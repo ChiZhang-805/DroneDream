@@ -129,11 +129,20 @@ describe("cloud model access client", () => {
     });
   });
 
-  it("fails a cloud request at its deadline even if fetch ignores abort", async () => {
+  it("fails at its deadline when response headers arrive but the body stalls", async () => {
     vi.useFakeTimers();
     const { cloud, auth } = await loadCloudAccess();
     auth.setAuthAccessToken("signed-user-token");
-    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull: () => new Promise<void>(() => undefined),
+          }),
+        ),
+      ),
+    );
 
     const assertion = expect(cloud.getManagedModelUsage()).rejects.toMatchObject({
       name: "CloudModelAccessError",

@@ -2,7 +2,10 @@
 // desktop-runtime liveness checks, and the typed call surface used by pages.
 
 import { desktopApiRequest, isDesktopRuntime } from "../desktop/bridge";
-import { fetchWithDeadline } from "./fetchWithDeadline";
+import {
+  FetchDeadlineError,
+  fetchWithDeadline,
+} from "./fetchWithDeadline";
 import {
   ensureDesktopRuntimeLiveness,
   getDesktopReadinessSession,
@@ -290,7 +293,10 @@ async function request<T>(
   let envelope: ApiEnvelope<T>;
   try {
     envelope = (await response.json()) as ApiEnvelope<T>;
-  } catch {
+  } catch (error) {
+    if (error instanceof FetchDeadlineError) {
+      throw new ApiClientError("NETWORK_ERROR", error.message, null, 0);
+    }
     throw new ApiClientError(
       "INTERNAL_ERROR",
       `Unexpected non-JSON response (HTTP ${response.status})`,

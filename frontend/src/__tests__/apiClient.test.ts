@@ -223,9 +223,18 @@ describe("apiClient envelope handling", () => {
     );
   });
 
-  it("fails a browser API request at its hard deadline", async () => {
+  it("fails a browser request when response headers arrive but the body stalls", async () => {
     vi.useFakeTimers();
-    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>(() => undefined)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            pull: () => new Promise<void>(() => undefined),
+          }),
+        ),
+      ),
+    );
 
     const assertion = expect(apiClient.getJob("job_x")).rejects.toMatchObject({
       name: "ApiClientError",

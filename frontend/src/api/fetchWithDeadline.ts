@@ -9,7 +9,8 @@ export class FetchDeadlineError extends Error {
 }
 
 /**
- * Apply a hard deadline while preserving a caller-provided abort signal.
+ * Apply a hard deadline through both response headers and response body while
+ * preserving a caller-provided abort signal.
  *
  * The explicit race is intentional: native fetch rejects when aborted, but a
  * test double, embedded transport, or future fetch shim may ignore the signal.
@@ -26,29 +27,101 @@ export async function fetchWithDeadline(
 
   const controller = new AbortController();
   const upstreamSignal = init?.signal;
-  const relayAbort = () => controller.abort(upstreamSignal?.reason);
+  let responseController: ReadableStreamDefaultController<Uint8Array> | null =
+    null;
+  let responseReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let rejectDeadline: ((reason: unknown) => void) | null = null;
+  let settled = false;
+
+  const cleanup = () => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+    upstreamSignal?.removeEventListener("abort", relayAbort);
+  };
+  const fail = (reason: unknown) => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    controller.abort(reason);
+    rejectDeadline?.(reason);
+    responseController?.error(reason);
+    void responseReader?.cancel(reason).catch(() => undefined);
+  };
+  const relayAbort = () => {
+    fail(
+      upstreamSignal?.reason ??
+        new DOMException("The request was aborted.", "AbortError"),
+    );
+  };
+
+  const deadline = new Promise<never>((_resolve, reject) => {
+    rejectDeadline = reject;
+    timer = setTimeout(() => {
+      fail(new FetchDeadlineError(timeoutMs));
+    }, timeoutMs);
+  });
   if (upstreamSignal?.aborted) {
     relayAbort();
   } else {
     upstreamSignal?.addEventListener("abort", relayAbort, { once: true });
   }
 
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      const error = new FetchDeadlineError(timeoutMs);
-      controller.abort(error);
-      reject(error);
-    }, timeoutMs);
-  });
-
+  let response: Response;
   try {
-    return await Promise.race([
+    response = await Promise.race([
       fetch(input, { ...init, signal: controller.signal }),
       deadline,
     ]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-    upstreamSignal?.removeEventListener("abort", relayAbort);
+  } catch (error) {
+    if (!settled) {
+      settled = true;
+      cleanup();
+    }
+    throw error;
   }
+  if (response.body === null) {
+    settled = true;
+    cleanup();
+    return response;
+  }
+
+  responseReader = response.body.getReader();
+  const boundedBody = new ReadableStream<Uint8Array>({
+    start(streamController) {
+      responseController = streamController;
+    },
+    async pull(streamController) {
+      try {
+        const chunk = await responseReader?.read();
+        if (!chunk || chunk.done) {
+          if (!settled) {
+            settled = true;
+            cleanup();
+            streamController.close();
+          }
+          return;
+        }
+        streamController.enqueue(chunk.value);
+      } catch (error) {
+        if (!settled) {
+          settled = true;
+          cleanup();
+          streamController.error(error);
+        }
+      }
+    },
+    async cancel(reason) {
+      if (!settled) {
+        settled = true;
+        cleanup();
+      }
+      await responseReader?.cancel(reason);
+    },
+  });
+  return new Response(boundedBody, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }

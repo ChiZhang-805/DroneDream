@@ -1,5 +1,8 @@
 import { getAuthAccessToken } from "../auth/authTokenStore";
-import { fetchWithDeadline } from "../../api/fetchWithDeadline";
+import {
+  FetchDeadlineError,
+  fetchWithDeadline,
+} from "../../api/fetchWithDeadline";
 
 export type ManagedModelPlanId = "free" | "plus" | "pro";
 export type ManagedModelGrantScope = "assistant" | "job";
@@ -174,7 +177,10 @@ async function cloudRequest<T>(
   let parsed: unknown;
   try {
     parsed = await response.json();
-  } catch {
+  } catch (error) {
+    if (error instanceof FetchDeadlineError) {
+      throw new CloudModelAccessError("NETWORK_ERROR", error.message, 0);
+    }
     throw new CloudModelAccessError(
       "INVALID_RESPONSE",
       `The cloud service returned HTTP ${response.status} without JSON.`,
