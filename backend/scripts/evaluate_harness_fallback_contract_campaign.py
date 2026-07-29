@@ -23,17 +23,17 @@ from app.orchestration.harness_fallback_contract_campaign import (  # noqa: E402
 DEFAULT_JSON_OUTPUT = (
     BACKEND_ROOT
     / "evaluation_artifacts"
-    / "harness-fallback-contract-campaign-v2.json"
+    / "harness-fallback-contract-campaign-v3.json"
 )
 DEFAULT_CSV_OUTPUT = (
     BACKEND_ROOT
     / "evaluation_artifacts"
-    / "harness-fallback-contract-campaign-v2.csv"
+    / "harness-fallback-contract-campaign-v3.csv"
 )
 DEFAULT_SHA256_OUTPUT = (
     BACKEND_ROOT
     / "evaluation_artifacts"
-    / "harness-fallback-contract-campaign-v2.sha256"
+    / "harness-fallback-contract-campaign-v3.sha256"
 )
 
 CSV_FIELDS = (

@@ -32,8 +32,11 @@ from app.orchestration.harness_outcome_campaign import (
 )
 from app.services import jobs as job_services
 
-HARNESS_FALLBACK_CONTRACT_SCHEMA_VERSION = (
+HARNESS_FALLBACK_CONTRACT_LEGACY_SCHEMA_VERSION = (
     "dronedream.harness-fallback-contract-campaign/v2"
+)
+HARNESS_FALLBACK_CONTRACT_SCHEMA_VERSION = (
+    "dronedream.harness-fallback-contract-campaign/v3"
 )
 HARNESS_FALLBACK_CONTRACT_EVIDENCE_CLASS = (
     "synthetic_mock_multi_tool_fallback_campaign"
@@ -392,7 +395,7 @@ def build_harness_fallback_contract_campaign() -> dict[str, Any]:
 
 
 def verify_harness_fallback_contract_campaign(payload: object) -> dict[str, Any]:
-    """Verify v2 artifact integrity, traces, claim bounds, and equivalence."""
+    """Verify v2/v3 artifact integrity, traces, claim bounds, and equivalence."""
 
     if not isinstance(payload, dict):
         raise ValueError("Harness fallback contract campaign must be an object")
@@ -401,7 +404,11 @@ def verify_harness_fallback_contract_campaign(payload: object) -> dict[str, Any]
     if not isinstance(declared_hash, str) or declared_hash != _sha256(artifact):
         raise ValueError("Harness fallback contract artifact hash does not recompute")
     if (
-        artifact.get("schema_version") != HARNESS_FALLBACK_CONTRACT_SCHEMA_VERSION
+        artifact.get("schema_version")
+        not in {
+            HARNESS_FALLBACK_CONTRACT_LEGACY_SCHEMA_VERSION,
+            HARNESS_FALLBACK_CONTRACT_SCHEMA_VERSION,
+        }
         or artifact.get("evidence_class") != HARNESS_FALLBACK_CONTRACT_EVIDENCE_CLASS
         or artifact.get("claim_label") != HARNESS_FALLBACK_CONTRACT_LABEL
         or artifact.get("claim_boundary") != HARNESS_FALLBACK_CONTRACT_CLAIM_BOUNDARY
@@ -518,6 +525,7 @@ __all__ = [
     "HARNESS_FALLBACK_CONTRACT_CLAIM_BOUNDARY",
     "HARNESS_FALLBACK_CONTRACT_EVIDENCE_CLASS",
     "HARNESS_FALLBACK_CONTRACT_LABEL",
+    "HARNESS_FALLBACK_CONTRACT_LEGACY_SCHEMA_VERSION",
     "HARNESS_FALLBACK_CONTRACT_REFERENCE_ARM",
     "HARNESS_FALLBACK_CONTRACT_SCHEMA_VERSION",
     "build_harness_fallback_contract_campaign",

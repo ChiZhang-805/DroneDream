@@ -165,6 +165,20 @@ def _normalized_json(value: object) -> object:
     raise ValueError(f"campaign outcome contains unsupported {type(value).__name__}")
 
 
+def _normalized_campaign_json(value: object) -> object:
+    """Canonicalize outcomes while omitting declared opaque evidence IDs."""
+
+    if isinstance(value, dict):
+        return {
+            str(key): _normalized_campaign_json(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+            if str(key) != "evidence_id"
+        }
+    if isinstance(value, list | tuple):
+        return [_normalized_campaign_json(item) for item in value]
+    return _normalized_json(value)
+
+
 def _scenario_suite(seed_block: int) -> schemas.ScenarioSuiteConfig:
     return schemas.ScenarioSuiteConfig(
         common_random_numbers=True,
@@ -268,7 +282,7 @@ def _aggregate_projection(candidate: models.CandidateParameterSet) -> dict[str, 
         "holdout",
     )
     return {
-        key: _normalized_json(aggregate[key])
+        key: _normalized_campaign_json(aggregate[key])
         for key in keys
         if key in aggregate
     }
