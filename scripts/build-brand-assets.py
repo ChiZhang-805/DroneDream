@@ -6,7 +6,6 @@ from pathlib import Path
 from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont
 
-
 REPO = Path(__file__).resolve().parents[1]
 SOURCE = REPO / "docs" / "assets" / "drone-dream-logo-source.png"
 DOCS_ASSETS = REPO / "docs" / "assets"
@@ -116,7 +115,7 @@ def horizontal_gradient(
             start, end = anchors[1], anchors[2]
         pixels[x, 0] = tuple(
             round(channel_start + (channel_end - channel_start) * local)
-            for channel_start, channel_end in zip(start, end)
+            for channel_start, channel_end in zip(start, end, strict=True)
         )
     return row.resize((width, height))
 
