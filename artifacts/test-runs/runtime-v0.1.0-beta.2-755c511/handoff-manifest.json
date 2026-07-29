@@ -120,8 +120,8 @@
     },
     {
       "path": "payload/THIRD_PARTY_NOTICES.md",
-      "bytes": 4410,
-      "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+      "bytes": 4413,
+      "sha256": "fb41ce98b2e12e8b45918b547dd358f5178bf9e0a8fffc2932418a41882829b7"
     },
     {
       "path": "payload/Valkey-COPYING.txt",

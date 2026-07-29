@@ -8,10 +8,10 @@ rights or implies endorsement by an upstream project.
 
 ## Release inventory
 
-The current `0.1.0` runtime is built from the reviewed values in
-[`pins.env`](pins.env) and the exact Python input set in
-[`locks/python-requirements.lock`](locks/python-requirements.lock). Every built
-rootfs also records the effective package closures at:
+The current `0.1.0` runtime is built from the reviewed repository inputs
+`runtime/pins.env` and `runtime/locks/python-requirements.lock` at the source
+commit recorded in `runtime-release.json`. Every built rootfs also records the
+effective package closures at:
 
 - `/opt/dronedream/runtime/apt-packages.lock`
 - `/opt/dronedream/runtime/python-installed.lock`
@@ -21,7 +21,7 @@ license files should be retained with every distributed runtime version.
 
 ## Principal components and source locations
 
-- **DroneDream** — MIT License; see the repository [`LICENSE`](../LICENSE) and
+- **DroneDream** — MIT License; see the included `DroneDream-LICENSE.txt` and
   the source commit recorded in the runtime manifest.
 - **Ubuntu 24.04 (Noble), amd64** — the base image is pinned in `pins.env` by
   OCI digest. Ubuntu contains many independently licensed binary packages, not
