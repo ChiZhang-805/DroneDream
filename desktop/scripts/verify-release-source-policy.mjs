@@ -30,6 +30,7 @@ if (!licenseText.startsWith("MIT License\n") && !licenseText.startsWith("MIT Lic
 const codeSigningPolicy = readText("CODE_SIGNING_POLICY.md");
 const privacyPolicy = readText("PRIVACY.md");
 const readme = readText("README.md");
+const llvmBuildScript = readText("desktop/scripts/build-windows-llvm.ps1");
 for (const requiredText of [
   "Free code signing provided by [SignPath.io]",
   "certificate by [SignPath Foundation]",
@@ -40,6 +41,9 @@ for (const requiredText of [
   if (!codeSigningPolicy.includes(requiredText)) {
     fail(`CODE_SIGNING_POLICY.md is missing: ${requiredText}`);
   }
+}
+if (/--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(llvmBuildScript)) {
+  fail("the updater key password must not be interpolated into a process argument");
 }
 for (const requiredText of [
   "does not include first-party advertising",
