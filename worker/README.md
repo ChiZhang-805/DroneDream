@@ -22,9 +22,13 @@ are produced outside a long database transaction.
 `mock` is synthetic workflow evidence. `real_cli` executes the external
 PX4/Gazebo artifact contract and, in the bundled single-host configuration,
 runs at most one real trial at a time because PX4/Gazebo share ports and process
-state. Static obstacle injection has a verified bundled path; unsupported
-wind/gust, sensor/GPS, battery, payload, and actuator-delay effects fail closed.
-The internal `real_stub` adapter is test-only.
+state. The bundled launcher supports verified steady wind, obstacles, gust and
+turbulence, sensor noise, payload mass and inertia, first-order actuator delay,
+hard actuator failure, deterministic GPS dropout, and battery initial-state /
+voltage-sag effects. Each requested effect must retain request-bound runtime
+readback or fail closed. These capabilities are PX4 SITL/Gazebo evidence, not
+real-aircraft transfer or flight-safety claims. The internal `real_stub` adapter
+is test-only.
 
 ```bash
 .venv/bin/ruff check .

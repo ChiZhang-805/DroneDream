@@ -18,7 +18,7 @@ import sys
 from app.orchestration.runner import run_forever
 
 from drone_dream_worker import __version__
-from drone_dream_worker.config import get_settings
+from drone_dream_worker.config import database_log_label, get_settings
 
 logger = logging.getLogger("drone_dream.worker")
 
@@ -35,7 +35,7 @@ def run(max_iterations: int | None = None) -> int:
         "drone-dream-worker %s starting (poll_interval=%.2fs, database=%s)",
         __version__,
         settings.worker_poll_interval_seconds,
-        settings.database_url,
+        database_log_label(settings.database_url),
     )
     exit_code: int = run_forever(
         poll_interval_seconds=settings.worker_poll_interval_seconds,
