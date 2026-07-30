@@ -1,0 +1,447 @@
+{
+  "schemaVersion": "dronedream.website-shared-console-integration-production-deployment.v1",
+  "generatedAt": "2026-07-30T02:43:41.5688714Z",
+  "scope": {
+    "branch": "codex/website",
+    "staticDeploymentPerformed": true,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "releaseOrRuntimeMutationPerformed": false,
+    "technicalReportModified": false,
+    "otherServerModified": false,
+    "approvedMirrorServer": "47.93.180.216",
+    "explicitlyExcludedServer": "124.221.220.60"
+  },
+  "subject": {
+    "integrationSourceCommit": "80e22057ed6223e1e0bf3b6dc23ea6d977d04a38",
+    "integrationSourceTree": "1999dd823723443a46134b05e25c917a61a8b474",
+    "integrationSourceCommittedAt": "2026-07-30T08:56:21+08:00",
+    "websiteStartingHead": "9e40c2d7aa26794079e896a2028d87532691199c",
+    "donorSourceCommit": "89f4e50fb61cab9a382328c223cb77ba83fbc2ed",
+    "donorParentCommit": "3149d1336c745b2211312116d96448482c5de651",
+    "selectionCommand": "git diff 3149d1336c745b2211312116d96448482c5de651..89f4e50fb61cab9a382328c223cb77ba83fbc2ed -- frontend/**",
+    "integrationPolicy": "Only the donor frontend diff was consumed. No desktop, backend, artifacts, installer, Runtime, or technical-report path was imported. Conflicts were resolved by composing the donor console features with the website branch's site, Supabase security, Community, Manual, navigation, and cover changes."
+  },
+  "donorPathProvenance": [
+    {
+      "path": "frontend/package.json",
+      "parentBlob": "f3fa18fc63827ec3e3f01184952409a9189f8353",
+      "donorBlob": "a664a97e9438465c0673dc9b67bf4e196a1d4105",
+      "integrationBlob": "d4d87c60ea9df96baa5684ef758c8085eae676d2"
+    },
+    {
+      "path": "frontend/scripts/verify-software-ui-layout.mjs",
+      "parentBlob": null,
+      "donorBlob": "12cd0269cfb118073f48b585bf870a5d9f7ddd0c",
+      "integrationBlob": "12cd0269cfb118073f48b585bf870a5d9f7ddd0c"
+    },
+    {
+      "path": "frontend/src/AppShell.tsx",
+      "parentBlob": "2a00938b24f1a7d998215e12e4c1232dce30df97",
+      "donorBlob": "6204f13f030345d1055610736c5dfa56a8885967",
+      "integrationBlob": "e077f89c852b4180986064fdedea55aeb41b5461"
+    },
+    {
+      "path": "frontend/src/__tests__/AppShellAvatar.test.tsx",
+      "parentBlob": "53d62d129b62e8d0e521361e02f664b1f10ff126",
+      "donorBlob": "7dbe5f0855b5ffe329f0627ac87916db942f3946",
+      "integrationBlob": "7dbe5f0855b5ffe329f0627ac87916db942f3946"
+    },
+    {
+      "path": "frontend/src/__tests__/ECE498.test.tsx",
+      "parentBlob": "618d7c5adc69c8209b5c0b4124b174d7ffe9fe4b",
+      "donorBlob": "c07fa4053643a0bfd2588ac52b1812b8fdc5a83f",
+      "integrationBlob": "c07fa4053643a0bfd2588ac52b1812b8fdc5a83f"
+    },
+    {
+      "path": "frontend/src/__tests__/ExperimentWorkspaceSidebar.test.tsx",
+      "parentBlob": "246c0048a48836874087e2f76931e27553024324",
+      "donorBlob": "3b71fa1ea633bc93a0c034081809ff650fc4e8b8",
+      "integrationBlob": "3b71fa1ea633bc93a0c034081809ff650fc4e8b8"
+    },
+    {
+      "path": "frontend/src/__tests__/NewJob.test.tsx",
+      "parentBlob": "b86fe5c8e424522ba702d284582c86bd09261647",
+      "donorBlob": "b2548244c3b7a39f00f6c48acf8c76c00834421d",
+      "integrationBlob": "499dece4bbe10c977cf57a06076cb68d1be83c58"
+    },
+    {
+      "path": "frontend/src/__tests__/TrackEditor2D.test.tsx",
+      "parentBlob": "b007956464b574c129ffae27ca77912ed9d51652",
+      "donorBlob": "97ba94d71ea55c2e003619cadbbfe366f28fa432",
+      "integrationBlob": "9635061257687ccd7de1b3b6371de455198e701a"
+    },
+    {
+      "path": "frontend/src/__tests__/workspaceRegistry.test.ts",
+      "parentBlob": "24e859d5ba4561723c24b0299bd66fd93e456dd9",
+      "donorBlob": "d6eff4dc8db015beeef0e222a7b7020f7bc05243",
+      "integrationBlob": "d6eff4dc8db015beeef0e222a7b7020f7bc05243"
+    },
+    {
+      "path": "frontend/src/components/AvatarCropDialog.tsx",
+      "parentBlob": null,
+      "donorBlob": "9700a3fde231af8dc4a854e09f35348e96c969fa",
+      "integrationBlob": "9700a3fde231af8dc4a854e09f35348e96c969fa"
+    },
+    {
+      "path": "frontend/src/components/ExperimentWorkspaceSidebar.tsx",
+      "parentBlob": "3ea2ba5700c2eb713820e425c24045ca50cacfbc",
+      "donorBlob": "62cf72757530f3e209c414407daec6f2ba58e341",
+      "integrationBlob": "62cf72757530f3e209c414407daec6f2ba58e341"
+    },
+    {
+      "path": "frontend/src/components/TrackEditor2D.tsx",
+      "parentBlob": "9af029e3a602d101598da675d9792c24b386f50d",
+      "donorBlob": "903d309d809dc98bca3b5877f5dafe31da0c024b",
+      "integrationBlob": "f18f052c275d2de7d9d4a5dbaca7723ed1ea8849"
+    },
+    {
+      "path": "frontend/src/features/account/avatarCrop.ts",
+      "parentBlob": null,
+      "donorBlob": "1547d3040982755770c7e88d5f057e30a0a046a4",
+      "integrationBlob": "1547d3040982755770c7e88d5f057e30a0a046a4"
+    },
+    {
+      "path": "frontend/src/features/experiment/workspaceRegistry.ts",
+      "parentBlob": "dc3c02c2dde3bd97cfaa28799cf3c3d48fb4900d",
+      "donorBlob": "6f9e9ee5eeede68cd8e4e6af001d37519db3167f",
+      "integrationBlob": "6f9e9ee5eeede68cd8e4e6af001d37519db3167f"
+    },
+    {
+      "path": "frontend/src/i18n/I18nProvider.tsx",
+      "parentBlob": "4c0c5c29e388989ab2c47e01dfdc3967a05acb1d",
+      "donorBlob": "38a0a5ab8a9bf5e740cf788e71b98cde5c8ee4f8",
+      "integrationBlob": "6c3025938d6bbb4d22e790d59b3f74d3ba47704a"
+    },
+    {
+      "path": "frontend/src/pages/ECE498.css",
+      "parentBlob": "fbba6f4268eb6ba7fdad310f652d6c7282ccdd58",
+      "donorBlob": "82b2aa76b57708e5b34a09eb46e23f3e8d99835b",
+      "integrationBlob": "82b2aa76b57708e5b34a09eb46e23f3e8d99835b"
+    },
+    {
+      "path": "frontend/src/pages/ECE498.tsx",
+      "parentBlob": "272a0167943f3218132a14a45a9f9894cea455e1",
+      "donorBlob": "9ff57a8851fc79fd6df11bce65aa584257cbab69",
+      "integrationBlob": "9ff57a8851fc79fd6df11bce65aa584257cbab69"
+    },
+    {
+      "path": "frontend/src/pages/NewJob.tsx",
+      "parentBlob": "f5cc738baf6790cf10beac98f9eeb65a5296fec3",
+      "donorBlob": "2044f85701478ac956c57f386c3b870ec10c6977",
+      "integrationBlob": "faaa503dbe40a28134959a5945e01971e620a331"
+    },
+    {
+      "path": "frontend/src/pages/NewJobRoute.tsx",
+      "parentBlob": "b4cfdb6fb712d4bcb4c749c32d0fd1c711d2c3bd",
+      "donorBlob": "ff937b0cfaeefad826f09487d6919440511dd520",
+      "integrationBlob": "ff937b0cfaeefad826f09487d6919440511dd520"
+    },
+    {
+      "path": "frontend/src/pages/ece498Layout.ts",
+      "parentBlob": "f82b833f492586178bfb7e186ab9ca2b51dc5e82",
+      "donorBlob": "5921c7710ac79e40182b59e86dc5aa832629f797",
+      "integrationBlob": "5921c7710ac79e40182b59e86dc5aa832629f797"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "parentBlob": "1c7b1d1f1ef42fdfeed09dc2f0989b00c03b8415",
+      "donorBlob": "cc3f269e03f7c6567f68f34f737db84a1cabdad9",
+      "integrationBlob": "cc41c2d84d516d9dd88db974a25a52f083941173"
+    }
+  ],
+  "sourceValidation": {
+    "focusedDonorTests": {
+      "files": 6,
+      "tests": 71,
+      "passed": 71,
+      "failed": 0
+    },
+    "currentCompleteFrontendSuite": {
+      "files": 52,
+      "tests": 354,
+      "passed": 354,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appBuild": "passed with the pre-existing non-failing Vite chunk-size advisory",
+    "sharedSiteAndConsoleBuild": "passed with repository public Supabase build variables; the first local console build without those variables was classified as a missing-local-public-env invocation and was not treated as a source failure",
+    "denoFunctionsSecurity": {
+      "tests": 24,
+      "passed": 24,
+      "failed": 0,
+      "deploymentPerformed": false
+    },
+    "deploymentContract": {
+      "tests": 11,
+      "subtests": 22,
+      "passedTests": 11,
+      "passedSubtests": 22,
+      "failed": 0
+    },
+    "softwareUiLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "browsers": [
+        "Edge"
+      ],
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "screenshots": 30,
+      "receiptSha256": "a938c82eaf9e5aa8bd2016c3704720764031c38ac5500fb3f2251d8c0b0d2a9d",
+      "coverage": [
+        "Settings refresh button right alignment",
+        "ECE498 seven stages with four cards and desktop one-title-plus-nine-body-line rhythm",
+        "file and camera avatar crop with mouse, touch, keyboard, and resource cleanup",
+        "Track XY selector",
+        "Scenario no-inner-scroll layout",
+        "seven-or-more parameter loop wheel and touchpad merging",
+        "blank uniquely named new drafts and explicit resume",
+        "workspace pinning and drag ordering"
+      ]
+    },
+    "siteTypographyAndLayout": {
+      "desktop1440x1000": "passed strict typography and layout",
+      "wide2048x1280": "passed strict typography and layout",
+      "mobile390x844": "passed layout-only",
+      "communityManualCases": 8,
+      "communityManualPassed": 8,
+      "yellowDiagonalAccentCount": 0,
+      "localCommunityManualReceiptSha256": "c55d754cda924e598dfce3a9358b31606051f8e0746dd31dd4a1b7f98bf3205d",
+      "localFourBrowserChecks": 100,
+      "localFourBrowserPassed": 100,
+      "localFourBrowserFailed": 0,
+      "localFourBrowserReceiptSha256": "f4016eb11914c0eaab69b5e5c7bae1addf9d8ccf1374e2a2743648dce3efe28c"
+    },
+    "diffCheck": "passed",
+    "exactSourceCleanBeforeDeployment": true
+  },
+  "artifact": {
+    "buildPolicy": "The GitHub Actions run built once from the immutable deploy tag. The exact Pages-published bytes were reconstructed from the public SHA256SUMS by copying 104 local byte-identical files and downloading the 18 workflow-specific files from Pages; all 122 listed hashes were checked before the same archive was sent to Aliyun. Aliyun was not rebuilt.",
+    "workflowArtifact": {
+      "siteArtifactId": 8745070192,
+      "siteArtifactName": "dronedream-site-80e22057ed6223e1e0bf3b6dc23ea6d977d04a38",
+      "siteArtifactZipBytes": 28546105,
+      "siteArtifactDigest": "sha256:fc329ee9f80f5e326051c516977a88959c5de78f9774c8bd909c7128da3f717f",
+      "pagesArtifactId": 8745070939,
+      "pagesArtifactZipBytes": 28553572,
+      "pagesArtifactDigest": "sha256:57145aa52284a3efe017d859e92667e1575345fbfd6c68632f1194dbc099d4eb"
+    },
+    "deployedDirectoryFiles": 123,
+    "integrityEntries": 122,
+    "deployedDirectoryBytes": 31893610,
+    "publicFilesPerOrigin": 121,
+    "publicBytesPerOrigin": 31880256,
+    "publicIntegrityMismatchesPerOrigin": 0,
+    "internalOnlyIntegrityEntry": ".nojekyll",
+    "sha256SumsFileSha256": "5caf5a291d2fdeeb9841cf239062b493c82675b5092c6801030e1c2a0eca4bb2",
+    "buildManifestSha256": "edadaa163fe8ddcfa566f75447d16abe954aefc04381654ff79959a9200df82d",
+    "latestJsonSha256": "98d1fb659c3121f4b1ae051e717bb9cc20fb6536ab48118f56b0483eb736ea9d",
+    "aliYunUploadArchiveBytes": 28519194,
+    "aliYunUploadArchiveSha256": "99e0a5fb4d1cc60336ee1a049a06cd956f597df0d39ca1988090f431e3b2ae62",
+    "localValidationBuildNotDeployed": {
+      "reason": "Its generated workflow metadata differed from the Pages artifact, so it was correctly rejected for mirror deployment.",
+      "sha256SumsFileSha256": "8b5a2b7caa7c03eeed45f015ca071f60d2735fec759a3fda697f93e94317d1ec",
+      "buildManifestSha256": "e22745a76aba454834d3f014cb05e7f53a213d286723d10389e90e4b9e591189"
+    }
+  },
+  "deployment": {
+    "deployTag": {
+      "name": "website-deploy-1.0.0-20260730-80e2205-v2",
+      "tagObjectSha": "9432b597be6330905a025e2fa9e67ebf9578ea7d",
+      "peeledSourceCommit": "80e22057ed6223e1e0bf3b6dc23ea6d977d04a38",
+      "immutable": true
+    },
+    "supersededUnusedTag": {
+      "name": "website-deploy-1.0.0-20260730-80e2205",
+      "tagObjectSha": "c785164afc55432eeaf1728c775b932be8a2d035",
+      "peeledSourceCommit": "80e22057ed6223e1e0bf3b6dc23ea6d977d04a38",
+      "usedForWorkflowOrDeployment": false,
+      "reason": "Its annotation tree field was corrupted by PowerShell interpolation. It was retained immutably for audit and superseded before any deployment."
+    },
+    "githubPages": {
+      "workflowRunId": 30505272240,
+      "workflowUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30505272240",
+      "workflowConclusion": "success",
+      "workflowHeadRef": "website-deploy-1.0.0-20260730-80e2205-v2",
+      "workflowHeadSha": "80e22057ed6223e1e0bf3b6dc23ea6d977d04a38",
+      "buildJobId": 90753556547,
+      "publishJobId": 90753694077,
+      "deploymentId": 5667503925,
+      "deploymentStatusId": 16115814319,
+      "deploymentStatus": "success",
+      "environmentUrl": "http://getdronedream.com/"
+    },
+    "aliYun": {
+      "host": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260730T015614Z",
+      "rollbackRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260729T140151Z",
+      "rollbackReleaseRetained": true,
+      "atomicCurrentSwitch": true,
+      "nginxConfigurationTests": "passed",
+      "temporaryStagingRemoved": true
+    },
+    "githubPagesEnvironmentPolicy": {
+      "preDeploymentSha256": "465003d92d12a488890d6dd03c5233ae8be255da94e7e4baf2c792a47f0a4cb6",
+      "temporaryExactTagPolicyId": 55981496,
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredPolicies": [
+        {
+          "id": 55186327,
+          "name": "main",
+          "type": "branch"
+        }
+      ],
+      "postDeploymentSha256": "465003d92d12a488890d6dd03c5233ae8be255da94e7e4baf2c792a47f0a4cb6",
+      "restoredExactly": true
+    }
+  },
+  "onlineParity": {
+    "origins": [
+      "http://getdronedream.com/",
+      "http://47.93.180.216/"
+    ],
+    "sourceCommitAtBothOrigins": "80e22057ed6223e1e0bf3b6dc23ea6d977d04a38",
+    "completePublicIntegrity": {
+      "filesCheckedPerOrigin": 121,
+      "bytesCheckedPerOrigin": 31880256,
+      "mismatchesPerOrigin": 0,
+      "internalNoJekyllCheckedByArtifactAndServer": true
+    },
+    "installer": {
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "bytes": 10387042,
+      "sha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+      "authenticode": "NotSigned",
+      "notSignedStatusAllowedForInternalTesting": true,
+      "githubReleasePagesAliyunByteParity": true,
+      "checksumBytes": 98,
+      "checksumFileSha256": "400d33119bcea1447262904bf718b96b4aed2dd4395e8a4e5e120f89faf0d40d",
+      "updaterSignatureBytes": 420,
+      "updaterSignatureSha256": "0406f72c46f44da494e29621b815b190d43698f1f700c63df14e95d66431230a",
+      "updaterSignatureByteParity": true
+    },
+    "runtime": {
+      "tag": "runtime-v0.1.0-beta.2",
+      "sourceCommit": "755c511539fe561207ca38ff5079f471a4110896",
+      "authoritativeHandoffManifestSha256": "34f5738101217ce92adfdfe8a2a932e6f4ecb73ecb41ba601c851ad217dfa33a",
+      "publicReleaseId": 361519694,
+      "publicAssets": 10,
+      "currentGithubAssetIdsSizesAndDigestsMatchPublicationReceipt": true,
+      "runtimeReleaseJsonStatus": 200,
+      "runtimeReleaseJsonBytes": 2207,
+      "runtimeReleaseJsonSha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+      "thirdPartyNoticesStatus": 200,
+      "thirdPartyNoticesBytes": 4413,
+      "thirdPartyNoticesSha256": "fb41ce98b2e12e8b45918b547dd358f5178bf9e0a8fffc2932418a41882829b7",
+      "priorPublicReassemblyAndFreshWslImportReceipt": "website/validation-receipts/runtime-v0.1.0-beta.2-publication-755c511.json",
+      "assetsChangedInThisDeployment": false
+    }
+  },
+  "onlineBrowserValidation": {
+    "communityManual": {
+      "profilesPerOrigin": 8,
+      "layoutAndStaticUiPassedPerOrigin": 8,
+      "yellowDiagonalAccentCount": 0,
+      "pagesReceiptSha256": "504038f14aea9229d02deadef753bcc3cedfac9bf267ae41b0e610f003857172",
+      "aliYunReceiptSha256": "76bbeb8d28c214ee2f49ee3231080548a8c1bcb795427b6e8e40ec2c13af0701",
+      "signedInCommentFormPassed": 0,
+      "signedInCommentFormExpected": 8,
+      "classification": "Both public origins are HTTP. The deployed security policy intentionally replaces the signed-in comment form with an explicit trusted-HTTPS read-only notice. This is an external TLS and production-auth gate, not a static artifact mismatch."
+    },
+    "publicSiteFourBrowserMatrix": {
+      "browsers": [
+        "Edge",
+        "Chrome",
+        "Lenovo SLBrowser",
+        "Firefox"
+      ],
+      "routes": [
+        "home",
+        "pricing",
+        "manual",
+        "community"
+      ],
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "pagesChecks": 80,
+      "pagesPassed": 80,
+      "pagesFailed": 0,
+      "aliYunChecks": 80,
+      "aliYunPassed": 80,
+      "aliYunFailed": 0,
+      "externalWarnings": 0,
+      "method": "The unmodified audit first proved all 40 English public-route combinations passed and exposed that its account-dialog assumption did not understand disabled HTTP mirrors. A temporary uncommitted harness adaptation required the EN/ZH disabled-account explanation, omitted the intentionally unavailable secure console route, and proved all 40 Chinese combinations per origin. The harness was then restored exactly; git diff --check passed and the worktree returned clean.",
+      "pagesEnglishAndClassificationReceiptSha256": "b266f64120448777107e176b9023eb1686a0598215b644b539a3ac2035f0f495",
+      "aliYunEnglishAndClassificationReceiptSha256": "6faff27d0123d7e941eea5abe960749ce17130c1ad04daa3b2d65c4b3d2def7c",
+      "pagesChineseReceiptSha256": "b0dff61d6755a9bcc11f2e8569970a4663f24e3874580155410ede3e65574a31",
+      "aliYunChineseReceiptSha256": "9e2504ec2e8d9c6ed19a79d92801ee5002ba7c065aa8dd9c3d1832b573ba56b0"
+    },
+    "insecureConsole": {
+      "pages": "Secure console unavailable; HTTP mirror limited to public viewing and downloads; return link present",
+      "aliYun": "Secure console unavailable; HTTP mirror limited to public viewing and downloads; return link present",
+      "pageErrorsPerOrigin": 0,
+      "classification": "Intentional fail-closed behavior until a normally trusted HTTPS origin is available. Full console interaction remains proven locally by the 4/4 software UI layout and 100/100 local four-browser receipts."
+    },
+    "visualInspection": [
+      "Pages EN desktop Community recent: five complete cards, no yellow diagonal accent, module spacing visually balanced",
+      "Pages EN desktop topic detail: cover fills the left half and the trusted-HTTPS read-only explanation is visible",
+      "Pages ZH desktop Manual: fixed header, chapter hierarchy, subsection indent, heading spacing, and no footer visually verified",
+      "Aliyun EN mobile Manual: responsive header and accordion layout remain within the 390px viewport"
+    ]
+  },
+  "externalGatesAndHonestResiduals": {
+    "tls": {
+      "normalTrustResult": "failed",
+      "curlExitCode": 60,
+      "reason": "SEC_E_WRONG_PRINCIPAL",
+      "servedCertificateSubject": "CN=*.github.io",
+      "servedCertificateIssuer": "Let's Encrypt YR2",
+      "servedCertificateNotBefore": "2026-06-04T23:26:07Z",
+      "servedCertificateNotAfter": "2026-09-02T23:26:06Z",
+      "servedCertificateSans": [
+        "*.github.com",
+        "*.github.io",
+        "*.githubusercontent.com",
+        "github.com",
+        "github.io",
+        "githubusercontent.com"
+      ],
+      "customDomainSanPresent": false,
+      "pagesProtectedDomainState": "verified",
+      "httpsEnforced": false,
+      "httpsEnforcedChanged": false,
+      "requiredNextStep": "Wait for GitHub Pages to issue a normally trusted certificate whose SAN includes getdronedream.com. Only then enable https_enforced and rerun the signed-in dual-origin browser matrix."
+    },
+    "supabase": {
+      "boundedResponseAndCorsSourceIncluded": true,
+      "productionFunctionsDeploymentPerformed": false,
+      "productionSecretsOrCorsEnvironmentChanged": false,
+      "paymentOrModelProductionConfigurationChanged": false
+    },
+    "updater": {
+      "versionedLatestJsonAtBothStaticOrigins": "passed",
+      "githubPrereleaseLatestAlias": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/latest.json",
+      "githubPrereleaseLatestAliasStatus": 404,
+      "classification": "The internal 1.0.0 is a prerelease, so GitHub's releases/latest alias does not discover it. The deployed versioned website metadata and Tauri metadata remain byte-consistent; automatic discovery through that GitHub alias is not claimed."
+    }
+  },
+  "attestation": {
+    "receiptOnlyCommitMayFollow": true,
+    "thisReceiptDoesNotClaimValidationOfItsOwnCommit": true,
+    "sourceCommitRemainsTheDeploymentSubject": "80e22057ed6223e1e0bf3b6dc23ea6d977d04a38",
+    "worktreeCleanBeforeReceiptCreation": true,
+    "upstreamAlignedBeforeReceiptCreation": true
+  }
+}
