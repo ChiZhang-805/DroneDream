@@ -375,3 +375,25 @@ def test_formal_release_workflow_fails_closed_on_signing_and_source_binding() ->
     assert workflow.count('if ($signature.Status -ne "Valid")') == 2
     assert ".sourceCommit == env.GITHUB_SHA" in workflow
     assert "release already exists and will never be overwritten" in workflow
+
+
+def test_desktop_workflow_bounds_pr_concurrency_and_artifact_retention() -> None:
+    repository_root = Path(__file__).resolve().parents[2]
+    workflow = (repository_root / ".github" / "workflows" / "desktop-installer.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "group: desktop-installer-${{ github.event.pull_request.number || github.ref }}"
+        in workflow
+    )
+    assert "cancel-in-progress: ${{ github.event_name == 'pull_request' }}" in workflow
+    retention = (
+        "retention-days: ${{ github.event_name == 'pull_request' && 3 || "
+        "(github.event_name == 'workflow_dispatch' && 14 || 30) }}"
+    )
+    assert workflow.count(retention) == 1
+    assert 'name: DroneDream-Windows-x64' in workflow
+    assert 'tags:\n      - "desktop-v*"' in workflow
+    assert "workflow_dispatch:" in workflow
+    assert "pull_request:" in workflow
