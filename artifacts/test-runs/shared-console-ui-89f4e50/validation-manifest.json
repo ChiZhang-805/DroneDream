@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "subject_commit": "89f4e50fb61cab9a382328c223cb77ba83fbc2ed",
+  "subject_clean": true,
+  "generated_at": "2026-07-30T00:38:52.407Z",
+  "scope": [
+    "shared authenticated console and desktop frontend",
+    "desktop icon and NSIS shortcut refresh contract",
+    "offline Microsoft Edge visual validation"
+  ],
+  "ownership": {
+    "branch": "codex/software",
+    "included_roots": [
+      "frontend/** except frontend/src/site/**",
+      "desktop/**",
+      "artifacts/test-runs/**"
+    ],
+    "excluded_roots": [
+      "website/**",
+      "technical-report/**",
+      "frontend/src/site/**",
+      "deploy/**",
+      "supabase/**"
+    ]
+  },
+  "visual_evidence": {
+    "receipt": "artifacts/test-runs/shared-console-ui-89f4e50/software-ui-layout-receipt.json",
+    "receipt_sha256": "33945cd65a1e2b05c3deef77fa48e76416b8e0aeb8d7a52e15ec245a44c2a2d6",
+    "browser": "Microsoft Edge via Playwright msedge channel",
+    "cases": [
+      "desktop-en 1440x1000",
+      "desktop-zh 1440x1000",
+      "mobile-en 390x844",
+      "mobile-zh 390x844"
+    ],
+    "status": "pass",
+    "case_count": 4,
+    "screenshot_count": 30,
+    "screenshot_hash_mismatches": 0,
+    "page_errors": 0,
+    "api_mode": "offline 503 fixture; no API key, backend write, credential, or user photo"
+  },
+  "validation": [
+    {
+      "command": "npm exec vitest -- run --exclude src/__tests__/PublicSite.test.tsx",
+      "cwd": "frontend",
+      "status": "pass",
+      "result": "59 files; 373 tests passed"
+    },
+    {
+      "command": "npm test",
+      "cwd": "frontend",
+      "status": "known_cross_line_failure",
+      "result": "60 files; 385 passed; 1 failed",
+      "residual": "PublicSite.test.tsx waits for the website-owned billing-checkout availability request. No frontend/src/site/** source was changed on codex/software."
+    },
+    {
+      "command": "npm run typecheck && npm run lint",
+      "cwd": "frontend",
+      "status": "pass"
+    },
+    {
+      "command": "npm run build",
+      "cwd": "frontend",
+      "status": "pass",
+      "warning": "Vite retained its existing chunk-size warning for the main application bundle."
+    },
+    {
+      "command": "npm run console:build",
+      "cwd": "frontend",
+      "status": "pass",
+      "environment": "offline placeholder VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY; no real configuration read",
+      "warning": "Vite retained its existing chunk-size warning for the shared console bundle."
+    },
+    {
+      "command": "npm run verify:release-source",
+      "cwd": "desktop",
+      "status": "pass",
+      "result": "1271 tracked files; 390 npm packages; 532 external Rust packages"
+    },
+    {
+      "command": "verify-nsis-template.ps1; Tauri gnullvm build; WebView2/path/locales/planner checks",
+      "cwd": "desktop",
+      "status": "pass",
+      "result": "Tauri application and NSIS installer compiled with the dedicated icons/DroneDream.ico resource; WebView2, path guard, English/Simplified Chinese locales, and planner contracts passed",
+      "non_authoritative_smoke_installer": {
+        "file_name": "DroneDream_1.0.0_x64-setup.exe",
+        "bytes": 10211422,
+        "sha256": "84ba6dd9e82ba66947a9302af38fd804c9354cabba0984bd70ddd1cf39f3bb7c",
+        "authenticode": "NotSigned",
+        "publishable": false,
+        "reason": "Local dirty-tree compile smoke only; not a release handoff and not uploaded."
+      }
+    },
+    {
+      "command": "direct Tauri gnullvm build without the repository LLVM environment",
+      "cwd": "desktop",
+      "status": "expected_environment_failure",
+      "result": "Stopped before NSIS because the host MSVC link.exe was absent; the repository LLVM environment was then used successfully."
+    },
+    {
+      "command": "git diff --check",
+      "cwd": "repository",
+      "status": "pass"
+    }
+  ],
+  "release_actions": {
+    "deployment_performed": false,
+    "github_release_modified": false,
+    "server_modified": false,
+    "installer_handoff_created": false
+  },
+  "website_integration": {
+    "consume_source_commit": "89f4e50fb61cab9a382328c223cb77ba83fbc2ed",
+    "consume_shared_paths_only": true,
+    "website_branch_write_performed": false
+  }
+}
