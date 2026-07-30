@@ -38,7 +38,8 @@
     "resources": {
       "../../LICENSE": "licenses/DroneDream-LICENSE.txt",
       "../../runtime/THIRD_PARTY_NOTICES.md": "licenses/THIRD_PARTY_NOTICES.md",
-      "../../runtime/licenses/valkey-COPYING": "licenses/Valkey-COPYING.txt"
+      "../../runtime/licenses/valkey-COPYING": "licenses/Valkey-COPYING.txt",
+      "icons/icon.ico": "icons/DroneDream.ico"
     },
     "icon": [
       "icons/32x32.png",

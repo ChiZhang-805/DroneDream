@@ -685,15 +685,16 @@
   font-weight: 760;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .ece498-stage-copy-section p {
+  max-width: 100%;
   margin: 0;
   color: #d2c4d9;
   font-size: clamp(0.98rem, 1.08vw, 1.14rem);
-  line-height: 1.68;
-  text-align: justify;
-  text-align-last: left;
+  line-height: 1.58;
+  text-align: left;
   text-wrap: pretty;
   hyphens: auto;
 }

@@ -30,6 +30,10 @@ import {
   ArchivedExperimentManager,
   ExperimentWorkspaceSidebar,
 } from "./components/ExperimentWorkspaceSidebar";
+import {
+  AvatarCropDialog,
+  type AvatarCropCopy,
+} from "./components/AvatarCropDialog";
 import { BrandLockup } from "./components/BrandLockup";
 import {
   getDesktopWindowHandle,
@@ -120,6 +124,32 @@ const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
   "AGGREGATING",
   "FINALIZING",
 ];
+
+const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
+  plan: {
+    id: "plus",
+    name: "Plus",
+    monthly_price_cny_fen: 6_900,
+    included_ai_credits: 2_000,
+    capability_set: "core-v1",
+  },
+  period: {
+    starts_at: "2026-07-01T00:00:00Z",
+    ends_at: "2026-08-01T00:00:00Z",
+  },
+  usage: {
+    reserved_ai_credits: 0,
+    consumed_ai_credits: 684,
+    remaining_ai_credits: 1_316,
+    request_count: 57,
+    input_tokens: 184_320,
+    output_tokens: 46_080,
+    total_tokens: 230_400,
+    estimated_request_count: 0,
+    credit_policy_version: 1,
+  },
+  recent_requests: [],
+};
 const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
 const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
@@ -325,10 +355,16 @@ function SettingsDialog({
     selectProvider,
     updateSettings,
   } = useModelAccess();
+  const docsPreview = import.meta.env.DEV
+    && new URLSearchParams(window.location.search).has("docsPreview");
   const [managedUsage, setManagedUsage] =
-    useState<ManagedModelUsageSnapshot | null>(null);
+    useState<ManagedModelUsageSnapshot | null>(
+      docsPreview ? DOCS_PREVIEW_MANAGED_USAGE : null,
+    );
   const [managedUsageState, setManagedUsageState] =
-    useState<"idle" | "loading" | "ready" | "error">("idle");
+    useState<"idle" | "loading" | "ready" | "error">(
+      docsPreview ? "ready" : "idle",
+    );
   const [managedUsageError, setManagedUsageError] = useState<string | null>(null);
   const [subscriptionOpenError, setSubscriptionOpenError] =
     useState<string | null>(null);
@@ -359,7 +395,14 @@ function SettingsDialog({
       });
   }, [t]);
   const refreshManagedUsage = useCallback(async () => {
-    if (!auth.account || modelAccess.accessMode !== "platform") return;
+    if (modelAccess.accessMode !== "platform") return;
+    if (docsPreview) {
+      setManagedUsage(DOCS_PREVIEW_MANAGED_USAGE);
+      setManagedUsageState("ready");
+      setManagedUsageError(null);
+      return;
+    }
+    if (!auth.account) return;
     setManagedUsageState("loading");
     setManagedUsageError(null);
     try {
@@ -373,7 +416,7 @@ function SettingsDialog({
           : t("settings.model.usageUnavailable"),
       );
     }
-  }, [auth.account, modelAccess.accessMode, t]);
+  }, [auth.account, docsPreview, modelAccess.accessMode, t]);
   useEffect(() => {
     void refreshManagedUsage();
   }, [refreshManagedUsage]);
@@ -787,7 +830,7 @@ function SettingsDialog({
                 {subscriptionOpenError}
               </p>
             ) : null}
-            {!auth.account ? (
+            {!auth.account && !docsPreview ? (
               <p className="settings-model-usage-message">
                 {t("settings.model.signInForAllowance")}
               </p>
@@ -830,6 +873,16 @@ function SettingsDialog({
                     <strong>{numberFormatter.format(managedUsage.usage.output_tokens)}</strong>
                   </div>
                 </div>
+              </>
+            ) : (
+              <p className="settings-model-usage-message" role="status">
+                {managedUsageState === "loading"
+                  ? t("settings.model.loadingUsage")
+                  : managedUsageError ?? t("settings.model.usageUnavailable")}
+              </p>
+            )}
+            <div className="settings-model-usage-footer">
+              {managedUsage ? (
                 <p className="settings-model-period">
                   {t("settings.model.resetsAt")}:{" "}
                   {new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
@@ -842,24 +895,18 @@ function SettingsDialog({
                       })}`
                     : ""}
                 </p>
-              </>
-            ) : (
-              <p className="settings-model-usage-message" role="status">
-                {managedUsageState === "loading"
-                  ? t("settings.model.loadingUsage")
-                  : managedUsageError ?? t("settings.model.usageUnavailable")}
-              </p>
-            )}
-            {auth.account ? (
-              <button
-                type="button"
-                className="btn settings-model-refresh"
-                disabled={managedUsageState === "loading"}
-                onClick={() => void refreshManagedUsage()}
-              >
-                {t("settings.model.refreshUsage")}
-              </button>
-            ) : null}
+              ) : <span aria-hidden="true" />}
+              {auth.account || docsPreview ? (
+                <button
+                  type="button"
+                  className="btn settings-model-refresh"
+                  disabled={managedUsageState === "loading"}
+                  onClick={() => void refreshManagedUsage()}
+                >
+                  {t("settings.model.refreshUsage")}
+                </button>
+              ) : null}
+            </div>
             <p className="settings-model-security-note">
               {t("settings.model.platformSecurityNote")}
             </p>
@@ -1093,6 +1140,16 @@ const ACCOUNT_COPY = {
     cancelCamera: "Cancel camera",
     invalidPhoto: "Choose a JPEG, PNG, or WebP image.",
     photoTooLarge: "Choose an image smaller than 8 MB.",
+    cropTitle: "Crop profile photo",
+    cropInstructions:
+      "Drag the image to position it inside the circle. Use the slider, +/− keys, or arrow keys to adjust the crop before saving.",
+    cropArea: "Profile photo crop area",
+    cropZoom: "Zoom",
+    cropPreview: "Circular preview",
+    cropCancel: "Cancel",
+    cropConfirm: "Save cropped photo",
+    cropClose: "Close photo cropper",
+    cropFailed: "The profile photo could not be cropped. Choose another image and try again.",
     cameraRequiresHttps:
       "Camera access requires HTTPS. Open the secure GitHub Pages site, or use the DroneDream desktop app.",
     cameraDenied:
@@ -1149,6 +1206,16 @@ const ACCOUNT_COPY = {
     cancelCamera: "关闭摄像头",
     invalidPhoto: "请选择 JPEG、PNG 或 WebP 图片。",
     photoTooLarge: "请选择小于 8 MB 的图片。",
+    cropTitle: "裁剪头像",
+    cropInstructions:
+      "拖动图片，让需要保留的区域位于圆形框内。保存前可使用滑杆、加减键或方向键调整位置和缩放。",
+    cropArea: "头像裁剪区域",
+    cropZoom: "缩放",
+    cropPreview: "圆形预览",
+    cropCancel: "取消",
+    cropConfirm: "保存裁剪后的头像",
+    cropClose: "关闭头像裁剪窗口",
+    cropFailed: "无法裁剪这张图片。请重新选择图片后再试。",
     cameraRequiresHttps:
       "摄像头只能在 HTTPS 安全页面中使用。请打开 GitHub Pages 正式站点，或使用 DroneDream 桌面软件。",
     cameraDenied:
@@ -1168,51 +1235,33 @@ const ACCOUNT_COPY = {
 } as const;
 
 const MAX_AVATAR_FILE_BYTES = 8_000_000;
-const AVATAR_PIXEL_SIZE = 320;
 
-function renderSquareAvatar(
-  source: CanvasImageSource,
-  sourceWidth: number,
-  sourceHeight: number,
-): string {
-  if (sourceWidth < 1 || sourceHeight < 1) {
-    throw new Error("The profile photo is empty.");
+function cameraFrameBlob(video: HTMLVideoElement): Promise<Blob> {
+  if (video.videoWidth < 1 || video.videoHeight < 1) {
+    return Promise.reject(new Error("The camera preview is empty."));
   }
   const canvas = document.createElement("canvas");
-  canvas.width = AVATAR_PIXEL_SIZE;
-  canvas.height = AVATAR_PIXEL_SIZE;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
   const context = canvas.getContext("2d");
   if (!context) {
-    throw new Error("The profile photo could not be processed.");
+    return Promise.reject(new Error("The camera photo could not be processed."));
   }
-  const cropSize = Math.min(sourceWidth, sourceHeight);
-  const sourceX = (sourceWidth - cropSize) / 2;
-  const sourceY = (sourceHeight - cropSize) / 2;
-  context.drawImage(
-    source,
-    sourceX,
-    sourceY,
-    cropSize,
-    cropSize,
-    0,
-    0,
-    AVATAR_PIXEL_SIZE,
-    AVATAR_PIXEL_SIZE,
-  );
-  const result = canvas.toDataURL("image/jpeg", 0.86);
-  if (!result.startsWith("data:image/jpeg;base64,")) {
-    throw new Error("The profile photo could not be processed.");
-  }
-  return result;
-}
-
-async function avatarFromFile(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  try {
-    return renderSquareAvatar(bitmap, bitmap.width, bitmap.height);
-  } finally {
-    bitmap.close();
-  }
+  // Match the front-camera preview so the saved crop has the orientation the
+  // user approved instead of unexpectedly flipping after confirmation.
+  context.translate(video.videoWidth, 0);
+  context.scale(-1, 1);
+  context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("The camera photo could not be processed."));
+      },
+      "image/jpeg",
+      0.92,
+    );
+  });
 }
 
 function AccountAvatar({
@@ -1262,7 +1311,13 @@ function AccountDialog({
   const [error, setError] = useState<string | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
+  const [avatarCropSource, setAvatarCropSource] = useState<{
+    url: string;
+    returnFocus: HTMLElement | null;
+  } | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const chooseAvatarButtonRef = useRef<HTMLButtonElement>(null);
+  const cameraButtonRef = useRef<HTMLButtonElement>(null);
   const cameraVideoRef = useRef<HTMLVideoElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(true);
@@ -1277,6 +1332,12 @@ function AccountDialog({
     setCameraStream(null);
     setCameraReady(false);
   }, []);
+
+  useEffect(() => {
+    if (!avatarCropSource) return undefined;
+    const sourceUrl = avatarCropSource.url;
+    return () => URL.revokeObjectURL(sourceUrl);
+  }, [avatarCropSource]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -1314,7 +1375,7 @@ function AccountDialog({
     }
   };
 
-  const chooseAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
+  const chooseAvatar = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -1326,9 +1387,10 @@ function AccountDialog({
       setError(copy.photoTooLarge);
       return;
     }
-    await run(async () => {
-      const avatar = await avatarFromFile(file);
-      await auth.updateAvatar(avatar);
+    setError(null);
+    setAvatarCropSource({
+      url: URL.createObjectURL(file),
+      returnFocus: chooseAvatarButtonRef.current,
     });
   };
 
@@ -1385,15 +1447,55 @@ function AccountDialog({
       setError(copy.cameraNotReady);
       return;
     }
-    await run(async () => {
-      const avatar = renderSquareAvatar(
-        video,
-        video.videoWidth,
-        video.videoHeight,
-      );
-      await auth.updateAvatar(avatar);
+    setPending(true);
+    setError(null);
+    try {
+      const frame = await cameraFrameBlob(video);
       stopCamera();
-    });
+      setAvatarCropSource({
+        url: URL.createObjectURL(frame),
+        returnFocus: cameraButtonRef.current,
+      });
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : copy.cropFailed,
+      );
+    } finally {
+      if (mountedRef.current) setPending(false);
+    }
+  };
+
+  const closeAvatarCrop = useCallback(() => {
+    const returnFocus = avatarCropSource?.returnFocus ?? null;
+    setAvatarCropSource(null);
+    window.requestAnimationFrame(() => returnFocus?.focus());
+  }, [avatarCropSource]);
+
+  const saveCroppedAvatar = async (avatar: string) => {
+    setPending(true);
+    setError(null);
+    try {
+      await auth.updateAvatar(avatar);
+      closeAvatarCrop();
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : copy.cropFailed,
+      );
+      throw reason;
+    } finally {
+      if (mountedRef.current) setPending(false);
+    }
+  };
+  const avatarCropCopy: AvatarCropCopy = {
+    title: copy.cropTitle,
+    instructions: copy.cropInstructions,
+    cropArea: copy.cropArea,
+    zoom: copy.cropZoom,
+    preview: copy.cropPreview,
+    cancel: copy.cropCancel,
+    confirm: copy.cropConfirm,
+    close: copy.cropClose,
+    processingFailed: copy.cropFailed,
   };
 
   const registrationPasswordIsValid = () => {
@@ -1474,6 +1576,7 @@ function AccountDialog({
                 onChange={(event) => void chooseAvatar(event)}
               />
               <button
+                ref={chooseAvatarButtonRef}
                 type="button"
                 className="btn"
                 disabled={pending}
@@ -1483,6 +1586,7 @@ function AccountDialog({
                 {copy.choosePhoto}
               </button>
               <button
+                ref={cameraButtonRef}
                 type="button"
                 className="btn"
                 disabled={pending || Boolean(cameraStream)}
@@ -1558,6 +1662,19 @@ function AccountDialog({
               </button>
             </div>
           </form>
+          {avatarCropSource ? (
+            <AvatarCropDialog
+              sourceUrl={avatarCropSource.url}
+              copy={avatarCropCopy}
+              pending={pending}
+              onCancel={closeAvatarCrop}
+              onConfirm={saveCroppedAvatar}
+              onSourceError={(message) => {
+                setError(message);
+                closeAvatarCrop();
+              }}
+            />
+          ) : null}
         </div>
       ) : (
         <>

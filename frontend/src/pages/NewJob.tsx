@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChangeEvent, FormEvent, ReactNode } from "react";
+import type {
+  ChangeEvent,
+  FormEvent,
+  ReactNode,
+  WheelEvent as ReactWheelEvent,
+} from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Alert } from "../components/Alert";
@@ -84,6 +89,7 @@ import {
 } from "../features/experiment/experienceTemplates";
 import {
   createExperimentWorkspaceId,
+  isExperimentWorkspaceNameAvailable,
   listExperimentWorkspaces,
   registerExperimentWorkspace,
   updateExperimentWorkspace,
@@ -1235,9 +1241,10 @@ export function NewJob() {
   const [workspaceId, setWorkspaceId] = useState<string | null>(
     initialWorkspaceId,
   );
-  const migratedWorkspaceIdRef = useRef<string | null>(null);
   const initialDraft = useRef(
-    loadExperimentDraft(EXPERIMENT_DRAFT_SCHEMA, initialWorkspaceId),
+    initialWorkspaceId
+      ? loadExperimentDraft(EXPERIMENT_DRAFT_SCHEMA, initialWorkspaceId)
+      : null,
   ).current;
   const [form, setForm] = useState<FormState>(() => ({
     ...DEFAULTS,
@@ -1295,6 +1302,10 @@ export function NewJob() {
   const trackEditorTriggerRef = useRef<HTMLButtonElement>(null);
   const trackJsonTriggerRef = useRef<HTMLButtonElement>(null);
   const parameterReviewTriggerRef = useRef<HTMLButtonElement>(null);
+  const reviewParameterPreviewRef = useRef<HTMLDivElement>(null);
+  const reviewParameterPreviewIndexRef = useRef(0);
+  const reviewParameterWheelDeltaRef = useRef(0);
+  const reviewParameterWheelDirectionRef = useRef(0);
 
   const selectedCount = Object.values(selections).filter(
     (selection) => selection.selected,
@@ -1302,34 +1313,6 @@ export function NewJob() {
   const trialPlan = calculateTrialPlan(form, selectedCount);
   const estimatedTrials = trialPlan.scheduledTrials;
   const localPreviewPoints = referenceTrack(form) ?? [];
-
-  useEffect(() => {
-    if (
-      workspaceId
-      || migratedWorkspaceIdRef.current
-      || !initialDraft?.form.display_name.trim()
-    ) {
-      return;
-    }
-    const migratedWorkspaceId = createExperimentWorkspaceId();
-    migratedWorkspaceIdRef.current = migratedWorkspaceId;
-    saveExperimentDraft({
-      active_step: initialDraft.active_step,
-      completed_steps: initialDraft.completed_steps,
-      form: { ...initialDraft.form, llm_api_key: "" },
-      selections: initialDraft.selections,
-      conversation: initialDraft.conversation,
-    }, migratedWorkspaceId);
-    registerExperimentWorkspace({
-      id: migratedWorkspaceId,
-      ownerId,
-      name: initialDraft.form.display_name,
-      source: initialDraft.conversation ? "assistant" : "manual",
-      activeStep: initialDraft.active_step,
-      completedSteps: initialDraft.completed_steps,
-    });
-    setWorkspaceId(migratedWorkspaceId);
-  }, [initialDraft, ownerId, workspaceId]);
 
   useEffect(() => {
     if (!workspaceId || !initialDraft?.form.display_name.trim()) return;
@@ -1796,6 +1779,16 @@ export function NewJob() {
       setExperimentNameError(t("wizard.validation.nameMax"));
       return;
     }
+    if (
+      !isExperimentWorkspaceNameAvailable(
+        ownerId,
+        trimmedName,
+        workspaceId,
+      )
+    ) {
+      setExperimentNameError(t("wizard.validation.nameUnique"));
+      return;
+    }
     const nextForm = { ...form, display_name: trimmedName };
     const targetWorkspaceId = workspaceId ?? createExperimentWorkspaceId();
     setForm(nextForm);
@@ -1942,6 +1935,56 @@ export function NewJob() {
 
   const customTrack = parseReferenceTrackInput(form.reference_track_json, t).points ?? [];
   const selectedParameterRows = selectedParameters(selections);
+  useEffect(() => {
+    reviewParameterPreviewIndexRef.current = 0;
+    reviewParameterWheelDeltaRef.current = 0;
+    reviewParameterWheelDirectionRef.current = 0;
+    if (reviewParameterPreviewRef.current) {
+      reviewParameterPreviewRef.current.scrollLeft = 0;
+    }
+  }, [selectedParameterRows.length]);
+
+  const handleReviewParameterWheel = (
+    event: ReactWheelEvent<HTMLDivElement>,
+  ) => {
+    if (selectedParameterRows.length < 7) return;
+    const preview = reviewParameterPreviewRef.current;
+    const items = preview?.querySelectorAll<HTMLElement>("code");
+    if (!preview || !items || items.length < 7) return;
+
+    const delta = Math.abs(event.deltaY) >= Math.abs(event.deltaX)
+      ? event.deltaY
+      : event.deltaX;
+    if (delta === 0) return;
+    event.preventDefault();
+
+    const direction = delta > 0 ? 1 : -1;
+    if (
+      reviewParameterWheelDirectionRef.current !== 0
+      && reviewParameterWheelDirectionRef.current !== direction
+    ) {
+      reviewParameterWheelDeltaRef.current = 0;
+    }
+    reviewParameterWheelDirectionRef.current = direction;
+    reviewParameterWheelDeltaRef.current += Math.abs(delta);
+    const threshold = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? 40 : 1;
+    if (reviewParameterWheelDeltaRef.current < threshold) return;
+
+    // Consume one deliberate wheel step per threshold crossing. A mouse wheel
+    // notch therefore reveals exactly one parameter, while small touchpad
+    // deltas are accumulated instead of causing a rapid multi-card jump.
+    reviewParameterWheelDeltaRef.current = 0;
+    const nextIndex = (
+      reviewParameterPreviewIndexRef.current + direction + items.length
+    ) % items.length;
+    reviewParameterPreviewIndexRef.current = nextIndex;
+    const firstOffset = items[0]?.offsetLeft ?? 0;
+    const nextOffset = items[nextIndex]?.offsetLeft ?? firstOffset;
+    preview.scrollTo({
+      left: Math.max(0, nextOffset - firstOffset),
+      behavior: "smooth",
+    });
+  };
   const realCliCapability = capabilities?.simulators.items.real_cli;
   const modelOptimizerCapability = capabilities?.optimizers.items[form.optimizer_strategy];
   const preflightErrors = validate(form, selections, catalog, capabilities, t);
@@ -2688,7 +2731,12 @@ export function NewJob() {
                 </h3>
                 <span>{t("wizard.review.parameterCount", { count: selectedParameterRows.length })}</span>
               </div>
-              <div className="review-parameter-chips review-parameter-preview" aria-hidden="true">
+              <div
+                ref={reviewParameterPreviewRef}
+                className="review-parameter-chips review-parameter-preview"
+                aria-hidden="true"
+                onWheel={handleReviewParameterWheel}
+              >
                 {selectedParameterRows.map((parameter) => (
                   <code key={parameter.name}>
                     <strong>{parameter.name}</strong>

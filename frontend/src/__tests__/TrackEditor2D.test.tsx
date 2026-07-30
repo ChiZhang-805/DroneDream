@@ -78,10 +78,13 @@ describe("TrackEditor2D", () => {
     const visualPane = screen.getByTestId("track-editor-visual-pane");
     const dataPane = screen.getByTestId("track-waypoint-table-scroll");
     const dataAction = screen.getByTestId("track-editor-data-action");
+      const viewSwitcher = screen.getByRole("group", { name: "Track view" });
 
     expect(workspace).toContainElement(visualPane);
     expect(workspace).toContainElement(dataPane);
     expect(workspace).toContainElement(dataAction);
+    expect(viewSwitcher.closest(".track-editor-toolbar")).not.toBeNull();
+    expect(visualPane).not.toContainElement(viewSwitcher);
     expect(dataAction).toHaveTextContent("JSON import / export");
   });
 

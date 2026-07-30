@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -77,6 +83,96 @@ describe("ExperimentWorkspaceSidebar", () => {
       7,
     );
     expect(listExperimentWorkspaces(OWNER_ID)[0]?.name).toBe("Renamed experiment");
+  });
+
+  it("shows a persistent pin marker and previews a drag insertion before reordering", async () => {
+    createWorkspace("workspace-pinned-a", "Pinned A", "job-pinned-a");
+    createWorkspace("workspace-pinned-b", "Pinned B", "job-pinned-b");
+    createWorkspace("workspace-normal", "Normal", "job-normal");
+    updateExperimentWorkspace(OWNER_ID, "workspace-pinned-a", {
+      pinned: true,
+      order: 0,
+    });
+    updateExperimentWorkspace(OWNER_ID, "workspace-pinned-b", {
+      pinned: true,
+      order: 1,
+    });
+    updateExperimentWorkspace(OWNER_ID, "workspace-normal", {
+      pinned: false,
+      order: 2,
+    });
+    render(
+      <MemoryRouter>
+        <ExperimentWorkspaceSidebar ownerId={OWNER_ID} locale="en" />
+      </MemoryRouter>,
+    );
+
+    const pinnedRow = screen.getByText("Pinned A").closest(".app-workspace-row");
+    expect(pinnedRow?.querySelector(".app-workspace-pinned-indicator"))
+      .toBeInTheDocument();
+
+    const rows = screen.getAllByText(/Pinned A|Pinned B|Normal/)
+      .map((label) => label.closest<HTMLElement>(".app-workspace-row"))
+      .filter((row): row is HTMLElement => Boolean(row));
+    const byName = new Map(
+      rows.map((row) => [row.textContent?.trim(), row]),
+    );
+    const pinnedA = byName.get("Pinned A");
+    const pinnedB = byName.get("Pinned B");
+    const normal = byName.get("Normal");
+    if (!pinnedA || !pinnedB || !normal) {
+      throw new Error("Expected workspace rows were not rendered.");
+    }
+    vi.spyOn(pinnedA, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 38,
+      left: 0,
+      right: 220,
+      width: 220,
+      height: 38,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(pinnedB, "getBoundingClientRect").mockReturnValue({
+      top: 40,
+      bottom: 78,
+      left: 0,
+      right: 220,
+      width: 220,
+      height: 38,
+      x: 0,
+      y: 40,
+      toJSON: () => ({}),
+    });
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: vi.fn(),
+      getData: vi.fn(),
+    };
+
+    fireEvent.dragStart(normal, { dataTransfer });
+    const list = normal.closest(".app-workspace-list");
+    if (!list) throw new Error("Workspace list was not rendered.");
+    const dragOver = createEvent.dragOver(list, { dataTransfer });
+    Object.defineProperty(dragOver, "clientY", { value: 45 });
+    fireEvent(list, dragOver);
+    expect(list.querySelector(".app-workspace-drop-preview")).toBeInTheDocument();
+    expect(normal).toHaveClass("is-drag-source");
+    fireEvent.drop(list, { clientY: 45, dataTransfer });
+
+    await waitFor(() => {
+      expect(list.querySelector(".app-workspace-drop-preview")).toBeNull();
+      expect(listExperimentWorkspaces(OWNER_ID)
+        .filter((workspace) => !workspace.archived)
+        .map((workspace) => [workspace.name, workspace.pinned]))
+        .toEqual([
+          ["Pinned A", true],
+          ["Normal", true],
+          ["Pinned B", true],
+        ]);
+    });
   });
 });
 

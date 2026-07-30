@@ -37,6 +37,9 @@ if ($customLanguages.English -cne "nsis/languages/English.nsh" -or
     $customLanguages.SimpChinese -cne "nsis/languages/SimpChinese.nsh") {
     throw "The installer must use DroneDream-owned English and Simplified Chinese maintenance copy"
 }
+if ($config.bundle.resources.'icons/icon.ico' -cne "icons/DroneDream.ico") {
+    throw "The installed shortcut icon must use the dedicated DroneDream wing-mark resource"
+}
 
 $template = Get-Content -LiteralPath $templatePath -Raw
 $header = "; Vendored from tauri-apps/tauri tag tauri-v2.11.4.`n" +
@@ -254,11 +257,30 @@ foreach ($required in @(
     '$1 >= 2',
     'Call DroneDreamRevalidateRuntimeQuiesce',
     'Call DroneDreamEndRuntimeQuiesce',
-    'Call un.DroneDreamPrepareRuntimeQuiesce'
+    'Call un.DroneDreamPrepareRuntimeQuiesce',
+    '!macro DRONEDREAM_REFRESH_BRANDED_SHORTCUT SHORTCUT_PATH',
+    'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"',
+    'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\$OldMainBinaryName"',
+    'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\icons\DroneDream.ico" 0',
+    'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"',
+    'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\${PRODUCTNAME}.lnk"',
+    'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$DESKTOP\${PRODUCTNAME}.lnk"',
+    "shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)"
 )) {
     if (-not $installerHook.Contains($required)) {
         throw "Durable installer quiesce contract is missing: $required"
     }
+}
+
+$officialBrandIconPath = Join-Path $repoRoot "docs\assets\drone-dream-icon.png"
+$desktopBrandIconPath = Join-Path $repoRoot "desktop\src-tauri\app-icon.png"
+$shortcutBrandIconPath = Join-Path $repoRoot "desktop\src-tauri\icons\icon.ico"
+if ((Get-FileHash -LiteralPath $officialBrandIconPath -Algorithm SHA256).Hash -cne
+    (Get-FileHash -LiteralPath $desktopBrandIconPath -Algorithm SHA256).Hash) {
+    throw "The desktop application icon no longer matches the official DroneDream wing mark"
+}
+if ((Get-Item -LiteralPath $shortcutBrandIconPath).Length -le 0) {
+    throw "The bundled Windows shortcut icon is empty"
 }
 
 # Desktop removal and Runtime removal are intentionally separate products.

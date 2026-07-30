@@ -533,6 +533,188 @@ code {
   gap: 0.65rem;
 }
 
+.avatar-crop-backdrop {
+  position: fixed;
+  z-index: 1400;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(24, 14, 28, 0.68);
+  backdrop-filter: blur(9px);
+}
+
+.avatar-crop-dialog {
+  width: min(100%, 42rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.15rem;
+  border: 1px solid #ddcede;
+  border-radius: 1.25rem;
+  background: #ffffff;
+  color: #251d28;
+  box-shadow: 0 30px 90px rgba(31, 16, 35, 0.34);
+}
+
+.avatar-crop-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.avatar-crop-dialog > header h3 {
+  margin: 0;
+  color: #2e2331;
+  font-size: 1.15rem;
+}
+
+.avatar-crop-dialog > header p {
+  max-width: 49rem;
+  margin: 0.35rem 0 0;
+  color: #6f6373;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.avatar-crop-close {
+  display: inline-grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  min-height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #dfd2e1;
+  border-radius: 0.7rem;
+  background: #faf6fb;
+  color: #5f5263;
+  cursor: pointer;
+}
+
+.avatar-crop-close:hover:not(:disabled),
+.avatar-crop-close:focus-visible {
+  border-color: #c575cc;
+  background: #f7ebf8;
+  color: #8a328f;
+}
+
+.avatar-crop-close:focus-visible {
+  outline: 3px solid rgba(174, 85, 184, 0.18);
+  outline-offset: 2px;
+}
+
+.avatar-crop-workspace {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1fr) minmax(10rem, 0.55fr);
+  gap: 1.1rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.avatar-crop-viewport {
+  position: relative;
+  width: min(100%, 19rem);
+  aspect-ratio: 1;
+  justify-self: center;
+  overflow: hidden;
+  border: 1px solid #d7c5da;
+  border-radius: 1rem;
+  background:
+    linear-gradient(45deg, #efe8f1 25%, transparent 25%) 0 0 / 18px 18px,
+    linear-gradient(-45deg, #efe8f1 25%, transparent 25%) 0 9px / 18px 18px,
+    linear-gradient(45deg, transparent 75%, #efe8f1 75%) 9px -9px / 18px 18px,
+    linear-gradient(-45deg, transparent 75%, #efe8f1 75%) -9px 0 / 18px 18px,
+    #faf7fb;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.avatar-crop-viewport:active {
+  cursor: grabbing;
+}
+
+.avatar-crop-viewport:focus-visible {
+  outline: 3px solid rgba(174, 85, 184, 0.28);
+  outline-offset: 3px;
+}
+
+.avatar-crop-viewport > img,
+.avatar-crop-preview > img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.avatar-crop-mask {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 100vmax rgba(26, 14, 30, 0.54),
+    inset 0 0 0 1px rgba(119, 53, 128, 0.4);
+  pointer-events: none;
+}
+
+.avatar-crop-controls {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.avatar-crop-controls > label {
+  display: grid;
+  gap: 0.5rem;
+  color: #4f4353;
+  font-size: 0.82rem;
+  font-weight: 680;
+}
+
+.avatar-crop-controls input[type="range"] {
+  width: 100%;
+  accent-color: #ad45b6;
+}
+
+.avatar-crop-preview-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  color: #6f6373;
+  font-size: 0.8rem;
+}
+
+.avatar-crop-preview {
+  position: relative;
+  width: 4.5rem;
+  height: 4.5rem;
+  overflow: hidden;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #f3ebf4;
+  box-shadow: 0 0 0 1px #d7c5da, 0 8px 24px rgba(69, 38, 75, 0.14);
+}
+
+.avatar-crop-error {
+  margin: 0.8rem 0 0;
+  color: #b11f55;
+  font-size: 0.84rem;
+}
+
+.avatar-crop-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #eadfeb;
+}
+
 .account-username-form {
   display: grid;
   gap: 0.4rem;
@@ -668,6 +850,46 @@ code {
   .account-profile .account-sign-out {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .avatar-crop-backdrop {
+    padding: 0.35rem;
+  }
+
+  .avatar-crop-dialog {
+    max-height: calc(100dvh - 0.7rem);
+    padding: 0.9rem;
+    border-radius: 1rem;
+  }
+
+  .avatar-crop-workspace {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
+
+  .avatar-crop-viewport {
+    width: min(68vw, 16rem);
+  }
+
+  .avatar-crop-controls {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 0.8rem;
+  }
+
+  .avatar-crop-preview-wrap {
+    grid-template-columns: auto;
+    justify-items: center;
+    gap: 0.35rem;
+  }
+
+  .avatar-crop-preview {
+    width: 3.6rem;
+    height: 3.6rem;
+  }
+
+  .avatar-crop-dialog > footer .btn {
+    flex: 1 1 0;
   }
 }
 
@@ -3272,9 +3494,9 @@ a {
 
 .scenario-case-option select {
   flex: 0 0 auto;
-  width: min(104px, 46%);
-  min-width: 84px;
-  font-size: 0.7rem;
+  width: 118px;
+  min-width: 118px;
+  font-size: 0.72rem;
 }
 
 .scenario-case-option span,
@@ -3356,8 +3578,8 @@ a {
   grid-template:
     "view-toolbar data-toolbar" auto
     "visual data" minmax(0, 1fr)
-    / minmax(0, 1fr) minmax(540px, 1fr);
-  gap: 0.55rem 0.65rem;
+    / minmax(0, 0.9fr) minmax(540px, 1.1fr);
+  gap: 0.5rem 0.48rem;
   min-height: 0;
   margin-top: 0;
 }
@@ -3380,10 +3602,8 @@ a {
 }
 
 .track-view-switcher {
-  position: absolute;
-  z-index: 3;
-  top: 0.65rem;
-  right: 0.65rem;
+  grid-area: view-toolbar;
+  justify-self: end;
 }
 
 .track-editor-data-action {
@@ -5409,8 +5629,8 @@ a {
 
 .settings-model-usage {
   display: grid;
-  gap: 0.72rem;
-  padding: 0.85rem;
+  gap: 0.66rem;
+  padding: 0.9rem;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: color-mix(in srgb, var(--panel) 94%, transparent);
@@ -5474,8 +5694,17 @@ a {
   margin: 0;
 }
 
+.settings-model-usage-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  min-width: 0;
+}
+
 .settings-model-refresh {
-  justify-self: start;
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .settings-model-heading h3 {
@@ -8756,6 +8985,7 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(0, 1fr));
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -8763,6 +8993,7 @@ a {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
   min-height: 0;
   box-sizing: border-box;
 }
@@ -8770,6 +9001,7 @@ a {
 .wizard-panel:has(.review-grid-detailed) .section-card-body {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
 }
 
 .review-facts {
@@ -8815,6 +9047,7 @@ a {
 
 .review-parameter-card {
   flex: 0 0 auto;
+  min-width: 0;
   gap: 0.55rem;
   padding: 0.7rem 0.78rem;
 }
@@ -9310,6 +9543,14 @@ a {
   border-radius: 9px;
 }
 
+.app-workspace-row.is-drag-source {
+  opacity: 0.42;
+}
+
+.app-workspace-row.is-drag-source > a {
+  background: rgba(190, 69, 194, 0.06);
+}
+
 .app-workspace-row + .app-workspace-row {
   margin-top: 0.14rem;
 }
@@ -9346,6 +9587,41 @@ a {
   white-space: nowrap;
   font-size: 0.86rem;
   font-weight: 650;
+}
+
+.app-workspace-pinned-indicator {
+  position: absolute;
+  top: 50%;
+  right: 0.75rem;
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  color: var(--primary-strong);
+  transform: translateY(-50%);
+  transition: opacity 130ms ease;
+}
+
+.app-workspace-pinned-indicator svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+}
+
+.app-workspace-row:hover .app-workspace-pinned-indicator,
+.app-workspace-row:focus-within .app-workspace-pinned-indicator {
+  opacity: 0;
+}
+
+.app-workspace-drop-preview {
+  height: 38px;
+  margin-block: 0.14rem;
+  border: 1px dashed rgba(190, 69, 194, 0.34);
+  border-radius: 9px;
+  background: rgba(190, 69, 194, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.48);
 }
 
 .app-workspace-actions {
@@ -9595,6 +9871,84 @@ a {
 
   .wizard-panel .form-field {
     gap: 0.14rem;
+  }
+
+  /*
+   * Scenario step desktop density: keep all controls in the visible panel
+   * without clipping the native Enabled/Disabled values or hiding content
+   * behind an always-visible inner scrollbar.
+   */
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-case-selector {
+    margin-bottom: 0.22rem;
+    padding: 0.05rem 0 0.34rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-case-grid {
+    gap: 0.28rem 0.34rem;
+    margin-top: 0.28rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-case-option {
+    min-height: 42px;
+    padding: 0.24rem 0.42rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-case-option select {
+    width: 118px;
+    min-width: 118px;
+    min-height: 32px;
+    height: 32px;
+    padding-block: 0.25rem;
+    font-size: 0.72rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-base-grid {
+    gap: 0.28rem 0.58rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-inline-advanced {
+    gap: 0.28rem 0.58rem;
+    padding-top: 0.32rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-inline-advanced > h3 {
+    font-size: 1rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-advanced-group {
+    padding: 0.34rem 0.55rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-advanced-group > h4 {
+    margin-bottom: 0.18rem;
+    font-size: 0.98rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced)
+    .scenario-advanced-group
+    .scenario-advanced-grid {
+    gap: 0.12rem;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced)
+    .scenario-advanced-group
+    .scenario-advanced-grid
+    input,
+  .wizard-panel:has(.scenario-inline-advanced)
+    .scenario-advanced-group
+    .scenario-advanced-grid
+    select,
+  .wizard-panel:has(.scenario-inline-advanced) .scenario-obstacle-action .btn {
+    min-height: 31px;
+    height: 31px;
+  }
+
+  .wizard-panel:has(.scenario-inline-advanced)
+    .scenario-advanced-group
+    .scenario-advanced-grid
+    select {
+    padding-block: 0.12rem;
+    line-height: 1.2;
   }
 
   .wizard-actions {

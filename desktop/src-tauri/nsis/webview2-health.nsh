@@ -12,6 +12,24 @@
 
 !include "${__FILEDIR__}\runtime-mode.nsh"
 
+; Recreate only shortcuts that already belong to this installation. Pointing
+; at a dedicated icon resource gives Windows a new cache identity when an
+; existing 1.0.0 installation replaces the retired legacy cloud artwork.
+; Missing shortcuts stay missing, including when the user chose /NS.
+!macro DRONEDREAM_REFRESH_BRANDED_SHORTCUT SHORTCUT_PATH
+  !insertmacro IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $0
+  ${If} $0 != 1
+    !insertmacro IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\$OldMainBinaryName"
+    Pop $0
+  ${EndIf}
+  ${If} $0 = 1
+    Delete "${SHORTCUT_PATH}"
+    CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\icons\DroneDream.ico" 0
+    !insertmacro SetLnkAppUserModelId "${SHORTCUT_PATH}"
+  ${EndIf}
+!macroend
+
 !macro NSIS_HOOK_PREINSTALL
   Push $0
   Push $1
@@ -116,6 +134,14 @@
   ${If} $0 != "ok"
     Abort "$(DD_ReleaseIsolationFailed)"
   ${EndIf}
+
+  ; The standard Tauri shortcut functions intentionally skip existing links
+  ; during update mode. Refresh those links after the new executable and icon
+  ; resource are in place so desktop and Start Menu both adopt the wing mark.
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+  !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$DESKTOP\${PRODUCTNAME}.lnk"
+  System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 
   Pop $0
 !macroend

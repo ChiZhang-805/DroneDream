@@ -18,6 +18,7 @@ export interface ExperimentWorkspace {
   jobId: string | null;
   pinned: boolean;
   archived: boolean;
+  order?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,6 +47,7 @@ type WorkspacePatch = Partial<
     | "jobId"
     | "pinned"
     | "archived"
+    | "order"
   >
 >;
 
@@ -99,6 +101,13 @@ function isWorkspace(value: unknown, ownerId: string): value is ExperimentWorksp
     (candidate.jobId === null || isWorkspaceJobId(candidate.jobId)) &&
     typeof candidate.pinned === "boolean" &&
     typeof candidate.archived === "boolean" &&
+    (
+      candidate.order === undefined
+      || (
+        typeof candidate.order === "number"
+        && Number.isSafeInteger(candidate.order)
+      )
+    ) &&
     typeof candidate.createdAt === "string" &&
     Number.isFinite(Date.parse(candidate.createdAt)) &&
     typeof candidate.updatedAt === "string" &&
@@ -121,9 +130,15 @@ function readRegistry(ownerId: string): ExperimentWorkspaceRegistry {
     if (candidate.schemaVersion !== 1 || !Array.isArray(candidate.items)) {
       return { schemaVersion: 1, items: [] };
     }
+    const items = candidate.items.filter(
+      (item) => isWorkspace(item, normalizedOwnerId),
+    );
     return {
       schemaVersion: 1,
-      items: candidate.items.filter((item) => isWorkspace(item, normalizedOwnerId)),
+      items: items.map((item, index) => ({
+        ...item,
+        order: item.order ?? index,
+      })),
     };
   } catch {
     return { schemaVersion: 1, items: [] };
@@ -163,6 +178,14 @@ function normalizedName(name: string): string {
   return value.slice(0, 255) || "Untitled experiment";
 }
 
+function normalizedNameIdentity(name: string): string {
+  return name
+    .trim()
+    .replace(/\s+/gu, " ")
+    .normalize("NFKC")
+    .toLowerCase();
+}
+
 function normalizedSteps(steps: number[]): number[] {
   return [...new Set(steps)]
     .filter((step) => Number.isInteger(step) && step >= 0 && step <= 4)
@@ -190,8 +213,93 @@ export function listExperimentWorkspaces(ownerId: string): ExperimentWorkspace[]
   }
   return retained.sort((left, right) => {
     if (left.pinned !== right.pinned) return left.pinned ? -1 : 1;
+    if ((left.order ?? 0) !== (right.order ?? 0)) {
+      return (left.order ?? 0) - (right.order ?? 0);
+    }
     return Date.parse(right.updatedAt) - Date.parse(left.updatedAt);
   });
+}
+
+export function isExperimentWorkspaceNameAvailable(
+  ownerId: string,
+  name: string,
+  excludeWorkspaceId?: string | null,
+): boolean {
+  const identity = normalizedNameIdentity(name);
+  if (!identity) return false;
+  const normalizedOwnerId = normalizeOwnerId(ownerId);
+  return !readRegistry(normalizedOwnerId).items.some(
+    (workspace) =>
+      !workspace.archived
+      && workspace.id !== excludeWorkspaceId
+      && normalizedNameIdentity(workspace.name) === identity,
+  );
+}
+
+export function reorderExperimentWorkspaceItems(
+  workspaces: ExperimentWorkspace[],
+  draggedWorkspaceId: string,
+  insertionIndex: number,
+): ExperimentWorkspace[] {
+  const dragged = workspaces.find(
+    (workspace) => workspace.id === draggedWorkspaceId,
+  );
+  if (!dragged) return workspaces;
+  const remaining = workspaces.filter(
+    (workspace) => workspace.id !== draggedWorkspaceId,
+  );
+  const targetIndex = Math.min(
+    remaining.length,
+    Math.max(0, Math.trunc(insertionIndex)),
+  );
+  const remainingPinnedCount = remaining.filter(
+    (workspace) => workspace.pinned,
+  ).length;
+  const nextPinned = dragged.pinned
+    ? targetIndex <= remainingPinnedCount
+    : remainingPinnedCount > 0 && targetIndex < remainingPinnedCount;
+  const nextDragged = { ...dragged, pinned: nextPinned };
+  const ordered = [...remaining];
+  ordered.splice(targetIndex, 0, nextDragged);
+  return ordered.map((workspace, order) => ({ ...workspace, order }));
+}
+
+export function reorderExperimentWorkspace(
+  ownerId: string,
+  draggedWorkspaceId: string,
+  insertionIndex: number,
+): ExperimentWorkspace[] {
+  const normalizedOwnerId = normalizeOwnerId(ownerId);
+  const visible = listExperimentWorkspaces(normalizedOwnerId).filter(
+    (workspace) => !workspace.archived,
+  );
+  const reordered = reorderExperimentWorkspaceItems(
+    visible,
+    draggedWorkspaceId,
+    insertionIndex,
+  );
+  if (reordered === visible) return visible;
+  const reorderedById = new Map(
+    reordered.map((workspace) => [workspace.id, workspace]),
+  );
+  const now = new Date().toISOString();
+  const registry = readRegistry(normalizedOwnerId);
+  writeRegistry(
+    normalizedOwnerId,
+    registry.items.map((workspace) => {
+      const next = reorderedById.get(workspace.id);
+      if (!next) return workspace;
+      return {
+        ...workspace,
+        pinned: next.pinned,
+        order: next.order,
+        ...(workspace.id === draggedWorkspaceId ? { updatedAt: now } : {}),
+      };
+    }),
+  );
+  return listExperimentWorkspaces(normalizedOwnerId).filter(
+    (workspace) => !workspace.archived,
+  );
 }
 
 export function registerExperimentWorkspace(
@@ -201,6 +309,10 @@ export function registerExperimentWorkspace(
   const registry = readRegistry(ownerId);
   const now = new Date().toISOString();
   const existing = registry.items.find((item) => item.id === input.id);
+  const firstOrder = registry.items.reduce(
+    (minimum, item) => Math.min(minimum, item.order ?? 0),
+    0,
+  );
   const workspace: ExperimentWorkspace = {
     id: input.id,
     ownerId,
@@ -214,6 +326,7 @@ export function registerExperimentWorkspace(
     jobId: existing?.jobId ?? null,
     pinned: existing?.pinned ?? false,
     archived: existing?.archived ?? false,
+    order: existing?.order ?? firstOrder - 1,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -242,6 +355,9 @@ export function updateExperimentWorkspace(
       : {}),
     ...(patch.completedSteps !== undefined
       ? { completedSteps: normalizedSteps(patch.completedSteps) }
+      : {}),
+    ...(patch.order !== undefined
+      ? { order: Number.isSafeInteger(patch.order) ? patch.order : current.order }
       : {}),
     updatedAt: new Date().toISOString(),
   };

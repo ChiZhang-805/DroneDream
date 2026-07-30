@@ -12,6 +12,10 @@ import {
 import type { BackendCapabilitiesResponse, Job } from "../types/api";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 import type { ModelAccessSettings } from "../features/settings/ModelAccessContext";
+import {
+  listExperimentWorkspaces,
+  updateExperimentWorkspace,
+} from "../features/experiment/workspaceRegistry";
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -24,19 +28,21 @@ interface RenderPageOptions {
   confirmName?: boolean;
   experimentName?: string;
   modelSettings?: Partial<ModelAccessSettings>;
+  initialEntry?: string;
 }
 
 function renderPage({
   confirmName = true,
   experimentName,
   modelSettings,
+  initialEntry = "/jobs/new",
 }: RenderPageOptions = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   const result = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <ModelAccessProvider initialSettings={modelSettings}>
           <NewJob />
         </ModelAccessProvider>
@@ -211,12 +217,53 @@ describe("NewJob experiment wizard", () => {
 
   it("keeps selected PX4 parameters to one preview row and opens the complete list", async () => {
     const page = renderPage();
+    openStep(/Parameters/i);
+    fireEvent.click(screen.getByRole("button", {
+      name: "Expand: Horizontal Motion Control",
+    }));
+    const availableParameters = screen.getAllByRole("checkbox");
+    const additionalParameters = availableParameters
+      .filter((checkbox) => !(checkbox as HTMLInputElement).checked)
+      .slice(0, 3);
+    expect(additionalParameters).toHaveLength(3);
+    additionalParameters.forEach((checkbox) => fireEvent.click(checkbox));
     openStep(/Review/i);
 
     const trigger = screen.getByRole("button", { name: "View all parameters" });
     const preview = page.container.querySelector(".review-parameter-preview");
     expect(preview).toBeInTheDocument();
     expect(preview).toHaveClass("review-parameter-chips");
+    if (!(preview instanceof HTMLElement)) {
+      throw new Error("Selected-parameter preview was not rendered.");
+    }
+    const previewItems = preview.querySelectorAll("code");
+    expect(previewItems.length).toBeGreaterThanOrEqual(7);
+    previewItems.forEach((item, index) => {
+      Object.defineProperty(item, "offsetLeft", {
+        configurable: true,
+        value: index * 215,
+      });
+    });
+    const scrollTo = vi.fn();
+    Object.defineProperty(preview, "scrollTo", {
+      configurable: true,
+      value: scrollTo,
+    });
+
+    fireEvent.wheel(preview, { deltaY: 12, deltaMode: 0 });
+    expect(scrollTo).not.toHaveBeenCalled();
+    fireEvent.wheel(preview, { deltaY: 28, deltaMode: 0 });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 215, behavior: "smooth" });
+    fireEvent.wheel(preview, { deltaY: 100, deltaMode: 0 });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 430, behavior: "smooth" });
+    fireEvent.wheel(preview, { deltaY: -100, deltaMode: 0 });
+    expect(scrollTo).toHaveBeenLastCalledWith({ left: 215, behavior: "smooth" });
+    fireEvent.wheel(preview, { deltaY: -100, deltaMode: 0 });
+    fireEvent.wheel(preview, { deltaY: -100, deltaMode: 0 });
+    expect(scrollTo).toHaveBeenLastCalledWith({
+      left: (previewItems.length - 1) * 215,
+      behavior: "smooth",
+    });
     expect(screen.queryByRole("dialog", { name: "Selected PX4 parameters" }))
       .not.toBeInTheDocument();
 
@@ -229,6 +276,25 @@ describe("NewJob experiment wizard", () => {
     expect(screen.queryByRole("dialog", { name: "Selected PX4 parameters" }))
       .not.toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
+
+    openStep(/Parameters/i);
+    const selectedCheckbox = screen.getAllByRole("checkbox")
+      .find((checkbox) => (checkbox as HTMLInputElement).checked);
+    if (!selectedCheckbox) throw new Error("No selected PX4 parameter was found.");
+    fireEvent.click(selectedCheckbox);
+    openStep(/Review/i);
+    const shortPreview = page.container.querySelector(".review-parameter-preview");
+    if (!(shortPreview instanceof HTMLElement)) {
+      throw new Error("Short selected-parameter preview was not rendered.");
+    }
+    expect(shortPreview.querySelectorAll("code")).toHaveLength(previewItems.length - 1);
+    const shortScrollTo = vi.fn();
+    Object.defineProperty(shortPreview, "scrollTo", {
+      configurable: true,
+      value: shortScrollTo,
+    });
+    fireEvent.wheel(shortPreview, { deltaY: 100, deltaMode: 0 });
+    expect(shortScrollTo).not.toHaveBeenCalled();
   });
 
   it("persists a validated Next transition immediately and keeps completed steps after Back", () => {
@@ -276,7 +342,12 @@ describe("NewJob experiment wizard", () => {
     });
 
     first.unmount();
-    renderPage({ confirmName: false });
+    const workspace = listExperimentWorkspaces("local")[0];
+    expect(workspace).toBeDefined();
+    renderPage({
+      confirmName: false,
+      initialEntry: `/jobs/new?experiment=${workspace.id}`,
+    });
     const restoredProgress = screen.getByRole("navigation", {
       name: /Experiment setup progress/i,
     });
@@ -643,7 +714,12 @@ describe("NewJob experiment wizard", () => {
     });
 
     first.unmount();
-    renderPage({ confirmName: false });
+    const workspace = listExperimentWorkspaces("local")[0];
+    expect(workspace).toBeDefined();
+    renderPage({
+      confirmName: false,
+      initialEntry: `/jobs/new?experiment=${workspace.id}`,
+    });
     expect(screen.queryByLabelText(/Experiment Name/i)).toBeNull();
     expect(screen.queryByRole("button", { name: /Configure model access/i })).toBeNull();
     expect(screen.queryByLabelText(/Model API key/i)).toBeNull();
@@ -663,12 +739,17 @@ describe("NewJob experiment wizard", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Next$/i }));
 
     first.unmount();
-    renderPage({ confirmName: false });
+    const workspace = listExperimentWorkspaces("local")[0];
+    expect(workspace).toBeDefined();
+    renderPage({
+      confirmName: false,
+      initialEntry: `/jobs/new?experiment=${workspace.id}`,
+    });
     fireEvent.click(screen.getByRole("button", { name: /^Back$/i }));
     expect(screen.getByLabelText(/Environment presets/i)).toHaveValue("stress");
   });
 
-  it("normalizes type-mismatched draft fields instead of crashing", () => {
+  it("starts blank instead of cloning a type-mismatched legacy active draft", () => {
     window.sessionStorage.setItem(
       LEGACY_EXPERIMENT_DRAFT_KEY,
       JSON.stringify({
@@ -696,16 +777,23 @@ describe("NewJob experiment wizard", () => {
     );
 
     renderPage({ confirmName: false });
+    const nameDialog = screen.getByRole("dialog", {
+      name: "New Tuning Experiment",
+    });
+    const nameInput = within(nameDialog).getByRole("textbox");
+    expect(nameInput).toHaveValue("");
+    fireEvent.change(nameInput, { target: { value: "fresh-study" } });
+    fireEvent.click(within(nameDialog).getByRole("button", { name: "Continue" }));
     expect(activeStepIndex()).toBe(0);
     expect(screen.getByLabelText(/Tuning experience level/i)).toHaveValue("basic");
     expect(screen.getByLabelText(/Search seeds/i)).toHaveValue("101, 202, 303");
-    const migratedRaw = window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY);
-    expect(migratedRaw).toContain("recovered-study");
-    expect(migratedRaw).not.toContain("must-not-restore");
-    expect(window.sessionStorage.getItem(LEGACY_EXPERIMENT_DRAFT_KEY)).toBeNull();
+    expect(screen.queryByDisplayValue("recovered-study")).toBeNull();
+    expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain(
+      "fresh-study",
+    );
   });
 
-  it("keeps the historical heuristic default when restoring a draft without an optimizer", () => {
+  it("keeps the current product default when a new draft ignores a legacy alias", () => {
     window.sessionStorage.setItem(
       LEGACY_EXPERIMENT_DRAFT_KEY,
       JSON.stringify({
@@ -720,9 +808,43 @@ describe("NewJob experiment wizard", () => {
     );
 
     renderPage({ confirmName: false });
-
+    const nameDialog = screen.getByRole("dialog", {
+      name: "New Tuning Experiment",
+    });
+    fireEvent.change(within(nameDialog).getByRole("textbox"), {
+      target: { value: "new-portfolio-study" },
+    });
+    fireEvent.submit(nameDialog);
     expect(activeStepIndex()).toBe(0);
-    expect(screen.getByLabelText(/Optimizer Strategy/i)).toHaveValue("heuristic");
+    expect(screen.getByLabelText(/Optimizer Strategy/i))
+      .toHaveValue("optimizer_portfolio");
+  });
+
+  it("requires a unique active experiment name but permits reuse after archive", () => {
+    const first = renderPage({ experimentName: "Wind Study" });
+    first.unmount();
+
+    renderPage({ confirmName: false });
+    const dialog = screen.getByRole("dialog", { name: "New Tuning Experiment" });
+    const input = within(dialog).getByRole("textbox");
+    fireEvent.change(input, { target: { value: "  wind   study  " } });
+    fireEvent.submit(dialog);
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(
+      "already used by an active experiment",
+    );
+    expect(screen.queryByRole("navigation", {
+      name: "Experiment setup progress",
+    })).toBeNull();
+
+    const existing = listExperimentWorkspaces("local")[0];
+    expect(existing).toBeDefined();
+    updateExperimentWorkspace("local", existing.id, { archived: true });
+    fireEvent.submit(dialog);
+    expect(screen.getByRole("navigation", {
+      name: "Experiment setup progress",
+    })).toBeVisible();
+    expect(listExperimentWorkspaces("local").filter((item) => !item.archived))
+      .toHaveLength(1);
   });
 
   it("discards unsupported or structurally invalid draft envelopes", () => {
