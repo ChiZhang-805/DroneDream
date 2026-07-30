@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { I18nProvider } from "../i18n/I18nProvider";
 import { ECE498 } from "../pages/ECE498";
+import { lastLineOccupancy, renderedLineCount } from "../pages/ece498Layout";
 
 function renderCourse(locale: "en" | "zh-CN" = "en") {
   window.localStorage.setItem("drone-dream:locale", locale);
@@ -16,7 +17,73 @@ function renderCourse(locale: "en" | "zh-CN" = "en") {
 describe("ECE498 course tribute", () => {
   afterEach(() => {
     window.localStorage.removeItem("drone-dream:locale");
+    vi.restoreAllMocks();
   });
+
+  it("measures paragraph line fragments without per-character layout reads", () => {
+    const selectNodeContents = vi.fn();
+    const getClientRects = vi.fn(() => [
+      new DOMRect(0, 0, 100, 16),
+      new DOMRect(0, 16, 84, 16),
+    ]);
+    const range = {
+      selectNodeContents,
+      getClientRects,
+    } as unknown as Range;
+    vi.spyOn(document, "createRange").mockReturnValue(range);
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "A paragraph long enough to wrap onto two measured lines.";
+    Object.defineProperty(paragraph, "clientWidth", { value: 100 });
+
+    expect(lastLineOccupancy(paragraph)).toBe(0.84);
+    expect(selectNodeContents).toHaveBeenCalledTimes(1);
+    expect(getClientRects).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts distinct rendered lines without relying on fixed heights or clipping", () => {
+    const selectNodeContents = vi.fn();
+    const getClientRects = vi.fn(() => [
+      new DOMRect(0, 0, 100, 16),
+      new DOMRect(0, 16, 100, 16),
+      new DOMRect(0, 32, 72, 16),
+    ]);
+    vi.spyOn(document, "createRange").mockReturnValue({
+      selectNodeContents,
+      getClientRects,
+    } as unknown as Range);
+    const paragraph = document.createElement("p");
+    paragraph.textContent = "Three real rendered lines.";
+
+    expect(renderedLineCount(paragraph)).toBe(3);
+    expect(selectNodeContents).toHaveBeenCalledTimes(1);
+    expect(getClientRects).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["en", "zh-CN"] as const)(
+    "renders four unclipped nine-line targets for every %s stage",
+    (locale) => {
+      renderCourse(locale);
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs).toHaveLength(7);
+
+      for (const tab of tabs) {
+        fireEvent.click(tab);
+        const panel = screen.getByRole("tabpanel");
+        const cards = panel.querySelectorAll(".ece498-stage-copy-section");
+        const bodies = panel.querySelectorAll<HTMLParagraphElement>(
+          ".ece498-stage-body[data-target-lines=\"9\"]",
+        );
+        expect(cards).toHaveLength(4);
+        expect(bodies).toHaveLength(4);
+        for (const body of bodies) {
+          expect(body.textContent?.trim().length).toBeGreaterThan(
+            locale === "en" ? 75 : 45,
+          );
+          expect(body.querySelector("br")).toBeNull();
+        }
+      }
+    },
+  );
 
   it("renders a one-line English course introduction and seven-stage timeline", () => {
     renderCourse("en");

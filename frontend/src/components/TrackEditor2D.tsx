@@ -481,6 +481,27 @@ export function TrackEditor2D({
   return (
     <div className="track-editor" data-testid="track-editor-workspace">
       <div className="track-editor-toolbar">
+        <div className="track-view-switcher" role="group" aria-label={t("track.viewSwitcher")}>
+          <button
+            type="button"
+            className="track-icon-button"
+            onClick={() => changeView(-1)}
+            aria-label={t("track.previousView")}
+            title={t("track.previousView")}
+          >
+            <Icon name="left" />
+          </button>
+          <span className="track-view-label" aria-live="polite">{viewLabel}</span>
+          <button
+            type="button"
+            className="track-icon-button"
+            onClick={() => changeView(1)}
+            aria-label={t("track.nextView")}
+            title={t("track.nextView")}
+          >
+            <Icon name="right" />
+          </button>
+        </div>
         <div className="track-editor-actions">
           {dataPanelAction ? (
             <div className="track-editor-data-action" data-testid="track-editor-data-action">
@@ -557,27 +578,6 @@ export function TrackEditor2D({
       ) : null}
 
       <div className="track-canvas-shell" data-testid="track-editor-visual-pane">
-        <div className="track-view-switcher" role="group" aria-label={t("track.viewSwitcher")}>
-          <button
-            type="button"
-            className="track-icon-button"
-            onClick={() => changeView(-1)}
-            aria-label={t("track.previousView")}
-            title={t("track.previousView")}
-          >
-            <Icon name="left" />
-          </button>
-          <span className="track-view-label" aria-live="polite">{viewLabel}</span>
-          <button
-            type="button"
-            className="track-icon-button"
-            onClick={() => changeView(1)}
-            aria-label={t("track.nextView")}
-            title={t("track.nextView")}
-          >
-            <Icon name="right" />
-          </button>
-        </div>
         <svg
           className={`track-editor-canvas ${view === "3d" ? "track-editor-canvas-3d" : ""}`}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}

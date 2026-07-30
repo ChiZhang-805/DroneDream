@@ -3,6 +3,7 @@ import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } fr
 
 import { useI18n } from "../i18n/I18nProvider";
 import type { Locale } from "../i18n/I18nProvider";
+import { lastLineOccupancy, renderedLineCount } from "./ece498Layout";
 
 import "./ECE498.css";
 
@@ -51,10 +52,6 @@ interface CourseCopy {
   methodLabel: string;
   evidenceLabel: string;
   boundaryLabel: string;
-  changeContext: string;
-  methodContext: string;
-  evidenceContext: string;
-  boundaryContext: string;
   courseLink: string;
   linksLabel: string;
   timelineAriaLabel: string;
@@ -85,14 +82,6 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
     methodLabel: "Engineering method",
     evidenceLabel: "Measured evidence",
     boundaryLabel: "Boundary to retain",
-    changeContext:
-      "Its inputs, outcomes, and failures remain inspectable.",
-    methodContext:
-      "DroneDream keeps configuration, runs, logs, and the acceptance gate explicit here.",
-    evidenceContext:
-      "Each result stays attached to its named setup and record.",
-    boundaryContext:
-      "This limit prevents an unsupported safety or performance claim.",
     courseLink: "Course website",
     linksLabel: "Explore the course",
     timelineAriaLabel: "Course project progression",
@@ -109,7 +98,7 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         evidence:
           "Independent samples passed 5/5, but the important result was recognizing the easy single-question setup and the boundary between visual evidence and an invented claim.",
         boundary:
-          "A perfect score on a tiny case is a pipeline check, not general accuracy. The evaluator can also be wrong, so disagreements and source frames must remain inspectable.",
+          "A perfect score on a tiny case is a pipeline check, not general accuracy. The evaluator can also be wrong, so disagreements and source frames must remain inspectable. Keep the question and source frames linked.",
         flow: ["PROMPT", "TRACE", "AUDIT"],
         glyph: "reason",
       },
@@ -123,7 +112,7 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         method:
           "Constrain every proposal to valid PX4 ranges, execute the same scenario matrix, and return metric-level failures so the next revision responds to measured behavior. Each revision answers that evidence.",
         evidence:
-          "Only 2/5 independent proposals passed. Precise verifier feedback then drove a three-round Fail → Fail → Pass refinement trace.",
+          "Only 2/5 independent proposals passed. Precise verifier feedback then drove a three-round Fail → Fail → Pass refinement trace. The retained record identifies the blocking metric and the bounded change made after each attempt.",
         boundary:
           "A simulator pass supports the tested vehicle, world, trajectory, and disturbance envelope only. It does not establish hardware-flight safety or transfer to another airframe.",
         flow: ["PROPOSE", "SIMULATE", "REFINE"],
@@ -139,9 +128,9 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         method:
           "Give every task the same tool contract, preserve structured observations, and allow another attempt only after the prior run produces usable diagnostic evidence. Retries answer prior evidence.",
         evidence:
-          "No-tool performance was 13/25; tool augmentation reached 22/25. Refinement recovered three first-round failures without making unverified decisions.",
+          "No-tool performance was 13/25; tool augmentation reached 22/25. Refinement recovered three first-round failures without making unverified decisions. Each recovery preserved its diagnostic trace.",
         boundary:
-          "Tool access helps only when tools expose the right state and the verifier reflects the real objective. A confident tool call is still not an acceptance decision.",
+          "Tool access helps only when tools expose the right state and the verifier reflects the real objective. A confident tool call is still not an acceptance decision. Logs must show tool state, verifier inputs, and the acceptance rule beside every result.",
         flow: ["CALL", "MEASURE", "RETRY"],
         glyph: "tools",
       },
@@ -153,7 +142,7 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         summary:
           "The original worksheet was unavailable, so this bridge is reconstructed from HW5 and the final guide: task families, repeated trials, a common verifier, logs, and explicit failure categories. This makes comparisons auditable.",
         method:
-          "Group related cases, repeat them under controlled seeds, persist every trial, and separate tracking, safety, reliability, and infrastructure failure modes.",
+          "Group related cases, repeat them under controlled seeds, persist every trial, and separate tracking, safety, reliability, and infrastructure failure modes. Use the same labels across runs.",
         evidence:
           "Per-trial records made tracking, reliability, safety, and infrastructure failures diagnosable instead of anecdotal — the bridge from a demo to an auditable benchmark across runs.",
         boundary:
@@ -232,14 +221,6 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
     methodLabel: "工程方法",
     evidenceLabel: "实验证据",
     boundaryLabel: "必须保留的边界",
-    changeContext:
-      "它的输入、结果和失败轨迹始终可以检查和复查。",
-    methodContext:
-      "DroneDream 同时把配置、运行、日志与验收关口写入同一条实验记录，使每次提议的依据、执行环境和验收结论都能沿原始证据追溯。",
-    evidenceContext:
-      "每个结果都对应明确的实验设置、证据和可检查记录。",
-    boundaryContext:
-      "这条边界可以避免把有限证据夸大成安全或性能结论。",
     courseLink: "课程官网",
     linksLabel: "进一步了解课程",
     timelineAriaLabel: "课程项目成长时间线",
@@ -250,13 +231,13 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         kicker: "推理与评估",
         title: "从会回答，到能被验证",
         summary:
-          "自动驾驶视频问答把结构化选择、逐帧推理与置信度交给精确答案核对和第二个模型的证据审查，不再把一段流畅解释直接当作正确。",
+          "自动驾驶视频问答把结构化选择、逐帧推理与置信度交给精确答案核对和第二个模型的证据审查，不再把一段流畅解释直接当作正确。同时保留问题、原始回答、证据定位与审查结论，让复核者能够沿同一条证据链回看。",
         method:
-          "先要求模型给出机器可核对的答案，再保留支撑答案的画面轨迹，并让独立评估器逐项检查每个判断是否真的能从视频中得到。",
+          "先要求模型给出机器可核对的答案，再保留支撑答案的画面轨迹，并让独立评估器逐项检查每个判断是否真的能从视频中得到。答案、依据和审查意见使用同一编号关联，避免核验时丢失上下文。",
         evidence:
-          "五次独立采样全部通过；更重要的是主动识别了单题过易，以及“根据遮挡预判风险”和“声称看见并不存在的证据”之间的边界。",
+          "五次独立采样全部通过；更重要的是主动识别了单题过易，以及“根据遮挡预判风险”和“声称看见并不存在的证据”之间的边界。每次采样都保存选择、置信度、证据帧与审查意见，区分流程成功和题目过易，逐项说明依据并保留完整时间顺序，审查者可以据此复算每次判定。",
         boundary:
-          "小样本满分只能证明流程能够跑通，不能代表普遍准确率；评估模型本身也可能出错，因此分歧、原始画面和核验过程都必须可追溯。",
+          "小样本满分只能证明流程能够跑通，不能代表普遍准确率；评估模型本身也可能出错，因此分歧、原始画面和核验过程都必须可追溯。最终记录还要把题目、原始回答、证据帧和审查理由保持关联，防止结论脱离来源。",
         flow: ["提问", "留痕", "审查"],
         glyph: "reason",
       },
@@ -266,13 +247,13 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         kicker: "仿真与改进",
         title: "让答案进入真实工程闭环",
         summary:
-          "模型提出飞行控制增益与限制，再由 PX4 和 Gazebo 在多种轨迹与扰动中判定。结构化格式正确，从此不能再冒充工程设计正确。",
+          "模型提出飞行控制增益与限制，再由 PX4 和 Gazebo 在多种轨迹与扰动中判定。结构化格式正确，从此不能再冒充工程设计正确。每组候选还必须绑定机型、世界、轨迹和扰动条件，才能解释一次通过究竟覆盖了什么。",
         method:
-          "把每次提议限制在合法的 PX4 参数范围内，执行统一的场景矩阵，并把具体超标指标反馈给下一轮，让修改真正回应测量结果。",
+          "把每次提议限制在合法的 PX4 参数范围内，执行统一的场景矩阵，并把具体超标指标反馈给下一轮，让修改真正回应测量结果。下一轮必须说明调整了哪项参数、为何调整，以及它回应了哪个失败指标。",
         evidence:
-          "五次独立提议只有两次通过；验证器明确指出哪项指标超出多少后，系统留下了一条“失败 → 失败 → 通过”的三轮改进轨迹。",
+          "五次独立提议只有两次通过；验证器明确指出哪项指标超出多少后，系统留下了一条“失败 → 失败 → 通过”的三轮改进轨迹。留存记录逐轮标出阻断指标、参数变化和复测结果，而不是只保存最后一次成功。",
         boundary:
-          "仿真通过只支持已经测试的机型、世界、轨迹和扰动范围，不能直接证明实机飞行安全，也不能自动迁移到另一种机架。",
+          "仿真通过只支持已经测试的机型、世界、轨迹和扰动范围，不能直接证明实机飞行安全，也不能自动迁移到另一种机架。改变载荷、传感器、动力或环境后，都必须重新验证，不能沿用原结论。",
         flow: ["提议", "仿真", "改进"],
         glyph: "simulate",
       },
@@ -282,13 +263,13 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         kicker: "工具与反馈",
         title: "把工具、仿真和反馈接成回路",
         summary:
-          "五个无人机任务共用一套跟踪误差、超调和稳定性验证器；模型读取仿真反馈，再提出下一组受边界约束的参数。",
+          "五个无人机任务共用一套跟踪误差、超调和稳定性验证器；模型读取仿真反馈，再提出下一组受边界约束的参数。每次工具调用都留下输入、输出和状态，避免只看最终结论却无法解释中间过程。",
         method:
-          "让所有任务共享同一套工具契约和结构化观测，只有上一轮产生了可诊断证据之后，系统才允许据此发起下一次尝试；下一轮必须逐项回应已经测得的异常，不能无依据重试。",
+          "让所有任务共享同一套工具契约和结构化观测，只有上一轮产生了可诊断证据之后，系统才允许据此发起下一次尝试；下一轮必须逐项回应已经测得的异常，不能无依据重试。工具失败也作为独立结果保存。",
         evidence:
-          "无工具条件为十三次通过、十二次失败；加入工具后达到二十二次通过、三次失败。多轮改进还救回了三次首轮失败。",
+          "无工具条件为十三次通过、十二次失败；加入工具后达到二十二次通过、三次失败。多轮改进还救回了三次首轮失败。每次恢复都保留前后诊断差异，说明改进来自哪些观测，而不是偶然重跑。",
         boundary:
-          "工具只有在暴露了正确状态、验证器也真实对应工程目标时才有价值；一次看起来很自信的工具调用，仍然不等于接受结论。",
+          "工具只有在暴露了正确状态、验证器也真实对应工程目标时才有价值；一次看起来很自信的工具调用，仍然不等于接受结论。日志必须同时展示工具状态、验证器输入和最终验收规则。",
         flow: ["调用", "测量", "重试"],
         glyph: "tools",
       },
@@ -298,13 +279,13 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         kicker: "基准与诊断",
         title: "从一道题走向问题家族",
         summary:
-          "作业四原始文档暂缺，因此这一桥梁依据作业五与课程项目指南重建：问题家族、重复试验、统一验证接口、仿真日志和明确的失败分类。",
+          "作业四原始文档暂缺，因此这一桥梁依据作业五与课程项目指南重建：问题家族、重复试验、统一验证接口、仿真日志和明确的失败分类。重建依据和无法恢复的部分分别标注，避免把后来的推断写成当时的原始事实。",
         method:
-          "把相关案例组织成问题家族，在受控随机种子下重复试验，保存每次记录，并区分跟踪、安全、可靠性与基础设施故障。",
+          "把相关案例组织成问题家族，在受控随机种子下重复试验，保存每次记录，并区分跟踪、安全、可靠性与基础设施故障。所有运行使用相同字段和分类标签，使跨任务、跨种子比较保持一致。",
         evidence:
-          "逐次记录让跟踪、可靠性、安全和基础设施故障都能够被诊断，而不再只是一次演示中的偶然现象；这一步把原型连接到可审计基准。",
+          "逐次记录让跟踪、可靠性、安全和基础设施故障都能够被诊断，而不再只是一次演示中的偶然现象；这一步把原型连接到可审计基准。失败能够按类别汇总，也能回到单次日志查明发生条件。",
         boundary:
-          "由于作业四原始材料尚未找回，本阶段明确标注为依据后续课程证据进行的重建，而不是对缺失细节作未经证实的补写。",
+          "由于作业四原始材料尚未找回，本阶段明确标注为依据后续课程证据进行的重建，而不是对缺失细节作未经证实的补写。任何数字或流程若没有后续材料支持，就不会被补成确定事实。",
         flow: ["分组", "记录", "诊断"],
         glyph: "benchmark",
       },
@@ -314,13 +295,13 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         kicker: "记忆与安全",
         title: "让系统记住，也学会怀疑记忆",
         summary:
-          "历史试验被提炼为可按问题家族与失败机理检索的工程经验；同一研究也检验了过度泛化和恶意记忆怎样污染后续决策。",
+          "历史试验被提炼为可按问题家族与失败机理检索的工程经验；同一研究也检验了过度泛化和恶意记忆怎样污染后续决策。每条经验都携带来源、适用条件和结果，便于判断它是否真的适合当前任务。",
         method:
-          "按照问题结构检索经验，同时附带来源和结果；任何被召回的建议都必须重新交给当前任务的验证器检查，才能进入下一步。",
+          "按照问题结构检索经验，同时附带来源和结果；任何被召回的建议都必须重新交给当前任务的验证器检查，才能进入下一步。不匹配、过期或缺少出处的内容默认拒绝，不能悄悄进入参数方案。",
         evidence:
-          "困难题通过率由百分之二十六点七提升到百分之六十三点三；一条误导经验又让某题由五次通过四次跌至仅通过一次。收益与风险被同时测量。",
+          "困难题通过率由百分之二十六点七提升到百分之六十三点三；一条误导经验又让某题由五次通过四次跌至仅通过一次。收益与风险被同时测量，并保留每次检索命中和验证结果，也记录经验为何被采用或拒绝。",
         boundary:
-          "记忆只能作为上下文，不能成为裁决者；过期、不匹配或恶意的经验必须能够被拒绝，而且不能污染当前实验的真实记录。",
+          "记忆只能作为上下文，不能成为裁决者；过期、不匹配或恶意的经验必须能够被拒绝，而且不能污染当前实验的真实记录。用户还应能够查看来源、撤销使用并删除个人记忆，隔离范围必须绑定用户和实验。",
         flow: ["检索", "核对", "应用"],
         glyph: "memory",
       },
@@ -330,13 +311,13 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         kicker: "受控研究",
         title: "把一次作业变成诚实的工程研究",
         summary:
-          "ECE484 中真实的调参困难被重构成具体问题，并配上事前预测、对照条件、验收标准、试验预算、可复现材料和局限讨论。",
+          "ECE484 中真实的调参困难被重构成具体问题，并配上事前预测、对照条件、验收标准、试验预算、可复现材料和局限讨论。研究协议先于结果冻结，避免看到结果之后再改问题或挑选有利指标。",
         method:
-          "在比较前冻结研究问题与指标，让基线和不同提议方法处在匹配条件下，并保存足以复现每项结果的配置、日志和报告。",
+          "在比较前冻结研究问题与指标，让基线和不同提议方法处在匹配条件下，并保存足以复现每项结果的配置、日志和报告。随机种子、预算、场景矩阵和失败规则也必须保持一致，保证比较能够复查。",
         evidence:
-          "课程报告用九个案例比较默认参数、搜索、模型提议和多轮改进。它提供的是仿真证据，明确不能被包装成真实飞行安全结论。",
+          "课程报告用九个案例比较默认参数、搜索、模型提议和多轮改进。它提供的是仿真证据，明确不能被包装成真实飞行安全结论。每个数字都应能回到对应配置、日志和验收判定，包括未通过案例。",
         boundary:
-          "报告只支持其仿真协议之内的结论；更广泛的主张还需要更多随机种子、机型和环境、独立复现，以及最终的实机验证。",
+          "报告只支持其仿真协议之内的结论；更广泛的主张还需要更多随机种子、机型和环境、独立复现，以及最终的实机验证。在这些工作完成前，结论必须保持限定，不得提前外推或省略局限。",
         flow: ["预测", "比较", "报告"],
         glyph: "study",
       },
@@ -346,13 +327,13 @@ const COURSE_COPY: Record<Locale, CourseCopy> = {
         kicker: "产品延伸",
         title: "让经过验证的闭环真正可用",
         summary:
-          "DroneDream 把课程项目延伸为一个连接实验设计、受约束提议、任务执行、仿真适配、验收规则、诊断、历史与报告的平台。",
+          "DroneDream 把课程项目延伸为一个连接实验设计、受约束提议、任务执行、仿真适配、验收规则、诊断、历史与报告的平台。用户能够从问题定义一路追踪到候选参数、运行状态、失败原因和最终证据。",
         method:
-          "把验证闭环产品化为明确阶段：配置实验、生成有边界的候选、执行可重复试验、按规则接受，并完整保存证据链。",
+          "把验证闭环产品化为明确阶段：配置实验、生成有边界的候选、执行可重复试验、按规则接受，并完整保存证据链。每个阶段都具有可观察状态、失败关闭路径和人工复核入口，系统才能安全恢复。",
         evidence:
-          "大模型负责提出可检验的假设，仿真结果和验收条件负责决定是否采用。产品继续坚持课程所强调的“智能”与“决策权限”分离。",
+          "大模型负责提出可检验的假设，仿真结果和验收条件负责决定是否采用。产品继续坚持课程所强调的“智能”与“决策权限”分离，并把失败运行和拒绝理由同样作为证据保存，供用户完整回看。",
         boundary:
-          "DroneDream 用来辅助工程判断，而不是替代判断；约束、密钥、运行执行、结果审查以及是否离开仿真环境，最终都由用户控制。",
+          "DroneDream 用来辅助工程判断，而不是替代判断；约束、密钥、运行执行、结果审查以及是否离开仿真环境，最终都由用户控制。任何离开既有仿真范围的决定都需要新的验证，并重新建立证据。",
         flow: ["设计", "执行", "接受"],
         glyph: "product",
       },
@@ -520,29 +501,6 @@ function EngineeringBackdrop() {
   );
 }
 
-function lastLineOccupancy(paragraph: HTMLParagraphElement): number {
-  const range = document.createRange();
-  const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
-  const characterRects: DOMRect[] = [];
-  while (walker.nextNode()) {
-    const node = walker.currentNode;
-    const text = node.textContent ?? "";
-    for (let offset = 0; offset < text.length; offset += 1) {
-      if (text[offset]?.trim() === "") continue;
-      range.setStart(node, offset);
-      range.setEnd(node, offset + 1);
-      const rect = range.getBoundingClientRect();
-      if (rect.width > 0) characterRects.push(rect);
-    }
-  }
-  if (characterRects.length === 0 || paragraph.clientWidth <= 0) return 1;
-  const lastTop = Math.max(...characterRects.map((rect) => rect.top));
-  const lastLine = characterRects.filter((rect) => Math.abs(rect.top - lastTop) < 1);
-  const left = Math.min(...lastLine.map((rect) => rect.left));
-  const right = Math.max(...lastLine.map((rect) => rect.right));
-  return (right - left) / paragraph.clientWidth;
-}
-
 function FittedParagraph({
   children,
   className,
@@ -613,6 +571,88 @@ function FittedParagraph({
 
   return (
     <p ref={paragraphRef} className={className} id={id}>
+      {children}
+    </p>
+  );
+}
+
+const STAGE_BODY_TARGET_LINES = 9;
+const STAGE_BODY_MIN_WIDTH_PX = 160;
+
+function StageBodyParagraph({ children }: { children: ReactNode }) {
+  const paragraphRef = useRef<HTMLParagraphElement>(null);
+
+  useLayoutEffect(() => {
+    const paragraph = paragraphRef.current;
+    const container = paragraph?.parentElement;
+    if (!paragraph || !container) return undefined;
+    let cancelled = false;
+    let frame = 0;
+
+    const fit = () => {
+      if (cancelled) return;
+      paragraph.style.width = "100%";
+      paragraph.dataset.renderedLines = "0";
+      paragraph.dataset.lineContract = "pending";
+      const style = getComputedStyle(container);
+      const availableWidth = Math.max(
+        0,
+        container.clientWidth
+          - Number.parseFloat(style.paddingLeft)
+          - Number.parseFloat(style.paddingRight),
+      );
+      if (availableWidth <= 0) return;
+
+      const minWidth = Math.min(STAGE_BODY_MIN_WIDTH_PX, Math.floor(availableWidth));
+      const maxWidth = Math.floor(availableWidth);
+      let best = {
+        width: maxWidth,
+        lines: Number.POSITIVE_INFINITY,
+        distance: Number.POSITIVE_INFINITY,
+      };
+      for (let width = maxWidth; width >= minWidth; width -= 1) {
+        paragraph.style.width = `${width}px`;
+        const lines = renderedLineCount(paragraph);
+        const distance = Math.abs(lines - STAGE_BODY_TARGET_LINES);
+        if (
+          distance < best.distance
+          || (distance === best.distance && width > best.width)
+        ) {
+          best = { width, lines, distance };
+        }
+        if (lines === STAGE_BODY_TARGET_LINES) break;
+      }
+      paragraph.style.width = `${best.width}px`;
+      paragraph.dataset.renderedLines = String(best.lines);
+      paragraph.dataset.lineContract =
+        best.lines === STAGE_BODY_TARGET_LINES ? "pass" : "fail";
+    };
+
+    const scheduleFit = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(fit);
+    };
+    scheduleFit();
+    void document.fonts?.ready.then(scheduleFit);
+    window.addEventListener("resize", scheduleFit);
+    const resizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(scheduleFit);
+    resizeObserver?.observe(container);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", scheduleFit);
+      resizeObserver?.disconnect();
+    };
+  }, [children]);
+
+  return (
+    <p
+      ref={paragraphRef}
+      className="ece498-stage-body"
+      data-target-lines={STAGE_BODY_TARGET_LINES}
+    >
       {children}
     </p>
   );
@@ -831,46 +871,19 @@ export function ECE498() {
           <div className="ece498-stage-sections">
             <section className="ece498-stage-copy-section">
               <span>{copy.detailLabel}</span>
-              <FittedParagraph>
-                {activeStage.summary} {copy.changeContext}
-                {activeStage.id === "dronedream"
-                  ? locale === "zh-CN"
-                    ? " 整个平台始终保持端到端可检查、可复核，每一项结论都能回到对应的提议、运行与裁决。"
-                    : " The platform remains inspectable end to end across every experiment and review."
-                  : ""}
-              </FittedParagraph>
+              <StageBodyParagraph>{activeStage.summary}</StageBodyParagraph>
             </section>
             <section className="ece498-stage-copy-section ece498-stage-evidence">
               <span>{copy.evidenceLabel}</span>
-              <FittedParagraph>
-                {activeStage.evidence} {copy.evidenceContext}
-                {activeStage.id === "hw2"
-                  ? locale === "zh-CN"
-                    ? " 完整改进轨迹始终可以被独立复查。"
-                    : " The full trace remains independently reviewable."
-                  : activeStage.id === "dronedream"
-                  ? locale === "zh-CN"
-                    ? " 完整的决策路径始终清晰可见、可查。"
-                    : " The full decision path remains visible."
-                  : ""}
-              </FittedParagraph>
+              <StageBodyParagraph>{activeStage.evidence}</StageBodyParagraph>
             </section>
             <section className="ece498-stage-copy-section">
               <span>{copy.methodLabel}</span>
-              <FittedParagraph>
-                {activeStage.method} {copy.methodContext}
-              </FittedParagraph>
+              <StageBodyParagraph>{activeStage.method}</StageBodyParagraph>
             </section>
             <section className="ece498-stage-copy-section ece498-stage-boundary">
               <span>{copy.boundaryLabel}</span>
-              <FittedParagraph>
-                {activeStage.boundary} {copy.boundaryContext}
-                {activeStage.id === "dronedream"
-                  ? locale === "zh-CN"
-                    ? " 最终决定权始终掌握在用户手中。"
-                    : " The human operator makes that final decision in every recorded experiment."
-                  : ""}
-              </FittedParagraph>
+              <StageBodyParagraph>{activeStage.boundary}</StageBodyParagraph>
             </section>
           </div>
         </div>
