@@ -1,0 +1,360 @@
+{
+  "schemaVersion": "dronedream.website-browser-auth-shared-static-production-deployment.v1",
+  "generatedAt": "2026-07-30T06:26:19.3844437Z",
+  "scope": {
+    "branch": "codex/website",
+    "staticDeploymentPerformed": true,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "releaseOrRuntimeMutationPerformed": false,
+    "technicalReportModified": false,
+    "otherServerModified": false,
+    "approvedMirrorServer": "47.93.180.216",
+    "explicitlyExcludedServer": "124.221.220.60"
+  },
+  "subject": {
+    "integrationSourceCommit": "2ee320996036e5e7cd5f5a22b99ccbf1af084e9f",
+    "integrationSourceTree": "ecf68031cca5c426f6dff9714629a92fa1f4d862",
+    "integrationSourceCommittedAt": "2026-07-30T13:15:55+08:00",
+    "firstDonorIntegrationCommit": "80e22057ed6223e1e0bf3b6dc23ea6d977d04a38",
+    "secondDonorIntegrationCommit": "4d8af408ac3f192c7969d247c5ad36f1f1e081a6",
+    "websiteAccountSourceCommit": "1366572e4b52777e7ffb6106568bfbc579517bbc",
+    "websiteAccountAuditCommit": "2ee320996036e5e7cd5f5a22b99ccbf1af084e9f"
+  },
+  "donorProvenance": [
+    {
+      "source": "89f4e50fb61cab9a382328c223cb77ba83fbc2ed",
+      "parent": "3149d1336c745b2211312116d96448482c5de651",
+      "selection": "git diff 3149d1336c745b2211312116d96448482c5de651..89f4e50fb61cab9a382328c223cb77ba83fbc2ed -- frontend/**",
+      "frontendPaths": 21,
+      "detailedBlobProvenanceReceipt": "website/validation-receipts/website-shared-console-integration-production-deployment-80e2205.json",
+      "excluded": [
+        "desktop/**",
+        "backend/**",
+        "artifacts/**",
+        "technical-report/**"
+      ]
+    },
+    {
+      "source": "b679c07a133dd6fb026f807d91e418908b96695c",
+      "parent": "024597c0bf28b8e414b1b39b52fc41c4f8aedd09",
+      "selection": "git diff 024597c0bf28b8e414b1b39b52fc41c4f8aedd09..b679c07a133dd6fb026f807d91e418908b96695c -- frontend/**",
+      "frontendPaths": [
+        "frontend/package.json",
+        "frontend/scripts/verify-desktop-browser-auth.mjs",
+        "frontend/src/AppShell.tsx",
+        "frontend/src/__tests__/AppShellLauncher.test.tsx",
+        "frontend/src/__tests__/DesktopSetup.test.tsx",
+        "frontend/src/__tests__/browserAuth.test.ts",
+        "frontend/src/__tests__/desktopBridge.test.ts",
+        "frontend/src/desktop/bridge.ts",
+        "frontend/src/features/auth/browserAuth.ts",
+        "frontend/src/features/auth/supabaseClient.ts",
+        "frontend/src/i18n/I18nProvider.tsx",
+        "frontend/src/pages/DesktopSetup.tsx"
+      ],
+      "excluded": [
+        "desktop/**",
+        "docs/**",
+        "artifacts/**",
+        "backend/**",
+        "technical-report/**"
+      ]
+    }
+  ],
+  "authenticationContract": {
+    "websiteOrigin": {
+      "entry": "/account/?source=website&mode=sign-in&returnTo=/",
+      "presentation": "full-page website account route; no sign-in modal",
+      "sessionScope": "website session in the current browser origin only",
+      "desktopApplicationSessionCreated": false,
+      "desktopBridgeInvoked": false,
+      "querySpoofing": "A caller-supplied source=desktop query is ignored by the website route; data-auth-source remains website.",
+      "returnPathPolicy": "Only allowlisted same-site return paths are accepted.",
+      "httpMirrorPolicy": "The HTTP mirror displays a bilingual read-only explanation and renders no email or password form."
+    },
+    "desktopOrigin": {
+      "currentBehavior": "The integrated donor uses a local loopback browser flow to establish the desktop session without putting tokens or state in the site URL or logs.",
+      "canonicalWebsiteSessionAlsoCreated": false,
+      "classification": "Not yet complete against the product-owner rule that desktop-origin sign-in should sign in both desktop and website.",
+      "reason": "The software-owned desktop launcher still opens the local loopback page rather than a normally trusted canonical website origin. Secure dual-session handoff requires a software-side request binding and a trusted HTTPS website page; this website source does not pass credentials or session tokens through URLs.",
+      "requiredNextSteps": [
+        "GitHub Pages must serve a normally trusted certificate whose SAN includes getdronedream.com.",
+        "The software line must adopt a cryptographically bound, one-time desktop-origin request that opens the canonical website account page.",
+        "The website page must establish its own Supabase browser session and return the desktop result to the validated loopback request without URL or log token leakage.",
+        "Both origins must then pass real email sign-in and cancellation E2E before the dual-session behavior is claimed complete."
+      ]
+    }
+  },
+  "sourceValidation": {
+    "currentCompleteFrontendSuite": {
+      "files": 54,
+      "tests": 365,
+      "passed": 365,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appBuild": "passed with the existing non-failing Vite chunk-size advisory",
+    "sharedSiteAndConsoleBuild": "passed",
+    "deploymentContract": {
+      "tests": 11,
+      "subtests": 22,
+      "passedTests": 11,
+      "passedSubtests": 22,
+      "failed": 0
+    },
+    "denoFunctionsSecurity": {
+      "tests": 24,
+      "passed": 24,
+      "failed": 0,
+      "fmt": "passed",
+      "lint": "passed",
+      "typecheck": "passed",
+      "deploymentPerformed": false
+    },
+    "historyLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "summarySha256": "06543ef194858dce39b063493cb1afb403e7a361f5e5da593dda22a9e0b7a637"
+    },
+    "softwareUiLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "receiptSha256": "367fa26ca03ef1fbc1d1d51e19cde0f6286e6880aac4ac8eb19c61b21d8dc6b3"
+    },
+    "desktopBrowserAuthHarness": {
+      "layouts": 3,
+      "successfulCallbacks": 3,
+      "cancellations": 1,
+      "tokenOrStateUrlLeakage": 0,
+      "visualInspection": "passed"
+    },
+    "localFourBrowserMatrix": {
+      "checks": 120,
+      "passed": 120,
+      "failed": 0,
+      "summarySha256": "7bbac0db4da7ddc9284ed67c83ad987bbfebd24c23858633b162703ec0c7da5a"
+    },
+    "communityManual": {
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "yellowDiagonalAccentCount": 0,
+      "summarySha256": "757c3d5101455f2b27112acdfc57cd0cacd4807a2c3fbcddfcafe8d21c425caf"
+    },
+    "typographyAndLayout": {
+      "desktop1440x1000": {
+        "result": "passed full typography and layout",
+        "summarySha256": "bb06def4cda13830cace8db80ee132a59ffed3ad3871c793cc16c242f014b48"
+      },
+      "wide2048x1152": {
+        "result": "passed full typography and layout",
+        "summarySha256": "2cc526ce1e520f7e128268465b210d0687bb9fa73cce03b781ae745866f0627d"
+      },
+      "mobile390x844": {
+        "result": "passed layout-only",
+        "summarySha256": "ef262aa584b3865a2be2685e38e9df2f5b4a3676066c8f192365d57d1e67d573"
+      }
+    },
+    "performance": {
+      "cases": 6,
+      "passed": 6,
+      "failed": 0,
+      "summarySha256": "ea103bc651c05a6d26bb72ecd14c77a4b9af2fc5be3aa617cb0cebd27e9cbb5d"
+    },
+    "diffCheck": "passed",
+    "exactSourceCleanBeforeDeployment": true
+  },
+  "artifact": {
+    "buildPolicy": "GitHub Actions built once from the immutable deploy tag. The exact dronedream-site workflow artifact was downloaded by artifact ID, matched GitHub's artifact digest, expanded, and verified against all 123 SHA256SUMS entries. The same expanded workflow artifact bytes were then downloaded and verified on the Aliyun staging host before atomic activation; Aliyun did not rebuild the frontend.",
+    "localProductionLikeValidationBuildNotDeployed": {
+      "files": 124,
+      "integrityEntries": 123,
+      "sha256SumsSha256": "ceea223cf0e680e33572ae68f4b788ea95d38991a561f4dd5cf8c8acafa0ffbf",
+      "buildManifestSha256": "b8dd0a0c590f904f14da4a851a82ba33f30ad705596d8f9bdd70d1379d441956"
+    },
+    "workflowArtifact": {
+      "siteArtifactId": 8749170822,
+      "siteArtifactName": "dronedream-site-2ee320996036e5e7cd5f5a22b99ccbf1af084e9f",
+      "siteArtifactZipBytes": 28548560,
+      "siteArtifactDigest": "sha256:fa753d080aa8ea991fbe6d70360646286d0aebf7166ec178a80dfb7e322fb748",
+      "pagesArtifactId": 8749171339,
+      "pagesArtifactZipBytes": 28556225,
+      "pagesArtifactDigest": "sha256:70f8d5e951e4c80d3981f65a2732f8f5244fa2d96d99ca27a356c599f9c7ef94",
+      "expandedFiles": 124,
+      "expandedBytes": 31899975,
+      "integrityEntries": 123,
+      "missing": 0,
+      "mismatched": 0,
+      "unlisted": 0
+    },
+    "sha256SumsFileSha256": "68a0be1efce69569d2d2fc0ba6678c6dfd702c9ee6d6d7a1f96ad2e16be4444c",
+    "buildManifestSha256": "a77a7ca87f1e5042a860ba40f5d63905231eced67ea2df788755c84af02ada6a",
+    "latestJsonSha256": "98d1fb659c3121f4b1ae051e717bb9cc20fb6536ab48118f56b0483eb736ea9d",
+    "aliYunServerArchiveBytes": 28516138,
+    "aliYunServerArchiveSha256": "8f3084b735d9ef9e7faf9d95482a930a018292b7584053b975b8a49430217253"
+  },
+  "deployment": {
+    "deployTag": {
+      "name": "website-deploy-1.0.0-20260730-2ee3209",
+      "tagObjectSha": "6c6e55c50ab6f001a59d3faa19641a3dca86fa9b",
+      "peeledSourceCommit": "2ee320996036e5e7cd5f5a22b99ccbf1af084e9f",
+      "immutable": true
+    },
+    "githubPages": {
+      "workflowRunId": 30516729057,
+      "workflowUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30516729057",
+      "workflowConclusion": "success",
+      "workflowHeadRef": "website-deploy-1.0.0-20260730-2ee3209",
+      "workflowHeadSha": "2ee320996036e5e7cd5f5a22b99ccbf1af084e9f",
+      "buildJobId": 90788164919,
+      "publishJobId": 90788291575,
+      "deploymentId": 5669617348,
+      "deploymentStatusId": 16121771449,
+      "deploymentStatus": "success",
+      "environmentUrl": "http://getdronedream.com/"
+    },
+    "aliYun": {
+      "host": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260730T060229Z",
+      "rollbackRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260730T015614Z",
+      "rollbackReleaseRetained": true,
+      "atomicCurrentSwitch": true,
+      "nginxConfigurationTests": "passed",
+      "temporaryStagingRemoved": true
+    },
+    "githubPagesEnvironmentPolicy": {
+      "preDeploymentSha256": "465003d92d12a488890d6dd03c5233ae8be255da94e7e4baf2c792a47f0a4cb6",
+      "temporaryExactTagPolicyId": 55994534,
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredPolicies": [
+        {
+          "id": 55186327,
+          "name": "main",
+          "type": "branch"
+        }
+      ],
+      "postDeploymentSha256": "465003d92d12a488890d6dd03c5233ae8be255da94e7e4baf2c792a47f0a4cb6",
+      "restoredExactly": true
+    }
+  },
+  "onlineParity": {
+    "sourceCommitAtBothOrigins": "2ee320996036e5e7cd5f5a22b99ccbf1af084e9f",
+    "publicManifestBytesIdentical": true,
+    "completePathAudit": {
+      "integrityEntries": 123,
+      "byteIdenticalAndExpectedSha256": 122,
+      "productAssetMismatches": 0,
+      "totalBytesDownloaded": 63773072,
+      "platformControlException": {
+        "path": ".nojekyll",
+        "githubPagesStatus": 404,
+        "aliYunStatus": 200,
+        "classification": "GitHub Pages consumes the .nojekyll deployment sentinel but does not expose it as a public asset. The file remains present and hash-verified in both the workflow artifact and the Aliyun release. All HTML, JavaScript, CSS, documents, images, metadata, checksum, signature, and installer paths passed byte parity."
+      }
+    },
+    "installer": {
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "bytes": 10387042,
+      "sha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+      "authenticode": "NotSigned",
+      "notSignedStatusAllowedForInternalTesting": true,
+      "githubReleasePagesAliyunByteParity": true,
+      "checksumBytes": 98,
+      "checksumFileSha256": "400d33119bcea1447262904bf718b96b4aed2dd4395e8a4e5e120f89faf0d40d",
+      "updaterSignatureBytes": 420,
+      "updaterSignatureSha256": "0406f72c46f44da494e29621b815b190d43698f1f700c63df14e95d66431230a",
+      "tauriLatestJsonSha256": "96774c5f1db7ffd6ecb60b160044aaa21afaa771e67dd83cc0d9422072c410f0"
+    },
+    "runtime": {
+      "changedInThisDeployment": false,
+      "tag": "runtime-v0.1.0-beta.2",
+      "sourceCommit": "755c511539fe561207ca38ff5079f471a4110896",
+      "authoritativeHandoffManifestSha256": "34f5738101217ce92adfdfe8a2a932e6f4ecb73ecb41ba601c851ad217dfa33a"
+    }
+  },
+  "onlineBrowserValidation": {
+    "matrix": {
+      "checks": 100,
+      "passed": 100,
+      "failed": 0,
+      "productErrors": 0,
+      "browsers": [
+        "Microsoft Edge",
+        "Google Chrome",
+        "Lenovo SLBrowser",
+        "Firefox"
+      ],
+      "routes": [
+        "home",
+        "community",
+        "manual",
+        "account",
+        "console"
+      ],
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "edgeOrigins": [
+        "https://getdronedream.com/",
+        "http://47.93.180.216/"
+      ],
+      "otherBrowserOrigin": "http://47.93.180.216/",
+      "accountChecks": 20,
+      "accountIsolationFailures": 0,
+      "horizontalOverflowFailures": 0,
+      "screenshots": 100,
+      "screenshotManifestSha256": "7589a2481ed4b96595cfbf2bf32657cf73f87ed80edf4152da9ec144dd871e7d"
+    },
+    "delayedVisualInspection": {
+      "screenshots": 6,
+      "screenshotManifestSha256": "4f362f81b90ed55b8bc71296a5d20c5581afd390a4204feb258743e609a3f906",
+      "result": "The initial 900 ms screenshots showed an incompletely painted brand image and Manual/Community loading states. A second run used network-idle plus five seconds. The brand images were complete with non-zero natural and rendered dimensions, Manual content was present, Community cards were present on both origins, and no spinner remained. The six delayed screenshots were visually inspected."
+    },
+    "visualFindings": [
+      "Global home: complete lockup, hero copy, drone scene, controls, and no clipping.",
+      "Global account: full-page bilingual website-only sign-in copy and complete credential form.",
+      "Global and Aliyun Community: complete recent-topic cards, no yellow diagonal accent, and no card clipping.",
+      "Global and Aliyun mobile Manual: chapter rail, title, body, and callout render within 390 pixels.",
+      "Aliyun account and console: explicit read-only/trusted-HTTPS explanation with no credential form or sensitive action."
+    ]
+  },
+  "externalGatesAndHonestResiduals": {
+    "tls": {
+      "normalTrustResult": "failed",
+      "curlExitCode": 60,
+      "pagesProtectedDomainState": "verified",
+      "certificateState": "authorization_created",
+      "certificateDomainsRequested": [
+        "getdronedream.com",
+        "www.getdronedream.com"
+      ],
+      "httpsEnforced": false,
+      "httpsEnforcedChanged": false,
+      "requiredNextStep": "Wait for GitHub Pages to issue a normally trusted certificate whose SAN includes getdronedream.com, then enable https_enforced and rerun the real signed-in website and desktop-origin dual-session E2E."
+    },
+    "supabase": {
+      "boundedResponseAndCorsSourceIncluded": true,
+      "productionFunctionsDeploymentPerformed": false,
+      "productionSecretsOrCorsEnvironmentChanged": false,
+      "paymentOrModelProductionConfigurationChanged": false
+    },
+    "desktopDualSession": "Desktop-origin sign-in does not yet establish a canonical website session; this remains a software-plus-trusted-HTTPS integration gate and is not claimed complete."
+  },
+  "attestation": {
+    "receiptOnlyCommitMayFollow": true,
+    "thisReceiptDoesNotClaimValidationOfItsOwnCommit": true,
+    "sourceCommitRemainsTheDeploymentSubject": "2ee320996036e5e7cd5f5a22b99ccbf1af084e9f",
+    "worktreeCleanBeforeReceiptCreation": true,
+    "upstreamAlignedBeforeReceiptCreation": true
+  }
+}
