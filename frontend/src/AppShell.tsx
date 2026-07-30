@@ -1697,7 +1697,8 @@ function AppShellContent() {
     && auth.configured
     && !auth.loading
     && !auth.account;
-  const accountDialogOpen = accountOpen || accountRequired;
+  const accountDialogRequired = accountRequired && !launcherMode;
+  const accountDialogOpen = accountOpen || accountDialogRequired;
 
   useEffect(() => {
     if (!desktopRuntime) return;
@@ -1971,7 +1972,7 @@ function AppShellContent() {
       (accountCloseRef.current ?? firstInput)?.focus();
     });
     const handleDialogKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !accountRequired) {
+      if (event.key === "Escape" && !accountDialogRequired) {
         closeAccount();
         return;
       }
@@ -2007,7 +2008,7 @@ function AppShellContent() {
       cancelAnimationFrame(focusFrame);
       document.removeEventListener("keydown", handleDialogKeyDown);
     };
-  }, [accountDialogOpen, accountRequired, closeAccount]);
+  }, [accountDialogOpen, accountDialogRequired, closeAccount]);
 
   const exitGuard = exitPrompt ? (
     <ExitGuardDialog
@@ -2021,13 +2022,13 @@ function AppShellContent() {
       className="account-dialog-backdrop"
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target !== event.currentTarget || accountRequired) return;
+        if (event.target !== event.currentTarget || accountDialogRequired) return;
         closeAccount();
       }}
     >
       <AccountDialog
         closeRef={accountCloseRef}
-        required={accountRequired}
+        required={accountDialogRequired}
         onClose={closeAccount}
       />
     </div>
@@ -2059,26 +2060,6 @@ function AppShellContent() {
                   ? t("runtimeGate.checkedShort")
                   : t("runtimeGate.requiredShort")}
             </span>
-            <button
-              ref={accountButtonRef}
-              type="button"
-              className="launcher-account-button"
-              aria-label={accountCopy.account}
-              aria-haspopup="dialog"
-              aria-expanded={accountDialogOpen}
-              onClick={() => {
-                setLauncherSettingsOpen(false);
-                setAccountOpen(true);
-              }}
-            >
-              <AccountAvatar
-                account={auth.account}
-                className="launcher-account-avatar"
-              />
-              <span>
-                {auth.account?.displayName ?? accountCopy.signIn}
-              </span>
-            </button>
             <button
               ref={launcherSettingsButtonRef}
               type="button"

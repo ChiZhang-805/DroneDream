@@ -138,7 +138,17 @@ const enTranslations = {
     "launcher.title.preparing": "Preparing your flight environment",
     "launcher.title.ready": "Your flight lab is ready",
     "launcher.openWorkspace": "Open tuning workspace",
-    "launcher.signIn": "Sign in to continue",
+    "launcher.signIn": "Sign in and enter tuning workspace",
+    "launcher.browserAuthWaiting": "Waiting for browser sign-in…",
+    "launcher.browserAuthAdopting": "Confirming account…",
+    "launcher.browserAuthCancel": "Cancel sign-in",
+    "launcher.browserAuthErrorTitle": "Browser sign-in needs attention",
+    "launcher.browserAuthFailed":
+      "The browser sign-in did not complete. Start it again when you are ready.",
+    "launcher.browserAuthCancelFailed":
+      "The browser sign-in could not be cancelled cleanly. Close the browser page and retry after the current request times out.",
+    "launcher.browserAuthNotConfigured":
+      "This desktop build is missing the public account configuration. Install a release build that passed the account configuration gate.",
     "launcher.retryChecks": "Retry startup checks",
     "launcher.startupBlocked": "Startup checks need attention",
     "launcher.progressLabel": "Startup readiness progress",
@@ -1494,7 +1504,16 @@ const zhTranslations = {
     "launcher.title.preparing": "正在准备飞行环境",
     "launcher.title.ready": "你的飞行实验室已经就绪",
     "launcher.openWorkspace": "进入调优平台",
-    "launcher.signIn": "登录后继续",
+    "launcher.signIn": "登录并进入调优平台",
+    "launcher.browserAuthWaiting": "正在等待浏览器登录…",
+    "launcher.browserAuthAdopting": "正在确认账户…",
+    "launcher.browserAuthCancel": "取消登录",
+    "launcher.browserAuthErrorTitle": "浏览器登录需要处理",
+    "launcher.browserAuthFailed": "浏览器登录没有完成。准备好后可以重新发起登录。",
+    "launcher.browserAuthCancelFailed":
+      "本次浏览器登录未能正常取消。请关闭浏览器登录页，等待当前请求超时后再试。",
+    "launcher.browserAuthNotConfigured":
+      "这个桌面版本缺少公开账户配置。请安装已经通过账户配置门禁的正式构建。",
     "launcher.retryChecks": "重新检查启动条件",
     "launcher.startupBlocked": "启动检查需要处理",
     "launcher.progressLabel": "启动就绪进度",
