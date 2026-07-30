@@ -115,7 +115,7 @@ describe("DroneDream public website", () => {
     );
 
     expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
     expect(screen.getByRole("link", { name: "Download Windows preview" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
     expect(screen.getByRole("link", { name: "Download" }))

@@ -72,7 +72,7 @@ describe("website account navigation", () => {
   it("keeps a website-origin sign-in browser-only and returns to the homepage", async () => {
     renderSite();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Login" }));
 
     const form = await waitFor(() => {
       const current = document.querySelector(".site-auth-form");

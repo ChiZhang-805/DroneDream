@@ -56,7 +56,7 @@ const content = {
     console: "Console",
     insecureMirror:
       "This HTTP mirror is read-only; secure account and console actions are disabled.",
-    signIn: "Sign in",
+    signIn: "Login",
     register: "Register",
     account: "Account",
     authTitle: "Sign in",
