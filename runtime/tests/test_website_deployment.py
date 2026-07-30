@@ -186,7 +186,7 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         workflow = self.read(".github/workflows/pages.yml")
 
         self.assertNotIn("DRONEDREAM_CUSTOM_DOMAIN", builder)
-        self.assertIn('$customDomain = [string]$globalTarget.publicHost', builder)
+        self.assertIn("$customDomain = [string]$globalTarget.publicHost", builder)
         self.assertIn("build-manifest.json", builder)
         self.assertIn("SHA256SUMS", builder)
         self.assertIn("dronedream-shared-static-site", builder)
