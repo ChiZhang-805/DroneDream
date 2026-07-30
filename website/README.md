@@ -22,6 +22,13 @@ exact versioned GitHub Release asset. It does not duplicate the installer in
 the shared site artifact. This keeps the global download, checksum, CI artifact,
 and future SignPath-signed release traceable to the same bytes.
 
+Ordinary Pages review deployments retain the commit-pinned shared artifact for
+three days. For a formal production anchor, dispatch `pages.yml` with
+`preserve_release_artifact=true`; that exact artifact is retained for 30 days.
+The immutable deploy tag, committed receipt, public hashes, and server rollback
+directory remain the long-lived audit anchors, so intermediate workflow
+artifacts do not accumulate indefinitely.
+
 Build the Pages artifact locally with:
 
 ```powershell

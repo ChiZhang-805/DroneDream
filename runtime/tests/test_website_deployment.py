@@ -197,6 +197,12 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("-Recurse -Force -File", builder)
         self.assertIn("dronedream-site-${{ github.sha }}", workflow)
         self.assertIn("include-hidden-files: true", workflow)
+        self.assertIn("preserve_release_artifact:", workflow)
+        self.assertIn(
+            "github.event_name == 'workflow_dispatch' "
+            "&& inputs.preserve_release_artifact && 30 || 3",
+            workflow,
+        )
 
     def test_parity_verifies_public_release_metadata_on_both_origins(self) -> None:
         parity = self.read("website/scripts/verify-site-parity.ps1")

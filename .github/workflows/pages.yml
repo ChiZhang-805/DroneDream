@@ -12,6 +12,12 @@ on:
       - "website/pages-release.json"
       - "website/scripts/build-pages-site.ps1"
   workflow_dispatch:
+    inputs:
+      preserve_release_artifact:
+        description: Preserve the commit-pinned shared artifact for a formal release anchor
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -59,7 +65,9 @@ jobs:
           path: frontend/site-dist
           include-hidden-files: true
           if-no-files-found: error
-          retention-days: 30
+          # Ordinary review deployments need only a short rollback window. A
+          # formal release operator must opt in explicitly to long retention.
+          retention-days: ${{ github.event_name == 'workflow_dispatch' && inputs.preserve_release_artifact && 30 || 3 }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
