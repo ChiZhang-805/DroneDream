@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "browser": "Microsoft Edge (Playwright Chromium driver)",
+  "cases": [
+    {
+      "name": "en-login-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentClientWidth": 1440,
+      "documentScrollWidth": 1440,
+      "formVisible": true,
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainBackground": "rgba(0, 0, 0, 0)",
+      "mainBorderRadius": "0px",
+      "brandWidth": 432,
+      "inputWidth": 432,
+      "hasExplanatoryCopy": false,
+      "title": "DroneDream"
+    },
+    {
+      "name": "zh-register-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentClientWidth": 390,
+      "documentScrollWidth": 390,
+      "formVisible": true,
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainBackground": "rgba(0, 0, 0, 0)",
+      "mainBorderRadius": "0px",
+      "brandWidth": 350,
+      "inputWidth": 350,
+      "hasExplanatoryCopy": false,
+      "title": "DroneDream"
+    },
+    {
+      "name": "en-reset-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "documentClientWidth": 1440,
+      "documentScrollWidth": 1440,
+      "formVisible": true,
+      "bodyBackground": "rgb(255, 255, 255)",
+      "mainBackground": "rgba(0, 0, 0, 0)",
+      "mainBorderRadius": "0px",
+      "brandWidth": 432,
+      "inputWidth": 432,
+      "hasExplanatoryCopy": false,
+      "title": "DroneDream"
+    }
+  ],
+  "callbackCount": 3,
+  "cancellationCount": 1,
+  "accountRequests": [
+    {
+      "method": "POST",
+      "path": "/auth/v1/token?grant_type=password"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/v1/otp"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/v1/verify"
+    },
+    {
+      "method": "PUT",
+      "path": "/auth/v1/user"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/v1/otp"
+    },
+    {
+      "method": "POST",
+      "path": "/auth/v1/verify"
+    },
+    {
+      "method": "PUT",
+      "path": "/auth/v1/user"
+    }
+  ],
+  "tokenInUrl": false,
+  "tokenInRequestInventory": false
+}
