@@ -583,4 +583,3 @@ Runtime 体积较大，可以采用：
 - [Runtime beta.2 公开发布回执](validation-receipts/runtime-v0.1.0-beta.2-publication-755c511.json)
 
 这些回执是某次精确发布的历史证据，不应替代下一次上线前的实时检查。
-
