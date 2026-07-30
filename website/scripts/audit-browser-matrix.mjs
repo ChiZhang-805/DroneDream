@@ -86,7 +86,12 @@ const routes = [
   { name: "pricing", path: "/pricing/", root: "#site-root > .dd-site" },
   { name: "manual", path: "/manual/", root: "#site-root > .dd-site" },
   { name: "community", path: "/community/", root: "#site-root > .dd-site" },
-  { name: "account", path: "/account/?source=website&mode=sign-in&returnTo=%2F", root: "#site-root > .dd-site" },
+  {
+    name: "account",
+    path: "/account/?source=website&mode=sign-in&returnTo=%2F",
+    expectedPath: "/account/",
+    root: "#site-root > .dd-site",
+  },
   { name: "console", path: "/console/", root: "#root > .app-shell" },
 ];
 if (consolePreviewUrl) {
@@ -393,60 +398,36 @@ const collectAccessibility = async (page) => page.evaluate(() => {
   return violations;
 });
 
-const checkDialog = async (page) => {
+const checkWebsiteAccountNavigation = async (page, originalRoot) => {
   const button = page.locator(".site-account-button").first();
   if (await button.count() === 0 || !await button.isVisible()) return [];
   await button.click();
-  const dialog = page.locator('[role="dialog"]').last();
-  await dialog.waitFor({ state: "visible", timeout: 10_000 });
-  const issues = await dialog.evaluate((node) => {
-    const rect = node.getBoundingClientRect();
-    const tolerance = 2;
+  await page.waitForURL((url) => url.pathname === "/account/", {
+    timeout: 10_000,
+  });
+  await page.locator('[data-auth-source="website"]').waitFor({
+    state: "visible",
+    timeout: 10_000,
+  });
+  const issues = await page.evaluate(() => {
     const output = [];
-    if (rect.left < -tolerance || rect.right > innerWidth + tolerance) {
-      output.push(`account dialog outside viewport (${Math.round(rect.left)}..${Math.round(rect.right)})`);
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("source") !== "website") {
+      output.push("website account navigation does not carry source=website");
     }
-    if (node.scrollWidth > node.clientWidth + tolerance) {
-      output.push(`account dialog horizontal overflow ${node.scrollWidth - node.clientWidth}px`);
+    if (document.querySelector('[role="dialog"]')) {
+      output.push("website account navigation still opened a dialog");
     }
-    if (node.getAttribute("aria-modal") !== "true") {
-      output.push("account dialog does not declare aria-modal=true");
+    if (!document.querySelector(".site-auth-form")) {
+      output.push("website account page does not expose the browser sign-in form");
     }
-    const labelledBy = node.getAttribute("aria-labelledby");
-    if (
-      !node.getAttribute("aria-label")?.trim()
-      && (!labelledBy || !document.getElementById(labelledBy)?.textContent?.trim())
-    ) {
-      output.push("account dialog has no accessible name");
+    if (document.querySelector('[data-auth-source="desktop"]')) {
+      output.push("website account page exposes a desktop auth source");
     }
     return output;
   });
-  const dialogHandle = await dialog.elementHandle();
-  try {
-    await page.waitForFunction(
-      (node) => node instanceof Element && node.contains(document.activeElement),
-      dialogHandle,
-      { timeout: 2_000 },
-    );
-  } catch {
-    issues.push("focus did not enter the account dialog");
-  }
-  await page.keyboard.press("Tab");
-  if (!await dialog.evaluate((node) => node.contains(document.activeElement))) {
-    issues.push("Tab moved focus outside the account dialog");
-  }
-  await page.keyboard.press("Escape");
-  await dialog.waitFor({ state: "hidden", timeout: 10_000 });
-  const buttonHandle = await button.elementHandle();
-  try {
-    await page.waitForFunction(
-      (node) => node === document.activeElement,
-      buttonHandle,
-      { timeout: 2_000 },
-    );
-  } catch {
-    issues.push("focus did not return to the account button");
-  }
+  await page.goBack();
+  await page.waitForSelector(originalRoot, { state: "visible", timeout: 10_000 });
   return issues;
 };
 
@@ -758,7 +739,7 @@ for (const browserName of requestedBrowsers) {
             errors.push(...layout.violations);
             errors.push(...await collectAccessibility(page));
             if (route.name !== "console") {
-              errors.push(...await checkDialog(page));
+              errors.push(...await checkWebsiteAccountNavigation(page, route.root));
               if (profile.viewport.width <= 1050) errors.push(...await checkMobileMenu(page));
             }
             if (route.name === "home") errors.push(...await checkHomeKeyboard(page));
