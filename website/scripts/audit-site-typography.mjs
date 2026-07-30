@@ -173,6 +173,10 @@ const collectLayout = async (page, locale, state) => page.evaluate(({ activeLoca
     ".site-download-copy",
     ".site-release-card",
     ".site-footer > .site-shell",
+    ".site-auth-page-shell",
+    ".site-auth-page-intro",
+    ".site-auth-page-panel",
+    ".site-auth-form",
     ".site-manual-dialog",
     ".site-manual-dialog-body",
   ];
@@ -304,12 +308,28 @@ async function addLayoutSnapshot(page, snapshots, locale, state) {
 async function collectLocale(page, locale) {
   await page.evaluate((nextLocale) => localStorage.setItem("drone-dream:locale", nextLocale), locale);
   await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
-  await page.waitForSelector("#home", { state: "visible", timeout: 60_000 });
+  await page.waitForSelector(".dd-site", { state: "visible", timeout: 60_000 });
   await waitForStableLayout(page);
   const copy = {};
   const layout = [];
   await mergeVisibleCopy(page, copy);
   await addLayoutSnapshot(page, layout, locale, "initial");
+  const sitePage = await page.locator(".dd-site").getAttribute("data-page");
+
+  const auditMobileMenu = async () => {
+    const menuButton = page.locator(".site-menu-button");
+    if (await menuButton.isVisible()) {
+      await menuButton.click();
+      await page.waitForFunction(() => document.querySelector(".site-menu-button")?.getAttribute("aria-expanded") === "true");
+      await addLayoutSnapshot(page, layout, locale, "mobile-menu");
+      await page.keyboard.press("Escape");
+    }
+  };
+
+  if (sitePage !== "home") {
+    await auditMobileMenu();
+    return { copy, layout };
+  }
 
   const tabs = page.locator(".site-phase-tabs [role=tab]");
   for (let index = 0; index < await tabs.count(); index += 1) {
@@ -347,13 +367,7 @@ async function collectLocale(page, locale) {
     await page.waitForFunction((cardNumber) => !document.querySelectorAll(".site-capability-card")[cardNumber]?.classList.contains("is-flipped"), cardIndex);
   }
 
-  const menuButton = page.locator(".site-menu-button");
-  if (await menuButton.isVisible()) {
-    await menuButton.click();
-    await page.waitForFunction(() => document.querySelector(".site-menu-button")?.getAttribute("aria-expanded") === "true");
-    await addLayoutSnapshot(page, layout, locale, "mobile-menu");
-    await page.keyboard.press("Escape");
-  }
+  await auditMobileMenu();
 
   const manualLink = page.locator('.site-manual-links a[href="/manual/"]');
   await manualLink.waitFor({ state: "visible" });

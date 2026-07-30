@@ -86,6 +86,7 @@ const routes = [
   { name: "pricing", path: "/pricing/", root: "#site-root > .dd-site" },
   { name: "manual", path: "/manual/", root: "#site-root > .dd-site" },
   { name: "community", path: "/community/", root: "#site-root > .dd-site" },
+  { name: "account", path: "/account/?source=website&mode=sign-in&returnTo=%2F", root: "#site-root > .dd-site" },
   { name: "console", path: "/console/", root: "#root > .app-shell" },
 ];
 if (consolePreviewUrl) {

@@ -23,6 +23,7 @@ const routes = [
   { name: "pricing", path: "/pricing/" },
   { name: "manual", path: "/manual/" },
   { name: "community", path: "/community/" },
+  { name: "account", path: "/account/?source=website&mode=sign-in&returnTo=%2F" },
   { name: "console", path: "/console/" },
 ];
 const budgets = {

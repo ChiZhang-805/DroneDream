@@ -167,7 +167,7 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         performance = self.read("website/scripts/audit-site-performance.mjs")
         readme = self.read("website/README.md")
 
-        for route in ("home", "pricing", "manual", "community", "console"):
+        for route in ("home", "pricing", "manual", "community", "account", "console"):
             with self.subTest(route=route):
                 self.assertIn(f'name: "{route}"', matrix)
                 self.assertIn(f'name: "{route}"', performance)

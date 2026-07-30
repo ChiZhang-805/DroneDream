@@ -36,6 +36,7 @@ describe("DroneDream public website", () => {
     window.localStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "en");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
+    vi.stubGlobal("scrollTo", vi.fn());
   });
 
   it("renders a direct, versioned Windows download and the primary product sections", async () => {
@@ -117,6 +118,30 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
     expect(screen.getByRole("link", { name: "Download Windows preview" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
+    expect(screen.getByRole("link", { name: "Download" }))
+      .toHaveAttribute("href", fallbackRelease.downloadUrl);
+  });
+
+  it("renders a read-only account route on the HTTP mirror without credential fields", () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/account/?source=website&mode=sign-in&returnTo=%2F",
+    );
+
+    render(
+      <I18nProvider>
+        <SiteApp sensitiveCloudActionsEnabled={false} />
+      </I18nProvider>,
+    );
+
+    expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "This HTTP mirror is read-only; secure account and console actions are disabled.",
+    );
+    expect(screen.queryByLabelText("Email address")).toBeNull();
+    expect(screen.queryByLabelText("Password")).toBeNull();
+    expect(document.querySelector(".site-auth-form")).toBeNull();
     expect(screen.getByRole("link", { name: "Download" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
   });
@@ -447,7 +472,7 @@ title: "DroneDream 1.0.0 用户说明书"
     });
   });
 
-  it("requires an account before a visitor can publish a community topic and restores focus", async () => {
+  it("routes a community visitor to the website account page without opening a dialog", () => {
     window.history.replaceState(null, "", "/community/");
 
     renderSite();
@@ -456,9 +481,12 @@ title: "DroneDream 1.0.0 用户说明书"
     const trigger = screen.getByRole("button", { name: "Sign in to publish" });
     trigger.focus();
     fireEvent.click(trigger);
-    expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
-    fireEvent.keyDown(window, { key: "Escape" });
-    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(window.location.pathname).toBe("/account/");
+    expect(new URLSearchParams(window.location.search).get("source")).toBe("website");
+    expect(new URLSearchParams(window.location.search).get("returnTo"))
+      .toBe("/community/");
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("switches the entire website to Simplified Chinese", () => {

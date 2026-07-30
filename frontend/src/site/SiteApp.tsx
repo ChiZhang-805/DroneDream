@@ -20,6 +20,11 @@ import {
   isWebsiteRelease,
   type WebsiteRelease,
 } from "./release";
+import {
+  type WebsiteAuthMode,
+  websiteAuthReturnPath,
+  websiteAuthUrl,
+} from "./websiteAuth";
 
 const DroneLaunchScene = lazy(async () => {
   const module = await import("../components/DroneLaunchScene");
@@ -76,6 +81,12 @@ const content = {
     openConsole: "Open console",
     signOut: "Sign out",
     closeAuth: "Close account dialog",
+    authEyebrow: "DRONEDREAM ACCOUNT",
+    authBrowserOnly:
+      "This sign-in is for the website in this browser only. It does not sign in the desktop application.",
+    authReturnHome:
+      "After sign-in, you will return to the DroneDream homepage.",
+    backHome: "Back to homepage",
     eyebrow: "AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION",
     heroLead: "Tune with evidence.",
     heroAccent: "Fly with confidence.",
@@ -265,6 +276,11 @@ const content = {
     openConsole: "进入控制台",
     signOut: "退出登录",
     closeAuth: "关闭账号窗口",
+    authEyebrow: "DRONEDREAM 账号",
+    authBrowserOnly:
+      "本次登录只用于当前浏览器中的网站，不会让桌面软件自动登录。",
+    authReturnHome: "登录成功后将返回 DroneDream 首页。",
+    backHome: "返回首页",
     eyebrow: "智能体驱动的 PX4 / GAZEBO 控制参数优化",
     heroLead: "让调优有章法",
     heroAccent: "让飞行更加从容",
@@ -765,8 +781,15 @@ export function SiteApp({
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
+  const [siteLocation, setSiteLocation] = useState(
+    () => `${window.location.pathname}${window.location.search}`,
+  );
+  const currentSiteUrl = new URL(siteLocation, window.location.origin);
+  const [authMode, setAuthMode] = useState<WebsiteAuthMode>(
+    () => currentSiteUrl.searchParams.get("mode") === "register"
+      ? "register"
+      : "sign-in",
+  );
   const [authEmail, setAuthEmail] = useState("");
   const [authCode, setAuthCode] = useState("");
   const [authCodeSent, setAuthCodeSent] = useState(false);
@@ -779,21 +802,21 @@ export function SiteApp({
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
-  const authDialogRef = useRef<HTMLElement>(null);
-  const authCloseRef = useRef<HTMLButtonElement>(null);
-  const authTriggerRef = useRef<HTMLElement | null>(null);
-  const path = window.location.pathname.replace(/\/+$/u, "") || "/";
+  const path = currentSiteUrl.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
     : path === "/pricing"
       ? "pricing"
       : path === "/community"
         ? "community"
-        : "home";
+        : path === "/account"
+          ? "account"
+          : "home";
   const communityView = sitePage === "community"
-    && new URLSearchParams(window.location.search).get("view") === "all"
+    && currentSiteUrl.searchParams.get("view") === "all"
     ? "all"
     : "recent";
+  const authReturnPath = websiteAuthReturnPath(currentSiteUrl.searchParams);
 
   useEffect(() => {
     document.title = copy.metaTitle;
@@ -829,6 +852,14 @@ export function SiteApp({
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      setSiteLocation(`${window.location.pathname}${window.location.search}`);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   useEffect(() => {
@@ -892,66 +923,6 @@ export function SiteApp({
   }, []);
 
   useEffect(() => {
-    if (!authOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    const inertTargets = Array.from(document.querySelectorAll<HTMLElement>(
-      ".site-header, #main-content, .site-footer",
-    ));
-    const previousInertStates = inertTargets.map((target) => target.inert);
-    document.body.style.overflow = "hidden";
-    inertTargets.forEach((target) => {
-      target.inert = true;
-    });
-    const focusFrame = window.requestAnimationFrame(() => {
-      const firstInput = authDialogRef.current?.querySelector<HTMLInputElement>(
-        "input:not(:disabled)",
-      );
-      (auth.account ? authCloseRef.current : firstInput)?.focus();
-    });
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setAuthOpen(false);
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = Array.from(
-        authDialogRef.current?.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ) ?? [],
-      );
-      const first = focusable[0];
-      const last = focusable.at(-1);
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.body.style.overflow = previousOverflow;
-      inertTargets.forEach((target, index) => {
-        target.inert = previousInertStates[index] ?? false;
-      });
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [auth.account, authOpen]);
-
-  useEffect(() => {
-    if (authOpen || !authTriggerRef.current) return;
-    const trigger = authTriggerRef.current;
-    authTriggerRef.current = null;
-    const focusFrame = window.requestAnimationFrame(() => {
-      if (trigger.isConnected) trigger.focus({ preventScroll: true });
-    });
-    return () => window.cancelAnimationFrame(focusFrame);
-  }, [authOpen]);
-
-  useEffect(() => {
     if (!menuOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -988,10 +959,17 @@ export function SiteApp({
   };
 
   const closeMenu = () => setMenuOpen(false);
-  const openAccount = (mode: "sign-in" | "register" = "sign-in") => {
-    authTriggerRef.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
+  const navigateWithinSite = (target: string, replace = false) => {
+    if (replace) window.history.replaceState(null, "", target);
+    else window.history.pushState(null, "", target);
+    setSiteLocation(`${window.location.pathname}${window.location.search}`);
+    setMenuOpen(false);
+    window.scrollTo({ top: 0 });
+  };
+  const openAccount = (
+    mode: WebsiteAuthMode = "sign-in",
+    returnPath = "/",
+  ) => {
     setAuthMode(mode);
     setAuthCode("");
     setAuthCodeSent(false);
@@ -1000,8 +978,7 @@ export function SiteApp({
     setAuthCaptchaToken(null);
     setAuthCaptchaCycle((current) => current + 1);
     setAuthError(null);
-    setMenuOpen(false);
-    setAuthOpen(true);
+    navigateWithinSite(websiteAuthUrl(mode, returnPath));
   };
 
   const openConsole = () => {
@@ -1009,7 +986,7 @@ export function SiteApp({
       window.location.assign("/console/");
       return;
     }
-    openAccount("sign-in");
+    openAccount("sign-in", "/console/");
   };
 
   const submitAuth = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1047,6 +1024,7 @@ export function SiteApp({
           authPassword,
         );
       }
+      navigateWithinSite(authReturnPath, true);
     } catch (reason) {
       setAuthError(
         reason instanceof Error ? reason.message : "Account request failed.",
@@ -1095,6 +1073,208 @@ export function SiteApp({
       }
     }
   };
+
+  const authPage = (
+    <section
+      className="site-auth-page"
+      aria-labelledby="site-auth-title"
+      data-auth-source="website"
+    >
+      <div className="site-auth-page-shell">
+        <div className="site-auth-page-intro">
+          <p className="site-eyebrow">{copy.authEyebrow}</p>
+          <h1 id="site-auth-title">
+            {auth.account
+              ? copy.account
+              : authMode === "register"
+                ? copy.registerTitle
+                : copy.authTitle}
+          </h1>
+          {!auth.account ? (
+            <>
+              <p>{copy.authBrowserOnly}</p>
+              <p>{copy.authReturnHome}</p>
+            </>
+          ) : null}
+        </div>
+        <div className="site-auth-page-panel">
+          {!sensitiveCloudActionsEnabled ? (
+            <div className="site-auth-unavailable" role="status">
+              <AccountIcon />
+              <p>{copy.insecureMirror}</p>
+            </div>
+          ) : auth.account ? (
+            <div className="site-auth-account">
+              <AccountIcon />
+              <strong>{auth.account.displayName}</strong>
+              <span>{auth.account.email}</span>
+              <a className="site-button site-button-primary" href="/console/">
+                {copy.openConsole}
+                <ArrowRightIcon />
+              </a>
+              <button
+                type="button"
+                className="site-auth-text-button"
+                disabled={authPending}
+                onClick={() => {
+                  setAuthPending(true);
+                  setAuthError(null);
+                  void auth.signOut()
+                    .catch((reason: unknown) => {
+                      setAuthError(
+                        reason instanceof Error
+                          ? reason.message
+                          : "Account request failed.",
+                      );
+                    })
+                    .finally(() => setAuthPending(false));
+                }}
+              >
+                {copy.signOut}
+              </button>
+            </div>
+          ) : (
+            <>
+              <form className="site-auth-form" onSubmit={(event) => void submitAuth(event)}>
+                <label>
+                  <span>{copy.email}</span>
+                  <input
+                    type="email"
+                    required
+                    autoComplete="email"
+                    value={authEmail}
+                    disabled={
+                      authPending ||
+                      (authMode === "register" && authCodeSent)
+                    }
+                    onChange={(event) => setAuthEmail(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>{copy.password}</span>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    autoComplete={
+                      authMode === "register"
+                        ? "new-password"
+                        : "current-password"
+                    }
+                    value={authPassword}
+                    placeholder={copy.passwordPlaceholder}
+                    disabled={authPending}
+                    onChange={(event) => setAuthPassword(event.target.value)}
+                  />
+                </label>
+                {authMode === "register" ? (
+                  <>
+                    <label>
+                      <span>{copy.confirmPassword}</span>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        autoComplete="new-password"
+                        value={authPasswordConfirmation}
+                        placeholder={copy.confirmPasswordPlaceholder}
+                        disabled={authPending}
+                        onChange={(event) =>
+                          setAuthPasswordConfirmation(event.target.value)
+                        }
+                      />
+                    </label>
+                    <div className="site-auth-code-field">
+                      <label htmlFor="site-registration-code">
+                        <span>{copy.code}</span>
+                      </label>
+                      <div className="site-auth-code-row">
+                        <input
+                          id="site-registration-code"
+                          type="text"
+                          required
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          minLength={6}
+                          maxLength={12}
+                          value={authCode}
+                          placeholder={copy.codePlaceholder}
+                          disabled={authPending}
+                          onChange={(event) =>
+                            setAuthCode(event.target.value.replace(/\s/gu, ""))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="site-auth-code-button"
+                          disabled={authPending || !authEmail.trim()}
+                          onClick={() => void sendRegistrationCode()}
+                        >
+                          {authCodeSent ? copy.resendCode : copy.sendCode}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+                {captchaProtectionConfigured ? (
+                  <AuthCaptcha
+                    key={authCaptchaCycle}
+                    siteKey={turnstileSiteKey}
+                    onTokenChange={setAuthCaptchaToken}
+                  />
+                ) : null}
+                <button type="submit" disabled={authPending || auth.loading}>
+                  {authMode === "register"
+                    ? copy.createAccount
+                    : copy.signInAction}
+                </button>
+              </form>
+              <button
+                type="button"
+                className="site-auth-text-button"
+                disabled={authPending}
+                onClick={() => {
+                  const nextMode = authMode === "sign-in"
+                    ? "register"
+                    : "sign-in";
+                  setAuthMode(nextMode);
+                  setAuthCode("");
+                  setAuthCodeSent(false);
+                  setAuthPassword("");
+                  setAuthPasswordConfirmation("");
+                  setAuthCaptchaToken(null);
+                  setAuthCaptchaCycle((current) => current + 1);
+                  setAuthError(null);
+                  navigateWithinSite(
+                    websiteAuthUrl(nextMode, authReturnPath),
+                    true,
+                  );
+                }}
+              >
+                {authMode === "sign-in"
+                  ? copy.registerNow
+                  : copy.backToSignIn}
+              </button>
+            </>
+          )}
+          {authError ? (
+            <div className="site-auth-error" role="alert">{authError}</div>
+          ) : null}
+        </div>
+        <a
+          className="site-auth-back-home"
+          href="/"
+          onClick={(event) => {
+            event.preventDefault();
+            navigateWithinSite("/");
+          }}
+        >
+          <ArrowRightIcon />
+          {copy.backHome}
+        </a>
+      </div>
+    </section>
+  );
 
   return (
     <div
@@ -1165,20 +1345,22 @@ export function SiteApp({
       </header>
 
       <main id="main-content">
-        {sitePage === "manual" ? (
+        {sitePage === "account" ? (
+          authPage
+        ) : sitePage === "manual" ? (
           <ManualPage locale={locale} />
         ) : sitePage === "pricing" ? (
           <PricingPage
             locale={locale}
             authenticated={Boolean(auth.account)}
-            onRequireAccount={() => openAccount("register")}
+            onRequireAccount={() => openAccount("register", "/pricing/")}
             sensitiveCloudActionsEnabled={sensitiveCloudActionsEnabled}
           />
         ) : sitePage === "community" ? (
           <CommunityPage
             locale={locale}
             account={auth.account}
-            onRequireAccount={() => openAccount("sign-in")}
+            onRequireAccount={() => openAccount("sign-in", "/community/")}
             sensitiveCloudActionsEnabled={sensitiveCloudActionsEnabled}
           />
         ) : (
@@ -1413,193 +1595,6 @@ export function SiteApp({
           </>
         )}
       </main>
-
-      {authOpen ? (
-        <div
-          className="site-auth-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setAuthOpen(false);
-          }}
-        >
-          <section
-            ref={authDialogRef}
-            className="site-auth-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="site-auth-title"
-          >
-            <header>
-              <h2 id="site-auth-title">
-                {auth.account
-                  ? copy.account
-                  : authMode === "register"
-                    ? copy.registerTitle
-                    : copy.authTitle}
-              </h2>
-              <button
-                ref={authCloseRef}
-                type="button"
-                aria-label={copy.closeAuth}
-                onClick={() => setAuthOpen(false)}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="m7 7 10 10M17 7 7 17" />
-                </svg>
-              </button>
-            </header>
-            {auth.account ? (
-              <div className="site-auth-account">
-                <AccountIcon />
-                <strong>{auth.account.displayName}</strong>
-                <span>{auth.account.email}</span>
-                <a className="site-button site-button-primary" href="/console/">
-                  {copy.openConsole}
-                  <ArrowRightIcon />
-                </a>
-                <button
-                  type="button"
-                  className="site-auth-text-button"
-                  disabled={authPending}
-                  onClick={() => {
-                    setAuthPending(true);
-                    setAuthError(null);
-                    void auth.signOut()
-                      .catch((reason: unknown) => {
-                        setAuthError(
-                          reason instanceof Error
-                            ? reason.message
-                            : "Account request failed.",
-                        );
-                      })
-                      .finally(() => setAuthPending(false));
-                  }}
-                >
-                  {copy.signOut}
-                </button>
-              </div>
-            ) : (
-              <>
-                <form className="site-auth-form" onSubmit={(event) => void submitAuth(event)}>
-                  <label>
-                    <span>{copy.email}</span>
-                    <input
-                      type="email"
-                      required
-                      autoComplete="email"
-                      value={authEmail}
-                      disabled={
-                        authPending ||
-                        (authMode === "register" && authCodeSent)
-                      }
-                      onChange={(event) => setAuthEmail(event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <span>{copy.password}</span>
-                    <input
-                      type="password"
-                      required
-                      minLength={8}
-                      autoComplete={
-                        authMode === "register"
-                          ? "new-password"
-                          : "current-password"
-                      }
-                      value={authPassword}
-                      placeholder={copy.passwordPlaceholder}
-                      disabled={authPending}
-                      onChange={(event) => setAuthPassword(event.target.value)}
-                    />
-                  </label>
-                  {authMode === "register" ? (
-                    <>
-                      <label>
-                        <span>{copy.confirmPassword}</span>
-                        <input
-                          type="password"
-                          required
-                          minLength={8}
-                          autoComplete="new-password"
-                          value={authPasswordConfirmation}
-                          placeholder={copy.confirmPasswordPlaceholder}
-                          disabled={authPending}
-                          onChange={(event) =>
-                            setAuthPasswordConfirmation(event.target.value)
-                          }
-                        />
-                      </label>
-                      <div className="site-auth-code-field">
-                        <label htmlFor="site-registration-code">
-                          <span>{copy.code}</span>
-                        </label>
-                        <div className="site-auth-code-row">
-                          <input
-                            id="site-registration-code"
-                            type="text"
-                            required
-                            inputMode="numeric"
-                            autoComplete="one-time-code"
-                            minLength={6}
-                            maxLength={12}
-                            value={authCode}
-                            placeholder={copy.codePlaceholder}
-                            disabled={authPending}
-                            onChange={(event) =>
-                              setAuthCode(event.target.value.replace(/\s/gu, ""))
-                            }
-                          />
-                          <button
-                            type="button"
-                            className="site-auth-code-button"
-                            disabled={authPending || !authEmail.trim()}
-                            onClick={() => void sendRegistrationCode()}
-                          >
-                            {authCodeSent ? copy.resendCode : copy.sendCode}
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  ) : null}
-                  {captchaProtectionConfigured ? (
-                    <AuthCaptcha
-                      key={authCaptchaCycle}
-                      siteKey={turnstileSiteKey}
-                      onTokenChange={setAuthCaptchaToken}
-                    />
-                  ) : null}
-                  <button type="submit" disabled={authPending || auth.loading}>
-                    {authMode === "register"
-                      ? copy.createAccount
-                      : copy.signInAction}
-                  </button>
-                </form>
-                <button
-                  type="button"
-                  className="site-auth-text-button"
-                  disabled={authPending}
-                  onClick={() => {
-                    setAuthMode((current) =>
-                      current === "sign-in" ? "register" : "sign-in",
-                    );
-                    setAuthCode("");
-                    setAuthCodeSent(false);
-                    setAuthPassword("");
-                    setAuthPasswordConfirmation("");
-                    setAuthCaptchaToken(null);
-                    setAuthCaptchaCycle((current) => current + 1);
-                    setAuthError(null);
-                  }}
-                >
-                  {authMode === "sign-in"
-                    ? copy.registerNow
-                    : copy.backToSignIn}
-                </button>
-              </>
-            )}
-            {authError ? <div className="site-auth-error" role="alert">{authError}</div> : null}
-          </section>
-        </div>
-      ) : null}
 
       {sitePage === "home" ? (
         <footer className="site-footer">

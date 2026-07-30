@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
           manual: `${projectRoot}manual/index.html`,
           pricing: `${projectRoot}pricing/index.html`,
           community: `${projectRoot}community/index.html`,
+          account: `${projectRoot}account/index.html`,
         },
         output: {
           manualChunks: {

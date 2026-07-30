@@ -2152,71 +2152,81 @@ html[lang="zh-CN"] .site-hero h1 {
   animation: site-dialog-backdrop 220ms ease both;
 }
 
-.site-auth-backdrop {
-  position: fixed;
-  z-index: 410;
-  display: grid;
-  padding: 24px;
-  background: rgba(3, 4, 12, 0.8);
-  backdrop-filter: blur(16px);
-  animation: site-dialog-backdrop 180ms ease both;
-  inset: 0;
-  place-items: center;
-}
-
-.site-auth-dialog {
-  display: grid;
-  width: min(560px, 100%);
-  gap: 1rem;
-  padding: 1.5rem;
-  border: 1px solid rgba(150, 171, 255, 0.2);
-  border-radius: 24px;
-  color: #eff2ff;
+.dd-site[data-page="account"] {
+  min-height: 100svh;
+  color: #151526;
   background:
-    radial-gradient(circle at 100% 0, rgba(120, 90, 230, 0.22), transparent 38%),
-    #0d1020;
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
-  animation: site-dialog-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    radial-gradient(circle at 18% 12%, rgba(104, 221, 255, 0.2), transparent 31%),
+    radial-gradient(circle at 84% 18%, rgba(232, 92, 211, 0.16), transparent 34%),
+    #f7f8fd;
 }
 
-.site-auth-dialog > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.site-auth-dialog h2 {
-  margin: 0;
-  color: #fff;
-  font-size: clamp(1.55rem, 4vw, 2.1rem);
-  letter-spacing: -0.035em;
-  white-space: nowrap;
-}
-
-.site-auth-dialog > header > button {
+.site-auth-page {
+  min-height: calc(100svh - 78px);
   display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.05);
-  font-size: 1.5rem;
-  cursor: pointer;
+  padding: clamp(2.4rem, 6vw, 5.5rem) clamp(1rem, 4vw, 3rem);
   place-items: center;
 }
 
-.site-auth-dialog > header > button svg {
-  display: block;
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-width: 2;
+.site-auth-page-shell {
+  width: min(540px, 100%);
+  display: grid;
+  gap: 1.15rem;
+}
+
+.site-auth-page-intro {
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  text-align: center;
+}
+
+.site-auth-page-intro .site-eyebrow {
+  margin: 0;
+  color: #8244e8;
+}
+
+.site-auth-page-intro h1 {
+  margin: 0;
+  color: #111222;
+  font-size: clamp(2.1rem, 5vw, 3.25rem);
+  letter-spacing: -0.055em;
+  line-height: 1;
+}
+
+.site-auth-page-intro p:not(.site-eyebrow) {
+  max-width: 50ch;
+  margin: 0;
+  color: #666a7d;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.site-auth-page-panel {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1.25rem, 4vw, 1.75rem);
+  border: 1px solid rgba(92, 72, 145, 0.15);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 24px 70px rgba(52, 39, 90, 0.14);
+}
+
+.site-auth-back-home {
+  display: inline-flex;
+  align-items: center;
+  justify-self: center;
+  gap: 0.45rem;
+  color: #6d37d9;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-auth-back-home svg {
+  width: 15px;
+  height: 15px;
+  transform: rotate(180deg);
 }
 
 .site-auth-form {
@@ -2227,7 +2237,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .site-auth-form label {
   display: grid;
   gap: 0.38rem;
-  color: rgba(235, 237, 249, 0.82);
+  color: #36364a;
   font-size: 0.86rem;
   font-weight: 650;
 }
@@ -2236,17 +2246,17 @@ html[lang="zh-CN"] .site-hero h1 {
   width: 100%;
   min-height: 48px;
   padding: 0 0.85rem;
-  border: 1px solid rgba(184, 188, 223, 0.25);
+  border: 1px solid #d9d6e5;
   border-radius: 12px;
   outline: none;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.055);
+  color: #151526;
+  background: #fff;
   font: inherit;
 }
 
 .site-auth-form input:focus {
-  border-color: var(--site-cyan);
-  box-shadow: 0 0 0 3px rgba(104, 232, 255, 0.12);
+  border-color: #8c5cff;
+  box-shadow: 0 0 0 3px rgba(140, 92, 255, 0.14);
 }
 
 .site-auth-code-row {
@@ -2259,10 +2269,10 @@ html[lang="zh-CN"] .site-hero h1 {
   min-width: 116px;
   min-height: 48px;
   padding: 0 1rem;
-  border: 1px solid rgba(104, 232, 255, 0.38);
+  border: 1px solid rgba(123, 76, 225, 0.32);
   border-radius: 12px;
-  color: #e8faff;
-  background: rgba(104, 232, 255, 0.09);
+  color: #6630c9;
+  background: rgba(123, 76, 225, 0.06);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -2272,7 +2282,7 @@ html[lang="zh-CN"] .site-hero h1 {
   min-height: 48px;
   border: 0;
   border-radius: 12px;
-  color: #07101b;
+  color: #fff;
   background: linear-gradient(
     110deg,
     var(--site-cyan),
@@ -2295,7 +2305,7 @@ html[lang="zh-CN"] .site-hero h1 {
   justify-self: center;
   padding: 0.4rem 0.2rem;
   border: 0;
-  color: #c9d0ff;
+  color: #6d37d9;
   background: transparent;
   font: inherit;
   font-size: 0.9rem;
@@ -2304,15 +2314,15 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-auth-text-button:hover:not(:disabled),
 .site-auth-text-button:focus-visible {
-  color: #fff;
+  color: #31106f;
 }
 
 .site-auth-error {
   padding: 0.75rem 0.85rem;
   border: 1px solid rgba(255, 113, 156, 0.3);
   border-radius: 11px;
-  color: #ffd2df;
-  background: rgba(255, 72, 127, 0.09);
+  color: #a21442;
+  background: rgba(255, 72, 127, 0.07);
   font-size: 0.86rem;
 }
 
@@ -2334,28 +2344,76 @@ html[lang="zh-CN"] .site-hero h1 {
   width: 56px;
   height: 56px;
   padding: 0.75rem;
-  border: 1px solid rgba(104, 232, 255, 0.28);
+  border: 1px solid rgba(123, 76, 225, 0.24);
   border-radius: 50%;
   fill: none;
-  stroke: var(--site-cyan);
+  stroke: #7b4ce1;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.5;
 }
 
 .site-auth-account strong {
-  color: #fff;
+  color: #171726;
   font-size: 1.18rem;
 }
 
 .site-auth-account span {
-  color: rgba(222, 225, 242, 0.7);
+  color: #74778a;
   font-size: 0.9rem;
 }
 
 .site-auth-account .site-button {
   width: 100%;
   margin-top: 0.7rem;
+}
+
+.site-auth-unavailable {
+  display: grid;
+  justify-items: center;
+  gap: 0.8rem;
+  padding: 1rem 0.5rem;
+  color: #5f6275;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.site-auth-unavailable > svg {
+  width: 50px;
+  height: 50px;
+  padding: 0.7rem;
+  border: 1px solid rgba(123, 76, 225, 0.2);
+  border-radius: 50%;
+  fill: none;
+  stroke: #7b4ce1;
+}
+
+.site-auth-unavailable p {
+  margin: 0;
+}
+
+@media (max-width: 620px) {
+  .site-auth-page {
+    align-items: start;
+    padding: calc(66px + 2rem) 1rem 3rem;
+  }
+
+  .site-auth-page-shell {
+    gap: 1rem;
+  }
+
+  .site-auth-page-panel {
+    padding: 1.15rem;
+    border-radius: 20px;
+  }
+
+  .site-auth-code-row {
+    grid-template-columns: 1fr;
+  }
+
+  .site-auth-code-button {
+    width: 100%;
+  }
 }
 
 .site-manual-dialog {
