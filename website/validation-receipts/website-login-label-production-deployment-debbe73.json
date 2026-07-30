@@ -1,0 +1,205 @@
+{
+  "schemaVersion": "dronedream.website-login-label-production-deployment.v1",
+  "generatedAt": "2026-07-30T08:01:49.1069272Z",
+  "scope": {
+    "branch": "codex/website",
+    "staticDeploymentPerformed": true,
+    "githubPagesDeployed": true,
+    "aliyunMirrorDeployed": true,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "releaseOrRuntimeMutationPerformed": false,
+    "otherServerModified": false,
+    "technicalReportModified": false
+  },
+  "subject": {
+    "sourceCommit": "debbe73f2348ec22e5e841de9682e911dcbdb967",
+    "sourceTree": "7ab1d7cda63f1ed0a5d142b76d45330bb1f5faa1",
+    "change": "Rename the public website navigation entry from Sign in to Login.",
+    "sourcePaths": [
+      "frontend/src/site/SiteApp.tsx",
+      "frontend/src/__tests__/PublicSite.test.tsx",
+      "frontend/src/__tests__/WebsiteAuthFlow.test.tsx"
+    ],
+    "intentionalScopeBoundary": "The full-page account heading and credential-submit action remain Sign in; only the public navigation entry is Login."
+  },
+  "sourceValidation": {
+    "focusedPublicSiteAndWebsiteAuth": {
+      "files": 2,
+      "tests": 21,
+      "passed": 21,
+      "failed": 0
+    },
+    "completeFrontendSuiteFinalRun": {
+      "files": 54,
+      "tests": 365,
+      "passed": 365,
+      "failed": 0
+    },
+    "transientFirstCompleteSuiteRun": {
+      "passed": 364,
+      "failed": 1,
+      "classification": "An unrelated AuthContext asynchronous text assertion failed during the first parallel full-suite run.",
+      "isolatedRerun": "AuthContext.test.tsx passed 2/2.",
+      "completeSuiteRerun": "54 files and 365/365 tests passed."
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "siteBuild": "passed with local non-production placeholders for the initial visual preview",
+    "productionLikeSharedSiteAndConsoleBuild": "passed using the same public repository variables consumed by the Pages workflow; no production secret was read",
+    "deploymentContract": {
+      "tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "diffCheck": "passed",
+    "localVisualPreview": {
+      "viewport": "1440x1000",
+      "result": "Login is visible, aligned with the language and Download controls, and not clipped."
+    }
+  },
+  "deploymentAnchor": {
+    "tag": "website-deploy-1.0.0-20260730-debbe73",
+    "tagObjectSha": "bdf68871ff58383130e812b7645ae474e27646d8",
+    "peeledSourceCommit": "debbe73f2348ec22e5e841de9682e911dcbdb967",
+    "immutable": true
+  },
+  "githubPages": {
+    "workflowRunId": 30521342343,
+    "workflowUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30521342343",
+    "workflowConclusion": "success",
+    "workflowHeadRef": "website-deploy-1.0.0-20260730-debbe73",
+    "workflowHeadSha": "debbe73f2348ec22e5e841de9682e911dcbdb967",
+    "buildJobId": 90802233279,
+    "publishJobId": 90802386270,
+    "deploymentId": 5670472191,
+    "deploymentStatusId": 16124271842,
+    "deploymentStatus": "success",
+    "siteArtifact": {
+      "id": 8750880568,
+      "name": "dronedream-site-debbe73f2348ec22e5e841de9682e911dcbdb967",
+      "zipBytes": 28548574,
+      "digest": "sha256:a86e07c4640441b32562dfbd74b2328a6979d09d8835f6a45f8e0d84df62fb10"
+    },
+    "pagesArtifact": {
+      "id": 8750881348,
+      "zipBytes": 28557947,
+      "digest": "sha256:ec9b868bb50fadbb51200fb325b478fd5c513370576fd2434929755048aa13e9"
+    },
+    "environmentPolicy": {
+      "preDeployment": [
+        {
+          "id": 55186327,
+          "name": "main",
+          "type": "branch"
+        }
+      ],
+      "temporaryExactTagPolicyId": 56000856,
+      "temporaryExactTagPolicyRemoved": true,
+      "postDeployment": [
+        {
+          "id": 55186327,
+          "name": "main",
+          "type": "branch"
+        }
+      ],
+      "canonicalPolicyJsonSha256BeforeAndAfter": "15ba1babae7fdf6fca0d479042014fd5ece966218a2cafa53855270a981665f5",
+      "restoredExactly": true
+    }
+  },
+  "sharedArtifact": {
+    "expandedFiles": 124,
+    "integrityEntries": 123,
+    "missing": 0,
+    "mismatched": 0,
+    "unlisted": 0,
+    "sha256SumsSha256": "13e7dd64824824f5691c4d6efe8622371f52b48d5b974dd1ca51397b05fc8ead",
+    "buildManifestSha256": "2ef280ec1c44df05d42472b2aa9df10ca183d0e2ff98e08265f26c8cda52ef8b",
+    "buildManifestSourceCommit": "debbe73f2348ec22e5e841de9682e911dcbdb967",
+    "aliyunTransferArchiveBytes": 28521105,
+    "aliyunTransferArchiveSha256": "0b9266a3d665a114f148d5b21f96542d3aa89173c0754a9e065034a2e5acd198",
+    "buildPolicy": "GitHub Actions built the shared artifact once from the immutable source tag. The verified expanded workflow artifact was uploaded to Aliyun without rebuilding."
+  },
+  "aliyun": {
+    "approvedHost": "47.93.180.216",
+    "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260730T074054Z",
+    "rollbackRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260730T060229Z",
+    "rollbackReleaseRetained": true,
+    "atomicCurrentSwitch": true,
+    "publicBuildManifestSourceCommit": "debbe73f2348ec22e5e841de9682e911dcbdb967",
+    "currentBuildManifestSha256": "2ef280ec1c44df05d42472b2aa9df10ca183d0e2ff98e08265f26c8cda52ef8b",
+    "currentSha256SumsSha256": "13e7dd64824824f5691c4d6efe8622371f52b48d5b974dd1ca51397b05fc8ead",
+    "explicitlyExcludedHost": "124.221.220.60"
+  },
+  "onlineValidation": {
+    "publicSourceCommitAtBothOrigins": "debbe73f2348ec22e5e841de9682e911dcbdb967",
+    "targetedByteParity": {
+      "paths": [
+        "build-manifest.json",
+        "SHA256SUMS",
+        "index.html",
+        "assets/main-D1WLlTnz.js",
+        "assets/main-CW6HPenp.css",
+        "downloads/latest.json"
+      ],
+      "passed": 6,
+      "failed": 0,
+      "allMatchedActionsArtifact": true,
+      "allMatchedAcrossOrigins": true
+    },
+    "completePublicPathAudit": {
+      "attempted": true,
+      "completed": false,
+      "reason": "The 122-product-path re-download exceeded the ten-minute local execution window because of mirror bandwidth. This receipt does not claim that audit completed.",
+      "platformSentinel": ".nojekyll is present and hash-verified in the shared artifact; direct mirror access returns 403 because Nginx blocks dotfiles."
+    },
+    "chromiumDomChecks": [
+      {
+        "origin": "http://getdronedream.com/",
+        "viewport": "1440x1000",
+        "loginVisible": true,
+        "loginLabel": "Login",
+        "loginDisabled": true,
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "pageErrors": 0
+      },
+      {
+        "origin": "http://47.93.180.216/",
+        "viewport": "1440x1000",
+        "loginVisible": true,
+        "loginLabel": "Login",
+        "loginDisabled": true,
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "pageErrors": 0
+      }
+    ],
+    "visualInspection": {
+      "result": "Both live 1440x1000 screenshots show Login aligned with the language and Download controls, with no clipping or layout shift.",
+      "globalScreenshotSha256": "099ed95fc5aa3dafc3958b6faebb1b6055eeffc9e4b8a0b9705ca22480ffe1c5",
+      "mirrorScreenshotSha256": "a226c111987d8f24440b8da3cc9eddadbcced3ce69f4c4970faf24d4502215b4"
+    }
+  },
+  "releaseMetadata": {
+    "changed": false,
+    "version": "1.0.0",
+    "installerSha256": "9f44f79821dd27b283afcc57b3d4d194341a6cef655ce309c3609d1c834b3b8b",
+    "latestJsonSha256": "98d1fb659c3121f4b1ae051e717bb9cc20fb6536ab48118f56b0483eb736ea9d"
+  },
+  "externalGate": {
+    "tlsNormalTrust": "failed",
+    "curlExitCode": 60,
+    "curlError": "SEC_E_WRONG_PRINCIPAL",
+    "pagesProtectedDomainState": "verified",
+    "pagesCertificateState": "authorization_created",
+    "httpsEnforced": false,
+    "effect": "Login is correctly labeled but remains disabled on the current HTTP or untrusted-TLS origins. The label deployment does not claim that website authentication is usable.",
+    "requiredNextStep": "Wait for a normally trusted certificate whose SAN includes getdronedream.com, then enable HTTPS enforcement and run real website sign-in E2E."
+  },
+  "attestation": {
+    "receiptOnlyCommitMayFollow": true,
+    "thisReceiptDoesNotClaimValidationOfItsOwnCommit": true,
+    "deploymentSubject": "debbe73f2348ec22e5e841de9682e911dcbdb967"
+  }
+}
