@@ -4,12 +4,13 @@
 
 DroneDream uses two explicit operating modes:
 
-- **Public signed Windows application** requires a Supabase account. Supabase
+- **Release Windows application** requires a Supabase account. Supabase
   Auth supplies the access token, while the bundled local Runtime and database
-  remain the experiment execution boundary. The startup screen cannot report
-  100% or expose the tuning-platform entry until the Runtime is ready, the
-  signed update check has completed, and `GET /api/v1/session` accepts the
-  current account identity.
+  remain the experiment execution boundary. The startup screen reports 100%
+  only for the local environment checks. At that point it exposes one
+  **Sign in and enter tuning workspace** action. The tuning workspace itself
+  remains locked until browser authentication succeeds and
+  `GET /api/v1/session` accepts the same account identity.
 - **Local development/test workspace** may explicitly omit Supabase and use
   disabled or demo authentication. This exception is not a shippable desktop
   configuration and must never be used to make a public build appear ready.
@@ -38,8 +39,21 @@ The backend already has the required ownership model:
 The frontend has a Supabase account layer for public desktop builds:
 
 - no Supabase environment variables means an honest local-development
-  workspace; a formal signed desktop build must fail before release when those
+  workspace; a release desktop build must fail before packaging when those
   public variables are absent;
+- the desktop launcher's chrome does not expose a separate account button;
+  after local checks reach 100%, a system-browser login is the only entry
+  action;
+- the system browser receives a random loopback port and a 64-hex one-time
+  state assembled from two OS-random UUIDs, then sends credentials directly to
+  the approved Supabase HTTPS origin;
+  access and refresh tokens return in a bounded same-origin POST body and never
+  appear in a URL, command line, Runtime request, or persisted browser page;
+- the local callback rejects wrong hosts, origins, state, content types,
+  duplicate headers, transfer encoding, oversized requests, and malformed
+  tokens; cancellation and a ten-minute timeout close abandoned attempts;
+- after the WebView adopts the returned session, the local API must confirm
+  the same account before navigation automatically enters the workspace;
 - email verification creates one password-protected account per verified
   email, and the registration form keeps the code field visible from the
   beginning;
@@ -81,6 +95,12 @@ VITE_AUTH_GOOGLE_ENABLED=false
 VITE_AUTH_APPLE_ENABLED=false
 ```
 
+The standalone desktop browser page currently fails the desktop packaging gate
+when `VITE_TURNSTILE_SITE_KEY` is non-empty. Supabase CAPTCHA must not be
+enabled for desktop accounts until that browser page implements and verifies
+the Turnstile token exchange. This does not prevent the separately deployed
+website from using its own CAPTCHA integration.
+
 Backend runtime variables:
 
 ```dotenv
@@ -108,14 +128,17 @@ password, or any signing key in frontend variables or the repository.
    public release, connect a dedicated sender domain and custom SMTP provider
    such as Resend, Postmark, Amazon SES, or another provider chosen by the
    operator.
-4. Create a Cloudflare Turnstile widget for the production domains, copy its
-   public site key into the frontend build variables, deploy that build, and
-   only then enable CAPTCHA in Supabase Auth with the private secret key.
+4. The browser website may use Cloudflare Turnstile after its widget, public
+   site key, and Supabase private secret are configured. Keep Supabase CAPTCHA
+   disabled for desktop login until the standalone desktop browser page gains
+   the same verified token exchange; the desktop build gate rejects a
+   non-empty Turnstile key in the meantime.
 5. Add the production website URL and allowed redirect URLs.
-6. Copy only the project URL, publishable key, and Turnstile public site key
-   into the frontend build variables. The packaged local Runtime receives only
-   the public OIDC verifier configuration above; it never receives a Supabase
-   service-role key.
+6. Copy only the project URL and publishable key into desktop frontend build
+   variables. The browser website may additionally receive the Turnstile
+   public site key. The packaged local Runtime receives only the public OIDC
+   verifier configuration above; it never receives a Supabase service-role
+   key.
 7. Confirm the project uses an asymmetric signing key compatible with the
    JWKS verifier, then run the cross-user isolation acceptance tests.
 8. If Google login is wanted, create a Google OAuth web client, register the
