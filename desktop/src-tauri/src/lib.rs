@@ -1,3 +1,4 @@
+mod browser_auth;
 mod desktop_api_bridge;
 mod installer_handoff;
 mod preferences;
@@ -52,7 +53,10 @@ pub fn run() {
         .manage(runtime_installer::RuntimeInstaller::default())
         .manage(runtime_keepalive::RuntimeKeepalive::default())
         .manage(desktop_api_bridge::DesktopApiBridge::default())
+        .manage(browser_auth::BrowserAuthCoordinator::default())
         .invoke_handler(tauri::generate_handler![
+            browser_auth::begin_browser_auth,
+            browser_auth::cancel_browser_auth,
             prerequisites::probe_system_prerequisites,
             preferences::get_installer_locale,
             installer_handoff::get_installer_runtime_intent,

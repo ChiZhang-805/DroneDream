@@ -98,6 +98,17 @@ export interface DesktopArtifactDownloadResponse {
   bytes: number;
 }
 
+export interface BrowserAuthRequest {
+  locale: InstallerLocale;
+  supabaseUrl: string;
+  publishableKey: string;
+}
+
+export interface BrowserAuthSession {
+  accessToken: string;
+  refreshToken: string;
+}
+
 export interface RuntimeInstallStep {
   id: string;
   title: string;
@@ -358,6 +369,35 @@ export function getInstallerLocale(): Promise<InstallerLocale> {
   });
 }
 
+export function beginBrowserAuth(
+  request: BrowserAuthRequest,
+): Promise<BrowserAuthSession> {
+  const normalizedRequest = {
+    locale: request.locale,
+    supabaseUrl: expectSafeNonEmptyString(
+      request.supabaseUrl,
+      "request.supabaseUrl",
+    ),
+    publishableKey: expectSafeNonEmptyString(
+      request.publishableKey,
+      "request.publishableKey",
+    ),
+  };
+  if (normalizedRequest.locale !== "en" && normalizedRequest.locale !== "zh-CN") {
+    return Promise.reject(new Error("Browser sign-in locale must be en or zh-CN."));
+  }
+  return invokeDesktop(
+    "begin_browser_auth",
+    parseBrowserAuthSession,
+    { request: normalizedRequest },
+  );
+}
+
+export function cancelBrowserAuth(): Promise<boolean> {
+  return invokeDesktop("cancel_browser_auth", (value) =>
+    expectBoolean(value, "response"));
+}
+
 export function probeSystemPrerequisites(): Promise<SystemPrerequisiteReport> {
   return invokeDesktop("probe_system_prerequisites", parsePrerequisiteReport);
 }
@@ -464,6 +504,36 @@ export function desktopDownloadArtifact(
     parseDesktopArtifactDownloadResponse,
     { request },
   );
+}
+
+function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
+  const record = expectRecord(value, "response");
+  return {
+    accessToken: expectBrowserAuthToken(
+      record.accessToken,
+      "response.accessToken",
+    ),
+    refreshToken: expectBrowserAuthToken(
+      record.refreshToken,
+      "response.refreshToken",
+    ),
+  };
+}
+
+function expectBrowserAuthToken(value: unknown, path: string): string {
+  const token = expectString(value, path);
+  if (
+    token.length === 0 ||
+    token.length > 16 * 1024 ||
+    /\s/u.test(token) ||
+    [...token].some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint < 32 || codePoint === 127;
+    })
+  ) {
+    throw new Error(`${path} must be a bounded non-empty token`);
+  }
+  return token;
 }
 
 function parseDesktopArtifactDownloadResponse(

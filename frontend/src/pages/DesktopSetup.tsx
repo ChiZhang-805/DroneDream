@@ -7,7 +7,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { apiClient } from "../api/client";
 import { Alert } from "../components/Alert";
@@ -15,6 +15,8 @@ import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
 import {
   autoStartInstallerRuntime,
+  beginBrowserAuth,
+  cancelBrowserAuth,
   cancelRuntimeInstall,
   discardInstallerRuntimeIntent,
   getInstallerRuntimeIntent,
@@ -41,7 +43,8 @@ import type {
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useOptionalAuth } from "../features/auth/AuthContext";
-import { OPEN_ACCOUNT_DIALOG_EVENT } from "../features/auth/events";
+import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
+import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
   clearRuntimeAutoStartFailure,
@@ -294,7 +297,8 @@ function runtimeHealthFailureCopy(code: string | undefined): LauncherFailureCopy
 }
 
 export function DesktopSetup() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const navigate = useNavigate();
   const auth = useOptionalAuth();
   const updater = useAppUpdaterState();
   const startupGate = useSyncExternalStore(
@@ -314,6 +318,7 @@ export function DesktopSetup() {
   const installerDiscardRequested = useRef(false);
   const installerDiscardSucceeded = useRef(false);
   const componentMounted = useRef(false);
+  const browserAuthActive = useRef(false);
   const selectedDriveRef = useRef("");
   const [state, setState] = useState<ProbeState>(() => ({
     ...INITIAL_STATE,
@@ -334,6 +339,10 @@ export function DesktopSetup() {
   const [installerAttempt, setInstallerAttempt] = useState(0);
   const [dismissedLauncherError, setDismissedLauncherError] = useState("");
   const [launcherErrorExpanded, setLauncherErrorExpanded] = useState(false);
+  const [browserAuthStatus, setBrowserAuthStatus] = useState<
+    "idle" | "waiting" | "adopting"
+  >("idle");
+  const [browserAuthError, setBrowserAuthError] = useState<string | null>(null);
   const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
   const installActive = isActiveInstall(installState.snapshot);
   const receiptCleanupPending =
@@ -358,30 +367,35 @@ export function DesktopSetup() {
     isOverallDesktopReady(state.prerequisites, state.runtime);
   const accountChecking = Boolean(auth?.configured && auth.loading);
   const accountRequired = Boolean(
-    auth?.configured && !auth.loading && !auth.account,
+    auth && (
+      !auth.configured ||
+      (!auth.loading && !auth.account)
+    ),
   );
   const accountReady =
-    !auth?.configured || (!auth.loading && Boolean(auth.account));
+    !auth || Boolean(auth.configured && !auth.loading && auth.account);
   const startupGateReady =
     !desktopAvailable ||
     (startupGate.status === "ready" &&
-      (!auth?.configured ||
-        (Boolean(auth.account) && startupGate.accountId === auth.account?.id)));
+      Boolean(auth?.configured && auth.account) &&
+      startupGate.accountId === auth?.account?.id);
   const updaterBusy =
     updater.status === "checking" ||
     updater.status === "downloading" ||
     updater.status === "installing";
   const updaterBlocksWorkspace =
     updaterBusy || updater.status === "available";
-  const workspaceReady =
+  const localChecksReady =
     localRuntimeReady &&
-    accountReady &&
-    startupGateReady &&
     !updaterBlocksWorkspace &&
     !state.loading &&
     !installerHandoffState.checking &&
     (!runtimeAccess.desktopRuntime ||
       (runtimeAccess.status === "ready" && !runtimeAccess.isChecking));
+  const workspaceReady =
+    localChecksReady &&
+    accountReady &&
+    startupGateReady;
   const workspaceChecking =
     state.loading ||
     installerHandoffState.checking ||
@@ -454,6 +468,9 @@ export function DesktopSetup() {
     componentMounted.current = true;
     return () => {
       componentMounted.current = false;
+      if (browserAuthActive.current) {
+        void cancelBrowserAuth().catch(() => undefined);
+      }
     };
   }, []);
 
@@ -528,6 +545,65 @@ export function DesktopSetup() {
     updater.availableVersion,
     updater.status,
   ]);
+
+  useEffect(() => {
+    if (
+      workspaceReady &&
+      auth?.configured &&
+      auth.account &&
+      browserAuthStatus === "idle"
+    ) {
+      navigate("/assistant", { replace: true });
+    }
+  }, [
+    auth?.account,
+    auth?.configured,
+    browserAuthStatus,
+    navigate,
+    workspaceReady,
+  ]);
+
+  const startBrowserSignIn = useCallback(async () => {
+    if (!localChecksReady || browserAuthStatus !== "idle") return;
+    const configuration = browserAuthConfiguration();
+    if (!configuration) {
+      setBrowserAuthError(t("launcher.browserAuthNotConfigured"));
+      return;
+    }
+    setBrowserAuthError(null);
+    setBrowserAuthStatus("waiting");
+    browserAuthActive.current = true;
+    try {
+      const session = await beginBrowserAuth({
+        locale,
+        ...configuration,
+      });
+      if (!componentMounted.current) return;
+      setBrowserAuthStatus("adopting");
+      await adoptBrowserAuthSession(session);
+      if (componentMounted.current) setBrowserAuthStatus("idle");
+    } catch (error) {
+      if (!componentMounted.current) return;
+      setBrowserAuthStatus("idle");
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/cancelled/iu.test(message)) {
+        setBrowserAuthError(t("launcher.browserAuthFailed"));
+      }
+    } finally {
+      browserAuthActive.current = false;
+    }
+  }, [browserAuthStatus, localChecksReady, locale, t]);
+
+  const cancelBrowserSignIn = useCallback(async () => {
+    if (browserAuthStatus === "idle") return;
+    try {
+      await cancelBrowserAuth();
+    } catch {
+      if (componentMounted.current) {
+        setBrowserAuthError(t("launcher.browserAuthCancelFailed"));
+      }
+    }
+  }, [browserAuthStatus, t]);
 
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
@@ -1287,6 +1363,7 @@ export function DesktopSetup() {
       >
         <RuntimeLauncherHero
           snapshot={installState.snapshot}
+          localReady={localChecksReady}
           ready={workspaceReady}
           checking={workspaceChecking}
           gateBlocked={
@@ -1295,7 +1372,7 @@ export function DesktopSetup() {
             (startupGate.status === "blocked" ||
               updater.status === "available")
           }
-          accountRequired={localRuntimeReady && accountRequired}
+          accountRequired={localChecksReady && accountRequired}
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
           onCancel={() => void cancelInstall()}
@@ -1321,24 +1398,31 @@ export function DesktopSetup() {
               })}
             </button>
           </div>
-        ) : localRuntimeReady && accountRequired ? (
+        ) : localChecksReady && accountRequired ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
               className="btn btn-primary launcher-primary-action"
-              onClick={() =>
-                window.dispatchEvent(new Event(OPEN_ACCOUNT_DIALOG_EVENT))}
+              disabled={browserAuthStatus !== "idle"}
+              onClick={() => void startBrowserSignIn()}
             >
-              {t("launcher.signIn")}
+              {browserAuthStatus === "waiting"
+                ? t("launcher.browserAuthWaiting")
+                : browserAuthStatus === "adopting"
+                  ? t("launcher.browserAuthAdopting")
+                  : t("launcher.signIn")}
             </button>
+            {browserAuthStatus !== "idle" ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => void cancelBrowserSignIn()}
+              >
+                {t("launcher.browserAuthCancel")}
+              </button>
+            ) : null}
           </div>
-        ) : workspaceReady ? (
-          <div className="launcher-ready-actions">
-            <Link to="/assistant" className="btn btn-primary launcher-primary-action">
-              {t("launcher.openWorkspace")}
-            </Link>
-          </div>
-        ) : localRuntimeReady && (
+        ) : workspaceReady ? null : localRuntimeReady && (
           updaterBusy || startupGate.status === "checking"
         ) ? null : localRuntimeReady ? (
           <div className="launcher-ready-actions">
@@ -1402,6 +1486,12 @@ export function DesktopSetup() {
             ) : null}
           </>
         )}
+
+        {browserAuthError ? (
+          <Alert tone="danger" title={t("launcher.browserAuthErrorTitle")}>
+            <p>{browserAuthError}</p>
+          </Alert>
+        ) : null}
 
         {requestedFeatureLabel && !workspaceReady ? (
           <span className="sr-only">
@@ -2445,6 +2535,7 @@ const LAUNCHER_STATUS_KEYS: Record<RuntimeInstallPhase, TranslationKey> = {
 
 function RuntimeLauncherHero({
   snapshot,
+  localReady,
   ready,
   checking,
   gateBlocked,
@@ -2454,6 +2545,7 @@ function RuntimeLauncherHero({
   onCancel,
 }: {
   snapshot: RuntimeInstallSnapshot | null;
+  localReady: boolean;
   ready: boolean;
   checking: boolean;
   gateBlocked: boolean;
@@ -2468,7 +2560,7 @@ function RuntimeLauncherHero({
   const total = snapshot?.bytesTotal ?? null;
   const downloaded = snapshot?.bytesDownloaded ?? 0;
   const measuredPercent = runtimeInstallPercent(downloaded, total);
-  const percent = ready
+  const percent = localReady
     ? 100
     : measuredPercent !== null
       ? Math.min(measuredPercent, 99)
@@ -2496,10 +2588,10 @@ function RuntimeLauncherHero({
         : t(LAUNCHER_STATUS_KEYS[phase]);
 
   return (
-    <div className={`launcher-hero launcher-hero-${ready ? "ready" : phase}`}>
+    <div className={`launcher-hero launcher-hero-${localReady ? "ready" : phase}`}>
       <div className="launcher-hero-visual">
         <Suspense fallback={<DroneSceneLoadingFallback />}>
-          <DroneLaunchScene active={active || ready} progress={percent} />
+          <DroneLaunchScene active={active || localReady} progress={percent} />
         </Suspense>
       </div>
 

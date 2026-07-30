@@ -3,6 +3,19 @@ import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const launcherAuthState = vi.hoisted(() => ({
+  current: {
+    configured: false,
+    loading: false,
+    account: null as null | {
+      id: string;
+      email: string | null;
+      displayName: string;
+      avatarUrl: string | null;
+    },
+  },
+}));
+
 vi.mock("../features/auth/AuthContext", async (importOriginal) => {
   const original =
     await importOriginal<typeof import("../features/auth/AuthContext")>();
@@ -11,9 +24,7 @@ vi.mock("../features/auth/AuthContext", async (importOriginal) => {
     ...original,
     AuthProvider: ({ children }: { children: ReactNode }) => children,
     useAuth: () => ({
-      configured: false,
-      loading: false,
-      account: null,
+      ...launcherAuthState.current,
       googleEnabled: false,
       appleEnabled: false,
       signInWithPassword: unavailable,
@@ -125,9 +136,34 @@ afterEach(() => {
   delete window.__TAURI__;
   window.localStorage.clear();
   window.sessionStorage.clear();
+  launcherAuthState.current = {
+    configured: false,
+    loading: false,
+    account: null,
+  };
 });
 
 describe("desktop launcher chrome", () => {
+  it("does not expose a header sign-in control on the startup launcher", () => {
+    launcherAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    installDesktopBridge();
+    const { router } = renderLauncher();
+
+    expect(screen.queryByRole("button", { name: "Account" }))
+      .not.toBeInTheDocument();
+    expect(document.querySelector(".launcher-account-button"))
+      .not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Sign in to DroneDream" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+
+    router.dispose();
+  });
+
   it("saves opt-in defaults and confirms permanent memory deletion", async () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     installDesktopBridge();

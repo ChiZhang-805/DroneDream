@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   autoStartInstallerRuntime,
+  beginBrowserAuth,
+  cancelBrowserAuth,
   cancelRuntimeInstall,
   desktopApiRequest,
   desktopDownloadArtifact,
@@ -155,6 +157,50 @@ describe("desktop bridge", () => {
       "get_runtime_install_plan",
       { targetRoot: "E:\\DroneDream" },
     );
+  });
+
+  it("validates the browser-auth command without exposing returned tokens", async () => {
+    const session = {
+      accessToken: "header.payload.signature",
+      refreshToken: "refresh-token-value",
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "begin_browser_auth") return session;
+      if (command === "cancel_browser_auth") return true;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(beginBrowserAuth({
+      locale: "zh-CN",
+      supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
+      publishableKey: "public-test-key-for-browser-auth",
+    })).resolves.toEqual(session);
+    await expect(cancelBrowserAuth()).resolves.toBe(true);
+    expect(invoke).toHaveBeenNthCalledWith(1, "begin_browser_auth", {
+      request: {
+        locale: "zh-CN",
+        supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
+        publishableKey: "public-test-key-for-browser-auth",
+      },
+    });
+    expect(invoke).toHaveBeenNthCalledWith(2, "cancel_browser_auth", undefined);
+  });
+
+  it("rejects malformed browser-auth tokens at the native boundary", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      accessToken: "valid-token",
+      refreshToken: "secret refresh token",
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const error = await beginBrowserAuth({
+      locale: "en",
+      supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
+      publishableKey: "public-test-key-for-browser-auth",
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(DesktopCommandContractError);
+    expect(String(error)).not.toContain("secret refresh token");
   });
 
   it("validates the bounded native API response contract", async () => {

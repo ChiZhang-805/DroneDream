@@ -13,6 +13,19 @@ export const cloudAuthConfigured = Boolean(
   supabaseUrl && supabasePublishableKey,
 );
 
+export interface BrowserAuthConfiguration {
+  supabaseUrl: string;
+  publishableKey: string;
+}
+
+export function browserAuthConfiguration(): BrowserAuthConfiguration | null {
+  if (!supabaseUrl || !supabasePublishableKey) return null;
+  return {
+    supabaseUrl,
+    publishableKey: supabasePublishableKey,
+  };
+}
+
 function authStorage(): Storage | undefined {
   if (typeof window === "undefined") return undefined;
   // The desktop WebView does not yet have an OS-keychain-backed storage

@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const optionalAuthState = vi.hoisted(() => ({
@@ -33,6 +33,13 @@ const updaterState = vi.hoisted(() => ({
     installAvailableUpdate: vi.fn(async () => undefined),
   },
 }));
+const browserAuthMocks = vi.hoisted(() => ({
+  configuration: {
+    supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
+    publishableKey: "public-test-key-for-browser-auth",
+  } as { supabaseUrl: string; publishableKey: string } | null,
+  adoptSession: vi.fn(async () => undefined),
+}));
 
 vi.mock("../features/auth/AuthContext", async (importOriginal) => {
   const original =
@@ -51,6 +58,19 @@ vi.mock("../desktop/updaterContext", async (importOriginal) => {
     useAppUpdaterState: () => updaterState.current,
   };
 });
+
+vi.mock("../features/auth/supabaseClient", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../features/auth/supabaseClient")>();
+  return {
+    ...original,
+    browserAuthConfiguration: () => browserAuthMocks.configuration,
+  };
+});
+
+vi.mock("../features/auth/browserAuth", () => ({
+  adoptBrowserAuthSession: browserAuthMocks.adoptSession,
+}));
 
 import type {
   InstallerRuntimeAutoStartResult,
@@ -395,6 +415,7 @@ function renderPage(
       <I18nProvider>
         <MemoryRouter initialEntries={[initialEntry]}>
           <DesktopSetup />
+          <LocationProbe />
         </MemoryRouter>
       </I18nProvider>
     </StrictMode>
@@ -402,6 +423,7 @@ function renderPage(
     <I18nProvider>
       <MemoryRouter initialEntries={[initialEntry]}>
         <DesktopSetup />
+        <LocationProbe />
       </MemoryRouter>
     </I18nProvider>
   ));
@@ -417,6 +439,11 @@ function renderPage(
   });
 }
 
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="current-route">{location.pathname}</output>;
+}
+
 afterEach(() => {
   optionalAuthState.current = null;
   resetDesktopReadinessSession();
@@ -429,6 +456,12 @@ afterEach(() => {
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
   };
+  browserAuthMocks.configuration = {
+    supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
+    publishableKey: "public-test-key-for-browser-auth",
+  };
+  browserAuthMocks.adoptSession.mockReset();
+  browserAuthMocks.adoptSession.mockResolvedValue(undefined);
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
@@ -443,7 +476,7 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
   });
 
-  it("shows a ready installed runtime without offering a duplicate install", async () => {
+  it("shows a ready installed runtime without offering duplicate install or entry controls", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
@@ -460,17 +493,15 @@ describe("DesktopSetup", () => {
     expect(screen.queryByText("Validate Windows, virtualization, memory, and disk"))
       .not.toBeInTheDocument();
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(await screen.findByRole("link", { name: "Open tuning workspace" })).toHaveAttribute(
-      "href",
-      "/assistant",
-    );
+    expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+      .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
   });
 
-  it("holds startup at 99 percent while a configured account is still loading", async () => {
+  it("shows 100 percent local readiness while a configured account is still loading", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: true,
@@ -491,14 +522,16 @@ describe("DesktopSetup", () => {
     expect(await screen.findByText("DroneDreamRuntime · Installed · Running"))
       .toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "99");
-    expect(screen.queryByRole("button", { name: "Sign in to continue" }))
+      .toHaveAttribute("aria-valuenow", "100");
+    expect(screen.queryByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    }))
       .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
   });
 
-  it("holds startup at 99 percent until the configured account signs in", async () => {
+  it("offers the browser sign-in only after local checks reach 100 percent", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
@@ -518,14 +551,87 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText("Sign in to finish")).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "99");
-    expect(screen.getByRole("button", { name: "Sign in to continue" }))
+      .toHaveAttribute("aria-valuenow", "100");
+    expect(screen.getByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    }))
       .toBeEnabled();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
   });
 
-  it("reaches 100 percent only after the local backend accepts the signed-in account", async () => {
+  it("fails closed at 100 percent when account configuration is missing", async () => {
+    optionalAuthState.current = {
+      configured: false,
+      loading: false,
+      account: null,
+    };
+    browserAuthMocks.configuration = null;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const user = userEvent.setup();
+
+    renderPage();
+    const signIn = await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    });
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "100");
+
+    await user.click(signIn);
+
+    expect(await screen.findByText(
+      "This desktop build is missing the public account configuration. Install a release build that passed the account configuration gate.",
+    )).toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+  });
+
+  it("adopts exactly the session returned by the native browser flow", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    const browserSession = {
+      accessToken: "header.payload.signature",
+      refreshToken: "refresh-token-value",
+    };
+    const invoke = vi.fn(async (
+      command: string,
+      args?: Record<string, unknown>,
+    ) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "begin_browser_auth") return browserSession;
+      throw new Error(`Unexpected command: ${command} ${JSON.stringify(args)}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const user = userEvent.setup();
+
+    renderPage();
+    await user.click(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    }));
+
+    await waitFor(() => {
+      expect(browserAuthMocks.adoptSession).toHaveBeenCalledTimes(1);
+      expect(browserAuthMocks.adoptSession).toHaveBeenCalledWith(browserSession);
+    });
+    expect(invoke).toHaveBeenCalledWith("begin_browser_auth", {
+      request: {
+        locale: "en",
+        supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
+        publishableKey: "public-test-key-for-browser-auth",
+      },
+    });
+  });
+
+  it("automatically enters only after the local backend accepts the signed-in account", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
@@ -551,8 +657,9 @@ describe("DesktopSetup", () => {
 
     renderPage();
 
-    expect(await screen.findByRole("link", { name: "Open tuning workspace" }))
-      .toHaveAttribute("href", "/assistant");
+    await waitFor(() => {
+      expect(screen.getByTestId("current-route")).toHaveTextContent("/assistant");
+    });
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(verifySession).toHaveBeenCalledTimes(1);
@@ -589,7 +696,7 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "99");
+      .toHaveAttribute("aria-valuenow", "100");
   });
 
   it("blocks entry and offers the signed updater when a newer application is available", async () => {
@@ -649,9 +756,12 @@ describe("DesktopSetup", () => {
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "99");
 
-    expect(await screen.findByRole("link", { name: "Open tuning workspace" }, {
-      timeout: 3_000,
-    })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(prerequisiteAttempts).toBe(2);
+      expect(screen.getByRole("progressbar", {
+        name: "Startup readiness progress",
+      })).toHaveAttribute("aria-valuenow", "100");
+    }, { timeout: 3_000 });
     expect(prerequisiteAttempts).toBe(2);
     expect(screen.queryByRole("dialog", { name: "Setup needs attention" }))
       .not.toBeInTheDocument();
