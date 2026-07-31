@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isSensitiveCloudOriginAllowed } from "../security/sensitiveOrigin";
+import {
+  isAccountCommunityOriginAllowed,
+  isSensitiveCloudOriginAllowed,
+} from "../security/sensitiveOrigin";
 
 describe("sensitive cloud origin policy", () => {
   it("rejects the public HTTP mirror and unknown or opaque origins", () => {
@@ -27,5 +30,19 @@ describe("sensitive cloud origin policy", () => {
     expect(isSensitiveCloudOriginAllowed("http://localhost:5173/")).toBe(true);
     expect(isSensitiveCloudOriginAllowed("http://tauri.localhost/")).toBe(true);
     expect(isSensitiveCloudOriginAllowed("tauri://localhost/")).toBe(true);
+  });
+
+  it("allows account and community access on the approved HTTP preview origins only", () => {
+    expect(isAccountCommunityOriginAllowed("http://47.93.180.216/community/"))
+      .toBe(true);
+    expect(isAccountCommunityOriginAllowed("http://getdronedream.com/account/"))
+      .toBe(true);
+    expect(isAccountCommunityOriginAllowed("http://www.getdronedream.com/community/"))
+      .toBe(true);
+    expect(isAccountCommunityOriginAllowed("http://47.93.180.216:8080/account/"))
+      .toBe(false);
+    expect(isAccountCommunityOriginAllowed("http://unknown.example/community/"))
+      .toBe(false);
+    expect(isAccountCommunityOriginAllowed("null")).toBe(false);
   });
 });

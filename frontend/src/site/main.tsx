@@ -4,18 +4,25 @@ import "@fontsource-variable/space-grotesk/wght.css";
 
 import { AuthProvider } from "../features/auth/AuthContext";
 import { I18nProvider } from "../i18n/I18nProvider";
-import { sensitiveCloudActionsAllowed } from "../security/sensitiveOrigin";
+import {
+  accountCommunityActionsAllowed,
+  sensitiveCloudActionsAllowed,
+} from "../security/sensitiveOrigin";
 import "../styles.css";
 import { SiteApp } from "./SiteApp";
 import "./site.css";
 
 const sensitiveCloudActionsEnabled = sensitiveCloudActionsAllowed();
+const accountCommunityActionsEnabled = accountCommunityActionsAllowed();
 
 ReactDOM.createRoot(document.getElementById("site-root")!).render(
   <React.StrictMode>
     <I18nProvider>
-      <AuthProvider cloudActionsEnabled={sensitiveCloudActionsEnabled}>
-        <SiteApp sensitiveCloudActionsEnabled={sensitiveCloudActionsEnabled} />
+      <AuthProvider cloudActionsEnabled={accountCommunityActionsEnabled}>
+        <SiteApp
+          accountCommunityActionsEnabled={accountCommunityActionsEnabled}
+          sensitiveCloudActionsEnabled={sensitiveCloudActionsEnabled}
+        />
       </AuthProvider>
     </I18nProvider>
   </React.StrictMode>,

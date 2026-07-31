@@ -768,8 +768,10 @@ function StarflightIcon() {
 
 export function SiteApp({
   sensitiveCloudActionsEnabled = sensitiveCloudActionsAllowed(),
+  accountCommunityActionsEnabled = sensitiveCloudActionsEnabled,
 }: {
   sensitiveCloudActionsEnabled?: boolean;
+  accountCommunityActionsEnabled?: boolean;
 }) {
   const { locale, setLocale } = useI18n();
   const auth = useAuthOrLocal();
@@ -987,12 +989,12 @@ export function SiteApp({
   };
 
   useEffect(() => {
-    if (sensitiveCloudActionsEnabled || sitePage !== "account") return;
+    if (accountCommunityActionsEnabled || sitePage !== "account") return;
     window.history.replaceState(null, "", "/");
     setSiteLocation("/");
     setMenuOpen(false);
     window.scrollTo({ top: 0 });
-  }, [sensitiveCloudActionsEnabled, sitePage]);
+  }, [accountCommunityActionsEnabled, sitePage]);
 
   const submitAuth = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1308,7 +1310,7 @@ export function SiteApp({
           <button
             type="button"
             className="site-account-button"
-            disabled={!sensitiveCloudActionsEnabled}
+            disabled={!accountCommunityActionsEnabled}
             onClick={() => openAccount("sign-in")}
           >
             <AccountIcon />
@@ -1343,7 +1345,7 @@ export function SiteApp({
       </header>
 
       <main id="main-content">
-        {sitePage === "account" && sensitiveCloudActionsEnabled ? (
+        {sitePage === "account" && accountCommunityActionsEnabled ? (
           authPage
         ) : sitePage === "manual" ? (
           <ManualPage locale={locale} />
@@ -1359,7 +1361,7 @@ export function SiteApp({
             locale={locale}
             account={auth.account}
             onRequireAccount={() => openAccount("sign-in", "/community/")}
-            sensitiveCloudActionsEnabled={sensitiveCloudActionsEnabled}
+            sensitiveCloudActionsEnabled={accountCommunityActionsEnabled}
           />
         ) : (
           <>

@@ -147,6 +147,36 @@ describe("DroneDream public website", () => {
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
   });
 
+  it("opens account and community for the approved internal preview while payment stays disabled", async () => {
+    const { unmount } = render(
+      <I18nProvider>
+        <SiteApp
+          accountCommunityActionsEnabled
+          sensitiveCloudActionsEnabled={false}
+        />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Login" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Login" }));
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeVisible();
+    expect(document.querySelector('[data-auth-source="website"]')).not.toBeNull();
+
+    unmount();
+    window.history.replaceState(null, "", "/community/");
+    render(
+      <I18nProvider>
+        <SiteApp
+          accountCommunityActionsEnabled
+          sensitiveCloudActionsEnabled={false}
+        />
+      </I18nProvider>,
+    );
+    expect(await screen.findByRole("button", { name: "Sign in to publish" }))
+      .toBeEnabled();
+  });
+
   it("flips capability cards and browses their localized detail carousel", async () => {
     renderSite();
 
