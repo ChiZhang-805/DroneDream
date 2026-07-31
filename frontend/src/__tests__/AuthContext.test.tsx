@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "../features/auth/AuthContext";
+import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
 
 const authMock = vi.hoisted(() => {
   const state = {
@@ -11,8 +12,24 @@ const authMock = vi.hoisted(() => {
       user_metadata: {} as Record<string, unknown>,
     },
   };
+  const getSession = vi.fn(async () => ({
+    data: {
+      session: {
+        user: state.user,
+        access_token: "session-token",
+      },
+    },
+    error: null,
+  }));
+  const onAuthStateChange = vi.fn(() => ({
+    data: {
+      subscription: { unsubscribe: vi.fn() },
+    },
+  }));
   return {
     state,
+    getSession,
+    onAuthStateChange,
     signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
     signInWithOtp: vi.fn(async () => ({ data: {}, error: null })),
     verifyOtp: vi.fn(async () => ({ data: {}, error: null })),
@@ -41,20 +58,8 @@ vi.mock("../features/auth/supabaseClient", () => ({
   googleAuthEnabled: false,
   supabaseClient: {
     auth: {
-      getSession: vi.fn(async () => ({
-        data: {
-          session: {
-            user: authMock.state.user,
-            access_token: "session-token",
-          },
-        },
-        error: null,
-      })),
-      onAuthStateChange: vi.fn(() => ({
-        data: {
-          subscription: { unsubscribe: authMock.unsubscribe },
-        },
-      })),
+      getSession: authMock.getSession,
+      onAuthStateChange: authMock.onAuthStateChange,
       signInWithPassword: authMock.signInWithPassword,
       signInWithOtp: authMock.signInWithOtp,
       verifyOtp: authMock.verifyOtp,
@@ -131,12 +136,16 @@ describe("AuthContext account profile", () => {
       user_metadata: {},
     };
     authMock.updateUser.mockClear();
+    authMock.getSession.mockClear();
+    authMock.onAuthStateChange.mockClear();
     authMock.signInWithPassword.mockClear();
     authMock.signInWithOtp.mockClear();
     authMock.verifyOtp.mockClear();
     authMock.signOut.mockReset();
     authMock.signOut.mockResolvedValue({ data: {}, error: null });
     authMock.unsubscribe.mockClear();
+    delete window.__TAURI__;
+    window.history.replaceState(null, "", "/");
     window.localStorage.clear();
     window.sessionStorage.clear();
   });
@@ -213,6 +222,34 @@ describe("AuthContext account profile", () => {
       expect(authMock.updateUser).toHaveBeenCalledWith({
         password: "correct-horse",
       });
+    });
+  });
+
+  it("does not hydrate a desktop launcher account until the 100 percent sign-in action activates it", async () => {
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async () => undefined),
+      },
+    };
+    window.history.replaceState(null, "", "/desktop/setup");
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await Promise.resolve();
+    expect(authMock.getSession).not.toHaveBeenCalled();
+    expect(authMock.onAuthStateChange).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("username")).toHaveTextContent("");
+
+    activateDesktopAuthSession();
+
+    await waitFor(() => {
+      expect(authMock.getSession).toHaveBeenCalledTimes(1);
+      expect(authMock.onAuthStateChange).toHaveBeenCalledTimes(1);
+      expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name");
     });
   });
 

@@ -12,6 +12,7 @@ import type { Provider, User } from "@supabase/supabase-js";
 
 import { isDesktopRuntime } from "../../desktop/bridge";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
+import { ACTIVATE_DESKTOP_AUTH_EVENT } from "./desktopAuthActivation";
 import { setAuthAccessToken } from "./authTokenStore";
 import {
   appleAuthEnabled,
@@ -74,6 +75,10 @@ const OPTIONAL_AUTH_FALLBACK: AuthContextValue = {
 const AVATAR_STORAGE_PREFIX = "drone-dream:account-avatar:";
 const MAX_AVATAR_DATA_URL_LENGTH = 600_000;
 
+function shouldDeferDesktopAuth(): boolean {
+  return isDesktopRuntime() && window.location.pathname === "/desktop/setup";
+}
+
 function avatarStorageKey(userId: string): string {
   return `${AVATAR_STORAGE_PREFIX}${userId}`;
 }
@@ -132,7 +137,11 @@ function providerRedirectUrl(): string {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const docsPreview = import.meta.env.DEV &&
     new URLSearchParams(window.location.search).has("docsPreview");
-  const [loading, setLoading] = useState(cloudAuthConfigured && !docsPreview);
+  const deferDesktopAuth = useRef(shouldDeferDesktopAuth()).current;
+  const [authActivated, setAuthActivated] = useState(!deferDesktopAuth);
+  const [loading, setLoading] = useState(
+    cloudAuthConfigured && !docsPreview && !deferDesktopAuth,
+  );
   const [account, setAccount] = useState<DroneDreamAccount | null>(
     docsPreview
       ? {
@@ -157,7 +166,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (docsPreview) return undefined;
+    if (!deferDesktopAuth || authActivated) return undefined;
+    const activate = () => {
+      setLoading(cloudAuthConfigured && !docsPreview);
+      setAuthActivated(true);
+    };
+    window.addEventListener(ACTIVATE_DESKTOP_AUTH_EVENT, activate, { once: true });
+    return () => window.removeEventListener(ACTIVATE_DESKTOP_AUTH_EVENT, activate);
+  }, [authActivated, deferDesktopAuth, docsPreview]);
+
+  useEffect(() => {
+    if (docsPreview || !authActivated) return undefined;
     if (!supabaseClient) {
       setLoading(false);
       return undefined;
@@ -182,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [adoptUser, docsPreview]);
+  }, [adoptUser, authActivated, docsPreview]);
 
   const signInWithPassword = useCallback(async (
     email: string,

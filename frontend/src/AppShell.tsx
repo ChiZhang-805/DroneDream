@@ -3,7 +3,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react";
 import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
@@ -49,9 +48,7 @@ import type { DesktopRuntimeAccess } from "./desktop/access";
 import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
 import {
   approveDesktopStartupGateWithoutCloudAuth,
-  getDesktopStartupGateSession,
   setDesktopStartupGateState,
-  subscribeDesktopStartupGate,
   verifyDesktopStartupGate,
 } from "./desktop/startupGate";
 import {
@@ -1901,11 +1898,6 @@ function AppShellContent() {
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuth();
   const updater = useAppUpdaterState();
-  const startupGate = useSyncExternalStore(
-    subscribeDesktopStartupGate,
-    getDesktopStartupGateSession,
-    getDesktopStartupGateSession,
-  );
   const { locale, t } = useI18n();
   const accountCopy = ACCOUNT_COPY[locale];
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
@@ -1926,16 +1918,10 @@ function AppShellContent() {
     runtimeAccess.status === "starting";
   const launcherRuntimeChecking =
     runtimeAccess.isChecking ||
-    runtimeIsBusy ||
-    startupGate.status === "checking";
-  const startupGateIdentityReady =
-    startupGate.status === "ready" &&
-    (!auth.configured ||
-      (Boolean(auth.account) && startupGate.accountId === auth.account?.id));
+    runtimeIsBusy;
   const launcherRuntimeChecked =
     runtimeAccess.status === "ready" &&
-    !runtimeAccess.isChecking &&
-    startupGateIdentityReady;
+    !runtimeAccess.isChecking;
   const runtimeNavDescription = runtimeAccess.status === "checking"
     ? t("runtimeGate.navChecking")
     : runtimeAccess.status === "starting"
@@ -1950,7 +1936,11 @@ function AppShellContent() {
   const accountDialogOpen = accountOpen || accountDialogRequired;
 
   useEffect(() => {
-    if (!desktopRuntime) return;
+    // The launcher owns a strict two-stage flow: environment first, browser
+    // authentication only after the user selects the sole sign-in action at
+    // 100%. The workspace gate below therefore runs only after navigation away
+    // from the launcher.
+    if (!desktopRuntime || launcherMode) return;
     if (
       updater.status === "checking" ||
       updater.status === "downloading" ||
@@ -2012,6 +2002,7 @@ function AppShellContent() {
     auth.configured,
     auth.loading,
     desktopRuntime,
+    launcherMode,
     runtimeAccess.isChecking,
     runtimeAccess.lastFullCheckAt,
     runtimeAccess.status,
@@ -2033,6 +2024,7 @@ function AppShellContent() {
   }, [accountRequired]);
 
   useEffect(() => {
+    if (launcherMode) return;
     const openAccountDialog = () => {
       setLauncherSettingsOpen(false);
       setAccountOpen(true);
@@ -2040,7 +2032,7 @@ function AppShellContent() {
     window.addEventListener(OPEN_ACCOUNT_DIALOG_EVENT, openAccountDialog);
     return () =>
       window.removeEventListener(OPEN_ACCOUNT_DIALOG_EVENT, openAccountDialog);
-  }, []);
+  }, [launcherMode]);
 
   const returnFromExitPrompt = useCallback(() => {
     exitPromptRef.current = null;
@@ -2338,7 +2330,6 @@ function AppShellContent() {
             />
           </div>
         ) : null}
-        {accountDialog}
         {exitGuard}
         <main id="main-content" className="launcher-main" tabIndex={-1}>
           <Outlet />

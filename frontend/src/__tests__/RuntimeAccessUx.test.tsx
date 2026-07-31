@@ -49,16 +49,6 @@ const readyRuntime = {
   })),
 };
 
-const stoppedRuntime = {
-  ...readyRuntime,
-  running: false,
-  ready: false,
-  components: readyRuntime.components.map((component) => ({
-    ...component,
-    status: component.id === "wsl-runtime" ? "ready" : "stopped",
-  })),
-};
-
 const autoStartableRuntime = {
   ...readyRuntime,
   running: false,
@@ -373,22 +363,17 @@ afterEach(() => {
     router.dispose();
   });
 
-  it("syncs a focus recheck from ready to stopped into the global gate", async () => {
-    let currentRuntime = readyRuntime;
-    window.__TAURI__ = {
-      core: {
-        invoke: vi.fn(async (command: string) => {
-          if (command === "get_installer_runtime_intent") {
-            return { status: "none", mode: null, targetRoot: null, message: null };
-          }
-          if (command === "probe_system_prerequisites") return prerequisites;
-          if (command === "probe_runtime_status") {
-            return currentRuntime;
-          }
-          throw new Error(`Unexpected command: ${command}`);
-        }),
-      },
-    };
+  it("keeps a ready launcher frozen on focus and changes it only after a manual check", async () => {
+    let currentRuntime: typeof readyRuntime | typeof missingRuntime = readyRuntime;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "get_installer_runtime_intent") {
+        return { status: "none", mode: null, targetRoot: null, message: null };
+      }
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return currentRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
     const router = createMemoryRouter([
       {
         path: "/",
@@ -412,15 +397,30 @@ afterEach(() => {
       .not.toBeInTheDocument();
     expect(screen.queryByText("This feature needs DroneDreamRuntime"))
       .not.toBeInTheDocument();
+    const initialRuntimeProbeCount = invoke.mock.calls.filter(
+      ([command]) => command === "probe_runtime_status",
+    ).length;
 
-    currentRuntime = stoppedRuntime;
+    currentRuntime = missingRuntime;
     fireEvent.focus(window);
 
-    expect(await screen.findByText("DroneDreamRuntime · Installed · Stopped"))
+    await act(async () => Promise.resolve());
+    expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
+    expect(invoke.mock.calls.filter(
+      ([command]) => command === "probe_runtime_status",
+    )).toHaveLength(initialRuntimeProbeCount);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
+
+    expect(await screen.findByText("Environment unavailable")).toBeInTheDocument();
+    expect(screen.getByText("DroneDreamRuntime is not installed."))
       .toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByText("Runtime")).toBeInTheDocument();
-    });
+    expect(invoke.mock.calls.filter(
+      ([command]) => command === "probe_runtime_status",
+    )).toHaveLength(initialRuntimeProbeCount + 1);
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "99");
 
     router.dispose();
   });

@@ -160,6 +160,10 @@ describe("desktop launcher chrome", () => {
     expect(screen.queryByRole("dialog", { name: "Sign in to DroneDream" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
+    const launcherActions = document.querySelector(".launcher-chrome-actions");
+    expect(launcherActions?.querySelector(".launcher-runtime-indicator"))
+      .toBeInTheDocument();
+    expect(launcherActions?.querySelectorAll("button")).toHaveLength(1);
 
     router.dispose();
   });

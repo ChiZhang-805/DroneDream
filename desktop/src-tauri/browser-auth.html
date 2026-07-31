@@ -220,7 +220,7 @@
         registerSwitch: "还没有账户？注册",
         signInSwitch: "已有账户？登录",
         submitSignIn: "登录并进入调优平台",
-        submitRegister: "创建账户并进入",
+        submitRegister: "创建账户",
         submitReset: "更新密码并进入",
         cancel: "取消本次登录",
         working: "正在处理…",
@@ -229,6 +229,7 @@
         shortPassword: "密码至少需要 8 个字符。",
         codeRequired: "请输入邮件验证码。",
         genericError: "账户请求失败，请稍后重试。",
+        registrationComplete: "账户已创建。请使用邮箱和密码登录。",
         success: "登录成功，正在返回 DroneDream…",
         cancelled: "本次登录已取消。"
       } : {
@@ -251,7 +252,7 @@
         registerSwitch: "No account? Register",
         signInSwitch: "Already registered? Sign in",
         submitSignIn: "Sign in and enter tuning workspace",
-        submitRegister: "Create account and continue",
+        submitRegister: "Create account",
         submitReset: "Update password and continue",
         cancel: "Cancel this sign-in",
         working: "Working…",
@@ -260,6 +261,7 @@
         shortPassword: "Password must contain at least 8 characters.",
         codeRequired: "Enter the email verification code.",
         genericError: "The account request failed. Please try again.",
+        registrationComplete: "Account created. Sign in with your email and password.",
         success: "Signed in. Returning to DroneDream…",
         cancelled: "This sign-in was cancelled."
       };
@@ -450,6 +452,19 @@
         setTimeout(() => window.location.replace(homeUrl), 900);
       }
 
+      function returnToSignInAfterRegistration(session) {
+        const registeredEmail = elements.email.value.trim();
+        // Verification returns a short-lived session so the password can be
+        // established. Registration must not forward that session to the
+        // desktop: the product contract requires an explicit password sign-in.
+        session.access_token = "";
+        session.refresh_token = "";
+        renderMode("sign-in");
+        elements.email.value = registeredEmail;
+        setStatus(copy.registrationComplete, "success");
+        elements.password.focus();
+      }
+
       elements.form.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (busy || !elements.form.reportValidity()) return;
@@ -457,6 +472,13 @@
         setBusy(true);
         setStatus(copy.working);
         try {
+          if (mode === "register") {
+            const registrationSession = await verifyCodeAndSetPassword();
+            if (registrationSession) {
+              returnToSignInAfterRegistration(registrationSession);
+            }
+            return;
+          }
           const session = mode === "sign-in"
             ? await authRequest("/auth/v1/token?grant_type=password", {
                 email: elements.email.value.trim(),
