@@ -170,9 +170,7 @@ describe("CommunityPage public data loading", () => {
     expect(await screen.findByRole("heading", {
       name: "Stable hover evidence",
     })).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "This HTTP mirror is read-only.",
-    );
+    expect(screen.queryByRole("status")).toBeNull();
     expect(screen.getByRole("button", { name: "Create a topic" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "7 likes" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Delete topic" })).toBeDisabled();
@@ -182,6 +180,7 @@ describe("CommunityPage public data loading", () => {
     const dialog = await screen.findByRole("dialog", {
       name: "Stable hover evidence",
     });
+    expect(within(dialog).queryByRole("status")).toBeNull();
     expect(within(dialog).queryByRole("textbox", {
       name: "Add a useful observation or a reproducible next step…",
     })).toBeNull();

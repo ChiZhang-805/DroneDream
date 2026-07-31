@@ -109,8 +109,6 @@ const communityContent = {
     empty: "No topic matches this view. Start the first evidence-backed discussion.",
     loading: "Loading community topics…",
     unavailable: "The community connection is temporarily unavailable.",
-    insecureMirror:
-      "This HTTP mirror is read-only. Sign-in and community contributions require a trusted HTTPS site.",
     titleLabel: "Topic title",
     titlePlaceholder: "What should the community help you understand?",
     bodyLabel: "Evidence and context",
@@ -163,8 +161,6 @@ const communityContent = {
     empty: "当前视图没有匹配的话题；你可以发起第一场有证据的讨论。",
     loading: "正在加载社区话题……",
     unavailable: "社区连接暂时不可用。",
-    insecureMirror:
-      "当前 HTTP 镜像仅供只读浏览与下载；登录和社区写入须在可信 HTTPS 网站中使用。",
     titleLabel: "话题标题",
     titlePlaceholder: "你希望社区帮助理解什么问题？",
     bodyLabel: "证据与背景",
@@ -478,10 +474,7 @@ export function CommunityPage({
   };
 
   const startTopic = () => {
-    if (!sensitiveCloudActionsEnabled) {
-      setFeedError(copy.insecureMirror);
-      return;
-    }
+    if (!sensitiveCloudActionsEnabled) return;
     if (!account) {
       onRequireAccount();
       return;
@@ -667,10 +660,7 @@ export function CommunityPage({
   };
 
   const toggleTopicLike = async (topicId: string) => {
-    if (!sensitiveCloudActionsEnabled) {
-      setFeedError(copy.insecureMirror);
-      return;
-    }
+    if (!sensitiveCloudActionsEnabled) return;
     if (!account || !supabaseClient) {
       onRequireAccount();
       return;
@@ -708,10 +698,7 @@ export function CommunityPage({
   };
 
   const toggleCommentLike = async (commentId: string) => {
-    if (!sensitiveCloudActionsEnabled) {
-      setDialogError(copy.insecureMirror);
-      return;
-    }
+    if (!sensitiveCloudActionsEnabled) return;
     if (!account || !supabaseClient) {
       onRequireAccount();
       return;
@@ -796,18 +783,12 @@ export function CommunityPage({
         <button
           type="button"
           disabled={!sensitiveCloudActionsEnabled}
-          title={!sensitiveCloudActionsEnabled ? copy.insecureMirror : undefined}
           onClick={startTopic}
         >
           <PenLine aria-hidden="true" />
           {account ? copy.newTopic : copy.signIn}
         </button>
       </header>
-      {!sensitiveCloudActionsEnabled ? (
-        <p className="site-security-notice" role="status">
-          {copy.insecureMirror}
-        </p>
-      ) : null}
 
       <section className="community-feed" aria-labelledby="community-feed-heading">
         <header className="community-feed-heading">
@@ -1252,9 +1233,8 @@ export function CommunityPage({
                         <button
                           type="button"
                           onClick={() => {
-                            if (!sensitiveCloudActionsEnabled) {
-                              setDialogError(copy.insecureMirror);
-                            } else if (!account) onRequireAccount();
+                            if (!sensitiveCloudActionsEnabled) return;
+                            if (!account) onRequireAccount();
                             else setReplyTo(comment);
                           }}
                           disabled={!sensitiveCloudActionsEnabled}
@@ -1313,11 +1293,7 @@ export function CommunityPage({
                 >
                   {copy.signInAction}
                 </button>
-              ) : (
-                <p className="site-security-notice" role="status">
-                  {copy.insecureMirror}
-                </p>
-              )}
+              ) : null}
             </div>
           </section>
         </div>
