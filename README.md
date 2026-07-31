@@ -3,21 +3,13 @@
 </p>
 
 <p align="center">
-  <strong>Simulation-first PX4 and Gazebo tuning, from intent to evidence.</strong>
+  <strong>Agentic PX4/GAZEBO Parameter Optimization Platform</strong>
 </p>
 
 <p align="center">
   <img alt="AURORA · evidence-gated" src="https://img.shields.io/badge/AURORA-evidence--gated-7C3AED?style=for-the-badge" />
   <img alt="PX4 and Gazebo · simulation-first" src="https://img.shields.io/badge/PX4%20%2B%20Gazebo-simulation--first-2563EB?style=for-the-badge" />
-  <img alt="Windows desktop and WSL2 Runtime" src="https://img.shields.io/badge/Windows-Desktop%20%2B%20WSL2-8B5CF6?style=for-the-badge&logo=windows11&logoColor=white" />
   <img alt="Receipted evidence" src="https://img.shields.io/badge/Evidence-receipted-EC4899?style=for-the-badge" />
-</p>
-
-<p align="center">
-  <a href="https://getdronedream.com/">Website</a> ·
-  <a href="https://github.com/ChiZhang-805/DroneDream/releases">Releases</a> ·
-  <a href="docs/README.md">Documentation</a> ·
-  <a href="https://github.com/ChiZhang-805/DroneDream/blob/codex/technical-report/technical-report/output/DroneDream_AURORA_Technical_Report.pdf">Technical report</a>
 </p>
 
 ## ✦ What DroneDream is
