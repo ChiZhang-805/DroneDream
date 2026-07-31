@@ -1,0 +1,141 @@
+{
+  "schemaVersion": "dronedream.website-ece498-auth-pro-validation.v1",
+  "generatedAt": "2026-07-31T15:04:49.9393213Z",
+  "scope": {
+    "branch": "codex/website",
+    "sourceCommit": "1b16e5b05736bb2b9cba7027e5e3b0f4093a236d",
+    "sourceTree": "9ea262c18b33f36460343546a7572b67230de687",
+    "sourcePatchId": "a20def5fceef528da4b46621d39c3b78f211edf1",
+    "staticDeploymentPerformed": false,
+    "desktopInstallerRebuilt": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "paymentRecordCreated": false
+  },
+  "changes": {
+    "ece498": {
+      "sharedFrontend": true,
+      "paths": [
+        "frontend/src/pages/ECE498.css"
+      ],
+      "desktopParagraphAlignment": "justify",
+      "desktopTextColor": "#eee6f2",
+      "desktopContract": "7 stages x 4 cards x (1 title line + 9 body lines)",
+      "mobileContract": "responsive, unclipped, naturally left aligned"
+    },
+    "websiteAuth": {
+      "paths": [
+        "frontend/src/site/SiteApp.tsx",
+        "frontend/src/__tests__/WebsiteAuthFlow.test.tsx"
+      ],
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "removedCopy": "browser-only and return-home explanatory paragraphs beneath the account title",
+      "formAndNavigationPreserved": true
+    }
+  },
+  "productionAccountEntitlement": {
+    "performed": true,
+    "principalIdentifierSha256": "1fe6fcca94d88d21afac42fd75ea7672e3502e9050d9c788d4db7e08a3c0fa4c",
+    "matchedUsers": 1,
+    "previousPlan": "free",
+    "currentPlan": "pro",
+    "status": "active",
+    "source": "admin",
+    "cancelAtPeriodEnd": false,
+    "currentPeriodEnd": "infinity",
+    "includedAiCredits": 15000000,
+    "consumedAiCreditsPreserved": 0,
+    "reservedAiCreditsPreserved": 0,
+    "requestCountPreserved": 0,
+    "paymentOrderCount": 0,
+    "notes": "The requested internal-test account was upgraded through an administrator entitlement. No payment order or paid-subscription record was fabricated."
+  },
+  "validation": {
+    "focusedTests": {
+      "files": 2,
+      "tests": 14,
+      "passed": 14,
+      "failed": 0
+    },
+    "completeFrontendSuite": {
+      "files": 54,
+      "tests": 371,
+      "passed": 371,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appBuild": "passed with the existing non-failing Vite chunk-size advisory",
+    "sharedSiteAndConsoleBuild": "passed",
+    "deploymentContract": {
+      "tests": 11,
+      "subtests": 23,
+      "passed": true
+    },
+    "softwareUiLayout": {
+      "status": "passed",
+      "cases": 4,
+      "desktopLocales": [
+        "en",
+        "zh-CN"
+      ],
+      "desktopViewports": [
+        "1440x1000"
+      ],
+      "mobileLocales": [
+        "en",
+        "zh-CN"
+      ],
+      "mobileViewports": [
+        "390x844"
+      ],
+      "desktopEceParagraphsMeasured": 56,
+      "allDesktopBodyLineCounts": 9,
+      "allParagraphsUnclipped": true,
+      "pageErrors": 0,
+      "receiptSha256": "1678fe78db57599ca7c4a9e18ad51700059f1661d51d70d4b8b2060dc999c791"
+    },
+    "siteBrowserMatrix": {
+      "browsers": [
+        "edge",
+        "chrome",
+        "lenovo",
+        "firefox"
+      ],
+      "checks": 120,
+      "passed": 120,
+      "failed": 0,
+      "externalWarnings": 0,
+      "receiptSha256": "c0e1c5c073b8ce67defa1af2b1d05cad27b1b35029d1ae8ca43b2e0b2305afe5"
+    },
+    "authVisualReview": {
+      "screenshots": 8,
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "modes": [
+        "sign-in",
+        "register"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "result": "passed; explanatory copy absent, forms visually balanced, no clipping or horizontal overflow"
+    },
+    "diffCheck": "passed",
+    "trackedSourceClean": true
+  },
+  "crossWorkstreamBoundary": {
+    "sharedFrontendReadyForWebsiteAndDesktop": true,
+    "currentInstalledDesktopContainsThisSource": false,
+    "desktopBrowserAuthVerifier": {
+      "status": "not runnable in website worktree",
+      "reason": "The website ownership worktree intentionally excludes desktop/src-tauri/browser-auth.html. The shared browser-auth frontend tests are included in the passing 371-test suite; the complete desktop verifier must run when the software line rebuilds the installer."
+    }
+  }
+}
