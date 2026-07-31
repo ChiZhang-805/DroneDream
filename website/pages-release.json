@@ -2,24 +2,24 @@
   "version": "1.0.0",
   "fileName": "DroneDream_1.0.0_x64-setup.exe",
   "releaseTag": "signpath-candidate-v1.0.0",
-  "sha256": "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
-  "sizeBytes": 10331399,
-  "publishedAt": "2026-07-31",
+  "sha256": "bb0e0ba15fc9826b61367c7b83d04eac0587e885ce98c1db76427a62d10ab50b",
+  "sizeBytes": 10330782,
+  "publishedAt": "2026-08-01",
   "publicationFiles": {
     "checksum": {
       "fileName": "DroneDream_1.0.0_x64-setup.exe.sha256",
-      "sha256": "022c0192874c9478748414da3275a6081d40a89256a7b631ae5caa60679fa630",
+      "sha256": "1a886c95571f2581f1cd0709b94e75f2c1e93b6d898ffd74bf39459ac24ca8c3",
       "sizeBytes": 98
     },
     "updaterSignature": {
       "fileName": "DroneDream_1.0.0_x64-setup.exe.sig",
-      "sha256": "4d992ca27c3a42aabe411cb4123335ac608afbe62ec839ef7c3466fa14e12129",
+      "sha256": "9537b34e3dbe9ceb0935c23d902da9b85180a34a573b44eba7f3a7c109df836a",
       "sizeBytes": 420
     },
     "updaterManifest": {
       "assetName": "latest.json",
       "siteFileName": "tauri-latest.json",
-      "sha256": "6acca54e7a3c6fa6e6197481101110e5c87ec9866b69a0cac66b211b07d8c1e2",
+      "sha256": "4b2ab3213a9d2c9860de1b548679a255d5b0fdfdf33c78cdc71117a18c16e502",
       "sizeBytes": 954
     }
   }
