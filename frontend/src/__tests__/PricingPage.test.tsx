@@ -132,4 +132,23 @@ describe("PricingPage payment channels", () => {
     expect(billingMock.getBillingAvailability).not.toHaveBeenCalled();
     expect(billingMock.createBillingCheckout).not.toHaveBeenCalled();
   });
+
+  it("locks the Chinese mobile heading to a natural six-plus-nine character rhythm", () => {
+    const { container } = render(
+      <PricingPage
+        locale="zh-CN"
+        authenticated={false}
+        onRequireAccount={vi.fn()}
+        sensitiveCloudActionsEnabled={false}
+      />,
+    );
+
+    const lines = Array.from(
+      container.querySelectorAll(".pricing-page .portal-title-mobile > span"),
+      (line) => line.textContent ?? "",
+    );
+    expect(lines).toEqual(["为每一次飞行", "选择合适的优化深度"]);
+    expect(lines.map((line) => Array.from(line).length)).toEqual([6, 9]);
+    expect(lines.join("")).not.toMatch(/[。.!！?？]$/);
+  });
 });

@@ -93,7 +93,7 @@ const FEATURE_ICONS: Record<FeatureKey, LucideIcon> = {
 const pricingContent = {
   en: {
     title: "Choose the optimization depth for every flight.",
-    mobileTitle: "Choose your optimization depth.",
+    mobileTitleLines: ["Choose your", "optimization depth."],
     audienceLabel: "Workspace type",
     individual: "Individual",
     business: "Business",
@@ -130,7 +130,7 @@ const pricingContent = {
   },
   "zh-CN": {
     title: "为每一次飞行选择合适的优化深度。",
-    mobileTitle: "选择适合你的优化深度。",
+    mobileTitleLines: ["为每一次飞行", "选择合适的优化深度"],
     audienceLabel: "工作空间类型",
     individual: "个人",
     business: "商业",
@@ -359,7 +359,9 @@ export function PricingPage({
       <header className="portal-page-heading">
         <h1 aria-label={copy.title}>
           <span aria-hidden="true" className="portal-title-desktop">{copy.title}</span>
-          <span aria-hidden="true" className="portal-title-mobile">{copy.mobileTitle}</span>
+          <span aria-hidden="true" className="portal-title-mobile">
+            {copy.mobileTitleLines.map((line) => <span key={line}>{line}</span>)}
+          </span>
         </h1>
       </header>
       <div className="pricing-audience" role="tablist" aria-label={copy.audienceLabel}>

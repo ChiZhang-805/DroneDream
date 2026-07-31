@@ -2841,6 +2841,8 @@ html[lang="zh-CN"] .site-hero h1 {
   .site-portal { padding-top: 66px; }
   .portal-title-desktop { display: none; }
   .portal-title-mobile { display: inline; }
+  .pricing-page .portal-title-mobile { display: grid; }
+  .pricing-page .portal-title-mobile > span { display: block; }
   .site-manual-page { display: block; }
   .manual-sidebar {
     position: relative;
