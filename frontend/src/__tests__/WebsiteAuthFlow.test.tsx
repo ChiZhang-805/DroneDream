@@ -84,9 +84,8 @@ describe("website account navigation", () => {
     expect(window.location.pathname).toBe("/account/");
     expect(new URLSearchParams(window.location.search).get("source")).toBe("website");
     expect(new URLSearchParams(window.location.search).get("returnTo")).toBe("/");
-    expect(screen.getByText(
-      "This sign-in is for the website in this browser only. It does not sign in the desktop application.",
-    )).toBeVisible();
+    expect(screen.queryByText(/website in this browser only/i)).toBeNull();
+    expect(screen.queryByText(/return to the DroneDream homepage/i)).toBeNull();
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
     expect(screen.queryByRole("dialog")).toBeNull();
 
@@ -119,9 +118,23 @@ describe("website account navigation", () => {
     renderSite();
 
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
-    expect(screen.getByText(
-      "This sign-in is for the website in this browser only. It does not sign in the desktop application.",
-    )).toBeVisible();
+    expect(screen.queryByText(/website in this browser only/i)).toBeNull();
     expect(desktopInvoke).not.toHaveBeenCalled();
+  });
+
+  it("omits the browser-only explanation from the Chinese registration page", () => {
+    window.localStorage.setItem("drone-dream:locale", "zh-CN");
+    window.history.replaceState(
+      null,
+      "",
+      "/account/?source=website&mode=register&returnTo=%2F",
+    );
+
+    renderSite();
+
+    expect(screen.getByRole("heading", { name: "创建账号" })).toBeVisible();
+    expect(screen.queryByText(/本次登录只用于当前浏览器/)).toBeNull();
+    expect(screen.queryByText(/登录成功后将返回/)).toBeNull();
+    expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
   });
 });

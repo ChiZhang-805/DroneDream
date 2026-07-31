@@ -80,10 +80,6 @@ const content = {
     signOut: "Sign out",
     closeAuth: "Close account dialog",
     authEyebrow: "DRONEDREAM ACCOUNT",
-    authBrowserOnly:
-      "This sign-in is for the website in this browser only. It does not sign in the desktop application.",
-    authReturnHome:
-      "After sign-in, you will return to the DroneDream homepage.",
     backHome: "Back to homepage",
     eyebrow: "AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION",
     heroLead: "Tune with evidence.",
@@ -274,9 +270,6 @@ const content = {
     signOut: "退出登录",
     closeAuth: "关闭账号窗口",
     authEyebrow: "DRONEDREAM 账号",
-    authBrowserOnly:
-      "本次登录只用于当前浏览器中的网站，不会让桌面软件自动登录。",
-    authReturnHome: "登录成功后将返回 DroneDream 首页。",
     backHome: "返回首页",
     eyebrow: "智能体驱动的 PX4 / GAZEBO 控制参数优化",
     heroLead: "让调优有章法",
@@ -1097,12 +1090,6 @@ export function SiteApp({
                 ? copy.registerTitle
                 : copy.authTitle}
           </h1>
-          {!auth.account ? (
-            <>
-              <p>{copy.authBrowserOnly}</p>
-              <p>{copy.authReturnHome}</p>
-            </>
-          ) : null}
         </div>
         <div className="site-auth-page-panel">
           {auth.account ? (

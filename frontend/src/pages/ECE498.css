@@ -691,12 +691,14 @@
 .ece498-stage-copy-section p {
   max-width: 100%;
   margin: 0;
-  color: #d2c4d9;
+  color: #eee6f2;
   font-size: clamp(0.98rem, 1.08vw, 1.14rem);
   line-height: 1.58;
-  text-align: left;
-  text-wrap: pretty;
-  hyphens: auto;
+  text-align: justify;
+  text-justify: inter-word;
+  text-wrap: wrap;
+  hyphens: none;
+  overflow-wrap: break-word;
 }
 
 html[lang^="zh"] .ece498-course-summary,
