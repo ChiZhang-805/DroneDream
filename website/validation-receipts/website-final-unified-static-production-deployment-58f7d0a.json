@@ -1,0 +1,362 @@
+{
+  "schemaVersion": "dronedream.website-final-unified-static-production-deployment.v1",
+  "generatedAt": "2026-07-31T11:07:53.3192688Z",
+  "scope": {
+    "branch": "codex/website",
+    "staticDeploymentPerformed": true,
+    "githubPagesDeployed": true,
+    "aliyunMirrorDeployed": true,
+    "releaseAssetsReplaced": true,
+    "runtimeAssetsChanged": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "productionSecretsOrCorsEnvironmentChanged": false,
+    "paymentOrModelProductionConfigurationChanged": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforcedChanged": false,
+    "technicalReportModified": false,
+    "approvedMirrorServer": "47.93.180.216",
+    "explicitlyExcludedServer": "124.221.220.60"
+  },
+  "subject": {
+    "sourceCommit": "58f7d0ad1d9baabb8f5162ae82e5325dfe11464d",
+    "sourceTree": "8184f18b95a0ad54ab6a56da4a1793766c27522f",
+    "sourceCommittedAt": "2026-07-31T18:28:41+08:00",
+    "sourceMessage": "Contain assistant layout on narrow browsers",
+    "baseWebsiteSource": "9e40c2d7aa26794079e896a2028d87532691199c",
+    "finalNarrowBrowserFix": {
+      "path": "frontend/src/styles.css",
+      "result": "The assistant grid and stage use minmax(0, 1fr) and min-width: 0 so the 390x844 console remains within the document viewport."
+    }
+  },
+  "donorProvenance": [
+    {
+      "source": "89f4e50fb61cab9a382328c223cb77ba83fbc2ed",
+      "parent": "3149d1336c745b2211312116d96448482c5de651",
+      "selection": "git diff 3149d1336c745b2211312116d96448482c5de651..89f4e50fb61cab9a382328c223cb77ba83fbc2ed -- frontend/**",
+      "excluded": [
+        "desktop/**",
+        "backend/**",
+        "artifacts/**",
+        "technical-report/**"
+      ]
+    },
+    {
+      "source": "b679c07a133dd6fb026f807d91e418908b96695c",
+      "parent": "024597c0bf28b8e414b1b39b52fc41c4f8aedd09",
+      "selection": "git diff 024597c0bf28b8e414b1b39b52fc41c4f8aedd09..b679c07a133dd6fb026f807d91e418908b96695c -- frontend/**",
+      "excluded": [
+        "desktop/**",
+        "docs/**",
+        "artifacts/**",
+        "backend/**",
+        "technical-report/**"
+      ]
+    },
+    {
+      "source": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+      "parent": "0d9441ef44b9c4e58349b978847e8a4dd93d62a6",
+      "selection": "git diff 0d9441ef44b9c4e58349b978847e8a4dd93d62a6..c3fb2c0ad5f4009659c661d89945433e524d358e -- frontend/**",
+      "excluded": [
+        "desktop/**",
+        "artifacts/**",
+        "backend/**",
+        "technical-report/**"
+      ]
+    }
+  ],
+  "sourceValidation": {
+    "focusedExperimentAssistant": {
+      "files": 1,
+      "tests": 9,
+      "passed": 9,
+      "failed": 0
+    },
+    "completeFrontendSuite": {
+      "files": 54,
+      "tests": 370,
+      "passed": 370,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appBuild": "passed with the existing non-failing Vite chunk-size advisory",
+    "sharedSiteAndConsoleBuild": "passed",
+    "deploymentContract": {
+      "tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "denoFunctionsSecurity": {
+      "tests": 24,
+      "passed": 24,
+      "failed": 0,
+      "fmt": "passed",
+      "lint": "passed",
+      "typecheck": "passed",
+      "deploymentPerformed": false
+    },
+    "localLenovo390x844": {
+      "documentOverflow": false,
+      "visualInspection": "passed"
+    },
+    "diffCheck": "passed",
+    "trackedWorktreeCleanBeforeDeployment": true,
+    "upstreamAlignedBeforeDeployment": true
+  },
+  "release": {
+    "productSource": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "handoffEvidenceCommit": "a9c2fe0216ab841bb4cdd078af7b6cb111e198ad",
+    "handoffManifestSha256": "f37b29dc4e8d3967844910d9db8753f52ba6555e39dccb74487b83e710f0ec2d",
+    "version": "1.0.0",
+    "releaseTag": "signpath-candidate-v1.0.0",
+    "fileName": "DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 10331399,
+    "sha256": "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+    "authenticode": "NotSigned",
+    "peCertificateTable": "0/0",
+    "classification": "Unsigned 1.0.0 internal preview explicitly allowed by the product owner.",
+    "checksum": {
+      "bytes": 98,
+      "sha256": "022c0192874c9478748414da3275a6081d40a89256a7b631ae5caa60679fa630"
+    },
+    "updaterSignature": {
+      "bytes": 420,
+      "sha256": "4d992ca27c3a42aabe411cb4123335ac608afbe62ec839ef7c3466fa14e12129"
+    },
+    "githubRelease": {
+      "releaseId": 357114097,
+      "exeAssetId": 496434214,
+      "checksumAssetId": 496434203,
+      "signatureAssetId": 496434213,
+      "latestAssetId": 496434200,
+      "sourceInventoryAssetId": 496434199
+    },
+    "githubRollbackAssets": {
+      "exeAssetId": 493897300,
+      "checksumAssetId": 493897431,
+      "signatureAssetId": 493897516,
+      "latestAssetId": 493897585,
+      "sourceInventoryAssetId": 493897656,
+      "retained": true
+    }
+  },
+  "artifact": {
+    "buildPolicy": "The immutable deploy tag caused GitHub Actions to build one shared site-and-console artifact from the exact source commit. The same expanded, SHA256SUMS-verified bytes were deployed to GitHub Pages and reconstructed on Aliyun without rebuilding.",
+    "expandedFiles": 124,
+    "integrityEntries": 123,
+    "expandedBytes": 31842902,
+    "sha256SumsSha256": "82b930c8bd4912024c4a7765b287de14b37b71cb37fc1c5184925ae81abfc0fc",
+    "buildManifestSha256": "a3e2475aae8359fc54d5d63ea4be96fc4bd9179ad69dbdf82318e54c263772c6",
+    "latestJsonSha256": "42eeecccbd84d1b4aa1abf5a68b4b691d460ab5b69ff7551662e65a7c7d2f959",
+    "tauriLatestJsonSha256": "6acca54e7a3c6fa6e6197481101110e5c87ec9866b69a0cac66b211b07d8c1e2",
+    "workflowArtifact": {
+      "id": 8790495658,
+      "name": "dronedream-site-58f7d0ad1d9baabb8f5162ae82e5325dfe11464d",
+      "zipBytes": 28492550,
+      "digest": "sha256:f80fa64567f0bf1a90ae90ebc259b6db263d7d6751129b8f798a3a47b1582f35"
+    },
+    "pagesArtifact": {
+      "id": 8790496774,
+      "name": "github-pages",
+      "zipBytes": 28500662,
+      "digest": "sha256:27cd12d083db63d8e23d4d213575ef16b966d1025bcf7c97fc1490d46289e109"
+    },
+    "aliyunTransfer": {
+      "exactDeltaArchiveSha256": "821c87c51052c7bc0b2578544525be5e6a95f8ab15311a755b96669458a64326",
+      "serverReconstructedArchiveSha256": "f26d14cd21b8271def201ee177fc220b9833fc784718cecd86060c29811c9ec0",
+      "allIntegrityEntriesVerifiedBeforeActivation": true
+    }
+  },
+  "deployment": {
+    "deployTag": {
+      "name": "website-deploy-1.0.0-20260731-58f7d0a",
+      "tagObjectSha": "af86aa3806638a53f9d79ce90a2afcb12d2ba0fc",
+      "peeledSourceCommit": "58f7d0ad1d9baabb8f5162ae82e5325dfe11464d",
+      "immutable": true
+    },
+    "githubPages": {
+      "workflowRunId": 30623770148,
+      "workflowUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30623770148",
+      "workflowConclusion": "success",
+      "workflowHeadRef": "website-deploy-1.0.0-20260731-58f7d0a",
+      "workflowHeadSha": "58f7d0ad1d9baabb8f5162ae82e5325dfe11464d",
+      "buildJobId": 91134155892,
+      "publishJobId": 91134346582,
+      "deploymentId": 5690104917,
+      "deploymentStatusId": 16180266983,
+      "deploymentStatus": "success",
+      "environmentUrl": "http://getdronedream.com/",
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredMainOnlyPolicy": {
+        "id": 55186327,
+        "name": "main",
+        "type": "branch"
+      }
+    },
+    "aliyun": {
+      "host": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260731T104216Z",
+      "rollbackRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260731T100801Z",
+      "rollbackReleaseRetained": true,
+      "atomicCurrentSwitch": true,
+      "nginxConfigurationTests": "passed",
+      "temporaryStagingRemoved": true
+    },
+    "supersededTransitionalPagesDeployments": [
+      {
+        "workflowRunId": 30608925903,
+        "classification": "Superseded transitional deployment; it did not include the final donor and release."
+      },
+      {
+        "workflowRunId": 30616820957,
+        "classification": "Superseded transitional deployment."
+      },
+      {
+        "workflowRunId": 30621533297,
+        "classification": "Superseded transitional deployment before the final narrow-browser fix."
+      }
+    ]
+  },
+  "onlineParity": {
+    "sourceCommitAtBothOrigins": "58f7d0ad1d9baabb8f5162ae82e5325dfe11464d",
+    "buildManifestAndSha256SumsIdentical": true,
+    "criticalHtmlJavascriptCssAndMetadataFilesPerOrigin": 20,
+    "criticalFilesMatchedArtifactAndCrossOrigin": true,
+    "publicParityEvidenceSha256": "689d29082b7b95381d84815850ed6477fa6793900eca8ffd2139865cd3fb6f00",
+    "threeWayInstaller": {
+      "origins": [
+        "GitHub Release",
+        "GitHub Pages download entry",
+        "Aliyun mirror download entry"
+      ],
+      "bytesAtEveryOrigin": 10331399,
+      "sha256AtEveryOrigin": "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+      "signatureSha256AtEveryOrigin": "4d992ca27c3a42aabe411cb4123335ac608afbe62ec839ef7c3466fa14e12129",
+      "byteParity": true
+    },
+    "manualMarkdown": {
+      "bytesAtBothOrigins": 51557,
+      "sha256AtBothOrigins": "86f7dee32b7df11fb1252b1e336ec9892e9fa502ef4975bc086fcfa9f040b3e7",
+      "matchedSha256Sums": true
+    }
+  },
+  "onlineBrowserValidation": {
+    "lenovo": {
+      "pages": {
+        "checks": 24,
+        "passed": 24,
+        "failed": 0,
+        "evidenceSha256": "052ad0401eaf23ccbec91062e44f38a0be81c4d027eaa6356c2ca2bdf796d379"
+      },
+      "aliyun": {
+        "checks": 24,
+        "passed": 24,
+        "failed": 0,
+        "evidenceSha256": "302e7212bb1869e0f1066bad4b0aa57383ecd887fa73af41f1894084d09d7314"
+      }
+    },
+    "fourBrowserGeneralMatrix": {
+      "pages": {
+        "checks": 120,
+        "passed": 119,
+        "failed": 1,
+        "evidenceSha256": "02bae0ba6405625372055fc2a2ff4bfef09b5ff0fbaa2bb1b7c49c31ac552dd5"
+      },
+      "aliyun": {
+        "checks": 120,
+        "passed": 116,
+        "failed": 4,
+        "evidenceSha256": "17a601035d5f1087b2cf87e61cd8543c6816a8b9a587a393ad47b4460c1665d4"
+      },
+      "failureClassification": "All five generic-matrix failures were Firefox NS_BINDING_ABORTED events caused by the harness navigating away from Manual immediately after root visibility and before the Manual fetch settled. No layout, accessibility, account, community, console, or external-warning check failed."
+    },
+    "firefoxManualFocusedRerun": {
+      "checks": 8,
+      "passed": 8,
+      "failed": 0,
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "origins": [
+        "http://getdronedream.com/",
+        "http://47.93.180.216/"
+      ],
+      "headingCountBeforeAndAfterAccountNavigation": 54,
+      "documentWidthParityFailures": 0,
+      "requestOrPageErrors": 0,
+      "evidenceSha256": "038acc272224e319e836bacc67c320a7c76e3a94e6f27e26b4015befcc8d478f"
+    },
+    "communityManualVisualAudit": {
+      "pages": {
+        "cases": 8,
+        "passed": 8,
+        "failed": 0,
+        "evidenceSha256": "3bdc77456cfe12a1a0c8704b1912c8b26e1d6a5b2558842f6cc80adb43b9256e"
+      },
+      "aliyun": {
+        "cases": 8,
+        "passed": 8,
+        "failed": 0,
+        "evidenceSha256": "6a424e6e833c56b111c98c8cec48035224d7500b8ca278dc4a0282faaeb11291"
+      },
+      "visualFindings": [
+        "Desktop Community fits five complete recent cards in the one-screen module; More topics is right-aligned.",
+        "Mobile Community uses the intended horizontal recent-topic carousel while All topics uses document scrolling.",
+        "Topic detail fills the left pane and retains the taller comment composer.",
+        "The yellow diagonal card accent is absent; the remaining colored background geometry does not overlap the copy.",
+        "Manual desktop and mobile layouts retain the compact accordion, indentation, fixed header height, and no document-width overflow.",
+        "Account, Community, and Console entries are enabled on the two explicitly approved HTTP internal-preview origins.",
+        "Payment and managed-model sensitive actions remain disabled."
+      ]
+    }
+  },
+  "previewSecurityBoundary": {
+    "productOwnerOverride": "For the current internal preview, the product owner explicitly authorized account, community, and console access on the HTTP custom-domain and IP mirror even before trusted HTTPS is available.",
+    "approvedHttpPreviewOrigins": [
+      "http://getdronedream.com/",
+      "http://47.93.180.216/"
+    ],
+    "accountCommunityConsoleEnabled": true,
+    "paymentActionsEnabled": false,
+    "managedModelSensitiveActionsEnabled": false,
+    "supabaseFunctionsProductionSecuritySourcePresentButNotDeployed": true
+  },
+  "runtime": {
+    "changedInThisDeployment": false,
+    "tag": "runtime-v0.1.0-beta.2",
+    "sourceCommit": "755c511539fe561207ca38ff5079f471a4110896",
+    "authoritativeHandoffManifestSha256": "34f5738101217ce92adfdfe8a2a932e6f4ecb73ecb41ba601c851ad217dfa33a"
+  },
+  "externalGatesAndResiduals": {
+    "tls": {
+      "pagesProtectedDomainState": "verified",
+      "certificateState": "authorization_created",
+      "certificateDomainsRequested": [
+        "getdronedream.com",
+        "www.getdronedream.com"
+      ],
+      "httpsEnforced": false,
+      "httpsEnforcedChanged": false,
+      "classification": "GitHub Pages certificate issuance remains externally pending. This deployment does not claim normal HTTPS trust."
+    },
+    "supabase": {
+      "boundedResponseAndCorsSourceIncluded": true,
+      "productionFunctionsDeploymentPerformed": false,
+      "productionSecretsOrCorsEnvironmentChanged": false
+    },
+    "payment": "Disabled until the product owner separately authorizes production payment configuration after trusted HTTPS is available.",
+    "codeSigning": "Authenticode remains NotSigned for the approved internal 1.0.0 preview."
+  },
+  "attestation": {
+    "receiptOnlyCommitMayFollow": true,
+    "thisReceiptDoesNotClaimValidationOfItsOwnCommit": true,
+    "deploymentSubject": "58f7d0ad1d9baabb8f5162ae82e5325dfe11464d",
+    "trackedWorktreeCleanBeforeReceiptCreation": true,
+    "upstreamAlignedBeforeReceiptCreation": true
+  }
+}
