@@ -58,7 +58,7 @@ import {
 import { OPEN_APP_SETTINGS_EVENT } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
-import { sensitiveCloudActionsAllowed } from "./security/sensitiveOrigin";
+import { accountCommunityActionsAllowed } from "./security/sensitiveOrigin";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import {
   captchaProtectionConfigured,
@@ -269,7 +269,7 @@ function RedirectBlockedConsole() {
 }
 
 export function AppShell() {
-  if (!sensitiveCloudActionsAllowed()) {
+  if (!accountCommunityActionsAllowed()) {
     return <RedirectBlockedConsole />;
   }
   return (

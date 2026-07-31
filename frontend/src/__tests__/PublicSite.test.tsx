@@ -147,7 +147,7 @@ describe("DroneDream public website", () => {
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
   });
 
-  it("opens account and community for the approved internal preview while payment stays disabled", async () => {
+  it("opens account, community, and console for the approved internal preview while payment stays disabled", async () => {
     const { unmount } = render(
       <I18nProvider>
         <SiteApp
@@ -158,7 +158,7 @@ describe("DroneDream public website", () => {
     );
 
     expect(screen.getByRole("button", { name: "Login" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Console" })).toBeEnabled();
     fireEvent.click(screen.getByRole("button", { name: "Login" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeVisible();
     expect(document.querySelector('[data-auth-source="website"]')).not.toBeNull();

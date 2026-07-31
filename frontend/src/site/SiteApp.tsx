@@ -1300,7 +1300,7 @@ export function SiteApp({
           ))}
           <button
             type="button"
-            disabled={!sensitiveCloudActionsEnabled}
+            disabled={!accountCommunityActionsEnabled}
             onClick={openConsole}
           >
             {copy.console}
