@@ -1,5 +1,7 @@
 $ErrorActionPreference = "Stop"
 
+& (Join-Path $PSScriptRoot "verify-updater-signing-contract.ps1")
+
 $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
 if (Test-Path -LiteralPath $cargoBin) {
     $env:PATH = "$cargoBin;$env:PATH"
@@ -181,11 +183,9 @@ if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
 }
 
 # Sign the final NSIS bytes for the in-app updater after bundling. This updater
-# signature is separate from Authenticode. Explicit --password= handles the
-# current empty-password encrypted key without an interactive prompt. A real
-# non-empty password stays in TAURI_SIGNING_PRIVATE_KEY_PASSWORD, which the
-# Tauri CLI reads directly, so it never appears in the child process command
-# line or an operating-system process audit.
+# signature is separate from Authenticode. The helper keeps a complete, typed
+# argv vector so PowerShell cannot unwrap a one-item password array and splat
+# it character by character.
 $updaterKeyPath = $env:TAURI_SIGNING_PRIVATE_KEY_PATH
 if (-not $updaterKeyPath) {
     $localUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
@@ -201,18 +201,11 @@ $tauriCli = Join-Path $PSScriptRoot "..\node_modules\@tauri-apps\cli\tauri.js"
 if (-not (Test-Path -LiteralPath $tauriCli -PathType Leaf)) {
     throw "The installed Tauri CLI was not found at $tauriCli"
 }
-$updaterPasswordArguments = if ($null -eq $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
-    @("--password=")
-} else {
-    @()
-}
-& node.exe $tauriCli signer sign `
-    --private-key-path $updaterKeyPath `
-    @updaterPasswordArguments `
-    $installer
-if ($LASTEXITCODE -ne 0) {
-    throw "Tauri updater signing failed."
-}
+& (Join-Path $PSScriptRoot "invoke-tauri-updater-signer.ps1") `
+    -NodeExecutable "node.exe" `
+    -TauriCliPath $tauriCli `
+    -UpdaterKeyPath $updaterKeyPath `
+    -InstallerPath $installer
 
 $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer
 $checksumPath = "$installer.sha256"

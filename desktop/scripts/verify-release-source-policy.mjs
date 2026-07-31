@@ -31,6 +31,7 @@ const codeSigningPolicy = readText("CODE_SIGNING_POLICY.md");
 const privacyPolicy = readText("PRIVACY.md");
 const readme = readText("README.md");
 const llvmBuildScript = readText("desktop/scripts/build-windows-llvm.ps1");
+const updaterSignerScript = readText("desktop/scripts/invoke-tauri-updater-signer.ps1");
 for (const requiredText of [
   "Free code signing provided by [SignPath.io]",
   "certificate by [SignPath Foundation]",
@@ -42,8 +43,40 @@ for (const requiredText of [
     fail(`CODE_SIGNING_POLICY.md is missing: ${requiredText}`);
   }
 }
-if (/--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(llvmBuildScript)) {
+if (
+  /--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(llvmBuildScript)
+  || /--password=.*TAURI_SIGNING_PRIVATE_KEY_PASSWORD/.test(updaterSignerScript)
+) {
   fail("the updater key password must not be interpolated into a process argument");
+}
+if (!llvmBuildScript.includes("invoke-tauri-updater-signer.ps1")) {
+  fail("the LLVM build must use the tested updater signer helper");
+}
+const updaterSigningPreflightIndex = llvmBuildScript.indexOf(
+  "verify-updater-signing-contract.ps1",
+);
+const desktopBuildInvocationIndex = llvmBuildScript.indexOf(
+  "& npm.cmd --prefix $desktopRoot run build",
+);
+if (
+  updaterSigningPreflightIndex < 0
+  || desktopBuildInvocationIndex < 0
+  || updaterSigningPreflightIndex >= desktopBuildInvocationIndex
+) {
+  fail("the updater signing contract must run before the desktop and NSIS build");
+}
+if (llvmBuildScript.includes("@updaterPasswordArguments")) {
+  fail("the LLVM build contains the scalar updater-password splat regression");
+}
+for (const requiredText of [
+  '[string[]]$signerArguments = @(',
+  '$signerArguments += "--password="',
+  '$signerArguments += "--"',
+  "& $NodeExecutable @signerArguments",
+]) {
+  if (!updaterSignerScript.includes(requiredText)) {
+    fail(`the updater signer helper is missing: ${requiredText}`);
+  }
 }
 for (const requiredText of [
   "does not include first-party advertising",

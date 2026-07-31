@@ -12,7 +12,8 @@
     "build:llvm": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-windows-llvm.ps1",
     "check:frontend": "npm --prefix ../frontend run typecheck",
     "verify:browser-auth-config": "node scripts/verify-browser-auth-config.mjs",
-    "verify:release-source": "node scripts/verify-release-source-policy.mjs"
+    "verify:release-source": "node scripts/verify-release-source-policy.mjs",
+    "verify:updater-signing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-updater-signing-contract.ps1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.11.4"
