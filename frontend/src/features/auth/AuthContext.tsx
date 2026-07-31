@@ -12,6 +12,7 @@ import type { Provider, User } from "@supabase/supabase-js";
 
 import { isDesktopRuntime } from "../../desktop/bridge";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
+import { ACTIVATE_DESKTOP_AUTH_EVENT } from "./desktopAuthActivation";
 import { setAuthAccessToken } from "./authTokenStore";
 import { sensitiveCloudActionsAllowed } from "../../security/sensitiveOrigin";
 import {
@@ -74,6 +75,10 @@ const OPTIONAL_AUTH_FALLBACK: AuthContextValue = {
 };
 const AVATAR_STORAGE_PREFIX = "drone-dream:account-avatar:";
 const MAX_AVATAR_DATA_URL_LENGTH = 600_000;
+
+function shouldDeferDesktopAuth(): boolean {
+  return isDesktopRuntime() && window.location.pathname === "/desktop/setup";
+}
 
 function avatarStorageKey(userId: string): string {
   return `${AVATAR_STORAGE_PREFIX}${userId}`;
@@ -139,8 +144,15 @@ export function AuthProvider({
 }) {
   const docsPreview = cloudActionsEnabled && import.meta.env.DEV &&
     new URLSearchParams(window.location.search).has("docsPreview");
+  const deferDesktopAuth = useRef(
+    cloudActionsEnabled && shouldDeferDesktopAuth(),
+  ).current;
+  const [authActivated, setAuthActivated] = useState(!deferDesktopAuth);
   const [loading, setLoading] = useState(
-    cloudActionsEnabled && cloudAuthConfigured && !docsPreview,
+    cloudActionsEnabled &&
+      cloudAuthConfigured &&
+      !docsPreview &&
+      !deferDesktopAuth,
   );
   const [account, setAccount] = useState<DroneDreamAccount | null>(
     docsPreview
@@ -166,7 +178,22 @@ export function AuthProvider({
   }, []);
 
   useEffect(() => {
-    if (docsPreview) return undefined;
+    if (!deferDesktopAuth || authActivated) return undefined;
+    const activate = () => {
+      setLoading(cloudActionsEnabled && cloudAuthConfigured && !docsPreview);
+      setAuthActivated(true);
+    };
+    window.addEventListener(ACTIVATE_DESKTOP_AUTH_EVENT, activate, { once: true });
+    return () => window.removeEventListener(ACTIVATE_DESKTOP_AUTH_EVENT, activate);
+  }, [
+    authActivated,
+    cloudActionsEnabled,
+    deferDesktopAuth,
+    docsPreview,
+  ]);
+
+  useEffect(() => {
+    if (docsPreview || !authActivated) return undefined;
     if (!cloudActionsEnabled) {
       setAuthAccessToken(null);
       setAccount(null);
@@ -197,7 +224,7 @@ export function AuthProvider({
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [adoptUser, cloudActionsEnabled, docsPreview]);
+  }, [adoptUser, authActivated, cloudActionsEnabled, docsPreview]);
 
   const signInWithPassword = useCallback(async (
     email: string,

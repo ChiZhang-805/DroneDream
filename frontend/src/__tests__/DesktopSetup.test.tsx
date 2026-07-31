@@ -476,7 +476,7 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
   });
 
-  it("shows a ready installed runtime without offering duplicate install or entry controls", async () => {
+  it("shows a ready installed runtime with the single browser sign-in entry", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
@@ -495,6 +495,9 @@ describe("DesktopSetup", () => {
     expect(screen.getByText("The installed runtime is ready.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
+    expect(screen.getByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    })).toBeEnabled();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
     expect(invoke).toHaveBeenCalledTimes(2);
@@ -523,10 +526,9 @@ describe("DesktopSetup", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
-    expect(screen.queryByRole("button", {
+    expect(screen.getByRole("button", {
       name: "Sign in and enter tuning workspace",
-    }))
-      .not.toBeInTheDocument();
+    })).toBeEnabled();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
   });
@@ -560,6 +562,36 @@ describe("DesktopSetup", () => {
       .not.toBeInTheDocument();
   });
 
+  it("does not automatically recheck a ready environment when the window regains focus", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+
+    expect(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    })).toBeEnabled();
+    expect(invoke).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await Promise.resolve();
+    });
+
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "100");
+  });
+
   it("fails closed at 100 percent when account configuration is missing", async () => {
     optionalAuthState.current = {
       configured: false,
@@ -581,6 +613,8 @@ describe("DesktopSetup", () => {
     });
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "100");
+    expect(screen.queryByText("Account authentication is not configured in this desktop build."))
+      .not.toBeInTheDocument();
 
     await user.click(signIn);
 
@@ -631,17 +665,28 @@ describe("DesktopSetup", () => {
     });
   });
 
-  it("automatically enters only after the local backend accepts the signed-in account", async () => {
+  it("enters only after the browser flow and local backend accept the same account", async () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
-      account: {
-        id: "user-accepted",
-        email: "pilot@example.com",
-        displayName: "Pilot",
-        avatarUrl: null,
-      },
+      account: null,
     };
+    const browserSession = {
+      accessToken: "header.payload.signature",
+      refreshToken: "refresh-token-value",
+    };
+    browserAuthMocks.adoptSession.mockImplementationOnce(async () => {
+      optionalAuthState.current = {
+        configured: true,
+        loading: false,
+        account: {
+          id: "user-accepted",
+          email: "pilot@example.com",
+          displayName: "Pilot",
+          avatarUrl: null,
+        },
+      };
+    });
     const verifySession = vi
       .spyOn(apiClient, "verifyAuthenticatedSession")
       .mockResolvedValue({ status: "ready", user_id: "user-accepted" });
@@ -650,12 +695,23 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return runtime;
+          if (command === "begin_browser_auth") return browserSession;
           throw new Error(`Unexpected command: ${command}`);
         }),
       },
     };
 
     renderPage();
+
+    expect(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    })).toBeEnabled();
+    expect(verifySession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+
+    await userEvent.click(screen.getByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    }));
 
     await waitFor(() => {
       expect(screen.getByTestId("current-route")).toHaveTextContent("/assistant");
@@ -669,13 +725,20 @@ describe("DesktopSetup", () => {
     optionalAuthState.current = {
       configured: true,
       loading: false,
-      account: {
-        id: "user-expected",
-        email: "pilot@example.com",
-        displayName: "Pilot",
-        avatarUrl: null,
-      },
+      account: null,
     };
+    browserAuthMocks.adoptSession.mockImplementationOnce(async () => {
+      optionalAuthState.current = {
+        configured: true,
+        loading: false,
+        account: {
+          id: "user-expected",
+          email: "pilot@example.com",
+          displayName: "Pilot",
+          avatarUrl: null,
+        },
+      };
+    });
     vi.spyOn(apiClient, "verifyAuthenticatedSession").mockResolvedValue({
       status: "ready",
       user_id: "user-other",
@@ -685,6 +748,12 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return runtime;
+          if (command === "begin_browser_auth") {
+            return {
+              accessToken: "header.payload.signature",
+              refreshToken: "refresh-token-value",
+            };
+          }
           throw new Error(`Unexpected command: ${command}`);
         }),
       },
@@ -692,6 +761,9 @@ describe("DesktopSetup", () => {
 
     renderPage();
 
+    await userEvent.click(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    }));
     expect(await screen.findByText(/different account identity/i)).toBeVisible();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
@@ -725,7 +797,7 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "99");
+      .toHaveAttribute("aria-valuenow", "100");
     await userEvent.click(update);
     expect(installAvailableUpdate).toHaveBeenCalledTimes(1);
   });

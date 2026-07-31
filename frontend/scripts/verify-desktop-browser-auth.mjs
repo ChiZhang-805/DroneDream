@@ -6,10 +6,14 @@ import { chromium } from "playwright";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, "..", "..");
-const template = readFileSync(
-  resolve(repositoryRoot, "desktop", "src-tauri", "browser-auth.html"),
-  "utf8",
-);
+const templateIndex = process.argv.indexOf("--template");
+const templatePath = templateIndex >= 0
+  ? resolve(process.argv[templateIndex + 1] ?? "")
+  : resolve(repositoryRoot, "desktop", "src-tauri", "browser-auth.html");
+if (templateIndex >= 0 && !process.argv[templateIndex + 1]) {
+  throw new Error("--template requires a browser-auth HTML path");
+}
+const template = readFileSync(templatePath, "utf8");
 const brandLockupDataUrl = `data:image/png;base64,${
   readFileSync(
     resolve(
@@ -295,7 +299,20 @@ try {
     await page.getByRole("button", { name: "发送验证码" }).click();
     await page.getByLabel("邮件验证码", { exact: true }).fill("123456");
     const previousCount = completions.length;
-    await page.getByRole("button", { name: "创建账户并进入" }).click();
+    await page.getByRole("button", { name: "创建账户", exact: true }).click();
+    await page.getByRole("heading", { name: "登录并进入 DroneDream" }).waitFor();
+    await page.getByText("账户已创建。请使用邮箱和密码登录。").waitFor();
+    if (completions.length !== previousCount) {
+      throw new Error("Registration must not complete the desktop sign-in");
+    }
+    if (await page.getByLabel("邮箱", { exact: true }).inputValue() !== "pilot@example.test") {
+      throw new Error("Registration did not preserve the email for explicit sign-in");
+    }
+    await page.getByLabel("密码", { exact: true }).fill("same-password-is-client-valid");
+    await page.getByRole("button", {
+      name: "登录并进入调优平台",
+      exact: true,
+    }).click();
     await waitForCompletion(previousCount);
     await page.close();
   }

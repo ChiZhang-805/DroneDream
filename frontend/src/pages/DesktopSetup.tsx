@@ -43,6 +43,7 @@ import type {
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useOptionalAuth } from "../features/auth/AuthContext";
+import { activateDesktopAuthSession } from "../features/auth/desktopAuthActivation";
 import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
 import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
@@ -54,7 +55,6 @@ import {
   MINIMUM_MEMORY_BYTES,
 } from "../desktop/readiness";
 import {
-  approveDesktopStartupGateWithoutCloudAuth,
   getDesktopStartupGateSession,
   setDesktopStartupGateState,
   subscribeDesktopStartupGate,
@@ -342,6 +342,8 @@ export function DesktopSetup() {
   const [browserAuthStatus, setBrowserAuthStatus] = useState<
     "idle" | "waiting" | "adopting"
   >("idle");
+  const [browserAuthCompletedForLaunch, setBrowserAuthCompletedForLaunch] =
+    useState(false);
   const [browserAuthError, setBrowserAuthError] = useState<string | null>(null);
   const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
   const installActive = isActiveInstall(installState.snapshot);
@@ -365,20 +367,14 @@ export function DesktopSetup() {
     state.prerequisitesFresh &&
     state.runtimeFresh &&
     isOverallDesktopReady(state.prerequisites, state.runtime);
-  const accountChecking = Boolean(auth?.configured && auth.loading);
-  const accountRequired = Boolean(
-    auth && (
-      !auth.configured ||
-      (!auth.loading && !auth.account)
-    ),
-  );
-  const accountReady =
-    !auth || Boolean(auth.configured && !auth.loading && auth.account);
+  const signedInAccount =
+    auth?.configured && !auth.loading ? auth.account : null;
   const startupGateReady =
     !desktopAvailable ||
-    (startupGate.status === "ready" &&
-      Boolean(auth?.configured && auth.account) &&
-      startupGate.accountId === auth?.account?.id);
+    (browserAuthCompletedForLaunch &&
+      startupGate.status === "ready" &&
+      Boolean(signedInAccount) &&
+      startupGate.accountId === signedInAccount?.id);
   const updaterBusy =
     updater.status === "checking" ||
     updater.status === "downloading" ||
@@ -387,24 +383,32 @@ export function DesktopSetup() {
     updaterBusy || updater.status === "available";
   const localChecksReady =
     localRuntimeReady &&
-    !updaterBlocksWorkspace &&
     !state.loading &&
     !installerHandoffState.checking &&
     (!runtimeAccess.desktopRuntime ||
       (runtimeAccess.status === "ready" && !runtimeAccess.isChecking));
   const workspaceReady =
     localChecksReady &&
-    accountReady &&
-    startupGateReady;
-  const workspaceChecking =
+    browserAuthCompletedForLaunch &&
+    Boolean(signedInAccount) &&
+    startupGateReady &&
+    !updaterBlocksWorkspace;
+  const environmentChecking =
     state.loading ||
     installerHandoffState.checking ||
-    accountChecking ||
-    updaterBusy ||
-    startupGate.status === "checking" ||
     runtimeAccess.isChecking ||
     runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
+  const accountVerificationInProgress =
+    browserAuthCompletedForLaunch &&
+    Boolean(
+      (auth?.configured && auth.loading) ||
+      startupGate.status === "checking",
+    );
+  const postSignInBlocked =
+    browserAuthCompletedForLaunch && startupGate.status === "blocked";
+  const environmentBlocked =
+    localRuntimeReady && !localChecksReady && !environmentChecking;
   const installerHandoffNeedsAttention = Boolean(
     installerHandoffState.commandError ||
     installerHandoffState.autoStartUncertain ||
@@ -476,72 +480,37 @@ export function DesktopSetup() {
 
   useEffect(() => {
     if (!desktopAvailable) return;
+    // Account state is deliberately a second stage. It must never participate
+    // in the environment percentage or run before the user selects the single
+    // browser sign-in action shown at 100%.
+    if (!localChecksReady || !browserAuthCompletedForLaunch) return;
     if (
       updater.status === "checking" ||
       updater.status === "downloading" ||
       updater.status === "installing"
     ) {
       setDesktopStartupGateState("checking", {
-        accountId: auth?.account?.id ?? null,
+        accountId: signedInAccount?.id ?? null,
       });
       return;
     }
     if (updater.status === "available") {
       setDesktopStartupGateState("blocked", {
-        accountId: auth?.account?.id ?? null,
+        accountId: signedInAccount?.id ?? null,
         error: `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
       });
       return;
     }
-    const accessCheckInProgress = runtimeAccess.desktopRuntime && (
-      runtimeAccess.isChecking ||
-      runtimeAccess.status === "checking" ||
-      runtimeAccess.status === "starting"
-    );
-    const accessApproved =
-      !runtimeAccess.desktopRuntime || runtimeAccess.status === "ready";
-    if (
-      !localRuntimeReady ||
-      accessCheckInProgress ||
-      !accessApproved
-    ) {
-      if (accessCheckInProgress) {
-        setDesktopStartupGateState("checking", {
-          accountId: auth?.account?.id ?? null,
-        });
-      }
-      return;
-    }
-    if (!auth?.configured) {
-      if (import.meta.env.DEV || import.meta.env.MODE === "test") {
-        approveDesktopStartupGateWithoutCloudAuth();
-      } else {
-        setDesktopStartupGateState("blocked", {
-          error: "Account authentication is not configured in this desktop build.",
-        });
-      }
-      return;
-    }
-    if (auth.loading) {
-      setDesktopStartupGateState("checking");
-      return;
-    }
-    if (!auth.account) {
-      setDesktopStartupGateState("accountRequired");
-      return;
-    }
+    if (!signedInAccount) return;
     void verifyDesktopStartupGate(
-      auth.account.id,
+      signedInAccount.id,
       () => apiClient.verifyAuthenticatedSession(),
     );
   }, [
-    auth,
+    browserAuthCompletedForLaunch,
     desktopAvailable,
-    localRuntimeReady,
-    runtimeAccess.isChecking,
-    runtimeAccess.lastFullCheckAt,
-    runtimeAccess.status,
-    runtimeAccess.desktopRuntime,
+    localChecksReady,
+    signedInAccount,
     updater.availableVersion,
     updater.status,
   ]);
@@ -571,6 +540,9 @@ export function DesktopSetup() {
       return;
     }
     setBrowserAuthError(null);
+    activateDesktopAuthSession();
+    setBrowserAuthCompletedForLaunch(false);
+    setDesktopStartupGateState("idle");
     setBrowserAuthStatus("waiting");
     browserAuthActive.current = true;
     try {
@@ -581,7 +553,10 @@ export function DesktopSetup() {
       if (!componentMounted.current) return;
       setBrowserAuthStatus("adopting");
       await adoptBrowserAuthSession(session);
-      if (componentMounted.current) setBrowserAuthStatus("idle");
+      if (componentMounted.current) {
+        setBrowserAuthCompletedForLaunch(true);
+        setBrowserAuthStatus("idle");
+      }
     } catch (error) {
       if (!componentMounted.current) return;
       setBrowserAuthStatus("idle");
@@ -1224,24 +1199,6 @@ export function DesktopSetup() {
     !installerHandoffState.commandError &&
     !installerHandoffState.discardResult,
   );
-  useEffect(() => {
-    if (!desktopAvailable || installActive) return;
-    const refreshWhenFocused = () => {
-      void refresh(
-        automaticStartPending
-          ? installerIntent?.targetRoot ?? undefined
-          : undefined,
-      );
-    };
-    window.addEventListener("focus", refreshWhenFocused);
-    return () => window.removeEventListener("focus", refreshWhenFocused);
-  }, [
-    automaticStartPending,
-    desktopAvailable,
-    installActive,
-    installerIntent?.targetRoot,
-    refresh,
-  ]);
   const retryInstallerHandoff = useCallback(() => {
     if (installerHandoffState.autoStarting) return;
     installerIntentPromise.current = null;
@@ -1365,21 +1322,24 @@ export function DesktopSetup() {
           snapshot={installState.snapshot}
           localReady={localChecksReady}
           ready={workspaceReady}
-          checking={workspaceChecking}
+          checking={environmentChecking}
           gateBlocked={
-            localRuntimeReady &&
-            accountReady &&
-            (startupGate.status === "blocked" ||
-              updater.status === "available")
+            environmentBlocked ||
+            (localChecksReady &&
+              (postSignInBlocked || updater.status === "available"))
           }
-          accountRequired={localChecksReady && accountRequired}
+          accountRequired={
+            localChecksReady &&
+            !workspaceReady &&
+            !postSignInBlocked &&
+            updater.status !== "available"
+          }
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
           onCancel={() => void cancelInstall()}
         />
 
-        {localRuntimeReady &&
-        startupGate.status === "blocked" &&
+        {postSignInBlocked &&
         updater.status !== "available" ? (
           <Alert tone="warning" title={t("launcher.startupBlocked")}>
             <p>{startupGate.error ?? t("launcher.errorHint")}</p>
@@ -1398,18 +1358,23 @@ export function DesktopSetup() {
               })}
             </button>
           </div>
-        ) : localChecksReady && accountRequired ? (
+        ) : localChecksReady && !workspaceReady ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
               className="btn btn-primary launcher-primary-action"
-              disabled={browserAuthStatus !== "idle"}
+              disabled={
+                browserAuthStatus !== "idle" ||
+                accountVerificationInProgress
+              }
               onClick={() => void startBrowserSignIn()}
             >
               {browserAuthStatus === "waiting"
                 ? t("launcher.browserAuthWaiting")
                 : browserAuthStatus === "adopting"
                   ? t("launcher.browserAuthAdopting")
+                  : accountVerificationInProgress
+                    ? t("launcher.browserAuthAdopting")
                   : t("launcher.signIn")}
             </button>
             {browserAuthStatus !== "idle" ? (
@@ -1422,17 +1387,13 @@ export function DesktopSetup() {
               </button>
             ) : null}
           </div>
-        ) : workspaceReady ? null : localRuntimeReady && (
-          updaterBusy || startupGate.status === "checking"
-        ) ? null : localRuntimeReady ? (
+        ) : workspaceReady ? null : localRuntimeReady &&
+          environmentChecking ? null : localRuntimeReady ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
               className="btn btn-primary launcher-primary-action"
-              onClick={() => {
-                void updater.checkForUpdates();
-                void refreshRuntimeAccess();
-              }}
+              onClick={() => void refreshRuntimeAccess()}
             >
               {t("launcher.retryChecks")}
             </button>
@@ -2577,10 +2538,10 @@ function RuntimeLauncherHero({
       ? t("launcher.status.pausing")
       : commandBusy
         ? t("launcher.status.queued")
-      : accountRequired
-        ? t("launcher.status.signIn")
       : gateBlocked
         ? t("launcher.status.blocked")
+      : accountRequired
+        ? t("launcher.status.signIn")
       : phase === "completed"
         ? t("launcher.status.healthChecking")
       : (checking || automaticStartPending) && phase === "idle"
