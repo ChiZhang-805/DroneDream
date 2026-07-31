@@ -1,0 +1,314 @@
+{
+  "schemaVersion": "dronedream.website-latest-installer-unified-production-deployment.v1",
+  "generatedAt": "2026-07-31T18:29:17.1193149Z",
+  "scope": {
+    "branch": "codex/website",
+    "staticDeploymentPerformed": true,
+    "githubPagesDeployed": true,
+    "aliyunMirrorDeployed": true,
+    "githubReleaseAssetsReplaced": true,
+    "approvedMirrorServer": "47.93.180.216",
+    "explicitlyExcludedServer": "124.221.220.60",
+    "runtimeAssetsChanged": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "productionSecretsOrCorsEnvironmentChanged": false,
+    "paymentOrModelProductionConfigurationChanged": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforcedChanged": false,
+    "technicalReportModified": false
+  },
+  "subjects": {
+    "websiteSourceCommit": "b8b019635e0026e816b65806d12a6cc8c37a812a",
+    "websiteSourceTree": "a6ca9d8257dac722734af9ee9235dfc1dd73e027",
+    "softwareProductSourceCommit": "2c3d06ad6af303de49b86272d5932f2327e37f92",
+    "softwareProductSourceTree": "99536ba7a1ab3d30c547c65846ddad463cefe6fd",
+    "softwareBranchLaterReadmeOnlyHead": "295d6ee4f7b43ad7d1200431acca9d9ad4a54d32",
+    "productProvenanceDoesNotClaimLaterReadmeOnlyHead": true
+  },
+  "deployTag": {
+    "authoritative": "website-deploy-1.0.0-20260801-b8b0196-v2",
+    "tagObject": "3e5cd19c86bc1e0d866e7bbd693690282534678c",
+    "pointsTo": "b8b019635e0026e816b65806d12a6cc8c37a812a",
+    "supersededAnnotationOnlyTag": "website-deploy-1.0.0-20260801-b8b0196",
+    "supersededTagObject": "ea4dcb1fdabc305fb8145efe128cfc14c056e49f",
+    "supersededReason": "The first tag points to the same source but its annotation tree field was malformed; it was not moved or deleted and is not authoritative."
+  },
+  "installer": {
+    "version": "1.0.0",
+    "channel": "unsigned internal preview",
+    "fileName": "DroneDream_1.0.0_x64-setup.exe",
+    "sizeBytes": 10330782,
+    "sha256": "bb0e0ba15fc9826b61367c7b83d04eac0587e885ce98c1db76427a62d10ab50b",
+    "authenticode": "NotSigned",
+    "peCertificateTable": "0/0",
+    "checksum": {
+      "fileName": "DroneDream_1.0.0_x64-setup.exe.sha256",
+      "sizeBytes": 98,
+      "sha256": "1a886c95571f2581f1cd0709b94e75f2c1e93b6d898ffd74bf39459ac24ca8c3",
+      "declaredInstallerSha256": "bb0e0ba15fc9826b61367c7b83d04eac0587e885ce98c1db76427a62d10ab50b"
+    },
+    "updaterSignature": {
+      "fileName": "DroneDream_1.0.0_x64-setup.exe.sig",
+      "sizeBytes": 420,
+      "sha256": "9537b34e3dbe9ceb0935c23d902da9b85180a34a573b44eba7f3a7c109df836a",
+      "mainSignatureValid": true,
+      "trustedCommentSignatureValid": true,
+      "keyIdMatched": true
+    },
+    "tauriLatestSha256": "4b2ab3213a9d2c9860de1b548679a255d5b0fdfdf33c78cdc71117a18c16e502",
+    "releaseSourceInventorySha256": "2b20351a09bc445b47e15ea7a6d7b3a3eff83e42cd9709b6474e8919e243ccc1"
+  },
+  "githubRelease": {
+    "tag": "signpath-candidate-v1.0.0",
+    "prerelease": true,
+    "url": "https://github.com/ChiZhang-805/DroneDream/releases/tag/signpath-candidate-v1.0.0",
+    "canonicalAssets": [
+      {
+        "name": "DroneDream_1.0.0_x64-setup.exe",
+        "assetId": "RA_kwDOSJOgTs4dnwi-",
+        "databaseId": 496961726,
+        "sizeBytes": 10330782,
+        "sha256": "bb0e0ba15fc9826b61367c7b83d04eac0587e885ce98c1db76427a62d10ab50b"
+      },
+      {
+        "name": "DroneDream_1.0.0_x64-setup.exe.sha256",
+        "assetId": "RA_kwDOSJOgTs4dnwkr",
+        "databaseId": 496961835,
+        "sizeBytes": 98,
+        "sha256": "1a886c95571f2581f1cd0709b94e75f2c1e93b6d898ffd74bf39459ac24ca8c3"
+      },
+      {
+        "name": "DroneDream_1.0.0_x64-setup.exe.sig",
+        "assetId": "RA_kwDOSJOgTs4dnwlA",
+        "databaseId": 496961856,
+        "sizeBytes": 420,
+        "sha256": "9537b34e3dbe9ceb0935c23d902da9b85180a34a573b44eba7f3a7c109df836a"
+      },
+      {
+        "name": "latest.json",
+        "assetId": "RA_kwDOSJOgTs4dnwls",
+        "databaseId": 496961900,
+        "sizeBytes": 954,
+        "sha256": "4b2ab3213a9d2c9860de1b548679a255d5b0fdfdf33c78cdc71117a18c16e502"
+      },
+      {
+        "name": "release-source-inventory.json",
+        "assetId": "RA_kwDOSJOgTs4dnwmN",
+        "databaseId": 496961933,
+        "sizeBytes": 179069,
+        "sha256": "2b20351a09bc445b47e15ea7a6d7b3a3eff83e42cd9709b6474e8919e243ccc1"
+      }
+    ],
+    "rollbackAssetsPreserved": true,
+    "previousCanonicalAssetsBackedUpBeforeReplacement": true
+  },
+  "sharedArtifact": {
+    "buildOnce": true,
+    "sameExpandedBytesUsedForPagesAndAliyun": true,
+    "sourceCommit": "b8b019635e0026e816b65806d12a6cc8c37a812a",
+    "commitPinnedArtifactId": 8801505647,
+    "commitPinnedArtifactName": "dronedream-site-b8b019635e0026e816b65806d12a6cc8c37a812a",
+    "commitPinnedArtifactDigest": "sha256:4f9f52a9b81b4dc00dfb239b3e8e9b7f0a23c483eae36959bb0cd1ee731cbf2e",
+    "pagesArtifactId": 8801506453,
+    "pagesArtifactDigest": "sha256:1abd1aea6c1fab3d75dc5e76c65f7636fd73f18347b1b2a5941519f6ea6f72a8",
+    "expandedFileCount": 124,
+    "manifestEntryCount": 123,
+    "expandedBytes": 31841847,
+    "sha256sumsSha256": "f00d05a6e739cb40f739a368e7f1f340b7f9275078ca444472dc13716525417f",
+    "buildManifestSha256": "48e2f519a6f5671a9ed16c101a05818fe71748a18c1028e8b60bc287cebfd93b",
+    "websiteLatestSha256": "b17f5eca3751f77b16a04ce5c00d6c33ee86afa33a0fa144330637452e57d620"
+  },
+  "githubPages": {
+    "workflow": "Deploy global product website",
+    "runId": 30651350061,
+    "runNumber": 23,
+    "runUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30651350061",
+    "conclusion": "success",
+    "headSha": "b8b019635e0026e816b65806d12a6cc8c37a812a",
+    "headTag": "website-deploy-1.0.0-20260801-b8b0196-v2",
+    "buildJobId": 91225099876,
+    "deployJobId": 91225289535,
+    "deploymentId": 5695581131,
+    "environmentPolicy": {
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredToMainOnly": true,
+      "preCanonicalSha256": "465003d92d12a488890d6dd03c5233ae8be255da94e7e4baf2c792a47f0a4cb6",
+      "postCanonicalSha256": "465003d92d12a488890d6dd03c5233ae8be255da94e7e4baf2c792a47f0a4cb6"
+    }
+  },
+  "aliyun": {
+    "server": "47.93.180.216",
+    "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260731T175440Z",
+    "previousRollbackRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260731T155325Z",
+    "currentSymlinkSwitched": true,
+    "serverRebuildPerformed": false,
+    "verifiedManifestEntries": 123,
+    "sha256sumsSha256": "f00d05a6e739cb40f739a368e7f1f340b7f9275078ca444472dc13716525417f",
+    "buildManifestSha256": "48e2f519a6f5671a9ed16c101a05818fe71748a18c1028e8b60bc287cebfd93b",
+    "websiteLatestSha256": "b17f5eca3751f77b16a04ce5c00d6c33ee86afa33a0fa144330637452e57d620",
+    "installerSha256": "bb0e0ba15fc9826b61367c7b83d04eac0587e885ce98c1db76427a62d10ab50b"
+  },
+  "publicVerification": {
+    "contentParity": {
+      "pagesOrigin": "http://getdronedream.com",
+      "aliyunOrigin": "http://47.93.180.216",
+      "manifestEntryCount": 123,
+      "publicFilesComparedByteForByte": 121,
+      "excludedDeploymentControlFiles": [
+        ".nojekyll",
+        "CNAME"
+      ],
+      "passed": true
+    },
+    "threeWayInstallerParity": {
+      "origins": [
+        "GitHub Release",
+        "GitHub Pages download path",
+        "Aliyun download path"
+      ],
+      "installerByteParity": true,
+      "checksumByteParity": true,
+      "signatureByteParity": true,
+      "installerSizeBytes": 10330782,
+      "installerSha256": "bb0e0ba15fc9826b61367c7b83d04eac0587e885ce98c1db76427a62d10ab50b",
+      "checksumSha256": "1a886c95571f2581f1cd0709b94e75f2c1e93b6d898ffd74bf39459ac24ca8c3",
+      "signatureSha256": "9537b34e3dbe9ceb0935c23d902da9b85180a34a573b44eba7f3a7c109df836a"
+    },
+    "browserMatrix": {
+      "pagesInitial": {
+        "browsers": [
+          "Microsoft Edge",
+          "Google Chrome",
+          "Lenovo Browser",
+          "Firefox"
+        ],
+        "checks": 120,
+        "passed": 119,
+        "failed": 1,
+        "reportSha256": "9847dce67935d13bb0b2098e1575dffa01283f44fa7e41d542f2f180664babe1",
+        "singleFailure": "Firefox zh-CN mobile manual fetch was cancelled once with NS_BINDING_ABORTED."
+      },
+      "firefoxRerun": {
+        "checks": 24,
+        "passed": 24,
+        "failed": 0,
+        "reportSha256": "7a93b5edb539089d8e7b1deddeba5431d031314f4f549498a3488616c718142f",
+        "classification": "transient cancelled request; not reproducible on the complete Firefox rerun"
+      },
+      "aliyunEdge": {
+        "checks": 48,
+        "passed": 48,
+        "failed": 0,
+        "reportSha256": "96f15740a5cc5f6e529d33386e55c5a117c76a4e4a057f227d8b41c1eaf7416b"
+      },
+      "routes": [
+        "home",
+        "pricing",
+        "manual",
+        "community",
+        "account",
+        "console"
+      ],
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "desktopAndMobileViewportsCovered": true,
+      "externalWarnings": 0
+    },
+    "renderedVisualAudit": {
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "generatedScreenshots": 48,
+      "representativeScreenshotsVisuallyInspected": 8,
+      "reportSha256": "3d716d65f60af1b1955be93d7e7cf7eea99d24bfef0e1ec356a20221d2b212f3",
+      "covered": [
+        "five complete recent-topic cards",
+        "document-scrolling all-topics view",
+        "topic detail card and comment editor",
+        "manual accordion and sticky header",
+        "English and Chinese",
+        "desktop, wide desktop, and mobile"
+      ],
+      "yellowDiagonalDecorationCount": 0
+    }
+  },
+  "sourceValidation": {
+    "frontendSuite": {
+      "files": 54,
+      "tests": 371,
+      "passed": 371,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appBuild": "passed with the existing non-failing Vite chunk-size advisory",
+    "sharedSiteAndConsoleBuild": "passed",
+    "deploymentContract": {
+      "tests": 11,
+      "subtests": 23,
+      "passed": true
+    },
+    "softwareFrontendSuite": {
+      "files": 60,
+      "tests": 382,
+      "passed": 382,
+      "failed": 0
+    },
+    "desktopRust": "fmt, clippy, and tests passed; 112 passed and 1 ignored",
+    "installerIntegrity": "17/17 passed"
+  },
+  "branchGovernance": {
+    "accidentalBranchesDeleted": [
+      {
+        "name": "ChiZhang-805-patch-1",
+        "lastCommit": "39b91d581517719cb7655b1db3e394d2d4ec23ee",
+        "uniqueChange": "README.md only"
+      },
+      {
+        "name": "ChiZhang-805-patch-2",
+        "lastCommit": "1b9d72c717545cfeccfae65241fe71102fc6eba6",
+        "uniqueChange": "README.md only"
+      }
+    ],
+    "finalRemoteBranchCount": 4,
+    "preAttestationRemoteBranches": {
+      "main": "a4d6e7762050cc2e7a249b8431d3c05a27be1ce8",
+      "codex/software": "295d6ee4f7b43ad7d1200431acca9d9ad4a54d32",
+      "codex/technical-report": "003a0139a12bdacd12a1a27ab91cd8469791c9fd",
+      "codex/website": "b8b019635e0026e816b65806d12a6cc8c37a812a"
+    }
+  },
+  "residuals": {
+    "tls": {
+      "cname": "getdronedream.com",
+      "protectedDomainState": "verified",
+      "certificateState": "authorization_created",
+      "certificateDomains": [
+        "getdronedream.com",
+        "www.getdronedream.com"
+      ],
+      "httpsEnforced": false,
+      "hostnameValidation": "not valid yet",
+      "actionTaken": "none; HTTPS enforcement was not enabled"
+    },
+    "updaterDiscovery": {
+      "versionPinnedLatestJsonStatus": 200,
+      "genericLatestDownloadStatus": 404,
+      "genericLatestResolvedTag": "v0.1.0-alpha.1",
+      "reason": "The canonical 1.0.0 release remains a prerelease, so GitHub's generic releases/latest endpoint does not select it.",
+      "automaticUpdaterDiscoveryClaimedComplete": false
+    },
+    "authenticodeSigning": "NotSigned is intentionally disclosed and allowed for this internal preview.",
+    "supabaseSecuritySource": "Present in repository source but the Functions were not deployed by this release."
+  },
+  "result": {
+    "deploymentPerformed": true,
+    "sameSourceCommitAcrossStaticOrigins": true,
+    "sameSharedArtifactAcrossStaticOrigins": true,
+    "sameInstallerBytesAcrossReleasePagesAndAliyun": true,
+    "rollbackAvailable": true,
+    "productionStaticReleaseStatus": "passed with disclosed TLS, updater-discovery, and unsigned-preview residuals"
+  }
+}
