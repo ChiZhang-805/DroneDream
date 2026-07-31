@@ -25,7 +25,6 @@ This branch owns the DroneDream product: the React experiment workspace, Tauri
 Windows application, FastAPI service, background worker, WSL2 Runtime,
 PX4/Gazebo adapters, optimization engines, and the evidence contracts that join
 them together.
-
 Its goal is not simply to search for a lower error value. It turns controller
 tuning into a reviewable engineering process in which the task, parameter
 space, scenarios, budget, execution history, and final recommendation remain
@@ -55,7 +54,6 @@ Assurance —** is the software’s agentic core. It compiles a closed, versione
 decision context, exposes only eligible optimizer tools, records bounded
 reflection from verified outcomes, and falls back to deterministic behavior
 when provider output is unavailable or invalid.
-
 Its tool surface includes constrained MOBO, multi-fidelity MOBO, TuRBO, SAASBO,
 surrogate-assisted CMA-ES, BIPOP-CMA-ES, and an adaptive optimizer portfolio.
 Fair seed matrices, robust multi-objective scoring, feasibility gates, Pareto
@@ -68,7 +66,6 @@ The user-facing console communicates with a FastAPI backend that persists Jobs,
 Candidates, Trials, reports, events, and artifacts. A lease-aware worker claims
 work, dispatches optimizers, invokes the selected simulator adapter, and drives
 each experiment to a terminal state.
-
 On Windows, the Tauri application manages an isolated, manifest-signed WSL2
 Runtime containing the API, worker, Valkey, PX4 SITL, Gazebo, MAVSDK, and
 supporting tools. Guided prerequisite checks, installation planning, repair,
@@ -82,7 +79,6 @@ optimizer provenance, winner selection, and report projections can be bound to
 content-addressed receipts. The system rejects stale leases, mutated evidence,
 unverified winner changes, holdout feedback leakage, unsafe parameter values,
 and unsupported physical-effect claims.
-
 The deterministic mock simulator is useful for workflow and regression
 evidence; it is not physical-flight evidence. Real PX4/Gazebo runs must retain
 the expected identity, parameter readback, scenario-effect, telemetry, and
