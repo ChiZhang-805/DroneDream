@@ -1,0 +1,294 @@
+{
+  "schemaVersion": "dronedream.website-ece498-auth-pro-production-deployment.v1",
+  "generatedAt": "2026-07-31T16:10:36.0307707Z",
+  "scope": {
+    "branch": "codex/website",
+    "staticDeploymentPerformed": true,
+    "githubPagesDeployed": true,
+    "aliyunMirrorDeployed": true,
+    "approvedMirrorServer": "47.93.180.216",
+    "explicitlyExcludedServer": "124.221.220.60",
+    "releaseAssetsReplacedInThisDeployment": false,
+    "runtimeAssetsChanged": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "productionSecretsOrCorsEnvironmentChanged": false,
+    "paymentOrModelProductionConfigurationChanged": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforcedChanged": false,
+    "technicalReportModified": false
+  },
+  "subject": {
+    "sourceCommit": "1b16e5b05736bb2b9cba7027e5e3b0f4093a236d",
+    "sourceParent": "3a941d818dbf6664c3e6d251ddfdd4642bcd0ae6",
+    "sourceTree": "9ea262c18b33f36460343546a7572b67230de687",
+    "sourceCommittedAt": "2026-07-31T22:57:25+08:00",
+    "sourceMessage": "Polish ECE498 copy and simplify website auth",
+    "sourcePaths": [
+      "frontend/src/__tests__/WebsiteAuthFlow.test.tsx",
+      "frontend/src/pages/ECE498.css",
+      "frontend/src/site/SiteApp.tsx"
+    ],
+    "sourceValidationReceipt": {
+      "path": "website/validation-receipts/website-ece498-auth-pro-validation-1b16e5b.json",
+      "sha256": "44b4ef3a07fbb0b015e94c23a231a0f6b90273daecf98fd39b4e509ca663c9b0"
+    }
+  },
+  "deliveredChanges": {
+    "ece498": {
+      "sharedFrontend": true,
+      "desktopParagraphAlignment": "justify",
+      "desktopTextColor": "#eee6f2",
+      "desktopContract": "7 stages x 4 cards x (1 title line + exactly 9 body lines)",
+      "desktopParagraphsMeasured": 56,
+      "mobileContract": "responsive, unclipped, naturally left aligned"
+    },
+    "websiteAuth": {
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "removedCopy": "browser-only and return-home explanatory paragraphs beneath the account title",
+      "formsAndNavigationPreserved": true
+    },
+    "productionAccountEntitlement": {
+      "performed": true,
+      "principalIdentifierSha256": "1fe6fcca94d88d21afac42fd75ea7672e3502e9050d9c788d4db7e08a3c0fa4c",
+      "matchedUsers": 1,
+      "previousPlan": "free",
+      "currentPlan": "pro",
+      "status": "active",
+      "source": "admin",
+      "includedAiCredits": 15000000,
+      "consumedAiCreditsPreserved": 0,
+      "reservedAiCreditsPreserved": 0,
+      "requestCountPreserved": 0,
+      "paymentOrderCount": 0,
+      "note": "Administrator entitlement for internal testing; no paid order or payment record was fabricated."
+    }
+  },
+  "sourceValidation": {
+    "focusedTests": {
+      "files": 2,
+      "tests": 14,
+      "passed": 14,
+      "failed": 0
+    },
+    "completeFrontendSuite": {
+      "files": 54,
+      "tests": 371,
+      "passed": 371,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appBuild": "passed with the existing non-failing Vite chunk-size advisory",
+    "sharedSiteAndConsoleBuild": "passed",
+    "deploymentContract": {
+      "tests": 11,
+      "subtests": 23,
+      "passed": true
+    },
+    "softwareUiLayout": {
+      "cases": 4,
+      "passed": 4,
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "desktopEceParagraphsMeasured": 56,
+      "allDesktopBodyLineCounts": 9,
+      "allParagraphsUnclipped": true,
+      "pageErrors": 0,
+      "evidenceSha256": "1678fe78db57599ca7c4a9e18ad51700059f1661d51d70d4b8b2060dc999c791"
+    },
+    "localFourBrowserSiteMatrix": {
+      "checks": 120,
+      "passed": 120,
+      "failed": 0,
+      "externalWarnings": 0,
+      "evidenceSha256": "c0e1c5c073b8ce67defa1af2b1d05cad27b1b35029d1ae8ca43b2e0b2305afe5"
+    },
+    "authVisualReview": {
+      "screenshots": 8,
+      "result": "passed"
+    },
+    "diffCheck": "passed",
+    "trackedSourceClean": true
+  },
+  "release": {
+    "productSource": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "handoffEvidenceCommit": "a9c2fe0216ab841bb4cdd078af7b6cb111e198ad",
+    "handoffManifestSha256": "f37b29dc4e8d3967844910d9db8753f52ba6555e39dccb74487b83e710f0ec2d",
+    "version": "1.0.0",
+    "releaseTag": "signpath-candidate-v1.0.0",
+    "fileName": "DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 10331399,
+    "sha256": "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+    "authenticode": "NotSigned",
+    "peCertificateTable": "0/0",
+    "classification": "Unsigned 1.0.0 internal preview explicitly allowed by the product owner.",
+    "checksum": {
+      "bytes": 98,
+      "sha256": "022c0192874c9478748414da3275a6081d40a89256a7b631ae5caa60679fa630"
+    },
+    "updaterSignature": {
+      "bytes": 420,
+      "sha256": "4d992ca27c3a42aabe411cb4123335ac608afbe62ec839ef7c3466fa14e12129"
+    },
+    "githubRelease": {
+      "releaseId": 357114097,
+      "exeAssetId": 496434214,
+      "checksumAssetId": 496434203,
+      "signatureAssetId": 496434213,
+      "latestAssetId": 496434200,
+      "sourceInventoryAssetId": 496434199,
+      "verifiedUnchangedAndAvailable": true
+    }
+  },
+  "artifact": {
+    "buildPolicy": "GitHub Actions built one shared site-and-console artifact from the immutable deploy tag at the exact source commit. The downloaded and SHA256SUMS-verified expanded bytes were transferred to Aliyun without a second build.",
+    "expandedFiles": 124,
+    "integrityEntries": 123,
+    "expandedBytes": 31842464,
+    "sha256SumsSha256": "60567284601b2ae981ee1519cb5c31fed128efb526acc048e20884af2472fdc1",
+    "buildManifestSha256": "eb0369b78cb01c984f92a4ede03a5ae1f00e0788e007f1ce6687f822c3f2bbb1",
+    "latestJsonSha256": "42eeecccbd84d1b4aa1abf5a68b4b691d460ab5b69ff7551662e65a7c7d2f959",
+    "tauriLatestJsonSha256": "6acca54e7a3c6fa6e6197481101110e5c87ec9866b69a0cac66b211b07d8c1e2",
+    "workflowArtifact": {
+      "id": 8797749083,
+      "name": "dronedream-site-1b16e5b05736bb2b9cba7027e5e3b0f4093a236d",
+      "zipBytes": 28492371,
+      "digest": "sha256:5a85e7a99e1edc86a9f0fca297e407670e79a896920d941687567d10caffc567"
+    },
+    "pagesArtifact": {
+      "id": 8797750361,
+      "name": "github-pages",
+      "zipBytes": 28501138,
+      "digest": "sha256:3b46fe561b20014db4ae148a97ddc675502a155f3fb0b5685f7f8835d098031d"
+    },
+    "aliyunTransfer": {
+      "archiveBytes": 28465050,
+      "archiveSha256": "518c2737df98c369212b289d011b887c69d4e35279b2be80ffcca6e92f1756fe",
+      "allIntegrityEntriesVerifiedBeforeActivation": true
+    }
+  },
+  "deployment": {
+    "deployTag": {
+      "name": "website-deploy-1.0.0-20260731-1b16e5b",
+      "tagObjectSha": "79a960a58852abb366c3bb8904c217ba1a78dc6a",
+      "peeledSourceCommit": "1b16e5b05736bb2b9cba7027e5e3b0f4093a236d",
+      "immutable": true
+    },
+    "githubPages": {
+      "workflowRunId": 30641789900,
+      "workflowRunNumber": 22,
+      "workflowUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30641789900",
+      "workflowConclusion": "success",
+      "workflowHeadRef": "website-deploy-1.0.0-20260731-1b16e5b",
+      "workflowHeadSha": "1b16e5b05736bb2b9cba7027e5e3b0f4093a236d",
+      "buildJobId": 91193301655,
+      "publishJobId": 91193526332,
+      "deploymentId": 5693746518,
+      "deploymentStatusId": 16190676213,
+      "deploymentStatus": "success",
+      "environmentUrl": "http://getdronedream.com/",
+      "temporaryExactTagPolicyId": 56130190,
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredMainOnlyPolicy": {
+        "id": 55186327,
+        "name": "main",
+        "type": "branch"
+      },
+      "nonFailingAdvisory": "GitHub Actions reported its upstream Node 20 runtime deprecation and forced Node 24; both jobs completed successfully."
+    },
+    "aliyun": {
+      "host": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260731T155325Z",
+      "rollbackRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260731T104216Z",
+      "rollbackReleaseRetained": true,
+      "atomicCurrentSwitch": true,
+      "nginxConfigurationTests": "passed"
+    }
+  },
+  "onlineParity": {
+    "sourceCommitAtBothOrigins": "1b16e5b05736bb2b9cba7027e5e3b0f4093a236d",
+    "buildManifestAndSha256SumsIdentical": true,
+    "criticalHtmlJavascriptCssAndMetadataFilesPerOrigin": 20,
+    "criticalFilesMatchedArtifactAndCrossOrigin": true,
+    "canonicalAssetUrlValidationNote": "The canonical asset URL rerun passed. One earlier cache-busting query was served by the intentional SPA fallback and was classified as a validation-harness artifact, not a deployed-byte mismatch.",
+    "threeWayInstaller": {
+      "origins": [
+        "GitHub Release",
+        "GitHub Pages download entry",
+        "Aliyun mirror download entry"
+      ],
+      "bytesAtEveryOrigin": 10331399,
+      "sha256AtEveryOrigin": "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+      "checksumSha256AtEveryOrigin": "022c0192874c9478748414da3275a6081d40a89256a7b631ae5caa60679fa630",
+      "signatureSha256AtEveryOrigin": "4d992ca27c3a42aabe411cb4123335ac608afbe62ec839ef7c3466fa14e12129",
+      "byteParity": true
+    }
+  },
+  "onlineBrowserValidation": {
+    "pagesFourBrowserMatrix": {
+      "checks": 120,
+      "passed": 120,
+      "failed": 0,
+      "externalWarnings": 0,
+      "evidenceSha256": "2d68ab7bb04983dc7f4ee00a8deae62251552945e756875ac84e7cf318b2849a"
+    },
+    "aliyunFourBrowserGeneralMatrix": {
+      "checks": 120,
+      "passed": 116,
+      "failed": 4,
+      "externalWarnings": 0,
+      "evidenceSha256": "7389df2653d2a909fdf3b22f28bb0ca8fa75236a53bc2fb9694410591d6a3a60",
+      "failureClassification": "The four Firefox Manual entries were NS_BINDING_ABORTED events caused by the general harness navigating away before the Markdown request settled. No layout, accessibility, account, community, console, or external-warning check failed."
+    },
+    "aliyunFirefoxManualFocusedRerun": {
+      "checks": 4,
+      "passed": 4,
+      "failed": 0,
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "markdownStatus": 200,
+      "headingCountPerCase": 54,
+      "documentWidthParity": true,
+      "requestPageAndConsoleErrors": 0,
+      "evidenceSha256": "fb9559fc9235dc8c340629a8f96b34a0fb71f7f478e821a67d737413cd307d5c"
+    },
+    "visualReview": {
+      "firefoxManualScreenshotsInspected": 4,
+      "result": "passed; complete content, stable header, no clipping or horizontal overflow"
+    }
+  },
+  "tls": {
+    "customDomain": "getdronedream.com",
+    "protectedDomainState": "verified",
+    "certificateState": "authorization_created",
+    "certificateDomains": [
+      "getdronedream.com",
+      "www.getdronedream.com"
+    ],
+    "httpsEnforced": false,
+    "mutationPerformed": false,
+    "status": "external GitHub Pages certificate issuance remains pending; HTTPS was not enabled or claimed complete"
+  },
+  "crossWorkstreamBoundary": {
+    "sharedFrontendSourceReadyForWebsiteAndFutureDesktopBuild": true,
+    "currentlyPublishedDesktopInstallerContainsThisSource": false,
+    "desktopFollowUp": "The software line must consume this shared frontend source and rebuild/validate a later installer before the installed desktop application can show these ECE498 refinements.",
+    "supabaseFunctionSecuritySourcePresentButNotDeployed": true,
+    "receiptOnlyCommitDoesNotClaimValidationOfItself": true
+  }
+}
