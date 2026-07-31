@@ -1,0 +1,125 @@
+{
+  "schema_version": "dronedream.updater-signing-contract-receipt.v1",
+  "generated_at": "2026-07-31T08:13:48.5775041Z",
+  "subject_commit": "96cd879a1af39f32557d8e663f0ff98e232d5966",
+  "subject_parent": "a9c2fe0216ab841bb4cdd078af7b6cb111e198ad",
+  "branch": "codex/software",
+  "scope": [
+    "desktop/package.json",
+    "desktop/scripts/build-windows-llvm.ps1",
+    "desktop/scripts/invoke-tauri-updater-signer.ps1",
+    "desktop/scripts/verify-release-source-policy.mjs",
+    "desktop/scripts/verify-updater-signing-contract.ps1"
+  ],
+  "root_cause": {
+    "old_expression": "A one-element array emitted from a PowerShell if expression was automatically unwrapped to System.String.",
+    "failure_mechanism": "Splatting that String passed one character per native-process argument, so the Tauri CLI received '-' as an unexpected argument.",
+    "observed_release_failure": "error: unexpected argument '-' found",
+    "failure_stage": "post-NSIS updater signing"
+  },
+  "fix_contract": {
+    "complete_argv_type": "System.String[]",
+    "empty_password": "Pass the single literal argument --password=.",
+    "non_empty_password": "Keep the value only in the inherited TAURI_SIGNING_PRIVATE_KEY_PASSWORD environment variable and omit it from argv.",
+    "option_terminator_before_installer": true,
+    "paths_with_spaces_preserved_as_single_arguments": true,
+    "stale_signature_removed_before_signing": true,
+    "non_zero_signer_exit_removes_partial_signature": true,
+    "zero_exit_without_non_empty_signature_fails_closed": true,
+    "contract_preflight_runs_before_desktop_and_nsis_build": true
+  },
+  "tests": [
+    {
+      "command": "npm --prefix desktop run verify:updater-signing",
+      "started_at": "2026-07-31T08:13:31.2778095Z",
+      "ended_at": "2026-07-31T08:13:32.0963418Z",
+      "duration_seconds": 0.819,
+      "exit_code": 0,
+      "coverage": [
+        "PowerShell AST parses without errors",
+        "actual native node.exe receives exact empty-password argv",
+        "actual native node.exe receives non-empty password only through a dedicated test environment variable",
+        "CLI, key and installer paths containing spaces remain single ordered arguments",
+        "non-zero signer exit fails closed and removes a stale signature",
+        "zero signer exit without a signature fails closed"
+      ]
+    },
+    {
+      "command": "npm --prefix desktop run verify:release-source",
+      "started_at": "2026-07-31T08:13:32.1055233Z",
+      "ended_at": "2026-07-31T08:13:33.0355557Z",
+      "duration_seconds": 0.93,
+      "exit_code": 0,
+      "result": "1362 tracked files, 390 npm packages, 532 external Rust packages"
+    },
+    {
+      "command": "PowerShell Parser.ParseFile for build, helper and contract scripts",
+      "started_at": "2026-07-31T08:13:33.0355557Z",
+      "ended_at": "2026-07-31T08:13:33.0455864Z",
+      "duration_seconds": 0.01,
+      "exit_code": 0,
+      "parsed_files": 3
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "source_file_hashes": [
+    {
+      "path": "desktop/package.json",
+      "bytes": 931,
+      "sha256": "64e389425a87d35b139c94bf2008103b77aae8482be8757653428611b3524745"
+    },
+    {
+      "path": "desktop/scripts/build-windows-llvm.ps1",
+      "bytes": 10510,
+      "sha256": "88c20f307cbd40aa2e99db06568df89d2f603793d205fb3fd921cb8774319f0a"
+    },
+    {
+      "path": "desktop/scripts/invoke-tauri-updater-signer.ps1",
+      "bytes": 2533,
+      "sha256": "fafc214e38ea96866a29f3a403e030f208a33c4e6228827b5fccb5819029ac94"
+    },
+    {
+      "path": "desktop/scripts/verify-release-source-policy.mjs",
+      "bytes": 7388,
+      "sha256": "ba8cbe0b417149c1ad323b9eb87aaca142c989fde3b4fc5be54f32d1c80fd6a8"
+    },
+    {
+      "path": "desktop/scripts/verify-updater-signing-contract.ps1",
+      "bytes": 9919,
+      "sha256": "1c68bb878779e1ff35170836adac1c258165a2f0a445c10146947956d702bbc6"
+    }
+  ],
+  "frozen_release": {
+    "release_subject_commit": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "handoff_evidence_commit": "a9c2fe0216ab841bb4cdd078af7b6cb111e198ad",
+    "installer_path": "artifacts/test-runs/internal-installer-1.0.0-c3fb2c0/DroneDream_1.0.0_x64-setup.exe",
+    "installer_bytes": 10331399,
+    "installer_sha256": "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+    "installer_last_write_utc": "2026-07-31T07:22:20.6356677Z",
+    "installer_tracked_by_git": false,
+    "installer_rebuilt": false,
+    "installer_resigned": false,
+    "installer_modified": false,
+    "build_llvm_invoked": false,
+    "nsis_invoked": false,
+    "release_subject_relabelled": false
+  },
+  "security_boundary": {
+    "real_updater_private_key_read": false,
+    "real_tauri_password_read": false,
+    "test_password_value_persisted": false,
+    "openai_api_key_read_or_used": false,
+    "real_signing_performed": false
+  },
+  "external_actions": {
+    "github_release_modified": false,
+    "aliyun_modified": false,
+    "website_modified": false,
+    "upload_performed": false,
+    "deployment_performed": false
+  },
+  "result": "pass"
+}
