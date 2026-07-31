@@ -25,8 +25,7 @@
 DroneDream is an engineering workspace for designing, running, and explaining
 PX4 controller-tuning experiments in Gazebo. It brings flight-task definition,
 bounded parameter search, scenario design, asynchronous optimization,
-trajectory review, artifacts, and experiment reports into one product.
-
+trajectory review, artifacts, and experiment reports into one product. 
 The project is built around a simple principle: an attractive result is not
 enough. Every recommendation should remain connected to the experiment that
 produced it, the evidence that supports it, and the limits that still apply.
@@ -38,7 +37,6 @@ study manually. DroneDream turns that intent into a reviewable five-step
 experiment, evaluates candidate parameter sets on controlled scenario and seed
 matrices, and presents the resulting metrics, trajectories, failures, artifacts,
 and comparisons in one workspace.
-
 The Windows application adds guided setup for its isolated WSL2 Runtime, while
 the browser console and public website extend the same visual and product
 language across the rest of the experience.
@@ -61,7 +59,6 @@ Assurance —** is DroneDream’s evidence-gated optimization harness. It gives 
 bounded model a closed set of eligible numerical tools, preserves deterministic
 fallbacks, separates search evidence from holdout evidence, and records the
 provenance needed to explain each decision.
-
 The software also includes constrained and multi-fidelity Bayesian optimization,
 TuRBO, SAASBO, surrogate-assisted and BIPOP CMA-ES, and an adaptive optimizer
 portfolio. The model coordinates tools; it does not replace the simulator,
@@ -74,7 +71,6 @@ execution, retained telemetry, source-contract checks, and publication evidence.
 Unsupported physical effects fail closed, holdout results are kept out of
 candidate selection, and content-addressed receipts bind important outcomes to
 their source state.
-
 The product is simulation-first. A selected parameter set is an experiment
 result, not an authorization to fly real hardware; independent SITL
 reproduction and engineering review remain necessary.
