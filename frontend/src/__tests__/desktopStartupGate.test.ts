@@ -61,4 +61,21 @@ describe("desktop startup identity gate", () => {
       accountId: "account-b",
     });
   });
+
+  it("classifies a missing session route without leaking the raw Not Found response", async () => {
+    const result = await verifyDesktopStartupGate("account-a", async () => {
+      throw Object.assign(new Error("Not Found"), {
+        code: "NOT_FOUND",
+        httpStatus: 404,
+      });
+    });
+
+    expect(result).toMatchObject({
+      status: "blocked",
+      accountId: "account-a",
+      failureCode: "runtimeSessionApiMissing",
+      error: "The installed Runtime does not provide the desktop account-session API.",
+    });
+    expect(result.error).not.toContain("Not Found");
+  });
 });

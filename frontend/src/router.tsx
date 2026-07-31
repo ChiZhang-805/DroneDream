@@ -92,13 +92,6 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: DesktopSetup };
           },
         },
-        {
-          path: "ece498",
-          lazy: async () => {
-            const { ECE498 } = await import("./pages/ECE498");
-            return { Component: ECE498 };
-          },
-        },
         { path: "*", loader: () => redirect(fallbackPath) },
       ],
     },

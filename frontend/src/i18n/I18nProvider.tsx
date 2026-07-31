@@ -143,8 +143,6 @@ const enTranslations = {
       "You can view the Dashboard, but live job summaries and tuning actions remain unavailable until DroneDreamRuntime is installed and running.",
     "runtimeGate.historyPreviewBody":
       "You can open History / Reports, but local job records and report actions remain unavailable until DroneDreamRuntime is installed and running.",
-    "runtimeGate.ece498PreviewBody":
-      "You can review and edit the ECE498 configuration, but its three run actions remain disabled until DroneDreamRuntime is installed and running.",
     "runtimeGate.openSetup": "Open settings",
     "runtimeGate.redirectTitle": "This feature needs DroneDreamRuntime",
     "runtimeGate.redirectBody":
@@ -165,14 +163,21 @@ const enTranslations = {
     "launcher.signIn": "Sign in and enter tuning workspace",
     "launcher.browserAuthWaiting": "Waiting for browser sign-in…",
     "launcher.browserAuthAdopting": "Confirming account…",
-    "launcher.browserAuthCancel": "Cancel sign-in",
     "launcher.browserAuthErrorTitle": "Browser sign-in needs attention",
     "launcher.browserAuthFailed":
       "The browser sign-in did not complete. Start it again when you are ready.",
-    "launcher.browserAuthCancelFailed":
-      "The browser sign-in could not be cancelled cleanly. Close the browser page and retry after the current request times out.",
     "launcher.browserAuthNotConfigured":
       "This desktop build is missing the public account configuration. Install a release build that passed the account configuration gate.",
+    "launcher.accountVerificationBlocked": "Desktop sign-in could not be completed",
+    "launcher.runtimeSessionApiTitle": "DroneDreamRuntime must be updated",
+    "launcher.runtimeSessionApiMissing":
+      "This installed DroneDreamRuntime is older than the desktop sign-in protocol. Install the current Runtime, then check the environment again. Restarting the old Runtime will not add the missing account-session API.",
+    "launcher.runtimeSessionApiUnavailable":
+      "Windows could not verify the Runtime account-session API. Confirm that the current DroneDreamRuntime is running, then check the environment again.",
+    "launcher.accountIdentityMismatch":
+      "The browser and local Runtime returned different account identities, so DroneDream kept the workspace locked. Sign out in the browser and try again with the same account.",
+    "launcher.accountVerificationFailed":
+      "Browser sign-in returned to DroneDream, but the local Runtime could not verify that account. Check the Runtime connection and try again.",
     "launcher.retryChecks": "Retry startup checks",
     "launcher.startupBlocked": "Startup checks need attention",
     "launcher.progressLabel": "Startup readiness progress",
@@ -284,6 +289,9 @@ const enTranslations = {
     "desktop.componentLabel.backend": "Local DroneDream API",
     "desktop.componentLabel.px4": "PX4 SITL",
     "desktop.componentLabel.gazebo": "Gazebo simulator",
+    "desktop.componentLabel.accountSessionApi": "Desktop account-session API",
+    "desktop.componentDetail.accountSessionApiReady":
+      "The Runtime supports browser-to-desktop account verification.",
     "desktop.diagnosticsTitle": "Runtime diagnostics",
     "desktop.storageTitle": "Choose runtime storage",
     "desktop.storageDesc":
@@ -1563,7 +1571,6 @@ const zhTranslations = {
     "runtimeGate.previewTitle": "运行数据暂不可用",
     "runtimeGate.dashboardPreviewBody": "你可以浏览控制台，但在 DroneDreamRuntime 安装并运行前，实时任务汇总与调优操作暂不可用。",
     "runtimeGate.historyPreviewBody": "你可以打开历史与报告页面，但在 DroneDreamRuntime 安装并运行前，本地任务记录与报告操作暂不可用。",
-    "runtimeGate.ece498PreviewBody": "你可以查看并编辑 ECE498 配置，但在 DroneDreamRuntime 安装并运行前，三个执行操作均保持禁用。",
     "runtimeGate.openSetup": "打开设置",
     "runtimeGate.redirectTitle": "此功能需要 DroneDreamRuntime",
     "runtimeGate.redirectBody": "本次操作已被安全拦截。请在下方完成安装、启动或修复，然后重新打开该功能。",
@@ -1582,13 +1589,20 @@ const zhTranslations = {
     "launcher.signIn": "登录并进入调优平台",
     "launcher.browserAuthWaiting": "正在等待浏览器登录…",
     "launcher.browserAuthAdopting": "正在确认账户…",
-    "launcher.browserAuthCancel": "取消登录",
     "launcher.browserAuthErrorTitle": "浏览器登录需要处理",
     "launcher.browserAuthFailed": "浏览器登录没有完成。准备好后可以重新发起登录。",
-    "launcher.browserAuthCancelFailed":
-      "本次浏览器登录未能正常取消。请关闭浏览器登录页，等待当前请求超时后再试。",
     "launcher.browserAuthNotConfigured":
       "这个桌面版本缺少公开账户配置。请安装已经通过账户配置门禁的正式构建。",
+    "launcher.accountVerificationBlocked": "桌面端未能完成登录",
+    "launcher.runtimeSessionApiTitle": "需要更新 DroneDreamRuntime",
+    "launcher.runtimeSessionApiMissing":
+      "当前安装的 DroneDreamRuntime 早于桌面登录协议。请安装最新运行环境后重新检查；仅重启旧运行环境无法补上缺失的账户会话接口。",
+    "launcher.runtimeSessionApiUnavailable":
+      "Windows 暂时无法验证运行环境的账户会话接口。请确认最新 DroneDreamRuntime 正在运行，然后重新检查环境。",
+    "launcher.accountIdentityMismatch":
+      "浏览器与本地运行环境返回了不同的账户身份，因此 DroneDream 已保持锁定。请先在浏览器退出，再使用同一账户重新登录。",
+    "launcher.accountVerificationFailed":
+      "浏览器登录已经返回 DroneDream，但本地运行环境未能验证这个账户。请检查运行环境连接后重试。",
     "launcher.retryChecks": "重新检查启动条件",
     "launcher.startupBlocked": "启动检查需要处理",
     "launcher.progressLabel": "启动就绪进度",
@@ -1692,6 +1706,8 @@ const zhTranslations = {
     "desktop.componentLabel.backend": "本地 DroneDream API",
     "desktop.componentLabel.px4": "PX4 SITL",
     "desktop.componentLabel.gazebo": "Gazebo 仿真器",
+    "desktop.componentLabel.accountSessionApi": "桌面账户会话接口",
+    "desktop.componentDetail.accountSessionApiReady": "运行环境支持浏览器向桌面端安全回传账户。",
     "desktop.diagnosticsTitle": "运行环境诊断",
     "desktop.storageTitle": "选择运行环境存储位置",
     "desktop.storageDesc": "DroneDream 会优先推荐可写、至少有 52 GiB 空间的非系统 NTFS 固定磁盘（8 GiB 下载、24 GiB 运行环境、20 GiB 安装后余量）；没有符合条件的非系统盘时才回退到 Windows 系统盘。它会创建独立专用目录，不会复用用户个人的 WSL 发行版。",

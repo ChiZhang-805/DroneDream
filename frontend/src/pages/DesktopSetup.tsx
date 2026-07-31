@@ -55,6 +55,10 @@ import {
   MINIMUM_MEMORY_BYTES,
 } from "../desktop/readiness";
 import {
+  runtimeSessionContractFailure,
+  verifyRuntimeSessionContract,
+} from "../desktop/runtimeSessionContract";
+import {
   getDesktopStartupGateSession,
   setDesktopStartupGateState,
   subscribeDesktopStartupGate,
@@ -367,6 +371,13 @@ export function DesktopSetup() {
     state.prerequisitesFresh &&
     state.runtimeFresh &&
     isOverallDesktopReady(state.prerequisites, state.runtime);
+  const runtimeSessionFailure = runtimeSessionContractFailure(state.runtime);
+  const runtimeSessionFailureKey: TranslationKey | null =
+    runtimeSessionFailure === "runtime_session_api_missing"
+      ? "launcher.runtimeSessionApiMissing"
+      : runtimeSessionFailure === "runtime_session_api_unavailable"
+        ? "launcher.runtimeSessionApiUnavailable"
+        : null;
   const signedInAccount =
     auth?.configured && !auth.loading ? auth.account : null;
   const startupGateReady =
@@ -407,6 +418,12 @@ export function DesktopSetup() {
     );
   const postSignInBlocked =
     browserAuthCompletedForLaunch && startupGate.status === "blocked";
+  const startupGateFailureKey: TranslationKey =
+    startupGate.failureCode === "runtimeSessionApiMissing"
+      ? "launcher.runtimeSessionApiMissing"
+      : startupGate.failureCode === "accountIdentityMismatch"
+        ? "launcher.accountIdentityMismatch"
+        : "launcher.accountVerificationFailed";
   const environmentBlocked =
     localRuntimeReady && !localChecksReady && !environmentChecking;
   const installerHandoffNeedsAttention = Boolean(
@@ -444,7 +461,9 @@ export function DesktopSetup() {
       state.runtime?.installed &&
       state.runtime.running &&
       !isRuntimeFullyReady(state.runtime)
-      ? state.runtime.diagnostics.join("\n") || t("desktop.runtimeNeedsRepair")
+      ? runtimeSessionFailureKey
+        ? t(runtimeSessionFailureKey)
+        : state.runtime.diagnostics.join("\n") || t("desktop.runtimeNeedsRepair")
       : null,
     installState.snapshot?.phase === "completed" &&
       state.prerequisitesFresh &&
@@ -498,6 +517,7 @@ export function DesktopSetup() {
       setDesktopStartupGateState("blocked", {
         accountId: signedInAccount?.id ?? null,
         error: `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
+        failureCode: "updateRequired",
       });
       return;
     }
@@ -569,17 +589,6 @@ export function DesktopSetup() {
     }
   }, [browserAuthStatus, localChecksReady, locale, t]);
 
-  const cancelBrowserSignIn = useCallback(async () => {
-    if (browserAuthStatus === "idle") return;
-    try {
-      await cancelBrowserAuth();
-    } catch {
-      if (componentMounted.current) {
-        setBrowserAuthError(t("launcher.browserAuthCancelFailed"));
-      }
-    }
-  }, [browserAuthStatus, t]);
-
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
     const currentRequest = ++requestId.current;
@@ -594,7 +603,7 @@ export function DesktopSetup() {
 
     const [prerequisites, runtime] = await Promise.allSettled([
       probeSystemPrerequisitesWithStartupGrace(),
-      probeRuntimeStatus(),
+      probeRuntimeStatus().then(verifyRuntimeSessionContract),
     ]);
     if (requestId.current !== currentRequest) return;
 
@@ -826,7 +835,8 @@ export function DesktopSetup() {
     setRuntimeCommandError(null);
     setRuntimeCommandBusy(true);
     try {
-      const runtime = action === "start" ? await startRuntime() : await repairRuntime();
+      const nativeRuntime = action === "start" ? await startRuntime() : await repairRuntime();
+      const runtime = await verifyRuntimeSessionContract(nativeRuntime);
       if (isRuntimeFullyReady(runtime)) clearRuntimeAutoStartFailure();
       setState((current) => ({
         ...current,
@@ -1325,6 +1335,7 @@ export function DesktopSetup() {
           checking={environmentChecking}
           gateBlocked={
             environmentBlocked ||
+            runtimeSessionFailure !== null ||
             (localChecksReady &&
               (postSignInBlocked || updater.status === "available"))
           }
@@ -1341,8 +1352,14 @@ export function DesktopSetup() {
 
         {postSignInBlocked &&
         updater.status !== "available" ? (
-          <Alert tone="warning" title={t("launcher.startupBlocked")}>
-            <p>{startupGate.error ?? t("launcher.errorHint")}</p>
+          <Alert tone="warning" title={t("launcher.accountVerificationBlocked")}>
+            <p>{t(startupGateFailureKey)}</p>
+          </Alert>
+        ) : null}
+
+        {runtimeSessionFailureKey ? (
+          <Alert tone="warning" title={t("launcher.runtimeSessionApiTitle")}>
+            <p>{t(runtimeSessionFailureKey)}</p>
           </Alert>
         ) : null}
 
@@ -1356,6 +1373,16 @@ export function DesktopSetup() {
               {t("updater.available", {
                 version: updater.availableVersion ?? "",
               })}
+            </button>
+          </div>
+        ) : runtimeSessionFailureKey ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void refresh()}
+            >
+              {t("launcher.retryChecks")}
             </button>
           </div>
         ) : localChecksReady && !workspaceReady ? (
@@ -1377,15 +1404,6 @@ export function DesktopSetup() {
                     ? t("launcher.browserAuthAdopting")
                   : t("launcher.signIn")}
             </button>
-            {browserAuthStatus !== "idle" ? (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => void cancelBrowserSignIn()}
-              >
-                {t("launcher.browserAuthCancel")}
-              </button>
-            ) : null}
           </div>
         ) : workspaceReady ? null : localRuntimeReady &&
           environmentChecking ? null : localRuntimeReady ? (
@@ -2325,7 +2343,7 @@ function RuntimeOverview({
               />
               <div>
                 <strong>{translatedComponentLabel(t, component.id, component.label)}</strong>
-                <span>{component.detail || component.version || "—"}</span>
+                <span>{translatedComponentDetail(t, component.detail) || component.version || "—"}</span>
               </div>
               <div className="desktop-component-badges">
                 <span className={`desktop-status-badge desktop-status-${component.status}`}>
@@ -3081,6 +3099,13 @@ const COMPONENT_LABEL_KEYS: Partial<Record<string, TranslationKey>> = {
   "local-backend": "desktop.componentLabel.backend",
   px4: "desktop.componentLabel.px4",
   gazebo: "desktop.componentLabel.gazebo",
+  "account-session-api": "desktop.componentLabel.accountSessionApi",
+};
+
+const COMPONENT_DETAIL_KEYS: Partial<Record<string, TranslationKey>> = {
+  runtime_session_api_ready: "desktop.componentDetail.accountSessionApiReady",
+  runtime_session_api_missing: "launcher.runtimeSessionApiMissing",
+  runtime_session_api_unavailable: "launcher.runtimeSessionApiUnavailable",
 };
 
 function translatedComponentLabel(
@@ -3090,6 +3115,15 @@ function translatedComponentLabel(
 ): string {
   const key = COMPONENT_LABEL_KEYS[id];
   return key ? t(key) : fallback;
+}
+
+function translatedComponentDetail(
+  t: (key: TranslationKey) => string,
+  detail: string | null | undefined,
+): string | null | undefined {
+  if (!detail) return detail;
+  const key = COMPONENT_DETAIL_KEYS[detail];
+  return key ? t(key) : detail;
 }
 
 const STEP_TEXT_KEYS: Partial<

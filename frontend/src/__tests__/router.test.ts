@@ -121,7 +121,7 @@ describe("environment-aware routing", () => {
       .toBeUndefined();
     expect(children.find((route) => route.path === "batches/*")?.loader)
       .toEqual(expect.any(Function));
-    for (const path of ["dashboard", "history", "ece498"]) {
+    for (const path of ["dashboard", "history"]) {
       expect(children.find((route) => route.path === path)?.loader, path)
         .toBeUndefined();
     }
@@ -134,12 +134,12 @@ describe("environment-aware routing", () => {
       "history",
       "compare",
       "desktop/setup",
-      "ece498",
     ]) {
       const route = children.find((candidate) => candidate.path === path);
       expect(route?.lazy, path).toEqual(expect.any(Function));
       expect(route?.element, path).toBeUndefined();
     }
+    expect(children.find((route) => route.path === "ece498")).toBeUndefined();
 
     router.dispose();
   });

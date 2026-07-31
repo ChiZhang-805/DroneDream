@@ -169,6 +169,21 @@ for (const requiredPermission of [
     fail(`desktop capability is missing: ${requiredPermission}`);
   }
 }
+const openerPermission = desktopCapability.permissions?.find(
+  (permission) => permission && typeof permission === "object" &&
+    permission.identifier === "opener:allow-open-url",
+);
+if (!openerPermission || !Array.isArray(openerPermission.allow)) {
+  fail("desktop capability is missing its explicit external URL allowlist");
+}
+for (const requiredUrl of [
+  "https://getdronedream.com/pricing/",
+  "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+]) {
+  if (!openerPermission.allow.some((entry) => entry?.url === requiredUrl)) {
+    fail(`desktop external URL allowlist is missing: ${requiredUrl}`);
+  }
+}
 const inventory = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),

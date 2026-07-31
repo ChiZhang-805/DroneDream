@@ -3,6 +3,27 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const runtimeSessionContractMocks = vi.hoisted(() => ({
+  verify: vi.fn(async <T,>(report: T) => report),
+}));
+const openerMocks = vi.hoisted(() => ({
+  openUrl: vi.fn(async () => undefined),
+}));
+
+vi.mock("../desktop/runtimeSessionContract", async (importOriginal) => {
+  const original = await importOriginal<
+    typeof import("../desktop/runtimeSessionContract")
+  >();
+  return {
+    ...original,
+    verifyRuntimeSessionContract: runtimeSessionContractMocks.verify,
+  };
+});
+
+vi.mock("@tauri-apps/plugin-opener", () => ({
+  openUrl: openerMocks.openUrl,
+}));
+
 import { apiClient } from "../api/client";
 import { AppShell } from "../AppShell";
 import { I18nProvider } from "../i18n/I18nProvider";
@@ -78,6 +99,10 @@ const prerequisites = {
 describe("desktop runtime access UX", () => {
 afterEach(() => {
   resetDesktopReadinessSession();
+    runtimeSessionContractMocks.verify.mockReset();
+    runtimeSessionContractMocks.verify.mockImplementation(async (report) => report);
+    openerMocks.openUrl.mockReset();
+    openerMocks.openUrl.mockResolvedValue(undefined);
     delete window.__TAURI__;
     window.localStorage.clear();
     vi.restoreAllMocks();
@@ -119,8 +144,22 @@ afterEach(() => {
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");
-    expect(screen.getByRole("link", { name: "ECE498BH" }))
+    const courseLink = screen.getByRole("link", { name: "ECE498BH" });
+    expect(courseLink)
       .not.toHaveClass("runtime-locked");
+    expect(courseLink)
+      .toHaveAttribute(
+        "href",
+        "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+      );
+    expect(courseLink)
+      .toHaveAttribute("target", "_blank");
+    fireEvent.click(courseLink);
+    await waitFor(() => {
+      expect(openerMocks.openUrl).toHaveBeenCalledWith(
+        "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+      );
+    });
     expect(screen.queryByRole("link", { name: "Experiment" }))
       .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();

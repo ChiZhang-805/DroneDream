@@ -40,6 +40,9 @@ const browserAuthMocks = vi.hoisted(() => ({
   } as { supabaseUrl: string; publishableKey: string } | null,
   adoptSession: vi.fn(async () => undefined),
 }));
+const runtimeSessionContractMocks = vi.hoisted(() => ({
+  verify: vi.fn(async <T,>(report: T) => report),
+}));
 
 vi.mock("../features/auth/AuthContext", async (importOriginal) => {
   const original =
@@ -71,6 +74,16 @@ vi.mock("../features/auth/supabaseClient", async (importOriginal) => {
 vi.mock("../features/auth/browserAuth", () => ({
   adoptBrowserAuthSession: browserAuthMocks.adoptSession,
 }));
+
+vi.mock("../desktop/runtimeSessionContract", async (importOriginal) => {
+  const original = await importOriginal<
+    typeof import("../desktop/runtimeSessionContract")
+  >();
+  return {
+    ...original,
+    verifyRuntimeSessionContract: runtimeSessionContractMocks.verify,
+  };
+});
 
 import type {
   InstallerRuntimeAutoStartResult,
@@ -462,6 +475,8 @@ afterEach(() => {
   };
   browserAuthMocks.adoptSession.mockReset();
   browserAuthMocks.adoptSession.mockResolvedValue(undefined);
+  runtimeSessionContractMocks.verify.mockReset();
+  runtimeSessionContractMocks.verify.mockImplementation(async (report) => report);
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
 });
@@ -559,6 +574,74 @@ describe("DesktopSetup", () => {
     }))
       .toBeEnabled();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
+      .not.toBeInTheDocument();
+  });
+
+  it("keeps an outdated Runtime below the sign-in gate and explains the required update", async () => {
+    runtimeSessionContractMocks.verify.mockImplementationOnce(async (report) => ({
+      ...(report as RuntimeStatusReport),
+      ready: false,
+      components: [
+        ...(report as RuntimeStatusReport).components,
+        {
+          id: "account-session-api",
+          label: "Desktop account-session API",
+          status: "unhealthy",
+          required: true,
+          version: null,
+          detail: "runtime_session_api_missing",
+        },
+      ],
+      diagnostics: ["runtime_session_api_missing"],
+    }));
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+
+    expect(await screen.findByText("DroneDreamRuntime must be updated"))
+      .toBeVisible();
+    expect(screen.getAllByText(/older than the desktop sign-in protocol/i))
+      .toHaveLength(2);
+    expect(screen.queryByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    })).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .not.toHaveAttribute("aria-valuenow", "100");
+  });
+
+  it("does not expose a cancel control while browser sign-in is pending", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          if (command === "begin_browser_auth") return new Promise(() => undefined);
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    }));
+
+    expect(screen.getByRole("button", { name: "Waiting for browser sign-in…" }))
+      .toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Cancel sign-in" }))
       .not.toBeInTheDocument();
   });
 
@@ -764,7 +847,7 @@ describe("DesktopSetup", () => {
     await userEvent.click(await screen.findByRole("button", {
       name: "Sign in and enter tuning workspace",
     }));
-    expect(await screen.findByText(/different account identity/i)).toBeVisible();
+    expect(await screen.findByText(/different account identit/i)).toBeVisible();
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))

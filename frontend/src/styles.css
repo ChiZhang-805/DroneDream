@@ -2033,11 +2033,7 @@ a {
   color: #f5e8ff;
 }
 
-.ece498-run-actions { display:flex; flex-wrap:wrap; gap:12px; margin:16px 0; }
-
 .muted { color: var(--text-muted); }
-
-.ece498-result-reason { max-width: 360px; white-space: normal; }
 
 .history-table-centered th,
 .history-table-centered td {

@@ -253,59 +253,43 @@ async function verifyAvatar(page, testCase, avatarBytes) {
   };
 }
 
-async function verifyEce498(page, testCase) {
-  await page.goto(`${origin}/ece498?docsPreview=1`, { waitUntil: "networkidle" });
-  const stageResults = [];
-  const tabs = page.getByRole("tab");
-  assert.equal(await tabs.count(), 7);
-  for (let index = 0; index < 7; index += 1) {
-    await tabs.nth(index).click();
-    await page.waitForFunction(() => {
-      const bodies = Array.from(document.querySelectorAll(".ece498-stage-body"));
-      return bodies.length === 4
-        && bodies.every((body) => body.dataset.lineContract !== "pending");
-    });
-    const stage = await page.locator(".ece498-stage-detail").evaluate((element) => {
-      const titleLines = Array.from(
-        element.querySelectorAll(".ece498-stage-copy-section > span"),
-      ).map((title) => {
-        const bounds = title.getBoundingClientRect();
-        const lineHeight = Number.parseFloat(getComputedStyle(title).lineHeight);
-        return Math.round(bounds.height / lineHeight);
-      });
-      const bodies = Array.from(
-        element.querySelectorAll(".ece498-stage-body"),
-      ).map((body) => ({
-        lines: Number(body.dataset.renderedLines || 0),
-        contract: body.dataset.lineContract,
-        clientHeight: body.clientHeight,
-        scrollHeight: body.scrollHeight,
-      }));
-      return {
-        title: element.querySelector(".ece498-stage-heading h3")?.textContent,
-        titleLines,
-        bodies,
-        documentWidth: document.documentElement.clientWidth,
-        documentScrollWidth: document.documentElement.scrollWidth,
-      };
-    });
-    assert(stage.titleLines.every((lines) => lines === 1));
-    assert(stage.bodies.every((body) => body.scrollHeight <= body.clientHeight + 1));
-    if (testCase.viewport.width >= 1000) {
-      assert(
-        stage.bodies.every((body) => body.lines === 9 && body.contract === "pass"),
-        `${testCase.id}: ${stage.title} did not render four nine-line bodies: ${
-          JSON.stringify(stage.bodies)
-        }`,
-      );
-    }
-    assert.equal(stage.documentScrollWidth, stage.documentWidth);
-    stageResults.push(stage);
-  }
-  const image = await screenshot(page, testCase.id, "ece498");
+async function verifyEce498ExternalEntry(page, testCase) {
+  const courseUrl =
+    "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
+  await page.goto(`${origin}/dashboard?docsPreview=1`, { waitUntil: "networkidle" });
+  const courseLink = page.getByRole("link", { name: "ECE498BH" });
+  await courseLink.waitFor();
+  assert.equal(await courseLink.getAttribute("href"), courseUrl);
+  assert.equal(await courseLink.getAttribute("target"), "_blank");
+  assert.equal(await courseLink.getAttribute("rel"), "noreferrer");
+  assert.equal(await page.getByRole("tab").count(), 0);
+  assert.equal(await page.locator(".ece498-stage-detail").count(), 0);
+
+  await page.context().route(courseUrl, (route) => route.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: "<!doctype html><title>ECE498BH course fixture</title>",
+  }));
+  const popupPromise = page.waitForEvent("popup");
+  await courseLink.click();
+  const popup = await popupPromise;
+  await popup.waitForLoadState("domcontentloaded");
+  assert.equal(popup.url(), courseUrl);
+  await popup.close();
+  await page.context().unroute(courseUrl);
+
+  const dimensions = await page.evaluate(() => ({
+    documentWidth: document.documentElement.clientWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+  }));
+  assert.equal(dimensions.documentScrollWidth, dimensions.documentWidth);
+  const image = await screenshot(page, testCase.id, "ece498-external-entry");
   return {
-    stages: stageResults,
-    desktopLineContract: testCase.viewport.width >= 1000 ? "4 cards x (1 + 9 lines)" : "responsive unclipped",
+    courseUrl,
+    target: "_blank",
+    internalCoursePageRemoved: true,
+    popupReachedExactUrl: true,
+    ...dimensions,
     image,
   };
 }
@@ -645,7 +629,7 @@ try {
     try {
       entry.settings = await verifySettings(page, testCase);
       entry.avatar = await verifyAvatar(page, testCase, avatarBytes);
-      entry.ece498 = await verifyEce498(page, testCase);
+      entry.ece498 = await verifyEce498ExternalEntry(page, testCase);
       entry.wizard = await verifyTrackAndScenario(page, testCase);
       entry.workspace = await verifyWorkspaceLifecycle(page, testCase);
       entry.pageErrors = pageErrors;

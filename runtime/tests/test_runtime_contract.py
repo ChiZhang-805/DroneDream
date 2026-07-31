@@ -612,6 +612,15 @@ class SystemdContractTests(unittest.TestCase):
         self.assertIn("/var/lib/dronedream/runtime-smoke", smoke)
         self.assertNotIn("/tmp/dronedream-runtime-smoke", smoke)
 
+    def test_runtime_smoke_requires_the_signed_account_session_route(self) -> None:
+        smoke = (RUNTIME / "smoke-image.sh").read_text(encoding="utf-8")
+        check = (RUNTIME / "scripts" / "runtime-check.sh").read_text(encoding="utf-8")
+        self.assertIn("account_session_api", smoke)
+        self.assertIn('path = "/api/v1/session"', check)
+        self.assertIn('"X-DroneDream-Bridge-Version": "DD-BRIDGE-V2"', check)
+        self.assertIn('payload["error"].get("code") != "UNAUTHORIZED"', check)
+        self.assertNotIn("print(secret", check)
+
     def test_journal_limits_are_packaged_and_disk_conservative(self) -> None:
         parser = configparser.ConfigParser()
         config_path = RUNTIME / "config" / "journald-dronedream.conf"

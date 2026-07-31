@@ -87,6 +87,7 @@ import type {
   UserDefaultTrackType,
   UserExperiencePreferences,
 } from "./types/api";
+import { ECE498BH_COURSE_URL } from "./externalLinks";
 
 const NAV_ITEMS: {
   to: string;
@@ -95,6 +96,7 @@ const NAV_ITEMS: {
   end?: boolean;
   desktopTo?: string;
   requiresRuntime?: boolean;
+  externalUrl?: string;
   icon: LucideIcon;
 }[] = [
   {
@@ -111,7 +113,12 @@ const NAV_ITEMS: {
     icon: LayoutDashboard,
   },
   { to: "/history", labelKey: "app.history", icon: History },
-  { to: "/ece498", label: "ECE498BH", icon: GraduationCap },
+  {
+    to: ECE498BH_COURSE_URL,
+    label: "ECE498BH",
+    externalUrl: ECE498BH_COURSE_URL,
+    icon: GraduationCap,
+  },
 ];
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
@@ -1934,6 +1941,16 @@ function AppShellContent() {
     && !auth.account;
   const accountDialogRequired = accountRequired && !launcherMode;
   const accountDialogOpen = accountOpen || accountDialogRequired;
+  const openExternalNavigation = useCallback((
+    event: MouseEvent<HTMLAnchorElement>,
+    url: string,
+  ) => {
+    if (!desktopRuntime) return;
+    event.preventDefault();
+    void import("@tauri-apps/plugin-opener")
+      .then(({ openUrl }) => openUrl(url))
+      .catch(() => undefined);
+  }, [desktopRuntime]);
 
   useEffect(() => {
     // The launcher owns a strict two-stage flow: environment first, browser
@@ -2374,6 +2391,38 @@ function AppShellContent() {
               item.requiresRuntime &&
               !runtimeAccess.canUseRuntime,
             );
+            const itemContent = (
+              <>
+                <span className="app-nav-entry">
+                  <ItemIcon aria-hidden="true" strokeWidth={1.75} />
+                  <span>{item.labelKey ? t(item.labelKey) : item.label}</span>
+                </span>
+                {runtimeLocked ? (
+                  <span className="nav-runtime-badge" aria-hidden="true">
+                    {runtimeIsBusy
+                      ? runtimeAccess.status === "starting"
+                        ? t("runtimeGate.startingShort")
+                        : t("runtimeGate.checkingShort")
+                      : `🔒 ${t("runtimeGate.requiredShort")}`}
+                  </span>
+                ) : null}
+              </>
+            );
+
+            const externalUrl = item.externalUrl;
+            if (externalUrl) {
+              return (
+                <a
+                  key={item.to}
+                  href={externalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => openExternalNavigation(event, externalUrl)}
+                >
+                  {itemContent}
+                </a>
+              );
+            }
 
             return (
               <NavLink
@@ -2388,19 +2437,7 @@ function AppShellContent() {
                   return classes.length > 0 ? classes.join(" ") : undefined;
                 }}
               >
-                <span className="app-nav-entry">
-                  <ItemIcon aria-hidden="true" strokeWidth={1.75} />
-                  <span>{item.labelKey ? t(item.labelKey) : item.label}</span>
-                </span>
-                {runtimeLocked ? (
-                  <span className="nav-runtime-badge" aria-hidden="true">
-                    {runtimeIsBusy
-                      ? runtimeAccess.status === "starting"
-                        ? t("runtimeGate.startingShort")
-                        : t("runtimeGate.checkingShort")
-                      : `🔒 ${t("runtimeGate.requiredShort")}`}
-                  </span>
-                ) : null}
+                {itemContent}
               </NavLink>
             );
           })}
