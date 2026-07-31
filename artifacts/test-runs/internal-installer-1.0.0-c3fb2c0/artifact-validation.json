@@ -1,0 +1,37 @@
+﻿{
+    "schema_version":  "dronedream.internal-test-installer-artifact-validation.v3",
+    "generated_at":  "2026-07-31T07:26:17Z",
+    "source_commit":  "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "artifact":  {
+                     "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+                     "bytes":  10331399,
+                     "sha256":  "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+                     "checksum_declared":  "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+                     "checksum_matches":  true,
+                     "pe_magic":  "0x10b",
+                     "pe_certificate_table_file_offset":  0,
+                     "pe_certificate_table_size":  0,
+                     "has_pe_certificate_table":  false,
+                     "authenticode_status":  "NotSigned",
+                     "authenticode_valid":  false,
+                     "not_signed_is_owner_accepted_internal_test_fact":  true
+                 },
+    "version_contract":  {
+                             "file_name_version":  "1.0.0",
+                             "tauri_config_version":  "1.0.0",
+                             "all_required_surfaces_equal":  true
+                         },
+    "installer_contract":  {
+                               "pinned_tauri_nsis_template":  true,
+                               "webview2_file_health":  true,
+                               "static_gnullvm_runtime":  true,
+                               "english_language_id":  1033,
+                               "simplified_chinese_language_id":  2052,
+                               "default_application_path_guard":  true,
+                               "runtime_planner_extracted_and_executed":  true,
+                               "desktop_shortcut_static_contract":  true,
+                               "shortcut_icon":  "icons/DroneDream.ico"
+                           },
+    "tauri_updater_signature_verification":  "updater-signature-verification.json",
+    "claim_boundary":  "Authenticode is intentionally NotSigned for owner-approved internal testing; the independent Tauri updater signature is required and verified."
+}

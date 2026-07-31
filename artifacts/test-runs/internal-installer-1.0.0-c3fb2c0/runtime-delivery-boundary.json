@@ -1,0 +1,26 @@
+{
+    "schema_version":  "dronedream.internal-installer-runtime-delivery-boundary.v2",
+    "generated_at":  "2026-07-31T07:34:01Z",
+    "desktop_source_commit":  "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "desktop_installer_ready":  true,
+    "desktop_frontend_embedded":  true,
+    "backend_source_embedded_in_nsis":  false,
+    "wsl_runtime_embedded_in_nsis":  false,
+    "runtime_release":  {
+                            "tag":  "runtime-v0.1.0-beta.2",
+                            "source_commit":  "755c511539fe561207ca38ff5079f471a4110896",
+                            "manifest_url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.0-beta.2/runtime-release.json",
+                            "manifest_bytes":  2207,
+                            "manifest_sha256":  "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+                            "public_release_draft":  false,
+                            "public_release_prerelease":  true,
+                            "all_four_parts_size_and_sha_match_public_github_assets":  true,
+                            "smoke_passed":  true,
+                            "archive_bytes":  6141118464,
+                            "archive_sha256":  "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9"
+                        },
+    "fresh_full_stack_runtime_delivery_ready":  true,
+    "latest_software_boundary":  "Installer embeds c3fb2c0 desktop and production frontend. Backend, PX4 and Gazebo run from the separate public 755c511 Runtime; later backend source changes are tested at c3fb2c0 but are not embedded in this installer or the published Runtime.",
+    "upload_performed":  false,
+    "release_modified":  false
+}

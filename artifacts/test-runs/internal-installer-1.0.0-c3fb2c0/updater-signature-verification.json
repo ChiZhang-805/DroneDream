@@ -1,0 +1,16 @@
+﻿{
+  "schema_version": "dronedream.tauri-updater-signature-verification.v1",
+  "source_commit": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+  "artifact": "DroneDream_1.0.0_x64-setup.exe",
+  "artifact_bytes": 10331399,
+  "artifact_sha256": "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+  "signature_file": "DroneDream_1.0.0_x64-setup.exe.sig",
+  "signature_file_sha256": "4d992ca27c3a42aabe411cb4123335ac608afbe62ec839ef7c3466fa14e12129",
+  "algorithm": "ED",
+  "key_id_matches_configured_public_key": true,
+  "payload_signature_valid": true,
+  "trusted_comment_and_global_signature_valid": true,
+  "manifest_signature_matches_file": true,
+  "trusted_comment": "timestamp:1785482611\tfile:DroneDream_1.0.0_x64-setup.exe",
+  "verification_method": "Python cryptography Ed25519 over minisign prehash plus global trusted-comment signature"
+}

@@ -1,0 +1,8 @@
+﻿{
+    "pid":  31232,
+    "started_at_utc":  "2026-07-31T07:00:22.8704241Z",
+    "source_commit":  "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "command":  "python -m pytest tests -q --junitxml=\u003cfull-suite-final.xml\u003e",
+    "openai_api_key_available_to_child":  false,
+    "harness_routing_api_key_available_to_child":  false
+}

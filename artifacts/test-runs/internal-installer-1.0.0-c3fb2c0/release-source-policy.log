@@ -1,0 +1,4 @@
+SOURCE_COMMIT=c3fb2c0ad5f4009659c661d89945433e524d358e
+COMMAND=npm --prefix desktop run verify:release-source
+EXIT_CODE=0
+RESULT=Release-source policy verified: 1318 tracked files, 390 npm packages, 532 external Rust packages.

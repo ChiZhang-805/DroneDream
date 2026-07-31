@@ -1,0 +1,48 @@
+{
+  "schema_version": "dronedream.backend-test-receipt.v2",
+  "generated_at": "2026-07-31T07:55:00Z",
+  "subject_commit": "c3fb2c0ad5f4009659c661d89945433e524d358e",
+  "working_directory": "backend",
+  "environment": {
+    "openai_api_key_available_to_test_child": false,
+    "harness_routing_api_key_available_to_test_child": false
+  },
+  "final_suite": {
+    "command": "python -m pytest tests -q --junitxml=<full-suite-final.xml>",
+    "started_at": "2026-07-31T07:00:22.8704241Z",
+    "duration_seconds": 1176.28,
+    "tests": 1389,
+    "passed": 1389,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "stdout_sha256": "70ff75390464bff956e90edbe4878c4f7f5b04a6af6652c35859064cb91b99c3",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "junit_sha256": "940d69ed88507c27a0de872d5c216e6a59eb0a0598ce939edd8a0e56befa2442"
+  },
+  "static_gates": {
+    "ruff": {
+      "command": "python -m ruff check app tests",
+      "exit_code": 0
+    },
+    "mypy": {
+      "command": "python -m mypy app",
+      "working_directory": "backend",
+      "source_files": 117,
+      "exit_code": 0
+    }
+  },
+  "preserved_non_final_attempts": [
+    {
+      "kind": "outer_command_timeout",
+      "detail": "The first foreground full-suite process was terminated by the 20-minute outer tool limit at approximately 62 percent with no assertion failures observed. It is not the final test result.",
+      "evidence": "exact-backend-gates.log"
+    },
+    {
+      "kind": "wrong_working_directory",
+      "detail": "An earlier repository-root mypy invocation did not load backend configuration and reported missing optional import stubs. The exact backend-cwd invocation passed and is authoritative.",
+      "evidence": "full-gates.log"
+    }
+  ],
+  "result": "pass"
+}

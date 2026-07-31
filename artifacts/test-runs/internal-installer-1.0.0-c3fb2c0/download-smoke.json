@@ -1,0 +1,13 @@
+﻿{
+    "schema_version":  "dronedream.loopback-download-smoke.v2",
+    "generated_at":  "2026-07-31T07:32:24Z",
+    "source_commit":  "c3fb2c0ad5f4009659c661d89945433e524d358e",
+    "uri":  "http://127.0.0.1:61386/DroneDream_1.0.0_x64-setup.exe",
+    "http_status":  200,
+    "source_bytes":  10331399,
+    "downloaded_bytes":  10331399,
+    "source_sha256":  "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+    "downloaded_sha256":  "a642b0fc7e0be94e2a50e82c8869f5609325248d640da3e6eae794bede5f2672",
+    "byte_parity":  true,
+    "upload_performed":  false
+}

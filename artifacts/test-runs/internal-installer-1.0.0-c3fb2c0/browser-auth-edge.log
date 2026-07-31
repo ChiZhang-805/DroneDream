@@ -1,0 +1,10 @@
+COMMAND=npm --prefix frontend run test:desktop-browser-auth -- --output browser-auth
+START_UTC=2026-07-31T06:35:14.8955542Z
+
+> drone-dream-frontend@1.0.0 test:desktop-browser-auth
+> node scripts/verify-desktop-browser-auth.mjs --output artifacts\test-runs\internal-installer-1.0.0-c3fb2c0\browser-auth
+
+Desktop browser auth verified: 3 layouts, 3 exact callbacks, 1 cancellation, no token URL leakage.
+
+EXIT_CODE=0
+END_UTC=2026-07-31T06:35:32.3591416Z

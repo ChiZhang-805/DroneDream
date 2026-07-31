@@ -1,0 +1,11 @@
+{
+    "version":  "1.0.0",
+    "notes":  "DroneDream 1.0.0 for Windows x64.",
+    "pub_date":  "2026-07-31T07:23:48Z",
+    "platforms":  {
+                      "windows-x86_64":  {
+                                             "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUMUw4NXhyOXcvdXAxeWFWTWZFSmZGWWJ6SVFWNExKeDBBSU13QzIySzcvblJPSmI2Tnp6NFI3VW11ZkdZWjRuNUdTTXZSRzR1M3A5aERoaFlsWmdDcGlkVytSQTJkdXdNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1NDgyNjExCWZpbGU6RHJvbmVEcmVhbV8xLjAuMF94NjQtc2V0dXAuZXhlCnAxOUkxUFRGMmh2UXpZeDE1NXh2SEE1ck9KME1OVmF3UUdHdnh3RTc2T2pEQ1FlQy96Qy9uNzVoWXBwRTc0dlF4VWRPaE50ZUpiZ0hqbFJ1Zkt3OUJBPT0K",
+                                             "url":  "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-v1.0.0/DroneDream_1.0.0_x64-setup.exe"
+                                         }
+                  }
+}
