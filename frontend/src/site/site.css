@@ -2368,30 +2368,6 @@ html[lang="zh-CN"] .site-hero h1 {
   margin-top: 0.7rem;
 }
 
-.site-auth-unavailable {
-  display: grid;
-  justify-items: center;
-  gap: 0.8rem;
-  padding: 1rem 0.5rem;
-  color: #5f6275;
-  line-height: 1.55;
-  text-align: center;
-}
-
-.site-auth-unavailable > svg {
-  width: 50px;
-  height: 50px;
-  padding: 0.7rem;
-  border: 1px solid rgba(123, 76, 225, 0.2);
-  border-radius: 50%;
-  fill: none;
-  stroke: #7b4ce1;
-}
-
-.site-auth-unavailable p {
-  margin: 0;
-}
-
 @media (max-width: 620px) {
   .site-auth-page {
     align-items: start;
@@ -4609,14 +4585,4 @@ html[lang="zh-CN"] .community-cover-art > strong {
     min-height: 0;
     height: auto;
   }
-}
-.site-security-notice {
-  margin: 0 auto 1rem;
-  max-width: min(100% - 2rem, 112rem);
-  border: 1px solid rgba(126, 87, 194, 0.28);
-  border-radius: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: rgba(126, 87, 194, 0.08);
-  color: #3d3158;
-  font-size: 0.9rem;
 }

@@ -113,7 +113,7 @@ describe("PricingPage payment channels", () => {
     ]);
   });
 
-  it("keeps the HTTP mirror read-only without probing or creating billing", () => {
+  it("quietly keeps the HTTP mirror read-only without probing or creating billing", () => {
     render(
       <PricingPage
         locale="en"
@@ -123,10 +123,12 @@ describe("PricingPage payment channels", () => {
       />,
     );
 
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "This HTTP mirror is read-only.",
-    );
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(document.querySelector(".site-security-notice")).toBeNull();
     expect(screen.getByRole("button", { name: "Choose Plus" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Choose Plus" })).not.toHaveAttribute(
+      "title",
+    );
     expect(billingMock.getBillingAvailability).not.toHaveBeenCalled();
     expect(billingMock.createBillingCheckout).not.toHaveBeenCalled();
   });

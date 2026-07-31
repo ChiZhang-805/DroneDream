@@ -115,14 +115,16 @@ describe("DroneDream public website", () => {
     );
 
     expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Console" })).not.toHaveAttribute("title");
     expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Login" })).not.toHaveAttribute("title");
     expect(screen.getByRole("link", { name: "Download Windows preview" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
     expect(screen.getByRole("link", { name: "Download" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
   });
 
-  it("renders a read-only account route on the HTTP mirror without credential fields", () => {
+  it("quietly returns a blocked HTTP-mirror account route to the public site", async () => {
     window.history.replaceState(
       null,
       "",
@@ -135,13 +137,12 @@ describe("DroneDream public website", () => {
       </I18nProvider>,
     );
 
-    expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "This HTTP mirror is read-only; secure account and console actions are disabled.",
-    );
-    expect(screen.queryByLabelText("Email address")).toBeNull();
-    expect(screen.queryByLabelText("Password")).toBeNull();
-    expect(document.querySelector(".site-auth-form")).toBeNull();
+    await waitFor(() => expect(window.location.pathname).toBe("/"));
+    expect(document.querySelector('[data-auth-source="website"]')).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(document.body).not.toHaveTextContent("HTTP mirror");
+    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
     expect(screen.getByRole("link", { name: "Download" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
   });

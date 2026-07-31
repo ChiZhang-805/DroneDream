@@ -54,8 +54,6 @@ const content = {
     closeMenu: "Close navigation",
     downloadShort: "Download",
     console: "Console",
-    insecureMirror:
-      "This HTTP mirror is read-only; secure account and console actions are disabled.",
     signIn: "Login",
     register: "Register",
     account: "Account",
@@ -250,7 +248,6 @@ const content = {
     closeMenu: "关闭导航",
     downloadShort: "下载",
     console: "控制台",
-    insecureMirror: "当前 HTTP 镜像仅供只读浏览与下载；账户和控制台操作已禁用。",
     signIn: "登录",
     register: "注册",
     account: "账号",
@@ -989,6 +986,14 @@ export function SiteApp({
     openAccount("sign-in", "/console/");
   };
 
+  useEffect(() => {
+    if (sensitiveCloudActionsEnabled || sitePage !== "account") return;
+    window.history.replaceState(null, "", "/");
+    setSiteLocation("/");
+    setMenuOpen(false);
+    window.scrollTo({ top: 0 });
+  }, [sensitiveCloudActionsEnabled, sitePage]);
+
   const submitAuth = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (authPending) return;
@@ -1098,12 +1103,7 @@ export function SiteApp({
           ) : null}
         </div>
         <div className="site-auth-page-panel">
-          {!sensitiveCloudActionsEnabled ? (
-            <div className="site-auth-unavailable" role="status">
-              <AccountIcon />
-              <p>{copy.insecureMirror}</p>
-            </div>
-          ) : auth.account ? (
+          {auth.account ? (
             <div className="site-auth-account">
               <AccountIcon />
               <strong>{auth.account.displayName}</strong>
@@ -1299,7 +1299,6 @@ export function SiteApp({
           <button
             type="button"
             disabled={!sensitiveCloudActionsEnabled}
-            title={!sensitiveCloudActionsEnabled ? copy.insecureMirror : undefined}
             onClick={openConsole}
           >
             {copy.console}
@@ -1310,7 +1309,6 @@ export function SiteApp({
             type="button"
             className="site-account-button"
             disabled={!sensitiveCloudActionsEnabled}
-            title={!sensitiveCloudActionsEnabled ? copy.insecureMirror : undefined}
             onClick={() => openAccount("sign-in")}
           >
             <AccountIcon />
@@ -1345,7 +1343,7 @@ export function SiteApp({
       </header>
 
       <main id="main-content">
-        {sitePage === "account" ? (
+        {sitePage === "account" && sensitiveCloudActionsEnabled ? (
           authPage
         ) : sitePage === "manual" ? (
           <ManualPage locale={locale} />
