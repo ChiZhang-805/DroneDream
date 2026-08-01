@@ -144,6 +144,12 @@ describe("administration console", () => {
       .toBeVisible();
     const removeButtons = screen.getAllByRole("button", { name: "Remove" });
     fireEvent.click(removeButtons[0]);
+    const reason = screen.getByLabelText("Moderation reason");
+    await waitFor(() => expect(reason).toHaveFocus());
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(removeButtons[0]).toHaveFocus());
+    fireEvent.click(removeButtons[0]);
     const confirm = screen.getByRole("button", { name: "Confirm removal" });
     expect(confirm).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Moderation reason"), {

@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -50,6 +51,7 @@ const COPY = {
     totalUsers: "Total users",
     newUsers: "New users",
     activeUsers: "Active users",
+    trendAria: "Daily active, new, and activated users trend",
     activation: "7-day activation",
     dauWauMau: "DAU / WAU / MAU",
     stickiness: "DAU / MAU",
@@ -179,6 +181,7 @@ const COPY = {
     totalUsers: "累计用户",
     newUsers: "新增用户",
     activeUsers: "活跃用户",
+    trendAria: "每日活跃、新增与完成激活用户趋势",
     activation: "7 日激活率",
     dauWauMau: "日活 / 周活 / 月活",
     stickiness: "日活 / 月活",
@@ -308,7 +311,13 @@ function translatedLabel(
   return dictionary[key] ?? fallback;
 }
 
-function TrendChart({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
+function TrendChart({
+  snapshot,
+  label,
+}: {
+  snapshot: AdminDashboardSnapshot;
+  label: string;
+}) {
   const maximum = Math.max(1, ...snapshot.daily.flatMap((day) => [
     day.active_users,
     day.new_users,
@@ -321,7 +330,7 @@ function TrendChart({ snapshot }: { snapshot: AdminDashboardSnapshot }) {
       return `${x},${y}`;
     }).join(" ");
   return (
-    <div className="admin-trend-chart" role="img" aria-label="Daily users trend">
+    <div className="admin-trend-chart" role="img" aria-label={label}>
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         <polyline className="is-active" points={points("active_users")} />
         <polyline className="is-new" points={points("new_users")} />
@@ -360,9 +369,14 @@ export function AdminPage() {
   const [moderatingTopic, setModeratingTopic] = useState<AdminTopicRow | null>(null);
   const [moderationReason, setModerationReason] = useState("");
   const [moderating, setModerating] = useState(false);
+  const loadSequenceRef = useRef(0);
+  const moderationDialogRef = useRef<HTMLElement | null>(null);
+  const moderationReasonRef = useRef<HTMLTextAreaElement | null>(null);
+  const moderationTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const loadAll = useCallback(async () => {
     if (access.status !== "allowed") return;
+    const sequence = ++loadSequenceRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -373,6 +387,7 @@ export function AdminPage() {
         listAdminTopics(topicPage),
         listAdminAudit(1),
       ]);
+      if (sequence !== loadSequenceRef.current) return;
       setDashboard(nextDashboard);
       setModels(nextModels);
       setUsers(nextUsers.items);
@@ -381,15 +396,57 @@ export function AdminPage() {
       setTopicsTotal(nextTopics.total);
       setAudit(nextAudit.items);
     } catch (caught) {
+      if (sequence !== loadSequenceRef.current) return;
       setError(safeError(caught, copy.unavailableTitle));
     } finally {
-      setLoading(false);
+      if (sequence === loadSequenceRef.current) setLoading(false);
     }
   }, [access.status, copy.unavailableTitle, range, submittedUserSearch, topicPage, userPage]);
 
   useEffect(() => {
     void loadAll();
+    return () => {
+      loadSequenceRef.current += 1;
+    };
   }, [loadAll]);
+
+  const closeModeration = useCallback((restoreFocus = true) => {
+    setModeratingTopic(null);
+    setModerationReason("");
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => moderationTriggerRef.current?.focus());
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!moderatingTopic) return;
+    window.requestAnimationFrame(() => moderationReasonRef.current?.focus());
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !moderating) {
+        event.preventDefault();
+        closeModeration();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = moderationDialogRef.current;
+      if (!dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => !element.hidden);
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable.at(-1) ?? first;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closeModeration, moderating, moderatingTopic]);
 
   const number = useMemo(
     () => new Intl.NumberFormat(locale === "zh-CN" ? "zh-CN" : "en-US"),
@@ -496,8 +553,7 @@ export function AdminPage() {
       setTopics((current) => current.map((topic) =>
         topic.id === moderatingTopic.id ? { ...topic, status: "removed" } : topic
       ));
-      setModeratingTopic(null);
-      setModerationReason("");
+      closeModeration(false);
       const refreshedAudit = await listAdminAudit(1);
       setAudit(refreshedAudit.items);
     } catch (caught) {
@@ -563,7 +619,7 @@ export function AdminPage() {
           <div className="admin-overview-grid">
             <section className="admin-panel admin-trend-panel">
               <header><h2>{copy.dailyTrend}</h2><div className="admin-legend"><span className="is-active">{copy.active}</span><span className="is-new">{copy.new}</span><span className="is-activated">{copy.activated}</span></div></header>
-              <TrendChart snapshot={dashboard} />
+              <TrendChart snapshot={dashboard} label={copy.trendAria} />
             </section>
             <section className="admin-panel">
               <h2>{copy.funnel}</h2>
@@ -655,7 +711,7 @@ export function AdminPage() {
           <section className="admin-panel">
             <h2>{copy.topics}</h2>
             <div className="admin-table-scroll"><table><thead><tr><th>{copy.topic}</th><th>{copy.author}</th><th>{copy.comments}</th><th>{copy.reports}</th><th>{copy.status}</th><th /></tr></thead><tbody>
-              {topics.map((topic) => <tr key={topic.id}><td><strong>{topic.title}</strong><small>{date.format(new Date(topic.created_at))}</small></td><td>{topic.author_email}</td><td>{topic.comment_count}</td><td>{topic.report_count}</td><td>{topic.status === "removed" ? copy.removed : copy.active}</td><td><button type="button" className="btn btn-danger" disabled={topic.status === "removed"} onClick={() => setModeratingTopic(topic)}>{copy.remove}</button></td></tr>)}
+              {topics.map((topic) => <tr key={topic.id}><td><strong>{topic.title}</strong><small>{date.format(new Date(topic.created_at))}</small></td><td>{topic.author_email}</td><td>{topic.comment_count}</td><td>{topic.report_count}</td><td>{topic.status === "removed" ? copy.removed : copy.active}</td><td><button type="button" className="btn btn-danger" disabled={topic.status === "removed"} onClick={(event) => { moderationTriggerRef.current = event.currentTarget; setModeratingTopic(topic); }}>{copy.remove}</button></td></tr>)}
             </tbody></table></div>
             <div className="admin-pager"><button type="button" className="btn" disabled={loading || topicPage <= 1} onClick={() => setTopicPage((current) => Math.max(1, current - 1))}>{copy.previous}</button><span>{copy.page} {topicPage} {copy.of} {Math.max(1, Math.ceil(topicsTotal / 25))}{locale === "zh-CN" ? " 页" : ""}</span><button type="button" className="btn" disabled={loading || topicPage >= Math.max(1, Math.ceil(topicsTotal / 25))} onClick={() => setTopicPage((current) => current + 1)}>{copy.next}</button></div>
           </section>
@@ -671,12 +727,12 @@ export function AdminPage() {
 
       {moderatingTopic ? (
         <div className="admin-dialog-backdrop" role="presentation">
-          <section role="dialog" aria-modal="true" aria-labelledby="admin-remove-title" className="admin-dialog">
+          <section ref={moderationDialogRef} role="dialog" aria-modal="true" aria-labelledby="admin-remove-title" className="admin-dialog">
             <h2 id="admin-remove-title">{copy.removeTitle}</h2>
             <strong>{moderatingTopic.title}</strong>
             <p>{copy.removeWarning}</p>
-            <label><span>{copy.reason}</span><textarea value={moderationReason} minLength={8} maxLength={500} onChange={(event) => setModerationReason(event.target.value)} placeholder={copy.reasonPlaceholder} /></label>
-            <div><button type="button" className="btn" disabled={moderating} onClick={() => { setModeratingTopic(null); setModerationReason(""); }}>{copy.cancel}</button><button type="button" className="btn btn-danger" disabled={moderating || moderationReason.trim().length < 8} onClick={() => void confirmModeration()}>{copy.confirmRemove}</button></div>
+            <label><span>{copy.reason}</span><textarea ref={moderationReasonRef} value={moderationReason} minLength={8} maxLength={500} onChange={(event) => setModerationReason(event.target.value)} placeholder={copy.reasonPlaceholder} /></label>
+            <div><button type="button" className="btn" disabled={moderating} onClick={() => closeModeration()}>{copy.cancel}</button><button type="button" className="btn btn-danger" disabled={moderating || moderationReason.trim().length < 8} onClick={() => void confirmModeration()}>{copy.confirmRemove}</button></div>
           </section>
         </div>
       ) : null}
