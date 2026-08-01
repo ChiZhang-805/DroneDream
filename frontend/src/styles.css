@@ -1017,16 +1017,21 @@ code {
   .app-nav {
     display: grid;
     grid-column: 1 / -1;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0.35rem;
     width: 100%;
     min-width: 0;
   }
 
   .app-nav a {
+    grid-column: span 2;
     min-width: 0;
     justify-content: center;
     padding: 0.45rem 0.4rem;
+  }
+
+  .app-nav > a:nth-last-of-type(2):nth-of-type(3n + 1) {
+    grid-column: 2 / span 2;
   }
 
   .app-nav-entry {
@@ -1074,8 +1079,17 @@ code {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .app-nav a,
+  .app-nav > a:nth-last-of-type(2):nth-of-type(3n + 1) {
+    grid-column: auto;
+  }
+
   .app-nav a {
     font-size: 0.83rem;
+  }
+
+  .app-nav > a:last-of-type:nth-of-type(odd) {
+    grid-column: 1 / -1;
   }
 
   .app-header {

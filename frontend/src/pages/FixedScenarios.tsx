@@ -21,7 +21,7 @@ interface FixedScenarioDefinition {
   goalKey: TranslationKey;
 }
 
-export const FIXED_SCENARIO_DEFINITIONS: readonly FixedScenarioDefinition[] = Object.freeze([
+const FIXED_SCENARIO_DEFINITIONS: readonly FixedScenarioDefinition[] = Object.freeze([
   {
     id: "hover-basics",
     difficulty: "simple",
