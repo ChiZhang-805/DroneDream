@@ -6016,6 +6016,22 @@ a {
   min-width: 0;
 }
 
+@media (max-width: 720px) {
+  .settings-managed-model-row label {
+    grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.28fr);
+  }
+
+  .settings-model-usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-model-usage-grid strong {
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+}
+
 .settings-model-refresh {
   justify-self: end;
   white-space: nowrap;
@@ -10382,6 +10398,11 @@ a {
   gap: 0.55rem;
 }
 
+.admin-hero-actions > label {
+  display: flex;
+  min-width: 0;
+}
+
 .admin-hero-actions select,
 .admin-users-panel input,
 .admin-dialog textarea {
@@ -10398,6 +10419,10 @@ a {
   padding: 0.52rem 0.72rem;
 }
 
+.admin-hero-actions select {
+  width: 100%;
+}
+
 .admin-tabs {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -10410,12 +10435,15 @@ a {
 
 .admin-tabs button {
   min-height: 42px;
+  padding: 0.45rem 0.6rem;
   border: 0;
   border-radius: 9px;
   background: transparent;
   color: var(--text-muted);
   font: inherit;
   font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
   cursor: pointer;
 }
 
@@ -10599,8 +10627,10 @@ a {
 }
 
 .admin-table-scroll {
+  min-width: 0;
   max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
 }
 
 .admin-panel table {
@@ -10775,6 +10805,12 @@ a {
   font-size: 0.7rem;
 }
 
+.admin-model-title strong {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .admin-model-list label {
   display: flex;
   align-items: center;
@@ -10785,6 +10821,11 @@ a {
   border-radius: 9px;
   background: color-mix(in srgb, var(--bg-elev-2) 72%, transparent);
   font-size: 0.78rem;
+}
+
+.admin-model-list label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .admin-model-list input[type="checkbox"] {
@@ -10893,6 +10934,7 @@ a {
 
 @media (max-width: 760px) {
   .admin-page {
+    gap: 0.85rem;
     padding: 0.85rem 0.75rem 1.5rem;
   }
 
@@ -10907,6 +10949,10 @@ a {
   .admin-hero-actions select,
   .admin-hero-actions .btn {
     flex: 1;
+  }
+
+  .admin-hero-actions {
+    width: 100%;
   }
 
   .admin-tabs {
@@ -10939,6 +10985,20 @@ a {
   .admin-users-panel header form {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .admin-hero-actions > label,
+  .admin-hero-actions select,
+  .admin-hero-actions .btn,
+  .admin-users-panel header form,
+  .admin-users-panel header form label,
+  .admin-users-panel header form input,
+  .admin-users-panel header form .btn {
+    width: 100%;
+  }
+
+  .admin-panel {
+    padding: 0.9rem;
   }
 
   .admin-dialog > div {

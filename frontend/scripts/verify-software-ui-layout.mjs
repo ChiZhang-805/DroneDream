@@ -146,6 +146,15 @@ async function openAccountCropper(page, avatarBytes) {
 
 async function verifySettings(page, testCase) {
   await page.goto(`${origin}/assistant?docsPreview=1`, { waitUntil: "networkidle" });
+  const assistantModel = page.locator(".assistant-model-button");
+  await assistantModel.waitFor();
+  assert.equal(await assistantModel.locator("option").count(), 3);
+  assert.equal(
+    await assistantModel.getAttribute("aria-label"),
+    testCase.locale === "en" ? "Model" : "模型",
+  );
+  await assistantModel.scrollIntoViewIfNeeded();
+  const assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
   await page.locator(".launcher-settings-button").click();
   const dialog = page.locator(".launcher-settings-dialog");
   await dialog.waitFor();
@@ -179,6 +188,12 @@ async function verifySettings(page, testCase) {
       },
       documentWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
+      managedModelOptions: element.querySelectorAll(
+        ".settings-managed-model-row select option",
+      ).length,
+      usageValuesFit: Array.from(
+        element.querySelectorAll(".settings-model-usage-grid strong"),
+      ).every((value) => value.scrollWidth <= value.clientWidth + 1),
     };
   });
   assert(metrics.manage && metrics.refresh && metrics.period && metrics.usage);
@@ -195,6 +210,8 @@ async function verifySettings(page, testCase) {
     metrics.documentWidth,
     `${testCase.id}: Settings caused horizontal document overflow`,
   );
+  assert.equal(metrics.managedModelOptions, 3);
+  assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
   const manage = usage.locator(".settings-model-plan-row .btn");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
@@ -202,7 +219,12 @@ async function verifySettings(page, testCase) {
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
   await dialog.locator(".launcher-settings-close").click();
-  return { ...metrics, keyboardFocusOrder: "manage-subscription -> refresh-usage", image };
+  return {
+    ...metrics,
+    keyboardFocusOrder: "manage-subscription -> refresh-usage",
+    assistantModelImage,
+    image,
+  };
 }
 
 async function verifyAvatar(page, testCase, avatarBytes) {

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -38,6 +39,13 @@ const cases = [
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 
+function git(...gitArgs) {
+  return execFileSync("git", gitArgs, {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }).trim();
+}
+
 async function sha256File(filePath) {
   return createHash("sha256").update(await readFile(filePath)).digest("hex");
 }
@@ -55,6 +63,7 @@ async function geometry(page) {
   return page.evaluate(() => {
     const root = document.querySelector(".admin-page");
     const tabs = Array.from(document.querySelectorAll(".admin-tabs button"));
+    const panels = Array.from(document.querySelectorAll(".admin-panel"));
     const bounds = (element) => {
       const rect = element.getBoundingClientRect();
       return {
@@ -74,6 +83,10 @@ async function geometry(page) {
         ...bounds(tab),
         label: tab.textContent?.trim() ?? "",
         labelFits: tab.scrollWidth <= tab.clientWidth + 1,
+      })),
+      panels: panels.map((panel) => ({
+        ...bounds(panel),
+        contentFits: panel.scrollWidth <= panel.clientWidth + 1,
       })),
       documentWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
@@ -123,16 +136,25 @@ try {
       assert.equal(overviewGeometry.documentScrollWidth, overviewGeometry.documentWidth);
       assert.equal(overviewGeometry.tabs.length, 4);
       assert(overviewGeometry.tabs.every((tab) => tab.labelFits));
+      assert(overviewGeometry.root.left >= 0);
+      assert(overviewGeometry.root.right <= overviewGeometry.documentWidth + 1);
       entry.overview = {
         ...overviewGeometry,
         image: await screenshot(page, testCase, "overview"),
       };
+      await page.locator(".admin-overview-grid").scrollIntoViewIfNeeded();
+      entry.overview.detailImage = await screenshot(page, testCase, "overview-detail");
 
       await page.getByRole("button", { name: testCase.locale === "en"
         ? "Model availability"
         : "模型开放状态" }).click();
       assert.equal(await page.locator(".admin-model-list > article").count(), 3);
       assert.equal(await page.locator('.admin-model-list input[type="checkbox"]').count(), 9);
+      const modelCardsFit = await page.locator(".admin-model-list > article").evaluateAll(
+        (cards) => cards.every((card) => card.scrollWidth <= card.clientWidth + 1),
+      );
+      assert(modelCardsFit);
+      await page.locator(".admin-model-list").scrollIntoViewIfNeeded();
       entry.models = {
         ...(await geometry(page)),
         image: await screenshot(page, testCase, "models"),
@@ -145,18 +167,40 @@ try {
       const userGeometry = await geometry(page);
       assert.equal(userGeometry.passwordInputs, 0);
       assert.equal(userGeometry.documentScrollWidth, userGeometry.documentWidth);
+      const userTableScroll = page.locator(".admin-users-panel .admin-table-scroll");
+      await userTableScroll.scrollIntoViewIfNeeded();
       entry.users = {
         ...userGeometry,
         image: await screenshot(page, testCase, "users"),
       };
+      entry.users.horizontalScroll = await userTableScroll.evaluate((element) => {
+        element.scrollLeft = element.scrollWidth;
+        return {
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          scrollLeft: element.scrollLeft,
+        };
+      });
+      if (entry.users.horizontalScroll.scrollWidth > entry.users.horizontalScroll.clientWidth + 1) {
+        assert(entry.users.horizontalScroll.scrollLeft > 0);
+      }
+      entry.users.usageImage = await screenshot(page, testCase, "users-usage");
 
       await page.getByRole("button", { name: testCase.locale === "en"
         ? "Community & audit"
         : "社区与审计" }).click();
       await page.locator(".admin-community-grid section").first()
         .locator("tbody tr").first().waitFor();
+      const communityGeometry = await geometry(page);
+      assert.equal(communityGeometry.documentScrollWidth, communityGeometry.documentWidth);
+      entry.community = {
+        ...communityGeometry,
+        image: await screenshot(page, testCase, "community"),
+      };
       const removeButton = page.locator(".admin-community-grid section").first()
         .locator(".btn-danger").first();
+      await removeButton.scrollIntoViewIfNeeded();
+      entry.community.actionImage = await screenshot(page, testCase, "community-actions");
       await removeButton.focus();
       assert(await removeButton.evaluate((element) => element === document.activeElement));
       await page.keyboard.press("Enter");
@@ -170,10 +214,10 @@ try {
           : "已确认违反社区管理规则",
       );
       assert(await confirm.isEnabled());
-      entry.community = {
+      entry.moderationDialog = {
         ...(await geometry(page)),
         moderationReasonRequired: true,
-        image: await screenshot(page, testCase, "community"),
+        image: await screenshot(page, testCase, "moderation-dialog"),
       };
       assert.deepEqual(pageErrors, []);
       entry.pageErrors = pageErrors;
@@ -194,6 +238,9 @@ try {
 
 const receipt = {
   schema_version: 1,
+  subject_commit: git("rev-parse", "HEAD"),
+  subject_dirty: Boolean(git("status", "--short")),
+  branch: git("branch", "--show-current"),
   browser: "Microsoft Edge via Playwright",
   api_mode: "development-only synthetic preview; no API key, backend write, or real user data",
   generated_at: new Date().toISOString(),
