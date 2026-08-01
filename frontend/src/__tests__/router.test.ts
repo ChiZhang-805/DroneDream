@@ -121,7 +121,7 @@ describe("environment-aware routing", () => {
       .toBeUndefined();
     expect(children.find((route) => route.path === "batches/*")?.loader)
       .toEqual(expect.any(Function));
-    for (const path of ["dashboard", "history"]) {
+    for (const path of ["dashboard", "history", "scenarios"]) {
       expect(children.find((route) => route.path === path)?.loader, path)
         .toBeUndefined();
     }
@@ -132,6 +132,7 @@ describe("environment-aware routing", () => {
       "jobs/:jobId",
       "trials/:trialId",
       "history",
+      "scenarios",
       "compare",
       "desktop/setup",
     ]) {

@@ -14,8 +14,9 @@ describe("starter experience templates", () => {
       "hover-basics@1",
       "first-circle@1",
       "light-wind-circle@1",
+      "wind-sensor-circle@1",
     ]);
-    expect(new Set(STARTER_EXPERIENCE_TEMPLATES.map((template) => template.key)).size).toBe(3);
+    expect(new Set(STARTER_EXPERIENCE_TEMPLATES.map((template) => template.key)).size).toBe(4);
     expect(Object.isFrozen(STARTER_EXPERIENCE_TEMPLATES)).toBe(true);
     expect(STARTER_EXPERIENCE_TEMPLATES.every((template) => Object.isFrozen(template.patch))).toBe(
       true,
@@ -54,11 +55,29 @@ describe("starter experience templates", () => {
     expect(result.wind_north).toBe("2");
     expect(result.wind_search_enabled).toBe(true);
     expect(result.scenario_preset).toBe("wind");
-    expect(result.simulator_backend).toBe("mock");
+    expect(result.simulator_backend).toBe("real_cli");
     expect(result.gust_enabled).toBe(false);
     expect(result.advanced_enabled).toBe(false);
     expect(result.obstacles_json).toBe("[]");
     expect(result.search_seeds).toBe("101, 202, 303");
     expect(result.optimizer_strategy).toBe("optimizer_portfolio");
+  });
+
+  it("defines the combined medium scenario with deterministic wind, noise, and holdout", () => {
+    const result = applyStarterExperienceTemplate(
+      EXPERIMENT_FORM_DEFAULTS,
+      STARTER_EXPERIENCE_TEMPLATES[3],
+    );
+
+    expect(result.track_type).toBe("circle");
+    expect(result.wind_east).toBe("3");
+    expect(result.sensor_noise_level).toBe("medium");
+    expect(result.wind_search_enabled).toBe(true);
+    expect(result.noise_search_enabled).toBe(true);
+    expect(result.combined_holdout_enabled).toBe(true);
+    expect(result.scenario_preset).toBe("stress");
+    expect(result.simulator_backend).toBe("real_cli");
+    expect(result.gust_enabled).toBe(false);
+    expect(result.obstacles_json).toBe("[]");
   });
 });

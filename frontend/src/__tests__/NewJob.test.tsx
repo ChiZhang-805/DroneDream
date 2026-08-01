@@ -123,6 +123,43 @@ afterEach(() => {
 });
 
 describe("NewJob experiment wizard", () => {
+  it("prefills an exact fixed scenario only after asking for a fresh experiment name", () => {
+    const createSpy = vi.spyOn(apiClient, "createJob");
+    renderPage({
+      confirmName: false,
+      initialEntry: "/jobs/new?scenario=wind-sensor-circle%401",
+    });
+
+    const nameDialog = screen.getByRole("dialog", { name: /New Tuning Experiment/i });
+    expect(within(nameDialog).getByRole("textbox")).toHaveValue("");
+    expect(screen.queryByRole("navigation", { name: /Experiment setup progress/i })).toBeNull();
+
+    fireEvent.change(within(nameDialog).getByRole("textbox"), {
+      target: { value: "combined-common-conditions" },
+    });
+    fireEvent.click(within(nameDialog).getByRole("button", { name: /^Continue$/i }));
+
+    expect(screen.getByLabelText(/Track type/i)).toHaveValue("circle");
+    expect(screen.getByText(/wind-sensor-circle@1/i)).toBeVisible();
+    openStep(/Scenarios/i);
+    expect(screen.getByLabelText(/East wind/i)).toHaveValue(3);
+    expect(screen.getByLabelText(/Sensor noise level/i)).toHaveValue("medium");
+    expect(screen.getByLabelText(/Wind search/i)).toHaveValue("true");
+    expect(screen.getByLabelText(/Sensor-noise search/i)).toHaveValue("true");
+    expect(screen.getByLabelText(/Combined-stress holdout/i)).toHaveValue("true");
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("ignores an unknown scenario key and retains safe defaults", () => {
+    renderPage({
+      initialEntry: "/jobs/new?scenario=unknown%40999",
+    });
+
+    expect(screen.getByLabelText(/Track type/i)).toHaveValue("circle");
+    expect(screen.getByLabelText(/Objective profile/i)).toHaveValue("robust");
+    expect(screen.queryByText(/unknown@999/i)).toBeNull();
+  });
+
   it("collects the experiment name before entering the wizard and cancels back", () => {
     const first = renderPage({ confirmName: false });
 

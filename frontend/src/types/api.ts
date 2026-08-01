@@ -48,7 +48,8 @@ export const TRACK_TYPES: readonly TrackType[] = [
 export type StarterExperienceTemplateKey =
   | "hover-basics@1"
   | "first-circle@1"
-  | "light-wind-circle@1";
+  | "light-wind-circle@1"
+  | "wind-sensor-circle@1";
 export type UserDefaultTrackType =
   | "hover"
   | "circle"

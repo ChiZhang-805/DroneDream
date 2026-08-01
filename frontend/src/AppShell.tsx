@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   LogIn,
   MailCheck,
+  MapPinned,
   MoreHorizontal,
   Save,
   Settings,
@@ -114,6 +115,11 @@ const NAV_ITEMS: {
     icon: LayoutDashboard,
   },
   { to: "/history", labelKey: "app.history", icon: History },
+  {
+    to: "/scenarios",
+    labelKey: "app.fixedScenarios",
+    icon: MapPinned,
+  },
   {
     to: ECE498BH_COURSE_URL,
     label: "ECE498BH",
@@ -1911,6 +1917,7 @@ function AppShellContent() {
   const accountCopy = ACCOUNT_COPY[locale];
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
   const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
@@ -1988,10 +1995,11 @@ function AppShellContent() {
   ) => {
     if (!desktopRuntime) return;
     event.preventDefault();
+    setExternalNavigationError(null);
     void import("@tauri-apps/plugin-opener")
       .then(({ openUrl }) => openUrl(url))
-      .catch(() => undefined);
-  }, [desktopRuntime]);
+      .catch(() => setExternalNavigationError(t("app.externalOpenFailed")));
+  }, [desktopRuntime, t]);
 
   useEffect(() => {
     // The launcher owns a strict two-stage flow: environment first, browser
@@ -2572,6 +2580,18 @@ function AppShellContent() {
         ) : null}
         {accountDialog}
         {exitGuard}
+        {externalNavigationError ? (
+          <div className="app-external-navigation-error" role="alert">
+            <span>{externalNavigationError}</span>
+            <button
+              type="button"
+              aria-label={t("app.dismiss")}
+              onClick={() => setExternalNavigationError(null)}
+            >
+              <X aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
         <main id="main-content" className={`app-main${experimentWizardMode ? " app-main-wizard" : ""}`} tabIndex={-1}>
           <Outlet />
         </main>

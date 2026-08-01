@@ -2633,6 +2633,224 @@ a {
   color: var(--danger);
 }
 
+.app-external-navigation-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.55rem 1rem 0;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #e7a6ba;
+  border-radius: 10px;
+  color: #8f244b;
+  background: #fff2f6;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.app-external-navigation-error button {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  place-items: center;
+}
+
+.app-external-navigation-error svg {
+  width: 18px;
+  height: 18px;
+}
+
+.fixed-scenarios-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.fixed-scenarios-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.fixed-scenarios-version,
+.fixed-scenario-difficulty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  padding: 0.28rem 0.58rem;
+  border: 1px solid #dec6e5;
+  border-radius: 999px;
+  color: #8b328f;
+  background: #fcf4fc;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.fixed-scenarios-assurance {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.62rem 0.78rem;
+  border: 1px solid #bce8dc;
+  border-radius: 10px;
+  color: #18755d;
+  background: #f0fcf8;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.fixed-scenarios-assurance svg,
+.fixed-scenario-difficulty svg {
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+}
+
+.fixed-scenarios-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.fixed-scenario-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 28px rgba(66, 38, 75, 0.06);
+}
+
+.fixed-scenario-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.fixed-scenario-card h2 {
+  margin: 0.45rem 0 0;
+  color: #251929;
+  font-size: 1.08rem;
+}
+
+.fixed-scenario-card-heading code {
+  flex: 0 0 auto;
+  padding: 0.25rem 0.42rem;
+  border-radius: 6px;
+  color: #76687c;
+  background: #f6f0f7;
+  font-size: 0.66rem;
+}
+
+.fixed-scenario-card > p {
+  min-height: 2.8em;
+  margin: 0;
+  color: #635968;
+  font-size: 0.82rem;
+  line-height: 1.42;
+}
+
+.fixed-scenario-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.fixed-scenario-facts > div {
+  min-width: 0;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid #eadfeb;
+  border-radius: 9px;
+  background: #fcf9fc;
+}
+
+.fixed-scenario-facts dt,
+.fixed-scenario-facts dd {
+  margin: 0;
+}
+
+.fixed-scenario-facts dt {
+  color: #887d8c;
+  font-size: 0.68rem;
+}
+
+.fixed-scenario-facts dd {
+  margin-top: 0.18rem;
+  overflow-wrap: anywhere;
+  color: #382c3c;
+  font-size: 0.78rem;
+  font-weight: 720;
+}
+
+.fixed-scenario-card .experience-preview {
+  border-color: #e5d8e7;
+  background: #faf7fb;
+}
+
+.fixed-scenario-goal {
+  display: grid;
+  gap: 0.15rem;
+  min-height: 3.2rem;
+  padding-left: 0.65rem;
+  border-left: 3px solid #cf64c8;
+  color: #625567;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.fixed-scenario-goal strong {
+  color: #87368a;
+}
+
+.fixed-scenario-use {
+  justify-content: center;
+  width: 100%;
+  margin-top: auto;
+}
+
+.fixed-scenario-use svg {
+  width: 17px;
+  height: 17px;
+}
+
+@media (max-width: 980px) {
+  .fixed-scenarios-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .fixed-scenarios-header,
+  .fixed-scenario-card-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .fixed-scenarios-version,
+  .fixed-scenario-card-heading code {
+    align-self: flex-start;
+  }
+
+  .fixed-scenario-facts {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 1100px) {
   .starter-experience-layout {
     grid-template-columns: 1fr;

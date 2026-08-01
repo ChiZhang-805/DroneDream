@@ -82,6 +82,7 @@ import {
 import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
 import {
   applyStarterExperienceTemplate,
+  findStarterExperienceTemplate,
   STARTER_EXPERIENCE_CATALOG_VERSION,
   STARTER_EXPERIENCE_TEMPLATES,
   type StarterExperienceId,
@@ -142,6 +143,10 @@ const STARTER_EXPERIENCE_I18N: Record<
   "light-wind-circle": {
     title: "wizard.starter.wind.title",
     description: "wizard.starter.wind.description",
+  },
+  "wind-sensor-circle": {
+    title: "wizard.starter.combined.title",
+    description: "wizard.starter.combined.description",
   },
 };
 
@@ -1246,9 +1251,19 @@ export function NewJob() {
       ? loadExperimentDraft(EXPERIMENT_DRAFT_SCHEMA, initialWorkspaceId)
       : null,
   ).current;
+  const initialTemplate = useRef(
+    initialWorkspaceId
+      ? null
+      : findStarterExperienceTemplate(searchParams.get("scenario")),
+  ).current;
+  const initialBaseForm = useRef<FormState>(
+    initialDraft?.form
+      ?? (initialTemplate
+        ? applyStarterExperienceTemplate(DEFAULTS, initialTemplate)
+        : DEFAULTS),
+  ).current;
   const [form, setForm] = useState<FormState>(() => ({
-    ...DEFAULTS,
-    ...(initialDraft?.form ?? {}),
+    ...initialBaseForm,
     llm_provider: modelAccess.provider,
     llm_access_mode: modelAccess.accessMode,
     llm_api_key: modelAccess.apiKey,
@@ -1258,19 +1273,19 @@ export function NewJob() {
   const [catalog, setCatalog] = useState<ParameterCatalogResponse>(BUILTIN_PARAMETER_CATALOG);
   const [selections, setSelections] = useState<ParameterSelectionMap>(() =>
     mergeSelections(
-      createParameterSelections(BUILTIN_PARAMETER_CATALOG.parameters, initialDraft?.form.tuning_mode ?? "basic"),
+      createParameterSelections(BUILTIN_PARAMETER_CATALOG.parameters, initialBaseForm.tuning_mode),
       initialDraft?.selections,
     ),
   );
   const manualEditOriginForm = useRef<FormState>(
-    initialDraft?.conversation ? initialDraft.form : DEFAULTS,
+    initialDraft?.conversation ? initialDraft.form : initialBaseForm,
   ).current;
   const manualEditOriginSelections = useRef<ParameterSelectionMap>(
     initialDraft?.conversation
       ? initialDraft.selections
       : createParameterSelections(
         BUILTIN_PARAMETER_CATALOG.parameters,
-        initialDraft?.form.tuning_mode ?? "basic",
+        initialBaseForm.tuning_mode,
       ),
   ).current;
   const conversationRef = useRef(initialDraft?.conversation ?? null);
@@ -1292,7 +1307,9 @@ export function NewJob() {
   const [showTrackEditor, setShowTrackEditor] = useState(false);
   const [showTrackJson, setShowTrackJson] = useState(false);
   const [showParameterReview, setShowParameterReview] = useState(false);
-  const [lastAppliedTemplateKey, setLastAppliedTemplateKey] = useState<string | null>(null);
+  const [lastAppliedTemplateKey, setLastAppliedTemplateKey] = useState<string | null>(
+    initialTemplate?.key ?? null,
+  );
   const [savedDefaultsState, setSavedDefaultsState] =
     useState<"idle" | "loading" | "applied" | "empty" | "error">("idle");
   const [capabilities, setCapabilities] = useState<BackendCapabilitiesResponse | null>(null);

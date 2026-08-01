@@ -5,7 +5,8 @@ export const STARTER_EXPERIENCE_CATALOG_VERSION = 1;
 export type StarterExperienceId =
   | "hover-basics"
   | "first-circle"
-  | "light-wind-circle";
+  | "light-wind-circle"
+  | "wind-sensor-circle";
 
 type TemplateField =
   | "tuning_mode"
@@ -122,7 +123,7 @@ const COMMON_BEGINNER_FIELDS = {
   search_seeds: "101, 202, 303",
   holdout_seeds: "901, 902",
   common_random_numbers: true,
-  simulator_backend: "mock",
+  simulator_backend: "real_cli",
   optimizer_strategy: "optimizer_portfolio",
   max_iterations: "12",
   trials_per_candidate: "3",
@@ -167,7 +168,29 @@ export const STARTER_EXPERIENCE_TEMPLATES: readonly StarterExperienceTemplate[] 
       wind_search_enabled: true,
       scenario_preset: "wind",
     }),
+    freezeTemplate("wind-sensor-circle", {
+      ...COMMON_BEGINNER_FIELDS,
+      ...ROBUST_OBJECTIVE,
+      track_type: "circle",
+      circle_radius_m: "5",
+      sensor_noise_level: "medium",
+      wind_north: "0",
+      wind_east: "3",
+      wind_south: "0",
+      wind_west: "0",
+      wind_search_enabled: true,
+      noise_search_enabled: true,
+      combined_holdout_enabled: true,
+      scenario_preset: "stress",
+    }),
   ]);
+
+export function findStarterExperienceTemplate(
+  key: string | null,
+): StarterExperienceTemplate | null {
+  if (!key) return null;
+  return STARTER_EXPERIENCE_TEMPLATES.find((template) => template.key === key) ?? null;
+}
 
 /**
  * Applying a starter experience is deliberately a pure draft transformation.

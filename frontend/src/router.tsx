@@ -76,6 +76,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: History };
           },
         },
+        {
+          path: "scenarios",
+          lazy: async () => {
+            const { FixedScenarios } = await import("./pages/FixedScenarios");
+            return { Component: FixedScenarios };
+          },
+        },
         { path: "batches/*", loader: () => redirect("/dashboard") },
         {
           path: "compare",
