@@ -283,6 +283,40 @@ describe("workspace profile photo editor", () => {
     router.dispose();
   });
 
+  it("does not let Escape dismiss the cropper while a confirmed upload is pending", async () => {
+    mockAvatarObjectUrls();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL")
+      .mockReturnValue("data:image/jpeg;base64,pending-avatar");
+    let finishUpload: (() => void) | undefined;
+    authMock.updateAvatar.mockImplementationOnce(() => new Promise<undefined>((resolve) => {
+      finishUpload = () => resolve(undefined);
+    }));
+    window.localStorage.setItem("drone-dream:locale", "en");
+    const { container, router } = renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    chooseTestPhoto(container);
+    const cropDialog = screen.getByRole("dialog", { name: "Crop profile photo" });
+    loadCropImage(cropDialog);
+    fireEvent.click(within(cropDialog).getByRole("button", {
+      name: "Save cropped photo",
+    }));
+
+    await waitFor(() => expect(authMock.updateAvatar).toHaveBeenCalledTimes(1));
+    expect(within(cropDialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.getByRole("dialog", { name: "Crop profile photo" })).toBeVisible();
+
+    finishUpload?.();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Crop profile photo" })).toBeNull();
+    });
+    router.dispose();
+  });
+
   it("sends a camera frame to the cropper, mirrors the preview, and releases media", async () => {
     const stop = vi.fn();
     const stream = { getTracks: () => [{ stop }] } as unknown as MediaStream;

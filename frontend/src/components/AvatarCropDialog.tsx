@@ -116,7 +116,11 @@ export function AvatarCropDialog({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        onCancel();
+        // The visible close and cancel controls are disabled while the avatar
+        // is being saved. Escape must follow the same contract; otherwise the
+        // dialog can disappear while a successful upload continues in the
+        // background and unexpectedly changes the user's profile photo.
+        if (!pending) onCancel();
         return;
       }
       if (event.key !== "Tab") return;
@@ -142,7 +146,7 @@ export function AvatarCropDialog({
       document.removeEventListener("keydown", handleKeyDown, true);
       previousFocus?.focus();
     };
-  }, [onCancel]);
+  }, [onCancel, pending]);
 
   const updateZoom = useCallback((nextZoom: number) => {
     setZoom(clampAvatarCropZoom(nextZoom));
