@@ -1,0 +1,188 @@
+{
+  "schemaVersion": "dronedream.manual-pdf-branding-production-deployment.v1",
+  "generatedAt": "2026-08-01T02:12:53.7177330Z",
+  "scope": {
+    "branch": "codex/website",
+    "staticDeploymentPerformed": true,
+    "githubPagesDeployed": true,
+    "aliyunMirrorDeployed": true,
+    "githubReleaseAssetsChanged": false,
+    "installerMetadataChanged": false,
+    "runtimeAssetsChanged": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "productionSecretsOrCorsEnvironmentChanged": false,
+    "paymentOrModelProductionConfigurationChanged": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforcedChanged": false,
+    "technicalReportModified": false,
+    "approvedMirrorServer": "47.93.180.216",
+    "explicitlyExcludedServer": "124.221.220.60"
+  },
+  "source": {
+    "commit": "70cdd56e47752d341f0a6b4e0e9d0f93e01bfd92",
+    "tree": "75e8cd7728dca29a1e487591495d6df5e567156a",
+    "deployTag": "website-deploy-1.0.0-20260801-70cdd56",
+    "deployTagObject": "040c02c2d356238e1fa1f5b336ada31df4026ca3",
+    "deployTagPointsTo": "70cdd56e47752d341f0a6b4e0e9d0f93e01bfd92"
+  },
+  "manuals": {
+    "english": {
+      "path": "frontend/public/docs/downloads/DroneDream-Manual-en.pdf",
+      "pages": 19,
+      "sizeBytes": 1406641,
+      "sha256": "c8fc7a57c604f960eeccf4f64b83a13c9650d5e1b202d4d90cc579b1449fb6da",
+      "coverVersionLabel": "Version"
+    },
+    "simplifiedChinese": {
+      "path": "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.pdf",
+      "pages": 17,
+      "sizeBytes": 1564490,
+      "sha256": "8dac86abea284001077fc4e8ab160f6360232d4981962f69d3295209364b1d21"
+    },
+    "deterministicDoubleBuild": true,
+    "allPagesRenderedAndVisuallyInspected": true,
+    "coverBlackStripDetected": false,
+    "runningHeaderLockupVerified": true,
+    "freeWatermarkSafeAreaVerified": true
+  },
+  "validation": {
+    "focusedPublicSiteTests": {
+      "passed": 19,
+      "failed": 0
+    },
+    "frontendSuite": {
+      "files": 54,
+      "tests": 371,
+      "passed": 371,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "pythonCompile": "passed",
+    "deterministicManualBuild": "passed",
+    "deploymentContract": {
+      "tests": 11,
+      "subtests": 23,
+      "passed": true
+    },
+    "gitDiffCheck": "passed"
+  },
+  "sharedArtifact": {
+    "builtOnce": true,
+    "sameExpandedBytesUsedForPagesAndAliyun": true,
+    "sourceCommit": "70cdd56e47752d341f0a6b4e0e9d0f93e01bfd92",
+    "commitPinnedArtifactId": 8811348618,
+    "commitPinnedArtifactName": "dronedream-site-70cdd56e47752d341f0a6b4e0e9d0f93e01bfd92",
+    "commitPinnedArtifactDigest": "sha256:17d3259df2c12fddba175be34a32374870804ddacadfaebc9c6ea8ef96dbc8d8",
+    "pagesArtifactId": 8811349215,
+    "pagesArtifactDigest": "sha256:6882cd833472bbb8e8a4983aaadf20a87770e97e61ca2ff3a89d6138d147d7c7",
+    "expandedFileCount": 124,
+    "manifestEntryCount": 123,
+    "expandedBytes": 32230139,
+    "archiveSizeBytes": 28852370,
+    "archiveSha256": "6adda66b5e8092059ae632705e0db54be1db0055316604528f168c3e6f63884a",
+    "buildManifestSha256": "c295a27819a9148c13f4883791c3224ab84293c4c468506117a8acce2f01a254",
+    "sha256sumsSha256": "08707c2080b951ec81f6195e5d71e7af3599b5d0319bc4bc11a5ee56bb3ec818"
+  },
+  "githubPages": {
+    "workflow": "Deploy global product website",
+    "runId": 30678466360,
+    "runUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30678466360",
+    "conclusion": "success",
+    "headSha": "70cdd56e47752d341f0a6b4e0e9d0f93e01bfd92",
+    "headTag": "website-deploy-1.0.0-20260801-70cdd56",
+    "buildJobId": 91310448022,
+    "deployJobId": 91310571494,
+    "deploymentId": 5700465981,
+    "environmentPolicy": {
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredToMainOnly": true,
+      "mainPolicyId": 55186327,
+      "livePolicyCount": 1
+    }
+  },
+  "aliyun": {
+    "server": "47.93.180.216",
+    "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260801T020828Z",
+    "previousRollbackRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260731T175440Z",
+    "currentSymlinkSwitched": true,
+    "serverRebuildPerformed": false,
+    "verifiedManifestEntries": 123,
+    "initialWrapperAttempts": {
+      "result": "timed out before the server release switch",
+      "productionStateChanged": false,
+      "duplicateUploadProcessesStopped": true,
+      "finalArchiveVerifiedBeforeDeployment": true
+    }
+  },
+  "publicVerification": {
+    "origins": [
+      "http://getdronedream.com/",
+      "http://47.93.180.216/"
+    ],
+    "files": [
+      {
+        "path": "build-manifest.json",
+        "sizeBytes": 1152,
+        "sha256": "c295a27819a9148c13f4883791c3224ab84293c4c468506117a8acce2f01a254",
+        "byteEqual": true
+      },
+      {
+        "path": "SHA256SUMS",
+        "sizeBytes": 13439,
+        "sha256": "08707c2080b951ec81f6195e5d71e7af3599b5d0319bc4bc11a5ee56bb3ec818",
+        "byteEqual": true
+      },
+      {
+        "path": "index.html",
+        "sizeBytes": 1029,
+        "sha256": "02c4ba427b639fa784c698615cf21632793ec15c464be8cb41f63429f02a967c",
+        "byteEqual": true
+      },
+      {
+        "path": "docs/downloads/DroneDream-Manual-en.pdf",
+        "sizeBytes": 1406641,
+        "sha256": "c8fc7a57c604f960eeccf4f64b83a13c9650d5e1b202d4d90cc579b1449fb6da",
+        "byteEqual": true
+      },
+      {
+        "path": "docs/downloads/DroneDream-Manual-zh-CN.pdf",
+        "sizeBytes": 1564490,
+        "sha256": "8dac86abea284001077fc4e8ab160f6360232d4981962f69d3295209364b1d21",
+        "byteEqual": true
+      }
+    ],
+    "sourceCommitInBothBuildManifests": "70cdd56e47752d341f0a6b4e0e9d0f93e01bfd92",
+    "passed": true
+  },
+  "unchangedInstallerContract": {
+    "version": "1.0.0",
+    "fileName": "DroneDream_1.0.0_x64-setup.exe",
+    "sizeBytes": 10330782,
+    "sha256": "bb0e0ba15fc9826b61367c7b83d04eac0587e885ce98c1db76427a62d10ab50b",
+    "releaseTag": "signpath-candidate-v1.0.0",
+    "releaseAssetsReplaced": false
+  },
+  "residuals": {
+    "tls": {
+      "cname": "getdronedream.com",
+      "protectedDomainState": "verified",
+      "certificateState": "authorization_created",
+      "certificateDomains": [
+        "getdronedream.com",
+        "www.getdronedream.com"
+      ],
+      "httpsEnforced": false,
+      "actionTaken": "none"
+    },
+    "secondPhaseManualLayoutOptimization": "Not included in this production source. The approved branded PDFs were deployed first; typography and pagination optimization continues in a later source after separate visual review."
+  },
+  "result": {
+    "deploymentPerformed": true,
+    "sameSourceCommitAcrossStaticOrigins": true,
+    "sameSharedArtifactAcrossStaticOrigins": true,
+    "publicManualPdfParity": true,
+    "rollbackAvailable": true,
+    "status": "passed with disclosed TLS and future layout-optimization work"
+  }
+}
