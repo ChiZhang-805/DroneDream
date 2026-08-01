@@ -15,7 +15,15 @@ The build requires `pandoc`, `xelatex`, and `pdfinfo` on `PATH`. It consumes:
 - `frontend/public/docs/downloads/DroneDream-Manual-en.md`
 - `frontend/public/docs/downloads/DroneDream-Manual-zh-CN.md`
 - the locale-specific cover and screenshots referenced by those Markdown files
+- `frontend/public/docs/downloads/manual-assets/brand/dronedream-lockup-primary.png`
+  for the compact icon-and-wordmark running header
 - `website/manual-pdf/manual-template.tex`
+
+Before compiling the PDFs, `website/scripts/build_manual_covers.py` regenerates
+both 910 x 1287 cover PNGs from the locale metadata, the approved primary brand
+lockup, and the shared cover layout. The cover source is therefore reproducible;
+do not edit either cover PNG by hand. The cover generator requires Pillow and
+the Arial and Noto Sans SC fonts used by the corresponding manual.
 
 It writes the two downloadable PDFs in place, requires 19 English pages and 17
 Chinese pages, rejects overfull horizontal boxes, and builds each locale twice

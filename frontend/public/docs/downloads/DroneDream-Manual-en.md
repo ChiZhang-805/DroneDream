@@ -1,6 +1,5 @@
 ---
 title: "DroneDream 1.0.0 User Manual"
-subtitle: "Evidence-driven PX4 and Gazebo control-parameter tuning"
 author: "Chi Zhang"
 lang: en-US
 version: "1.0.0"
@@ -9,11 +8,11 @@ sansfont: "Arial"
 manualtype: "User Manual"
 coverkicker: "DRONEDREAM DOCUMENTATION"
 authorlabel: "Author"
-versionlabel: "Software version"
+versionlabel: "Version"
 editionlabel: "Edition"
 edition: "English"
 contentsname: "Contents"
-covernote: "A field-by-field guide to planning, validating, running, and interpreting PX4 / Gazebo control-parameter tuning experiments."
+covercopyright: "© 2026 DroneDream. All rights reserved."
 ---
 
 # About this manual

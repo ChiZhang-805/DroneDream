@@ -9,10 +9,16 @@ import shutil
 import subprocess
 import tempfile
 
+from build_manual_covers import build_covers
+
 
 ROOT = Path(__file__).resolve().parents[2]
 DOWNLOADS = ROOT / "frontend" / "public" / "docs" / "downloads"
 TEMPLATE = ROOT / "website" / "manual-pdf" / "manual-template.tex"
+HEADER_LOCKUP = (
+    DOWNLOADS / "manual-assets" / "brand" / "dronedream-lockup-primary.png"
+)
+COVER_GENERATOR = ROOT / "website" / "scripts" / "build_manual_covers.py"
 SOURCE_DATE_EPOCH = "1785211535"
 PAGE_BREAK_MARKER = "<!-- manual-pdf-pagebreak -->"
 MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)")
@@ -83,7 +89,13 @@ def manual_trailer_id(
     *,
     cover_name: str,
 ) -> str:
-    input_paths = [source, TEMPLATE, DOWNLOADS / cover_name]
+    input_paths = [
+        source,
+        TEMPLATE,
+        HEADER_LOCKUP,
+        COVER_GENERATOR,
+        DOWNLOADS / cover_name,
+    ]
     for relative_path in MARKDOWN_IMAGE_PATTERN.findall(source_text):
         input_paths.append(DOWNLOADS / relative_path)
 
@@ -151,6 +163,7 @@ def compile_manual(
             "--columns=12",
             f"--template={TEMPLATE}",
             f"--variable=coverimage:{config['cover']}",
+            f"--variable=headerlockup:{HEADER_LOCKUP.relative_to(DOWNLOADS).as_posix()}",
             f"--variable=trailerid:{trailer_id}",
             f"--output={tex_path}",
             str(pandoc_source),
@@ -209,6 +222,8 @@ def main() -> None:
     pdfinfo = require_tool("pdfinfo")
     if not TEMPLATE.is_file():
         raise RuntimeError(f"Manual template is missing: {TEMPLATE}")
+    if not HEADER_LOCKUP.is_file():
+        raise RuntimeError(f"Manual header lockup is missing: {HEADER_LOCKUP}")
 
     env = os.environ.copy()
     env["SOURCE_DATE_EPOCH"] = SOURCE_DATE_EPOCH
@@ -216,6 +231,9 @@ def main() -> None:
     env["TZ"] = "UTC"
 
     locales = list(MANUALS) if args.locale == "all" else [args.locale]
+    cover_results = build_covers(locales)
+    for locale, (cover_path, cover_digest) in cover_results.items():
+        print(f"{locale}: {cover_path} | sha256={cover_digest}")
     with tempfile.TemporaryDirectory(prefix="dronedream-manual-build-") as first_temp:
         first_root = Path(first_temp)
         first_results = {

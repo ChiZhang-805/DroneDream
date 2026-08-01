@@ -1,6 +1,5 @@
 ---
 title: "DroneDream 1.0.0 用户说明书"
-subtitle: "以证据驱动的 PX4 / Gazebo 控制参数调优平台"
 author: "Chi Zhang"
 lang: zh-CN
 version: "1.0.0"
@@ -14,7 +13,7 @@ versionlabel: "软件版本"
 editionlabel: "语言版本"
 edition: "简体中文"
 contentsname: "目录"
-covernote: "从字段填写、五步校验、仿真执行到证据解释，完整说明 PX4 / Gazebo 控制参数调优流程。"
+covercopyright: "© 2026 DroneDream。保留所有权利。"
 ---
 
 # 关于本说明书

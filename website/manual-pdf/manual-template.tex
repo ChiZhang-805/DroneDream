@@ -119,7 +119,11 @@ $endif$
 
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\sffamily\bfseries\fontsize{7.5}{9}\selectfont\textcolor{brandPurple}{DroneDream}}
+\fancyhead[L]{%
+  \raisebox{-1.2pt}{%
+    \includegraphics[height=8.8pt,keepaspectratio]{$headerlockup$}%
+  }%
+}
 \fancyhead[R]{\sffamily\fontsize{7.5}{9}\selectfont\textcolor{muted}{$manualtype$}}
 \fancyfoot[L]{\sffamily\fontsize{6.7}{8}\selectfont\textcolor{muted}{Version $version$}}
 \fancyfoot[R]{\sffamily\fontsize{6.7}{8}\selectfont\textcolor{muted}{\thepage}}
