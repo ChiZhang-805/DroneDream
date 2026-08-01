@@ -13,6 +13,7 @@ if [[ -n "$(git -C "$root" status --porcelain=v1 --untracked-files=all)" ]]; the
     exit 2
 fi
 source_commit=$(git -C "$root" rev-parse --verify HEAD)
+source_date_epoch=$(git -C "$root" show -s --format=%ct "$source_commit")
 python3 "$root/runtime/tools/runtime_manifest.py" validate-config \
   --pins "$root/runtime/pins.env" \
   --python-lock "$root/runtime/locks/python-requirements.lock"
@@ -22,6 +23,7 @@ docker buildx build --load --platform linux/amd64 --provenance=false \
   --tag "$image" \
   --build-arg "UBUNTU_BASE_IMAGE=$UBUNTU_BASE_IMAGE" \
   --build-arg "DRONEDREAM_SOURCE_COMMIT=$source_commit" \
+  --build-arg "SOURCE_DATE_EPOCH=$source_date_epoch" \
   --build-arg "PX4_VERSION=$PX4_VERSION" \
   --build-arg "PX4_GIT_URL=$PX4_GIT_URL" \
   --build-arg "PX4_GIT_COMMIT=$PX4_GIT_COMMIT" \

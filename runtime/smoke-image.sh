@@ -83,7 +83,7 @@ for check in "${checks[@]}"; do
     --pipe
     --collect
     "--unit=$unit"
-    --working-directory=/opt/dronedream/source
+    --working-directory=/opt/dronedream/engine/current
   )
   for property in "${sandbox_properties[@]}"; do
     systemd_args+=(--property "$property")

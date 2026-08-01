@@ -9,6 +9,8 @@
 !scripts/simulators/**
 !runtime/
 !runtime/**
+!engine-pack/
+!engine-pack/**
 **/target/
 **/target/**
 **/.venv/
@@ -32,3 +34,5 @@
 **/artifacts/**
 runtime/out/
 runtime/out/**
+engine-pack/out/
+engine-pack/out/**

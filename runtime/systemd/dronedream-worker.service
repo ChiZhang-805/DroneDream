@@ -8,8 +8,9 @@ Type=simple
 User=dronedream
 Group=dronedream
 EnvironmentFile=/etc/dronedream/runtime.env
-WorkingDirectory=/opt/dronedream/source
-ExecStart=/opt/dronedream/venv/bin/drone-dream-worker
+Environment=PYTHONPATH=/opt/dronedream/engine/current/backend:/opt/dronedream/engine/current/worker
+WorkingDirectory=/opt/dronedream/engine/current
+ExecStart=/opt/dronedream/venv/bin/python -m drone_dream_worker.main
 Restart=on-failure
 RestartSec=3
 UMask=0027

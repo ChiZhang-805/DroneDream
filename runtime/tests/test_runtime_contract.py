@@ -456,7 +456,7 @@ class SystemdContractTests(unittest.TestCase):
             "/opt/dronedream/venv/bin/alembic",
             "/opt/dronedream/venv/bin/uvicorn",
         ],
-        "dronedream-worker.service": ["/opt/dronedream/venv/bin/drone-dream-worker"],
+        "dronedream-worker.service": ["/opt/dronedream/venv/bin/python"],
         "dronedream-px4-log-cleanup.service": ["/opt/dronedream/venv/bin/python"],
     }
 
@@ -522,6 +522,25 @@ class SystemdContractTests(unittest.TestCase):
             "/usr/bin/ip",
         ):
             self.assertIn(f"test -x {executable}", dockerfile, executable)
+
+    def test_runtime_base_activates_a_versioned_engine_pack(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        api = (RUNTIME / "systemd" / "dronedream-api.service").read_text(encoding="utf-8")
+        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(
+            encoding="utf-8"
+        )
+        environment = (RUNTIME / "config" / "runtime.env.default").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("engine-pack-manager.py", dockerfile)
+        self.assertIn("--no-services", dockerfile)
+        self.assertIn("test -L /opt/dronedream/engine/current", dockerfile)
+        self.assertIn("WorkingDirectory=/opt/dronedream/engine/current/backend", api)
+        self.assertIn("WorkingDirectory=/opt/dronedream/engine/current", worker)
+        self.assertIn("PYTHONPATH=/opt/dronedream/engine/current/backend", api)
+        self.assertIn("PYTHONPATH=/opt/dronedream/engine/current/backend", worker)
+        self.assertNotIn("/opt/dronedream/source/scripts/simulators", environment)
+        self.assertIn("/opt/dronedream/engine/current/scripts/simulators", environment)
 
     def test_generic_wsl_image_cannot_block_on_interactive_firstboot(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
@@ -607,7 +626,7 @@ class SystemdContractTests(unittest.TestCase):
         )
         self.assertEqual(smoke_properties, worker_properties)
         self.assertIn("/usr/bin/systemd-run", smoke)
-        self.assertIn("--working-directory=/opt/dronedream/source", smoke)
+        self.assertIn("--working-directory=/opt/dronedream/engine/current", smoke)
         self.assertNotIn('docker exec "$container" /usr/lib/dronedream/runtime-check.sh', smoke)
         self.assertIn("/var/lib/dronedream/runtime-smoke", smoke)
         self.assertNotIn("/tmp/dronedream-runtime-smoke", smoke)

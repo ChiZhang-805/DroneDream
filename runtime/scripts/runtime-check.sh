@@ -5,6 +5,7 @@ check=${1:-}
 manifest=/opt/dronedream/runtime-manifest.json
 venv=/opt/dronedream/venv
 source_root=/opt/dronedream/source
+engine_root=/opt/dronedream/engine/current
 smoke_root=/var/lib/dronedream/runtime-smoke
 mkdir -p "$smoke_root"
 
@@ -22,7 +23,7 @@ case "$check" in
     "$venv/bin/pip" check
     ;;
   python_imports)
-    "$venv/bin/python" -c \
+    PYTHONPATH="$engine_root/backend:$engine_root/worker" "$venv/bin/python" -c \
       'import app, cryptography, drone_dream_worker, mavsdk, pyulog, redis, sqlalchemy'
     ;;
   valkey_ping)
@@ -197,7 +198,7 @@ environment["PX4_GAZEBO_DRY_RUN"] = "true"
 result = subprocess.run(
     [
         "/opt/dronedream/venv/bin/python",
-        "/opt/dronedream/source/scripts/simulators/px4_gazebo_runner.py",
+        "/opt/dronedream/engine/current/scripts/simulators/px4_gazebo_runner.py",
         "--input",
         str(input_path),
         "--output",
