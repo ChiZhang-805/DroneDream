@@ -42,11 +42,20 @@ if (routerVersion !== "7.18.1") {
 }
 
 const auditArguments = ["audit", "--audit-level=high", "--json"];
+const invokedByNpm = Boolean(process.env.npm_execpath);
+const auditCommand = invokedByNpm
+  ? process.execPath
+  : process.platform === "win32"
+    ? process.env.ComSpec || "cmd.exe"
+    : "npm";
+const auditCommandArguments = invokedByNpm
+  ? [process.env.npm_execpath, ...auditArguments]
+  : process.platform === "win32"
+    ? ["/d", "/s", "/c", "npm", ...auditArguments]
+    : auditArguments;
 const audit = spawnSync(
-  process.env.npm_execpath ? process.execPath : "npm",
-  process.env.npm_execpath
-    ? [process.env.npm_execpath, ...auditArguments]
-    : auditArguments,
+  auditCommand,
+  auditCommandArguments,
   {
     cwd: frontendRoot,
     encoding: "utf8",
