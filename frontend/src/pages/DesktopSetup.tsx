@@ -389,9 +389,13 @@ export function DesktopSetup() {
   const updaterBusy =
     updater.status === "checking" ||
     updater.status === "downloading" ||
-    updater.status === "installing";
+    updater.status === "installing" ||
+    updater.status === "reconcilingEngine";
   const updaterBlocksWorkspace =
-    updaterBusy || updater.status === "available";
+    updaterBusy ||
+    updater.status === "available" ||
+    updater.status === "engineError" ||
+    updater.status === "runtimeBaseRequired";
   const localChecksReady =
     localRuntimeReady &&
     !state.loading &&
@@ -506,17 +510,23 @@ export function DesktopSetup() {
     if (
       updater.status === "checking" ||
       updater.status === "downloading" ||
-      updater.status === "installing"
+      updater.status === "installing" ||
+      updater.status === "reconcilingEngine"
     ) {
       setDesktopStartupGateState("checking", {
         accountId: signedInAccount?.id ?? null,
       });
       return;
     }
-    if (updater.status === "available") {
+    if (
+      updater.status === "available" ||
+      updater.status === "engineError" ||
+      updater.status === "runtimeBaseRequired"
+    ) {
       setDesktopStartupGateState("blocked", {
         accountId: signedInAccount?.id ?? null,
-        error: `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
+        error: updater.error ??
+          `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
         failureCode: "updateRequired",
       });
       return;
@@ -532,6 +542,7 @@ export function DesktopSetup() {
     localChecksReady,
     signedInAccount,
     updater.availableVersion,
+    updater.error,
     updater.status,
   ]);
 
@@ -1337,13 +1348,13 @@ export function DesktopSetup() {
             environmentBlocked ||
             runtimeSessionFailure !== null ||
             (localChecksReady &&
-              (postSignInBlocked || updater.status === "available"))
+              (postSignInBlocked || updaterBlocksWorkspace))
           }
           accountRequired={
             localChecksReady &&
             !workspaceReady &&
             !postSignInBlocked &&
-            updater.status !== "available"
+            !updaterBlocksWorkspace
           }
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
@@ -1351,7 +1362,7 @@ export function DesktopSetup() {
         />
 
         {postSignInBlocked &&
-        updater.status !== "available" ? (
+        !updaterBlocksWorkspace ? (
           <Alert tone="warning" title={t("launcher.accountVerificationBlocked")}>
             <p>{t(startupGateFailureKey)}</p>
           </Alert>
@@ -1370,11 +1381,27 @@ export function DesktopSetup() {
               className="btn btn-primary launcher-primary-action"
               onClick={() => void updater.installAvailableUpdate()}
             >
-              {t("updater.available", {
-                version: updater.availableVersion ?? "",
-              })}
+              {updater.error
+                ? t("updater.sidebarDeferred")
+                : t("updater.available", {
+                    version: updater.availableVersion ?? "",
+                  })}
             </button>
           </div>
+        ) : updater.status === "engineError" ? (
+          <div className="launcher-ready-actions">
+            <button
+              type="button"
+              className="btn btn-primary launcher-primary-action"
+              onClick={() => void updater.reconcileEnginePack()}
+            >
+              {t("updater.sidebarRetry")}
+            </button>
+          </div>
+        ) : updater.status === "runtimeBaseRequired" ? (
+          <Alert tone="warning" title={t("launcher.runtimeSessionApiTitle")}>
+            <p>{t("updater.runtimeBaseRequired")}</p>
+          </Alert>
         ) : runtimeSessionFailureKey ? (
           <div className="launcher-ready-actions">
             <button

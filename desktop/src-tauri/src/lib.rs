@@ -1,5 +1,7 @@
+mod app_update;
 mod browser_auth;
 mod desktop_api_bridge;
+mod engine_pack;
 mod installer_handoff;
 mod preferences;
 mod prerequisites;
@@ -40,7 +42,16 @@ pub fn run() {
     }
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(
+            tauri_plugin_updater::Builder::new()
+                .default_version_comparator(|current, release| {
+                    if release.version != current {
+                        return release.version > current;
+                    }
+                    app_update::newer_equal_version_release(release.notes.as_deref())
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -62,6 +73,9 @@ pub fn run() {
             installer_handoff::get_installer_runtime_intent,
             installer_handoff::auto_start_installer_runtime,
             installer_handoff::discard_installer_runtime_intent,
+            engine_pack::get_engine_pack_status,
+            engine_pack::ensure_app_update_idle,
+            engine_pack::install_embedded_engine_pack,
             runtime::probe_runtime_status,
             runtime::get_runtime_install_plan,
             runtime_installer::start_runtime_install,

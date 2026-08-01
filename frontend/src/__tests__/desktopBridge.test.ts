@@ -10,6 +10,8 @@ import {
   DesktopCommandContractError,
   DesktopRuntimeUnavailableError,
   discardInstallerRuntimeIntent,
+  ensureAppUpdateIdle,
+  getEnginePackStatus,
   getInstallerRuntimeIntent,
   getRuntimeInstallProgress,
   getRuntimeInstallPlan,
@@ -17,6 +19,7 @@ import {
   probeRuntimeStatus,
   probeSystemPrerequisites,
   repairRuntime,
+  installEmbeddedEnginePack,
   startRuntime,
   startRuntimeInstall,
   stopRuntimeForExit,
@@ -185,6 +188,47 @@ describe("desktop bridge", () => {
       },
     });
     expect(invoke).toHaveBeenNthCalledWith(2, "cancel_browser_auth", undefined);
+  });
+
+  it("validates Engine Pack identities and routes the idle preflight", async () => {
+    const status = {
+      supported: true,
+      updateRequired: true,
+      embeddedPackId: `sha256:${"1".repeat(64)}`,
+      embeddedSourceCommit: "2".repeat(40),
+      installedPackId: `sha256:${"3".repeat(64)}`,
+      installedSourceCommit: "4".repeat(40),
+      message: null,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "ensure_app_update_idle") return null;
+      if (command === "get_engine_pack_status") return status;
+      if (command === "install_embedded_engine_pack") {
+        return { ...status, updateRequired: false };
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(ensureAppUpdateIdle()).resolves.toBeUndefined();
+    await expect(getEnginePackStatus()).resolves.toEqual(status);
+    await expect(installEmbeddedEnginePack()).resolves.toMatchObject({
+      updateRequired: false,
+    });
+    expect(invoke.mock.calls.map(([command]) => command)).toEqual([
+      "ensure_app_update_idle",
+      "get_engine_pack_status",
+      "install_embedded_engine_pack",
+    ]);
+
+    invoke.mockResolvedValueOnce({
+      ...status,
+      embeddedPackId: "sha256:not-a-digest",
+    });
+    await expect(getEnginePackStatus()).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "get_engine_pack_status",
+    });
   });
 
   it("rejects malformed browser-auth tokens at the native boundary", async () => {

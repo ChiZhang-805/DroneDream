@@ -1,8 +1,17 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { checkMock, relaunchMock } = vi.hoisted(() => ({
+const {
+  checkMock,
+  ensureAppUpdateIdleMock,
+  getEnginePackStatusMock,
+  installEmbeddedEnginePackMock,
+  relaunchMock,
+} = vi.hoisted(() => ({
   checkMock: vi.fn(),
+  ensureAppUpdateIdleMock: vi.fn(),
+  getEnginePackStatusMock: vi.fn(),
+  installEmbeddedEnginePackMock: vi.fn(),
   relaunchMock: vi.fn(),
 }));
 
@@ -14,6 +23,9 @@ vi.mock("@tauri-apps/plugin-process", () => ({
 }));
 vi.mock("../desktop/bridge", () => ({
   isDesktopRuntime: () => true,
+  ensureAppUpdateIdle: ensureAppUpdateIdleMock,
+  getEnginePackStatus: getEnginePackStatusMock,
+  installEmbeddedEnginePack: installEmbeddedEnginePackMock,
 }));
 
 import { useAppUpdater } from "../desktop/updater";
@@ -38,8 +50,21 @@ function update(version: string, overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.stubEnv("MODE", "production");
   checkMock.mockReset();
+  ensureAppUpdateIdleMock.mockReset();
+  ensureAppUpdateIdleMock.mockResolvedValue(undefined);
   relaunchMock.mockReset();
   relaunchMock.mockResolvedValue(undefined);
+  getEnginePackStatusMock.mockReset();
+  getEnginePackStatusMock.mockResolvedValue({
+    supported: true,
+    updateRequired: false,
+    embeddedPackId: `sha256:${"1".repeat(64)}`,
+    embeddedSourceCommit: "2".repeat(40),
+    installedPackId: `sha256:${"1".repeat(64)}`,
+    installedSourceCommit: "2".repeat(40),
+    message: null,
+  });
+  installEmbeddedEnginePackMock.mockReset();
 });
 
 afterEach(() => {
@@ -89,11 +114,95 @@ describe("useAppUpdater", () => {
       firstInstall = hook.result.current.installAvailableUpdate();
       secondInstall = hook.result.current.installAvailableUpdate();
     });
-    expect(availableUpdate.downloadAndInstall).toHaveBeenCalledOnce();
+    await waitFor(() => expect(availableUpdate.downloadAndInstall).toHaveBeenCalledOnce());
 
     installing.resolve();
     await act(async () => Promise.all([firstInstall, secondInstall]));
     expect(relaunchMock).toHaveBeenCalledOnce();
+    hook.unmount();
+  });
+
+  it("does not download or relaunch while a Runtime experiment is active", async () => {
+    const availableUpdate = update("1.0.0");
+    checkMock.mockResolvedValue(availableUpdate);
+    ensureAppUpdateIdleMock.mockRejectedValue(
+      new Error("Engine Pack update is waiting for active experiments to finish (1 jobs, 0 trials)"),
+    );
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+
+    await act(async () => hook.result.current.installAvailableUpdate());
+
+    expect(availableUpdate.downloadAndInstall).not.toHaveBeenCalled();
+    expect(relaunchMock).not.toHaveBeenCalled();
+    expect(hook.result.current.status).toBe("available");
+    expect(hook.result.current.error).toContain("active experiments");
+    hook.unmount();
+  });
+
+  it("reconciles the embedded Engine Pack after confirming the app is current", async () => {
+    const pendingPack = {
+      supported: true,
+      updateRequired: true,
+      embeddedPackId: `sha256:${"3".repeat(64)}`,
+      embeddedSourceCommit: "4".repeat(40),
+      installedPackId: `sha256:${"1".repeat(64)}`,
+      installedSourceCommit: "2".repeat(40),
+      message: null,
+    };
+    const installedPack = { ...pendingPack, updateRequired: false };
+    checkMock.mockResolvedValue(null);
+    getEnginePackStatusMock.mockResolvedValue(pendingPack);
+    installEmbeddedEnginePackMock.mockResolvedValue(installedPack);
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+
+    expect(getEnginePackStatusMock).toHaveBeenCalledOnce();
+    expect(installEmbeddedEnginePackMock).toHaveBeenCalledOnce();
+    expect(hook.result.current.enginePack).toEqual(installedPack);
+    hook.unmount();
+  });
+
+  it("defers Engine Pack activation while an experiment is active", async () => {
+    checkMock.mockResolvedValue(null);
+    getEnginePackStatusMock.mockResolvedValue({
+      supported: true,
+      updateRequired: true,
+      embeddedPackId: `sha256:${"3".repeat(64)}`,
+      embeddedSourceCommit: "4".repeat(40),
+      installedPackId: `sha256:${"1".repeat(64)}`,
+      installedSourceCommit: "2".repeat(40),
+      message: null,
+    });
+    installEmbeddedEnginePackMock.mockRejectedValue(
+      new Error("Engine Pack update is waiting for active experiments to finish (1 jobs, 1 trials)"),
+    );
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("engineUpdateDeferred"));
+
+    expect(hook.result.current.error).toContain("active experiments");
+    expect(relaunchMock).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("requires a one-time Runtime Base upgrade when the manager is unavailable", async () => {
+    checkMock.mockResolvedValue(null);
+    getEnginePackStatusMock.mockResolvedValue({
+      supported: false,
+      updateRequired: true,
+      embeddedPackId: `sha256:${"3".repeat(64)}`,
+      embeddedSourceCommit: "4".repeat(40),
+      installedPackId: null,
+      installedSourceCommit: null,
+      message: "The installed Runtime Base predates Engine Pack updates.",
+    });
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("runtimeBaseRequired"));
+
+    expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
     hook.unmount();
   });
 });

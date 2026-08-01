@@ -9,9 +9,11 @@ const FALLBACK: AppUpdaterState = {
   availableVersion: null,
   progress: null,
   error: null,
+  enginePack: null,
   desktopRuntime: false,
   checkForUpdates: async () => undefined,
   installAvailableUpdate: async () => undefined,
+  reconcileEnginePack: async () => undefined,
 };
 
 const AppUpdaterContext = createContext<AppUpdaterState>(FALLBACK);

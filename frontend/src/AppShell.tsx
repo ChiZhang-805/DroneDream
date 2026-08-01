@@ -5,12 +5,13 @@ import {
   useState,
 } from "react";
 import type { ChangeEvent, MouseEvent, RefObject } from "react";
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
   BotMessageSquare,
   Camera,
   CircleUserRound,
+  Download,
   GraduationCap,
   History,
   ImagePlus,
@@ -1901,6 +1902,7 @@ function AccountDialog({
 
 function AppShellContent() {
   const location = useLocation();
+  const navigate = useNavigate();
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuth();
@@ -1941,6 +1943,45 @@ function AppShellContent() {
     && !auth.account;
   const accountDialogRequired = accountRequired && !launcherMode;
   const accountDialogOpen = accountOpen || accountDialogRequired;
+  const sidebarUpdateVisible = desktopRuntime && ![
+    "checking",
+    "current",
+  ].includes(updater.status);
+  const sidebarUpdateBusy = [
+    "downloading",
+    "installing",
+    "reconcilingEngine",
+  ].includes(updater.status);
+  const sidebarUpdateLabel = updater.status === "available"
+    ? updater.error
+      ? t("updater.sidebarDeferred")
+      : t("updater.sidebarAvailable")
+    : updater.status === "runtimeBaseRequired"
+      ? t("updater.sidebarRuntimeBase")
+      : sidebarUpdateBusy
+        ? t("updater.sidebarProgress")
+        : t("updater.sidebarRetry");
+  const handleSidebarUpdate = useCallback(() => {
+    if (updater.status === "available") {
+      void updater.installAvailableUpdate();
+      return;
+    }
+    if (updater.status === "engineUpdateDeferred") {
+      void updater.reconcileEnginePack();
+      return;
+    }
+    if (updater.status === "runtimeBaseRequired") {
+      navigate("/desktop/setup");
+      return;
+    }
+    if (updater.status === "engineError") {
+      void updater.reconcileEnginePack();
+      return;
+    }
+    if (updater.status === "error") {
+      void updater.checkForUpdates();
+    }
+  }, [navigate, updater]);
   const openExternalNavigation = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
     url: string,
@@ -1961,17 +2002,23 @@ function AppShellContent() {
     if (
       updater.status === "checking" ||
       updater.status === "downloading" ||
-      updater.status === "installing"
+      updater.status === "installing" ||
+      updater.status === "reconcilingEngine"
     ) {
       setDesktopStartupGateState("checking", {
         accountId: auth.account?.id ?? null,
       });
       return;
     }
-    if (updater.status === "available") {
+    if (
+      updater.status === "available" ||
+      updater.status === "engineError" ||
+      updater.status === "runtimeBaseRequired"
+    ) {
       setDesktopStartupGateState("blocked", {
         accountId: auth.account?.id ?? null,
-        error: `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
+        error: updater.error ??
+          `DroneDream ${updater.availableVersion ?? "update"} must be installed before entering the tuning workspace.`,
       });
       return;
     }
@@ -2024,6 +2071,7 @@ function AppShellContent() {
     runtimeAccess.lastFullCheckAt,
     runtimeAccess.status,
     updater.availableVersion,
+    updater.error,
     updater.status,
   ]);
 
@@ -2475,6 +2523,18 @@ function AppShellContent() {
             </span>
             <MoreHorizontal aria-hidden="true" strokeWidth={1.8} />
           </button>
+          {sidebarUpdateVisible ? (
+            <button
+              type="button"
+              className={`app-update-button${sidebarUpdateBusy ? " is-busy" : ""}`}
+              aria-label={sidebarUpdateLabel}
+              title={sidebarUpdateLabel}
+              disabled={sidebarUpdateBusy}
+              onClick={handleSidebarUpdate}
+            >
+              <Download aria-hidden="true" strokeWidth={2} />
+            </button>
+          ) : null}
         </div>
       </aside>
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>

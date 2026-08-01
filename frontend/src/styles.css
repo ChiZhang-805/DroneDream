@@ -170,10 +170,62 @@ code {
 }
 
 .app-sidebar-footer {
+  position: relative;
   display: grid;
   border-top: 1px solid var(--border);
   padding-top: 0.75rem;
   margin-top: 0.75rem;
+}
+
+.app-sidebar-footer:has(.app-update-button) .app-account-copy {
+  padding-right: 1.9rem;
+}
+
+.app-update-button {
+  position: absolute;
+  z-index: 1;
+  top: 0.82rem;
+  right: 2.35rem;
+  display: inline-grid;
+  width: 1.55rem;
+  height: 1.55rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(63, 147, 231, 0.24);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #2d8cea, #4b6ff1);
+  box-shadow: 0 0.3rem 0.8rem rgba(53, 116, 222, 0.24);
+  color: #fff;
+  cursor: pointer;
+}
+
+.app-update-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 0.42rem 0.95rem rgba(53, 116, 222, 0.32);
+}
+
+.app-update-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.app-update-button:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.app-update-button svg {
+  width: 0.86rem;
+  height: 0.86rem;
+}
+
+.app-update-button.is-busy svg {
+  animation: app-update-pulse 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes app-update-pulse {
+  from { transform: translateY(-1px); opacity: 0.55; }
+  to { transform: translateY(1px); opacity: 1; }
 }
 
 .app-account-button {
@@ -1007,6 +1059,13 @@ code {
   .app-account-copy,
   .app-account-button > svg {
     display: none;
+  }
+
+  .app-update-button {
+    top: -0.1rem;
+    right: -0.15rem;
+    width: 1.25rem;
+    height: 1.25rem;
   }
 }
 

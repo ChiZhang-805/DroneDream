@@ -72,6 +72,16 @@ export interface RuntimeStatusReport {
   diagnostics: string[];
 }
 
+export interface EnginePackStatus {
+  supported: boolean;
+  updateRequired: boolean;
+  embeddedPackId: string;
+  embeddedSourceCommit: string;
+  installedPackId: string | null;
+  installedSourceCommit: string | null;
+  message: string | null;
+}
+
 export interface DesktopApiRequest {
   method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
@@ -406,6 +416,18 @@ export function probeRuntimeStatus(): Promise<RuntimeStatusReport> {
   return invokeDesktop("probe_runtime_status", parseRuntimeStatus);
 }
 
+export function getEnginePackStatus(): Promise<EnginePackStatus> {
+  return invokeDesktop("get_engine_pack_status", parseEnginePackStatus);
+}
+
+export function ensureAppUpdateIdle(): Promise<void> {
+  return invokeDesktop("ensure_app_update_idle", () => undefined);
+}
+
+export function installEmbeddedEnginePack(): Promise<EnginePackStatus> {
+  return invokeDesktop("install_embedded_engine_pack", parseEnginePackStatus);
+}
+
 export async function getRuntimeInstallPlan(
   targetRoot?: string,
 ): Promise<RuntimeInstallPlan> {
@@ -688,6 +710,52 @@ function parseRuntimeStatus(value: unknown): RuntimeStatusReport {
   };
   validateRuntimeSemantics(report);
   return report;
+}
+
+function parseEnginePackStatus(value: unknown): EnginePackStatus {
+  const record = expectRecord(value, "enginePack");
+  const status: EnginePackStatus = {
+    supported: expectBoolean(record.supported, "enginePack.supported"),
+    updateRequired: expectBoolean(record.updateRequired, "enginePack.updateRequired"),
+    embeddedPackId: expectSafeNonEmptyString(
+      record.embeddedPackId,
+      "enginePack.embeddedPackId",
+    ),
+    embeddedSourceCommit: expectSafeNonEmptyString(
+      record.embeddedSourceCommit,
+      "enginePack.embeddedSourceCommit",
+    ),
+    installedPackId: expectNullableSafeNonEmptyString(
+      record.installedPackId,
+      "enginePack.installedPackId",
+    ),
+    installedSourceCommit: expectNullableSafeNonEmptyString(
+      record.installedSourceCommit,
+      "enginePack.installedSourceCommit",
+    ),
+    message: expectNullableString(record.message, "enginePack.message"),
+  };
+  const packIdPattern = /^sha256:[0-9a-f]{64}$/;
+  const commitPattern = /^[0-9a-f]{40}$/;
+  if (!packIdPattern.test(status.embeddedPackId)) {
+    throw new Error("enginePack.embeddedPackId must be a SHA-256 identity");
+  }
+  if (!commitPattern.test(status.embeddedSourceCommit)) {
+    throw new Error("enginePack.embeddedSourceCommit must be a full Git commit");
+  }
+  if (status.installedPackId && !packIdPattern.test(status.installedPackId)) {
+    throw new Error("enginePack.installedPackId must be a SHA-256 identity");
+  }
+  if (
+    status.installedSourceCommit &&
+    !commitPattern.test(status.installedSourceCommit)
+  ) {
+    throw new Error("enginePack.installedSourceCommit must be a full Git commit");
+  }
+  if (!status.supported && !status.updateRequired) {
+    throw new Error("an unsupported Engine Pack manager must require a Runtime Base update");
+  }
+  return status;
 }
 
 function validateRuntimeSemantics(report: RuntimeStatusReport): void {

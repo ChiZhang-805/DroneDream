@@ -1,9 +1,165 @@
 use std::path::PathBuf;
+use std::process::Command;
+
+fn emit_rerun_tree(path: &std::path::Path) {
+    println!("cargo:rerun-if-changed={}", path.display());
+    if !path.is_dir() {
+        return;
+    }
+    let mut entries = std::fs::read_dir(path)
+        .unwrap_or_else(|error| panic!("unable to inspect {}: {error}", path.display()))
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap_or_else(|error| panic!("unable to enumerate {}: {error}", path.display()));
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        emit_rerun_tree(&entry.path());
+    }
+}
+
+fn git_output(repository_root: &std::path::Path, arguments: &[&str]) -> String {
+    let output = Command::new("git")
+        .args(arguments)
+        .current_dir(repository_root)
+        .output()
+        .unwrap_or_else(|error| panic!("unable to run git for Engine Pack provenance: {error}"));
+    assert!(
+        output.status.success(),
+        "git could not resolve Engine Pack provenance: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout)
+        .expect("git Engine Pack provenance must be UTF-8")
+        .trim()
+        .to_string()
+}
+
+fn git_output_optional(repository_root: &std::path::Path, arguments: &[&str]) -> Option<String> {
+    let output = Command::new("git")
+        .args(arguments)
+        .current_dir(repository_root)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(String::from_utf8(output.stdout).ok()?.trim().to_string())
+}
+
+fn emit_git_provenance_reruns(repository_root: &std::path::Path) {
+    for git_path in ["HEAD", "packed-refs"] {
+        let path = PathBuf::from(git_output(
+            repository_root,
+            &["rev-parse", "--git-path", git_path],
+        ));
+        if path.exists() {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
+    if let Some(symbolic_ref) =
+        git_output_optional(repository_root, &["symbolic-ref", "-q", "HEAD"])
+    {
+        let path = PathBuf::from(git_output(
+            repository_root,
+            &["rev-parse", "--git-path", &symbolic_ref],
+        ));
+        if path.exists() {
+            println!("cargo:rerun-if-changed={}", path.display());
+        }
+    }
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_SOURCE_COMMIT");
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_BUILD_NUMBER");
+}
+
+fn build_engine_pack(manifest_dir: &std::path::Path) {
+    let repository_root = manifest_dir
+        .join("../..")
+        .canonicalize()
+        .expect("repository root must be available to the desktop build");
+    emit_git_provenance_reruns(&repository_root);
+    for relative in [
+        "backend/app",
+        "backend/alembic",
+        "backend/alembic.ini",
+        "backend/pyproject.toml",
+        "worker/drone_dream_worker",
+        "worker/pyproject.toml",
+        "scripts/simulators",
+        "runtime/pins.env",
+        "runtime/locks/python-requirements.lock",
+        "engine-pack/tools/engine_pack.py",
+    ] {
+        emit_rerun_tree(&repository_root.join(relative));
+    }
+    let source_commit = git_output(&repository_root, &["rev-parse", "--verify", "HEAD"]);
+    let source_date_epoch = git_output(
+        &repository_root,
+        &["show", "-s", "--format=%ct", &source_commit],
+    );
+    let build_number = git_output(&repository_root, &["rev-list", "--count", &source_commit]);
+    assert!(
+        build_number.parse::<u64>().is_ok_and(|value| value > 0),
+        "Git history did not produce a positive updater build number"
+    );
+    if let Ok(expected) = std::env::var("DRONEDREAM_RELEASE_SOURCE_COMMIT") {
+        assert_eq!(
+            source_commit, expected,
+            "Git HEAD changed after the release build was frozen"
+        );
+    }
+    if let Ok(expected) = std::env::var("DRONEDREAM_RELEASE_BUILD_NUMBER") {
+        assert_eq!(
+            build_number, expected,
+            "Git build number changed after the release build was frozen"
+        );
+    }
+    let output_directory = PathBuf::from(
+        std::env::var("OUT_DIR").expect("Cargo must set OUT_DIR for the Engine Pack build"),
+    )
+    .join("engine-pack");
+    std::fs::create_dir_all(&output_directory)
+        .expect("unable to create the generated Engine Pack directory");
+    let tool = repository_root.join("engine-pack/tools/engine_pack.py");
+    let python = std::env::var("PYTHON").unwrap_or_else(|_| {
+        if cfg!(windows) {
+            "python".to_string()
+        } else {
+            "python3".to_string()
+        }
+    });
+    let status = Command::new(&python)
+        .arg(&tool)
+        .arg("build")
+        .arg("--repository-root")
+        .arg(&repository_root)
+        .arg("--output-directory")
+        .arg(&output_directory)
+        .arg("--source-commit")
+        .arg(&source_commit)
+        .env("SOURCE_DATE_EPOCH", &source_date_epoch)
+        .status()
+        .unwrap_or_else(|error| {
+            panic!("unable to build the embedded Engine Pack with {python}: {error}")
+        });
+    assert!(status.success(), "embedded Engine Pack generation failed");
+    let descriptor_path = output_directory.join("engine-pack-bundle.json");
+    let descriptor: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(&descriptor_path).expect("embedded Engine Pack descriptor is missing"),
+    )
+    .expect("embedded Engine Pack descriptor is invalid");
+    let pack_id = descriptor
+        .get("packId")
+        .and_then(serde_json::Value::as_str)
+        .expect("embedded Engine Pack descriptor has no packId");
+    println!("cargo:rustc-env=DRONEDREAM_ENGINE_PACK_ID={pack_id}");
+    println!("cargo:rustc-env=DRONEDREAM_SOURCE_COMMIT={source_commit}");
+    println!("cargo:rustc-env=DRONEDREAM_BUILD_NUMBER={build_number}");
+}
 
 fn main() {
     let manifest_dir = PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("Cargo must set CARGO_MANIFEST_DIR"),
     );
+    build_engine_pack(&manifest_dir);
     let frontend_environment = manifest_dir.join("../../frontend/.env.production");
     println!("cargo:rerun-if-changed={}", frontend_environment.display());
     let raw = std::fs::read_to_string(&frontend_environment)

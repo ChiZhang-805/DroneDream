@@ -1,6 +1,23 @@
 $ErrorActionPreference = "Stop"
 
 & (Join-Path $PSScriptRoot "verify-updater-signing-contract.ps1")
+& (Join-Path $PSScriptRoot "verify-updater-build-contract.ps1")
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$releaseSourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
+if ($LASTEXITCODE -ne 0 -or $releaseSourceCommit -cnotmatch '^[0-9a-f]{40}$') {
+    throw "Unable to freeze the exact release source commit."
+}
+$releaseBuildNumber = (& git -C $repoRoot rev-list --count $releaseSourceCommit).Trim()
+if ($LASTEXITCODE -ne 0 -or $releaseBuildNumber -notmatch '^[1-9][0-9]*$') {
+    throw "Unable to freeze the exact release build number."
+}
+$releaseSourceStatus = (& git -C $repoRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $releaseSourceStatus) {
+    throw "The desktop release source must be an exact clean Git commit."
+}
+$env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $releaseSourceCommit
+$env:DRONEDREAM_RELEASE_BUILD_NUMBER = $releaseBuildNumber
 
 $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
 if (Test-Path -LiteralPath $cargoBin) {
@@ -123,6 +140,14 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
+$postBuildCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
+$postBuildStatus = (& git -C $repoRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or
+    $postBuildCommit -cne $releaseSourceCommit -or
+    $postBuildStatus) {
+    throw "The release source changed while the desktop installer was building."
+}
+
 $application = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\drone-dream-desktop.exe"
 if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
     throw "The LLVM build completed without producing $application"
@@ -218,7 +243,9 @@ if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
     throw "The signed Tauri updater artifact is missing: $updaterSignature"
 }
 & (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
-    -BundleDirectory $bundleDirectory
+    -BundleDirectory $bundleDirectory `
+    -SourceCommit $releaseSourceCommit `
+    -BuildNumber ([UInt64]$releaseBuildNumber)
 
 # A developer bundle directory otherwise accumulates every historical setup
 # executable, which makes manual testing error-prone. Prune only versioned
