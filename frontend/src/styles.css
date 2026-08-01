@@ -8291,6 +8291,25 @@ a {
   border-top-color: var(--border);
 }
 
+/* These two model surfaces intentionally remain dark inside the otherwise
+   light workspace dialog. Give only those surfaces their matching foreground
+   palette so headings elsewhere in the dialog stay dark on white. */
+.app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
+.app-shell:not(.app-shell-launcher) .settings-model-usage {
+  color: #f7f2ff;
+}
+
+.app-shell:not(.app-shell-launcher) .settings-model-access-mode > button span,
+.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-managed-model-row label > span,
+.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-managed-model-row p,
+.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-plan-row span,
+.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-quota-heading span,
+.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-usage-grid span,
+.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-period,
+.app-shell:not(.app-shell-launcher) .settings-model-usage .settings-model-security-note {
+  color: #d6b7ea;
+}
+
 .app-shell:not(.app-shell-launcher) .settings-model-security-note {
   color: var(--text-muted);
 }

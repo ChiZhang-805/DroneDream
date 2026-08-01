@@ -194,6 +194,16 @@ async function verifySettings(page, testCase) {
       usageValuesFit: Array.from(
         element.querySelectorAll(".settings-model-usage-grid strong"),
       ).every((value) => value.scrollWidth <= value.clientWidth + 1),
+      foregroundColor: getComputedStyle(element).color,
+      mutedColor: getComputedStyle(
+        element.querySelector(".settings-model-period"),
+      ).color,
+      accessModeColor: getComputedStyle(
+        element.parentElement?.querySelector(".settings-model-access-mode > button"),
+      ).color,
+      headingColor: getComputedStyle(
+        element.parentElement?.querySelector(".settings-model-heading h3"),
+      ).color,
     };
   });
   assert(metrics.manage && metrics.refresh && metrics.period && metrics.usage);
@@ -212,6 +222,10 @@ async function verifySettings(page, testCase) {
   );
   assert.equal(metrics.managedModelOptions, 3);
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
+  assert.equal(metrics.foregroundColor, "rgb(247, 242, 255)");
+  assert.equal(metrics.mutedColor, "rgb(214, 183, 234)");
+  assert.equal(metrics.accessModeColor, "rgb(247, 242, 255)");
+  assert.equal(metrics.headingColor, "rgb(30, 23, 33)");
   const manage = usage.locator(".settings-model-plan-row .btn");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
