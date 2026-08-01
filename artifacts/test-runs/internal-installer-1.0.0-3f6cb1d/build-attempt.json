@@ -1,0 +1,30 @@
+﻿{
+    "schema_version":  "dronedream.local-build-attempt.v2",
+    "attempt":  1,
+    "single_nsis_attempt_contract":  true,
+    "source_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+    "branch":  "codex/software",
+    "started_at":  "2026-07-31T23:59:16.5217180+00:00",
+    "preexisting_target":  {
+                               "bytes":  10330782,
+                               "sha256":  "bb0e0ba15fc9826b61367c7b83d04eac0587e885ce98c1db76427a62d10ab50b",
+                               "last_write_utc":  "2026-07-31T17:03:23.5708436Z"
+                           },
+    "upload_authorized":  false,
+    "authenticode_required":  false,
+    "version":  "1.0.0",
+    "openai_api_key_read_or_used":  false,
+    "completed":  true,
+    "ended_at":  "2026-08-01T00:00:24.8998088+00:00",
+    "duration_seconds":  68.38,
+    "exit_code":  0,
+    "pipeline_completed":  true,
+    "nsis_bundle_completed":  true,
+    "nsis_bundle_count":  1,
+    "post_build_target":  {
+                              "bytes":  10313264,
+                              "sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+                              "last_write_utc":  "2026-08-01T00:00:13.6221024Z"
+                          },
+    "second_nsis_attempt_performed":  false
+}

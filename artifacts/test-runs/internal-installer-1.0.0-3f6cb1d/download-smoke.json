@@ -1,0 +1,12 @@
+﻿{
+    "schema_version":  "1.0",
+    "url":  "http://127.0.0.1:50520/DroneDream_1.0.0_x64-setup.exe",
+    "http_status":  200,
+    "source_bytes":  10313264,
+    "downloaded_bytes":  10313264,
+    "source_sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+    "downloaded_sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+    "bytes_match":  true,
+    "transport_scope":  "loopback-only",
+    "uploaded":  false
+}

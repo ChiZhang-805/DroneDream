@@ -1,0 +1,43 @@
+{
+    "schema_version":  "dronedream.release-validation-anomalies.v1",
+    "generated_at":  "2026-08-01T00:13:27Z",
+    "source_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+    "preserved":  [
+                      {
+                          "stage":  "backend pytest wrapper",
+                          "outcome":  "failed before test collection",
+                          "reason":  "The first JUnit output path argument was not interpolated by the wrapper.",
+                          "product_or_test_result_changed":  false
+                      },
+                      {
+                          "stage":  "backend full suite attempt 1",
+                          "outcome":  "1388 passed / 1 failed",
+                          "reason":  "Windows scheduling did not advance the observed heartbeat expiry within the fixed sleep.",
+                          "follow_up":  "Focused test passed 5/5; unchanged-source authoritative full suite passed 1389/1389."
+                      },
+                      {
+                          "stage":  "frontend production-build wrapper",
+                          "outcome":  "wrapper reported NativeCommandError",
+                          "reason":  "PowerShell promoted Vite\u0027s non-failing chunk advisory from stderr.",
+                          "follow_up":  "Explicit final build exited 0."
+                      },
+                      {
+                          "stage":  "PublicSite isolated test",
+                          "outcome":  "12 passed / 1 failed",
+                          "reason":  "Cross-line website billing-checkout behavior is newer than codex/software.",
+                          "software_scope_result":  "60 files / 380 tests passed"
+                      },
+                      {
+                          "stage":  "loopback HTTP invocation 1",
+                          "outcome":  "server readiness timeout",
+                          "reason":  "Start-Process with --directory did not expose a ready listener in the combined wrapper.",
+                          "follow_up":  "Working-directory launch returned HTTP 200 with exact byte parity."
+                      },
+                      {
+                          "stage":  "WebView2 standalone invocation 1",
+                          "outcome":  "parameter binding failed",
+                          "reason":  "The initial generated-NSI search used the bundle directory instead of release/nsis/x64/installer.nsi.",
+                          "follow_up":  "Correct-path static validation passed."
+                      }
+                  ]
+}

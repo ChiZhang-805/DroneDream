@@ -1,0 +1,23 @@
+﻿{
+    "schema_version":  "1.0",
+    "source_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+    "file_name":  "DroneDream_1.0.0_x64-setup.exe",
+    "bytes":  10313264,
+    "sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+    "checksum_declared_sha256":  "6668e93751b7d69152d4322231c370d01f17afa7c8d076a5e7aced4d44a3bcd8",
+    "checksum_matches":  true,
+    "authenticode_status":  "NotSigned",
+    "authenticode_status_message":  "The file Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\internal-installer-1.0.0-3f6cb1d\\DroneDream_1.0.0_x64-setup.exe is not digitally signed. You cannot run this script on the current system. For more information about running scripts and setting execution policy, see about_Execution_Policies at https:/go.microsoft.com/fwlink/?LinkID=135170",
+    "pe_optional_header_magic":  "0x10B",
+    "pe_certificate_table_offset":  0,
+    "pe_certificate_table_size":  0,
+    "pe_certificate_table_present":  false,
+    "unsigned_internal_test_build":  true,
+    "file_version":  "1.0.0",
+    "product_version":  "1.0.0",
+    "updater_manifest_version":  "1.0.0",
+    "updater_signature_bytes":  420,
+    "updater_signature_verified":  true,
+    "single_nsis_attempt":  true,
+    "uploaded":  false
+}

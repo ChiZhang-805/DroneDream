@@ -1,0 +1,399 @@
+{
+    "schema_version":  "dronedream.internal-installer-product-source-binding.v3",
+    "generated_at":  "2026-08-01T00:13:27Z",
+    "source_commit":  "3f6cb1d81833e7fb10b4e39220825ddfc0624da2",
+    "source_checkout_clean_before_build":  true,
+    "selected_source_records":  [
+                                    {
+                                        "path":  "desktop/src-tauri/src/lib.rs",
+                                        "delivery":  "compiled_into_desktop_executable",
+                                        "bytes":  2832,
+                                        "sha256":  "3f52c244ccaafb1a48ad1ba77b3625045e18483c6bed84f42119845873923f66",
+                                        "git_blob":  "ff674a8fa00084e0bcf46dfac5397a35ae3c0857",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "desktop/src-tauri/src/browser_auth.rs",
+                                        "delivery":  "compiled_into_desktop_executable",
+                                        "bytes":  26724,
+                                        "sha256":  "08e740e48c69025bc834a6b0979d7c5d9264fb0bb754dc4db304a54e2ec7f227",
+                                        "git_blob":  "8bec964e39a9fed851746d2f35285f8c17e7ce62",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "desktop/src-tauri/src/runtime_installer.rs",
+                                        "delivery":  "compiled_into_desktop_executable",
+                                        "bytes":  200866,
+                                        "sha256":  "35077ce1979e60e28d2b15d93b4b9fed33bfe578c7d34e27f50f94ad93c8a202",
+                                        "git_blob":  "dc7d7a91d275600eec03c7126e1eb618c551f245",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "desktop/src-tauri/tauri.conf.json",
+                                        "delivery":  "desktop_bundle_and_updater_contract",
+                                        "bytes":  3333,
+                                        "sha256":  "cbcd45f68670e61c9e221ee292baeb4cefd26c492fb8511a20e9d41c34145cd5",
+                                        "git_blob":  "08e6e6959849f073db594310c07b136ddaac5f84",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "desktop/scripts/build-windows-llvm.ps1",
+                                        "delivery":  "build_contract_not_runtime_payload",
+                                        "bytes":  10510,
+                                        "sha256":  "88c20f307cbd40aa2e99db06568df89d2f603793d205fb3fd921cb8774319f0a",
+                                        "git_blob":  "804c68e9955801ab7e0bca1967034a1e0f3c60e0",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "desktop/scripts/invoke-tauri-updater-signer.ps1",
+                                        "delivery":  "updater_signing_contract_not_runtime_payload",
+                                        "bytes":  2533,
+                                        "sha256":  "fafc214e38ea96866a29f3a403e030f208a33c4e6228827b5fccb5819029ac94",
+                                        "git_blob":  "f824dfeab9f588d6df28dbee3a95c6fd6a2f7488",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/AppShell.tsx",
+                                        "delivery":  "compiled_into_desktop_frontend",
+                                        "bytes":  88978,
+                                        "sha256":  "60cd130235f875293a6c5b392db24549a0b19cc33dbd8e0f32a36a2fb865bcef",
+                                        "git_blob":  "896918e3f92d265959ba7003b69102053e82dd56",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/pages/DesktopSetup.tsx",
+                                        "delivery":  "compiled_into_desktop_frontend",
+                                        "bytes":  105864,
+                                        "sha256":  "579c2d9439f2688bde9b9981959d2053ba67aeb3420596712320398d82a3e08a",
+                                        "git_blob":  "d4e75d08b043387d44c500d29b5a4bc164300478",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/features/auth/browserAuth.ts",
+                                        "delivery":  "compiled_into_desktop_frontend",
+                                        "bytes":  568,
+                                        "sha256":  "22aa256d3a7b25011e27e22cf272e88837ce9faf41bd033b5e76c41d04f5cad5",
+                                        "git_blob":  "41670cdd786848a6c95eef60ff6455c965460bc6",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/features/auth/desktopAuthActivation.ts",
+                                        "delivery":  "compiled_into_desktop_frontend",
+                                        "bytes":  202,
+                                        "sha256":  "4ee8a1d482bd1e7f1b2a308a13168d17bf0cb148817e26481c2c05cb6d8ff94c",
+                                        "git_blob":  "95f7c3469bf166caee707d4ba9ead7363a6c1dd8",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/desktop/startupGate.ts",
+                                        "delivery":  "compiled_into_desktop_frontend",
+                                        "bytes":  4722,
+                                        "sha256":  "074caa2a18446fce7c176f588fbf04ae8de8677102900ba7c91e1c61644682e0",
+                                        "git_blob":  "2e557bdf0b37486f565b6eeb557ccd00dcc4f5a2",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/desktop/runtimeSessionContract.ts",
+                                        "delivery":  "compiled_into_desktop_frontend",
+                                        "bytes":  4469,
+                                        "sha256":  "affaf2e5f465f18d470dbfdaaaf6813b89a86e5e6e0c3eef332a4bf78d31deda",
+                                        "git_blob":  "b1a99b988b05d2c3687f53cf9b5d40661ec00d9f",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/externalLinks.ts",
+                                        "delivery":  "compiled_into_desktop_frontend",
+                                        "bytes":  107,
+                                        "sha256":  "665e7d6e41ec1f624719cd859878f0bb23435a26a47d7e3d805b15c5445fca08",
+                                        "git_blob":  "17f49eb278c5466b3375fcf60b60e9e54d008249",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "frontend/src/router.tsx",
+                                        "delivery":  "compiled_into_desktop_frontend",
+                                        "bytes":  3758,
+                                        "sha256":  "3b4a62f0bd69ad365f71caf99f49ecb98dc8f3a221452918f8ddac8fafffb547",
+                                        "git_blob":  "96fc0f57d66ea576c33a1d56806b1dea29d18d60",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "runtime/scripts/runtime-check.sh",
+                                        "delivery":  "runtime_contract_source_not_embedded_in_nsis",
+                                        "bytes":  7581,
+                                        "sha256":  "5cb44340837be5d82e97deed437f0327feb386ea961365fa5ec3e3b474c2a1e6",
+                                        "git_blob":  "5901c2110722ad784ed94e4959b0be7ac2e2a149",
+                                        "working_bytes_match_commit_blob":  true
+                                    },
+                                    {
+                                        "path":  "runtime/smoke-image.sh",
+                                        "delivery":  "runtime_contract_source_not_embedded_in_nsis",
+                                        "bytes":  4137,
+                                        "sha256":  "65be58d74dcf6fb962a018af80e4fafb76d075ab86530b36cae36fbeb770c81e",
+                                        "git_blob":  "f8c9022d3c0ba6d8b6d2c673d04a6de58a9a0174",
+                                        "working_bytes_match_commit_blob":  true
+                                    }
+                                ],
+    "compiled_payload":  {
+                             "desktop_executable":  {
+                                                        "bytes":  22855680,
+                                                        "sha256":  "f8d724635dfe7b91d0a876dab729334beaa24bcdcd481e98bb92a815569d743f"
+                                                    },
+                             "frontend_dist_files":  [
+                                                         {
+                                                             "path":  "assets/Alert-DIzPDHbi.js",
+                                                             "bytes":  321,
+                                                             "sha256":  "886f5cff6c0d5d1d1124e5b7df18e3673f7b328a8dea45b9a7cfcf50f189e213"
+                                                         },
+                                                         {
+                                                             "path":  "assets/api-eLdo7yaY.js",
+                                                             "bytes":  563,
+                                                             "sha256":  "dfd966fcc717ccbabe24998bd50242227b80712d3c1f4d0749b84640fd08c4f4"
+                                                         },
+                                                         {
+                                                             "path":  "assets/assistantDraft-DTMgR6sY.js",
+                                                             "bytes":  21073,
+                                                             "sha256":  "35dfed488dfb27b42085fb13621a4f23ecc859b3d7df953a1e87f8d55298e939"
+                                                         },
+                                                         {
+                                                             "path":  "assets/Dashboard-1PHcjUoB.js",
+                                                             "bytes":  4360,
+                                                             "sha256":  "ca81ccc95c32c24b19ea12af477ee93de4a1e0487880562f462ca8b079c02916"
+                                                         },
+                                                         {
+                                                             "path":  "assets/DataTable-CRRVtUaQ.js",
+                                                             "bytes":  581,
+                                                             "sha256":  "bcf7882c0f85666e64d99bb0d9a6046fa873d74c2d579568e3655f22e7f27401"
+                                                         },
+                                                         {
+                                                             "path":  "assets/DesktopSetup-e-7G5-eY.js",
+                                                             "bytes":  53599,
+                                                             "sha256":  "0cdd3ef12ab707bd03b865bf38b83151719f3615a0b07fc69844e28b373568d0"
+                                                         },
+                                                         {
+                                                             "path":  "assets/drone-dream-lockup-compact-CZrXD4We.png",
+                                                             "bytes":  96002,
+                                                             "sha256":  "3f2cb2badce89ab62ae4cf806c4ecef4ab7086cbf54cc36c479db57e206e27e3"
+                                                         },
+                                                         {
+                                                             "path":  "assets/drone-dream-lockup-primary-CdbtGdv9.png",
+                                                             "bytes":  108957,
+                                                             "sha256":  "10fb9b8d093e22bd5b0c76d5a221f8b228aabad1493acdcecefd1b25ceab1604"
+                                                         },
+                                                         {
+                                                             "path":  "assets/DroneLaunchScene-BL1x4Ah-.js",
+                                                             "bytes":  21710,
+                                                             "sha256":  "f9cd3faa4bb607e3940d3c787f3d07b07ebb0a35399c908984d2f0ba77fa1267"
+                                                         },
+                                                         {
+                                                             "path":  "assets/ExperimentAssistant-B6IpCGvc.js",
+                                                             "bytes":  20936,
+                                                             "sha256":  "50831c172e88e76f4958ca5181f96d122831d79bd9aa0a0065bbfb03b2bfd3e5"
+                                                         },
+                                                         {
+                                                             "path":  "assets/format-C4x73i-6.js",
+                                                             "bytes":  460,
+                                                             "sha256":  "8adc92247ab8cae78b8877aa7f393ff6e55e307e4f56e0c21b4cc1a033b72302"
+                                                         },
+                                                         {
+                                                             "path":  "assets/GazeboLivePanel-BH6xgWBf.js",
+                                                             "bytes":  4744,
+                                                             "sha256":  "8a8b8b6db76cfa3f1af8b2de629cb548b3d89cf76c3e851f1a33a53ecfb4c317"
+                                                         },
+                                                         {
+                                                             "path":  "assets/History-mZCtUGDn.js",
+                                                             "bytes":  11301,
+                                                             "sha256":  "d5670a1c0814b2e2844dddec0a0905ec76a484e91e2a0c7046ba4b1c8bde3141"
+                                                         },
+                                                         {
+                                                             "path":  "assets/index-Ba4zqL-o.css",
+                                                             "bytes":  162529,
+                                                             "sha256":  "45f47bf1b3a6e6e7fd346710af80935c479698909dcc0f0785f3bacef7f70f89"
+                                                         },
+                                                         {
+                                                             "path":  "assets/index-DXH5IGdR.js",
+                                                             "bytes":  525475,
+                                                             "sha256":  "76f22962de83e0d4e131505cb0aa7a53b8184db551cb3c2ce5828e49408c69ef"
+                                                         },
+                                                         {
+                                                             "path":  "assets/index-usmnKTVs.js",
+                                                             "bytes":  203,
+                                                             "sha256":  "658816a0254580b5da0744d66aab7a7feadbf8f43f0d1313b2d5ce7e4e90ea76"
+                                                         },
+                                                         {
+                                                             "path":  "assets/JobCompare-03UAX_gB.js",
+                                                             "bytes":  3298,
+                                                             "sha256":  "fdb6a61986d7b8222b9fcd502827893e0dcc775addd8f709c5159c7052f78d49"
+                                                         },
+                                                         {
+                                                             "path":  "assets/JobDetail-CTOureZt.js",
+                                                             "bytes":  32411,
+                                                             "sha256":  "c4f6c90c7a7328019431e8f42ebff15d0918d045db20f600131a844dd8600eaf"
+                                                         },
+                                                         {
+                                                             "path":  "assets/MetricCard-HHrv3Y4e.js",
+                                                             "bytes":  344,
+                                                             "sha256":  "da832e109188480b68c8019adf0f07120ef4262bb21df2897fc52982e6f804ba"
+                                                         },
+                                                         {
+                                                             "path":  "assets/NewJobRoute-Bk97nScl.js",
+                                                             "bytes":  100786,
+                                                             "sha256":  "214628a8ff3164708dc21b98d5d597f2b6fccec5b34693f785e2e7b650fb5ff8"
+                                                         },
+                                                         {
+                                                             "path":  "assets/optimizerStrategies-3Ue1gKIt.js",
+                                                             "bytes":  3831,
+                                                             "sha256":  "efc389a3884ef9e3200e731676067a9035c2095734a5d78590d412e28613f9b8"
+                                                         },
+                                                         {
+                                                             "path":  "assets/query-vendor-8KmyTj7m.js",
+                                                             "bytes":  43461,
+                                                             "sha256":  "5d4090f9e4feb51e9723b887e70b313fa93315a9ab5c569b5323f5fd4f66aad8"
+                                                         },
+                                                         {
+                                                             "path":  "assets/react-vendor-DAEnqdXy.js",
+                                                             "bytes":  227164,
+                                                             "sha256":  "97d87c5bb6282752fba2875de92f75f6fa55043b6e60f0a33704064935835bc9"
+                                                         },
+                                                         {
+                                                             "path":  "assets/RuntimeAccessNotice-C9PJPqMo.js",
+                                                             "bytes":  802,
+                                                             "sha256":  "467b27f800f0ea89cb1e76e0f337005bb590ea4aa286b6bb88c4a6baf4793388"
+                                                         },
+                                                         {
+                                                             "path":  "assets/SectionCard-BOkyBFCm.js",
+                                                             "bytes":  518,
+                                                             "sha256":  "0ee6b44b69b971eb20a3e2423e230755bf067e27d4e9498ecf72e4daf39bc162"
+                                                         },
+                                                         {
+                                                             "path":  "assets/States-DV04m_y3.js",
+                                                             "bytes":  1023,
+                                                             "sha256":  "4222eff762e58b9820b73739bcaf622c3fde8b368031c8970c3a5209ae923dc1"
+                                                         },
+                                                         {
+                                                             "path":  "assets/StatusBadge-BdjU5k8D.js",
+                                                             "bytes":  702,
+                                                             "sha256":  "9012fbfae97479591fd8318dd5890e4be4835f9c648c1ed5e72baabaaa25720d"
+                                                         },
+                                                         {
+                                                             "path":  "assets/three-CmEDHrYs.js",
+                                                             "bytes":  499591,
+                                                             "sha256":  "523a929c0d4b6606ab0f5edf103ec2731cfaf48ee1423f340d1c4de8d3a2f76b"
+                                                         },
+                                                         {
+                                                             "path":  "assets/TrialDetail-8pL2ObMS.js",
+                                                             "bytes":  13289,
+                                                             "sha256":  "ee47b5b1b4408b6f36d81796d9f996ee6115e380d5332c4a87f3eb2a950955a9"
+                                                         },
+                                                         {
+                                                             "path":  "docs/dashboard.png",
+                                                             "bytes":  356661,
+                                                             "sha256":  "e1c3c7185ce1fa388e83dab3bcf2b1afa89b4e0d1f621cb84bffadb30eb0aba3"
+                                                         },
+                                                         {
+                                                             "path":  "docs/downloads/DroneDream-Manual-en.md",
+                                                             "bytes":  9872,
+                                                             "sha256":  "b60019b4ab7d9151702b95870dc53b6dffcfb9c9beb475b05c3b9e2265ee60fe"
+                                                         },
+                                                         {
+                                                             "path":  "docs/downloads/DroneDream-Manual-en.pdf",
+                                                             "bytes":  1255797,
+                                                             "sha256":  "94db2d7ddac73d7076b8d37eeaee26cb6344bf2dfad5de0622a022080fbd3ee8"
+                                                         },
+                                                         {
+                                                             "path":  "docs/downloads/DroneDream-Manual-zh-CN.md",
+                                                             "bytes":  8952,
+                                                             "sha256":  "2c46cc6698fb5184f1f371c0f342623a852ba7f4f1c9857a3da3876aad5210f1"
+                                                         },
+                                                         {
+                                                             "path":  "docs/downloads/DroneDream-Manual-zh-CN.pdf",
+                                                             "bytes":  872814,
+                                                             "sha256":  "c3e3df35fa81ef54676a266ed4d2398e831160b835b204f325ec499074fad0a0"
+                                                         },
+                                                         {
+                                                             "path":  "docs/en/dashboard.png",
+                                                             "bytes":  1013619,
+                                                             "sha256":  "c4b46a700b0e3d08233ce9c4a40d238c1bc2d2bf8c8c70ad86c68e7222067dd6"
+                                                         },
+                                                         {
+                                                             "path":  "docs/en/flight-setup.png",
+                                                             "bytes":  118206,
+                                                             "sha256":  "57e1ba0c16bbdbe5d3110baf997622c5f1fc6f741ccb929e148d2c2971578b67"
+                                                         },
+                                                         {
+                                                             "path":  "docs/en/tuning-chat.png",
+                                                             "bytes":  177409,
+                                                             "sha256":  "ba5fccfb753aa632555dcf10c8c5f6595669589f3f56a7ce88ff37f0f85307ae"
+                                                         },
+                                                         {
+                                                             "path":  "docs/flight-setup.png",
+                                                             "bytes":  122186,
+                                                             "sha256":  "e78f071986fb710a1f5aaf27797a5e8379b20c280545a4299dd9de3ee6010ecf"
+                                                         },
+                                                         {
+                                                             "path":  "docs/scenarios.png",
+                                                             "bytes":  140324,
+                                                             "sha256":  "423efa3df23c938c0e529aeff8453acd7144af891ce76a01e2831921050de5c1"
+                                                         },
+                                                         {
+                                                             "path":  "docs/tuning-chat.png",
+                                                             "bytes":  177428,
+                                                             "sha256":  "eb2dc178c467694fd834646ffac6bc1c7c5ce521c3f852934fa30f3fe60db393"
+                                                         },
+                                                         {
+                                                             "path":  "docs/zh-CN/dashboard.png",
+                                                             "bytes":  356661,
+                                                             "sha256":  "e1c3c7185ce1fa388e83dab3bcf2b1afa89b4e0d1f621cb84bffadb30eb0aba3"
+                                                         },
+                                                         {
+                                                             "path":  "docs/zh-CN/flight-setup.png",
+                                                             "bytes":  123671,
+                                                             "sha256":  "0c756a60fb8fcea310bd9a4236ff487d1c930eb98e5da60a65b895b6a41b78a5"
+                                                         },
+                                                         {
+                                                             "path":  "docs/zh-CN/tuning-chat.png",
+                                                             "bytes":  182940,
+                                                             "sha256":  "c7dab3f7663bea2c20f372fd0244b2848d075ace9e2da0f5bfe81acde59113db"
+                                                         },
+                                                         {
+                                                             "path":  "drone-favicon.png",
+                                                             "bytes":  6072,
+                                                             "sha256":  "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7"
+                                                         },
+                                                         {
+                                                             "path":  "index.html",
+                                                             "bytes":  561,
+                                                             "sha256":  "60aecb0fcb67c12a60521c355f6c498fafe449e745957b7dd2fcca69d9fd45c2"
+                                                         },
+                                                         {
+                                                             "path":  "licenses/space-grotesk-OFL-1.1.txt",
+                                                             "bytes":  4490,
+                                                             "sha256":  "eedb5a89d8a84984a4923fe23b438fc654fe603657de7d335f67afdafb47a2a3"
+                                                         }
+                                                     ],
+                             "frontend_dist_inventory_sha256":  "c84137d2728f4b6ecb132f19363866d9cc48979592cffe62d80070e7a3c4739a",
+                             "browser_auth_localhost_callback_contract_compiled":  true,
+                             "browser_auth_expected_supabase_project_compiled":  true,
+                             "browser_auth_homepage_redirect_compiled":  true,
+                             "browser_auth_service_role_literal_compiled":  false,
+                             "ece498_external_url":  "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
+                             "ece498_local_page_removed":  true,
+                             "generated_nsis":  {
+                                                    "bytes":  32567,
+                                                    "sha256":  "91ba15e3177876f8a568a8fa084eb7402fbe1f79fd6aca78bca6ebc9266ba41c",
+                                                    "embedded_webview2_bootstrapper":  true,
+                                                    "desktop_shortcut_uses_official_icon":  true,
+                                                    "compiled_languages":  [
+                                                                               "English:1033",
+                                                                               "SimplifiedChinese:2052"
+                                                                           ]
+                                                }
+                         },
+    "delivery_boundary":  {
+                              "backend_source_embedded_in_nsis":  false,
+                              "simulator_scripts_embedded_in_nsis":  false,
+                              "wsl_rootfs_embedded_in_nsis":  false,
+                              "production_frontend_embedded_in_desktop_executable":  true,
+                              "desktop_runtime_installer_client_embedded":  true,
+                              "separate_public_runtime_release_subject":  "755c511539fe561207ca38ff5079f471a4110896"
+                          }
+}
