@@ -22,6 +22,7 @@ import {
   MoreHorizontal,
   Save,
   Settings,
+  ShieldCheck,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -62,6 +63,10 @@ import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import {
+  useAdminAccess,
+} from "./features/admin/AdminAccessContext";
+import { AdminAccessProvider } from "./features/admin/AdminAccessProvider";
+import {
   captchaProtectionConfigured,
   turnstileSiteKey,
 } from "./features/auth/supabaseClient";
@@ -73,7 +78,9 @@ import {
 import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
 import {
   CloudModelAccessError,
+  getManagedModelCatalog,
   getManagedModelUsage,
+  type ManagedModelCatalogEntry,
   type ManagedModelUsageSnapshot,
 } from "./features/settings/cloudModelAccess";
 import {
@@ -161,6 +168,12 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
   },
   recent_requests: [],
 };
+
+const DOCS_PREVIEW_MANAGED_MODELS: ManagedModelCatalogEntry[] = [
+  { provider: "openai", display_name: "GPT", model: "gpt-4.1", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "deepseek", display_name: "DeepSeek", model: "deepseek-chat", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "qwen", display_name: "Qwen", model: "qwen-plus", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+];
 const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
 const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
@@ -298,13 +311,15 @@ async function stopDesktopRuntimeBeforeExit(): Promise<void> {
 export function AppShell() {
   return (
     <AuthProvider>
-      <DesktopRuntimeAccessProvider>
-        <AppUpdaterProvider>
-          <ModelAccessProvider>
-            <AppShellContent />
-          </ModelAccessProvider>
-        </AppUpdaterProvider>
-      </DesktopRuntimeAccessProvider>
+      <AdminAccessProvider>
+        <DesktopRuntimeAccessProvider>
+          <AppUpdaterProvider>
+            <ModelAccessProvider>
+              <AppShellContent />
+            </ModelAccessProvider>
+          </AppUpdaterProvider>
+        </DesktopRuntimeAccessProvider>
+      </AdminAccessProvider>
     </AuthProvider>
   );
 }
@@ -363,6 +378,7 @@ function SettingsDialog({
     addProfile,
     removeActiveProfile,
     selectAccessMode,
+    selectManagedProvider,
     selectProvider,
     updateSettings,
   } = useModelAccess();
@@ -377,6 +393,10 @@ function SettingsDialog({
       docsPreview ? "ready" : "idle",
     );
   const [managedUsageError, setManagedUsageError] = useState<string | null>(null);
+  const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
+    docsPreview ? DOCS_PREVIEW_MANAGED_MODELS : [],
+  );
+  const [managedModelsError, setManagedModelsError] = useState<string | null>(null);
   const [subscriptionOpenError, setSubscriptionOpenError] =
     useState<string | null>(null);
   const [experiencePreferences, setExperiencePreferences] =
@@ -431,6 +451,38 @@ function SettingsDialog({
   useEffect(() => {
     void refreshManagedUsage();
   }, [refreshManagedUsage]);
+  useEffect(() => {
+    if (modelAccess.accessMode !== "platform") return;
+    if (docsPreview) {
+      setManagedModels(DOCS_PREVIEW_MANAGED_MODELS);
+      setManagedModelsError(null);
+      return;
+    }
+    if (!auth.account) return;
+    let active = true;
+    void getManagedModelCatalog()
+      .then((catalog) => {
+        if (!active) return;
+        setManagedModels(catalog.models.filter((model) =>
+          model.enabled && model.assistant_enabled
+        ));
+        setManagedModelsError(null);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setManagedModels([]);
+        setManagedModelsError(error instanceof Error ? error.message : t("settings.model.usageUnavailable"));
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth.account, docsPreview, modelAccess.accessMode, t]);
+  useEffect(() => {
+    if (managedModels.length === 0) return;
+    if (!managedModels.some((model) => model.provider === modelAccess.managedProvider)) {
+      selectManagedProvider(managedModels[0].provider);
+    }
+  }, [managedModels, modelAccess.managedProvider, selectManagedProvider]);
   useEffect(() => {
     if (!access.canUseRuntime) {
       setExperiencePreferenceState("blocked");
@@ -821,6 +873,28 @@ function SettingsDialog({
         </div>
         {modelAccess.accessMode === "platform" ? (
           <div className="settings-model-usage">
+            <div className="settings-managed-model-row">
+              <label htmlFor="settings_managed_model_provider">
+                <span>{locale === "zh-CN" ? "平台托管模型" : "Included model"}</span>
+                <select
+                  id="settings_managed_model_provider"
+                  value={modelAccess.managedProvider}
+                  disabled={managedModels.length === 0}
+                  onChange={(event) => selectManagedProvider(
+                    event.target.value as ManagedModelCatalogEntry["provider"],
+                  )}
+                >
+                  {managedModels.map((model) => (
+                    <option key={model.provider} value={model.provider}>
+                      {model.display_name} · {model.model}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {managedModelsError ? (
+                <p role="status">{managedModelsError}</p>
+              ) : null}
+            </div>
             <div className="settings-model-plan-row">
               <div>
                 <span>{t("settings.model.currentPlan")}</span>
@@ -1912,6 +1986,7 @@ function AppShellContent() {
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuth();
+  const adminAccess = useAdminAccess();
   const updater = useAppUpdaterState();
   const { locale, t } = useI18n();
   const accountCopy = ACCOUNT_COPY[locale];
@@ -2497,6 +2572,17 @@ function AppShellContent() {
               </NavLink>
             );
           })}
+          {!desktopRuntime && adminAccess.status === "allowed" ? (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) => isActive ? "active" : undefined}
+            >
+              <span className="app-nav-entry">
+                <ShieldCheck aria-hidden="true" strokeWidth={1.75} />
+                <span>{locale === "zh-CN" ? "管理端" : "Admin"}</span>
+              </span>
+            </NavLink>
+          ) : null}
         </nav>
         <ExperimentWorkspaceSidebar
           ownerId={auth.account?.id ?? "local"}

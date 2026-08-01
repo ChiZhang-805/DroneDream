@@ -24,6 +24,7 @@ import {
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { isDesktopRuntime } from "../desktop/bridge";
+import { recordProductEvent } from "../features/analytics/productEvents";
 import {
   applyAssistantTurn,
   assistantCurrentParameters,
@@ -47,7 +48,9 @@ import {
 } from "../features/settings/ModelAccessContext";
 import {
   CloudModelAccessError,
+  getManagedModelCatalog,
   issueManagedModelGrant,
+  type ManagedModelCatalogEntry,
 } from "../features/settings/cloudModelAccess";
 import { useI18n } from "../i18n/I18nProvider";
 import type {
@@ -97,6 +100,7 @@ const COPY = {
     model: "Model",
     noModel: "None",
     managedModel: "DroneDream Managed",
+    managedUnavailable: "No managed conversation model is currently available.",
     modelRequired: "Use the included allowance or configure your API key in Settings.",
     requestFailed: "The model could not compile this draft turn.",
     runtimeOutdated:
@@ -163,6 +167,7 @@ const COPY = {
     model: "模型",
     noModel: "无",
     managedModel: "DroneDream 托管模型",
+    managedUnavailable: "当前没有可用的平台托管对话模型。",
     modelRequired: "请在设置中使用赠送额度，或配置自己的 API Key。",
     requestFailed: "模型未能完成这次实验草稿编译。",
     runtimeOutdated:
@@ -332,13 +337,31 @@ export function ExperimentAssistant() {
     settings: modelAccess,
     profiles: modelProfiles,
     activeProfileId,
+    selectManagedProvider,
     selectProfile,
   } = useModelAccess();
+  const docsPreview = import.meta.env.DEV
+    && new URLSearchParams(window.location.search).has("docsPreview");
+  const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
+    docsPreview
+      ? [
+          { provider: "openai", display_name: "GPT", model: "gpt-4.1", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+          { provider: "deepseek", display_name: "DeepSeek", model: "deepseek-chat", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+          { provider: "qwen", display_name: "Qwen", model: "qwen-plus", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+        ]
+      : [],
+  );
+  const [managedModelsReady, setManagedModelsReady] = useState(docsPreview);
   const configuredModelProfiles = modelProfiles.filter((profile) =>
     profile.apiKey.trim(),
   );
+  const selectedManagedModel = managedModels.find(
+    (model) => model.provider === modelAccess.managedProvider,
+  );
   const selectedModelProfileId = modelAccess.accessMode === "platform"
-    ? "managed"
+    ? selectedManagedModel
+      ? `managed:${selectedManagedModel.provider}`
+      : "none"
     : configuredModelProfiles.some(
     (profile) => profile.id === activeProfileId,
   )
@@ -361,6 +384,59 @@ export function ExperimentAssistant() {
   const pendingRef = useRef(false);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (modelAccess.accessMode !== "platform") return;
+    if (docsPreview) {
+      setManagedModelsReady(true);
+      return;
+    }
+    if (!auth?.account) {
+      setManagedModels([]);
+      setManagedModelsReady(false);
+      return;
+    }
+    let active = true;
+    setManagedModelsReady(false);
+    void getManagedModelCatalog()
+      .then((catalog) => {
+        if (!active) return;
+        const available = catalog.models.filter((model) =>
+          model.enabled && model.assistant_enabled
+        );
+        setManagedModels(available);
+        setManagedModelsReady(true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setManagedModels([]);
+        setManagedModelsReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    auth?.account,
+    docsPreview,
+    modelAccess.accessMode,
+  ]);
+
+  useEffect(() => {
+    if (
+      modelAccess.accessMode === "platform"
+      && managedModels.length > 0
+      && !managedModels.some(
+        (model) => model.provider === modelAccess.managedProvider,
+      )
+    ) {
+      selectManagedProvider(managedModels[0].provider);
+    }
+  }, [
+    managedModels,
+    modelAccess.accessMode,
+    modelAccess.managedProvider,
+    selectManagedProvider,
+  ]);
 
   const appendTranscript = useCallback((transcript: string) => {
     setComposer((current) =>
@@ -456,6 +532,13 @@ export function ExperimentAssistant() {
       openAppSettings();
       return;
     }
+    if (
+      modelAccess.accessMode === "platform"
+      && (!managedModelsReady || !selectedManagedModel)
+    ) {
+      setError(copy.managedUnavailable);
+      return;
+    }
     const id = messageId();
     pendingRef.current = true;
     setPending(true);
@@ -465,6 +548,7 @@ export function ExperimentAssistant() {
         ? (await issueManagedModelGrant(
             "assistant",
             workspaceId ?? `draft:${ownerId}`,
+            modelAccess.managedProvider,
           )).grant
         : null;
       const result = await apiClient.compileExperimentAssistantTurn({
@@ -527,8 +611,21 @@ export function ExperimentAssistant() {
       setLatest(result);
       setComposer("");
       setReferenceFiles([]);
+      void recordProductEvent("assistant_turn_succeeded", {
+        access_mode: modelAccess.accessMode,
+        provider: modelAccess.accessMode === "platform"
+          ? modelAccess.managedProvider
+          : modelAccess.provider,
+        has_reference_files: referenceFiles.length > 0,
+      });
     } catch (reason) {
       setError(assistantErrorMessage(reason, copy));
+      void recordProductEvent("assistant_turn_failed", {
+        access_mode: modelAccess.accessMode,
+        provider: modelAccess.accessMode === "platform"
+          ? modelAccess.managedProvider
+          : modelAccess.provider,
+      });
     } finally {
       pendingRef.current = false;
       setPending(false);
@@ -745,22 +842,44 @@ export function ExperimentAssistant() {
             className="assistant-model-button"
             aria-label={copy.model}
             value={selectedModelProfileId}
+            disabled={
+              pending
+              || (modelAccess.accessMode === "platform" && !managedModelsReady)
+            }
             onChange={(event) => {
-              if (event.target.value !== "none") {
+              if (event.target.value.startsWith("managed:")) {
+                selectManagedProvider(
+                  event.target.value.slice("managed:".length) as
+                    | "openai"
+                    | "deepseek"
+                    | "qwen",
+                );
+              } else if (event.target.value !== "none") {
                 selectProfile(event.target.value);
               }
             }}
           >
             {modelAccess.accessMode === "platform" ? (
-              <option value="managed">{copy.managedModel}</option>
-            ) : null}
-            <option value="none">{copy.noModel}</option>
-            {configuredModelProfiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {modelProviderLabel(profile.provider)} ·{" "}
-                {profile.model.trim() || "default"}
-              </option>
-            ))}
+              managedModels.length ? (
+                managedModels.map((model) => (
+                  <option key={model.provider} value={`managed:${model.provider}`}>
+                    {model.display_name} · {model.model}
+                  </option>
+                ))
+              ) : (
+                <option value="none">{copy.managedUnavailable}</option>
+              )
+            ) : (
+              <>
+                <option value="none">{copy.noModel}</option>
+                {configuredModelProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>
+                    {modelProviderLabel(profile.provider)} ·{" "}
+                    {profile.model.trim() || "default"}
+                  </option>
+                ))}
+              </>
+            )}
           </select>
           <button
             type="button"

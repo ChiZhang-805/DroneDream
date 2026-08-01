@@ -83,6 +83,14 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: FixedScenarios };
           },
         },
+        {
+          path: "admin",
+          lazy: async () => {
+            const { AdminPage } = await import("./pages/AdminPage");
+            return { Component: AdminPage };
+          },
+          loader: desktopRuntime ? () => redirect("/assistant") : undefined,
+        },
         { path: "batches/*", loader: () => redirect("/dashboard") },
         {
           path: "compare",

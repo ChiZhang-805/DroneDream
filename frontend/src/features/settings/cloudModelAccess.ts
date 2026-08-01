@@ -4,6 +4,7 @@ import {
   FetchResponseSizeError,
   fetchWithDeadline,
 } from "../../api/fetchWithDeadline";
+import type { ManagedModelProvider } from "./ModelAccessContext";
 
 export type ManagedModelPlanId = "free" | "plus" | "pro";
 export type ManagedModelGrantScope = "assistant" | "job";
@@ -64,6 +65,21 @@ export interface ManagedModelGrant {
   gateway_base_url: string;
   managed_model: string;
   usage: ManagedModelUsageSnapshot;
+}
+
+export interface ManagedModelCatalogEntry {
+  provider: ManagedModelProvider;
+  display_name: string;
+  model: string;
+  enabled: boolean;
+  assistant_enabled: boolean;
+  job_enabled: boolean;
+  policy_version: number;
+}
+
+export interface ManagedModelCatalog {
+  generated_at: string;
+  models: ManagedModelCatalogEntry[];
 }
 
 export interface BillingAvailability {
@@ -220,15 +236,21 @@ export function getManagedModelUsage(): Promise<ManagedModelUsageSnapshot> {
   return cloudRequest<ManagedModelUsageSnapshot>(modelGatewayUrl, "/usage");
 }
 
+export function getManagedModelCatalog(): Promise<ManagedModelCatalog> {
+  return cloudRequest<ManagedModelCatalog>(modelGatewayUrl, "/models");
+}
+
 export function issueManagedModelGrant(
   scope: ManagedModelGrantScope,
   scopeReference?: string | null,
+  provider?: ManagedModelProvider,
 ): Promise<ManagedModelGrant> {
   return cloudRequest<ManagedModelGrant>(modelGatewayUrl, "/grants", {
     method: "POST",
     body: JSON.stringify({
       scope,
       scope_reference: scopeReference || null,
+      ...(provider ? { provider } : {}),
     }),
   });
 }

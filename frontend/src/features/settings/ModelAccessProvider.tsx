@@ -11,12 +11,14 @@ import type {
   ModelAccessMode,
   ModelAccessProfile,
   ModelAccessSettings,
+  ManagedModelProvider,
   ModelProvider,
 } from "./ModelAccessContext";
 
 interface PersistedModelAccessProfile {
   id: string;
   accessMode: ModelAccessMode;
+  managedProvider: ManagedModelProvider;
   provider: ModelProvider;
   model: string;
   baseUrl: string;
@@ -38,6 +40,7 @@ const DEFAULT_PROFILE_ID = "default";
 
 const DEFAULT_MODEL_ACCESS: ModelAccessSettings = {
   accessMode: "platform",
+  managedProvider: "openai",
   provider: "openai",
   apiKey: "",
   model: "",
@@ -62,6 +65,10 @@ const PROVIDER_DEFAULTS: Record<
 
 function isModelProvider(value: unknown): value is ModelProvider {
   return ["openai", "qwen", "deepseek", "custom"].includes(String(value));
+}
+
+function isManagedModelProvider(value: unknown): value is ManagedModelProvider {
+  return ["openai", "qwen", "deepseek"].includes(String(value));
 }
 
 function isModelAccessMode(value: unknown): value is ModelAccessMode {
@@ -102,6 +109,9 @@ function parsePersistedProfile(value: unknown): PersistedModelAccessProfile | nu
     accessMode: isModelAccessMode(candidate.accessMode)
       ? candidate.accessMode
       : "platform",
+    managedProvider: isManagedModelProvider(candidate.managedProvider)
+      ? candidate.managedProvider
+      : "openai",
     provider: candidate.provider,
     model: candidate.model,
     baseUrl: candidate.baseUrl,
@@ -152,6 +162,7 @@ function loadModelAccessState(): ModelAccessState {
         profiles: [{
           id: DEFAULT_PROFILE_ID,
           accessMode: "platform",
+          managedProvider: "openai",
           provider: candidate.provider,
           model: candidate.model,
           baseUrl: candidate.baseUrl,
@@ -220,6 +231,7 @@ export function ModelAccessProvider({
           profiles: state.profiles.map((profile) => ({
             id: profile.id,
             accessMode: profile.accessMode,
+            managedProvider: profile.managedProvider,
             provider: profile.provider,
             model: profile.model,
             baseUrl: profile.baseUrl,
@@ -262,6 +274,17 @@ export function ModelAccessProvider({
     }));
   }, []);
 
+  const selectManagedProvider = useCallback((managedProvider: ManagedModelProvider) => {
+    setState((current) => ({
+      ...current,
+      profiles: current.profiles.map((profile) =>
+        profile.id === current.activeProfileId
+          ? { ...profile, managedProvider }
+          : profile
+      ),
+    }));
+  }, []);
+
   const selectAccessMode = useCallback((accessMode: ModelAccessMode) => {
     setState((current) => ({
       ...current,
@@ -292,6 +315,7 @@ export function ModelAccessProvider({
           {
             id,
             accessMode: "byok",
+            managedProvider: "openai",
             provider: "custom",
             apiKey: "",
             ...PROVIDER_DEFAULTS.custom,
@@ -320,6 +344,7 @@ export function ModelAccessProvider({
     activeProfileId: state.activeProfileId,
     updateSettings,
     selectAccessMode,
+    selectManagedProvider,
     selectProvider,
     selectProfile,
     addProfile,
@@ -328,6 +353,7 @@ export function ModelAccessProvider({
     addProfile,
     removeActiveProfile,
     selectProfile,
+    selectManagedProvider,
     selectProvider,
     selectAccessMode,
     settings,
