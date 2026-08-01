@@ -53,3 +53,24 @@ def test_production_accepts_strong_secret_passphrase(
 
     assert is_configured() is True
     assert decrypt_secret(token) == "api-key-value"
+
+
+@pytest.mark.parametrize("app_env", ["desktop", "production"])
+def test_protected_environment_rejects_a_migrated_development_token(
+    monkeypatch: pytest.MonkeyPatch,
+    app_env: str,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.delenv("APP_SECRET_KEY", raising=False)
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
+    development_token = encrypt_secret("api-key-value")
+    assert development_token.startswith("DRONEDREAM_DEV::")
+
+    monkeypatch.setenv("APP_ENV", app_env)
+    monkeypatch.setenv(
+        "APP_SECRET_KEY",
+        "prod-secret-key-0123456789-ABCDEFGH-!@#$",
+    )
+
+    with pytest.raises(SecretStoreError, match="forbidden"):
+        decrypt_secret(development_token)

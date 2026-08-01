@@ -130,6 +130,13 @@ def decrypt_secret(token: str) -> str:
     if not token:
         raise SecretStoreError("Cannot decrypt an empty token.")
     if token.startswith(_DEV_MARKER):
+        if _is_protected_environment():
+            # A development database may be copied into a packaged or hosted
+            # environment. Never let its reversible base64 placeholder bypass
+            # the protected environment's Fernet-at-rest requirement.
+            raise SecretStoreError(
+                "Local-development secret tokens are forbidden in desktop or production."
+            )
         try:
             return base64.urlsafe_b64decode(token.removeprefix(_DEV_MARKER).encode("ascii")).decode(
                 "utf-8"
