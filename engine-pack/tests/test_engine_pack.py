@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import shutil
 import sys
 import tarfile
 import tempfile
@@ -105,6 +104,7 @@ class EnginePackTests(unittest.TestCase):
                 self.verify(output)
 
     def test_duplicate_or_traversal_manifest_paths_are_rejected(self) -> None:
+        pins = engine_pack.read_pins(ROOT / "runtime" / "pins.env")
         record = {"path": "../escape", "sizeBytes": 1, "sha256": "0" * 64}
         manifest = {
             "schemaVersion": 1,
@@ -112,11 +112,54 @@ class EnginePackTests(unittest.TestCase):
             "packId": "sha256:" + "0" * 64,
             "engineApiVersion": 1,
             "source": {"gitCommit": "1" * 40, "sourceDateEpoch": 1},
-            "runtimeCompatibility": {},
+            "runtimeCompatibility": {
+                "runtimeId": "DroneDreamRuntime",
+                "runtimeVersion": pins["DRONEDREAM_RUNTIME_VERSION"],
+                "pythonVersion": pins["PYTHON_VERSION"],
+                "px4Commit": pins["PX4_GIT_COMMIT"],
+                "gazeboVersion": (f"{pins['GAZEBO_RELEASE']}@{pins['GAZEBO_METAPACKAGE_VERSION']}"),
+                "dependencyLockSha256": engine_pack.sha256_file(
+                    ROOT / "runtime" / "locks" / "python-requirements.lock"
+                ),
+            },
             "files": [record],
         }
         with self.assertRaisesRegex(engine_pack.EnginePackError, "unsafe archive member"):
             engine_pack.validate_manifest(manifest)
+
+    def test_descriptor_cannot_redirect_the_manifest_sidecar(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            self.build(output)
+            descriptor_path = output / engine_pack.DESCRIPTOR_FILENAME
+            descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+            descriptor["manifest"]["filename"] = "../outside.json"
+            descriptor_path.write_bytes(engine_pack.canonical_json(descriptor))
+
+            with self.assertRaisesRegex(engine_pack.EnginePackError, "filename does not match"):
+                self.verify(output)
+
+    def test_sidecar_manifest_must_match_the_embedded_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            self.build(output)
+            manifest_path = output / engine_pack.MANIFEST_FILENAME
+            manifest_path.write_bytes(manifest_path.read_bytes() + b" ")
+
+            with self.assertRaisesRegex(engine_pack.EnginePackError, "size does not match"):
+                self.verify(output)
+
+    def test_descriptor_rejects_unknown_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            self.build(output)
+            descriptor_path = output / engine_pack.DESCRIPTOR_FILENAME
+            descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+            descriptor["unexpected"] = True
+            descriptor_path.write_bytes(engine_pack.canonical_json(descriptor))
+
+            with self.assertRaisesRegex(engine_pack.EnginePackError, "fields do not match"):
+                self.verify(output)
 
 
 if __name__ == "__main__":

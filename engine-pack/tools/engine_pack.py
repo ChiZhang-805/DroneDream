@@ -12,9 +12,9 @@ import os
 import re
 import subprocess
 import tarfile
-import tempfile
+from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any
 
 ARCHIVE_FILENAME = "DroneDreamEnginePack.tar.gz"
 DESCRIPTOR_FILENAME = "engine-pack-bundle.json"
@@ -219,7 +219,9 @@ def write_archive(
     try:
         with temporary.open("wb") as raw:
             with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
-                with tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive:
+                with tarfile.open(
+                    fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
+                ) as archive:
                     archive.addfile(
                         _tar_info(MANIFEST_FILENAME, manifest_bytes, epoch),
                         io.BytesIO(manifest_bytes),
@@ -295,12 +297,41 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         raise EnginePackError("Engine Pack manifest identity is invalid")
     if manifest["engineApiVersion"] != ENGINE_API_VERSION:
         raise EnginePackError("Engine Pack API version is unsupported")
+    source = manifest["source"]
+    if not isinstance(source, dict) or set(source) != {"gitCommit", "sourceDateEpoch"}:
+        raise EnginePackError("Engine Pack source identity is invalid")
+    if not isinstance(source["gitCommit"], str) or not COMMIT_RE.fullmatch(source["gitCommit"]):
+        raise EnginePackError("Engine Pack source commit is invalid")
+    if type(source["sourceDateEpoch"]) is not int or source["sourceDateEpoch"] < 0:
+        raise EnginePackError("Engine Pack source timestamp is invalid")
+    compatibility = manifest["runtimeCompatibility"]
+    compatibility_keys = {
+        "runtimeId",
+        "runtimeVersion",
+        "pythonVersion",
+        "px4Commit",
+        "gazeboVersion",
+        "dependencyLockSha256",
+    }
+    if not isinstance(compatibility, dict) or set(compatibility) != compatibility_keys:
+        raise EnginePackError("Engine Pack Runtime compatibility identity is invalid")
+    if any(
+        not isinstance(compatibility[key], str) or not compatibility[key]
+        for key in compatibility_keys
+    ):
+        raise EnginePackError("Engine Pack Runtime compatibility values are invalid")
+    if not COMMIT_RE.fullmatch(compatibility["px4Commit"]):
+        raise EnginePackError("Engine Pack PX4 compatibility commit is invalid")
+    if not SHA256_RE.fullmatch(compatibility["dependencyLockSha256"]):
+        raise EnginePackError("Engine Pack dependency lock identity is invalid")
     if not isinstance(manifest["files"], list) or not manifest["files"]:
         raise EnginePackError("Engine Pack file list is empty")
     paths: list[str] = []
     for record in manifest["files"]:
         if not isinstance(record, dict) or set(record) != {"path", "sizeBytes", "sha256"}:
             raise EnginePackError("Engine Pack file record is invalid")
+        if not isinstance(record["path"], str) or not isinstance(record["sha256"], str):
+            raise EnginePackError("Engine Pack file identity is invalid")
         path = _safe_member_path(record["path"])
         if str(path) != record["path"] or not SHA256_RE.fullmatch(record["sha256"]):
             raise EnginePackError("Engine Pack file identity is invalid")
@@ -317,19 +348,86 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
     return manifest
 
 
-def verified_bundle(descriptor_path: Path, archive_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
-    descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
-    if descriptor.get("schemaVersion") != 1 or descriptor.get("kind") != "dronedream-engine-pack-bundle":
+def verified_bundle(
+    descriptor_path: Path, archive_path: Path
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if descriptor_path.is_symlink() or not descriptor_path.is_file():
+        raise EnginePackError("Engine Pack descriptor must be a regular non-symlink file")
+    if archive_path.is_symlink() or not archive_path.is_file():
+        raise EnginePackError("Engine Pack archive must be a regular non-symlink file")
+    descriptor_bytes = descriptor_path.read_bytes()
+    descriptor = json.loads(descriptor_bytes)
+    if not isinstance(descriptor, dict) or set(descriptor) != {
+        "schemaVersion",
+        "kind",
+        "packId",
+        "sourceCommit",
+        "archive",
+        "manifest",
+    }:
+        raise EnginePackError("Engine Pack descriptor fields do not match schema v1")
+    if (
+        descriptor.get("schemaVersion") != 1
+        or descriptor.get("kind") != "dronedream-engine-pack-bundle"
+    ):
         raise EnginePackError("Engine Pack descriptor identity is invalid")
+    if descriptor_bytes != canonical_json(descriptor):
+        raise EnginePackError("Engine Pack descriptor is not canonical JSON")
+    if (
+        not isinstance(descriptor.get("packId"), str)
+        or not descriptor["packId"].startswith("sha256:")
+        or not SHA256_RE.fullmatch(descriptor["packId"].removeprefix("sha256:"))
+    ):
+        raise EnginePackError("Engine Pack descriptor pack ID is invalid")
+    if not isinstance(descriptor.get("sourceCommit"), str) or not COMMIT_RE.fullmatch(
+        descriptor["sourceCommit"]
+    ):
+        raise EnginePackError("Engine Pack descriptor source commit is invalid")
     expected_archive = descriptor.get("archive")
-    if not isinstance(expected_archive, dict):
+    if not isinstance(expected_archive, dict) or set(expected_archive) != {
+        "filename",
+        "sizeBytes",
+        "sha256",
+    }:
         raise EnginePackError("Engine Pack archive descriptor is missing")
-    if expected_archive.get("filename") != archive_path.name:
+    if (
+        expected_archive.get("filename") != ARCHIVE_FILENAME
+        or archive_path.name != ARCHIVE_FILENAME
+    ):
         raise EnginePackError("Engine Pack archive filename does not match")
-    if expected_archive.get("sizeBytes") != archive_path.stat().st_size:
+    if type(expected_archive.get("sizeBytes")) is not int or expected_archive["sizeBytes"] < 0:
+        raise EnginePackError("Engine Pack archive size is invalid")
+    if expected_archive["sizeBytes"] != archive_path.stat().st_size:
         raise EnginePackError("Engine Pack archive size does not match")
-    if expected_archive.get("sha256") != sha256_file(archive_path):
+    if not isinstance(expected_archive.get("sha256"), str) or not SHA256_RE.fullmatch(
+        expected_archive["sha256"]
+    ):
+        raise EnginePackError("Engine Pack archive hash is invalid")
+    if expected_archive["sha256"] != sha256_file(archive_path):
         raise EnginePackError("Engine Pack archive hash does not match")
+    expected_manifest = descriptor.get("manifest")
+    if not isinstance(expected_manifest, dict) or set(expected_manifest) != {
+        "filename",
+        "sizeBytes",
+        "sha256",
+    }:
+        raise EnginePackError("Engine Pack manifest descriptor is missing")
+    if expected_manifest.get("filename") != MANIFEST_FILENAME:
+        raise EnginePackError("Engine Pack manifest filename does not match")
+    if type(expected_manifest.get("sizeBytes")) is not int or expected_manifest["sizeBytes"] < 0:
+        raise EnginePackError("Engine Pack manifest size is invalid")
+    if not isinstance(expected_manifest.get("sha256"), str) or not SHA256_RE.fullmatch(
+        expected_manifest["sha256"]
+    ):
+        raise EnginePackError("Engine Pack manifest hash is invalid")
+    manifest_path = descriptor_path.parent / MANIFEST_FILENAME
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise EnginePackError("Engine Pack manifest must be a regular non-symlink file")
+    manifest_sidecar = manifest_path.read_bytes()
+    if len(manifest_sidecar) != expected_manifest["sizeBytes"]:
+        raise EnginePackError("Engine Pack manifest size does not match")
+    if sha256_bytes(manifest_sidecar) != expected_manifest["sha256"]:
+        raise EnginePackError("Engine Pack manifest hash does not match")
     with tarfile.open(archive_path, mode="r:gz") as archive:
         members = archive.getmembers()
         names = [str(_safe_member_path(member.name)) for member in members]
@@ -343,13 +441,16 @@ def verified_bundle(descriptor_path: Path, archive_path: Path) -> tuple[dict[str
             raise EnginePackError("Engine Pack manifest cannot be read")
         manifest_bytes = extracted.read()
         manifest = validate_manifest(json.loads(manifest_bytes))
-        expected_manifest = descriptor.get("manifest")
-        if not isinstance(expected_manifest, dict):
-            raise EnginePackError("Engine Pack manifest descriptor is missing")
-        if expected_manifest.get("sha256") != sha256_bytes(manifest_bytes):
+        if manifest_bytes != canonical_json(manifest):
+            raise EnginePackError("Engine Pack manifest is not canonical JSON")
+        if manifest_bytes != manifest_sidecar:
+            raise EnginePackError("Engine Pack embedded and sidecar manifests disagree")
+        if expected_manifest["sha256"] != sha256_bytes(manifest_bytes):
             raise EnginePackError("Engine Pack manifest hash does not match")
         records = {record["path"]: record for record in manifest["files"]}
-        payload_names = [name.removeprefix("payload/") for name in names if name.startswith("payload/")]
+        payload_names = [
+            name.removeprefix("payload/") for name in names if name.startswith("payload/")
+        ]
         if payload_names != list(records):
             raise EnginePackError("Engine Pack archive payload does not match its manifest")
         for inner_path, record in records.items():
@@ -360,8 +461,10 @@ def verified_bundle(descriptor_path: Path, archive_path: Path) -> tuple[dict[str
             payload = source.read()
             if len(payload) != record["sizeBytes"] or sha256_bytes(payload) != record["sha256"]:
                 raise EnginePackError(f"Engine Pack payload failed verification: {inner_path}")
-    if descriptor.get("packId") != manifest["packId"]:
+    if descriptor["packId"] != manifest["packId"]:
         raise EnginePackError("Engine Pack descriptor and manifest disagree")
+    if descriptor["sourceCommit"] != manifest["source"]["gitCommit"]:
+        raise EnginePackError("Engine Pack descriptor and source commit disagree")
     return descriptor, manifest
 
 
