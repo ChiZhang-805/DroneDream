@@ -10835,7 +10835,34 @@ a {
 }
 
 .admin-users-panel header form {
-  flex: 0 1 360px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.admin-users-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 1 590px;
+  min-width: 0;
+  gap: 0.55rem;
+}
+
+.admin-user-export {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.admin-user-export-scope,
+.admin-user-export-status {
+  margin: 0.55rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.admin-user-export-status {
+  color: color-mix(in srgb, #178b67 78%, var(--text));
+  font-weight: 650;
 }
 
 .admin-users-panel header form label {
@@ -10974,6 +11001,11 @@ a {
   .admin-users-panel header form {
     flex-basis: auto;
   }
+
+  .admin-users-toolbar {
+    width: 100%;
+    flex-basis: auto;
+  }
 }
 
 @media (max-width: 440px) {
@@ -10982,7 +11014,8 @@ a {
   }
 
   .admin-hero-actions,
-  .admin-users-panel header form {
+  .admin-users-panel header form,
+  .admin-users-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
@@ -10994,6 +11027,10 @@ a {
   .admin-users-panel header form label,
   .admin-users-panel header form input,
   .admin-users-panel header form .btn {
+    width: 100%;
+  }
+
+  .admin-user-export {
     width: 100%;
   }
 

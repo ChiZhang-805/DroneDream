@@ -167,6 +167,12 @@ export interface AdminPageResult<T> {
   total: number;
 }
 
+export interface AdminUserExport {
+  blob: Blob;
+  file_name: string;
+  row_count: number | null;
+}
+
 export class AdminConsoleError extends Error {
   readonly code: string;
   readonly status: number;
@@ -181,6 +187,8 @@ export class AdminConsoleError extends Error {
 
 const ADMIN_TIMEOUT_MS = 20_000;
 const ADMIN_RESPONSE_MAX_BYTES = 2 * 1024 * 1024;
+const ADMIN_EXPORT_TIMEOUT_MS = 60_000;
+const ADMIN_EXPORT_MAX_BYTES = 20 * 1024 * 1024;
 
 function deriveAdminConsoleUrl(): string {
   const explicit = (
@@ -200,7 +208,7 @@ function adminPreviewEnabled(): boolean {
     && new URLSearchParams(window.location.search).get("adminPreview") === "1";
 }
 
-function authenticatedHeaders(): Record<string, string> {
+function authenticatedHeaders(accept = "application/json"): Record<string, string> {
   const token = getAuthAccessToken();
   if (!token) {
     throw new AdminConsoleError(
@@ -212,8 +220,50 @@ function authenticatedHeaders(): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
-    Accept: "application/json",
+    Accept: accept,
   };
+}
+
+function safeCsvCell(value: string | number | null): string {
+  let normalized = value === null ? "" : String(value);
+  if (/^[=+\-@]/u.test(normalized)) normalized = `'${normalized}`;
+  return `"${normalized.replaceAll('"', '""')}"`;
+}
+
+function previewUserExport(search: string): AdminUserExport {
+  const query = search.trim().toLowerCase();
+  const rows = query
+    ? PREVIEW_USERS.filter((user) => user.email.toLowerCase().includes(query))
+    : PREVIEW_USERS;
+  const fields: Array<keyof AdminUserRow> = [
+    "id",
+    "email",
+    "created_at",
+    "last_sign_in_at",
+    "plan",
+    "subscription_status",
+    "period_consumed_ai_credits",
+    "period_remaining_ai_credits",
+    "period_request_count",
+    "period_total_tokens",
+  ];
+  const csv = [
+    fields.map((field) => safeCsvCell(field)).join(","),
+    ...rows.map((user) => fields.map((field) => safeCsvCell(user[field])).join(",")),
+  ].join("\r\n");
+  return {
+    blob: new Blob(["\ufeff", csv, "\r\n"], { type: "text/csv;charset=utf-8" }),
+    file_name: "DroneDream-users-preview.csv",
+    row_count: rows.length,
+  };
+}
+
+function exportFileName(response: Response): string {
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([A-Za-z0-9._-]+)"?/iu.exec(disposition);
+  return match?.[1]?.toLowerCase().endsWith(".csv")
+    ? match[1]
+    : `DroneDream-users-${new Date().toISOString().slice(0, 10)}.csv`;
 }
 
 async function adminRequest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -449,6 +499,87 @@ export async function listAdminUsers(
   const params = new URLSearchParams({ page: String(page), page_size: "25" });
   if (search.trim()) params.set("search", search.trim());
   return adminRequest<AdminPageResult<AdminUserRow>>(`/users?${params}`);
+}
+
+export async function exportAdminUsers(search: string): Promise<AdminUserExport> {
+  if (adminPreviewEnabled()) return previewUserExport(search);
+  if (!adminConsoleUrl) {
+    throw new AdminConsoleError(
+      "SERVICE_NOT_CONFIGURED",
+      "The administration service is not configured in this build.",
+      503,
+    );
+  }
+  let response: Response;
+  try {
+    response = await fetchWithDeadline(
+      `${adminConsoleUrl}/users/export`,
+      {
+        method: "POST",
+        headers: authenticatedHeaders("text/csv"),
+        body: JSON.stringify({
+          format: "csv",
+          search: search.trim() || null,
+        }),
+      },
+      ADMIN_EXPORT_TIMEOUT_MS,
+      ADMIN_EXPORT_MAX_BYTES,
+    );
+  } catch (error) {
+    if (error instanceof AdminConsoleError) throw error;
+    if (error instanceof FetchResponseSizeError) {
+      throw new AdminConsoleError("EXPORT_TOO_LARGE", error.message, error.httpStatus);
+    }
+    throw new AdminConsoleError(
+      "EXPORT_NETWORK_ERROR",
+      error instanceof Error ? error.message : "The user export could not be downloaded.",
+      0,
+    );
+  }
+  if (!response.ok) {
+    let message = `The user export failed with HTTP ${response.status}.`;
+    let code = "USER_EXPORT_FAILED";
+    try {
+      const envelope = await response.json() as {
+        error?: { code?: string; message?: string };
+      };
+      code = envelope.error?.code ?? code;
+      message = envelope.error?.message ?? message;
+    } catch {
+      // Keep the bounded generic message; never reflect an arbitrary response body.
+    }
+    throw new AdminConsoleError(code, message, response.status);
+  }
+  const contentType = response.headers.get("Content-Type")?.toLowerCase() ?? "";
+  if (!contentType.startsWith("text/csv")) {
+    throw new AdminConsoleError(
+      "INVALID_EXPORT_TYPE",
+      "The administration service returned a non-CSV user export.",
+      response.status,
+    );
+  }
+  const disposition = response.headers.get("Content-Disposition")?.toLowerCase() ?? "";
+  const cacheControl = response.headers.get("Cache-Control")?.toLowerCase() ?? "";
+  if (!disposition.startsWith("attachment") || !cacheControl.includes("no-store")) {
+    throw new AdminConsoleError(
+      "INSECURE_EXPORT_RESPONSE",
+      "The user export response did not include the required attachment and no-store controls.",
+      response.status,
+    );
+  }
+  const blob = await response.blob();
+  if (blob.size === 0) {
+    throw new AdminConsoleError(
+      "EMPTY_EXPORT",
+      "The administration service returned an empty user export.",
+      response.status,
+    );
+  }
+  const rowCountHeader = response.headers.get("X-Export-Row-Count");
+  const rowCount = rowCountHeader && /^\d+$/u.test(rowCountHeader)
+    ? Number(rowCountHeader)
+    : null;
+  return { blob, file_name: exportFileName(response), row_count: rowCount };
 }
 
 export async function listAdminTopics(page: number): Promise<AdminPageResult<AdminTopicRow>> {

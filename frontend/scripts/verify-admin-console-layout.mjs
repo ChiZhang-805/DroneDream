@@ -164,6 +164,14 @@ try {
         ? "Users & usage"
         : "用户与用量" }).click();
       await page.locator(".admin-users-panel tbody tr").first().waitFor();
+      const exportButton = page.getByRole("button", { name: testCase.locale === "en"
+        ? "Export user data"
+        : "导出用户数据" });
+      await exportButton.waitFor();
+      assert(await exportButton.isVisible());
+      assert(await exportButton.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ));
       const userGeometry = await geometry(page);
       assert.equal(userGeometry.passwordInputs, 0);
       assert.equal(userGeometry.documentScrollWidth, userGeometry.documentWidth);

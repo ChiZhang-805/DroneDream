@@ -9,6 +9,7 @@ import {
 import { useAdminAccess } from "../features/admin/AdminAccessContext";
 import {
   AdminConsoleError,
+  exportAdminUsers,
   getAdminDashboard,
   listAdminAudit,
   listAdminModels,
@@ -91,6 +92,11 @@ const COPY = {
     saving: "Saving…",
     modelSaveFailed: "The model policy could not be saved.",
     userPrivacy: "Passwords and password hashes are never returned by this interface.",
+    exportUsers: "Export user data",
+    exportingUsers: "Preparing export…",
+    exportStarted: "CSV download started:",
+    exportFailed: "The user data export could not be prepared.",
+    exportScope: "Exports every user matching the applied email search. Passwords, API keys, auth tokens, and raw conversations are excluded.",
     searchEmail: "Search email",
     search: "Search",
     email: "Email",
@@ -215,6 +221,11 @@ const COPY = {
     saving: "正在保存…",
     modelSaveFailed: "无法保存模型开放策略。",
     userPrivacy: "此管理端永远不会返回用户密码或密码哈希。",
+    exportUsers: "导出用户数据",
+    exportingUsers: "正在准备导出…",
+    exportStarted: "CSV 已开始下载：",
+    exportFailed: "无法生成用户数据导出文件。",
+    exportScope: "导出符合当前邮箱搜索条件的全部用户；不包含密码、API Key、登录令牌或原始对话。",
     searchEmail: "搜索邮箱",
     search: "搜索",
     email: "邮箱",
@@ -344,6 +355,8 @@ export function AdminPage() {
   const [savingProvider, setSavingProvider] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState("");
   const [submittedUserSearch, setSubmittedUserSearch] = useState("");
+  const [exportingUsers, setExportingUsers] = useState(false);
+  const [userExportMessage, setUserExportMessage] = useState<string | null>(null);
   const [moderatingTopic, setModeratingTopic] = useState<AdminTopicRow | null>(null);
   const [moderationReason, setModerationReason] = useState("");
   const [moderating, setModerating] = useState(false);
@@ -445,6 +458,33 @@ export function AdminPage() {
     event.preventDefault();
     setUserPage(1);
     setSubmittedUserSearch(userSearch.trim());
+  };
+
+  const startUserExport = async () => {
+    setExportingUsers(true);
+    setUserExportMessage(null);
+    setError(null);
+    try {
+      const exported = await exportAdminUsers(submittedUserSearch);
+      const objectUrl = URL.createObjectURL(exported.blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = exported.file_name;
+      anchor.hidden = true;
+      try {
+        document.body.append(anchor);
+        anchor.click();
+      } finally {
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+      }
+      const count = exported.row_count === null ? "" : ` (${number.format(exported.row_count)})`;
+      setUserExportMessage(`${copy.exportStarted} ${exported.file_name}${count}`);
+    } catch (caught) {
+      setError(safeError(caught, copy.exportFailed));
+    } finally {
+      setExportingUsers(false);
+    }
   };
 
   const confirmModeration = async () => {
@@ -599,7 +639,9 @@ export function AdminPage() {
 
       {tab === "users" ? (
         <section className="admin-panel admin-users-panel">
-          <header><div><h2>{copy.users}</h2><p>{copy.userPrivacy}</p></div><form onSubmit={submitSearch}><label><span className="sr-only">{copy.searchEmail}</span><input type="search" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={copy.searchEmail} /></label><button type="submit" className="btn">{copy.search}</button></form></header>
+          <header><div><h2>{copy.users}</h2><p>{copy.userPrivacy}</p></div><div className="admin-users-toolbar"><form onSubmit={submitSearch}><label><span className="sr-only">{copy.searchEmail}</span><input type="search" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={copy.searchEmail} /></label><button type="submit" className="btn">{copy.search}</button></form><button type="button" className="btn admin-user-export" disabled={exportingUsers} onClick={() => void startUserExport()}>{exportingUsers ? copy.exportingUsers : copy.exportUsers}</button></div></header>
+          <p className="admin-user-export-scope">{copy.exportScope}</p>
+          {userExportMessage ? <p className="admin-user-export-status" role="status">{userExportMessage}</p> : null}
           <div className="admin-table-scroll"><table><thead><tr><th>{copy.email}</th><th>{copy.plan}</th><th>{copy.lastSignIn}</th><th>{copy.usage}</th></tr></thead><tbody>
             {users.map((user) => <tr key={user.id}><td><strong>{user.email}</strong><small>{date.format(new Date(user.created_at))}</small></td><td><strong>{user.plan.toUpperCase()}</strong><small>{user.subscription_status}</small></td><td>{user.last_sign_in_at ? date.format(new Date(user.last_sign_in_at)) : "—"}</td><td><strong>{number.format(user.period_consumed_ai_credits)}</strong><small>{number.format(user.period_request_count)} {copy.requests} · {number.format(user.period_total_tokens)} {copy.tokens} · {number.format(user.period_remaining_ai_credits)} {copy.remaining}</small></td></tr>)}
             {users.length === 0 ? <tr><td colSpan={4}>{copy.noUsers}</td></tr> : null}
