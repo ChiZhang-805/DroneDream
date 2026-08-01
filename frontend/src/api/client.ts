@@ -98,15 +98,18 @@ async function triggerBrowserDownload(
   filename: string,
 ): Promise<void> {
   const objectUrl = URL.createObjectURL(content);
+  const link = document.createElement("a");
   try {
-    const link = document.createElement("a");
     link.href = objectUrl;
     link.download = filename;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
   } finally {
-    URL.revokeObjectURL(objectUrl);
+    link.remove();
+    // Firefox and embedded WebViews may not have consumed the object URL when
+    // click() returns. Revoke it on the next task so the download can start,
+    // while still guaranteeing bounded resource cleanup.
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
   }
 }
 

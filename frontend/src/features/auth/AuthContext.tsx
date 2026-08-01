@@ -76,7 +76,12 @@ const AVATAR_STORAGE_PREFIX = "drone-dream:account-avatar:";
 const MAX_AVATAR_DATA_URL_LENGTH = 600_000;
 
 function shouldDeferDesktopAuth(): boolean {
-  return isDesktopRuntime() && window.location.pathname === "/desktop/setup";
+  // Tauri uses a hash router and initially mounts the provider at `/` before
+  // the index redirect selects `#/desktop/setup`.  Looking only at pathname
+  // therefore lets account hydration race the environment-only launcher.
+  // Desktop auth is always a deliberate second stage and is activated by the
+  // single sign-in action after local readiness reaches 100%.
+  return isDesktopRuntime();
 }
 
 function avatarStorageKey(userId: string): string {
@@ -85,8 +90,15 @@ function avatarStorageKey(userId: string): string {
 
 function localAvatarForUser(userId: string): string | null {
   if (typeof window === "undefined") return null;
-  const stored = window.localStorage.getItem(avatarStorageKey(userId));
-  return stored?.startsWith("data:image/") ? stored : null;
+  try {
+    const stored = window.localStorage.getItem(avatarStorageKey(userId));
+    return stored?.startsWith("data:image/") ? stored : null;
+  } catch {
+    // Storage can be disabled by a hardened browser or WebView policy. A local
+    // avatar is optional and must never prevent the authenticated session from
+    // being adopted.
+    return null;
+  }
 }
 
 function metadataAvatar(user: User): string | null {

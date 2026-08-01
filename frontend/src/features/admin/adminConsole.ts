@@ -1,5 +1,6 @@
 import { getAuthAccessToken } from "../auth/authTokenStore";
 import {
+  FetchDeadlineError,
   FetchResponseSizeError,
   fetchWithDeadline,
 } from "../../api/fetchWithDeadline";
@@ -183,6 +184,21 @@ export class AdminConsoleError extends Error {
     this.code = code;
     this.status = status;
   }
+}
+
+function adminExportTransportError(error: unknown): AdminConsoleError {
+  if (error instanceof AdminConsoleError) return error;
+  if (error instanceof FetchResponseSizeError) {
+    return new AdminConsoleError("EXPORT_TOO_LARGE", error.message, error.httpStatus);
+  }
+  if (error instanceof FetchDeadlineError) {
+    return new AdminConsoleError("EXPORT_TIMEOUT", error.message, 0);
+  }
+  return new AdminConsoleError(
+    "EXPORT_NETWORK_ERROR",
+    error instanceof Error ? error.message : "The user export could not be downloaded.",
+    0,
+  );
 }
 
 const ADMIN_TIMEOUT_MS = 20_000;
@@ -526,15 +542,7 @@ export async function exportAdminUsers(search: string): Promise<AdminUserExport>
       ADMIN_EXPORT_MAX_BYTES,
     );
   } catch (error) {
-    if (error instanceof AdminConsoleError) throw error;
-    if (error instanceof FetchResponseSizeError) {
-      throw new AdminConsoleError("EXPORT_TOO_LARGE", error.message, error.httpStatus);
-    }
-    throw new AdminConsoleError(
-      "EXPORT_NETWORK_ERROR",
-      error instanceof Error ? error.message : "The user export could not be downloaded.",
-      0,
-    );
+    throw adminExportTransportError(error);
   }
   if (!response.ok) {
     let message = `The user export failed with HTTP ${response.status}.`;
@@ -567,7 +575,14 @@ export async function exportAdminUsers(search: string): Promise<AdminUserExport>
       response.status,
     );
   }
-  const blob = await response.blob();
+  let blob: Blob;
+  try {
+    // Content-Length is optional. The bounded response stream can still reject
+    // here when a chunked export crosses the limit or stalls after headers.
+    blob = await response.blob();
+  } catch (error) {
+    throw adminExportTransportError(error);
+  }
   if (blob.size === 0) {
     throw new AdminConsoleError(
       "EMPTY_EXPORT",
@@ -576,8 +591,11 @@ export async function exportAdminUsers(search: string): Promise<AdminUserExport>
     );
   }
   const rowCountHeader = response.headers.get("X-Export-Row-Count");
-  const rowCount = rowCountHeader && /^\d+$/u.test(rowCountHeader)
+  const parsedRowCount = rowCountHeader && /^\d+$/u.test(rowCountHeader)
     ? Number(rowCountHeader)
+    : null;
+  const rowCount = parsedRowCount !== null && Number.isSafeInteger(parsedRowCount)
+    ? parsedRowCount
     : null;
   return { blob, file_name: exportFileName(response), row_count: rowCount };
 }

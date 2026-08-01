@@ -225,13 +225,15 @@ describe("AuthContext account profile", () => {
     });
   });
 
-  it("does not hydrate a desktop launcher account until the 100 percent sign-in action activates it", async () => {
+  it.each(["/", "/#/desktop/setup"])(
+    "does not hydrate the desktop launcher at %s until the 100 percent sign-in action activates it",
+    async (launcherUrl) => {
     window.__TAURI__ = {
       core: {
         invoke: vi.fn(async () => undefined),
       },
     };
-    window.history.replaceState(null, "", "/desktop/setup");
+    window.history.replaceState(null, "", launcherUrl);
 
     render(
       <AuthProvider>
@@ -251,6 +253,27 @@ describe("AuthContext account profile", () => {
       expect(authMock.onAuthStateChange).toHaveBeenCalledTimes(1);
       expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name");
     });
+    },
+  );
+
+  it("adopts an authenticated account when optional avatar storage is unavailable", async () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new DOMException("storage disabled", "SecurityError");
+      });
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByLabelText("username"))
+      .toHaveTextContent("pilot.name");
+    expect(screen.getByLabelText("email"))
+      .toHaveTextContent("pilot.name@example.com");
+    expect(screen.getByLabelText("avatar")).toHaveTextContent("");
+    getItem.mockRestore();
   });
 
   it("preserves drafts when sign-out fails and clears them only after success", async () => {

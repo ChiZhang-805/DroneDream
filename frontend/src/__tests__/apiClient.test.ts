@@ -53,6 +53,7 @@ const runtimeComponents = [
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllEnvs();
   setAuthAccessToken(null);
   resetDesktopReadinessSession();
   resetDesktopStartupGateSession();
@@ -364,6 +365,7 @@ describe("apiClient envelope handling", () => {
 
 
   it("downloadArtifact sends Authorization header when configured", async () => {
+    vi.useFakeTimers();
     vi.stubEnv("VITE_DEMO_AUTH_TOKEN", "demo-token");
     vi.resetModules();
     const fetchSpy = vi.fn().mockResolvedValue(
@@ -381,8 +383,10 @@ describe("apiClient envelope handling", () => {
     const mod = await import("../api/client");
     await mod.apiClient.downloadArtifact("art_1", "file.txt");
     expect(createObjectURLSpy).toHaveBeenCalled();
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock");
+    expect(revokeObjectURLSpy).not.toHaveBeenCalled();
     expect(anchorClickSpy).toHaveBeenCalledOnce();
+    await vi.runAllTimersAsync();
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:mock");
     expect(fetchSpy).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/api/v1/artifacts/art_1/download",
       expect.objectContaining({

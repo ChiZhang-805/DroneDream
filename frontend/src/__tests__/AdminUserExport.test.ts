@@ -107,4 +107,45 @@ describe("admin user export client", () => {
       message: "Response exceeded the 20 MiB safety limit.",
     });
   });
+
+  it("maps a chunked export that crosses the 20 MiB limit to the typed admin error", async () => {
+    const { admin, auth } = await loadAdminExport();
+    auth.setAuthAccessToken("owner-session-token");
+    const firstChunk = new Uint8Array(20 * 1024 * 1024);
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(firstChunk);
+        controller.enqueue(new Uint8Array([1]));
+        controller.close();
+      },
+    }), {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv;charset=utf-8",
+        "Content-Disposition": 'attachment; filename="DroneDream-users.csv"',
+        "Cache-Control": "private, no-store",
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+
+    await expect(admin.exportAdminUsers("")).rejects.toMatchObject({
+      name: "AdminConsoleError",
+      code: "EXPORT_TOO_LARGE",
+      status: 200,
+      message: "Response exceeded the 20 MiB safety limit.",
+    });
+  });
+
+  it("ignores an export row-count header outside the safe integer range", async () => {
+    const { admin, auth } = await loadAdminExport();
+    auth.setAuthAccessToken("owner-session-token");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(csvResponse(
+      '"id"\r\n"user-1"\r\n',
+      { "X-Export-Row-Count": "9007199254740992" },
+    )));
+
+    const exported = await admin.exportAdminUsers("");
+
+    expect(exported.row_count).toBeNull();
+  });
 });
