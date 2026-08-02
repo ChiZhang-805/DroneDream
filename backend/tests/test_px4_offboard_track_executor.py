@@ -221,10 +221,9 @@ def test_gazebo_wind_activator_publishes_and_reads_back_exact_vector(
         subprocess.CompletedProcess(
             args=[],
             returncode=0,
-            stdout=(
-                "linear_velocity { x: 0 y: 3 z: 0 }\n"
-                "enable_wind: true\n"
-            ),
+            # Gazebo uses proto3 text formatting and omits default-zero scalar
+            # fields in real wind_info responses.
+            stdout="linear_velocity { y: 3 }\nenable_wind: true\n",
             stderr="",
         ),
     ]

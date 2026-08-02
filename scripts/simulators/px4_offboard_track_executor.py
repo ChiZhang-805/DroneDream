@@ -195,18 +195,12 @@ class MavsdkOffboardClient:
                     # advisory. PX4 armability is still a required preflight
                     # signal: numeric local coordinates alone are not proof that
                     # the estimator considers them stable enough for flight.
-                    if (
-                        sample.home_position_ok
-                        and sample.local_position_ok
-                        and sample.armable
-                    ):
+                    if sample.home_position_ok and sample.local_position_ok and sample.armable:
                         return sample
                 raise RuntimeError("PX4 health stream ended before the vehicle became ready")
         except TimeoutError:
             observed = _health_payload(last_health)
-            details = ", ".join(
-                f"{name}={str(value).lower()}" for name, value in observed.items()
-            )
+            details = ", ".join(f"{name}={str(value).lower()}" for name, value in observed.items())
             raise TimeoutError(
                 f"PX4 readiness timeout after {timeout_seconds}s; last_health: {details}"
             ) from None
@@ -573,9 +567,12 @@ def _parse_gazebo_wind_info(response_text: str) -> dict[str, Any]:
             rf"\b{axis}\s*:\s*([-+0-9.eE]+)",
             block.group("body"),
         )
-        if match is None:
-            raise RuntimeError(f"Gazebo wind_info response omitted {axis}")
-        value = float(match.group(1))
+        # ``gz service`` renders protobuf text format. Proto3 omits scalar
+        # fields whose value is the default zero, so a north-only wind can be
+        # returned as ``linear_velocity { y: 3 }``. Treat only an omitted axis
+        # as the protobuf-defined 0.0; present values remain strictly parsed
+        # and compared against the requested vector below.
+        value = 0.0 if match is None else float(match.group(1))
         if not math.isfinite(value):
             raise RuntimeError(f"Gazebo wind_info returned non-finite {axis}")
         vector[axis] = round(value, 12)
@@ -600,8 +597,7 @@ def _activate_gazebo_wind_profile(
     if not isinstance(vector, dict) or set(vector) != {"x", "y", "z"}:
         raise RuntimeError("compiled wind activation vector is invalid")
     requested = {
-        axis: _finite_float(vector[axis], f"wind_activation.{axis}")
-        for axis in ("x", "y", "z")
+        axis: _finite_float(vector[axis], f"wind_activation.{axis}") for axis in ("x", "y", "z")
     }
     gz_cli = shutil.which("gz")
     if not gz_cli:
@@ -678,9 +674,7 @@ def _activate_gazebo_wind_profile(
         if attempt + 1 < attempts:
             time.sleep(0.1)
     if readback is None:
-        raise RuntimeError(
-            "Gazebo post-hover wind activation was not verified: " + last_error
-        )
+        raise RuntimeError("Gazebo post-hover wind activation was not verified: " + last_error)
     return {
         "readback": {
             "source": service,
@@ -780,14 +774,10 @@ def _runtime_effect_records(
             )
             method = "gazebo_wind_topic_after_stable_hover_and_exact_readback"
         elif section == "gps_dropout":
-            capability_reason = (
-                "PX4 GPS availability parameter and telemetry verified the schedule"
-            )
+            capability_reason = "PX4 GPS availability parameter and telemetry verified the schedule"
             method = "mavsdk_sim_gps_used_plus_gps_info_telemetry_and_reset"
         else:
-            capability_reason = (
-                "PX4 parameter readback and battery telemetry verified the profile"
-            )
+            capability_reason = "PX4 parameter readback and battery telemetry verified the profile"
             method = "mavsdk_parameter_readback_and_battery_telemetry"
         records.append(
             {
@@ -1477,12 +1467,9 @@ async def run_executor(
             for name in ("connected", "home_position_ok", "local_position_ok", "armable")
         }
         takeoff_gate["advisory_readiness"] = {
-            name: takeoff_gate["readiness"][name]
-            for name in ("global_position_ok",)
+            name: takeoff_gate["readiness"][name] for name in ("global_position_ok",)
         }
-        takeoff_gate["readiness_observed"] = all(
-            takeoff_gate["required_readiness"].values()
-        )
+        takeoff_gate["readiness_observed"] = all(takeoff_gate["required_readiness"].values())
         if isinstance(gps_profile, dict):
             baseline_satellites = await client.get_param_int("SIM_GPS_USED")
             if baseline_satellites < 4:
@@ -1543,7 +1530,11 @@ async def run_executor(
             timing["wind_activation"] = {
                 "status": "verified",
                 "phase": "after_stable_hover_before_track_entry",
-                "activation_t_s": round(activation_t_s, 12),
+                # Preserve the monotonic timestamp for ordering checks. The
+                # request-bound evidence may round its display value, but the
+                # timing trace must never appear to place activation before
+                # the stable-hover sample because of decimal rounding.
+                "activation_t_s": activation_t_s,
             }
             _log(log_path, "post-hover Gazebo wind activation readback verified")
 
