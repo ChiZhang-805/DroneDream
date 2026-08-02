@@ -1119,6 +1119,53 @@ def test_advanced_sdf_overlay_binds_trial_local_top_level_model(tmp_path: Path) 
     assert f"export PX4_GZ_MODELS={expected_models}" in trial_env
 
 
+def test_steady_wind_overlay_accepts_exact_collinear_gust_superposition(
+    tmp_path: Path,
+) -> None:
+    request = build_scenario_effect_request(
+        execution_identity={"trial_id": "collinear-gust", "seed": 42},
+        scenario_type="wind_perturbed",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 2.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 12.0,
+            }
+        },
+    )
+    px4_root = _minimal_px4_gazebo_tree(tmp_path)
+
+    overlay = wrapper._prepare_steady_wind_overlay(
+        request,
+        scenario_effects,
+        run_dir=tmp_path / "run",
+        autopilot_dir=str(px4_root),
+        simulator_model="x500",
+        world="default",
+        launch_env={},
+    )
+
+    assert overlay is not None
+    gust = overlay["compiled_sdf_profile"]["wind_gust"]
+    assert gust["mean_linear_velocity_mps"] == {"x": 4.0, "y": 0.0, "z": 0.0}
+    assert gust["horizontal_magnitude_sine_amplitude_percent"] == 0.5
+    assert gust["range_mps"] == [2.0, 6.0]
+    world_tree = ET.parse(overlay["world_sdf_path"])
+    plugin = world_tree.find(
+        "./world[@name='default']/plugin[@name='gz::sim::systems::WindEffects']"
+    )
+    assert plugin is not None
+    assert float(
+        plugin.findtext("./horizontal/magnitude/sin/amplitude_percent", default="nan")
+    ) == 0.5
+
+
 def test_actuator_failure_sdf_and_joint_state_prove_one_hard_stopped_motor(
     tmp_path: Path,
 ) -> None:
@@ -2223,9 +2270,10 @@ def test_skipped_runtime_effect_records_preserve_pre_activation_failure(
         effects=[loaded[effect["effect_id"]] for effect in request["effects"]],
     )
     normalized = validate_scenario_effect_evidence(request, payload)
-    assert normalized["verification_status"] == "unsupported"
+    assert normalized["verification_status"] == "failed"
     assert normalized["failed_effects"] == []
-    assert normalized["unsupported_effects"] == [
+    assert normalized["unsupported_effects"] == []
+    assert normalized["skipped_effects"] == [
         "battery.initial_percent",
         "battery.voltage_sag",
     ]

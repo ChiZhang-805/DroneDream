@@ -1055,11 +1055,6 @@ def _prepare_steady_wind_overlay(
         compiled_sdf_profile.get("wind_gust") if isinstance(compiled_sdf_profile, dict) else None
     )
     wind_requested = compiled is not None or gust_profile is not None
-    if compiled is not None and gust_profile is not None and compiled["speed_mps"] > 1e-9:
-        raise ScenarioEffectUnsupportedError(
-            "the bundled sinusoidal gust profile cannot be superimposed exactly on a "
-            "non-zero steady-wind vector; split these into separate physical scenarios"
-        )
     if wind_requested:
         enable_wind = base_link.find("enable_wind")
         if enable_wind is None:

@@ -435,6 +435,85 @@ def compile_bundled_steady_wind(request: dict[str, Any]) -> dict[str, Any] | Non
     return _compile_bundled_steady_wind_unchecked(request)
 
 
+def _compose_collinear_steady_wind_and_gust(
+    request: dict[str, Any],
+    gust_profile: dict[str, Any],
+) -> dict[str, Any]:
+    """Express an exact same-direction steady + sinusoidal gust profile.
+
+    Gazebo's bundled WindEffects system modulates the magnitude of one
+    horizontal wind vector.  It can therefore represent a non-zero steady
+    component plus a ``0..peak`` gust exactly only when both components share
+    one direction.  Reject other vector combinations instead of silently
+    rotating or weakening either requested effect.
+    """
+
+    steady = _compile_bundled_steady_wind_unchecked(request)
+    if steady is None or float(steady["speed_mps"]) <= 1e-9:
+        return gust_profile
+
+    steady_vector = steady["linear_velocity_mps"]
+    gust_vector = gust_profile["mean_linear_velocity_mps"]
+    steady_speed = math.hypot(float(steady_vector["x"]), float(steady_vector["y"]))
+    gust_mean_speed = math.hypot(float(gust_vector["x"]), float(gust_vector["y"]))
+    if gust_mean_speed <= 1e-9:
+        combined_vector = {
+            "x": round(float(steady_vector["x"]), 12),
+            "y": round(float(steady_vector["y"]), 12),
+            "z": 0.0,
+        }
+        combined_mean_speed = steady_speed
+        direction_deg = math.degrees(
+            math.atan2(combined_vector["x"], combined_vector["y"])
+        ) % 360.0
+    else:
+        alignment = (
+            float(steady_vector["x"]) * float(gust_vector["x"])
+            + float(steady_vector["y"]) * float(gust_vector["y"])
+        ) / (steady_speed * gust_mean_speed)
+        if not math.isclose(alignment, 1.0, rel_tol=0.0, abs_tol=1e-9):
+            raise ScenarioEffectContractError(
+                "bundled WindEffects requires non-zero steady wind and sinusoidal "
+                "gusts to share the same horizontal direction; align the gust "
+                "direction with the steady-wind vector or split them into separate "
+                "physical scenarios"
+            )
+        combined_vector = {
+            "x": round(float(steady_vector["x"]) + float(gust_vector["x"]), 12),
+            "y": round(float(steady_vector["y"]) + float(gust_vector["y"]), 12),
+            "z": 0.0,
+        }
+        combined_mean_speed = math.hypot(combined_vector["x"], combined_vector["y"])
+        direction_deg = float(gust_profile["direction_deg_clockwise_from_north"])
+
+    gust_peak_speed = float(gust_profile["peak_magnitude_mps"])
+    amplitude_percent = (
+        0.0 if combined_mean_speed <= 1e-9 else gust_mean_speed / combined_mean_speed
+    )
+    composed = dict(gust_profile)
+    composed.update(
+        {
+            "mean_magnitude_mps": round(combined_mean_speed, 12),
+            "direction_deg_clockwise_from_north": round(direction_deg, 12),
+            "mean_linear_velocity_mps": combined_vector,
+            "horizontal_magnitude_sine_amplitude_percent": round(
+                amplitude_percent,
+                12,
+            ),
+            "range_mps": [
+                round(steady_speed, 12),
+                round(steady_speed + gust_peak_speed, 12),
+            ],
+            "composition_policy": "collinear-vector-superposition-v1",
+            "steady_component_magnitude_mps": round(steady_speed, 12),
+            "steady_component_linear_velocity_mps": dict(steady_vector),
+            "gust_component_peak_magnitude_mps": round(gust_peak_speed, 12),
+            "gust_component_mean_magnitude_mps": round(gust_mean_speed, 12),
+        }
+    )
+    return composed
+
+
 def _scenario_marker_config(effect: dict[str, Any], *, effect_id: str) -> dict[str, Any]:
     value = effect.get("requested_value")
     if not isinstance(value, dict):
@@ -588,7 +667,7 @@ def _compile_bundled_sdf_profile_unchecked(
             period_s = DEFAULT_TURBULENCE_PERIOD_S
         mean_mps = round(peak_mps / 2.0, 12)
         time_for_rise_s = round(min(1.0, period_s), 12)
-        profile["wind_gust"] = {
+        gust_profile = {
             "peak_magnitude_mps": peak_mps,
             "mean_magnitude_mps": mean_mps,
             "direction_deg_clockwise_from_north": direction_deg,
@@ -599,6 +678,10 @@ def _compile_bundled_sdf_profile_unchecked(
             "range_mps": [0.0, peak_mps],
             "effect_ids": sorted({"wind_gusts", "scenario_type.turbulence"} & set(by_id)),
         }
+        profile["wind_gust"] = _compose_collinear_steady_wind_and_gust(
+            request,
+            gust_profile,
+        )
 
     payload_effect = by_id.get("battery.mass_payload_kg")
     payload_marker = by_id.get("scenario_type.payload_changed")
@@ -1993,16 +2076,22 @@ def validate_scenario_effect_evidence(request: dict[str, Any], payload: object) 
     )
     failed = sorted(effect_id for effect_id, item in observed.items() if item["status"] == "failed")
     unsupported = sorted(
-        effect_id
-        for effect_id, item in observed.items()
-        if item["status"] in {"unsupported", "skipped"}
+        effect_id for effect_id, item in observed.items() if item["status"] == "unsupported"
     )
-    status = "failed" if failed else ("unsupported" if unsupported else "verified_applied")
+    skipped = sorted(
+        effect_id for effect_id, item in observed.items() if item["status"] == "skipped"
+    )
+    status = (
+        "failed"
+        if failed or skipped
+        else ("unsupported" if unsupported else "verified_applied")
+    )
     return {
         "requested_effects": sorted(requested_by_id),
         "applied_effects": applied,
         "unsupported_effects": unsupported,
         "failed_effects": failed,
+        "skipped_effects": skipped,
         "verification_status": status,
         "capabilities": [observed[effect_id] for effect_id in sorted(observed)],
         "evidence_schema_version": EVIDENCE_SCHEMA_VERSION,

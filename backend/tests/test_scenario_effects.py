@@ -124,7 +124,9 @@ def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
             "wind_gusts": {
                 "enabled": True,
                 "magnitude_mps": 4.0,
-                "direction_deg": 135.0,
+                # The test also requests a seeded 3 m/s wind plus 1 m/s north.
+                # This bearing is their exact combined direction.
+                "direction_deg": 332.966948831704,
                 "period_s": 8.0,
             },
             "obstacles": [
@@ -174,7 +176,7 @@ def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
     assert effects["wind_gusts"]["requested_value"] == {
         "enabled": True,
         "magnitude_mps": 4.0,
-        "direction_deg": 135.0,
+        "direction_deg": 332.966948831704,
         "period_s": 8.0,
     }
     assert "WindEffects" in effects["wind_gusts"]["capability"]["reason"]
@@ -239,6 +241,70 @@ def test_compile_bundled_sdf_profile_binds_explicit_physics() -> None:
         "iyy": pytest.approx(0.005),
         "izz": pytest.approx(0.008),
     }
+
+
+def test_collinear_steady_wind_and_gust_compile_to_exact_superposition() -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="wind_perturbed",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 2.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 12.0,
+            }
+        },
+    )
+
+    sdf_profile = compile_bundled_sdf_profile(request)
+    runtime_profile = compile_bundled_runtime_profile(request)
+
+    assert sdf_profile is not None
+    gust = sdf_profile["wind_gust"]
+    assert gust["composition_policy"] == "collinear-vector-superposition-v1"
+    assert gust["steady_component_magnitude_mps"] == 2.0
+    assert gust["gust_component_peak_magnitude_mps"] == 4.0
+    assert gust["gust_component_mean_magnitude_mps"] == 2.0
+    assert gust["mean_magnitude_mps"] == 4.0
+    assert gust["mean_linear_velocity_mps"] == {"x": 4.0, "y": 0.0, "z": 0.0}
+    assert gust["horizontal_magnitude_sine_amplitude_percent"] == 0.5
+    assert gust["range_mps"] == [2.0, 6.0]
+    assert runtime_profile is not None
+    assert runtime_profile["wind_activation"]["linear_velocity_mps"] == {
+        "x": 4.0,
+        "y": 0.0,
+        "z": 0.0,
+    }
+
+
+def test_non_collinear_steady_wind_and_gust_fail_before_launch() -> None:
+    with pytest.raises(
+        ScenarioEffectContractError,
+        match="share the same horizontal direction",
+    ):
+        build_scenario_effect_request(
+            execution_identity=_identity(),
+            scenario_type="wind_perturbed",
+            scenario_config={},
+            job_config={
+                "wind": {"north": 2.0, "east": 0.0, "south": 0.0, "west": 0.0},
+                "sensor_noise_level": "medium",
+            },
+            advanced_config={
+                "wind_gusts": {
+                    "enabled": True,
+                    "magnitude_mps": 4.0,
+                    "direction_deg": 90.0,
+                    "period_s": 12.0,
+                }
+            },
+        )
 
 
 def test_compile_bundled_runtime_profile_binds_dropout_and_battery() -> None:

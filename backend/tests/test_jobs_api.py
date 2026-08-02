@@ -332,6 +332,51 @@ def test_create_job_accepts_advanced_scenario_config(client: TestClient) -> None
     assert data["advanced_scenario_config"]["battery"]["initial_percent"] == 70
 
 
+def test_real_job_accepts_collinear_steady_wind_and_gust(client: TestClient) -> None:
+    payload = {
+        **VALID_JOB_PAYLOAD,
+        "simulator_backend": "real_cli",
+        "optimizer_strategy": "none",
+        "wind": {"north": 0, "east": 2, "south": 0, "west": 0},
+        "advanced_scenario_config": {
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4,
+                "direction_deg": 90,
+                "period_s": 12,
+            }
+        },
+    }
+
+    response = client.post("/api/v1/jobs", json=payload)
+
+    assert response.status_code == 200, response.text
+
+
+def test_real_job_rejects_non_collinear_wind_before_persistence(client: TestClient) -> None:
+    payload = {
+        **VALID_JOB_PAYLOAD,
+        "simulator_backend": "real_cli",
+        "optimizer_strategy": "none",
+        "wind": {"north": 2, "east": 0, "south": 0, "west": 0},
+        "advanced_scenario_config": {
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4,
+                "direction_deg": 90,
+                "period_s": 12,
+            }
+        },
+    }
+
+    response = client.post("/api/v1/jobs", json=payload)
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_SCENARIO_EFFECT_CONTRACT"
+    assert "share the same horizontal direction" in error["message"]
+
+
 def test_create_job_rejects_invalid_advanced_dropout_rate(client: TestClient) -> None:
     payload = {
         **HEURISTIC_JOB_PAYLOAD,

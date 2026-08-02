@@ -46,6 +46,10 @@ from app.parameters import (
     validate_parameter_values,
     validate_search_selections,
 )
+from app.simulator.scenario_effects import (
+    ScenarioEffectContractError,
+    build_scenario_effect_request,
+)
 from app.storage import get_artifact_storage
 from app.storage.evidence import candidate_trial_artifact_evidence
 from app.storage.integrity import authorize_artifact_integrity_deletion
@@ -65,6 +69,44 @@ class JobServiceError(Exception):
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _validate_real_cli_scenario_effect_contract(req: schemas.JobCreateRequest) -> None:
+    """Reject physically incompatible real-simulator effects before persistence."""
+
+    if req.simulator_backend != "real_cli":
+        return
+    advanced = (
+        req.advanced_scenario_config.model_dump(mode="json")
+        if req.advanced_scenario_config is not None
+        else {}
+    )
+    job_config = {
+        "wind": req.wind.model_dump(mode="json"),
+        "sensor_noise_level": req.sensor_noise_level,
+    }
+    for case in req.scenario_suite.cases:
+        if not case.enabled:
+            continue
+        for seed in case.seeds:
+            try:
+                build_scenario_effect_request(
+                    execution_identity={
+                        "job_validation": True,
+                        "scenario_case_id": case.id,
+                        "seed": seed,
+                    },
+                    scenario_type=case.scenario_type,
+                    scenario_config=dict(case.config),
+                    job_config=job_config,
+                    advanced_config=advanced,
+                )
+            except ScenarioEffectContractError as exc:
+                raise JobServiceError(
+                    "INVALID_SCENARIO_EFFECT_CONTRACT",
+                    f"scenario case {case.id!r} seed {seed} is not physically executable: {exc}",
+                    http_status=422,
+                ) from exc
 
 
 def _expected_control_version(
@@ -342,6 +384,7 @@ def _create_job_from_config(
     persist_objective_config: bool | None = None,
     persist_scenario_suite: bool | None = None,
 ) -> models.Job:
+    _validate_real_cli_scenario_effect_contract(req)
     try:
         outcome_contract = compile_outcome_contract(
             req.objective_config,
