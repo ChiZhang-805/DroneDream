@@ -42,6 +42,7 @@ MIN_HOVER_DURATION_SECONDS = 1.0
 MAX_HOVER_DURATION_SECONDS = 300.0
 BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS = 15.0
 RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
+GNSS_WARNING_READINESS_SAMPLE_COUNT = 3
 
 
 def _require_runtime_details(
@@ -115,7 +116,12 @@ class PositionVelocityNed:
 class OffboardClientProtocol(Protocol):
     async def connect(self, connection_url: str) -> None: ...
 
-    async def wait_until_ready(self, timeout_seconds: float) -> TelemetryHealth: ...
+    async def wait_until_ready(
+        self,
+        timeout_seconds: float,
+        *,
+        allow_gnss_warning_arm_authority: bool = False,
+    ) -> TelemetryHealth: ...
 
     async def arm(self) -> None: ...
 
@@ -172,9 +178,15 @@ class MavsdkOffboardClient:
             raise RuntimeError("PX4 offboard client is not connected")
         return self._system
 
-    async def wait_until_ready(self, timeout_seconds: float) -> TelemetryHealth:
+    async def wait_until_ready(
+        self,
+        timeout_seconds: float,
+        *,
+        allow_gnss_warning_arm_authority: bool = False,
+    ) -> TelemetryHealth:
         system = self._require_system()
         last_health: TelemetryHealth | None = None
+        gnss_warning_ready_samples = 0
         try:
             async with asyncio.timeout(timeout_seconds):
                 connected = False
@@ -200,6 +212,18 @@ class MavsdkOffboardClient:
                     # the estimator considers them stable enough for flight.
                     if sample.home_position_ok and sample.local_position_ok and sample.armable:
                         return sample
+                    if (
+                        allow_gnss_warning_arm_authority
+                        and sample.global_position_ok
+                        and sample.home_position_ok
+                        and sample.local_position_ok
+                        and not sample.armable
+                    ):
+                        gnss_warning_ready_samples += 1
+                        if gnss_warning_ready_samples >= GNSS_WARNING_READINESS_SAMPLE_COUNT:
+                            return sample
+                    else:
+                        gnss_warning_ready_samples = 0
                 raise RuntimeError("PX4 health stream ended before the vehicle became ready")
         except TimeoutError:
             observed = _health_payload(last_health)
@@ -329,6 +353,7 @@ class FakeOffboardClient:
         self.landed = False
         self.closed = False
         self.int_params: dict[str, int] = {
+            "COM_ARM_WO_GPS": 1,
             "SIM_GPS_USED": 10,
         }
         self.float_params: dict[str, float] = {
@@ -347,8 +372,14 @@ class FakeOffboardClient:
         _ = connection_url
         self.connected = True
 
-    async def wait_until_ready(self, timeout_seconds: float) -> TelemetryHealth:
+    async def wait_until_ready(
+        self,
+        timeout_seconds: float,
+        *,
+        allow_gnss_warning_arm_authority: bool = False,
+    ) -> TelemetryHealth:
         _ = timeout_seconds
+        _ = allow_gnss_warning_arm_authority
         return TelemetryHealth(
             connected=True,
             global_position_ok=True,
@@ -554,6 +585,41 @@ def _load_runtime_effect_request() -> tuple[Any, dict[str, Any] | None, dict[str
         return engine, None, None
     request = engine.load_scenario_effect_request(Path(raw_path))
     return engine, request, engine.compile_bundled_runtime_profile(request)
+
+
+def _requires_gnss_warning_arm_authority(
+    scenario_request: dict[str, Any] | None,
+) -> bool:
+    """Return whether a request intentionally degrades GNSS before arming.
+
+    PX4's ``COM_ARM_WO_GPS=1`` contract keeps GNSS preflight checks as warnings
+    while retaining the real arm command as the final authority. MAVSDK's
+    aggregate ``is_armable`` flag does not expose that warning-vs-denial
+    distinction. Only an exact, positive, request-bound GPS noise effect may
+    use the narrower readiness path; every other trial still requires
+    ``is_armable=true`` before an arm command is attempted.
+    """
+
+    if not isinstance(scenario_request, dict):
+        return False
+    effects = scenario_request.get("effects")
+    if not isinstance(effects, list):
+        return False
+    for effect in effects:
+        if not isinstance(effect, dict):
+            continue
+        if effect.get("effect_id") != "sensor_degradation.gps_noise_m":
+            continue
+        if effect.get("mechanism") != "sdformat_sensor_noise":
+            continue
+        requested = effect.get("requested_value")
+        return (
+            isinstance(requested, int | float)
+            and not isinstance(requested, bool)
+            and math.isfinite(float(requested))
+            and float(requested) > 0.0
+        )
+    return False
 
 
 def _canonical_sha256(value: object) -> str:
@@ -1658,6 +1724,9 @@ async def run_executor(
     gps_last_tick = -1
     gps_off = False
     battery_takeoff_gate_parameters: dict[str, dict[str, float]] | None = None
+    gnss_warning_arm_authority_requested = _requires_gnss_warning_arm_authority(
+        scenario_request
+    )
     if isinstance(gps_profile, dict):
         runtime_profile_details = _require_runtime_details(
             runtime_profile,
@@ -1677,7 +1746,13 @@ async def run_executor(
     try:
         await client.connect(connection)
         _log(log_path, f"connected via {connection}")
-        health = await client.wait_until_ready(takeoff_timeout_seconds)
+        if gnss_warning_arm_authority_requested:
+            health = await client.wait_until_ready(
+                takeoff_timeout_seconds,
+                allow_gnss_warning_arm_authority=True,
+            )
+        else:
+            health = await client.wait_until_ready(takeoff_timeout_seconds)
         takeoff_gate["readiness"] = _health_payload(health)
         takeoff_gate["readiness_policy"] = "local_ned_with_px4_preflight_authority"
         takeoff_gate["required_readiness"] = {
@@ -1688,6 +1763,54 @@ async def run_executor(
             name: takeoff_gate["readiness"][name] for name in ("global_position_ok",)
         }
         takeoff_gate["readiness_observed"] = all(takeoff_gate["required_readiness"].values())
+        if not health.armable:
+            if not gnss_warning_arm_authority_requested:
+                raise RuntimeError(
+                    "PX4 returned non-armable readiness outside an intentional GNSS "
+                    "degradation request"
+                )
+            com_arm_wo_gps = await client.get_param_int("COM_ARM_WO_GPS")
+            takeoff_gate["gnss_warning_arm_authority"] = {
+                "requested_by_effect": "sensor_degradation.gps_noise_m",
+                "required_continuous_health": {
+                    "global_position_ok": True,
+                    "home_position_ok": True,
+                    "local_position_ok": True,
+                    "sample_count": GNSS_WARNING_READINESS_SAMPLE_COUNT,
+                },
+                "px4_parameter": {
+                    "name": "COM_ARM_WO_GPS",
+                    "required": 1,
+                    "readback": com_arm_wo_gps,
+                },
+                "final_authority": "px4_arm_command",
+            }
+            if com_arm_wo_gps != 1:
+                raise RuntimeError(
+                    "intentional GNSS degradation readiness requires verified "
+                    f"COM_ARM_WO_GPS=1, got {com_arm_wo_gps}"
+                )
+            takeoff_gate["readiness_policy"] = (
+                "intentional_gnss_warning_with_px4_arm_command_authority"
+            )
+            takeoff_gate["required_readiness"] = {
+                name: takeoff_gate["readiness"][name]
+                for name in (
+                    "connected",
+                    "global_position_ok",
+                    "home_position_ok",
+                    "local_position_ok",
+                )
+            }
+            takeoff_gate["advisory_readiness"] = {"armable": health.armable}
+            takeoff_gate["readiness_observed"] = all(
+                takeoff_gate["required_readiness"].values()
+            )
+            _log(
+                log_path,
+                "intentional GNSS degradation kept PX4 arm command as final authority "
+                "after verified COM_ARM_WO_GPS=1",
+            )
         if isinstance(gps_profile, dict):
             baseline_satellites = await client.get_param_int("SIM_GPS_USED")
             if baseline_satellites < 4:
