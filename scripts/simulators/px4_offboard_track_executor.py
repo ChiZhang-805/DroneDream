@@ -167,6 +167,7 @@ class MavsdkOffboardClient:
 
     async def wait_until_ready(self, timeout_seconds: float) -> TelemetryHealth:
         system = self._require_system()
+        last_health: TelemetryHealth | None = None
         try:
             async with asyncio.timeout(timeout_seconds):
                 connected = False
@@ -185,6 +186,7 @@ class MavsdkOffboardClient:
                         local_position_ok=bool(getattr(health, "is_local_position_ok", False)),
                         armable=bool(getattr(health, "is_armable", False)),
                     )
+                    last_health = sample
                     if (
                         sample.global_position_ok
                         and sample.home_position_ok
@@ -194,7 +196,13 @@ class MavsdkOffboardClient:
                         return sample
                 raise RuntimeError("PX4 health stream ended before the vehicle became ready")
         except TimeoutError:
-            raise TimeoutError(f"PX4 readiness timeout after {timeout_seconds}s") from None
+            observed = _health_payload(last_health)
+            details = ", ".join(
+                f"{name}={str(value).lower()}" for name, value in observed.items()
+            )
+            raise TimeoutError(
+                f"PX4 readiness timeout after {timeout_seconds}s; last_health: {details}"
+            ) from None
 
     async def arm(self) -> None:
         await self._require_system().action.arm()

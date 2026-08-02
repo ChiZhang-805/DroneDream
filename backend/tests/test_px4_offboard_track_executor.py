@@ -622,6 +622,43 @@ def test_mavsdk_readiness_returns_observed_health_state():
     )
 
 
+def test_mavsdk_readiness_timeout_reports_last_observed_health_state():
+    class CoreStub:
+        async def connection_state(self):
+            yield type("ConnectionState", (), {"is_connected": True})()
+
+    class TelemetryStub:
+        async def health(self):
+            while True:
+                yield type(
+                    "Health",
+                    (),
+                    {
+                        "is_global_position_ok": False,
+                        "is_home_position_ok": True,
+                        "is_local_position_ok": True,
+                        "is_armable": False,
+                    },
+                )()
+                await asyncio.sleep(0.001)
+
+    class SystemStub:
+        core = CoreStub()
+        telemetry = TelemetryStub()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = SystemStub()
+
+    with pytest.raises(
+        TimeoutError,
+        match=(
+            "connected=true, global_position_ok=false, home_position_ok=true, "
+            "local_position_ok=true, armable=false"
+        ),
+    ):
+        asyncio.run(client.wait_until_ready(0.01))
+
+
 def test_mavsdk_position_velocity_sample_preserves_ned_units():
     class TelemetryStub:
         async def position_velocity_ned(self):
