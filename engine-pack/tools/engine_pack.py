@@ -217,21 +217,23 @@ def write_archive(
     temporary = archive_path.with_suffix(archive_path.suffix + ".tmp")
     temporary.unlink(missing_ok=True)
     try:
-        with temporary.open("wb") as raw:
-            with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
-                with tarfile.open(
-                    fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
-                ) as archive:
-                    archive.addfile(
-                        _tar_info(MANIFEST_FILENAME, manifest_bytes, epoch),
-                        io.BytesIO(manifest_bytes),
-                    )
-                    for relative, source in files:
-                        payload = source.read_bytes()
-                        archive.addfile(
-                            _tar_info(f"payload/{relative}", payload, epoch),
-                            io.BytesIO(payload),
-                        )
+        with (
+            temporary.open("wb") as raw,
+            gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed,
+            tarfile.open(
+                fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
+            ) as archive,
+        ):
+            archive.addfile(
+                _tar_info(MANIFEST_FILENAME, manifest_bytes, epoch),
+                io.BytesIO(manifest_bytes),
+            )
+            for relative, source in files:
+                payload = source.read_bytes()
+                archive.addfile(
+                    _tar_info(f"payload/{relative}", payload, epoch),
+                    io.BytesIO(payload),
+                )
         os.replace(temporary, archive_path)
     finally:
         temporary.unlink(missing_ok=True)

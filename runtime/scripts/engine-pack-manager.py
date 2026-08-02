@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import importlib.util
 import json
@@ -66,7 +67,11 @@ def assert_runtime_compatible(pack: dict[str, Any], runtime: dict[str, Any]) -> 
     compatibility = pack.get("runtimeCompatibility")
     details = runtime.get("componentDetails")
     locks = runtime.get("locks")
-    if not isinstance(compatibility, dict) or not isinstance(details, dict) or not isinstance(locks, dict):
+    if (
+        not isinstance(compatibility, dict)
+        or not isinstance(details, dict)
+        or not isinstance(locks, dict)
+    ):
         raise EnginePackInstallError("Runtime compatibility metadata is incomplete")
     px4 = details.get("px4")
     gazebo = details.get("gazebo")
@@ -143,7 +148,19 @@ def replace_symlink(link: Path, target: Path) -> None:
 def current_release(current: Path) -> Path | None:
     if not current.is_symlink():
         return None
-    target = current.resolve(strict=True)
+    try:
+        target = current.resolve(strict=True)
+        releases = (current.parent / "releases").resolve(strict=True)
+    except OSError as error:
+        raise EnginePackInstallError("Engine Pack current release link is invalid") from error
+    if target.parent != releases or len(target.name) != 64:
+        raise EnginePackInstallError(
+            "Engine Pack current release points outside the managed release directory"
+        )
+    try:
+        int(target.name, 16)
+    except ValueError as error:
+        raise EnginePackInstallError("Engine Pack current release ID is invalid") from error
     return target
 
 
@@ -163,7 +180,10 @@ def verify_release_directory(
                 raise EnginePackInstallError(
                     f"Engine Pack release file is missing or unsafe: {record['path']}"
                 )
-            if path.stat().st_size != record["sizeBytes"] or tool.sha256_file(path) != record["sha256"]:
+            if (
+                path.stat().st_size != record["sizeBytes"]
+                or tool.sha256_file(path) != record["sha256"]
+            ):
                 raise EnginePackInstallError(
                     f"Engine Pack release file failed verification: {record['path']}"
                 )
@@ -276,7 +296,9 @@ def migrate_database(release: Path) -> None:
         timeout=180,
     )
     if result.returncode:
-        raise EnginePackInstallError(f"Engine Pack database migration failed: {result.stderr[-1000:]}")
+        raise EnginePackInstallError(
+            f"Engine Pack database migration failed: {result.stderr[-1000:]}"
+        )
 
 
 def wait_healthy(timeout_seconds: int = 90) -> None:
@@ -319,14 +341,17 @@ def install_pack(
     manifest_bytes = (
         descriptor_path.parent / descriptor["manifest"]["filename"]
     ).read_bytes()
-    if target.exists() and not target.is_dir():
-        raise EnginePackInstallError("Engine Pack release target is not a directory")
+    if target.is_symlink() or (target.exists() and not target.is_dir()):
+        raise EnginePackInstallError(
+            "Engine Pack release target is not a managed ordinary directory"
+        )
     if not target.exists():
         staging = Path(tempfile.mkdtemp(prefix=f"{release_id}.", dir=staging_root))
         try:
             safe_extract(archive_path, staging, manifest["files"])
             (staging / "engine-pack-manifest.json").write_bytes(manifest_bytes)
-            for directory in sorted((path for path in staging.rglob("*") if path.is_dir()), reverse=True):
+            directories = (path for path in staging.rglob("*") if path.is_dir())
+            for directory in sorted(directories, reverse=True):
                 directory.chmod(0o755)
             staging.chmod(0o755)
             os.replace(staging, target)
@@ -378,10 +403,8 @@ def install_pack(
         return receipt
     except Exception:
         if manage_services and worker_stop_attempted:
-            try:
+            with contextlib.suppress(EnginePackInstallError):
                 run_systemctl("stop", ENGINE_SERVICES)
-            except EnginePackInstallError:
-                pass
         if switched:
             if previous is not None:
                 replace_symlink(current, previous)
@@ -389,9 +412,8 @@ def install_pack(
                 current.unlink()
         if manage_services and worker_stop_attempted:
             restore_sqlite(backup, DEFAULT_DATABASE)
-        if manage_services and api_stop_attempted:
-            if previous is not None or not switched:
-                run_systemctl("start", tuple(reversed(ENGINE_SERVICES)))
+        if manage_services and api_stop_attempted and (previous is not None or not switched):
+            run_systemctl("start", tuple(reversed(ENGINE_SERVICES)))
         raise
 
 

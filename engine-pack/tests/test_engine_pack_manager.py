@@ -6,9 +6,9 @@ import sqlite3
 import sys
 import tempfile
 import unittest
-from unittest import mock
 from pathlib import Path
 from types import ModuleType
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -121,6 +121,30 @@ class EnginePackManagerTests(unittest.TestCase):
         with self.assertRaisesRegex(manager.EnginePackInstallError, "failed verification"):
             self.install()
 
+    def test_release_target_symlink_is_rejected(self) -> None:
+        descriptor = json.loads(
+            (self.output / engine_pack.DESCRIPTOR_FILENAME).read_text(encoding="utf-8")
+        )
+        release_id = descriptor["packId"].removeprefix("sha256:")
+        releases = self.root / "engine/releases"
+        releases.mkdir(parents=True)
+        outside = self.root / "outside-release"
+        outside.mkdir()
+        (releases / release_id).symlink_to(outside, target_is_directory=True)
+
+        with self.assertRaisesRegex(manager.EnginePackInstallError, "ordinary directory"):
+            self.install()
+
+    def test_current_release_outside_managed_root_is_rejected(self) -> None:
+        engine_root = self.root / "engine"
+        (engine_root / "releases").mkdir(parents=True)
+        outside = self.root / ("a" * 64)
+        outside.mkdir()
+        (engine_root / "current").symlink_to(outside, target_is_directory=True)
+
+        with self.assertRaisesRegex(manager.EnginePackInstallError, "outside"):
+            self.install()
+
     def test_active_experiment_blocks_update_before_services_are_stopped(self) -> None:
         database = self.root / "state/dronedream.db"
         database.parent.mkdir()
@@ -169,16 +193,16 @@ class EnginePackManagerTests(unittest.TestCase):
                 ],
             ),
             mock.patch.object(manager, "run_systemctl", side_effect=record_systemctl),
+            self.assertRaisesRegex(manager.EnginePackInstallError, "active experiments"),
         ):
-            with self.assertRaisesRegex(manager.EnginePackInstallError, "active experiments"):
-                manager.install_pack(
-                    descriptor_path=self.output / engine_pack.DESCRIPTOR_FILENAME,
-                    archive_path=self.output / engine_pack.ARCHIVE_FILENAME,
-                    runtime_manifest_path=self.runtime_manifest,
-                    engine_root=self.root / "engine",
-                    state_path=self.root / "state/engine-pack-state.json",
-                    manage_services=True,
-                )
+            manager.install_pack(
+                descriptor_path=self.output / engine_pack.DESCRIPTOR_FILENAME,
+                archive_path=self.output / engine_pack.ARCHIVE_FILENAME,
+                runtime_manifest_path=self.runtime_manifest,
+                engine_root=self.root / "engine",
+                state_path=self.root / "state/engine-pack-state.json",
+                manage_services=True,
+            )
 
         self.assertEqual(
             events,
