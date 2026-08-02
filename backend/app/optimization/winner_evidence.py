@@ -119,7 +119,7 @@ def compile_winner_selection_evidence(
     winner_candidate_id: str,
     candidates: Sequence[Mapping[str, Any] | WinnerCandidateInputV1],
 ) -> WinnerSelectionEvidenceV1:
-    """Compile the complete Candidate universe and deterministic final ranking."""
+    """Compile the complete aggregated Candidate universe and final ranking."""
 
     try:
         parsed = [

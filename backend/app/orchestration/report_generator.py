@@ -983,19 +983,21 @@ def generate_and_persist_report(
     )
     if baseline is None:
         raise ReportEvidenceError("baseline Candidate is missing")
+    aggregated_candidates = [
+        candidate
+        for candidate in job.candidates
+        if candidate.aggregated_metric_json is not None
+    ]
     verified_aggregates = {
         candidate.id: _authoritative_report_aggregate(
             candidate,
             candidate.aggregated_metric_json,
             verify_artifact_bytes=True,
         )
-        for candidate in job.candidates
-        if candidate.aggregated_metric_json is not None
+        for candidate in aggregated_candidates
     }
     outcome_projections: dict[str, dict[str, Any]] = {}
-    for candidate in job.candidates:
-        if candidate.aggregated_metric_json is None:
-            continue
+    for candidate in aggregated_candidates:
         projection = authoritative_candidate_trial_outcome_projection(
             candidate_id=candidate.id,
             generation_index=candidate.generation_index,
@@ -1027,7 +1029,7 @@ def generate_and_persist_report(
             candidate_report_evidence_required(
                 candidate.aggregated_metric_json
             )
-            for candidate in job.candidates
+            for candidate in aggregated_candidates
         )
     )
     if winner_payload is not None and verified_winner is None:
@@ -1050,7 +1052,7 @@ def generate_and_persist_report(
         )
         or not winner_evidence_matches_current_candidates(
             verified_winner.model_dump(mode="json"),
-            candidates=job.candidates,
+            candidates=aggregated_candidates,
             outcome_projections=outcome_projections,
             report_projections=verified_aggregates,
         )

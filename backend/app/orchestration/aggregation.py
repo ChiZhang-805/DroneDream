@@ -1355,10 +1355,15 @@ def _compile_current_winner_evidence(
     best: models.CandidateParameterSet,
     outcome_contract: OptimizationOutcomeContractV1,
 ) -> WinnerSelectionEvidenceV1:
+    evidence_candidates = [
+        candidate
+        for candidate in candidates
+        if candidate.aggregated_metric_json is not None
+    ]
     inputs: list[dict[str, object]] = []
     outcome_projections: dict[str, dict[str, Any]] = {}
     report_projections: dict[str, dict[str, Any]] = {}
-    for candidate in candidates:
+    for candidate in evidence_candidates:
         outcome = authoritative_candidate_trial_outcome_projection(
             candidate_id=candidate.id,
             generation_index=candidate.generation_index,
@@ -1405,7 +1410,7 @@ def _compile_current_winner_evidence(
     )
     if not winner_evidence_matches_current_candidates(
         evidence.model_dump(mode="json"),
-        candidates=candidates,
+        candidates=evidence_candidates,
         outcome_projections=outcome_projections,
         report_projections=report_projections,
     ):

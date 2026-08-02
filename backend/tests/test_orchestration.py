@@ -2485,6 +2485,118 @@ def test_cancel_job_clears_trial_lease(orchestration_ctx):
 # --- Aggregation / full loop -----------------------------------------------
 
 
+def test_failed_unaggregated_candidates_do_not_block_baseline_report(
+    orchestration_ctx,
+) -> None:
+    """A failed proposal stays visible without entering winner evidence."""
+
+    ctx = orchestration_ctx
+    schemas = ctx["schemas"]
+    with ctx["db_module"].SessionLocal() as db:
+        job_id = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                simulator_backend="mock",
+                optimizer_strategy="heuristic",
+                max_iterations=3,
+                parameter_catalog_version="builtin-v1",
+                objective_config=schemas.ObjectiveConfig(),
+                scenario_suite=schemas.ScenarioSuiteConfig(),
+                parameter_space=[
+                    schemas.ParameterSelection(
+                        name="MPC_XY_P",
+                        baseline=0.95,
+                        minimum=0.6,
+                        maximum=1.3,
+                        step=0.1,
+                    )
+                ],
+            ),
+        ).id
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        baseline_id = job.baseline_candidate_id
+        assert baseline_id is not None
+
+    class FailOptimizerCandidates(MockSimulatorAdapter):
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            if trial_ctx.candidate_id != baseline_id:
+                return TrialResult(
+                    success=False,
+                    backend=self.backend_name,
+                    failure=TrialFailure(
+                        code="SIMULATION_FAILED",
+                        reason="injected optimizer-only physical failure",
+                    ),
+                    log_excerpt="[test] optimizer candidate failed",
+                )
+            return super().run_trial(trial_ctx)
+
+    adapter = FailOptimizerCandidates()
+    while True:
+        with ctx["db_module"].SessionLocal() as db:
+            trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-partial-candidate-failure",
+                adapter=adapter,
+            )
+        if trial_id is None:
+            break
+
+    with ctx["db_module"].SessionLocal() as db:
+        assert ctx["aggregation"].finalize_ready_jobs(db) == [job_id]
+
+    from app.optimization.winner_evidence import verify_winner_selection_evidence
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        assert job.status == "COMPLETED"
+        assert job.latest_error_code is None
+        assert job.best_candidate_id == baseline_id
+        assert job.report is not None
+
+        baseline = db.get(ctx["models"].CandidateParameterSet, baseline_id)
+        assert baseline is not None
+        assert baseline.aggregated_metric_json is not None
+        assert baseline.is_best is True
+        assert baseline.rank_in_job == 1
+
+        failed_candidates = [
+            candidate for candidate in job.candidates if candidate.id != baseline_id
+        ]
+        assert len(failed_candidates) == 3
+        assert all(
+            candidate.aggregated_metric_json is None
+            and candidate.aggregated_score is None
+            and candidate.rank_in_job is None
+            and candidate.is_best is False
+            and candidate.completed_trial_count == 0
+            and candidate.failed_trial_count == candidate.trial_count
+            for candidate in failed_candidates
+        )
+        assert all(
+            trial.status == "FAILED"
+            for candidate in failed_candidates
+            for trial in candidate.trials
+        )
+
+        evidence = verify_winner_selection_evidence(
+            job.report.winner_evidence_json
+        )
+        assert evidence is not None
+        assert evidence.candidate_set_policy == (
+            "all_aggregated_candidates_with_bound_report_evidence"
+        )
+        assert evidence.candidate_count == 1
+        assert evidence.eligible_candidate_count == 1
+        assert evidence.baseline_candidate_id == baseline_id
+        assert evidence.winner_candidate_id == baseline_id
+        assert [item.candidate_id for item in evidence.candidates] == [baseline_id]
+
+
 def test_finalization_failure_isolated_to_one_ready_job(orchestration_ctx, monkeypatch) -> None:
     ctx = orchestration_ctx
     failing_job_id = _create_queued_job(ctx)
