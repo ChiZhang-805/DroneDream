@@ -5,6 +5,7 @@ import importlib.util
 import json
 import math
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -175,6 +176,18 @@ def test_wrapper_site_dry_run_writes_valid_telemetry(tmp_path: Path):
         (tmp_path / "run" / "launch_config.json").read_text(encoding="utf-8")
     )
     assert launch_config["make_target"] == "gz_x500_depth"
+    assert launch_config["GZ_PARTITION"] == wrapper._trial_gazebo_partition(tmp_path / "run")
+    assert re.fullmatch(r"dronedream_[0-9a-f]{24}", launch_config["GZ_PARTITION"])
+
+
+def test_gazebo_transport_partition_is_stable_and_trial_isolated(tmp_path: Path) -> None:
+    first = wrapper._trial_gazebo_partition(tmp_path / "trial-a")
+    repeated = wrapper._trial_gazebo_partition(tmp_path / "trial-a")
+    second = wrapper._trial_gazebo_partition(tmp_path / "trial-b")
+
+    assert first == repeated
+    assert first != second
+    assert re.fullmatch(r"dronedream_[0-9a-f]{24}", first)
 
 
 def test_make_target_can_be_explicitly_forced(monkeypatch: pytest.MonkeyPatch) -> None:

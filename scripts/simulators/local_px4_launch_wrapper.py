@@ -2200,6 +2200,13 @@ def _prepare_px4_launch_environment(
     return launch_env, previous
 
 
+def _trial_gazebo_partition(run_dir: Path) -> str:
+    """Return a deterministic, collision-resistant transport partition per Trial."""
+
+    identity = str(run_dir.resolve(strict=False)).encode("utf-8")
+    return f"dronedream_{hashlib.sha256(identity).hexdigest()[:24]}"
+
+
 def _apply_or_verify_px4_parameters(
     requested: dict[str, object],
     *,
@@ -3303,6 +3310,7 @@ def _write_launch_config(
     setup_commands: str,
     make_target: str,
     px4_parameters: dict[str, object],
+    gazebo_transport_partition: str | None = None,
 ) -> None:
     gui_command = (
         os.environ.get("PX4_GAZEBO_GUI_COMMAND", DEFAULT_GUI_COMMAND).strip() or DEFAULT_GUI_COMMAND
@@ -3322,6 +3330,7 @@ def _write_launch_config(
         "make_target": make_target,
         "PX4_AUTOPILOT_DIR": autopilot_dir,
         "PX4_SETUP_COMMANDS": setup_commands,
+        "GZ_PARTITION": gazebo_transport_partition,
         "PX4_PARAMETER_TRANSPORT": _parameter_transport() if px4_parameters else None,
         "px4_parameter_names": sorted(px4_parameters),
         "PX4_ENABLE_OFFBOARD_EXECUTOR": _parse_bool(
@@ -3593,6 +3602,12 @@ def main() -> int:
     try:
         _copy_used_inputs(args.run_dir, args.params, args.track)
         px4_parameters = _load_px4_parameter_request(args)
+        gazebo_transport_partition = _trial_gazebo_partition(args.run_dir)
+        # Each wrapper is a single-Trial process, so give Gazebo Transport a
+        # Trial-private discovery domain. This prevents a just-terminated
+        # simulator's subscriber records from accepting wind messages meant
+        # for the next Trial in the same worker campaign.
+        os.environ["GZ_PARTITION"] = gazebo_transport_partition
         launch_env, previous_parameter_environment = _prepare_px4_launch_environment(px4_parameters)
         launch_env["PX4_GZ_WORLD"] = args.world
     except Exception as exc:
@@ -3609,6 +3624,7 @@ def main() -> int:
             setup_commands=setup_commands,
             make_target=make_target,
             px4_parameters=px4_parameters,
+            gazebo_transport_partition=gazebo_transport_partition,
         )
         if px4_parameters:
             engine = _load_parameter_engine()
@@ -3722,8 +3738,13 @@ def main() -> int:
             setup_commands=setup_commands,
             make_target=make_target,
             px4_parameters=px4_parameters,
+            gazebo_transport_partition=gazebo_transport_partition,
         )
         _append_log(args.stdout_log, f"[local_px4_launch_wrapper] Launch command: {command}")
+        _append_log(
+            args.stdout_log,
+            f"[local_px4_launch_wrapper] Gazebo Transport partition: {gazebo_transport_partition}",
+        )
         px4_proc = _launch_process(
             command,
             stdout_log=args.stdout_log,
