@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -194,12 +195,15 @@ function loadModelAccessState(): ModelAccessState {
 interface ModelAccessProviderProps {
   children: ReactNode;
   initialSettings?: Partial<ModelAccessSettings>;
+  accountScope?: string | null;
 }
 
 export function ModelAccessProvider({
   children,
   initialSettings,
+  accountScope,
 }: ModelAccessProviderProps) {
+  const previousAccountScope = useRef(accountScope);
   const [state, setState] = useState<ModelAccessState>(() => {
     const loaded = loadModelAccessState();
     if (!initialSettings) return loaded;
@@ -218,6 +222,24 @@ export function ModelAccessProvider({
       ),
     };
   });
+
+  useEffect(() => {
+    if (
+      accountScope === undefined
+      || accountScope === previousAccountScope.current
+    ) {
+      return;
+    }
+    previousAccountScope.current = accountScope;
+    setState((current) => ({
+      ...current,
+      profiles: current.profiles.map((profile) => ({
+        ...profile,
+        apiKey: "",
+      })),
+    }));
+  }, [accountScope]);
+
   const settings = state.profiles.find(
     (profile) => profile.id === state.activeProfileId,
   ) ?? state.profiles[0] ?? defaultProfile();

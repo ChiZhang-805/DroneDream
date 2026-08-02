@@ -493,6 +493,7 @@ export function AdminPage() {
   const [moderationReason, setModerationReason] = useState("");
   const [moderating, setModerating] = useState(false);
   const loadSequenceRef = useRef(0);
+  const exportSequenceRef = useRef(0);
   const moderationDialogRef = useRef<HTMLElement | null>(null);
   const moderationReasonRef = useRef<HTMLTextAreaElement | null>(null);
   const moderationTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -532,6 +533,25 @@ export function AdminPage() {
       loadSequenceRef.current += 1;
     };
   }, [loadAll]);
+
+  useEffect(() => {
+    if (access.status === "allowed") return;
+    loadSequenceRef.current += 1;
+    exportSequenceRef.current += 1;
+    setDashboard(null);
+    setModels([]);
+    setUsers([]);
+    setUsersTotal(0);
+    setTopics([]);
+    setTopicsTotal(0);
+    setAudit([]);
+    setLoading(false);
+    setExportingUsers(false);
+    setUserExportMessage(null);
+    setModeratingTopic(null);
+    setModerationReason("");
+    setModerating(false);
+  }, [access.status]);
 
   const closeModeration = useCallback((restoreFocus = true) => {
     setModeratingTopic(null);
@@ -641,11 +661,18 @@ export function AdminPage() {
   };
 
   const startUserExport = async () => {
+    const sequence = ++exportSequenceRef.current;
     setExportingUsers(true);
     setUserExportMessage(null);
     setError(null);
     try {
       const exported = await exportAdminUsers(submittedUserSearch);
+      if (
+        sequence !== exportSequenceRef.current
+        || access.status !== "allowed"
+      ) {
+        return;
+      }
       const objectUrl = URL.createObjectURL(exported.blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
@@ -661,9 +688,10 @@ export function AdminPage() {
       const count = exported.row_count === null ? "" : ` (${number.format(exported.row_count)})`;
       setUserExportMessage(`${copy.exportStarted} ${exported.file_name}${count}`);
     } catch (caught) {
+      if (sequence !== exportSequenceRef.current) return;
       setError(safeError(caught, copy.exportFailed));
     } finally {
-      setExportingUsers(false);
+      if (sequence === exportSequenceRef.current) setExportingUsers(false);
     }
   };
 

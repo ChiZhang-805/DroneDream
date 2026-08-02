@@ -329,13 +329,20 @@ export function AppShell() {
       <AdminAccessProvider>
         <DesktopRuntimeAccessProvider>
           <AppUpdaterProvider>
-            <ModelAccessProvider>
-              <AppShellContent />
-            </ModelAccessProvider>
+            <AccountScopedModelAccessProvider />
           </AppUpdaterProvider>
         </DesktopRuntimeAccessProvider>
       </AdminAccessProvider>
     </AuthProvider>
+  );
+}
+
+function AccountScopedModelAccessProvider() {
+  const auth = useAuth();
+  return (
+    <ModelAccessProvider accountScope={auth.account?.id ?? null}>
+      <AppShellContent />
+    </ModelAccessProvider>
   );
 }
 

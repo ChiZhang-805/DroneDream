@@ -330,6 +330,10 @@ async function verifyEce498ExternalEntry(page, testCase) {
   const popupPromise = page.waitForEvent("popup");
   await courseLink.click();
   const popup = await popupPromise;
+  // A target=_blank page is observable first as its transient about:blank
+  // document. Waiting only for DOMContentLoaded can therefore pass before the
+  // course navigation commits and turn a healthy link into a false failure.
+  await popup.waitForURL(courseUrl);
   await popup.waitForLoadState("domcontentloaded");
   assert.equal(popup.url(), courseUrl);
   await popup.close();

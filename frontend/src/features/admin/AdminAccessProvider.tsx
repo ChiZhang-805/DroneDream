@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -23,8 +24,11 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AdminAccessStatus>("disabled");
   const [access, setAccess] = useState<AdminAccessSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
+    const generation = requestGeneration.current + 1;
+    requestGeneration.current = generation;
     if (desktopRuntime || !auth.account || (!auth.configured && !preview)) {
       setStatus("disabled");
       setAccess(null);
@@ -36,9 +40,11 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
     try {
       const { getAdminAccess } = await import("./adminConsole");
       const snapshot = await getAdminAccess();
+      if (generation !== requestGeneration.current) return;
       setAccess(snapshot);
       setStatus(snapshot.authorized ? "allowed" : "denied");
     } catch (caught) {
+      if (generation !== requestGeneration.current) return;
       setAccess(null);
       const statusCode = caught instanceof Error
         && "status" in caught
@@ -56,6 +62,9 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
+    return () => {
+      requestGeneration.current += 1;
+    };
   }, [refresh]);
 
   const value = useMemo<AdminAccessContextValue>(() => ({
