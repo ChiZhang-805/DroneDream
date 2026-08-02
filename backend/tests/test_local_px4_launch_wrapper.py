@@ -848,9 +848,7 @@ def test_sdf_profile_mutators_round_trip_generated_runtime_sdf(tmp_path: Path) -
     }
     navsat = base_link.find("./sensor[@name='navsat_sensor']/navsat/position_sensing")
     assert navsat is not None
-    assert float(navsat.findtext("./horizontal/noise/stddev", default="nan")) == pytest.approx(
-        2.0 / scenario_effects.WGS84_EQUATORIAL_METERS_PER_DEGREE
-    )
+    assert float(navsat.findtext("./horizontal/noise/stddev", default="nan")) == 2.0
     assert float(navsat.findtext("./vertical/noise/stddev", default="nan")) == 2.0
     vehicle_root = ET.fromstring(
         """
