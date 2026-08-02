@@ -1480,6 +1480,46 @@ def test_px4_runner_surfaces_bounded_structured_launcher_failure(tmp_path: Path)
     )
 
 
+def test_px4_runner_surfaces_wrapper_failure_after_completed_offboard_flight(
+    tmp_path: Path,
+):
+    launcher = tmp_path / "nonzero_launcher.py"
+    launcher.write_text(
+        "import json, pathlib, sys\n"
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
+        "run_dir = telemetry.parent\n"
+        "(run_dir / 'offboard_timing.json').write_text(json.dumps({"
+        "'status': 'completed', 'failure': None}), encoding='utf-8')\n"
+        "(run_dir / 'launcher_failure.json').write_text(json.dumps({"
+        "'schema_version': 'dronedream.launcher_failure.v1', 'status': 'failed', "
+        "'stage': 'real_execution', 'failure': 'ValueError: telemetry timestamp moved "
+        "backwards'}), encoding='utf-8')\n"
+        "raise SystemExit(7)\n",
+        encoding="utf-8",
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert result["failure"]["reason"] == (
+        "lower-level launcher exited with code 7: ValueError: telemetry timestamp moved backwards"
+    )
+    failure_artifact = next(
+        artifact
+        for artifact in result["artifacts"]
+        if artifact["artifact_type"] == "launcher_failure_json"
+    )
+    assert Path(failure_artifact["storage_path"]).name == "launcher_failure.json"
+
+
 @pytest.mark.parametrize(
     "payload",
     [

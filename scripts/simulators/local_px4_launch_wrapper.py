@@ -76,6 +76,7 @@ MAX_ULOG_BYTES = 1024 * 1024 * 1024
 MAX_GENERATED_WORLD_SDF_BYTES = 16 * 1024 * 1024
 MAX_TRUSTED_LOCAL_XML_BYTES = 16 * 1024 * 1024
 RETAINED_ULOG_NAME = "px4_source.ulg"
+LAUNCHER_FAILURE_NAME = "launcher_failure.json"
 WIND_EFFECTS_PLUGIN_FILENAME = "gz-sim-wind-effects-system"
 WIND_EFFECTS_PLUGIN_NAME = "gz::sim::systems::WindEffects"
 JOINT_STATE_PUBLISHER_PLUGIN_FILENAME = "gz-sim-joint-state-publisher-system"
@@ -261,6 +262,39 @@ def _json_load(path: Path) -> Any:
 def _json_dump(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _write_launcher_failure(run_dir: Path, *, stage: str, exc: BaseException) -> None:
+    """Write a bounded, traceback-free failure record for the parent runner."""
+
+    normalized_message = " ".join(str(exc).split()) or "no failure detail"
+    failure = f"{type(exc).__name__}: {normalized_message}"
+    if len(failure) > 1200:
+        failure = failure[:1200] + f"... [truncated from {len(failure)} chars]"
+    destination = run_dir / LAUNCHER_FAILURE_NAME
+    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.{time.time_ns()}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(
+                {
+                    "schema_version": "dronedream.launcher_failure.v1",
+                    "status": "failed",
+                    "stage": stage,
+                    "failure": failure,
+                },
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            ),
+            encoding="utf-8",
+        )
+        temporary.replace(destination)
+    except (OSError, TypeError, ValueError):
+        # Failure reporting must never replace the original launcher outcome.
+        pass
+    finally:
+        with contextlib.suppress(OSError):
+            temporary.unlink()
 
 
 def _append_log(path: Path, message: str) -> None:
@@ -2397,6 +2431,41 @@ def _sample_indices(length: int, maximum: int | None = None) -> list[int]:
     return [index * (length - 1) // (maximum - 1) for index in range(maximum)]
 
 
+def _strict_ulog_timestamp_source_indices(values: Any) -> tuple[list[int], int]:
+    """Collapse exact PX4 ULog timestamp repeats while rejecting time reversal."""
+
+    source_indices: list[int] = []
+    previous_timestamp: int | None = None
+    duplicate_count = 0
+    for source_index, value in enumerate(values):
+        if isinstance(value, bool) or not isinstance(value, numbers.Real):
+            raise ValueError(
+                f"vehicle_local_position.timestamp sample {source_index} is not numeric"
+            )
+        numeric = float(value)
+        if not math.isfinite(numeric) or not numeric.is_integer() or numeric < 0:
+            raise ValueError(
+                f"vehicle_local_position.timestamp sample {source_index} is not a "
+                "finite non-negative integer"
+            )
+        timestamp = int(numeric)
+        if previous_timestamp is not None and timestamp < previous_timestamp:
+            raise ValueError(
+                "vehicle_local_position.timestamp moved backwards at sample "
+                f"{source_index}: {timestamp} < {previous_timestamp}"
+            )
+        if previous_timestamp == timestamp:
+            # PX4 can publish two vehicle_local_position states at one exact
+            # microsecond. Retain the later state deterministically so the
+            # converted series remains truthful and strictly increasing.
+            source_indices[-1] = source_index
+            duplicate_count += 1
+        else:
+            source_indices.append(source_index)
+            previous_timestamp = timestamp
+    return source_indices, duplicate_count
+
+
 def _to_float_list(values: Any, indices: list[int], *, default: float = 0.0) -> list[float]:
     if values is None:
         return [default] * len(indices)
@@ -2633,8 +2702,12 @@ def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, wor
     if timestamps is None or len(timestamps) == 0:
         raise ValueError("vehicle_local_position.timestamp is required and cannot be empty")
 
-    indices = _sample_indices(len(timestamps))
-    t0 = float(timestamps[0])
+    unique_source_indices, duplicate_timestamp_count = _strict_ulog_timestamp_source_indices(
+        timestamps
+    )
+    sampled_unique_positions = _sample_indices(len(unique_source_indices))
+    indices = [unique_source_indices[index] for index in sampled_unique_positions]
+    t0 = float(timestamps[unique_source_indices[0]])
     x_values = _to_float_list(data.get("x"), indices)
     y_values = _to_float_list(data.get("y"), indices)
     z_values = _to_float_list(data.get("z"), indices)
@@ -2674,7 +2747,9 @@ def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, wor
             "ulog_path": str(ulog_path),
             "origin_source_sha256": _sha256_file(ulog_path),
             "origin_source_byte_count": ulog_size,
-            "origin_extraction_revision": "pyulog-vehicle-local-position-1.0",
+            "origin_extraction_revision": "pyulog-vehicle-local-position-1.1",
+            "origin_timestamp_duplicate_count": duplicate_timestamp_count,
+            "origin_timestamp_duplicate_policy": "retain_last_exact_microsecond_sample",
             "origin_coordinate_frame": "PX4_LOCAL_NED",
             "coordinate_transform": (
                 "x=north_m;y=east_m;z=-down_m;vx=north_mps;vy=east_mps;vz=-down_mps;yaw=px4_ned_rad"
@@ -3519,6 +3594,8 @@ def _finalize_real_telemetry(
 def main() -> int:
     args = _parse_args()
     args.run_dir.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):
+        (args.run_dir / LAUNCHER_FAILURE_NAME).unlink(missing_ok=True)
 
     make_target = _make_target_for_vehicle(args.simulator_model or args.vehicle)
     setup_commands = os.environ.get("PX4_SETUP_COMMANDS", "").strip()
@@ -3604,6 +3681,7 @@ def main() -> int:
             _append_log(args.stderr_log, "")
             return 0
     except Exception as exc:
+        _write_launcher_failure(args.run_dir, stage="scenario_effect_preflight", exc=exc)
         _append_log(
             args.stderr_log,
             f"[local_px4_launch_wrapper] Invalid scenario-effect request: {exc}",
@@ -3622,6 +3700,7 @@ def main() -> int:
         launch_env, previous_parameter_environment = _prepare_px4_launch_environment(px4_parameters)
         launch_env["PX4_GZ_WORLD"] = args.world
     except Exception as exc:
+        _write_launcher_failure(args.run_dir, stage="input_preparation", exc=exc)
         _append_log(
             args.stderr_log,
             f"[local_px4_launch_wrapper] Failed preparing params/track: {exc}",
@@ -3659,6 +3738,7 @@ def main() -> int:
     try:
         automatic_ulog = _prepare_automatic_ulog()
     except Exception as exc:
+        _write_launcher_failure(args.run_dir, stage="ulog_snapshot_preparation", exc=exc)
         _append_log(
             args.stderr_log,
             f"[local_px4_launch_wrapper] Failed capturing pre-launch ULog snapshot: {exc}",
@@ -4197,6 +4277,7 @@ def main() -> int:
     except Exception as exc:
         _cleanup_process(gui_proc, args.stderr_log, label="GUI")
         _cleanup_process(px4_proc, args.stderr_log, label="PX4")
+        _write_launcher_failure(args.run_dir, stage="real_execution", exc=exc)
         _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Real mode failure: {exc}")
         return 1
     finally:

@@ -417,7 +417,8 @@ def test_ulog_to_telemetry_json_writes_schema_with_attitude_groundtruth_fallback
     assert len(payload["meta"]["origin_source_sha256"]) == 71
     assert payload["meta"]["origin_source_byte_count"] == len(b"test ULog fixture")
     assert payload["meta"]["origin_coordinate_frame"] == "PX4_LOCAL_NED"
-    assert payload["meta"]["origin_extraction_revision"] == ("pyulog-vehicle-local-position-1.0")
+    assert payload["meta"]["origin_extraction_revision"] == ("pyulog-vehicle-local-position-1.1")
+    assert payload["meta"]["origin_timestamp_duplicate_count"] == 0
     assert payload["samples"][0]["t"] == 0.0
     assert payload["samples"][0]["z"] == 5.0
     assert payload["samples"][0]["vz"] == 0.1
@@ -498,6 +499,73 @@ def test_ulog_conversion_downsamples_evenly_and_preserves_endpoints(
     samples = json.loads(output_path.read_text(encoding="utf-8"))["samples"]
     assert [sample["x"] for sample in samples] == [0.0, 2.0, 5.0]
     assert [sample["t"] for sample in samples] == [0.0, 2.0, 5.0]
+
+
+def test_ulog_conversion_collapses_exact_duplicate_timestamp_and_retains_last_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake_ulog = _fake_ulog_with_groundtruth_yaw()
+    local_position = fake_ulog.data_list[0]
+    local_position.data = {
+        "timestamp": [1_000_000, 2_000_000, 2_000_000, 3_000_000],
+        "x": [0.0, 1.0, 2.0, 3.0],
+        "y": [0.0] * 4,
+        "z": [-3.0] * 4,
+        "vx": [1.0] * 4,
+        "vy": [0.0] * 4,
+        "vz": [0.0] * 4,
+    }
+
+    class FakeULog:
+        def __init__(self, _path: str):
+            self.data_list = fake_ulog.data_list
+
+    monkeypatch.setitem(sys.modules, "pyulog", SimpleNamespace(ULog=FakeULog))
+    ulog_path = tmp_path / "sample.ulg"
+    ulog_path.write_bytes(b"test ULog fixture")
+    output_path = tmp_path / "telemetry.json"
+
+    wrapper.ulog_to_telemetry_json(ulog_path, output_path, "x500", "default")
+
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert [sample["t"] for sample in payload["samples"]] == [0.0, 1.0, 2.0]
+    assert [sample["x"] for sample in payload["samples"]] == [0.0, 2.0, 3.0]
+    assert payload["meta"]["origin_timestamp_duplicate_count"] == 1
+    assert payload["meta"]["origin_timestamp_duplicate_policy"] == (
+        "retain_last_exact_microsecond_sample"
+    )
+
+
+def test_ulog_conversion_rejects_timestamp_that_moves_backwards(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake_ulog = _fake_ulog_with_groundtruth_yaw()
+    local_position = fake_ulog.data_list[0]
+    local_position.data = {
+        "timestamp": [1_000_000, 3_000_000, 2_000_000],
+        "x": [0.0, 1.0, 2.0],
+        "y": [0.0] * 3,
+        "z": [-3.0] * 3,
+        "vx": [1.0] * 3,
+        "vy": [0.0] * 3,
+        "vz": [0.0] * 3,
+    }
+
+    class FakeULog:
+        def __init__(self, _path: str):
+            self.data_list = fake_ulog.data_list
+
+    monkeypatch.setitem(sys.modules, "pyulog", SimpleNamespace(ULog=FakeULog))
+    ulog_path = tmp_path / "sample.ulg"
+    ulog_path.write_bytes(b"test ULog fixture")
+
+    with pytest.raises(ValueError, match="timestamp moved backwards at sample 2"):
+        wrapper.ulog_to_telemetry_json(
+            ulog_path,
+            tmp_path / "telemetry.json",
+            "x500",
+            "default",
+        )
 
 
 def _obstacle_effect() -> dict[str, object]:
@@ -1161,9 +1229,9 @@ def test_steady_wind_overlay_accepts_exact_collinear_gust_superposition(
         "./world[@name='default']/plugin[@name='gz::sim::systems::WindEffects']"
     )
     assert plugin is not None
-    assert float(
-        plugin.findtext("./horizontal/magnitude/sin/amplitude_percent", default="nan")
-    ) == 0.5
+    assert (
+        float(plugin.findtext("./horizontal/magnitude/sin/amplitude_percent", default="nan")) == 0.5
+    )
 
 
 def test_actuator_failure_sdf_and_joint_state_prove_one_hard_stopped_motor(

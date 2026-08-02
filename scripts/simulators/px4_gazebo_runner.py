@@ -97,6 +97,7 @@ _MAX_TELEMETRY_BYTES = 16 * 1024 * 1024
 _MAX_TELEMETRY_SAMPLES = 50_000
 _MAX_TRIAL_INPUT_BYTES = 8 * 1024 * 1024
 _MAX_OFFBOARD_TIMING_BYTES = 1024 * 1024
+_MAX_LAUNCHER_FAILURE_BYTES = 64 * 1024
 _MAX_REFERENCE_TRACK_POINTS = 10_000
 _HOVER_DURATION_SECONDS = 10.0
 _HOVER_REFERENCE_SAMPLE_COUNT = 101
@@ -699,29 +700,42 @@ def _lower_level_failure_reason(run_dir: Path, exit_code: int) -> str:
     """Prefer the launcher's bounded structured failure over a bare exit code."""
 
     generic_reason = f"lower-level launcher exited with code {exit_code}"
-    timing_path = run_dir / "offboard_timing.json"
-    try:
-        timing_size = _regular_file_size(
-            timing_path,
-            label="offboard timing failure evidence",
-            required=False,
-        )
-        if timing_size is None:
-            return generic_reason
-        loaded = _load_bounded_json(
-            timing_path,
-            label="offboard timing failure evidence",
-            max_bytes=_MAX_OFFBOARD_TIMING_BYTES,
-        )
-    except RunnerError:
-        return generic_reason
-    if not isinstance(loaded, dict) or loaded.get("status") != "failed":
-        return generic_reason
-    failure = loaded.get("failure")
-    if not isinstance(failure, str) or not failure.strip():
-        return generic_reason
-    normalized_failure = " ".join(failure.split())
-    return f"{generic_reason}: {_safe_excerpt(normalized_failure, limit=1200)}"
+    evidence_sources = (
+        (
+            run_dir / "offboard_timing.json",
+            "offboard timing failure evidence",
+            _MAX_OFFBOARD_TIMING_BYTES,
+        ),
+        (
+            run_dir / "launcher_failure.json",
+            "launcher failure evidence",
+            _MAX_LAUNCHER_FAILURE_BYTES,
+        ),
+    )
+    for evidence_path, label, byte_limit in evidence_sources:
+        try:
+            evidence_size = _regular_file_size(
+                evidence_path,
+                label=label,
+                required=False,
+            )
+            if evidence_size is None:
+                continue
+            loaded = _load_bounded_json(
+                evidence_path,
+                label=label,
+                max_bytes=byte_limit,
+            )
+        except RunnerError:
+            continue
+        if not isinstance(loaded, dict) or loaded.get("status") != "failed":
+            continue
+        failure = loaded.get("failure")
+        if not isinstance(failure, str) or not failure.strip():
+            continue
+        normalized_failure = " ".join(failure.split())
+        return f"{generic_reason}: {_safe_excerpt(normalized_failure, limit=1200)}"
+    return generic_reason
 
 
 def _load_trial_payload(path: Path) -> dict[str, Any]:
@@ -2732,6 +2746,12 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             run_dir / "offboard_timing.json",
             "offboard_timing_json",
             "Offboard Timing",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "launcher_failure.json",
+            "launcher_failure_json",
+            "Launcher Failure",
             "application/json",
         ),
         _artifact_record(
