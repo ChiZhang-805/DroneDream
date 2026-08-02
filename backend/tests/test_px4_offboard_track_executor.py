@@ -407,6 +407,7 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
             ],
             connection="udp://:14540",
             takeoff_timeout_seconds=1.0,
+            takeoff_climb_rate_m_s=executor.MAX_TAKEOFF_CLIMB_RATE_M_S,
             track_timeout_seconds=5.0,
             rate_hz=100.0,
             land_after=True,
@@ -671,6 +672,7 @@ def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
             schedule,
             connection="udp://:14540",
             takeoff_timeout_seconds=1.0,
+            takeoff_climb_rate_m_s=executor.MAX_TAKEOFF_CLIMB_RATE_M_S,
             track_timeout_seconds=5.0,
             rate_hz=100.0,
             land_after=True,
@@ -689,11 +691,89 @@ def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
     assert timing["track_start_t"] <= timing["track_end_t"]
 
 
+def test_executor_streams_prearm_hold_and_bounded_vertical_takeoff_ramp(
+    tmp_path: Path,
+) -> None:
+    events: list[str] = []
+
+    class RecordingClient(executor.FakeOffboardClient):
+        async def set_position_ned(self, setpoint: executor.Setpoint) -> None:
+            events.append("setpoint")
+            await super().set_position_ned(setpoint)
+
+        async def arm(self) -> None:
+            events.append("arm")
+            await super().arm()
+
+        async def start_offboard(self) -> None:
+            events.append("start_offboard")
+            await super().start_offboard()
+
+    client = RecordingClient()
+    timing_path = tmp_path / "offboard_timing.json"
+    asyncio.run(
+        executor.run_executor(
+            client,
+            [executor.Setpoint(0.0, 0.0, -0.2, 0.0)],
+            connection="udp://:14540",
+            takeoff_timeout_seconds=0.5,
+            takeoff_climb_rate_m_s=1.0,
+            track_timeout_seconds=1.0,
+            rate_hz=100.0,
+            land_after=True,
+            log_path=tmp_path / "offboard.log",
+            timing_path=timing_path,
+            takeoff_vertical_tolerance_m=1e-6,
+        )
+    )
+
+    assert events[:3] == ["setpoint", "arm", "start_offboard"]
+    assert client.setpoints[0].down_m == pytest.approx(0.0)
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    gate = timing["takeoff_gate"]
+    assert gate["schema_version"] == "dronedream.takeoff_gate.v2"
+    assert gate["takeoff_profile"]["mode"] == "telemetry_anchored_bounded_vertical_ramp"
+    assert gate["takeoff_profile"]["origin_ned"]["down_m"] == pytest.approx(0.0)
+    assert gate["takeoff_profile"]["ramp_completed_after_s"] >= 0.2
+    commanded_down = [
+        observation["commanded_setpoint_ned"]["down_m"] for observation in gate["observations"]
+    ]
+    assert commanded_down == sorted(commanded_down, reverse=True)
+    assert any(-0.2 < value < 0.0 for value in commanded_down)
+    assert commanded_down[-1] == pytest.approx(-0.2)
+    for observation in gate["observations"]:
+        commanded_delta = abs(observation["commanded_setpoint_ned"]["down_m"])
+        assert commanded_delta <= observation["takeoff_ramp_elapsed_s"] + 1e-9
+
+
+def test_executor_rejects_unsafe_takeoff_climb_rate_before_connecting(tmp_path: Path) -> None:
+    client = executor.FakeOffboardClient()
+
+    with pytest.raises(ValueError, match="takeoff_climb_rate_m_s must be no greater"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -3.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=30.0,
+                takeoff_climb_rate_m_s=executor.MAX_TAKEOFF_CLIMB_RATE_M_S + 0.1,
+                track_timeout_seconds=5.0,
+                rate_hz=10.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+            )
+        )
+
+    assert client.connected is False
+    assert client.armed is False
+
+
 def test_executor_waits_for_continuously_stable_hover_before_track_entry(
     tmp_path: Path,
 ) -> None:
     client = executor.FakeOffboardClient()
     client.position_velocity_samples = [
+        executor.PositionVelocityNed(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
         executor.PositionVelocityNed(0.0, 0.0, -1.0, 0.0, 0.0, -1.5),
         executor.PositionVelocityNed(0.0, 0.0, -3.0, 0.0, 0.0, 0.0),
         executor.PositionVelocityNed(0.0, 0.0, -3.0, 0.0, 0.0, 0.0),
@@ -711,6 +791,7 @@ def test_executor_waits_for_continuously_stable_hover_before_track_entry(
             schedule,
             connection="udp://:14540",
             takeoff_timeout_seconds=1.0,
+            takeoff_climb_rate_m_s=executor.MAX_TAKEOFF_CLIMB_RATE_M_S,
             track_timeout_seconds=5.0,
             rate_hz=100.0,
             land_after=True,
@@ -804,6 +885,7 @@ def test_executor_activates_wind_after_hover_and_before_track_entry(tmp_path: Pa
             ],
             connection="udp://:14540",
             takeoff_timeout_seconds=1.0,
+            takeoff_climb_rate_m_s=executor.MAX_TAKEOFF_CLIMB_RATE_M_S,
             track_timeout_seconds=5.0,
             rate_hz=100.0,
             land_after=True,
@@ -867,6 +949,7 @@ def test_executor_fails_closed_when_post_hover_wind_readback_fails(tmp_path: Pat
                 ],
                 connection="udp://:14540",
                 takeoff_timeout_seconds=1.0,
+                takeoff_climb_rate_m_s=executor.MAX_TAKEOFF_CLIMB_RATE_M_S,
                 track_timeout_seconds=5.0,
                 rate_hz=100.0,
                 land_after=True,
@@ -1037,6 +1120,44 @@ def test_takeoff_initial_telemetry_failure_remains_fail_closed() -> None:
         )
     assert evidence["sample_count"] == 0
     assert evidence["failure_reason"] == "position_velocity_telemetry_unavailable"
+
+
+def test_executor_rejects_missing_initial_position_telemetry_before_arming(
+    tmp_path: Path,
+) -> None:
+    class NoInitialTelemetryClient(executor.FakeOffboardClient):
+        async def sample_position_velocity_ned(
+            self, timeout_seconds: float
+        ) -> executor.PositionVelocityNed:
+            raise TimeoutError(f"telemetry timeout after {timeout_seconds:.3f}s")
+
+    client = NoInitialTelemetryClient()
+    timing_path = tmp_path / "offboard_timing.json"
+
+    with pytest.raises(TimeoutError, match="telemetry timeout"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -3.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=5.0,
+                rate_hz=10.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=timing_path,
+            )
+        )
+
+    assert client.armed is False
+    assert client.offboard_started is False
+    assert client.landed is False
+    assert client.closed is True
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    gate = timing["takeoff_gate"]
+    assert gate["status"] == "failed"
+    assert gate["failure_reason"] == "initial_position_velocity_telemetry_unavailable"
+    assert "telemetry timeout" in gate["telemetry_error"]
 
 
 def test_executor_fails_closed_when_hover_velocity_never_stabilizes(

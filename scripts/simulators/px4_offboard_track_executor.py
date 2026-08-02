@@ -35,6 +35,7 @@ from typing import Any, Protocol
 
 MAX_REFERENCE_TRACK_POINTS = 10_000
 MAX_SETPOINT_RATE_HZ = 100.0
+MAX_TAKEOFF_CLIMB_RATE_M_S = 5.0
 MAX_SETPOINTS = 1_000_000
 DEFAULT_HOVER_DURATION_SECONDS = 10.0
 MIN_HOVER_DURATION_SECONDS = 1.0
@@ -458,6 +459,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--takeoff-timeout-seconds",
         type=float,
         default=_parse_float(os.environ.get("PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS"), default=30.0),
+    )
+    parser.add_argument(
+        "--takeoff-climb-rate-m-s",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_TAKEOFF_CLIMB_RATE_M_S"),
+            default=1.0,
+        ),
     )
     parser.add_argument(
         "--track-timeout-seconds",
@@ -1158,6 +1167,8 @@ async def _wait_for_takeoff_stability(
     client: OffboardClientProtocol,
     target: Setpoint,
     *,
+    takeoff_origin: PositionVelocityNed | None = None,
+    climb_rate_m_s: float = 1.0,
     timeout_seconds: float,
     sample_rate_hz: float,
     stable_window_seconds: float,
@@ -1170,6 +1181,7 @@ async def _wait_for_takeoff_stability(
     for label, value, allow_zero in (
         ("timeout_seconds", timeout_seconds, False),
         ("sample_rate_hz", sample_rate_hz, False),
+        ("climb_rate_m_s", climb_rate_m_s, False),
         ("stable_window_seconds", stable_window_seconds, True),
         ("horizontal_tolerance_m", horizontal_tolerance_m, False),
         ("vertical_tolerance_m", vertical_tolerance_m, False),
@@ -1181,14 +1193,19 @@ async def _wait_for_takeoff_stability(
         ("vertical_speed_tolerance_m_s", vertical_speed_tolerance_m_s, False),
     ):
         _validate_takeoff_gate_limit(value, label, allow_zero=allow_zero)
+    if climb_rate_m_s > MAX_TAKEOFF_CLIMB_RATE_M_S:
+        raise ValueError(f"climb_rate_m_s must be no greater than {MAX_TAKEOFF_CLIMB_RATE_M_S:g}")
 
     sample_interval_seconds = max(0.01, 1.0 / sample_rate_hz)
     telemetry_timeout_seconds = min(1.0, timeout_seconds)
     deadline = time.monotonic() + timeout_seconds
+    ramp_started_at = time.monotonic()
     stable_since: float | None = None
+    origin_down_m = target.down_m if takeoff_origin is None else takeoff_origin.down_m
+    vertical_distance_m = target.down_m - origin_down_m
     evidence.update(
         {
-            "schema_version": "dronedream.takeoff_gate.v1",
+            "schema_version": "dronedream.takeoff_gate.v2",
             "status": "waiting",
             "target_ned": {
                 "north_m": target.north_m,
@@ -1202,6 +1219,24 @@ async def _wait_for_takeoff_stability(
                 "vertical_speed_m_s": vertical_speed_tolerance_m_s,
             },
             "required_stable_window_s": stable_window_seconds,
+            "takeoff_profile": {
+                "mode": (
+                    "direct_target"
+                    if takeoff_origin is None
+                    else "telemetry_anchored_bounded_vertical_ramp"
+                ),
+                "climb_rate_limit_m_s": climb_rate_m_s,
+                "origin_ned": (
+                    None
+                    if takeoff_origin is None
+                    else {
+                        "north_m": takeoff_origin.north_m,
+                        "east_m": takeoff_origin.east_m,
+                        "down_m": takeoff_origin.down_m,
+                    }
+                ),
+                "vertical_distance_m": abs(vertical_distance_m),
+            },
             "sample_count": 0,
             "stable_sample_count": 0,
             "reset_count": 0,
@@ -1221,7 +1256,28 @@ async def _wait_for_takeoff_stability(
                 f"{timeout_seconds:g}s; latest={latest}"
             )
 
-        await client.set_position_ned(target)
+        ramp_elapsed_seconds = max(0.0, now - ramp_started_at)
+        maximum_vertical_delta_m = climb_rate_m_s * ramp_elapsed_seconds
+        if abs(vertical_distance_m) <= maximum_vertical_delta_m:
+            commanded_down_m = target.down_m
+            ramp_fraction = 1.0
+        else:
+            commanded_down_m = origin_down_m + math.copysign(
+                maximum_vertical_delta_m,
+                vertical_distance_m,
+            )
+            ramp_fraction = (
+                1.0
+                if abs(vertical_distance_m) <= 1e-12
+                else maximum_vertical_delta_m / abs(vertical_distance_m)
+            )
+        commanded = Setpoint(
+            north_m=target.north_m,
+            east_m=target.east_m,
+            down_m=commanded_down_m,
+            yaw_deg=target.yaw_deg,
+        )
+        await client.set_position_ned(commanded)
         try:
             sample = await client.sample_position_velocity_ned(
                 min(telemetry_timeout_seconds, remaining)
@@ -1243,6 +1299,16 @@ async def _wait_for_takeoff_stability(
 
         observed_at = time.monotonic()
         payload = _position_velocity_payload(sample, target)
+        payload["commanded_setpoint_ned"] = {
+            "north_m": commanded.north_m,
+            "east_m": commanded.east_m,
+            "down_m": commanded.down_m,
+            "yaw_deg": commanded.yaw_deg,
+        }
+        payload["takeoff_ramp_fraction"] = min(1.0, max(0.0, ramp_fraction))
+        payload["takeoff_ramp_elapsed_s"] = ramp_elapsed_seconds
+        if ramp_fraction >= 1.0 and "ramp_completed_after_s" not in evidence["takeoff_profile"]:
+            evidence["takeoff_profile"]["ramp_completed_after_s"] = ramp_elapsed_seconds
         within_limits = bool(
             float(payload["horizontal_error_m"]) <= horizontal_tolerance_m
             and float(payload["vertical_error_m"]) <= vertical_tolerance_m
@@ -1516,6 +1582,7 @@ async def run_executor(
     *,
     connection: str,
     takeoff_timeout_seconds: float,
+    takeoff_climb_rate_m_s: float = 1.0,
     track_timeout_seconds: float,
     rate_hz: float,
     land_after: bool,
@@ -1539,10 +1606,15 @@ async def run_executor(
         raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
     for label, value in (
         ("takeoff_timeout_seconds", takeoff_timeout_seconds),
+        ("takeoff_climb_rate_m_s", takeoff_climb_rate_m_s),
         ("track_timeout_seconds", track_timeout_seconds),
     ):
         if not math.isfinite(value) or value <= 0:
             raise ValueError(f"{label} must be finite and greater than zero")
+    if takeoff_climb_rate_m_s > MAX_TAKEOFF_CLIMB_RATE_M_S:
+        raise ValueError(
+            f"takeoff_climb_rate_m_s must be no greater than {MAX_TAKEOFF_CLIMB_RATE_M_S:g}"
+        )
     if not schedule:
         raise ValueError("setpoint schedule is empty")
     exec_start = time.monotonic()
@@ -1635,13 +1707,42 @@ async def run_executor(
             )
         if isinstance(battery_profile, dict):
             battery_takeoff_gate_parameters = await _hold_battery_during_takeoff_gate(client)
+        try:
+            takeoff_origin = await client.sample_position_velocity_ned(
+                min(2.0, takeoff_timeout_seconds)
+            )
+        except BaseException as exc:
+            takeoff_gate["status"] = "failed"
+            takeoff_gate["failure_reason"] = "initial_position_velocity_telemetry_unavailable"
+            takeoff_gate["telemetry_error"] = f"{type(exc).__name__}: {exc}"
+            raise
+        takeoff_gate["initial_position_velocity_ned"] = {
+            "north_m": takeoff_origin.north_m,
+            "east_m": takeoff_origin.east_m,
+            "down_m": takeoff_origin.down_m,
+            "north_m_s": takeoff_origin.north_m_s,
+            "east_m_s": takeoff_origin.east_m_s,
+            "down_m_s": takeoff_origin.down_m_s,
+        }
+        initial_hold = Setpoint(
+            north_m=schedule[0].north_m,
+            east_m=schedule[0].east_m,
+            down_m=takeoff_origin.down_m,
+            yaw_deg=schedule[0].yaw_deg,
+        )
+        await client.set_position_ned(initial_hold)
+        takeoff_gate["initial_setpoint_ned"] = {
+            "north_m": initial_hold.north_m,
+            "east_m": initial_hold.east_m,
+            "down_m": initial_hold.down_m,
+            "yaw_deg": initial_hold.yaw_deg,
+        }
         await client.arm()
         armed = True
         takeoff_gate["px4_arm_command"] = "accepted"
         _log(log_path, "armed")
 
         timing["takeoff_start_t"] = time.monotonic() - exec_start
-        await client.set_position_ned(schedule[0])
         await client.start_offboard()
         offboard_started = True
         timing["offboard_start_t"] = time.monotonic() - exec_start
@@ -1650,6 +1751,8 @@ async def run_executor(
         await _wait_for_takeoff_stability(
             client,
             schedule[0],
+            takeoff_origin=takeoff_origin,
+            climb_rate_m_s=takeoff_climb_rate_m_s,
             timeout_seconds=takeoff_timeout_seconds,
             sample_rate_hz=rate_hz,
             stable_window_seconds=takeoff_stable_window_seconds,
@@ -2005,6 +2108,7 @@ def main(argv: list[str] | None = None) -> int:
                 plan.schedule,
                 connection=args.connection,
                 takeoff_timeout_seconds=args.takeoff_timeout_seconds,
+                takeoff_climb_rate_m_s=args.takeoff_climb_rate_m_s,
                 track_timeout_seconds=args.track_timeout_seconds,
                 rate_hz=args.setpoint_rate_hz,
                 land_after=land_after,
