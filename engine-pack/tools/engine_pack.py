@@ -10,8 +10,11 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 import tarfile
+import tempfile
 from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -43,6 +46,23 @@ class EnginePackError(RuntimeError):
 
 def canonical_json(payload: Any) -> bytes:
     return (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
+
+
+def write_new_file(path: Path, payload: bytes) -> None:
+    """Create one delivery file without replacing an earlier build."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    created = False
+    try:
+        with path.open("xb") as handle:
+            created = True
+            handle.write(payload)
+    except FileExistsError as exc:
+        raise EnginePackError(f"refusing to replace Engine Pack output: {path}") from exc
+    except Exception:
+        if created:
+            path.unlink(missing_ok=True)
+        raise
 
 
 def sha256_bytes(payload: bytes) -> str:
@@ -81,6 +101,8 @@ def read_pins(path: Path) -> dict[str, str]:
 
 
 def source_date_epoch(repository_root: Path, source_commit: str) -> int:
+    if not COMMIT_RE.fullmatch(source_commit):
+        raise EnginePackError("source commit must be a full lowercase Git SHA")
     configured = os.environ.get("SOURCE_DATE_EPOCH")
     if configured:
         try:
@@ -90,8 +112,11 @@ def source_date_epoch(repository_root: Path, source_commit: str) -> int:
         if value < 0:
             raise EnginePackError("SOURCE_DATE_EPOCH must not be negative")
         return value
-    result = subprocess.run(
-        ["git", "show", "-s", "--format=%ct", source_commit],
+    git = shutil.which("git")
+    if git is None:
+        raise EnginePackError("git is required to derive the source commit timestamp")
+    result = subprocess.run(  # noqa: S603 - resolved executable and validated SHA argument.
+        [git, "show", "-s", "--format=%ct", source_commit],
         cwd=repository_root,
         check=False,
         capture_output=True,
@@ -214,8 +239,14 @@ def write_archive(
     files: list[tuple[str, Path]],
     epoch: int,
 ) -> None:
-    temporary = archive_path.with_suffix(archive_path.suffix + ".tmp")
-    temporary.unlink(missing_ok=True)
+    archive_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{archive_path.name}.",
+        suffix=".tmp",
+        dir=archive_path.parent,
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
     try:
         with (
             temporary.open("wb") as raw,
@@ -234,7 +265,12 @@ def write_archive(
                     _tar_info(f"payload/{relative}", payload, epoch),
                     io.BytesIO(payload),
                 )
-        os.replace(temporary, archive_path)
+        try:
+            os.link(temporary, archive_path)
+        except FileExistsError as exc:
+            raise EnginePackError(
+                f"refusing to replace Engine Pack output: {archive_path}"
+            ) from exc
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -244,6 +280,8 @@ def build(args: argparse.Namespace) -> int:
     output = Path(args.output_directory).resolve()
     if not root.is_dir():
         raise EnginePackError("repository root does not exist")
+    if output.exists() and any(output.iterdir()):
+        raise EnginePackError(f"output directory must be absent or empty: {output}")
     output.mkdir(parents=True, exist_ok=True)
     files = production_files(root)
     records = file_records(files)
@@ -252,25 +290,35 @@ def build(args: argparse.Namespace) -> int:
     manifest_bytes = canonical_json(manifest)
     manifest_path = output / MANIFEST_FILENAME
     archive_path = output / ARCHIVE_FILENAME
-    manifest_path.write_bytes(manifest_bytes)
-    write_archive(archive_path, manifest_bytes, files, epoch)
-    descriptor = {
-        "schemaVersion": 1,
-        "kind": "dronedream-engine-pack-bundle",
-        "packId": manifest["packId"],
-        "sourceCommit": args.source_commit,
-        "archive": {
-            "filename": ARCHIVE_FILENAME,
-            "sizeBytes": archive_path.stat().st_size,
-            "sha256": sha256_file(archive_path),
-        },
-        "manifest": {
-            "filename": MANIFEST_FILENAME,
-            "sizeBytes": len(manifest_bytes),
-            "sha256": sha256_bytes(manifest_bytes),
-        },
-    }
-    (output / DESCRIPTOR_FILENAME).write_bytes(canonical_json(descriptor))
+    created: list[Path] = []
+    try:
+        write_new_file(manifest_path, manifest_bytes)
+        created.append(manifest_path)
+        write_archive(archive_path, manifest_bytes, files, epoch)
+        created.append(archive_path)
+        descriptor = {
+            "schemaVersion": 1,
+            "kind": "dronedream-engine-pack-bundle",
+            "packId": manifest["packId"],
+            "sourceCommit": args.source_commit,
+            "archive": {
+                "filename": ARCHIVE_FILENAME,
+                "sizeBytes": archive_path.stat().st_size,
+                "sha256": sha256_file(archive_path),
+            },
+            "manifest": {
+                "filename": MANIFEST_FILENAME,
+                "sizeBytes": len(manifest_bytes),
+                "sha256": sha256_bytes(manifest_bytes),
+            },
+        }
+        descriptor_path = output / DESCRIPTOR_FILENAME
+        write_new_file(descriptor_path, canonical_json(descriptor))
+        created.append(descriptor_path)
+    except Exception:
+        for created_path in reversed(created):
+            created_path.unlink(missing_ok=True)
+        raise
     print(json.dumps(descriptor, sort_keys=True))
     return 0
 
@@ -498,7 +546,7 @@ def main() -> int:
     try:
         return args.handler(args)
     except (EnginePackError, OSError, json.JSONDecodeError, tarfile.TarError) as error:
-        print(f"engine pack error: {error}", file=os.sys.stderr)
+        print(f"engine pack error: {error}", file=sys.stderr)
         return 2
 
 

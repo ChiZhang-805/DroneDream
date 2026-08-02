@@ -29,6 +29,8 @@ DEFAULT_DATABASE = Path("/var/lib/dronedream/dronedream.db")
 ENGINE_SERVICES = ("dronedream-worker.service", "dronedream-api.service")
 HEALTH_URL = "http://127.0.0.1:8000/health/ready"
 ACTIVE_JOB_STATUSES = ("QUEUED", "RUNNING", "AGGREGATING", "FINALIZING")
+SYSTEMCTL = Path("/usr/bin/systemctl")
+ALEMBIC = Path("/opt/dronedream/venv/bin/alembic")
 
 
 class EnginePackInstallError(RuntimeError):
@@ -76,7 +78,11 @@ def assert_runtime_compatible(pack: dict[str, Any], runtime: dict[str, Any]) -> 
     px4 = details.get("px4")
     gazebo = details.get("gazebo")
     python = details.get("python")
-    if not all(isinstance(item, dict) for item in (px4, gazebo, python)):
+    if (
+        not isinstance(px4, dict)
+        or not isinstance(gazebo, dict)
+        or not isinstance(python, dict)
+    ):
         raise EnginePackInstallError("Runtime component details are incomplete")
     observed = {
         "runtimeId": runtime.get("runtimeId"),
@@ -212,10 +218,9 @@ def ensure_no_active_experiments(database: Path) -> None:
             active_jobs = 0
             active_trials = 0
             if "jobs" in tables:
-                placeholders = ",".join("?" for _ in ACTIVE_JOB_STATUSES)
                 active_jobs = int(
                     connection.execute(
-                        f"SELECT COUNT(*) FROM jobs WHERE status IN ({placeholders})",
+                        "SELECT COUNT(*) FROM jobs WHERE status IN (?, ?, ?, ?)",
                         ACTIVE_JOB_STATUSES,
                     ).fetchone()[0]
                 )
@@ -240,8 +245,14 @@ def ensure_no_active_experiments(database: Path) -> None:
 
 
 def run_systemctl(action: str, services: tuple[str, ...]) -> None:
-    result = subprocess.run(
-        ["systemctl", action, *services],
+    if action not in {"start", "stop"}:
+        raise EnginePackInstallError("unsupported systemctl action")
+    if not services or any(service not in ENGINE_SERVICES for service in services):
+        raise EnginePackInstallError("unsupported Engine Pack service")
+    if not SYSTEMCTL.is_file():
+        raise EnginePackInstallError("systemctl is unavailable")
+    result = subprocess.run(  # noqa: S603 - fixed executable and allowlisted arguments.
+        [str(SYSTEMCTL), action, *services],
         check=False,
         capture_output=True,
         text=True,
@@ -278,11 +289,13 @@ def restore_sqlite(backup: Path | None, database: Path) -> None:
 
 
 def migrate_database(release: Path) -> None:
+    if not ALEMBIC.is_file():
+        raise EnginePackInstallError("Engine Pack migration tool is unavailable")
     environment = os.environ.copy()
     environment["PYTHONPATH"] = f"{release / 'backend'}:{release / 'worker'}"
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - fixed executable and verified release paths.
         [
-            "/opt/dronedream/venv/bin/alembic",
+            str(ALEMBIC),
             "-c",
             str(release / "backend" / "alembic.ini"),
             "upgrade",
@@ -306,7 +319,10 @@ def wait_healthy(timeout_seconds: int = 90) -> None:
     last_error = "no response"
     while time.monotonic() < deadline:
         try:
-            with urllib.request.urlopen(HEALTH_URL, timeout=3) as response:
+            with urllib.request.urlopen(  # noqa: S310 - fixed loopback HTTP endpoint.
+                HEALTH_URL,
+                timeout=3,
+            ) as response:
                 payload = json.loads(response.read(65_537))
                 if response.status == 200 and payload.get("success") is True:
                     return

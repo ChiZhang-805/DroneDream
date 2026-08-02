@@ -174,6 +174,12 @@ class EnginePackManagerTests(unittest.TestCase):
             connection.close()
         manager.ensure_no_active_experiments(database)
 
+    def test_systemctl_rejects_unapproved_actions_and_services(self) -> None:
+        with self.assertRaisesRegex(manager.EnginePackInstallError, "action"):
+            manager.run_systemctl("restart", manager.ENGINE_SERVICES)
+        with self.assertRaisesRegex(manager.EnginePackInstallError, "service"):
+            manager.run_systemctl("stop", ("unrelated.service",))
+
     def test_race_window_recheck_reopens_api_without_stopping_worker(self) -> None:
         self.install()
         events: list[tuple[str, tuple[str, ...]]] = []

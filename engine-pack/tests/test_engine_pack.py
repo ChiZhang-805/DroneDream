@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL_PATH = ROOT / "engine-pack" / "tools" / "engine_pack.py"
@@ -67,6 +68,38 @@ class EnginePackTests(unittest.TestCase):
                 (second / engine_pack.DESCRIPTOR_FILENAME).read_bytes(),
             )
             self.verify(first)
+
+    def test_build_refuses_to_replace_an_existing_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "output"
+            output.mkdir()
+            sentinel = output / engine_pack.MANIFEST_FILENAME
+            sentinel.write_bytes(b"preserve me")
+
+            with self.assertRaisesRegex(
+                engine_pack.EnginePackError,
+                "output directory must be absent or empty",
+            ):
+                self.build(output)
+
+            self.assertEqual(sentinel.read_bytes(), b"preserve me")
+
+    def test_source_timestamp_rejects_invalid_commit_before_invoking_git(self) -> None:
+        with (
+            mock.patch.dict(engine_pack.os.environ, {}, clear=True),
+            mock.patch.object(engine_pack.shutil, "which") as which,
+            self.assertRaisesRegex(engine_pack.EnginePackError, "full lowercase Git SHA"),
+        ):
+            engine_pack.source_date_epoch(ROOT, "--help")
+        which.assert_not_called()
+
+    def test_source_timestamp_fails_closed_when_git_is_unavailable(self) -> None:
+        with (
+            mock.patch.dict(engine_pack.os.environ, {}, clear=True),
+            mock.patch.object(engine_pack.shutil, "which", return_value=None),
+            self.assertRaisesRegex(engine_pack.EnginePackError, "git is required"),
+        ):
+            engine_pack.source_date_epoch(ROOT, "1" * 40)
 
     def test_pack_contains_only_production_application_sources(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
