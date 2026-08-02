@@ -366,7 +366,7 @@ def test_gazebo_wind_activator_rejects_missing_subscriber(
     monkeypatch.setattr(executor.time, "sleep", lambda _seconds: None)
     monkeypatch.setenv("PX4_GAZEBO_WIND_DISCOVERY_TIMEOUT_SECONDS", "0.1")
 
-    with pytest.raises(RuntimeError, match="subscriber was not discovered"):
+    with pytest.raises(RuntimeError, match="subscriber was not discovered within 0.1s"):
         executor._activate_gazebo_wind_profile(
             world="default",
             profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},

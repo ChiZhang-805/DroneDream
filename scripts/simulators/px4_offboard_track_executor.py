@@ -642,17 +642,18 @@ def _activate_gazebo_wind_profile(
     _node, publisher, wind_message = _create_gazebo_wind_publisher(topic, requested)
     try:
         discovery_timeout = float(
-            os.environ.get("PX4_GAZEBO_WIND_DISCOVERY_TIMEOUT_SECONDS", "5.0")
+            os.environ.get("PX4_GAZEBO_WIND_DISCOVERY_TIMEOUT_SECONDS", "20.0")
         )
     except ValueError:
-        discovery_timeout = 5.0
+        discovery_timeout = 20.0
     discovery_timeout = min(30.0, max(0.1, discovery_timeout))
     discovery_deadline = time.monotonic() + discovery_timeout
     while not publisher.has_connections() and time.monotonic() < discovery_deadline:
         time.sleep(0.05)
     if not publisher.has_connections():
         raise RuntimeError(
-            "Gazebo WindEffects subscriber was not discovered before post-hover activation"
+            "Gazebo WindEffects subscriber was not discovered within "
+            f"{discovery_timeout:g}s before post-hover activation"
         )
     try:
         attempts = int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "10"))
