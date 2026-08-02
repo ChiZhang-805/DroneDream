@@ -5,14 +5,48 @@ const fs = require("fs");
 const path = require("path");
 const { chromium } = require("../../../frontend/node_modules/playwright");
 
-const EXECUTION_SUBJECT = "2d5c0e5864021ef129359b0f303bdba092bd4928";
+const EXECUTION_SUBJECT = "06fc17fc0e42e9521f6cc85aa4435e39944d001d";
 const ENGINE_PACK_ID =
-  "sha256:5ced4e533701d2416f71c7735688bf0cfb1cd4ef3f8404df74065b96a2079d09";
+  "sha256:3306e99bd31907a4efaed05988d766b55629ab7c9e35eb1df0906a522d70d25f";
 const ENGINE_PACK_ARCHIVE_SHA256 =
-  "a7624ac1cc7b29e704782b08a6686cec4077dbc7607517c394701862d8ee4804";
+  "ca7e371019deb875b5c7700ca268971700c69a5123e01c3f7d4cb9d00f107535";
 const PAYLOADS_PATH =
   "C:/Users/zju20/AppData/Local/Temp/dronedream-eab2485-campaign/payloads.json";
-const RECEIPT_PATH = path.join(__dirname, "local-runtime-smoke-recheck-receipt.json");
+const PAYLOAD_INDEX = Number(process.env.OFFLINE_PAYLOAD_INDEX || "0");
+const SCENARIO_VARIANT = process.env.OFFLINE_SCENARIO_VARIANT || "original";
+if (!Number.isInteger(PAYLOAD_INDEX) || PAYLOAD_INDEX < 0 || PAYLOAD_INDEX > 7) {
+  throw new Error("OFFLINE_PAYLOAD_INDEX must be an integer from 0 through 7");
+}
+if (
+  ![
+    "original",
+    "flyable-non-gps",
+    "flyable-contract-aligned",
+    "safe-high-preset",
+  ].includes(SCENARIO_VARIANT)
+) {
+  throw new Error(
+    "OFFLINE_SCENARIO_VARIANT is not one of the supported evidence variants",
+  );
+}
+const IS_FLYABLE_VARIANT = SCENARIO_VARIANT.startsWith("flyable-");
+if (IS_FLYABLE_VARIANT && ![1, 4, 6, 7].includes(PAYLOAD_INDEX)) {
+  throw new Error(
+    "flyable variants are only defined for payload indices 1, 4, 6, and 7",
+  );
+}
+if (SCENARIO_VARIANT === "flyable-contract-aligned" && PAYLOAD_INDEX !== 7) {
+  throw new Error("the flyable-contract-aligned variant is only defined for payload index 7");
+}
+if (SCENARIO_VARIANT === "safe-high-preset" && PAYLOAD_INDEX !== 4) {
+  throw new Error("the safe-high-preset variant is only defined for payload index 4");
+}
+const RECEIPT_VARIANT_SUFFIX =
+  SCENARIO_VARIANT === "original" ? "" : `-${SCENARIO_VARIANT}`;
+const RECEIPT_PATH = path.join(
+  __dirname,
+  `matrix-${String(PAYLOAD_INDEX + 1).padStart(2, "0")}-${EXECUTION_SUBJECT.slice(0, 7)}${RECEIPT_VARIANT_SUFFIX}-receipt.json`,
+);
 
 function atomicWriteJson(target, value) {
   const temporary = `${target}.${process.pid}.tmp`;
@@ -21,11 +55,80 @@ function atomicWriteJson(target, value) {
 }
 
 const payloads = JSON.parse(fs.readFileSync(PAYLOADS_PATH, "utf8"));
-const payload = structuredClone(payloads[0]);
+const payload = structuredClone(payloads[PAYLOAD_INDEX]);
 if (!payload || typeof payload !== "object") {
-  throw new Error("the frozen calm-hover payload is unavailable");
+  throw new Error(`the frozen payload at index ${PAYLOAD_INDEX} is unavailable`);
 }
-payload.display_name = "Pre-final runtime smoke - calm vertical takeoff and hover";
+let campaignAdjustment = null;
+if (IS_FLYABLE_VARIANT) {
+  const requestedGpsNoiseM =
+    payload.advanced_scenario_config?.sensor_degradation?.gps_noise_m;
+  payload.sensor_noise_level = "medium";
+  if (payload.advanced_scenario_config?.sensor_degradation) {
+    payload.advanced_scenario_config.sensor_degradation.gps_noise_m = 0;
+  }
+  for (const scenarioCase of payload.scenario_suite?.cases || []) {
+    if (!scenarioCase.config || typeof scenarioCase.config !== "object") continue;
+    scenarioCase.config.sensor_noise_level = "medium";
+    if (scenarioCase.scenario_type === "noise_perturbed") {
+      scenarioCase.scenario_type = "nominal";
+    }
+    if (scenarioCase.config.advanced_scenario_config?.sensor_degradation) {
+      scenarioCase.config.advanced_scenario_config.sensor_degradation.gps_noise_m = 0;
+    }
+  }
+  campaignAdjustment = {
+    id: "flyable_non_gps_v1",
+    requestedGpsNoiseM,
+    appliedGpsNoiseM: 0,
+    sensorNoisePreset: "medium",
+    reason:
+      "Continuous pre-arm GPS noise triggered the normal PX4 horizontal-position-drift gate; this variant retains explicit barometer, IMU, dropout, wind, battery, and payload effects while keeping GNSS nominal.",
+  };
+}
+if (SCENARIO_VARIANT === "flyable-contract-aligned") {
+  const wind = payload.wind || {};
+  const northMps = Number(wind.north || 0) - Number(wind.south || 0);
+  const eastMps = Number(wind.east || 0) - Number(wind.west || 0);
+  const alignedDirectionDeg =
+    ((Math.atan2(eastMps, northMps) * 180) / Math.PI + 360) % 360;
+  const originalGustDirectionDeg =
+    payload.advanced_scenario_config?.wind_gusts?.direction_deg;
+  if (payload.advanced_scenario_config?.wind_gusts) {
+    payload.advanced_scenario_config.wind_gusts.direction_deg = alignedDirectionDeg;
+  }
+  for (const scenarioCase of payload.scenario_suite?.cases || []) {
+    if (scenarioCase.config?.advanced_scenario_config?.wind_gusts) {
+      scenarioCase.config.advanced_scenario_config.wind_gusts.direction_deg =
+        alignedDirectionDeg;
+    }
+  }
+  campaignAdjustment.originalGustDirectionDeg = originalGustDirectionDeg;
+  campaignAdjustment.appliedGustDirectionDeg = alignedDirectionDeg;
+  campaignAdjustment.windContractReason =
+    "Gazebo WindEffects can represent simultaneous steady wind and sinusoidal gusts exactly only when their horizontal directions are aligned.";
+}
+if (SCENARIO_VARIANT === "safe-high-preset") {
+  const requestedGpsNoiseM =
+    payload.advanced_scenario_config?.sensor_degradation?.gps_noise_m;
+  if (payload.advanced_scenario_config?.sensor_degradation) {
+    payload.advanced_scenario_config.sensor_degradation.gps_noise_m = 0;
+  }
+  for (const scenarioCase of payload.scenario_suite?.cases || []) {
+    if (scenarioCase.config?.advanced_scenario_config?.sensor_degradation) {
+      scenarioCase.config.advanced_scenario_config.sensor_degradation.gps_noise_m = 0;
+    }
+  }
+  campaignAdjustment = {
+    id: "safe_high_sensor_preset_v1",
+    requestedGpsNoiseM,
+    appliedGpsNoiseM: 0,
+    sensorNoisePreset: payload.sensor_noise_level,
+    reason:
+      "Validates that the built-in high sensor preset keeps GNSS nominal while retaining its high barometer and IMU profile plus explicit dropout.",
+  };
+}
+payload.display_name = `Pre-final matrix - ${payload.display_name}`;
 payload.optimizer_strategy = "heuristic";
 payload.llm = null;
 payload.openai = null;
@@ -41,6 +144,9 @@ const receipt = {
   startedAt: new Date().toISOString(),
   completedAt: null,
   modelProviderCalls: 0,
+  payloadIndex: PAYLOAD_INDEX,
+  scenarioVariant: SCENARIO_VARIANT,
+  campaignAdjustment,
   displayName: payload.display_name,
   jobId: null,
   status: "preflight",
@@ -93,7 +199,10 @@ async function main() {
         },
       );
       if (response.status < 200 || response.status >= 300) {
-        throw new Error(`local API ${method} ${apiPath} returned ${response.status}`);
+        const boundedBody = JSON.stringify(response.json ?? null).slice(0, 1600);
+        throw new Error(
+          `local API ${method} ${apiPath} returned ${response.status}: ${boundedBody}`,
+        );
       }
       return response.json?.data;
     }
@@ -139,11 +248,39 @@ async function main() {
       "GET",
       `/api/v1/jobs/${encodeURIComponent(created.id)}/trials?page=1&page_size=100`,
     );
-    receipt.trials = (trials || []).map((trial) => ({
-      id: trial.id,
-      status: trial.status,
-      failureCode: trial.failure_code || null,
-      metrics: trial.metrics || null,
+    receipt.trials = [];
+    for (const trial of trials || []) {
+      const detail = await api(
+        "GET",
+        `/api/v1/trials/${encodeURIComponent(trial.id)}`,
+      );
+      receipt.trials.push({
+        id: trial.id,
+        candidateId: trial.candidate_id || detail?.candidate_id || null,
+        candidateLabel: detail?.candidate_label || null,
+        candidateSourceType: detail?.candidate_source_type || null,
+        candidateIsBaseline: detail?.candidate_is_baseline ?? null,
+        candidateIsBest: detail?.candidate_is_best ?? null,
+        candidateGenerationIndex: detail?.candidate_generation_index ?? null,
+        status: trial.status,
+        failureCode: trial.failure_code || detail?.failure_code || null,
+        failureReason: trial.failure_reason || detail?.failure_reason || null,
+        simulatorBackend: detail?.simulator_backend || null,
+        attempts: detail?.attempt_count ?? null,
+        metrics: detail?.metrics || null,
+      });
+    }
+    const artifacts = await api(
+      "GET",
+      `/api/v1/jobs/${encodeURIComponent(created.id)}/artifacts`,
+    );
+    receipt.artifacts = (artifacts || []).map((artifact) => ({
+      id: artifact.id,
+      ownerType: artifact.owner_type,
+      ownerId: artifact.owner_id,
+      artifactType: artifact.artifact_type,
+      displayName: artifact.display_name || null,
+      fileSizeBytes: artifact.file_size_bytes ?? null,
     }));
     receipt.bestCandidateId = finalJob?.best_candidate_id || null;
     receipt.optimizationOutcome = finalJob?.optimization_outcome || null;
