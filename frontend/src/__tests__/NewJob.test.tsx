@@ -658,6 +658,8 @@ describe("NewJob experiment wizard", () => {
     expect(screen.queryByText("Combines wind, gust, sensor, battery and payload effects.")).toBeNull();
     expect(screen.getByLabelText(/^Advanced environment$/i)).toHaveValue("true");
     expect(screen.getByLabelText(/Gust magnitude/i)).toHaveValue(10);
+    expect(screen.getByLabelText(/Gust direction/i)).toHaveValue(26.565051);
+    expect(screen.getByLabelText(/GPS noise/i)).toHaveValue(0);
     fireEvent.click(screen.getByRole("button", { name: /Edit obstacles/i }));
     const obstacleDialog = screen.getByRole("dialog", { name: /Obstacles.*JSON/i });
     fireEvent.change(within(obstacleDialog).getByRole("textbox"), {

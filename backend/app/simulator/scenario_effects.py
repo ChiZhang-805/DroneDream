@@ -83,12 +83,16 @@ DEFAULT_BATTERY_INITIAL_PERCENT = 45.0
 DEFAULT_BATTERY_SAG_DRAIN_SECONDS = 300.0
 _SENSOR_NOISE_PRESETS = {
     "low": {
-        "gps_position_stddev_m": 0.25,
+        # Static NavSat noise is present before PX4 arms.  Even modest
+        # continuous position drift can correctly trip PX4's estimator health
+        # gate, so general low/high presets keep GNSS nominal.  Expert GPS
+        # stress remains available through the explicit gps_noise_m field.
+        "gps_position_stddev_m": 0.0,
         "barometer_pressure_stddev_pa": 1.5,
         "imu_noise_scale": 0.5,
     },
     "high": {
-        "gps_position_stddev_m": 1.0,
+        "gps_position_stddev_m": 0.0,
         "barometer_pressure_stddev_pa": 6.0,
         "imu_noise_scale": 2.0,
     },

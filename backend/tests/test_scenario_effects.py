@@ -468,7 +468,7 @@ def test_runtime_profile_rejects_conflicting_dropout_sources() -> None:
             "noise_perturbed",
             {},
             "sensor_noise",
-            {"gps_position_stddev_m": 1.0, "imu_noise_scale": 2.0},
+            {"gps_position_stddev_m": 0.0, "imu_noise_scale": 2.0},
         ),
         (
             "turbulence",
