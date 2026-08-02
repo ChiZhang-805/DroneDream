@@ -15,6 +15,7 @@ import asyncio
 import contextlib
 import copy
 import hashlib
+import ipaddress
 import json
 import math
 import numbers
@@ -23,6 +24,7 @@ import re
 import shlex
 import shutil
 import signal
+import socket
 import stat
 import subprocess
 import sys
@@ -81,6 +83,55 @@ WIND_EFFECTS_PLUGIN_NAME = "gz::sim::systems::WindEffects"
 JOINT_STATE_PUBLISHER_PLUGIN_FILENAME = "gz-sim-joint-state-publisher-system"
 JOINT_STATE_PUBLISHER_PLUGIN_NAME = "gz::sim::systems::JointStatePublisher"
 _FORBIDDEN_XML_DECLARATION = re.compile(rb"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
+def _running_under_wsl() -> bool:
+    """Return whether this process is running inside Windows Subsystem for Linux."""
+
+    if os.environ.get("WSL_INTEROP", "").strip() or os.environ.get("WSL_DISTRO_NAME", "").strip():
+        return True
+    try:
+        release = Path("/proc/sys/kernel/osrelease").read_text(encoding="utf-8").lower()
+    except OSError:
+        return False
+    return "microsoft" in release or "wsl" in release
+
+
+def _gazebo_transport_ip() -> str:
+    """Choose one Gazebo Transport interface shared by every Trial child.
+
+    An explicit site setting remains authoritative.  Otherwise only WSL uses
+    its default-route source address: Gazebo Transport discovery can
+    intermittently omit cross-process subscribers when every process is bound
+    to loopback.  Native Linux and Windows retain the conservative loopback
+    default.  The UDP connect selects a route but sends no packet.
+    """
+
+    configured = os.environ.get("GZ_IP", "").strip()
+    if configured:
+        try:
+            address = ipaddress.ip_address(configured)
+        except ValueError as exc:
+            raise ValueError("GZ_IP must be a valid IPv4 address") from exc
+        if address.version != 4 or address.is_unspecified or address.is_multicast:
+            raise ValueError("GZ_IP must be a usable unicast IPv4 address")
+        return configured
+    if not _running_under_wsl():
+        return "127.0.0.1"
+
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        probe.connect(("192.0.2.1", 9))
+        candidate = str(probe.getsockname()[0]).strip()
+        address = ipaddress.ip_address(candidate)
+        if address.version == 4 and not address.is_unspecified and not address.is_multicast:
+            return candidate
+    except (OSError, ValueError, IndexError):
+        pass
+    finally:
+        probe.close()
+    return "127.0.0.1"
+
 
 REQUIRED_SAMPLE_KEYS = (
     "t",
@@ -3616,6 +3667,10 @@ def main() -> int:
         # simulator's subscriber records from accepting wind messages meant
         # for the next Trial in the same worker campaign.
         os.environ["GZ_PARTITION"] = gazebo_transport_partition
+        # Resolve this once before constructing any child environment so PX4,
+        # Gazebo, the offboard executor, and evidence probes all advertise on
+        # the same interface for the complete Trial lifetime.
+        os.environ["GZ_IP"] = _gazebo_transport_ip()
         launch_env, previous_parameter_environment = _prepare_px4_launch_environment(px4_parameters)
         launch_env["PX4_GZ_WORLD"] = args.world
     except Exception as exc:
