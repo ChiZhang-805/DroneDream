@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import functools
 import hashlib
 import json
 import math
@@ -586,37 +585,6 @@ def _parse_gazebo_wind_info(response_text: str) -> dict[str, Any]:
     }
 
 
-def _create_gazebo_wind_publisher(
-    topic: str,
-    requested: dict[str, float],
-) -> tuple[Any, Any, Any]:
-    # DroneDream's Runtime Base installs the Gazebo Python bindings as an OS
-    # package. The Engine Pack virtual environment deliberately excludes OS
-    # site packages, so expose only the standard Debian dist-packages location
-    # before importing this Runtime-owned transport dependency.
-    system_packages = "/usr/lib/python3/dist-packages"
-    if system_packages not in sys.path:
-        sys.path.append(system_packages)
-    try:
-        from gz.msgs10.wind_pb2 import Wind
-        from gz.transport13 import Node
-    except (ImportError, ModuleNotFoundError) as exc:
-        raise RuntimeError(
-            "Gazebo Python transport bindings are unavailable for verified wind activation"
-        ) from exc
-
-    node = Node()
-    publisher = node.advertise(topic, Wind)
-    if not publisher.valid():
-        raise RuntimeError(f"Gazebo wind publisher could not advertise {topic}")
-    message = Wind()
-    message.linear_velocity.x = requested["x"]
-    message.linear_velocity.y = requested["y"]
-    message.linear_velocity.z = requested["z"]
-    message.enable_wind = True
-    return node, publisher, message
-
-
 def _validated_gazebo_wind_activation(
     world: str,
     profile: dict[str, Any],
@@ -635,13 +603,12 @@ def _validated_gazebo_wind_activation(
     return requested, f"/world/{world}/wind", f"/world/{world}/wind_info", gz_cli
 
 
-def _prepare_gazebo_wind_transport(
-    *,
-    world: str,
-    profile: dict[str, Any],
-) -> tuple[Any, Any, Any]:
-    requested, topic, _service, _gz_cli = _validated_gazebo_wind_activation(world, profile)
-    return _create_gazebo_wind_publisher(topic, requested)
+def _gazebo_wind_message_text(requested: dict[str, float]) -> str:
+    return (
+        "linear_velocity { "
+        f"x: {requested['x']:.17g} y: {requested['y']:.17g} z: {requested['z']:.17g} "
+        "} enable_wind: true"
+    )
 
 
 def _activate_gazebo_wind_profile(
@@ -649,39 +616,56 @@ def _activate_gazebo_wind_profile(
     world: str,
     profile: dict[str, Any],
     activation_t_s: float,
-    prepared_transport: tuple[Any, Any, Any] | None = None,
 ) -> dict[str, Any]:
     requested, topic, service, gz_cli = _validated_gazebo_wind_activation(world, profile)
-    # Retain the node for the entire publish/read-back handshake. Gazebo
-    # Transport discovery is asynchronous, and has_connections() is only an
-    # advisory observation: a publisher can deliver a message even when the
-    # Python binding has not exposed a matching subscriber yet. Exact
-    # /wind_info read-back is the sole delivery authority.
-    transport_prepared_before_takeoff = prepared_transport is not None
-    if prepared_transport is None:
-        prepared_transport = _create_gazebo_wind_publisher(topic, requested)
-    _node, publisher, wind_message = prepared_transport
+    # Use the Runtime-owned Gazebo CLI for publication. The Python binding can
+    # advertise the correct endpoint while never completing delivery to the
+    # WindEffects subscriber under WSL; the official CLI shares the exact
+    # transport implementation used by the simulator. Publication is still
+    # not trusted on exit status alone: /wind_info exact read-back below is the
+    # sole authority that permits flight to enter the track.
     try:
         attempts = int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "100"))
     except ValueError:
         attempts = 100
     attempts = min(100, max(1, attempts))
     try:
-        republish_interval_seconds = float(
-            os.environ.get("PX4_GAZEBO_WIND_REPUBLISH_INTERVAL_SECONDS", "0.2")
+        publish_duration_seconds = float(
+            os.environ.get("PX4_GAZEBO_WIND_PUBLISH_DURATION_SECONDS", "0.5")
         )
     except ValueError:
-        republish_interval_seconds = 0.2
-    republish_interval_seconds = min(1.0, max(0.05, republish_interval_seconds))
+        publish_duration_seconds = 0.5
+    publish_duration_seconds = min(2.0, max(0.1, publish_duration_seconds))
     last_error = "no wind_info response"
     readback: dict[str, Any] | None = None
-    connections_observed = False
     publish_attempts = 0
-    for attempt in range(attempts):
-        connections_observed = connections_observed or publisher.has_connections()
+    message_text = _gazebo_wind_message_text(requested)
+    for _attempt in range(attempts):
         publish_attempts += 1
-        if not publisher.publish(wind_message):
-            raise RuntimeError("Gazebo post-hover wind publish failed")
+        publish = subprocess.run(  # noqa: S603
+            [
+                gz_cli,
+                "topic",
+                "-t",
+                topic,
+                "-m",
+                "gz.msgs.Wind",
+                "-p",
+                message_text,
+                "-d",
+                f"{publish_duration_seconds:g}",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=publish_duration_seconds + 5.0,
+        )
+        if publish.returncode != 0:
+            last_error = (
+                f"wind publish exit={publish.returncode}, response="
+                f"{(publish.stdout + publish.stderr).strip()[:400]}"
+            )
+            continue
         response = subprocess.run(  # noqa: S603
             [
                 gz_cli,
@@ -724,13 +708,10 @@ def _activate_gazebo_wind_profile(
             last_error = f"mismatched readback {candidate}"
         except (RuntimeError, ValueError) as exc:
             last_error = str(exc)
-        if attempt + 1 < attempts:
-            time.sleep(republish_interval_seconds)
     if readback is None:
         raise RuntimeError(
             "Gazebo post-hover wind activation was not verified after "
-            f"{publish_attempts} publishes "
-            f"(publisher_connections_observed={connections_observed}): {last_error}"
+            f"{publish_attempts} bounded CLI publishes: {last_error}"
         )
     return {
         "readback": {
@@ -747,9 +728,11 @@ def _activate_gazebo_wind_profile(
                 "activation_t_s": round(activation_t_s, 12),
                 "readback_service": service,
                 "delivery_verification": "wind_info_exact_readback",
+                "publisher": "gazebo_cli_topic",
+                "publish_duration_seconds": publish_duration_seconds,
                 "publish_attempts": publish_attempts,
-                "publisher_connections_observed": connections_observed,
-                "transport_prepared_before_takeoff": transport_prepared_before_takeoff,
+                "publisher_connections_observed": None,
+                "transport_prepared_before_takeoff": False,
             },
         },
     }
@@ -1895,20 +1878,12 @@ def main(argv: list[str] | None = None) -> int:
             _write_offboard_timing(args.run_dir / "offboard_timing.json", dry_timing)
             return 0
 
-        wind_activator: Callable[..., dict[str, Any]] = _activate_gazebo_wind_profile
         wind_profile = runtime_profile.get("wind_activation") if runtime_profile else None
         if isinstance(wind_profile, dict):
-            prepared_wind_transport = _prepare_gazebo_wind_transport(
-                world=args.world,
-                profile=wind_profile,
-            )
-            wind_activator = functools.partial(
-                _activate_gazebo_wind_profile,
-                prepared_transport=prepared_wind_transport,
-            )
+            _validated_gazebo_wind_activation(args.world, wind_profile)
             _log(
                 args.log,
-                "Gazebo wind publisher prepared before takeoff; no wind message published",
+                "Gazebo CLI wind publisher validated; activation remains gated until stable hover",
             )
 
         client = MavsdkOffboardClient()
@@ -1937,7 +1912,7 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 takeoff_vertical_speed_tolerance_m_s=(args.takeoff_vertical_speed_tolerance_m_s),
                 world=args.world,
-                wind_activator=wind_activator,
+                wind_activator=_activate_gazebo_wind_profile,
             )
         )
         _log(args.log, "executor completed successfully")

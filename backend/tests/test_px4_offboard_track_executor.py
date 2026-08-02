@@ -6,7 +6,6 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -218,6 +217,7 @@ def test_gazebo_wind_activator_publishes_and_reads_back_exact_vector(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     responses = [
+        subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
         subprocess.CompletedProcess(
             args=[],
             returncode=0,
@@ -229,40 +229,23 @@ def test_gazebo_wind_activator_publishes_and_reads_back_exact_vector(
     ]
     commands: list[list[str]] = []
 
-    class Publisher:
-        published: list[object] = []
-
-        def valid(self):
-            return True
-
-        def has_connections(self):
-            return True
-
-        def publish(self, message):
-            self.published.append(message)
-            return True
-
-    publisher = Publisher()
-
     def fake_run(command, **_kwargs):
         commands.append(command)
         return responses.pop(0)
 
     monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
     monkeypatch.setattr(executor.subprocess, "run", fake_run)
-    monkeypatch.setattr(
-        executor,
-        "_create_gazebo_wind_publisher",
-        lambda _topic, _requested: (object(), publisher, object()),
-    )
     result = executor._activate_gazebo_wind_profile(
         world="default",
         profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
         activation_t_s=2.5,
     )
 
-    assert len(publisher.published) == 1
-    assert commands[0][1:4] == ["service", "-s", "/world/default/wind_info"]
+    assert commands[0][1:4] == ["topic", "-t", "/world/default/wind"]
+    assert commands[0][commands[0].index("-p") + 1] == (
+        "linear_velocity { x: 0 y: 3 z: 0 } enable_wind: true"
+    )
+    assert commands[1][1:4] == ["service", "-s", "/world/default/wind_info"]
     assert result["readback"]["value"] == {
         "linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0},
         "enable_wind": True,
@@ -270,13 +253,15 @@ def test_gazebo_wind_activator_publishes_and_reads_back_exact_vector(
     assert result["activation"]["value"]["activation_t_s"] == 2.5
     assert result["activation"]["value"]["delivery_verification"] == ("wind_info_exact_readback")
     assert result["activation"]["value"]["publish_attempts"] == 1
-    assert result["activation"]["value"]["publisher_connections_observed"] is True
+    assert result["activation"]["value"]["publisher"] == "gazebo_cli_topic"
+    assert result["activation"]["value"]["publisher_connections_observed"] is None
 
 
 def test_gazebo_wind_activator_rejects_mismatched_readback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     responses = [
+        subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
         subprocess.CompletedProcess(
             args=[],
             returncode=0,
@@ -284,16 +269,8 @@ def test_gazebo_wind_activator_rejects_mismatched_readback(
             stderr="",
         ),
     ]
-    publisher = mock.Mock()
-    publisher.has_connections.return_value = True
-    publisher.publish.return_value = True
     monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
     monkeypatch.setattr(executor.subprocess, "run", lambda *_args, **_kwargs: responses.pop(0))
-    monkeypatch.setattr(
-        executor,
-        "_create_gazebo_wind_publisher",
-        lambda _topic, _requested: (object(), publisher, object()),
-    )
     monkeypatch.setenv("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "1")
 
     with pytest.raises(RuntimeError, match="post-hover wind activation was not verified"):
@@ -308,12 +285,14 @@ def test_gazebo_wind_activator_republishes_until_exact_readback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     responses = [
+        subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
         subprocess.CompletedProcess(
             args=[],
             returncode=0,
             stdout="linear_velocity {}\nenable_wind: true\n",
             stderr="",
         ),
+        subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
         subprocess.CompletedProcess(
             args=[],
             returncode=0,
@@ -322,9 +301,6 @@ def test_gazebo_wind_activator_republishes_until_exact_readback(
         ),
     ]
     commands: list[list[str]] = []
-    publisher = mock.Mock()
-    publisher.has_connections.return_value = True
-    publisher.publish.return_value = True
 
     def fake_run(command, **_kwargs):
         commands.append(command)
@@ -332,20 +308,13 @@ def test_gazebo_wind_activator_republishes_until_exact_readback(
 
     monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
     monkeypatch.setattr(executor.subprocess, "run", fake_run)
-    monkeypatch.setattr(executor.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(
-        executor,
-        "_create_gazebo_wind_publisher",
-        lambda _topic, _requested: (object(), publisher, object()),
-    )
     result = executor._activate_gazebo_wind_profile(
         world="default",
         profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
         activation_t_s=2.5,
     )
 
-    assert [command[1] for command in commands] == ["service", "service"]
-    assert publisher.publish.call_count == 2
+    assert [command[1] for command in commands] == ["topic", "service", "topic", "service"]
     assert result["readback"]["value"]["linear_velocity_mps"] == {
         "x": 0.0,
         "y": 3.0,
@@ -353,16 +322,17 @@ def test_gazebo_wind_activator_republishes_until_exact_readback(
     }
 
 
-def test_gazebo_wind_activator_treats_connection_hint_as_advisory(
+def test_gazebo_wind_activator_retries_failed_cli_publish(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     responses = [
         subprocess.CompletedProcess(
             args=[],
-            returncode=0,
-            stdout="linear_velocity {}\nenable_wind: true\n",
-            stderr="",
+            returncode=1,
+            stdout="",
+            stderr="publisher unavailable",
         ),
+        subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
         subprocess.CompletedProcess(
             args=[],
             returncode=0,
@@ -370,59 +340,30 @@ def test_gazebo_wind_activator_treats_connection_hint_as_advisory(
             stderr="",
         ),
     ]
-    publisher = mock.Mock()
-    publisher.has_connections.return_value = False
-    publisher.publish.return_value = True
+    commands: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        return responses.pop(0)
+
     monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
-    monkeypatch.setattr(executor.subprocess, "run", lambda *_args, **_kwargs: responses.pop(0))
-    monkeypatch.setattr(
-        executor,
-        "_create_gazebo_wind_publisher",
-        lambda _topic, _requested: (object(), publisher, object()),
-    )
-    monkeypatch.setattr(executor.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(executor.subprocess, "run", fake_run)
     result = executor._activate_gazebo_wind_profile(
         world="default",
         profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
         activation_t_s=2.5,
     )
 
-    assert publisher.publish.call_count == 2
+    assert [command[1] for command in commands] == ["topic", "topic", "service"]
     assert result["readback"]["value"]["linear_velocity_mps"]["y"] == 3.0
     assert result["activation"]["value"]["publish_attempts"] == 2
-    assert result["activation"]["value"]["publisher_connections_observed"] is False
+    assert result["activation"]["value"]["publisher_connections_observed"] is None
 
 
-def test_gazebo_wind_activator_reuses_prepared_transport(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    publisher = mock.Mock()
-    publisher.has_connections.return_value = True
-    publisher.publish.return_value = True
-    prepared = (object(), publisher, object())
-    response = subprocess.CompletedProcess(
-        args=[],
-        returncode=0,
-        stdout="linear_velocity { y: 3 }\nenable_wind: true\n",
-        stderr="",
+def test_gazebo_wind_message_text_is_explicit_and_deterministic() -> None:
+    assert executor._gazebo_wind_message_text({"x": -1.25, "y": 3.0, "z": 0.0}) == (
+        "linear_velocity { x: -1.25 y: 3 z: 0 } enable_wind: true"
     )
-    monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
-    monkeypatch.setattr(executor.subprocess, "run", lambda *_args, **_kwargs: response)
-    monkeypatch.setattr(
-        executor,
-        "_create_gazebo_wind_publisher",
-        lambda *_args, **_kwargs: pytest.fail("prepared publisher must be reused"),
-    )
-
-    result = executor._activate_gazebo_wind_profile(
-        world="default",
-        profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
-        activation_t_s=2.5,
-        prepared_transport=prepared,
-    )
-
-    assert publisher.publish.call_count == 1
-    assert result["activation"]["value"]["transport_prepared_before_takeoff"] is True
 
 
 def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
