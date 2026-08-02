@@ -457,6 +457,8 @@ def test_executor_waits_for_continuously_stable_hover_before_track_entry(
     gate = timing["takeoff_gate"]
     assert gate["status"] == "achieved"
     assert gate["readiness_observed"] is True
+    assert gate["readiness_policy"] == "local_ned_with_px4_arm_authority"
+    assert gate["px4_arm_command"] == "accepted"
     assert gate["sample_count"] >= 3
     assert gate["observations"][0]["within_all_limits"] is False
     assert gate["latest_observation"]["within_all_limits"] is True
@@ -510,6 +512,56 @@ def test_executor_fails_closed_when_hover_velocity_never_stabilizes(
         "land": "command_sent_during_failure_cleanup",
         "close": "completed",
     }
+
+
+def test_executor_fails_closed_when_px4_rejects_arm_after_local_readiness(
+    tmp_path: Path,
+) -> None:
+    class ArmRejectingClient(executor.FakeOffboardClient):
+        async def wait_until_ready(self, timeout_seconds: float) -> executor.TelemetryHealth:
+            _ = timeout_seconds
+            return executor.TelemetryHealth(
+                connected=True,
+                global_position_ok=False,
+                home_position_ok=True,
+                local_position_ok=True,
+                armable=False,
+            )
+
+        async def arm(self) -> None:
+            raise RuntimeError("PX4 rejected arm command")
+
+    client = ArmRejectingClient()
+    timing_path = tmp_path / "offboard_timing.json"
+
+    with pytest.raises(RuntimeError, match="PX4 rejected arm command"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -3.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=5.0,
+                rate_hz=10.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=timing_path,
+            )
+        )
+
+    assert client.armed is False
+    assert client.offboard_started is False
+    assert client.landed is False
+    assert client.closed is True
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    gate = timing["takeoff_gate"]
+    assert gate["readiness_observed"] is True
+    assert gate["advisory_readiness"] == {
+        "global_position_ok": False,
+        "armable": False,
+    }
+    assert "px4_arm_command" not in gate
+    assert gate["failure_reason"] == "readiness_or_preflight_failure"
 
 
 def test_executor_stops_offboard_and_lands_after_streaming_failure(tmp_path: Path):
@@ -622,6 +674,40 @@ def test_mavsdk_readiness_returns_observed_health_state():
     )
 
 
+def test_mavsdk_readiness_accepts_local_navigation_without_global_position():
+    class CoreStub:
+        async def connection_state(self):
+            yield type("ConnectionState", (), {"is_connected": True})()
+
+    class TelemetryStub:
+        async def health(self):
+            yield type(
+                "Health",
+                (),
+                {
+                    "is_global_position_ok": False,
+                    "is_home_position_ok": True,
+                    "is_local_position_ok": True,
+                    "is_armable": False,
+                },
+            )()
+
+    class SystemStub:
+        core = CoreStub()
+        telemetry = TelemetryStub()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = SystemStub()
+
+    assert asyncio.run(client.wait_until_ready(1.0)) == executor.TelemetryHealth(
+        connected=True,
+        global_position_ok=False,
+        home_position_ok=True,
+        local_position_ok=True,
+        armable=False,
+    )
+
+
 def test_mavsdk_readiness_timeout_reports_last_observed_health_state():
     class CoreStub:
         async def connection_state(self):
@@ -635,8 +721,8 @@ def test_mavsdk_readiness_timeout_reports_last_observed_health_state():
                     (),
                     {
                         "is_global_position_ok": False,
-                        "is_home_position_ok": True,
-                        "is_local_position_ok": True,
+                        "is_home_position_ok": False,
+                        "is_local_position_ok": False,
                         "is_armable": False,
                     },
                 )()
@@ -652,8 +738,8 @@ def test_mavsdk_readiness_timeout_reports_last_observed_health_state():
     with pytest.raises(
         TimeoutError,
         match=(
-            "connected=true, global_position_ok=false, home_position_ok=true, "
-            "local_position_ok=true, armable=false"
+            "connected=true, global_position_ok=false, home_position_ok=false, "
+            "local_position_ok=false, armable=false"
         ),
     ):
         asyncio.run(client.wait_until_ready(0.01))

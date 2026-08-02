@@ -187,12 +187,14 @@ class MavsdkOffboardClient:
                         armable=bool(getattr(health, "is_armable", False)),
                     )
                     last_health = sample
-                    if (
-                        sample.global_position_ok
-                        and sample.home_position_ok
-                        and sample.local_position_ok
-                        and sample.armable
-                    ):
+                    # Every DroneDream reference track is expressed in local
+                    # NED coordinates. A noisy simulated GPS can therefore make
+                    # MAVSDK's global-position/armable advisories remain false
+                    # even after PX4 has a valid home and local estimate. Gate
+                    # here on the navigation signals the controller actually
+                    # consumes; the immediately following PX4 arm command is
+                    # still authoritative and fails closed if PX4 rejects it.
+                    if sample.home_position_ok and sample.local_position_ok:
                         return sample
                 raise RuntimeError("PX4 health stream ended before the vehicle became ready")
         except TimeoutError:
@@ -1311,7 +1313,18 @@ async def run_executor(
         _log(log_path, f"connected via {connection}")
         health = await client.wait_until_ready(takeoff_timeout_seconds)
         takeoff_gate["readiness"] = _health_payload(health)
-        takeoff_gate["readiness_observed"] = all(takeoff_gate["readiness"].values())
+        takeoff_gate["readiness_policy"] = "local_ned_with_px4_arm_authority"
+        takeoff_gate["required_readiness"] = {
+            name: takeoff_gate["readiness"][name]
+            for name in ("connected", "home_position_ok", "local_position_ok")
+        }
+        takeoff_gate["advisory_readiness"] = {
+            name: takeoff_gate["readiness"][name]
+            for name in ("global_position_ok", "armable")
+        }
+        takeoff_gate["readiness_observed"] = all(
+            takeoff_gate["required_readiness"].values()
+        )
         if isinstance(gps_profile, dict):
             baseline_satellites = await client.get_param_int("SIM_GPS_USED")
             if baseline_satellites < 4:
@@ -1333,6 +1346,7 @@ async def run_executor(
             battery_takeoff_gate_parameters = await _hold_battery_during_takeoff_gate(client)
         await client.arm()
         armed = True
+        takeoff_gate["px4_arm_command"] = "accepted"
         _log(log_path, "armed")
 
         timing["takeoff_start_t"] = time.monotonic() - exec_start
