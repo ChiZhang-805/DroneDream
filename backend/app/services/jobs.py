@@ -1412,7 +1412,10 @@ def delete_job(
             cleanup_deleted_job_artifacts(artifact_payloads)
         else:
             db.flush()
-            assert deferred_artifact_cleanup is not None
+            if deferred_artifact_cleanup is None:
+                raise RuntimeError(
+                    "deferred artifact cleanup is missing after non-committing deletion"
+                )
             deferred_artifact_cleanup.extend(artifact_payloads)
         return {"id": job_id, "deleted": True}
     except Exception as exc:

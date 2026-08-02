@@ -76,6 +76,30 @@ def test_duplicate_detection_compares_only_selected_tuning_dimensions() -> None:
     assert job_manager._is_duplicate_proposal(job, {"MPC_XY_P": 1.05}) is False
 
 
+def test_candidate_completion_cannot_change_unselected_legacy_parameters() -> None:
+    job = models.Job(
+        id="job_selected_parameter_boundary",
+        track_type="circle",
+        altitude_m=3.0,
+        sensor_noise_level="medium",
+        objective_profile="robust",
+        parameter_space_json=[
+            {
+                "name": "MPC_XY_P",
+                "enabled": True,
+                "baseline": 0.95,
+            }
+        ],
+    )
+
+    completed = job_manager._complete_candidate_parameters(job, {"MPC_XY_P": 1.05})
+    assert completed["MPC_XY_P"] == pytest.approx(1.05)
+    assert completed["kp_xy"] == pytest.approx(constants.BASELINE_PARAMETERS["kp_xy"])
+
+    with pytest.raises(ValueError, match="unselected parameter kp_xy"):
+        job_manager._complete_candidate_parameters(job, {"kp_xy": 1.2})
+
+
 def test_optimizer_fidelity_prefers_effective_coverage_and_rejects_invalid_values() -> None:
     assert job_manager._optimizer_fidelity(
         {"fidelity": 0.5, "effective_fidelity": 0.25}

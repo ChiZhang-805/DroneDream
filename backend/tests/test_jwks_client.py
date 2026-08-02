@@ -98,3 +98,17 @@ def test_jwks_client_rejects_chunked_response_over_limit(
     ):
         client.fetch_data()
     assert response.read_sizes == [65]
+
+
+@pytest.mark.parametrize(
+    "jwks_url",
+    [
+        "file:///tmp/jwks.json",
+        "https://user:password@identity.example.test/jwks.json",
+        "https://identity.example.test/jwks.json#fragment",
+        "https://identity.example.test:invalid/jwks.json",
+    ],
+)
+def test_jwks_client_rejects_unsafe_urls(jwks_url: str) -> None:
+    with pytest.raises(auth.OIDCConfigurationError, match="OIDC JWKS URL"):
+        auth._jwks_client(jwks_url, 5, 64)

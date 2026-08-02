@@ -2855,12 +2855,26 @@ def test_harness_dispatches_revised_budget_plan_without_mutating_job_mode(
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         events = ctx["decision_harness"]._recent_harness_multi_tool_events(db, job)
+        by_type = {event.event_type: event for event in events}
+        tied_created_at = events[0].created_at
+        # SQLite can persist one timestamp for every event flushed in a single
+        # transaction. Deliberately reverse the random-ID order so the test
+        # proves identity strings are never treated as causal sequence.
+        tied_ids = {
+            "harness_budget_plan_started": "evt_ffffffffffff",
+            "harness_budget_plan_accepted": "evt_eeeeeeeeeeee",
+            "harness_plan_revision_started": "evt_dddddddddddd",
+            "harness_plan_revision_accepted": "evt_cccccccccccc",
+            "harness_multi_tool_execution_result": "evt_aaaaaaaaaaaa",
+        }
+        for event_type, event_id in tied_ids.items():
+            by_type[event_type].created_at = tied_created_at
+            by_type[event_type].id = event_id
         history = ctx["decision_harness"]._generation_plan_history(
             events,
             current_generation=job.current_generation,
         )
 
-        by_type = {event.event_type: event for event in events}
         assert ctx["decision_harness"]._multi_plan_binding(
             by_type["harness_budget_plan_started"].payload_json
         ) == ctx["decision_harness"]._multi_plan_binding(

@@ -747,6 +747,20 @@ def _event_order_key(event: models.JobEvent) -> tuple[datetime, str]:
     return created_at, event.id if isinstance(event.id, str) else ""
 
 
+def _event_happened_after(
+    left: models.JobEvent,
+    right: models.JobEvent,
+) -> bool:
+    """Compare persisted event time without inventing order from random IDs.
+
+    SQLite assigns one timestamp to multiple events flushed in the same
+    transaction. Event IDs still make sorting deterministic, but they are
+    random identities and cannot prove that one tied event happened later.
+    """
+
+    return _event_order_key(left)[0] > _event_order_key(right)[0]
+
+
 def _generation_plan_history(
     events: list[models.JobEvent],
     *,
@@ -795,7 +809,7 @@ def _generation_plan_history(
             or result_binding != decision_binding
             or result_binding[0] != decision_id
             or result_binding[1] > max(0, current_generation) + 1
-            or _event_order_key(decision_event) > _event_order_key(result_event)
+            or _event_happened_after(decision_event, result_event)
         ):
             continue
         _, generation, _, prompt_sha256 = result_binding
@@ -818,7 +832,7 @@ def _generation_plan_history(
                 continue
             if (
                 _multi_plan_binding(dict(start.payload_json)) != result_binding
-                or _event_order_key(start) > _event_order_key(decision_event)
+                or _event_happened_after(start, decision_event)
             ):
                 continue
             plan_wall = _bounded_number(result_payload.get("plan_decision_wall_ms"))
@@ -867,7 +881,7 @@ def _generation_plan_history(
             start_payload = dict(start.payload_json)
             if (
                 _multi_plan_binding(start_payload) != result_binding
-                or _event_order_key(start) > _event_order_key(decision_event)
+                or _event_happened_after(start, decision_event)
             ):
                 continue
             raw_opportunity = start_payload.get("opportunity")
@@ -890,7 +904,7 @@ def _generation_plan_history(
                 start = starts[0]
                 if not isinstance(start.payload_json, dict) or (
                     _multi_plan_binding(dict(start.payload_json)) != result_binding
-                    or _event_order_key(start) > _event_order_key(decision_event)
+                    or _event_happened_after(start, decision_event)
                 ):
                     continue
 
@@ -950,8 +964,8 @@ def _generation_plan_history(
         if (
             revision_binding is None
             or revision_binding != expected_revision_binding
-            or _event_order_key(decision_event) > _event_order_key(revision_event)
-            or _event_order_key(revision_event) > _event_order_key(result_event)
+            or _event_happened_after(decision_event, revision_event)
+            or _event_happened_after(revision_event, result_event)
         ):
             continue
         revision_refs = _selected_refs(revision_payload)
@@ -972,7 +986,7 @@ def _generation_plan_history(
             if not isinstance(revision_start.payload_json, dict) or (
                 _revision_binding(dict(revision_start.payload_json))
                 != revision_binding
-                or _event_order_key(revision_start) > _event_order_key(revision_event)
+                or _event_happened_after(revision_start, revision_event)
             ):
                 continue
             typed_revision_source: Literal["model", "deterministic_fallback"] = "model"
@@ -990,8 +1004,7 @@ def _generation_plan_history(
                 if not isinstance(revision_start.payload_json, dict) or (
                     _revision_binding(dict(revision_start.payload_json))
                     != revision_binding
-                    or _event_order_key(revision_start)
-                    > _event_order_key(revision_event)
+                    or _event_happened_after(revision_start, revision_event)
                 ):
                     continue
             typed_revision_source = "deterministic_fallback"

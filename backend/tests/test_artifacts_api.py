@@ -59,9 +59,7 @@ def test_download_pdf_artifact_success(client: TestClient, tmp_path: Path) -> No
     assert resp.headers["x-dronedream-report-watermark"] == "applied"
     page_count = re.search(rb"/Type /Pages /Kids \[.*?\] /Count (\d+)", resp.content)
     assert page_count is not None
-    assert resp.content.count(b"% DD-FREE-REPORT-WATERMARK-V1") == int(
-        page_count.group(1)
-    )
+    assert resp.content.count(b"% DD-FREE-REPORT-WATERMARK-V1") == int(page_count.group(1))
 
 
 @pytest.mark.parametrize("paid_tier", ["plus", "pro"])
@@ -177,14 +175,7 @@ def test_digest_bound_download_rejects_byte_tampering(
     tmp_path: Path,
 ) -> None:
     job_id = _seed_job()
-    path = (
-        tmp_path
-        / "real_artifacts"
-        / "jobs"
-        / job_id
-        / "job_artifacts"
-        / "verified.json"
-    )
+    path = tmp_path / "real_artifacts" / "jobs" / job_id / "job_artifacts" / "verified.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b'{"verified":true}\n')
 
@@ -207,21 +198,67 @@ def test_digest_bound_download_rejects_byte_tampering(
         artifact_id = artifact.id
         assert receipt.evidence_id.startswith("sha256:")
 
-    response = client.get(
-        f"/api/v1/artifacts/{artifact_id}/download"
-    )
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/download")
     assert response.status_code == 200
     assert response.content == b'{"verified":true}\n'
 
     path.write_bytes(b'{"verified":false}\n')
-    response = client.get(
-        f"/api/v1/artifacts/{artifact_id}/download"
-    )
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/download")
     assert response.status_code == 409
-    assert (
-        response.json()["error"]["code"]
-        == "ARTIFACT_INTEGRITY_INVALID"
+    assert response.json()["error"]["code"] == "ARTIFACT_INTEGRITY_INVALID"
+
+
+def test_digest_bound_local_download_serves_verified_snapshot(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job_id = _seed_job()
+    path = tmp_path / "real_artifacts" / "jobs" / job_id / "verified.bin"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    verified_bytes = b"verified-before-response"
+    replacement_bytes = b"replaced-after-verification"
+    path.write_bytes(verified_bytes)
+
+    with db.SessionLocal() as session:
+        artifact = models.Artifact(
+            owner_type="job",
+            owner_id=job_id,
+            artifact_type="report_json",
+            display_name="verified.bin",
+            storage_path=str(path),
+            mime_type="application/octet-stream",
+        )
+        session.add(artifact)
+        bind_artifact_integrity(session, artifact=artifact, content=path)
+        session.commit()
+        artifact_id = artifact.id
+
+    from app.routers import artifacts as artifacts_router
+
+    original_require = artifacts_router.require_artifact_integrity
+    verified_snapshots = 0
+
+    def replace_source_after_snapshot(artifact, **kwargs):
+        nonlocal verified_snapshots
+        receipt = original_require(artifact, **kwargs)
+        if kwargs.get("content_digest") is not None:
+            verified_snapshots += 1
+            path.write_bytes(replacement_bytes)
+        return receipt
+
+    monkeypatch.setattr(
+        artifacts_router,
+        "require_artifact_integrity",
+        replace_source_after_snapshot,
     )
+
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/download")
+
+    assert response.status_code == 200
+    assert verified_snapshots == 1
+    assert path.read_bytes() == replacement_bytes
+    assert response.content == verified_bytes
 
 
 def test_artifact_digest_receipt_rejects_update_and_delete(

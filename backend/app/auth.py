@@ -5,6 +5,7 @@ from functools import lru_cache
 from typing import Annotated, Any
 from urllib import error as url_error
 from urllib import request as url_request
+from urllib.parse import urlsplit
 
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
@@ -150,6 +151,19 @@ def _get_or_create_oidc_user(
 
 @lru_cache(maxsize=8)
 def _jwks_client(jwks_url: str, timeout_seconds: int, maximum_bytes: int) -> Any:
+    parsed_url = urlsplit(jwks_url)
+    try:
+        _ = parsed_url.port
+    except ValueError as exc:
+        raise OIDCConfigurationError("OIDC JWKS URL contains an invalid port") from exc
+    if (
+        parsed_url.scheme not in {"http", "https"}
+        or not parsed_url.hostname
+        or parsed_url.username
+        or parsed_url.password
+        or parsed_url.fragment
+    ):
+        raise OIDCConfigurationError("OIDC JWKS URL must be an absolute HTTP(S) URL")
     try:
         import jwt
     except ImportError as exc:  # pragma: no cover - deployment dependency guard
@@ -161,8 +175,11 @@ def _jwks_client(jwks_url: str, timeout_seconds: int, maximum_bytes: int) -> Any
         def fetch_data(self) -> Any:
             jwk_set: Any = None
             try:
-                request = url_request.Request(url=self.uri, headers=self.headers)
-                with url_request.urlopen(
+                request = url_request.Request(  # noqa: S310 - validated HTTP(S) URL above.
+                    url=self.uri,
+                    headers=self.headers,
+                )
+                with url_request.urlopen(  # noqa: S310 - validated HTTP(S) URL above.
                     request,
                     timeout=self.timeout,
                     context=self.ssl_context,

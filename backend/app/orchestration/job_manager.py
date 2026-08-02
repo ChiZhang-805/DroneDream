@@ -223,11 +223,17 @@ def _complete_candidate_parameters(job: models.Job, proposed: dict[str, float]) 
     if not isinstance(proposed, dict):
         raise ValueError("proposed parameters must be an object")
     completed = _baseline_parameters_for_job(job)
-    allowed_names = set(constants.BASELINE_PARAMETERS)
-    allowed_names.update(
-        str(item.get("name", "")).strip().upper()
-        for item in (job.parameter_space_json or [])
-        if isinstance(item, dict) and item.get("enabled", True) is True
+    parameter_space = job.parameter_space_json or []
+    allowed_names = (
+        {
+            str(item.get("name", "")).strip().upper()
+            for item in parameter_space
+            if isinstance(item, dict)
+            and item.get("enabled", True) is True
+            and str(item.get("name", "")).strip()
+        }
+        if parameter_space
+        else set(constants.BASELINE_PARAMETERS)
     )
     normalized: dict[str, float] = {}
     for raw_name, raw_value in proposed.items():

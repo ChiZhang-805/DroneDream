@@ -28,6 +28,7 @@ from app.storage.integrity import (
     ArtifactIntegrityError,
     require_artifact_integrity,
 )
+from app.storage.local import LocalArtifactStorage
 from app.storage.s3 import S3StorageConfigError
 
 router = APIRouter(tags=["artifacts"])
@@ -359,11 +360,33 @@ def download_artifact(
             detail={"code": "ARTIFACT_FILE_MISSING", "message": "Artifact file does not exist."},
         )
 
+    local_snapshot: Path | None = None
     try:
-        require_artifact_integrity(
-            artifact,
-            content=path,
-        )
+        if digest_receipt is not None:
+            maximum_bytes = min(
+                _MAX_ARTIFACT_DOWNLOAD_BYTES,
+                _MAX_PDF_REPORT_BYTES if report_tier is not None else _MAX_ARTIFACT_DOWNLOAD_BYTES,
+            )
+            if digest_receipt.content_size_bytes > maximum_bytes:
+                raise ArtifactDownloadTooLarge(
+                    "bound artifact exceeds the configured application download limit"
+                )
+            # FileResponse opens its path after this route returns. Copy and
+            # verify into a private snapshot so a cleanup task or local file
+            # replacement cannot change the bytes after the integrity check.
+            local_snapshot = _temporary_download(
+                storage=LocalArtifactStorage(),
+                artifact=artifact,
+                maximum_bytes=maximum_bytes,
+                verify_integrity=True,
+            )
+        elif report_tier is not None and report_tier != "free":
+            local_snapshot = _temporary_download(
+                storage=LocalArtifactStorage(),
+                artifact=artifact,
+                maximum_bytes=_MAX_PDF_REPORT_BYTES,
+                verify_integrity=False,
+            )
     except ArtifactIntegrityError as exc:
         raise HTTPException(
             status_code=409,
@@ -372,8 +395,26 @@ def download_artifact(
                 "message": "Artifact bytes failed integrity verification.",
             },
         ) from exc
+    except ArtifactDownloadTooLarge as exc:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "ARTIFACT_TOO_LARGE",
+                "message": "Artifact exceeds the application download limit.",
+            },
+        ) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "ARTIFACT_FILE_MISSING",
+                "message": "Artifact file does not exist.",
+            },
+        ) from exc
 
     if report_tier == "free":
+        if local_snapshot is not None:
+            _delete_temporary_download(local_snapshot)
         if job is None:
             raise RuntimeError("report export tier resolved without an owning job")
         return Response(
@@ -383,6 +424,25 @@ def download_artifact(
             ),
             media_type="application/pdf",
             headers=_report_headers(artifact=artifact, tier=report_tier),
+        )
+
+    if local_snapshot is not None:
+        return FileResponse(
+            path=local_snapshot,
+            media_type=artifact.mime_type or "application/octet-stream",
+            filename=_safe_download_name(
+                artifact.display_name,
+                artifact.storage_path,
+            ),
+            headers=(
+                _report_headers(artifact=artifact, tier=report_tier)
+                if report_tier is not None
+                else None
+            ),
+            background=BackgroundTask(
+                _delete_temporary_download,
+                local_snapshot,
+            ),
         )
 
     return FileResponse(
