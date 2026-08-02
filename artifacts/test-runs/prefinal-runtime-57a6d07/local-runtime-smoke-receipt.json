@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "dronedream.prefinal-runtime-smoke.v1",
+  "executionSubject": "57a6d0786a74c9e55957622aa8f0213d62afdcdc",
+  "enginePackId": "sha256:ab86d9b3c1279945138a738c2c6753736851cf8f4fc0e15b1d85ba225240135b",
+  "enginePackArchiveSha256": "922be3a79a5dbb1d8f570a955f4e60d2b46e62a314f14c967f2ad518bf3808d5",
+  "startedAt": "2026-08-02T18:52:54.739Z",
+  "completedAt": "2026-08-02T18:53:02.008Z",
+  "modelProviderCalls": 0,
+  "displayName": "Pre-final runtime smoke - calm vertical takeoff and hover",
+  "jobId": "job_a2a840bf7a5c",
+  "status": "FAILED",
+  "progress": {
+    "completed_trials": 2,
+    "total_trials": 2,
+    "current_phase": null
+  },
+  "latestError": {
+    "code": "ALL_TRIALS_FAILED",
+    "message": "All baseline trials failed; cannot produce a report. Inspect trial failures on the job detail page."
+  },
+  "harnessEvents": 0,
+  "trials": [
+    {
+      "id": "tri_da556d7b1670",
+      "status": "FAILED",
+      "failureCode": null,
+      "metrics": null
+    },
+    {
+      "id": "tri_2d389ee5c242",
+      "status": "FAILED",
+      "failureCode": null,
+      "metrics": null
+    }
+  ],
+  "bestCandidateId": null,
+  "optimizationOutcome": null
+}

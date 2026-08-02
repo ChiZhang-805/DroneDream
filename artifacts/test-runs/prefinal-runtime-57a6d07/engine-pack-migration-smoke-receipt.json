@@ -1,0 +1,155 @@
+{
+  "schemaVersion": "dronedream.engine-pack-migration-smoke.v1",
+  "generatedAt": "2026-08-02T19:04:03.2875375Z",
+  "finalExecutionSubject": "2d5c0e5864021ef129359b0f303bdba092bd4928",
+  "modelProviderCalls": 0,
+  "credentials": {
+    "openAiApiKeyRead": false,
+    "accountPasswordRead": false,
+    "existingDesktopSessionUsedOnlyForLocalApi": true
+  },
+  "runtime": {
+    "runtimeId": "c75ae324-c247-50b5-bd74-fa8325e9e616",
+    "runtimeVersion": "0.1.0",
+    "servicesAfterActivation": {
+      "dronedream-api.service": "active",
+      "dronedream-worker.service": "active"
+    },
+    "legacyExecutionPathFinding": {
+      "status": "legacy",
+      "sourceCommit": "b7a6a98dede7e6878876830015a26b37f35d48a0",
+      "packId": "sha256:b599cb140ad618b3ea018bf8b0f9bea271466b2c99d0a8372274258b48dbd536",
+      "managedKeys": [
+        "PX4_GAZEBO_LAUNCH_COMMAND",
+        "PX4_GAZEBO_WORKDIR",
+        "PX4_OFFBOARD_EXECUTOR_COMMAND",
+        "REAL_SIMULATOR_COMMAND"
+      ]
+    },
+    "migration": {
+      "implementationCommit": "57a6d0786a74c9e55957622aa8f0213d62afdcdc",
+      "status": "reconciled",
+      "changed": true,
+      "managedKeysUpdated": 4,
+      "unmanagedValuesPreservedByContract": true,
+      "liveWorkerProcessVerified": true,
+      "liveWorkerLegacyPathCount": 0
+    },
+    "finalEnginePack": {
+      "packId": "sha256:5ced4e533701d2416f71c7735688bf0cfb1cd4ef3f8404df74065b96a2079d09",
+      "archiveSha256": "a7624ac1cc7b29e704782b08a6686cec4077dbc7607517c394701862d8ee4804",
+      "archiveSizeBytes": 627080,
+      "manifestSha256": "a0f33dff6d66b045848cdb78a1970302401c005f4a55b90028c7395ae416e67b",
+      "sourceCommit": "2d5c0e5864021ef129359b0f303bdba092bd4928"
+    }
+  },
+  "failureClosure": {
+    "failedJobId": "job_a2a840bf7a5c",
+    "status": "FAILED",
+    "trialCount": 2,
+    "failedTrialCount": 2,
+    "failureCode": "ALL_TRIALS_FAILED",
+    "rootCause": "the runner derived the managed Engine Pack manifest one directory above the real release root",
+    "runnerFailure": "managed Engine Pack identity is incomplete: missing Engine Pack manifest",
+    "fixCommit": "2d5c0e5864021ef129359b0f303bdba092bd4928",
+    "failedReceiptSha256": "93a305e82becbbf5a45398f6c59d6312c6fd96676949290932f569881c7100d2"
+  },
+  "recheck": {
+    "jobId": "job_756cd4a5bfc3",
+    "status": "COMPLETED",
+    "reportStatus": "READY",
+    "optimizationOutcome": "success",
+    "modelProviderCalls": 0,
+    "bestCandidateId": "cand_efbc298c963e",
+    "winnerEvidenceId": "sha256:acb0070629ab188be777418e227eff6cf7b12003dcc30b4f7e100adee1084615",
+    "winnerFreezeReceiptId": "wfr_a402ec2e45a7",
+    "metrics": {
+      "completionRate": 1.0,
+      "completionTime": 14.304,
+      "failureRate": 0.0,
+      "maxError": 0.3001,
+      "passRate": 1.0,
+      "rmse": 0.091,
+      "score": 0.9563
+    },
+    "receiptSha256": "183ac43809246814b12b24059eab934a27248fdea48068f5c88fb1685ef68f7d",
+    "trials": [
+      {
+        "trialId": "tri_4910763f7eeb",
+        "status": "COMPLETED",
+        "takeoffGate": {
+          "schemaVersion": "dronedream.takeoff_gate.v2",
+          "status": "achieved",
+          "profile": "telemetry_anchored_bounded_vertical_ramp",
+          "climbRateLimitMps": 1.0,
+          "requiredStableWindowS": 1.5,
+          "achievedStableWindowS": 1.5996704650024185,
+          "resetCount": 0
+        },
+        "telemetry": {
+          "synthetic": false,
+          "sampleCount": 5943,
+          "durationS": 47.54,
+          "samplingCoverage": 0.999915860328
+        },
+        "firmwareCommit": "6ea3539157ca358c70a515878b77077af7d4611d",
+        "enginePackManifestArtifactSha256": "2e741bf1c847f8edc872e78af2deeca9a45a6f7a8e88b3a300ddfbd7b378aa03",
+        "telemetryArtifactSha256": "d62be01293de7ed1d7184bb14dea66a87746f9455d567781e4221c0a74f6879f",
+        "offboardTimingArtifactSha256": "61c01577fecc1c25c33c86ff59ced968136e6d8a98e7bdae55d5506d8c44937e",
+        "scenarioEffectArtifactSha256": "8de2743d748084494a821bb00ee14dec129435f3dd8f1eb18780b4b8518a32b0"
+      },
+      {
+        "trialId": "tri_7ff26a9d38c4",
+        "status": "COMPLETED",
+        "takeoffGate": {
+          "schemaVersion": "dronedream.takeoff_gate.v2",
+          "status": "achieved",
+          "profile": "telemetry_anchored_bounded_vertical_ramp",
+          "climbRateLimitMps": 1.0,
+          "requiredStableWindowS": 1.5,
+          "achievedStableWindowS": 1.6075953290055622,
+          "resetCount": 0
+        },
+        "telemetry": {
+          "synthetic": false,
+          "sampleCount": 6274,
+          "durationS": 50.184,
+          "samplingCoverage": 1.0
+        },
+        "firmwareCommit": "6ea3539157ca358c70a515878b77077af7d4611d",
+        "enginePackManifestArtifactSha256": "6661ac0728a102a403e7f1a16737553a5eceeae684fe3316b3b7b58e02fc21c2",
+        "telemetryArtifactSha256": "d2968355c15a9b450953b9dc0c7f761f6345a33491af1f60cdb188bc905c9e87",
+        "offboardTimingArtifactSha256": "992a8979d938162bd25283cde77c88fdedb01f2c8c2d3d19809e0afdf0385922",
+        "scenarioEffectArtifactSha256": "a08e0eb2c070393ebaa29ac0ae6900f2cc293577c7bf93257b559ff4ea927cfa"
+      }
+    ]
+  },
+  "checks": [
+    {
+      "name": "runtime environment reconciler pytest",
+      "result": "5 passed"
+    },
+    {
+      "name": "desktop Engine Pack Rust gnullvm tests",
+      "result": "4 passed",
+      "warning": "clang-22 reported the existing unused -no-pie linker argument"
+    },
+    {
+      "name": "Engine Pack identity pytest focus",
+      "result": "8 passed, 82 deselected"
+    },
+    {
+      "name": "ruff",
+      "result": "passed"
+    },
+    {
+      "name": "git diff --check",
+      "result": "passed"
+    },
+    {
+      "name": "px4_gazebo_runner pytest split isolation",
+      "result": "90 passed across two exhaustive disjoint selections (61 plus 29)",
+      "residual": "the initial single-process invocation returned only progress dots through the command wrapper, so the complete collected set was rerun as two disjoint selections with explicit summaries"
+    }
+  ]
+}
