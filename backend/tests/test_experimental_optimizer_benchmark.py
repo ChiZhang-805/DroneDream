@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pytest
 
@@ -10,6 +11,7 @@ from scripts.benchmark_experimental_optimizers import (
     _evaluate,
     _search_space,
     run_benchmark,
+    write_new_benchmark_result,
 )
 
 EXPECTED_STRATEGIES = {
@@ -74,3 +76,13 @@ def test_benchmark_rejects_duplicate_strategies() -> None:
             generations=1,
             batch_size=1,
         )
+
+
+def test_benchmark_output_never_replaces_an_existing_result(tmp_path: Path) -> None:
+    output = tmp_path / "benchmark.json"
+    write_new_benchmark_result(output, "first\n")
+
+    with pytest.raises(ValueError, match="already exists"):
+        write_new_benchmark_result(output, "second\n")
+
+    assert output.read_text(encoding="utf-8") == "first\n"

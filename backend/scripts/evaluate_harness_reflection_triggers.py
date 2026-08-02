@@ -21,6 +21,7 @@ from app.orchestration.harness_reflection_trigger_ablation import (  # noqa: E40
     verify_harness_reflection_trigger_artifact,
     verify_harness_reflection_trigger_manifest,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 _STEM = "harness-reflection-trigger-ablation-v1"
 DEFAULT_JSON_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.json"
@@ -164,9 +165,7 @@ def write_harness_reflection_trigger_files(
                 "Harness reflection-trigger artifacts are stale: " + ", ".join(mismatches)
             )
     else:
-        for path, payload in outputs:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(payload)
+        write_new_evidence_files(outputs, label="Harness reflection-trigger evidence")
     return {
         "artifact_sha256": resolved_artifact["artifact_sha256"],
         "manifest_sha256": resolved_manifest["manifest_sha256"],

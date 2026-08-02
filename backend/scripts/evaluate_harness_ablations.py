@@ -17,6 +17,7 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.orchestration.harness_ablation import (  # noqa: E402
     build_harness_ablation_artifact,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 DEFAULT_JSON_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v2.json"
 DEFAULT_CSV_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / "harness-contract-ablation-v2.csv"
@@ -107,9 +108,7 @@ def write_harness_ablation_files(
         if mismatches:
             raise ValueError("Harness ablation artifacts are stale: " + ", ".join(mismatches))
     else:
-        for path, payload in outputs:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(payload)
+        write_new_evidence_files(outputs, label="Harness ablation evidence")
     return {
         "artifact_sha256": str(artifact["artifact_sha256"]),
         "json_file_sha256": _sha256(json_payload),

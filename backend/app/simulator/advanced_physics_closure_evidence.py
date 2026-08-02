@@ -604,7 +604,17 @@ def _build_receipt(
 
 def _write_exact(path: Path, value: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(value)
+    created = False
+    try:
+        with path.open("xb") as handle:
+            created = True
+            handle.write(value)
+    except FileExistsError as exc:
+        raise ValueError(f"refusing to replace frozen evidence file: {path}") from exc
+    except Exception:
+        if created:
+            path.unlink(missing_ok=True)
+        raise
 
 
 def export_advanced_physics_closure(
@@ -617,6 +627,9 @@ def export_advanced_physics_closure(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Verify all source evidence and export the deterministic closure bundle."""
 
+    if output_root.exists() and any(output_root.iterdir()):
+        raise ValueError(f"output directory must be absent or empty: {output_root}")
+    output_root.mkdir(parents=True, exist_ok=True)
     manifest = _build_manifest(
         repository_root=repository_root,
         subject_commit=subject_commit,

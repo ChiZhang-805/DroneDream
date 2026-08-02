@@ -26,6 +26,7 @@ from app.orchestration.harness_multi_tool_budget_evaluation import (  # noqa: E4
     build_harness_multi_tool_budget_evaluation,
     build_harness_multi_tool_budget_manifest,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 DEFAULT_ROOT = BACKEND_ROOT / "evaluation_artifacts"
 DEFAULT_STEM = "harness-multi-tool-budget-evaluation-v1"
@@ -254,11 +255,11 @@ def _validate_timing_accounting(artifact: dict[str, object]) -> None:
             )
             for name in integer_fields:
                 observed = accounting.get(name)
-                expected = sum(int(getattr(row, name)) for row in history)
+                expected_integer = sum(int(getattr(row, name)) for row in history)
                 if (
                     isinstance(observed, bool)
                     or not isinstance(observed, int)
-                    or observed != expected
+                    or observed != expected_integer
                 ):
                     raise ValueError(
                         f"multi-tool evaluation {name} accounting does not match generation rows"
@@ -273,8 +274,8 @@ def _validate_timing_accounting(artifact: dict[str, object]) -> None:
                     accounting.get(name),
                     field=f"block_rows[{block_index}].arms[{arm_index}].accounting.{name}",
                 )
-                expected = round(sum(float(getattr(row, name)) for row in history), 3)
-                if not math.isclose(observed, expected, abs_tol=0.001):
+                expected_timing = round(sum(float(getattr(row, name)) for row in history), 3)
+                if not math.isclose(observed, expected_timing, abs_tol=0.001):
                     raise ValueError(
                         f"multi-tool evaluation {name} accounting does not match generation rows"
                     )
@@ -292,11 +293,17 @@ def _validate_timing_accounting(artifact: dict[str, object]) -> None:
     }
     for summary_name, accounting_name in summary_fields.items():
         observed = _finite_timing(summary.get(summary_name), field=f"summary.{summary_name}")
-        expected = round(
-            sum(float(accounting[accounting_name]) for accounting in scripted_accounting),
+        expected_timing = round(
+            sum(
+                _finite_timing(
+                    accounting.get(accounting_name),
+                    field=f"scripted_accounting.{accounting_name}",
+                )
+                for accounting in scripted_accounting
+            ),
             3,
         )
-        if not math.isclose(observed, expected, abs_tol=0.001):
+        if not math.isclose(observed, expected_timing, abs_tol=0.001):
             raise ValueError(
                 f"multi-tool evaluation {summary_name} does not match block accounting"
             )
@@ -367,9 +374,10 @@ def main() -> int:
             source_commit=args.source_commit,
             generated_at=args.generated_at,
         )
-        root.mkdir(parents=True, exist_ok=True)
-        for name, payload in _payloads(artifact, manifest).items():
-            (root / name).write_bytes(payload)
+        write_new_evidence_files(
+            ((root / name, payload) for name, payload in _payloads(artifact, manifest).items()),
+            label="Harness multi-tool budget evidence",
+        )
     print(
         json.dumps(
             {

@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import json
 import math
 import re
@@ -18,7 +19,7 @@ import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = BACKEND_ROOT.parent
@@ -63,6 +64,7 @@ from app.orchestration.harness_routing_holdout import (  # noqa: E402
     load_archived_locked_routing_policy_holdout,
     load_archived_locked_routing_policy_result,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 REPORT_EVIDENCE_SCHEMA_VERSION = "dronedream.technical-report-evidence.v9"
 REPORT_EVIDENCE_MANIFEST_SCHEMA_VERSION = "dronedream.technical-report-evidence-manifest.v1"
@@ -492,10 +494,20 @@ def summarize_scenario_generalization(payload: dict[str, Any]) -> dict[str, Any]
             or len(set(value)) != len(value)
         ):
             raise ValueError(f"{name} must contain {expected_count} unique ids")
-    assert isinstance(training_case_ids, list)
-    assert isinstance(validation_case_ids, list)
-    assert isinstance(configuration_shift_ids, list)
-    assert isinstance(novel_type_ids, list)
+    if not all(
+        isinstance(value, list)
+        for value in (
+            training_case_ids,
+            validation_case_ids,
+            configuration_shift_ids,
+            novel_type_ids,
+        )
+    ):
+        raise ValueError("mixed-shift case identifiers must be lists")
+    training_case_ids = cast(list[str], training_case_ids)
+    validation_case_ids = cast(list[str], validation_case_ids)
+    configuration_shift_ids = cast(list[str], configuration_shift_ids)
+    novel_type_ids = cast(list[str], novel_type_ids)
     if set(configuration_shift_ids) & set(novel_type_ids):
         raise ValueError("mixed-shift case classes must be disjoint")
     if set(configuration_shift_ids) | set(novel_type_ids) != set(validation_case_ids):
@@ -1084,14 +1096,14 @@ def build_report_evidence_bundle(
     }
 
 
-def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+def _csv_bytes(path: Path, rows: list[dict[str, Any]]) -> bytes:
     if not rows:
         raise ValueError(f"cannot write empty CSV: {path.name}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
-        writer.writeheader()
-        writer.writerows(rows)
+    handle = io.StringIO(newline="")
+    writer = csv.DictWriter(handle, fieldnames=list(rows[0]), lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    return handle.getvalue().encode("utf-8")
 
 
 def write_report_evidence_bundle(
@@ -1104,12 +1116,12 @@ def write_report_evidence_bundle(
 ) -> None:
     if (manifest_path is None) != (sha256_path is None):
         raise ValueError("manifest_path and sha256_path must be provided together")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(bundle, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    bundle_payload = (
+        json.dumps(bundle, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    outputs: list[tuple[Path, bytes]] = [(output_path, bundle_payload)]
     if manifest_path is not None and sha256_path is not None:
+        output_sha256 = hashlib.sha256(bundle_payload).hexdigest()
         manifest = {
             "schema_version": REPORT_EVIDENCE_MANIFEST_SCHEMA_VERSION,
             "source_commit": bundle["source_commit"],
@@ -1117,24 +1129,28 @@ def write_report_evidence_bundle(
             "bundle": {
                 "path": output_path.name,
                 "bundle_sha256": bundle["bundle_sha256"],
-                "file_sha256": _sha256_file(output_path),
+                "file_sha256": output_sha256,
             },
             "sources": bundle["sources"],
         }
-        manifest_path.parent.mkdir(parents=True, exist_ok=True)
-        manifest_path.write_text(
-            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        sha256_path.parent.mkdir(parents=True, exist_ok=True)
-        sha256_path.write_text(
+        manifest_payload = (
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        outputs.extend(
             (
-                f"{_sha256_file(output_path)}  {output_path.name}\n"
-                f"{_sha256_file(manifest_path)}  {manifest_path.name}\n"
-            ),
-            encoding="utf-8",
+                (manifest_path, manifest_payload),
+                (
+                    sha256_path,
+                    (
+                        f"{output_sha256}  {output_path.name}\n"
+                        f"{hashlib.sha256(manifest_payload).hexdigest()}  "
+                        f"{manifest_path.name}\n"
+                    ).encode(),
+                ),
+            )
         )
     if csv_directory is None:
+        write_new_evidence_files(outputs, label="technical-report evidence bundle")
         return
     routing = bundle["routing"]
     coverage = bundle["simulation_coverage"]
@@ -1165,46 +1181,33 @@ def write_report_evidence_bundle(
                     "selected_tool_changed": step["differences"]["selected_tool"],
                 }
             )
-    _write_csv(
-        csv_directory / "routing_categories.csv",
-        routing["category_rows"],
+    csv_rows = (
+        ("routing_categories.csv", routing["category_rows"]),
+        ("routing_tool_selection.csv", routing["tool_selection_rows"]),
+        ("synthetic_scenario_holdout.csv", coverage["scenario_rows"]),
+        (
+            "synthetic_mixed_shift_generalization.csv",
+            scenario_generalization["case_rows"],
+        ),
+        ("harness_contract_ablations.csv", harness_ablations["component_rows"]),
+        ("harness_fallback_outcomes.csv", harness_outcome_campaign["arm_rows"]),
+        ("harness_reflection_trigger_steps.csv", trigger_rows),
+        (
+            "harness_reflection_outcome_comparisons.csv",
+            harness_reflection_outcome_stress["comparison_rows"],
+        ),
+        ("harness_cross_job_memory_cases.csv", harness_cross_job_memory["case_rows"]),
+        (
+            "routing_policy_holdout_categories.csv",
+            routing_policy_holdout["category_rows"],
+        ),
     )
-    _write_csv(
-        csv_directory / "routing_tool_selection.csv",
-        routing["tool_selection_rows"],
+    outputs.extend(
+        (path, _csv_bytes(path, rows))
+        for name, rows in csv_rows
+        for path in (csv_directory / name,)
     )
-    _write_csv(
-        csv_directory / "synthetic_scenario_holdout.csv",
-        coverage["scenario_rows"],
-    )
-    _write_csv(
-        csv_directory / "synthetic_mixed_shift_generalization.csv",
-        scenario_generalization["case_rows"],
-    )
-    _write_csv(
-        csv_directory / "harness_contract_ablations.csv",
-        harness_ablations["component_rows"],
-    )
-    _write_csv(
-        csv_directory / "harness_fallback_outcomes.csv",
-        harness_outcome_campaign["arm_rows"],
-    )
-    _write_csv(
-        csv_directory / "harness_reflection_trigger_steps.csv",
-        trigger_rows,
-    )
-    _write_csv(
-        csv_directory / "harness_reflection_outcome_comparisons.csv",
-        harness_reflection_outcome_stress["comparison_rows"],
-    )
-    _write_csv(
-        csv_directory / "harness_cross_job_memory_cases.csv",
-        harness_cross_job_memory["case_rows"],
-    )
-    _write_csv(
-        csv_directory / "routing_policy_holdout_categories.csv",
-        routing_policy_holdout["category_rows"],
-    )
+    write_new_evidence_files(outputs, label="technical-report evidence bundle")
 
 
 def _parse_args() -> argparse.Namespace:

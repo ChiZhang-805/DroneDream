@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -63,7 +64,12 @@ def _sha256_text(value: str) -> str:
 
 
 def _run_wsl(*, distribution: str, name: str, argv: tuple[str, ...]) -> dict[str, Any]:
-    command = ["wsl.exe", "-d", distribution, "--", *argv]
+    if distribution != "DroneDreamRuntime":
+        raise ValueError("Runtime observation may only inspect DroneDreamRuntime")
+    wsl_executable = shutil.which("wsl.exe")
+    if wsl_executable is None:
+        raise ValueError("cannot observe Runtime because wsl.exe was not found")
+    command = [str(Path(wsl_executable).resolve()), "-d", distribution, "--", *argv]
     try:
         completed = subprocess.run(  # noqa: S603
             command,
@@ -150,11 +156,17 @@ def write_new_runtime_observation(path: Path, payload: dict[str, Any]) -> None:
         )
         + "\n"
     )
+    created = False
     try:
         with path.open("x", encoding="utf-8", newline="\n") as handle:
+            created = True
             handle.write(rendered)
     except FileExistsError as exc:
         raise ValueError(f"Runtime observation output already exists: {path}") from exc
+    except Exception:
+        if created:
+            path.unlink(missing_ok=True)
+        raise
 
 
 def main() -> int:

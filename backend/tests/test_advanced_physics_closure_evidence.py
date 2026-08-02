@@ -72,6 +72,23 @@ def test_export_and_verify_complete_physics_closure(tmp_path: Path) -> None:
     assert verified_receipt == receipt
 
 
+def test_export_never_replaces_an_existing_closure(tmp_path: Path) -> None:
+    output = tmp_path / "bundle"
+    output.mkdir()
+    sentinel = output / "advanced-physics-closure-v2.manifest.json"
+    sentinel.write_text("preserve me\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="absent or empty"):
+        export_advanced_physics_closure(
+            repository_root=REPOSITORY_ROOT,
+            output_root=output,
+            subject_commit=SUBJECT_COMMIT,
+            generated_at=GENERATED_AT,
+        )
+
+    assert sentinel.read_text(encoding="utf-8") == "preserve me\n"
+
+
 def test_verify_rejects_changed_manifest_bytes(tmp_path: Path) -> None:
     output = tmp_path / "bundle"
     export_advanced_physics_closure(

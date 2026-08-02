@@ -20,6 +20,7 @@ from app.orchestration.harness_fallback_contract_campaign import (  # noqa: E402
     build_harness_fallback_contract_campaign,
     verify_harness_fallback_contract_campaign,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 DEFAULT_JSON_OUTPUT = (
     BACKEND_ROOT / "evaluation_artifacts" / "harness-fallback-contract-campaign-v3.json"
@@ -162,9 +163,7 @@ def write_harness_fallback_contract_files(
                 "Harness fallback contract artifacts are stale: " + ", ".join(mismatches)
             )
     else:
-        for path, payload in outputs:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(payload)
+        write_new_evidence_files(outputs, label="Harness fallback-contract evidence")
     return {
         "artifact_sha256": str(campaign["artifact_sha256"]),
         "json_file_sha256": _sha256(payloads[0]),

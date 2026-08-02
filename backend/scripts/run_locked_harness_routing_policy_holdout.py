@@ -71,7 +71,8 @@ def main() -> int:
         action = "verified"
     else:
         result = evaluate_locked_routing_policy_holdout(bundle)
-        assert args.output is not None
+        if args.output is None:
+            raise RuntimeError("output path is missing for holdout creation")
         write_locked_routing_policy_result(args.output, result)
         output = args.output.resolve()
         action = "created"

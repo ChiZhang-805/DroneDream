@@ -480,3 +480,15 @@ def test_report_evidence_writes_chart_ready_csv(tmp_path: Path) -> None:
         holdout_rows = list(csv.DictReader(handle))
     assert sum(int(row["case_count"]) for row in holdout_rows) == 16
     assert all(float(row["pass_rate"]) == 1.0 for row in holdout_rows)
+
+
+def test_report_evidence_refuses_to_replace_an_existing_bundle(tmp_path: Path) -> None:
+    bundle = _build_bundle()
+    output_path = tmp_path / "evidence.json"
+    write_report_evidence_bundle(bundle, output_path=output_path)
+    frozen = output_path.read_bytes()
+
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        write_report_evidence_bundle(bundle, output_path=output_path)
+
+    assert output_path.read_bytes() == frozen

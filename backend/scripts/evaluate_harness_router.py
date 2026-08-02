@@ -32,6 +32,7 @@ from app.orchestration.harness_evaluation import (  # noqa: E402
     routing_prompt_suite_sha256,
     summarize_routing_baselines,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 
 def _assert_local_backend_import() -> None:
@@ -113,21 +114,25 @@ def main() -> int:
     result["baselines"] = summarize_routing_baselines(cases).model_dump(mode="json")
 
     if args.emit_prompts is not None:
-        with args.emit_prompts.open("w", encoding="utf-8", newline="\n") as handle:
-            for case in cases:
-                system, user = build_decision_messages(compile_routing_eval_snapshot(case))
-                handle.write(
-                    json.dumps(
-                        {
-                            "case_id": case.case_id,
-                            "system": system,
-                            "user": user,
-                        },
-                        sort_keys=True,
-                        ensure_ascii=False,
-                    )
-                    + "\n"
+        prompt_rows = []
+        for case in cases:
+            system, user = build_decision_messages(compile_routing_eval_snapshot(case))
+            prompt_rows.append(
+                json.dumps(
+                    {
+                        "case_id": case.case_id,
+                        "system": system,
+                        "user": user,
+                    },
+                    sort_keys=True,
+                    ensure_ascii=False,
                 )
+            )
+        prompt_bytes = (("\n".join(prompt_rows) + "\n").encode("utf-8"))
+        write_new_evidence_files(
+            [(args.emit_prompts, prompt_bytes)],
+            label="Harness routing prompt suite",
+        )
         result["prompt_output"] = str(args.emit_prompts)
 
     if args.predictions is not None:

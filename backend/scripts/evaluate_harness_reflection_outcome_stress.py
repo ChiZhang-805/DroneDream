@@ -21,6 +21,7 @@ from app.orchestration.harness_reflection_outcome_stress import (  # noqa: E402
     verify_harness_reflection_outcome_stress_artifact,
     verify_harness_reflection_outcome_stress_manifest,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 _STEM = "harness-reflection-outcome-stress-v1"
 DEFAULT_JSON_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.json"
@@ -178,9 +179,7 @@ def write_harness_reflection_outcome_stress_files(
                 "Harness reflection outcome-stress artifacts are stale: " + ", ".join(mismatches)
             )
     else:
-        for path, payload in outputs:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(payload)
+        write_new_evidence_files(outputs, label="Harness reflection outcome-stress evidence")
     return {
         "artifact_sha256": current_artifact["artifact_sha256"],
         "manifest_sha256": current_manifest["manifest_sha256"],

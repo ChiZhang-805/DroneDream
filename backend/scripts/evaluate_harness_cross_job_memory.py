@@ -22,6 +22,7 @@ from app.orchestration.harness_cross_job_memory_evaluation import (  # noqa: E40
     verify_harness_cross_job_memory_artifact,
     verify_harness_cross_job_memory_manifest,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 DEFAULT_ROOT = BACKEND_ROOT / "evaluation_artifacts"
 DEFAULT_STEM = "harness-cross-job-memory-contract-v1"
@@ -86,9 +87,7 @@ def write_harness_cross_job_memory_files(
         if mismatches:
             raise ValueError("cross-Job memory evidence drifted: " + ", ".join(mismatches))
     else:
-        for path, data in payloads.items():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(data)
+        write_new_evidence_files(payloads.items(), label="cross-Job memory evidence")
     return {
         "artifact_sha256": resolved_artifact["artifact_sha256"],
         "manifest_sha256": resolved_manifest["manifest_sha256"],

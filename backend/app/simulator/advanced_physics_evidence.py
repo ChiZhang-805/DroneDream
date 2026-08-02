@@ -627,7 +627,17 @@ def _omission_reason(relative: str) -> str:
 
 def _write_exact(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(payload)
+    created = False
+    try:
+        with path.open("xb") as handle:
+            created = True
+            handle.write(payload)
+    except FileExistsError as exc:
+        raise ValueError(f"refusing to replace frozen evidence file: {path}") from exc
+    except Exception:
+        if created:
+            path.unlink(missing_ok=True)
+        raise
 
 
 def _inventory_and_retain(

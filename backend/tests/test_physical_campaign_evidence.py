@@ -10,6 +10,7 @@ import pytest
 
 from app.simulator import physical_campaign_evidence
 from app.simulator.physical_campaign_evidence import build_runtime_observation
+from scripts import observe_px4_runtime
 from scripts.observe_px4_runtime import write_new_runtime_observation
 
 _PX4_COMMIT = "6ea3539157ca358c70a515878b77077af7d4611d"
@@ -79,6 +80,28 @@ def test_runtime_observation_writer_never_replaces_a_freeze(tmp_path: Path) -> N
         write_new_runtime_observation(output, payload)
 
     assert output.read_bytes() == original
+
+
+def test_runtime_observer_rejects_an_unexpected_distribution() -> None:
+    with pytest.raises(ValueError, match="only inspect DroneDreamRuntime"):
+        observe_px4_runtime._run_wsl(
+            distribution="Ubuntu",
+            name="px4_git_head",
+            argv=("git", "rev-parse", "HEAD"),
+        )
+
+
+def test_runtime_observer_fails_closed_when_wsl_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(observe_px4_runtime.shutil, "which", lambda _name: None)
+
+    with pytest.raises(ValueError, match="wsl.exe was not found"):
+        observe_px4_runtime._run_wsl(
+            distribution="DroneDreamRuntime",
+            name="px4_git_head",
+            argv=("git", "rev-parse", "HEAD"),
+        )
 
 
 def _identity(*, attempt: int) -> dict[str, Any]:

@@ -113,6 +113,12 @@ def is_text(path: Path) -> bool:
     return path.suffix.lower() in TEXT_SUFFIXES or path.name in TEXT_NAMES
 
 
+def read_utf8_text(path: Path) -> str:
+    """Read UTF-8 project text while accepting an optional leading BOM."""
+
+    return path.read_text(encoding="utf-8-sig", errors="strict")
+
+
 def markdown_target(raw_target: str) -> str | None:
     target = raw_target.strip()
     if target.startswith("<") and ">" in target:
@@ -151,7 +157,7 @@ def main() -> int:
             continue
         text_files += 1
         try:
-            text = absolute_path.read_text(encoding="utf-8", errors="strict")
+            text = read_utf8_text(absolute_path)
         except UnicodeDecodeError as exc:
             errors.append(f"{relative_path}: invalid UTF-8 ({exc})")
             continue

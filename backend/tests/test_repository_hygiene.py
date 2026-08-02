@@ -48,3 +48,15 @@ def test_complete_or_truncated_pem_key_material_is_reported() -> None:
     assert module.probable_secret_names(f"-----BEGIN ENCRYPTED PRIVATE KEY-----\n{key_body}") == [
         "PEM private key"
     ]
+
+
+def test_utf8_json_with_or_without_bom_decodes_to_the_same_text(tmp_path: Path) -> None:
+    module = _load_repository_check()
+    plain = tmp_path / "plain.json"
+    bom = tmp_path / "bom.json"
+    payload = b'{"verified":true}\n'
+    plain.write_bytes(payload)
+    bom.write_bytes(b"\xef\xbb\xbf" + payload)
+
+    assert module.read_utf8_text(plain) == payload.decode("utf-8")
+    assert module.read_utf8_text(bom) == payload.decode("utf-8")

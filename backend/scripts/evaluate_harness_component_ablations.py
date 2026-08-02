@@ -21,6 +21,7 @@ from app.orchestration.harness_component_ablation import (  # noqa: E402
     verify_harness_component_ablation_artifact,
     verify_harness_component_ablation_manifest,
 )
+from scripts.evidence_output import write_new_evidence_files  # noqa: E402
 
 _STEM = "harness-component-outcome-ablation-v2"
 DEFAULT_JSON_OUTPUT = BACKEND_ROOT / "evaluation_artifacts" / f"{_STEM}.json"
@@ -190,9 +191,7 @@ def write_harness_component_ablation_files(
                 "Harness component-ablation artifacts are stale: " + ", ".join(mismatches)
             )
     else:
-        for path, payload in outputs:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(payload)
+        write_new_evidence_files(outputs, label="Harness component-ablation evidence")
     return {
         "artifact_sha256": current_artifact["artifact_sha256"],
         "manifest_sha256": current_manifest["manifest_sha256"],

@@ -252,3 +252,26 @@ def test_evaluator_cli_accepts_latest_online_freeze_as_historical() -> None:
     assert report["prediction_provenance"]["qualification_scope"] == (
         "archived_evidence_2_8_prompt_1_7"
     )
+
+
+def test_evaluator_prompt_export_never_replaces_an_existing_suite(tmp_path: Path) -> None:
+    output = tmp_path / "prompts.jsonl"
+    output.write_text("preserve me\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EVALUATOR_SCRIPT),
+            "--emit-prompts",
+            str(output),
+        ],
+        cwd=REPOSITORY_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode != 0
+    assert "refusing to overwrite frozen" in result.stderr
+    assert output.read_text(encoding="utf-8") == "preserve me\n"
