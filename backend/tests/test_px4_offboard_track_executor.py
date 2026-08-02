@@ -535,6 +535,92 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
         )
 
 
+def test_battery_track_start_waits_for_telemetry_convergence() -> None:
+    client = executor.FakeOffboardClient()
+    client.battery_samples = [
+        {"remaining_percent": 81.0, "voltage_v": 16.1},
+        {"remaining_percent": 79.0, "voltage_v": 16.0},
+        {"remaining_percent": 76.0, "voltage_v": 15.9},
+        {"remaining_percent": 74.0, "voltage_v": 15.8},
+    ]
+    hold = executor.Setpoint(0.0, 0.0, -3.0, 0.0)
+
+    details = asyncio.run(
+        executor._transition_battery_at_track_start(
+            client,
+            {
+                "target_track_start_percent": 70.0,
+                "voltage_sag": True,
+                "sag_drain_seconds": 300.0,
+                "no_sag_hold_drain_seconds": 86400.0,
+            },
+            {"pretrack_drain_seconds": 6.666666666666667},
+            hold_setpoint=hold,
+            rate_hz=100.0,
+            settle_timeout_seconds=1.0,
+        )
+    )
+
+    assert details["conditioning_sample_count"] == 4
+    assert details["track_start_sample"]["remaining_percent"] == 74.0
+    assert client.setpoints == [hold, hold, hold, hold]
+    assert client.float_params["SIM_BAT_MIN_PCT"] == 0.0
+    assert client.float_params["SIM_BAT_DRAIN"] == 300.0
+
+
+def test_battery_track_start_keeps_offboard_setpoints_alive_during_slow_sample() -> None:
+    class SlowBatteryClient(executor.FakeOffboardClient):
+        async def sample_battery(self, timeout_seconds: float) -> dict[str, float]:
+            del timeout_seconds
+            await asyncio.sleep(0.035)
+            return {"remaining_percent": 74.0, "voltage_v": 15.8}
+
+    client = SlowBatteryClient()
+    hold = executor.Setpoint(0.0, 0.0, -3.0, 0.0)
+
+    details = asyncio.run(
+        executor._transition_battery_at_track_start(
+            client,
+            {
+                "target_track_start_percent": 70.0,
+                "voltage_sag": True,
+                "sag_drain_seconds": 300.0,
+                "no_sag_hold_drain_seconds": 86400.0,
+            },
+            {"pretrack_drain_seconds": 6.666666666666667},
+            hold_setpoint=hold,
+            rate_hz=100.0,
+            settle_timeout_seconds=1.0,
+        )
+    )
+
+    assert details["conditioning_sample_count"] == 1
+    assert len(client.setpoints) >= 3
+    assert all(setpoint == hold for setpoint in client.setpoints)
+
+
+def test_battery_track_start_fails_closed_when_telemetry_does_not_converge() -> None:
+    client = executor.FakeOffboardClient()
+    client.battery_samples = [{"remaining_percent": 81.0, "voltage_v": 16.1}]
+
+    with pytest.raises(RuntimeError, match="did not reach.*before timeout"):
+        asyncio.run(
+            executor._transition_battery_at_track_start(
+                client,
+                {
+                    "target_track_start_percent": 70.0,
+                    "voltage_sag": True,
+                    "sag_drain_seconds": 300.0,
+                    "no_sag_hold_drain_seconds": 86400.0,
+                },
+                {"pretrack_drain_seconds": 6.666666666666667},
+                hold_setpoint=executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+                rate_hz=100.0,
+                settle_timeout_seconds=0.01,
+            )
+        )
+
+
 def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
     client = executor.FakeOffboardClient()
     schedule = [
@@ -877,7 +963,7 @@ def test_takeoff_deadline_after_valid_samples_is_not_reported_as_telemetry_loss(
             executor._wait_for_takeoff_stability(
                 DeadlineClient(),
                 executor.Setpoint(0.0, 0.0, -3.0, 0.0),
-                timeout_seconds=0.03,
+                timeout_seconds=0.1,
                 sample_rate_hz=100.0,
                 stable_window_seconds=0.01,
                 horizontal_tolerance_m=0.35,

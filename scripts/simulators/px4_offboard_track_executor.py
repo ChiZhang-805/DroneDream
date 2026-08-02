@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import hashlib
 import json
 import math
@@ -38,6 +39,7 @@ MAX_SETPOINTS = 1_000_000
 DEFAULT_HOVER_DURATION_SECONDS = 10.0
 MIN_HOVER_DURATION_SECONDS = 1.0
 MAX_HOVER_DURATION_SECONDS = 300.0
+BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS = 15.0
 RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
 
 
@@ -1393,21 +1395,86 @@ async def _hold_battery_during_takeoff_gate(
     }
 
 
+async def _sample_battery_while_holding(
+    client: OffboardClientProtocol,
+    *,
+    hold_setpoint: Setpoint,
+    rate_hz: float,
+    deadline: float,
+) -> dict[str, float] | None:
+    """Keep the Offboard heartbeat alive while awaiting one battery sample."""
+
+    remaining = deadline - time.monotonic()
+    if remaining <= 0.0:
+        return None
+    sample_task = asyncio.create_task(client.sample_battery(min(1.0, remaining)))
+    try:
+        while not sample_task.done():
+            await client.set_position_ned(hold_setpoint)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                return None
+            await asyncio.wait(
+                {sample_task},
+                timeout=min(1.0 / rate_hz, remaining),
+            )
+        return sample_task.result()
+    finally:
+        if not sample_task.done():
+            sample_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await sample_task
+
+
 async def _transition_battery_at_track_start(
     client: OffboardClientProtocol,
     profile: dict[str, Any],
     prepared: dict[str, Any],
+    *,
+    hold_setpoint: Setpoint,
+    rate_hz: float,
+    settle_timeout_seconds: float = BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
-    track_start_sample = await client.sample_battery(5.0)
     target = float(profile["target_track_start_percent"])
-    sample_percent = float(track_start_sample["remaining_percent"])
     drain_seconds = float(prepared["pretrack_drain_seconds"])
     quantization_tolerance = 100.0 * 0.1 / max(1.0, drain_seconds)
     tolerance = max(5.0, quantization_tolerance + 2.0)
-    if abs(sample_percent - target) > tolerance:
+    if not math.isfinite(rate_hz) or rate_hz <= 0.0:
+        raise ValueError("battery conditioning setpoint rate must be finite and greater than zero")
+    if not math.isfinite(settle_timeout_seconds) or settle_timeout_seconds <= 0.0:
+        raise ValueError("battery settle timeout must be finite and greater than zero")
+    deadline = time.monotonic() + settle_timeout_seconds
+    conditioning_samples: list[dict[str, float]] = []
+    track_start_sample: dict[str, float] | None = None
+    while True:
+        sample = await _sample_battery_while_holding(
+            client,
+            hold_setpoint=hold_setpoint,
+            rate_hz=rate_hz,
+            deadline=deadline,
+        )
+        if sample is None:
+            break
+        conditioning_samples.append(sample)
+        sample_percent = float(sample["remaining_percent"])
+        if abs(sample_percent - target) <= tolerance:
+            track_start_sample = sample
+            break
+        if sample_percent < target - tolerance:
+            raise RuntimeError(
+                "PX4 battery overshot the requested track-start state: "
+                f"target={target:g}%, observed={sample_percent:g}%, tolerance={tolerance:g}%"
+            )
+    if track_start_sample is None:
+        observed = (
+            float(conditioning_samples[-1]["remaining_percent"])
+            if conditioning_samples
+            else math.nan
+        )
         raise RuntimeError(
-            "PX4 battery did not reach the requested track-start state: "
-            f"target={target:g}%, observed={sample_percent:g}%, tolerance={tolerance:g}%"
+            "PX4 battery did not reach the requested track-start state before timeout: "
+            f"target={target:g}%, observed={observed:g}%, tolerance={tolerance:g}%, "
+            f"samples={len(conditioning_samples)}, timeout={settle_timeout_seconds:g}s"
         )
     if bool(profile["voltage_sag"]):
         transition_values = {
@@ -1425,6 +1492,9 @@ async def _transition_battery_at_track_start(
     }
     return {
         **prepared,
+        "conditioning_sample_count": len(conditioning_samples),
+        "conditioning_samples": conditioning_samples,
+        "conditioning_timeout_seconds": settle_timeout_seconds,
         "track_start_sample": track_start_sample,
         "track_start_tolerance_percent": tolerance,
         "track_parameters": transition_parameters,
@@ -1623,6 +1693,21 @@ async def run_executor(
         for idx, setpoint in enumerate(schedule):
             if (time.monotonic() - start) > track_timeout_seconds:
                 raise TimeoutError(f"track timeout after {track_timeout_seconds}s")
+            if idx == track_start and isinstance(battery_profile, dict):
+                conditioning_started = time.monotonic()
+                battery_details = await _transition_battery_at_track_start(
+                    client,
+                    battery_profile,
+                    _require_runtime_details(
+                        battery_details,
+                        label="battery control details",
+                    ),
+                    hold_setpoint=schedule[max(0, track_start - 1)],
+                    rate_hz=rate_hz,
+                )
+                # Battery conditioning is a bounded pre-track safety gate, not
+                # part of the trajectory execution timeout budget.
+                start += time.monotonic() - conditioning_started
             if idx >= track_start and isinstance(gps_profile, dict):
                 elapsed_track_seconds = (idx - track_start) / rate_hz
                 tick_index = min(
@@ -1663,15 +1748,6 @@ async def run_executor(
             now_t = time.monotonic() - exec_start
             if idx == track_start:
                 timing["track_start_t"] = now_t
-                if isinstance(battery_profile, dict):
-                    battery_details = await _transition_battery_at_track_start(
-                        client,
-                        battery_profile,
-                        _require_runtime_details(
-                            battery_details,
-                            label="battery control details",
-                        ),
-                    )
             if idx == track_end:
                 timing["track_end_t"] = now_t
                 if isinstance(battery_profile, dict):
