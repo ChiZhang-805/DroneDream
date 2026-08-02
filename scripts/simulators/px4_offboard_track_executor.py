@@ -636,35 +636,32 @@ def _activate_gazebo_wind_profile(
     topic = f"/world/{world}/wind"
     service = f"/world/{world}/wind_info"
     # Retain the node for the entire publish/read-back handshake. Gazebo
-    # Transport discovery is asynchronous; publishing only after the
-    # WindEffects subscriber is connected removes the cold-start race that can
-    # make a short-lived command report success while delivering no message.
+    # Transport discovery is asynchronous, and has_connections() is only an
+    # advisory observation: a publisher can deliver a message even when the
+    # Python binding has not exposed a matching subscriber yet. Exact
+    # /wind_info read-back is the sole delivery authority.
     _node, publisher, wind_message = _create_gazebo_wind_publisher(topic, requested)
     try:
-        discovery_timeout = float(
-            os.environ.get("PX4_GAZEBO_WIND_DISCOVERY_TIMEOUT_SECONDS", "20.0")
-        )
+        attempts = int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "100"))
     except ValueError:
-        discovery_timeout = 20.0
-    discovery_timeout = min(30.0, max(0.1, discovery_timeout))
-    discovery_deadline = time.monotonic() + discovery_timeout
-    while not publisher.has_connections() and time.monotonic() < discovery_deadline:
-        time.sleep(0.05)
-    if not publisher.has_connections():
-        raise RuntimeError(
-            "Gazebo WindEffects subscriber was not discovered within "
-            f"{discovery_timeout:g}s before post-hover activation"
-        )
+        attempts = 100
+    attempts = min(100, max(1, attempts))
     try:
-        attempts = int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "10"))
+        republish_interval_seconds = float(
+            os.environ.get("PX4_GAZEBO_WIND_REPUBLISH_INTERVAL_SECONDS", "0.2")
+        )
     except ValueError:
-        attempts = 10
-    attempts = min(50, max(1, attempts))
+        republish_interval_seconds = 0.2
+    republish_interval_seconds = min(1.0, max(0.05, republish_interval_seconds))
     last_error = "no wind_info response"
     readback: dict[str, Any] | None = None
+    connections_observed = False
+    publish_attempts = 0
     for attempt in range(attempts):
+        connections_observed = connections_observed or publisher.has_connections()
+        publish_attempts += 1
         if not publisher.publish(wind_message):
-            raise RuntimeError("Gazebo post-hover wind publish failed after subscriber discovery")
+            raise RuntimeError("Gazebo post-hover wind publish failed")
         response = subprocess.run(  # noqa: S603
             [
                 gz_cli,
@@ -708,7 +705,7 @@ def _activate_gazebo_wind_profile(
         except (RuntimeError, ValueError) as exc:
             last_error = str(exc)
         if attempt + 1 < attempts:
-            time.sleep(0.1)
+            time.sleep(republish_interval_seconds)
     if readback is None:
         raise RuntimeError("Gazebo post-hover wind activation was not verified: " + last_error)
     return {
@@ -725,6 +722,9 @@ def _activate_gazebo_wind_profile(
                 "phase": "after_stable_hover_before_track_entry",
                 "activation_t_s": round(activation_t_s, 12),
                 "readback_service": service,
+                "delivery_verification": "wind_info_exact_readback",
+                "publish_attempts": publish_attempts,
+                "publisher_connections_observed": connections_observed,
             },
         },
     }

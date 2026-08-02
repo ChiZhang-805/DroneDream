@@ -268,6 +268,9 @@ def test_gazebo_wind_activator_publishes_and_reads_back_exact_vector(
         "enable_wind": True,
     }
     assert result["activation"]["value"]["activation_t_s"] == 2.5
+    assert result["activation"]["value"]["delivery_verification"] == ("wind_info_exact_readback")
+    assert result["activation"]["value"]["publish_attempts"] == 1
+    assert result["activation"]["value"]["publisher_connections_observed"] is True
 
 
 def test_gazebo_wind_activator_rejects_mismatched_readback(
@@ -350,28 +353,44 @@ def test_gazebo_wind_activator_republishes_until_exact_readback(
     }
 
 
-def test_gazebo_wind_activator_rejects_missing_subscriber(
+def test_gazebo_wind_activator_treats_connection_hint_as_advisory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    responses = [
+        subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="linear_velocity {}\nenable_wind: true\n",
+            stderr="",
+        ),
+        subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="linear_velocity { y: 3 }\nenable_wind: true\n",
+            stderr="",
+        ),
+    ]
     publisher = mock.Mock()
     publisher.has_connections.return_value = False
+    publisher.publish.return_value = True
     monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
+    monkeypatch.setattr(executor.subprocess, "run", lambda *_args, **_kwargs: responses.pop(0))
     monkeypatch.setattr(
         executor,
         "_create_gazebo_wind_publisher",
         lambda _topic, _requested: (object(), publisher, object()),
     )
-    monotonic_values = iter((1.0, 1.0, 1.2))
-    monkeypatch.setattr(executor.time, "monotonic", lambda: next(monotonic_values))
     monkeypatch.setattr(executor.time, "sleep", lambda _seconds: None)
-    monkeypatch.setenv("PX4_GAZEBO_WIND_DISCOVERY_TIMEOUT_SECONDS", "0.1")
+    result = executor._activate_gazebo_wind_profile(
+        world="default",
+        profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
+        activation_t_s=2.5,
+    )
 
-    with pytest.raises(RuntimeError, match="subscriber was not discovered within 0.1s"):
-        executor._activate_gazebo_wind_profile(
-            world="default",
-            profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
-            activation_t_s=2.5,
-        )
+    assert publisher.publish.call_count == 2
+    assert result["readback"]["value"]["linear_velocity_mps"]["y"] == 3.0
+    assert result["activation"]["value"]["publish_attempts"] == 2
+    assert result["activation"]["value"]["publisher_connections_observed"] is False
 
 
 def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
