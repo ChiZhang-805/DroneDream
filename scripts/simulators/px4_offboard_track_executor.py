@@ -776,6 +776,7 @@ def _runtime_effect_records(
     profile: dict[str, Any],
     *,
     observations: dict[str, dict[str, Any]],
+    attempted_sections: set[str],
     status: str,
     error: str | None,
 ) -> list[dict[str, Any]]:
@@ -789,22 +790,31 @@ def _runtime_effect_records(
             section = "gps_dropout"
         else:
             section = "battery"
-        if status != "complete":
+        observation = observations.get(section)
+        if status != "complete" and observation is None:
             reason = error or "flight-timed scenario effect did not complete"
+            attempted = section in attempted_sections
             records.append(
                 {
                     "effect_id": effect_id,
                     "mechanism": effect["mechanism"],
-                    "status": "failed",
+                    "status": "failed" if attempted else "skipped",
                     "capability": {
                         "status": "available",
-                        "reason": reason,
+                        "reason": (
+                            reason
+                            if attempted
+                            else "flight terminated before this available effect was activated"
+                        ),
                     },
-                    "reason": reason,
+                    "reason": (
+                        reason
+                        if attempted
+                        else f"flight terminated before {section} activation: {reason}"
+                    ),
                 }
             )
             continue
-        observation = observations.get(section)
         if observation is None:
             raise RuntimeError(f"runtime effect evidence omitted {section}")
         verification_observations = (
@@ -855,6 +865,7 @@ def _write_runtime_effect_artifact(
     path: Path,
     *,
     observations: dict[str, dict[str, Any]],
+    attempted_sections: set[str],
     status: str,
     error: str | None = None,
 ) -> None:
@@ -863,6 +874,7 @@ def _write_runtime_effect_artifact(
         request,
         profile,
         observations=observations,
+        attempted_sections=attempted_sections,
         status=status,
         error=error,
     )
@@ -870,6 +882,7 @@ def _write_runtime_effect_artifact(
         "schema_version": RUNTIME_EFFECT_SCHEMA_VERSION,
         "request_sha256": request["request_sha256"],
         "compiled_runtime_profile": profile,
+        "attempted_sections": sorted(attempted_sections),
         "status": status,
         "error": error,
         "records": records,
@@ -1212,6 +1225,15 @@ async def _wait_for_takeoff_stability(
                 min(telemetry_timeout_seconds, remaining)
             )
         except BaseException as exc:
+            if evidence["sample_count"] > 0 and time.monotonic() >= deadline:
+                latest = evidence.get("latest_observation")
+                evidence["status"] = "failed"
+                evidence["failure_reason"] = "takeoff_stability_timeout"
+                evidence["terminal_telemetry_error"] = f"{type(exc).__name__}: {exc}"
+                raise TimeoutError(
+                    "takeoff did not reach a continuously stable hover within "
+                    f"{timeout_seconds:g}s; latest={latest}"
+                ) from exc
             evidence["status"] = "failed"
             evidence["failure_reason"] = "position_velocity_telemetry_unavailable"
             evidence["telemetry_error"] = f"{type(exc).__name__}: {exc}"
@@ -1472,6 +1494,7 @@ async def run_executor(
     land_command_sent = False
     runtime_failure: str | None = None
     runtime_observations: dict[str, dict[str, Any]] = {}
+    attempted_effect_sections: set[str] = set()
     gps_transitions: list[dict[str, Any]] = []
     gps_reset_verified = False
     gps_value: dict[str, Any] | None = None
@@ -1562,6 +1585,7 @@ async def run_executor(
 
         if isinstance(wind_profile, dict):
             activation_t_s = time.monotonic() - exec_start
+            attempted_effect_sections.add("wind_activation")
             wind_observation = await asyncio.to_thread(
                 wind_activator,
                 world=world,
@@ -1583,6 +1607,7 @@ async def run_executor(
             _log(log_path, "post-hover Gazebo wind activation readback verified")
 
         if isinstance(battery_profile, dict):
+            attempted_effect_sections.add("battery")
             battery_details = await _prepare_battery_profile(
                 client,
                 battery_profile,
@@ -1608,6 +1633,7 @@ async def run_executor(
                     gps_last_tick = tick_index
                     desired_off = gps_schedule[tick_index]
                     if desired_off != gps_off:
+                        attempted_effect_sections.add("gps_dropout")
                         gps_control = _require_runtime_details(
                             gps_control_details,
                             label="GPS control details",
@@ -1802,6 +1828,7 @@ async def run_executor(
                     runtime_profile,
                     runtime_evidence_path,
                     observations=runtime_observations,
+                    attempted_sections=attempted_effect_sections,
                     status="complete" if runtime_failure is None else "failed",
                     error=runtime_failure,
                 )

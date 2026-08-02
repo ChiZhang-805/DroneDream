@@ -767,6 +767,156 @@ def test_executor_fails_closed_when_post_hover_wind_readback_fails(tmp_path: Pat
     artifact = json.loads(evidence_path.read_text(encoding="utf-8"))
     assert artifact["status"] == "failed"
     assert all(item["status"] == "failed" for item in artifact["records"])
+    assert artifact["attempted_sections"] == ["wind_activation"]
+
+
+def test_executor_marks_wind_skipped_when_takeoff_fails_before_activation(
+    tmp_path: Path,
+) -> None:
+    request = scenario_effects.build_scenario_effect_request(
+        execution_identity={
+            "trial_id": "trial-pre-wind-fail",
+            "job_id": "job-pre-wind-fail",
+            "candidate_id": "candidate-pre-wind-fail",
+            "seed": 19,
+            "attempt_count": 1,
+        },
+        scenario_type="nominal",
+        scenario_config={"wind_mps": 3.0},
+        job_config={
+            "wind": {"north": 3.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+    profile = scenario_effects.compile_bundled_runtime_profile(request)
+    assert profile is not None
+    client = executor.FakeOffboardClient()
+    client.position_velocity_samples = [executor.PositionVelocityNed(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)]
+    evidence_path = tmp_path / scenario_effects.RUNTIME_EVIDENCE_ARTIFACT_NAME
+
+    with pytest.raises(TimeoutError, match="continuously stable hover"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -3.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=0.03,
+                track_timeout_seconds=5.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                scenario_engine=scenario_effects,
+                scenario_request=request,
+                runtime_profile=profile,
+                runtime_evidence_path=evidence_path,
+            )
+        )
+
+    artifact = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert artifact["status"] == "failed"
+    assert artifact["attempted_sections"] == []
+    assert all(item["status"] == "skipped" for item in artifact["records"])
+    assert all(
+        "before wind_activation activation" in item["reason"] for item in artifact["records"]
+    )
+
+
+def test_runtime_effect_evidence_preserves_applied_effect_after_later_failure() -> None:
+    request = scenario_effects.build_scenario_effect_request(
+        execution_identity={"trial_id": "trial-post-wind-failure"},
+        scenario_type="nominal",
+        scenario_config={"wind_mps": 3.0},
+        job_config={
+            "wind": {"north": 3.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+    profile = scenario_effects.compile_bundled_runtime_profile(request)
+    assert profile is not None
+    observation = {
+        "readback": {"kind": "readback"},
+        "activation": {"kind": "acknowledgement"},
+    }
+
+    records = executor._runtime_effect_records(
+        scenario_effects,
+        request,
+        profile,
+        observations={"wind_activation": observation},
+        attempted_sections={"wind_activation"},
+        status="failed",
+        error="track timeout after verified wind activation",
+    )
+
+    assert all(item["status"] == "applied" for item in records)
+    assert all(
+        item["evidence"]["verification"]["observations"]
+        == [observation["readback"], observation["activation"]]
+        for item in records
+    )
+
+
+def test_takeoff_deadline_after_valid_samples_is_not_reported_as_telemetry_loss() -> None:
+    class DeadlineClient(executor.FakeOffboardClient):
+        sample_calls = 0
+
+        async def sample_position_velocity_ned(
+            self, timeout_seconds: float
+        ) -> executor.PositionVelocityNed:
+            self.sample_calls += 1
+            if self.sample_calls == 1:
+                return executor.PositionVelocityNed(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+            await asyncio.sleep(timeout_seconds + 0.01)
+            raise TimeoutError(f"telemetry timeout after {timeout_seconds:.3f}s")
+
+    evidence: dict = {}
+    with pytest.raises(TimeoutError, match="continuously stable hover"):
+        asyncio.run(
+            executor._wait_for_takeoff_stability(
+                DeadlineClient(),
+                executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+                timeout_seconds=0.03,
+                sample_rate_hz=100.0,
+                stable_window_seconds=0.01,
+                horizontal_tolerance_m=0.35,
+                vertical_tolerance_m=0.25,
+                horizontal_speed_tolerance_m_s=0.35,
+                vertical_speed_tolerance_m_s=0.25,
+                evidence=evidence,
+            )
+        )
+    assert evidence["sample_count"] == 1
+    assert evidence["failure_reason"] == "takeoff_stability_timeout"
+    assert "telemetry timeout" in evidence["terminal_telemetry_error"]
+
+
+def test_takeoff_initial_telemetry_failure_remains_fail_closed() -> None:
+    class NoTelemetryClient(executor.FakeOffboardClient):
+        async def sample_position_velocity_ned(
+            self, timeout_seconds: float
+        ) -> executor.PositionVelocityNed:
+            raise TimeoutError(f"telemetry timeout after {timeout_seconds:.3f}s")
+
+    evidence: dict = {}
+    with pytest.raises(TimeoutError, match="telemetry timeout"):
+        asyncio.run(
+            executor._wait_for_takeoff_stability(
+                NoTelemetryClient(),
+                executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+                timeout_seconds=0.1,
+                sample_rate_hz=100.0,
+                stable_window_seconds=0.01,
+                horizontal_tolerance_m=0.35,
+                vertical_tolerance_m=0.25,
+                horizontal_speed_tolerance_m_s=0.35,
+                vertical_speed_tolerance_m_s=0.25,
+                evidence=evidence,
+            )
+        )
+    assert evidence["sample_count"] == 0
+    assert evidence["failure_reason"] == "position_velocity_telemetry_unavailable"
 
 
 def test_executor_fails_closed_when_hover_velocity_never_stabilizes(

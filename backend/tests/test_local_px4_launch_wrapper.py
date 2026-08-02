@@ -2169,6 +2169,68 @@ def test_failed_runtime_effect_records_remain_valid_launcher_evidence(tmp_path: 
     ]
 
 
+def test_skipped_runtime_effect_records_preserve_pre_activation_failure(
+    tmp_path: Path,
+) -> None:
+    request = build_scenario_effect_request(
+        execution_identity={"trial_id": "trial-runtime-pre-activation-failure"},
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "battery": {"initial_percent": 75.0, "voltage_sag": True},
+        },
+    )
+    profile = scenario_effects.compile_bundled_runtime_profile(request)
+    assert profile is not None
+    reason = "flight terminated before battery activation: takeoff stability timeout"
+    records = [
+        wrapper._scenario_effect_record(
+            effect,
+            status="skipped",
+            capability_status="available",
+            reason=reason,
+        )
+        for effect in request["effects"]
+    ]
+    (tmp_path / scenario_effects.RUNTIME_EVIDENCE_ARTIFACT_NAME).write_text(
+        json.dumps(
+            {
+                "schema_version": "dronedream.scenario_runtime_effects.v1",
+                "request_sha256": request["request_sha256"],
+                "compiled_runtime_profile": profile,
+                "attempted_sections": [],
+                "status": "failed",
+                "error": "TimeoutError: takeoff stability timeout",
+                "records": records,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = wrapper._load_runtime_effect_records(
+        scenario_effects,
+        request,
+        run_dir=tmp_path,
+    )
+    payload = scenario_effects.build_scenario_effect_evidence(
+        request,
+        launcher="local_px4_launch_wrapper",
+        world="default",
+        effects=[loaded[effect["effect_id"]] for effect in request["effects"]],
+    )
+    normalized = validate_scenario_effect_evidence(request, payload)
+    assert normalized["verification_status"] == "unsupported"
+    assert normalized["failed_effects"] == []
+    assert normalized["unsupported_effects"] == [
+        "battery.initial_percent",
+        "battery.voltage_sag",
+    ]
+
+
 def test_wrapper_headless_true_does_not_launch_gui_client(tmp_path: Path):
     launcher = tmp_path / "launcher.py"
     launcher.write_text("import time\ntime.sleep(0.4)\n", encoding="utf-8")

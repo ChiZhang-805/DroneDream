@@ -407,8 +407,16 @@ def _load_runtime_effect_records(
     expected = set(profile["requested_effect_ids"])
     if set(by_id) != expected:
         raise RuntimeError("flight-timed scenario-effect records do not cover the compiled profile")
-    expected_record_status = "applied" if status == "complete" else "failed"
-    if any(record.get("status") != expected_record_status for record in by_id.values()):
+    allowed_record_statuses = (
+        {"applied"}
+        if status == "complete"
+        else {
+            "applied",
+            "failed",
+            "skipped",
+        }
+    )
+    if any(record.get("status") not in allowed_record_statuses for record in by_id.values()):
         raise RuntimeError(
             "flight-timed scenario-effect record statuses do not match the evidence status"
         )
