@@ -301,6 +301,50 @@ def test_environment_transport_readback_does_not_set_again(tmp_path: Path) -> No
     assert _read(tmp_path / BEFORE_EVIDENCE_NAME)["kind"] == "before_environment_override"
 
 
+def test_environment_transport_reconciles_live_airframe_override(tmp_path: Path) -> None:
+    client = FakeParameterClient({"MPC_THR_HOVER": 0.6})
+    result = asyncio.run(
+        verify_environment_parameters(
+            {"MPC_THR_HOVER": 0.5},
+            client,
+            tmp_path,
+            previous_environment={"PX4_PARAM_MPC_THR_HOVER": "0.5"},
+            reconcile_live_mismatches=True,
+        )
+    )
+
+    assert result.verified is True
+    assert result.applied == {"MPC_THR_HOVER": pytest.approx(0.5)}
+    assert client.set_calls == [("MPC_THR_HOVER", 0.5, "float")]
+    verification = _read(tmp_path / APPLIED_EVIDENCE_NAME)["verification"]
+    assert verification["initial_readback"] == {"MPC_THR_HOVER": 0.6}
+    mismatch = verification["initial_mismatches"]["MPC_THR_HOVER"]
+    assert mismatch["requested"] == 0.5
+    assert mismatch["applied"] == 0.6
+    assert mismatch["absolute_tolerance"] == pytest.approx(0.001)
+    assert verification["reconciliation_transport"] == "mavsdk"
+    assert verification["reconciled_parameters"] == ["MPC_THR_HOVER"]
+
+
+def test_environment_transport_never_reconciles_reboot_parameter_live(tmp_path: Path) -> None:
+    client = FakeParameterClient({"IMU_GYRO_CUTOFF": 40.0})
+
+    with pytest.raises(ParameterReadbackError, match="IMU_GYRO_CUTOFF"):
+        asyncio.run(
+            verify_environment_parameters(
+                {"IMU_GYRO_CUTOFF": 45.0},
+                client,
+                tmp_path,
+                reconcile_live_mismatches=True,
+            )
+        )
+
+    assert client.set_calls == []
+    applied = _read(tmp_path / APPLIED_EVIDENCE_NAME)
+    assert applied["status"] == "mismatch"
+    assert applied["verification"]["reconciled_parameters"] == []
+
+
 @pytest.mark.parametrize(
     ("name", "requested", "unsafe_readback"),
     (

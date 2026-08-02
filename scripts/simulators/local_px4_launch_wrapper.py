@@ -388,11 +388,11 @@ def _load_runtime_effect_records(
         raise RuntimeError("flight-timed scenario-effect evidence request hash mismatch")
     if payload.get("compiled_runtime_profile") != profile:
         raise RuntimeError("flight-timed scenario-effect profile does not match the request")
-    if payload.get("status") != "complete":
-        raise RuntimeError(
-            "flight-timed scenario effects failed: "
-            + str(payload.get("error") or "unknown runtime effect failure")
-        )
+    status = payload.get("status")
+    if status not in {"complete", "failed"}:
+        raise RuntimeError("flight-timed scenario-effect evidence status is invalid")
+    if status == "failed" and not str(payload.get("error") or "").strip():
+        raise RuntimeError("failed flight-timed scenario-effect evidence requires an error")
     records = payload.get("records")
     if not isinstance(records, list):
         raise RuntimeError("flight-timed scenario-effect records must be an array")
@@ -407,6 +407,11 @@ def _load_runtime_effect_records(
     expected = set(profile["requested_effect_ids"])
     if set(by_id) != expected:
         raise RuntimeError("flight-timed scenario-effect records do not cover the compiled profile")
+    expected_record_status = "applied" if status == "complete" else "failed"
+    if any(record.get("status") != expected_record_status for record in by_id.values()):
+        raise RuntimeError(
+            "flight-timed scenario-effect record statuses do not match the evidence status"
+        )
     return by_id
 
 
@@ -2137,6 +2142,7 @@ def _apply_or_verify_px4_parameters(
                 px4_version=px4_version,
                 context=context,
                 enforce_safe_bounds=enforce_safe,
+                reconcile_live_mismatches=True,
             )
         )
         return
@@ -3551,6 +3557,7 @@ def main() -> int:
     actuator_failure_observer: dict[str, Any] | None = None
     scenario_applied_by_id: dict[str, dict[str, Any]] = {}
     actuator_failure_ids: set[str] = set()
+    runtime_effect_ids: set[str] = set()
     previous_signal_handlers: dict[int, Any] = {}
 
     def _raise_shutdown(signum: int, _frame: Any) -> None:
@@ -3983,43 +3990,62 @@ def main() -> int:
                             for effect in scenario_effect_request["effects"]
                         ],
                     )
-            _append_log(
-                args.stdout_log,
-                f"[local_px4_launch_wrapper] Offboard executor exit code: {executor_exit}",
-            )
-            if executor_exit != 0:
-                raise RuntimeError(f"offboard executor failed with code {executor_exit}")
-            if scenario_effect_request is not None:
+            if scenario_effect_request is not None and runtime_effect_ids:
                 runtime_records = _load_runtime_effect_records(
                     scenario_engine,
                     scenario_effect_request,
                     run_dir=args.run_dir,
                 )
                 scenario_applied_by_id.update(runtime_records)
-                if scenario_effect_request["effects"]:
-                    expected_effect_ids = {
-                        effect["effect_id"] for effect in scenario_effect_request["effects"]
-                    }
-                    if set(scenario_applied_by_id) != expected_effect_ids:
-                        missing = sorted(expected_effect_ids - set(scenario_applied_by_id))
-                        raise RuntimeError(
-                            "scenario-effect dispatcher omitted effects after flight: "
-                            + ", ".join(missing)
-                        )
-                    _write_scenario_effect_evidence(
-                        scenario_engine,
-                        scenario_effect_request,
-                        scenario_effect_evidence_path,
-                        world=args.world,
-                        effects=[
-                            scenario_applied_by_id[effect["effect_id"]]
-                            for effect in scenario_effect_request["effects"]
-                        ],
+                expected_effect_ids = {
+                    effect["effect_id"] for effect in scenario_effect_request["effects"]
+                }
+                if set(scenario_applied_by_id) != expected_effect_ids:
+                    missing = sorted(expected_effect_ids - set(scenario_applied_by_id))
+                    raise RuntimeError(
+                        "scenario-effect dispatcher omitted effects after flight: "
+                        + ", ".join(missing)
                     )
-                    _append_log(
-                        args.stdout_log,
-                        "[local_px4_launch_wrapper] All scenario effects verified after flight",
+                _write_scenario_effect_evidence(
+                    scenario_engine,
+                    scenario_effect_request,
+                    scenario_effect_evidence_path,
+                    world=args.world,
+                    effects=[
+                        scenario_applied_by_id[effect["effect_id"]]
+                        for effect in scenario_effect_request["effects"]
+                    ],
+                )
+            _append_log(
+                args.stdout_log,
+                f"[local_px4_launch_wrapper] Offboard executor exit code: {executor_exit}",
+            )
+            if executor_exit != 0:
+                raise RuntimeError(f"offboard executor failed with code {executor_exit}")
+            if scenario_effect_request is not None and scenario_effect_request["effects"]:
+                expected_effect_ids = {
+                    effect["effect_id"] for effect in scenario_effect_request["effects"]
+                }
+                if set(scenario_applied_by_id) != expected_effect_ids:
+                    missing = sorted(expected_effect_ids - set(scenario_applied_by_id))
+                    raise RuntimeError(
+                        "scenario-effect dispatcher omitted effects after flight: "
+                        + ", ".join(missing)
                     )
+                _write_scenario_effect_evidence(
+                    scenario_engine,
+                    scenario_effect_request,
+                    scenario_effect_evidence_path,
+                    world=args.world,
+                    effects=[
+                        scenario_applied_by_id[effect["effect_id"]]
+                        for effect in scenario_effect_request["effects"]
+                    ],
+                )
+                _append_log(
+                    args.stdout_log,
+                    "[local_px4_launch_wrapper] All scenario effects verified after flight",
+                )
         else:
             _append_log(
                 args.stdout_log,
