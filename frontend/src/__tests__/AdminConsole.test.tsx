@@ -106,13 +106,21 @@ describe("administration console", () => {
 
     expect(await screen.findByText("Total users")).toBeVisible();
     expect(screen.getByText("Activation funnel")).toBeVisible();
+    expect(screen.getByRole("img", { name: "Daily successful jobs and managed model requests" })).toBeVisible();
     expect(screen.getByText("Weekly retention cohorts")).toBeVisible();
+    expect(document.querySelectorAll(".admin-retention-cell")).toHaveLength(12);
+    expect(screen.getByRole("img", { name: "Feature adoption by usage frequency" })).toBeVisible();
+    expect(document.querySelectorAll(".admin-engagement-point")).toHaveLength(4);
     expect(screen.getByText("Acquisition quality")).toBeVisible();
+    expect(document.querySelectorAll(".admin-acquisition-track")).toHaveLength(5);
     expect(screen.getByText("Time to first value · Median")).toBeVisible();
+    expect(screen.getByText("Subscription mix")).toBeVisible();
     expect(screen.getByText("Metric definitions")).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Model availability" }));
     expect(await screen.findByText("GPT")).toBeVisible();
+    expect(screen.getByText("Managed providers")).toBeVisible();
+    expect(screen.getByText("Conversation available")).toBeVisible();
     expect(screen.getByText("DeepSeek")).toBeVisible();
     expect(screen.getByText("Qwen")).toBeVisible();
     expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
@@ -127,6 +135,7 @@ describe("administration console", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Users & usage" }));
     expect(await screen.findByText("pilot.one@example.test")).toBeVisible();
+    expect(screen.getByLabelText("Account portfolio")).toBeVisible();
     expect(screen.getByText(/Passwords and password hashes are never returned/))
       .toBeVisible();
     expect(document.querySelector('input[type="password"]')).toBeNull();
@@ -142,6 +151,8 @@ describe("administration console", () => {
     fireEvent.click(screen.getByRole("button", { name: "Community & audit" }));
     expect(await screen.findByText("Stable hover before entering a circle track"))
       .toBeVisible();
+    expect(screen.getByText("Total topics")).toBeVisible();
+    expect(screen.getByText("Reported on this page")).toBeVisible();
     const removeButtons = screen.getAllByRole("button", { name: "Remove" });
     fireEvent.click(removeButtons[0]);
     const reason = screen.getByLabelText("Moderation reason");

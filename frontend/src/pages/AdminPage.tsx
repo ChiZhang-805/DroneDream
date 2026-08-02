@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
 } from "react";
 
@@ -58,6 +59,10 @@ const COPY = {
     retention: "D1 / D7 / D30 retention",
     paidConversion: "Paid conversion",
     dailyTrend: "Daily product value",
+    throughput: "Value delivery throughput",
+    throughputAria: "Daily successful jobs and managed model requests",
+    successfulJobs: "Successful jobs",
+    modelRequests: "Model requests",
     new: "New",
     active: "Active",
     activated: "Activated",
@@ -66,6 +71,9 @@ const COPY = {
     cohort: "Cohort",
     size: "Size",
     featureAdoption: "Feature adoption",
+    engagementAria: "Feature adoption by usage frequency",
+    adoptionAxis: "Adoption",
+    frequencyAxis: "Frequency",
     acquisition: "Acquisition quality",
     signupSource: "Verified signup source",
     timeToValue: "Time to first value",
@@ -80,6 +88,8 @@ const COPY = {
     p95Latency: "P95 model latency",
     quotaExhausted: "Quota exhausted",
     monetization: "Plans & managed usage",
+    planMix: "Subscription mix",
+    tokenMix: "Input / output token mix",
     credits: "AI credits consumed",
     tokens: "model tokens",
     estimated: "usage rows estimated",
@@ -93,6 +103,9 @@ const COPY = {
     lastChange: "Last change",
     saving: "Saving…",
     modelSaveFailed: "The model policy could not be saved.",
+    managedProviders: "Managed providers",
+    conversationProviders: "Conversation available",
+    jobProviders: "Job available",
     userPrivacy: "Passwords and password hashes are never returned by this interface.",
     exportUsers: "Export user data",
     exportingUsers: "Preparing export…",
@@ -108,6 +121,7 @@ const COPY = {
     requests: "requests",
     remaining: "remaining",
     noUsers: "No users match this search.",
+    userPortfolio: "Account portfolio",
     previous: "Previous",
     next: "Next",
     page: "Page",
@@ -133,6 +147,10 @@ const COPY = {
     actor: "Actor",
     time: "Time",
     noAudit: "No administrative changes in this range.",
+    totalTopics: "Total topics",
+    reportedOnPage: "Reported on this page",
+    removedOnPage: "Removed on this page",
+    auditOnPage: "Audit events shown",
     funnelSteps: {
       registered: "Registered",
       runtime_ready: "Runtime ready",
@@ -163,7 +181,7 @@ const COPY = {
   "zh-CN": {
     eyebrow: "所有者控制中心",
     title: "管理端",
-    subtitle: "统一查看产品增长、托管模型、账户用量与社区安全；权限由服务端强制验证，所有管理操作均保留审计记录。",
+    subtitle: "查看产品增长、托管模型、账户用量与社区安全；权限由服务端强制验证，管理操作均保留审计记录。",
     overview: "增长总览",
     models: "模型开放状态",
     users: "用户与用量",
@@ -188,6 +206,10 @@ const COPY = {
     retention: "次日 / 7 日 / 30 日留存",
     paidConversion: "付费转化率",
     dailyTrend: "每日产品价值行为",
+    throughput: "每日价值交付量",
+    throughputAria: "每日成功任务与托管模型请求量",
+    successfulJobs: "成功任务",
+    modelRequests: "模型请求",
     new: "新增",
     active: "活跃",
     activated: "完成激活",
@@ -196,6 +218,9 @@ const COPY = {
     cohort: "注册周",
     size: "人数",
     featureAdoption: "功能采用情况",
+    engagementAria: "功能采用率与人均使用频率",
+    adoptionAxis: "采用率",
+    frequencyAxis: "频率",
     acquisition: "获客质量",
     signupSource: "可信注册来源",
     timeToValue: "首次价值用时",
@@ -210,6 +235,8 @@ const COPY = {
     p95Latency: "模型 P95 延迟",
     quotaExhausted: "额度耗尽用户",
     monetization: "订阅与托管模型用量",
+    planMix: "订阅结构",
+    tokenMix: "输入 / 输出 Token 构成",
     credits: "已消耗 AI 额度",
     tokens: "模型 Token",
     estimated: "条用量为估算值",
@@ -223,6 +250,9 @@ const COPY = {
     lastChange: "最后修改",
     saving: "正在保存…",
     modelSaveFailed: "无法保存模型开放策略。",
+    managedProviders: "托管服务商",
+    conversationProviders: "对话已开放",
+    jobProviders: "任务已开放",
     userPrivacy: "此管理端永远不会返回用户密码或密码哈希。",
     exportUsers: "导出用户数据",
     exportingUsers: "正在准备导出…",
@@ -238,6 +268,7 @@ const COPY = {
     requests: "次请求",
     remaining: "剩余额度",
     noUsers: "没有符合条件的用户。",
+    userPortfolio: "账户结构",
     previous: "上一页",
     next: "下一页",
     page: "第",
@@ -263,6 +294,10 @@ const COPY = {
     actor: "管理员",
     time: "时间",
     noAudit: "当前范围内没有管理操作。",
+    totalTopics: "帖子总数",
+    reportedOnPage: "本页被举报",
+    removedOnPage: "本页已移除",
+    auditOnPage: "已显示审计事件",
     funnelSteps: {
       registered: "完成注册",
       runtime_ready: "运行环境就绪",
@@ -342,6 +377,94 @@ function TrendChart({
       </div>
     </div>
   );
+}
+
+function ThroughputChart({
+  snapshot,
+  label,
+  jobsLabel,
+  requestsLabel,
+}: {
+  snapshot: AdminDashboardSnapshot;
+  label: string;
+  jobsLabel: string;
+  requestsLabel: string;
+}) {
+  const maximum = Math.max(1, ...snapshot.daily.flatMap((day) => [
+    day.successful_jobs,
+    day.model_requests,
+  ]));
+  return (
+    <div className="admin-throughput" role="img" aria-label={label}>
+      <div className="admin-throughput-bars" aria-hidden="true">
+        {snapshot.daily.map((day) => (
+          <div key={day.date} className="admin-throughput-day" title={`${day.date}: ${jobsLabel} ${day.successful_jobs}; ${requestsLabel} ${day.model_requests}`}>
+            <span className="is-jobs" style={{ height: `${Math.max(3, (day.successful_jobs / maximum) * 100)}%` }} />
+            <span className="is-requests" style={{ height: `${Math.max(3, (day.model_requests / maximum) * 100)}%` }} />
+          </div>
+        ))}
+      </div>
+      <div className="admin-trend-dates">
+        <span>{snapshot.daily.at(0)?.date}</span>
+        <span>{snapshot.daily.at(-1)?.date}</span>
+      </div>
+    </div>
+  );
+}
+
+function FeatureEngagementMatrix({
+  snapshot,
+  names,
+  label,
+  adoptionAxis,
+  frequencyAxis,
+  usersLabel,
+  frequencyLabel,
+}: {
+  snapshot: AdminDashboardSnapshot;
+  names: Readonly<Record<string, string>>;
+  label: string;
+  adoptionAxis: string;
+  frequencyAxis: string;
+  usersLabel: string;
+  frequencyLabel: string;
+}) {
+  const maximumFrequency = Math.max(1, ...snapshot.features.map((feature) => feature.frequency_per_user));
+  return (
+    <div className="admin-engagement" aria-label={label}>
+      <div className="admin-engagement-plot" role="img" aria-label={label}>
+        <span className="admin-engagement-y">{frequencyAxis}</span>
+        <span className="admin-engagement-x">{adoptionAxis}</span>
+        {snapshot.features.map((feature, index) => (
+          <span
+            key={feature.key}
+            className="admin-engagement-point"
+            style={{
+              left: `${Math.min(94, Math.max(6, feature.adoption_pct))}%`,
+              bottom: `${Math.min(88, Math.max(10, (feature.frequency_per_user / maximumFrequency) * 88))}%`,
+            }}
+            title={`${translatedLabel(names, feature.key, feature.label)}: ${formatPercent(feature.adoption_pct)}, ${feature.frequency_per_user.toFixed(1)} ${frequencyLabel}`}
+          >
+            {index + 1}
+          </span>
+        ))}
+      </div>
+      <ol className="admin-engagement-key">
+        {snapshot.features.map((feature) => (
+          <li key={feature.key}>
+            <strong>{translatedLabel(names, feature.key, feature.label)}</strong>
+            <span>{formatPercent(feature.adoption_pct)} · {feature.users} {usersLabel} · {feature.frequency_per_user.toFixed(1)} {frequencyLabel}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function retentionHeat(value: number | null): CSSProperties {
+  return value === null
+    ? {}
+    : { "--admin-retention-strength": `${Math.max(8, Math.min(100, value * 1.8))}%` } as CSSProperties;
 }
 
 export function AdminPage() {
@@ -632,36 +755,42 @@ export function AdminPage() {
                 ))}
               </div>
             </section>
-            <section className="admin-panel">
+            <section className="admin-panel admin-throughput-panel">
+              <header><h2>{copy.throughput}</h2><div className="admin-legend"><span className="is-jobs">{copy.successfulJobs}</span><span className="is-requests">{copy.modelRequests}</span></div></header>
+              <ThroughputChart snapshot={dashboard} label={copy.throughputAria} jobsLabel={copy.successfulJobs} requestsLabel={copy.modelRequests} />
+            </section>
+            <section className="admin-panel admin-retention-panel">
               <h2>{copy.cohortRetention}</h2>
               <div className="admin-table-scroll">
                 <table><thead><tr><th>{copy.cohort}</th><th>{copy.size}</th><th>D1</th><th>D7</th><th>D30</th></tr></thead><tbody>
-                  {dashboard.retention.map((cohort) => <tr key={cohort.cohort_start}><td>{cohort.cohort_start}</td><td>{cohort.cohort_size}</td><td>{formatPercent(cohort.d1_pct)}</td><td>{formatPercent(cohort.d7_pct)}</td><td>{formatPercent(cohort.d30_pct)}</td></tr>)}
+                  {dashboard.retention.map((cohort) => <tr key={cohort.cohort_start}><td>{cohort.cohort_start}</td><td>{cohort.cohort_size}</td><td className="admin-retention-cell" style={retentionHeat(cohort.d1_pct)}>{formatPercent(cohort.d1_pct)}</td><td className="admin-retention-cell" style={retentionHeat(cohort.d7_pct)}>{formatPercent(cohort.d7_pct)}</td><td className="admin-retention-cell" style={retentionHeat(cohort.d30_pct)}>{formatPercent(cohort.d30_pct)}</td></tr>)}
                 </tbody></table>
               </div>
             </section>
-            <section className="admin-panel">
+            <section className="admin-panel admin-engagement-panel">
               <h2>{copy.featureAdoption}</h2>
-              <div className="admin-feature-list">
-                {dashboard.features.map((feature) => <div key={feature.key}><div><strong>{translatedLabel(copy.featureNames, feature.key, feature.label)}</strong><span>{feature.users} {copy.usersLabel} · {feature.frequency_per_user.toFixed(1)} {copy.frequency}</span></div><b>{formatPercent(feature.adoption_pct)}</b></div>)}
-              </div>
+              <FeatureEngagementMatrix snapshot={dashboard} names={copy.featureNames} label={copy.engagementAria} adoptionAxis={copy.adoptionAxis} frequencyAxis={copy.frequencyAxis} usersLabel={copy.usersLabel} frequencyLabel={copy.frequency} />
             </section>
-            <section className="admin-panel">
+            <section className="admin-panel admin-acquisition-panel">
               <h2>{copy.acquisition}</h2>
-              <div className="admin-table-scroll">
-                <table><thead><tr><th>{copy.signupSource}</th><th>{copy.newUsers}</th><th>{copy.activated}</th><th>{copy.activation}</th></tr></thead><tbody>
-                  {dashboard.acquisition.map((source) => <tr key={source.key}><td>{translatedLabel(copy.acquisitionSources, source.key, source.label)}</td><td>{number.format(source.new_users)}</td><td>{number.format(source.activated_users)}</td><td>{formatPercent(source.activation_rate_pct)}</td></tr>)}
-                </tbody></table>
+              <div className="admin-acquisition-list" aria-label={copy.signupSource}>
+                {dashboard.acquisition.map((source) => {
+                  const maximum = Math.max(1, ...dashboard.acquisition.map((item) => item.new_users));
+                  return <div key={source.key}><div><strong>{translatedLabel(copy.acquisitionSources, source.key, source.label)}</strong><span>{number.format(source.new_users)} {copy.new} · {number.format(source.activated_users)} {copy.activated} · {formatPercent(source.activation_rate_pct)}</span></div><span className="admin-acquisition-track"><i className="is-new" style={{ width: `${(source.new_users / maximum) * 100}%` }} /><i className="is-activated" style={{ width: `${(source.activated_users / maximum) * 100}%` }} /></span></div>;
+                })}
               </div>
-              <dl className="admin-time-to-value"><div><dt>{copy.timeToValue} · {copy.median}</dt><dd>{dashboard.time_to_value.median_minutes === null ? "—" : `${number.format(dashboard.time_to_value.median_minutes)} min`}</dd></div><div><dt>{copy.timeToValue} · {copy.p90}</dt><dd>{dashboard.time_to_value.p90_minutes === null ? "—" : `${number.format(dashboard.time_to_value.p90_minutes)} min`}</dd></div></dl>
+              <dl className="admin-time-to-value"><div><dt>{copy.timeToValue} · {copy.median}</dt><dd>{dashboard.time_to_value.median_minutes === null ? "—" : `${number.format(dashboard.time_to_value.median_minutes)} ${locale === "zh-CN" ? "分钟" : "min"}`}</dd></div><div><dt>{copy.timeToValue} · {copy.p90}</dt><dd>{dashboard.time_to_value.p90_minutes === null ? "—" : `${number.format(dashboard.time_to_value.p90_minutes)} ${locale === "zh-CN" ? "分钟" : "min"}`}</dd></div></dl>
             </section>
-            <section className="admin-panel">
+            <section className="admin-panel admin-health-panel">
               <h2>{copy.reliability}</h2>
-              <dl className="admin-definition-grid"><div><dt>{copy.jobSuccess}</dt><dd>{formatPercent(dashboard.reliability.job_success_pct)}</dd></div><div><dt>{copy.modelSuccess}</dt><dd>{formatPercent(dashboard.reliability.model_success_pct)}</dd></div><div><dt>{copy.rateLimited}</dt><dd>{formatPercent(dashboard.reliability.model_rate_limited_pct)}</dd></div><div><dt>{copy.p95Latency}</dt><dd>{dashboard.reliability.p95_model_latency_ms ? `${number.format(dashboard.reliability.p95_model_latency_ms)} ms` : "—"}</dd></div><div><dt>{copy.quotaExhausted}</dt><dd>{number.format(dashboard.reliability.quota_exhausted_users)}</dd></div></dl>
+              <div className="admin-health-bars"><div><div><span>{copy.jobSuccess}</span><strong>{formatPercent(dashboard.reliability.job_success_pct)}</strong></div><i><b style={{ width: `${dashboard.reliability.job_success_pct}%` }} /></i></div><div><div><span>{copy.modelSuccess}</span><strong>{formatPercent(dashboard.reliability.model_success_pct)}</strong></div><i><b style={{ width: `${dashboard.reliability.model_success_pct}%` }} /></i></div><div><div><span>{copy.rateLimited}</span><strong>{formatPercent(dashboard.reliability.model_rate_limited_pct)}</strong></div><i className="is-risk"><b style={{ width: `${Math.max(2, dashboard.reliability.model_rate_limited_pct)}%` }} /></i></div></div>
+              <dl className="admin-definition-grid admin-health-details"><div><dt>{copy.p95Latency}</dt><dd>{dashboard.reliability.p95_model_latency_ms ? `${number.format(dashboard.reliability.p95_model_latency_ms)} ms` : "—"}</dd></div><div><dt>{copy.quotaExhausted}</dt><dd>{number.format(dashboard.reliability.quota_exhausted_users)}</dd></div></dl>
             </section>
-            <section className="admin-panel">
+            <section className="admin-panel admin-monetization-panel">
               <h2>{copy.monetization}</h2>
-              <dl className="admin-definition-grid"><div><dt>Free / Plus / Pro</dt><dd>{dashboard.monetization.free_users} / {dashboard.monetization.plus_users} / {dashboard.monetization.pro_users}</dd></div><div><dt>{copy.credits}</dt><dd>{number.format(dashboard.monetization.consumed_ai_credits)}</dd></div><div><dt>{copy.tokens}</dt><dd>{number.format(dashboard.monetization.model_input_tokens + dashboard.monetization.model_output_tokens)}</dd></div><div><dt>{copy.estimated}</dt><dd>{number.format(dashboard.monetization.estimated_usage_requests)}</dd></div></dl>
+              <div className="admin-plan-mix"><div><span>{copy.planMix}</span><strong>{number.format(dashboard.summary.paying_users)} / {number.format(dashboard.summary.total_users)} {copy.usersLabel}</strong></div><span className="admin-plan-stack" aria-label={`${copy.planMix}: Free ${dashboard.monetization.free_users}, Plus ${dashboard.monetization.plus_users}, Pro ${dashboard.monetization.pro_users}`}><i className="is-free" style={{ flexGrow: dashboard.monetization.free_users }} /><i className="is-plus" style={{ flexGrow: dashboard.monetization.plus_users }} /><i className="is-pro" style={{ flexGrow: dashboard.monetization.pro_users }} /></span><div className="admin-plan-legend"><span className="is-free">Free {dashboard.monetization.free_users}</span><span className="is-plus">Plus {dashboard.monetization.plus_users}</span><span className="is-pro">Pro {dashboard.monetization.pro_users}</span></div></div>
+              <div className="admin-token-mix"><div><span>{copy.tokenMix}</span><strong>{number.format(dashboard.monetization.model_input_tokens + dashboard.monetization.model_output_tokens)}</strong></div><span><i style={{ flexGrow: dashboard.monetization.model_input_tokens }} /><i style={{ flexGrow: dashboard.monetization.model_output_tokens }} /></span></div>
+              <dl className="admin-definition-grid"><div><dt>{copy.credits}</dt><dd>{number.format(dashboard.monetization.consumed_ai_credits)}</dd></div><div><dt>{copy.estimated}</dt><dd>{number.format(dashboard.monetization.estimated_usage_requests)}</dd></div></dl>
             </section>
           </div>
           <section className="admin-panel admin-metric-definitions">
@@ -679,6 +808,7 @@ export function AdminPage() {
       {tab === "models" ? (
         <section className="admin-panel admin-model-panel">
           <header><div><h2>{copy.models}</h2><p>{copy.modelPolicyBody}</p></div></header>
+          <div className="admin-section-summary" aria-label={copy.models}><article><span>{copy.managedProviders}</span><strong>{number.format(models.length)}</strong></article><article><span>{copy.conversationProviders}</span><strong>{number.format(models.filter((item) => item.enabled && item.assistant_enabled).length)}</strong></article><article><span>{copy.jobProviders}</span><strong>{number.format(models.filter((item) => item.enabled && item.job_enabled).length)}</strong></article></div>
           <div className="admin-model-list">
             {models.map((item) => (
               <article key={item.provider}>
@@ -698,6 +828,7 @@ export function AdminPage() {
           <header><div><h2>{copy.users}</h2><p>{copy.userPrivacy}</p></div><div className="admin-users-toolbar"><form onSubmit={submitSearch}><label><span className="sr-only">{copy.searchEmail}</span><input type="search" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={copy.searchEmail} /></label><button type="submit" className="btn">{copy.search}</button></form><button type="button" className="btn admin-user-export" disabled={exportingUsers} onClick={() => void startUserExport()}>{exportingUsers ? copy.exportingUsers : copy.exportUsers}</button></div></header>
           <p className="admin-user-export-scope">{copy.exportScope}</p>
           {userExportMessage ? <p className="admin-user-export-status" role="status">{userExportMessage}</p> : null}
+          {dashboard ? <div className="admin-section-summary admin-user-summary" aria-label={copy.userPortfolio}><article><span>Free</span><strong>{number.format(dashboard.monetization.free_users)}</strong></article><article><span>Plus</span><strong>{number.format(dashboard.monetization.plus_users)}</strong></article><article><span>Pro</span><strong>{number.format(dashboard.monetization.pro_users)}</strong></article><article><span>{copy.credits}</span><strong>{number.format(dashboard.monetization.consumed_ai_credits)}</strong></article></div> : null}
           <div className="admin-table-scroll"><table><thead><tr><th>{copy.email}</th><th>{copy.plan}</th><th>{copy.lastSignIn}</th><th>{copy.usage}</th></tr></thead><tbody>
             {users.map((user) => <tr key={user.id}><td><strong>{user.email}</strong><small>{date.format(new Date(user.created_at))}</small></td><td><strong>{user.plan.toUpperCase()}</strong><small>{user.subscription_status}</small></td><td>{user.last_sign_in_at ? date.format(new Date(user.last_sign_in_at)) : "—"}</td><td><strong>{number.format(user.period_consumed_ai_credits)}</strong><small>{number.format(user.period_request_count)} {copy.requests} · {number.format(user.period_total_tokens)} {copy.tokens} · {number.format(user.period_remaining_ai_credits)} {copy.remaining}</small></td></tr>)}
             {users.length === 0 ? <tr><td colSpan={4}>{copy.noUsers}</td></tr> : null}
@@ -707,7 +838,9 @@ export function AdminPage() {
       ) : null}
 
       {tab === "community" ? (
-        <div className="admin-community-grid">
+        <div>
+          <section className="admin-section-summary admin-community-summary" aria-label={copy.community}><article><span>{copy.totalTopics}</span><strong>{number.format(topicsTotal)}</strong></article><article><span>{copy.reportedOnPage}</span><strong>{number.format(topics.filter((topic) => topic.report_count > 0).length)}</strong></article><article><span>{copy.removedOnPage}</span><strong>{number.format(topics.filter((topic) => topic.status === "removed").length)}</strong></article><article><span>{copy.auditOnPage}</span><strong>{number.format(audit.length)}</strong></article></section>
+          <div className="admin-community-grid">
           <section className="admin-panel">
             <h2>{copy.topics}</h2>
             <div className="admin-table-scroll"><table><thead><tr><th>{copy.topic}</th><th>{copy.author}</th><th>{copy.comments}</th><th>{copy.reports}</th><th>{copy.status}</th><th /></tr></thead><tbody>
@@ -722,6 +855,7 @@ export function AdminPage() {
               {audit.length === 0 ? <tr><td colSpan={4}>{copy.noAudit}</td></tr> : null}
             </tbody></table></div>
           </section>
+          </div>
         </div>
       ) : null}
 

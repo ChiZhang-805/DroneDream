@@ -62,6 +62,7 @@ async function screenshot(page, testCase, tab) {
 async function geometry(page) {
   return page.evaluate(() => {
     const root = document.querySelector(".admin-page");
+    const subtitle = document.querySelector(".admin-hero p");
     const tabs = Array.from(document.querySelectorAll(".admin-tabs button"));
     const panels = Array.from(document.querySelectorAll(".admin-panel"));
     const bounds = (element) => {
@@ -91,6 +92,15 @@ async function geometry(page) {
       documentWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
       passwordInputs: document.querySelectorAll('input[type="password"]').length,
+      subtitle: subtitle instanceof HTMLElement ? (() => {
+        const computed = window.getComputedStyle(subtitle);
+        const lineHeight = Number.parseFloat(computed.lineHeight);
+        return {
+          ...bounds(subtitle),
+          lineHeight,
+          lineCount: lineHeight > 0 ? subtitle.getBoundingClientRect().height / lineHeight : null,
+        };
+      })() : null,
     };
   });
 }
@@ -132,18 +142,30 @@ try {
         (element) => element.classList.contains("active"),
       ));
       assert.equal(await page.locator(".admin-kpi-grid > article").count(), 8);
+      assert.equal(await page.locator(".admin-throughput-day").count(), 14);
+      assert.equal(await page.locator(".admin-retention-cell").count(), 12);
+      assert.equal(await page.locator(".admin-engagement-point").count(), 4);
+      assert.equal(await page.locator(".admin-acquisition-track").count(), 5);
       const overviewGeometry = await geometry(page);
       assert.equal(overviewGeometry.documentScrollWidth, overviewGeometry.documentWidth);
       assert.equal(overviewGeometry.tabs.length, 4);
       assert(overviewGeometry.tabs.every((tab) => tab.labelFits));
       assert(overviewGeometry.root.left >= 0);
       assert(overviewGeometry.root.right <= overviewGeometry.documentWidth + 1);
+      if (testCase.id === "desktop-zh") {
+        assert(overviewGeometry.subtitle);
+        assert(overviewGeometry.subtitle.lineCount <= 1.15);
+      }
       entry.overview = {
         ...overviewGeometry,
         image: await screenshot(page, testCase, "overview"),
       };
       await page.locator(".admin-overview-grid").scrollIntoViewIfNeeded();
       entry.overview.detailImage = await screenshot(page, testCase, "overview-detail");
+      await page.locator(".admin-engagement-panel").scrollIntoViewIfNeeded();
+      entry.overview.engagementImage = await screenshot(page, testCase, "overview-engagement");
+      await page.locator(".admin-monetization-panel").scrollIntoViewIfNeeded();
+      entry.overview.healthImage = await screenshot(page, testCase, "overview-health");
 
       await page.getByRole("button", { name: testCase.locale === "en"
         ? "Model availability"
