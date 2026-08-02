@@ -170,29 +170,45 @@ code {
 }
 
 .app-sidebar-footer {
-  position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem;
   border-top: 1px solid var(--border);
   padding-top: 0.75rem;
   margin-top: 0.75rem;
 }
 
-.app-sidebar-footer:has(.app-update-button) .app-account-copy {
-  padding-right: 1.9rem;
+.app-account-trailing-button {
+  display: inline-grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.app-account-trailing-button:hover:not(:disabled) {
+  background: var(--bg-elev-2);
+  color: var(--text);
+}
+
+.app-account-trailing-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.app-account-trailing-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 .app-update-button {
-  position: absolute;
-  z-index: 1;
-  top: 0.82rem;
-  right: 2.35rem;
-  display: inline-grid;
-  width: 1.55rem;
-  height: 1.55rem;
-  place-items: center;
-  padding: 0;
   border: 1px solid rgba(63, 147, 231, 0.24);
-  border-radius: 50%;
   background: linear-gradient(145deg, #2d8cea, #4b6ff1);
   box-shadow: 0 0.3rem 0.8rem rgba(53, 116, 222, 0.24);
   color: #fff;
@@ -202,11 +218,6 @@ code {
 .app-update-button:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 0.42rem 0.95rem rgba(53, 116, 222, 0.32);
-}
-
-.app-update-button:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }
 
 .app-update-button:disabled {
@@ -230,7 +241,7 @@ code {
 
 .app-account-button {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   width: 100%;
   min-height: 3.35rem;
   align-items: center;
@@ -298,12 +309,6 @@ code {
 .app-account-copy small {
   color: var(--text-muted);
   font-size: 0.7rem;
-}
-
-.app-account-button > svg {
-  width: 1.1rem;
-  height: 1.1rem;
-  color: var(--text-muted);
 }
 
 .account-dialog-backdrop {
@@ -1049,6 +1054,7 @@ code {
   .app-sidebar-footer {
     grid-column: 2;
     grid-row: 1;
+    grid-template-columns: auto auto;
     border-top: none;
     padding-top: 0;
     margin-top: 0;
@@ -1061,16 +1067,13 @@ code {
     padding: 0.3rem;
   }
 
-  .app-account-copy,
-  .app-account-button > svg {
+  .app-account-copy {
     display: none;
   }
 
-  .app-update-button {
-    top: -0.1rem;
-    right: -0.15rem;
-    width: 1.25rem;
-    height: 1.25rem;
+  .app-account-trailing-button {
+    width: 1.65rem;
+    height: 1.65rem;
   }
 }
 

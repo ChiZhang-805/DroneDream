@@ -2056,9 +2056,14 @@ function AppShellContent() {
   const accountDialogRequired = accountRequired && !launcherMode;
   const accountDialogOpen = accountOpen || accountDialogRequired;
   const mobileMenuExpanded = mobileNavigationEnabled && mobileMenuOpen;
-  const sidebarUpdateVisible = desktopRuntime && ![
-    "checking",
-    "current",
+  const sidebarUpdateVisible = desktopRuntime && [
+    "available",
+    "downloading",
+    "installing",
+    "engineUpdateDeferred",
+    "reconcilingEngine",
+    "engineError",
+    "runtimeBaseRequired",
   ].includes(updater.status);
   const sidebarUpdateBusy = [
     "downloading",
@@ -2680,47 +2685,62 @@ function AppShellContent() {
             locale={locale}
           />
           <div className="app-sidebar-footer">
-          <button
-            ref={accountButtonRef}
-            type="button"
-            className="app-account-button"
-            aria-label={accountCopy.account}
-            aria-haspopup="dialog"
-            aria-expanded={accountDialogOpen}
-            onClick={() => {
-              setMobileMenuOpen(false);
-              setLauncherSettingsOpen(false);
-              setAccountOpen(true);
-            }}
-          >
-            <AccountAvatar
-              account={auth.account}
-              className="app-account-avatar"
-            />
-            <span className="app-account-copy">
-              <strong>
-                {auth.account?.displayName ?? accountCopy.localUser}
-              </strong>
-              <small>
-                {auth.account
-                  ? accountCopy.cloudWorkspace
-                  : accountCopy.localWorkspace}
-              </small>
-            </span>
-            <MoreHorizontal aria-hidden="true" strokeWidth={1.8} />
-          </button>
-          {sidebarUpdateVisible ? (
             <button
+              ref={accountButtonRef}
               type="button"
-              className={`app-update-button${sidebarUpdateBusy ? " is-busy" : ""}`}
-              aria-label={sidebarUpdateLabel}
-              title={sidebarUpdateLabel}
-              disabled={sidebarUpdateBusy}
-              onClick={handleSidebarUpdate}
+              className="app-account-button"
+              aria-label={accountCopy.account}
+              aria-haspopup="dialog"
+              aria-expanded={accountDialogOpen}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setLauncherSettingsOpen(false);
+                setAccountOpen(true);
+              }}
             >
-              <Download aria-hidden="true" strokeWidth={2} />
+              <AccountAvatar
+                account={auth.account}
+                className="app-account-avatar"
+              />
+              <span className="app-account-copy">
+                <strong>
+                  {auth.account?.displayName ?? accountCopy.localUser}
+                </strong>
+                <small>
+                  {auth.account
+                    ? accountCopy.cloudWorkspace
+                    : accountCopy.localWorkspace}
+                </small>
+              </span>
             </button>
-          ) : null}
+            {sidebarUpdateVisible ? (
+              <button
+                type="button"
+                className={`app-account-trailing-button app-update-button${sidebarUpdateBusy ? " is-busy" : ""}`}
+                aria-label={sidebarUpdateLabel}
+                title={sidebarUpdateLabel}
+                disabled={sidebarUpdateBusy}
+                onClick={handleSidebarUpdate}
+              >
+                <Download aria-hidden="true" strokeWidth={2} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="app-account-trailing-button app-account-more-button"
+                aria-label={t("app.accountOptions")}
+                title={t("app.accountOptions")}
+                aria-haspopup="dialog"
+                aria-expanded={accountDialogOpen}
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setLauncherSettingsOpen(false);
+                  setAccountOpen(true);
+                }}
+              >
+                <MoreHorizontal aria-hidden="true" strokeWidth={1.8} />
+              </button>
+            )}
           </div>
           {mobileNavigationEnabled ? (
             <button
