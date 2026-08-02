@@ -695,6 +695,35 @@ def _regular_file_size(
     return file_stat.st_size
 
 
+def _lower_level_failure_reason(run_dir: Path, exit_code: int) -> str:
+    """Prefer the launcher's bounded structured failure over a bare exit code."""
+
+    generic_reason = f"lower-level launcher exited with code {exit_code}"
+    timing_path = run_dir / "offboard_timing.json"
+    try:
+        timing_size = _regular_file_size(
+            timing_path,
+            label="offboard timing failure evidence",
+            required=False,
+        )
+        if timing_size is None:
+            return generic_reason
+        loaded = _load_bounded_json(
+            timing_path,
+            label="offboard timing failure evidence",
+            max_bytes=_MAX_OFFBOARD_TIMING_BYTES,
+        )
+    except RunnerError:
+        return generic_reason
+    if not isinstance(loaded, dict) or loaded.get("status") != "failed":
+        return generic_reason
+    failure = loaded.get("failure")
+    if not isinstance(failure, str) or not failure.strip():
+        return generic_reason
+    normalized_failure = " ".join(failure.split())
+    return f"{generic_reason}: {_safe_excerpt(normalized_failure, limit=1200)}"
+
+
 def _load_trial_payload(path: Path) -> dict[str, Any]:
     size = _regular_file_size(path, label="trial_input", required=True)
     if size is None or size > _MAX_TRIAL_INPUT_BYTES:
@@ -3242,11 +3271,12 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     )
                 _enforce_scenario_effect_contract(scenario_effect_contract)
             if exit_code != 0:
+                failure_reason = _lower_level_failure_reason(run_dir, exit_code)
                 result = _failure_result(
-                    f"lower-level launcher exited with code {exit_code}",
+                    failure_reason,
                     FAILURE_SIMULATION,
                     _collect_artifacts(run_dir),
-                    f"lower-level launcher exited with code {exit_code}",
+                    failure_reason,
                 )
                 write_result(result)
                 return 0

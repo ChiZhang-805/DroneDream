@@ -1450,6 +1450,65 @@ def test_px4_runner_treats_nonzero_launcher_exit_as_failure(tmp_path: Path):
     assert "exited with code 7" in result["failure"]["reason"]
 
 
+def test_px4_runner_surfaces_bounded_structured_launcher_failure(tmp_path: Path):
+    launcher = tmp_path / "nonzero_launcher.py"
+    launcher.write_text(
+        "import json, pathlib, sys\n"
+        "telemetry = pathlib.Path(sys.argv[sys.argv.index('--telemetry') + 1])\n"
+        "run_dir = telemetry.parent\n"
+        "(run_dir / 'offboard_timing.json').write_text(json.dumps({"
+        "'status': 'failed', 'failure': 'TimeoutError: PX4 readiness timeout; "
+        "global_position_ok=false, armable=false'}), encoding='utf-8')\n"
+        "raise SystemExit(7)\n",
+        encoding="utf-8",
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is False
+    assert result["failure"]["code"] == "SIMULATION_FAILED"
+    assert result["failure"]["reason"] == (
+        "lower-level launcher exited with code 7: TimeoutError: PX4 readiness timeout; "
+        "global_position_ok=false, armable=false"
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"status": "completed", "failure": "must not be surfaced"},
+        {"status": "failed", "failure": "   "},
+        ["failed", "must not be surfaced"],
+    ],
+)
+def test_lower_level_failure_reason_rejects_non_failure_payloads(
+    tmp_path: Path,
+    payload: object,
+) -> None:
+    (tmp_path / "offboard_timing.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    assert runner_module._lower_level_failure_reason(tmp_path, 9) == (
+        "lower-level launcher exited with code 9"
+    )
+
+
+def test_lower_level_failure_reason_falls_back_for_oversized_evidence(tmp_path: Path) -> None:
+    timing_path = tmp_path / "offboard_timing.json"
+    with timing_path.open("wb") as stream:
+        stream.truncate(runner_module._MAX_OFFBOARD_TIMING_BYTES + 1)
+
+    assert runner_module._lower_level_failure_reason(tmp_path, 9) == (
+        "lower-level launcher exited with code 9"
+    )
+
+
 def test_px4_runner_trajectory_artifact_type_is_json(tmp_path: Path):
     proc, result = _run_runner(tmp_path, env_overrides={"PX4_GAZEBO_DRY_RUN": "true"})
     assert proc.returncode == 0
