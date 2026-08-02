@@ -88,6 +88,15 @@ _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER = 10.0
 _MAX_EFFECTIVE_TIMEOUT_SECONDS = 86_400.0
 _PROCESS_POLL_SECONDS = 0.2
 _TERMINATE_GRACE_SECONDS = 2.0
+_LEGACY_RUNTIME_SOURCE_ROOT = "/opt/dronedream/source"
+_ACTIVE_ENGINE_PACK_ROOT = "/opt/dronedream/engine/current"
+_ENGINE_PACK_PATH_ENVIRONMENT_NAMES = frozenset(
+    {
+        "PX4_GAZEBO_LAUNCH_COMMAND",
+        "PX4_GAZEBO_WORKDIR",
+        "PX4_OFFBOARD_EXECUTOR_COMMAND",
+    }
+)
 
 _CHILD_ENV_EXACT_ALLOWLIST = frozenset(
     {
@@ -379,7 +388,9 @@ def _build_command(command_template: str, input_path: Path, output_path: Path) -
     has_input = any("{input}" in token for token in tokens)
     has_output = any("{output}" in token for token in tokens)
     rendered = [
-        token.replace("{input}", str(input_path)).replace("{output}", str(output_path))
+        _active_engine_pack_path(
+            token.replace("{input}", str(input_path)).replace("{output}", str(output_path))
+        )
         for token in tokens
     ]
     if not has_input:
@@ -387,6 +398,28 @@ def _build_command(command_template: str, input_path: Path, output_path: Path) -
     if not has_output:
         rendered.extend(["--output", str(output_path)])
     return rendered
+
+
+def _active_engine_pack_path(value: str) -> str:
+    """Retarget legacy mutable-code paths to the activated Engine Pack.
+
+    Runtime Base beta.2 installations created before Engine Pack support keep
+    their original ``runtime.env`` file across upgrades. Those files point the
+    simulator command chain at ``/opt/dronedream/source`` even though the API
+    and worker correctly run from ``/opt/dronedream/engine/current``. Leaving
+    that split in place makes new backend schemas reach an old simulator (for
+    example, ``hover`` is accepted by the API but rejected by the runner).
+
+    Only known pack-owned command/work-directory values use this helper. PX4,
+    Gazebo, user data and the immutable Runtime Base remain untouched.
+    """
+
+    if value == _LEGACY_RUNTIME_SOURCE_ROOT:
+        return _ACTIVE_ENGINE_PACK_ROOT
+    return value.replace(
+        f"{_LEGACY_RUNTIME_SOURCE_ROOT}/",
+        f"{_ACTIVE_ENGINE_PACK_ROOT}/",
+    )
 
 
 def _effective_timeout_seconds(baseline_seconds: float, simulation_speed_factor: object) -> float:
@@ -448,7 +481,11 @@ def _build_simulator_environment(source: Mapping[str, str]) -> dict[str, str]:
             or normalized.startswith(_CHILD_ENV_PREFIX_ALLOWLIST)
             or normalized.startswith("DRONEDREAM_RUNTIME_")
         ):
-            child[name] = value
+            child[name] = (
+                _active_engine_pack_path(value)
+                if normalized in _ENGINE_PACK_PATH_ENVIRONMENT_NAMES
+                else value
+            )
     return child
 
 

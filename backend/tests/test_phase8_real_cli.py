@@ -41,7 +41,9 @@ from app.simulator.real_cli import (
     _MAX_RESULT_ARTIFACTS,
     _MAX_RESULT_BYTES,
     RealCliSimulatorAdapter,
+    _active_engine_pack_path,
     _build_command,
+    _build_simulator_environment,
     _effective_timeout_seconds,
     _load_result_payload,
     _parse_artifacts,
@@ -907,6 +909,54 @@ def test_build_command_substitutes_paths_after_tokenization() -> None:
     assert argv[1].startswith("--literal={")
     assert argv[2] == f"--input={Path('C:/workspace with spaces/input.json')}"
     assert argv[-2:] == ["--output", str(Path("C:/workspace with spaces/output.json"))]
+
+
+def test_build_command_retargets_legacy_runtime_source_to_active_engine_pack() -> None:
+    argv = _build_command(
+        "/opt/dronedream/venv/bin/python "
+        "/opt/dronedream/source/scripts/simulators/px4_gazebo_runner.py",
+        Path("/tmp/input.json"),
+        Path("/tmp/output.json"),
+    )
+
+    assert argv[1] == (
+        "/opt/dronedream/engine/current/scripts/simulators/px4_gazebo_runner.py"
+    )
+    assert "/opt/dronedream/source" not in " ".join(argv)
+
+
+def test_simulator_child_environment_retargets_only_pack_owned_paths() -> None:
+    child = _build_simulator_environment(
+        {
+            "PX4_GAZEBO_WORKDIR": "/opt/dronedream/source",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                "/opt/dronedream/venv/bin/python "
+                "/opt/dronedream/source/scripts/simulators/local_px4_launch_wrapper.py"
+            ),
+            "PX4_OFFBOARD_EXECUTOR_COMMAND": (
+                "/opt/dronedream/venv/bin/python "
+                "/opt/dronedream/source/scripts/simulators/px4_offboard_track_executor.py"
+            ),
+            "PX4_CUSTOM_FIXTURE_PATH": "/opt/dronedream/source/user-controlled",
+            "OPENAI_API_KEY": "must-not-cross-the-process-boundary",
+        }
+    )
+
+    assert child["PX4_GAZEBO_WORKDIR"] == "/opt/dronedream/engine/current"
+    assert "/opt/dronedream/engine/current/scripts/simulators" in child[
+        "PX4_GAZEBO_LAUNCH_COMMAND"
+    ]
+    assert "/opt/dronedream/engine/current/scripts/simulators" in child[
+        "PX4_OFFBOARD_EXECUTOR_COMMAND"
+    ]
+    assert child["PX4_CUSTOM_FIXTURE_PATH"] == "/opt/dronedream/source/user-controlled"
+    assert "OPENAI_API_KEY" not in child
+
+
+def test_active_engine_pack_path_does_not_rewrite_similar_prefixes() -> None:
+    assert _active_engine_pack_path("/opt/dronedream/source-backup/script.py") == (
+        "/opt/dronedream/source-backup/script.py"
+    )
 
 
 def test_real_cli_timeout_scales_for_slow_simulation_with_bounded_multiplier() -> None:
