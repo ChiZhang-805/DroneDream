@@ -203,7 +203,10 @@ def build_manifest(
     lock = repository_root / "runtime" / "locks" / "python-requirements.lock"
     source = {"gitCommit": source_commit, "sourceDateEpoch": epoch}
     compatibility = {
-        "runtimeId": "DroneDreamRuntime",
+        # This is the stable product/distribution identity. The Runtime
+        # manifest's `runtimeId` is a build-specific UUID and must not be used
+        # as an Engine Pack compatibility key.
+        "runtimeProductId": "DroneDreamRuntime",
         "runtimeVersion": pins["DRONEDREAM_RUNTIME_VERSION"],
         "pythonVersion": pins["PYTHON_VERSION"],
         "px4Commit": pins["PX4_GIT_COMMIT"],
@@ -356,7 +359,7 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         raise EnginePackError("Engine Pack source timestamp is invalid")
     compatibility = manifest["runtimeCompatibility"]
     compatibility_keys = {
-        "runtimeId",
+        "runtimeProductId",
         "runtimeVersion",
         "pythonVersion",
         "px4Commit",

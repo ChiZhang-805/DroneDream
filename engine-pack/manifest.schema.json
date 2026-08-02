@@ -31,7 +31,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "runtimeId",
+        "runtimeProductId",
         "runtimeVersion",
         "pythonVersion",
         "px4Commit",
@@ -39,7 +39,7 @@
         "dependencyLockSha256"
       ],
       "properties": {
-        "runtimeId": {"const": "DroneDreamRuntime"},
+        "runtimeProductId": {"const": "DroneDreamRuntime"},
         "runtimeVersion": {"type": "string", "minLength": 1},
         "pythonVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
         "px4Commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},

@@ -27,6 +27,7 @@ DEFAULT_RUNTIME_MANIFEST = Path("/opt/dronedream/runtime-manifest.json")
 DEFAULT_STATE_PATH = Path("/var/lib/dronedream/engine-pack-state.json")
 DEFAULT_DATABASE = Path("/var/lib/dronedream/dronedream.db")
 ENGINE_SERVICES = ("dronedream-worker.service", "dronedream-api.service")
+RUNTIME_PRODUCT_ID = "DroneDreamRuntime"
 HEALTH_URL = "http://127.0.0.1:8000/health/ready"
 ACTIVE_JOB_STATUSES = ("QUEUED", "RUNNING", "AGGREGATING", "FINALIZING")
 SYSTEMCTL = Path("/usr/bin/systemctl")
@@ -84,8 +85,15 @@ def assert_runtime_compatible(pack: dict[str, Any], runtime: dict[str, Any]) -> 
         or not isinstance(python, dict)
     ):
         raise EnginePackInstallError("Runtime component details are incomplete")
+    build_id = runtime.get("runtimeId")
+    try:
+        parsed_build_id = uuid.UUID(build_id) if isinstance(build_id, str) else None
+    except ValueError as error:
+        raise EnginePackInstallError("Runtime build identity is invalid") from error
+    if parsed_build_id is None or str(parsed_build_id) != build_id:
+        raise EnginePackInstallError("Runtime build identity is invalid")
     observed = {
-        "runtimeId": runtime.get("runtimeId"),
+        "runtimeProductId": RUNTIME_PRODUCT_ID,
         "runtimeVersion": runtime.get("version"),
         "pythonVersion": python.get("version"),
         "px4Commit": px4.get("commit"),

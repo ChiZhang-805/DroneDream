@@ -122,7 +122,7 @@ class EnginePackTests(unittest.TestCase):
                 (output / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
             )
             compatibility = manifest["runtimeCompatibility"]
-            self.assertEqual(compatibility["runtimeId"], "DroneDreamRuntime")
+            self.assertEqual(compatibility["runtimeProductId"], "DroneDreamRuntime")
             self.assertRegex(compatibility["px4Commit"], r"^[0-9a-f]{40}$")
             self.assertRegex(compatibility["dependencyLockSha256"], r"^[0-9a-f]{64}$")
             self.assertEqual(manifest["source"]["gitCommit"], "1" * 40)
@@ -146,7 +146,7 @@ class EnginePackTests(unittest.TestCase):
             "engineApiVersion": 1,
             "source": {"gitCommit": "1" * 40, "sourceDateEpoch": 1},
             "runtimeCompatibility": {
-                "runtimeId": "DroneDreamRuntime",
+                "runtimeProductId": "DroneDreamRuntime",
                 "runtimeVersion": pins["DRONEDREAM_RUNTIME_VERSION"],
                 "pythonVersion": pins["PYTHON_VERSION"],
                 "px4Commit": pins["PX4_GIT_COMMIT"],

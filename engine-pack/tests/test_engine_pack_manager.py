@@ -52,7 +52,7 @@ class EnginePackManagerTests(unittest.TestCase):
         self.runtime_manifest.write_text(
             json.dumps(
                 {
-                    "runtimeId": "DroneDreamRuntime",
+                    "runtimeId": "c75ae324-c247-50b5-bd74-fa8325e9e616",
                     "version": pins["DRONEDREAM_RUNTIME_VERSION"],
                     "componentDetails": {
                         "px4": {"commit": pins["PX4_GIT_COMMIT"]},
@@ -96,6 +96,9 @@ class EnginePackManagerTests(unittest.TestCase):
         self.assertTrue((current / "worker/drone_dream_worker/main.py").is_file())
         self.assertEqual(user_data.read_text(encoding="utf-8"), "preserve-me")
         self.assertEqual(receipt["sourceCommit"], "2" * 40)
+        self.assertEqual(
+            receipt["runtimeId"], "c75ae324-c247-50b5-bd74-fa8325e9e616"
+        )
 
     def test_reinstall_of_same_pack_is_idempotent(self) -> None:
         first = self.install()
@@ -111,6 +114,14 @@ class EnginePackManagerTests(unittest.TestCase):
         payload["componentDetails"]["px4"]["commit"] = "0" * 40
         self.runtime_manifest.write_text(json.dumps(payload), encoding="utf-8")
         with self.assertRaisesRegex(manager.EnginePackInstallError, "different Runtime Base"):
+            self.install()
+        self.assertFalse((self.root / "engine/current").exists())
+
+    def test_runtime_product_name_cannot_masquerade_as_build_identity(self) -> None:
+        payload = json.loads(self.runtime_manifest.read_text(encoding="utf-8"))
+        payload["runtimeId"] = "DroneDreamRuntime"
+        self.runtime_manifest.write_text(json.dumps(payload), encoding="utf-8")
+        with self.assertRaisesRegex(manager.EnginePackInstallError, "build identity"):
             self.install()
         self.assertFalse((self.root / "engine/current").exists())
 

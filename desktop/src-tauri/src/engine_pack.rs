@@ -10,7 +10,6 @@ use std::time::Duration;
 #[cfg(target_os = "windows")]
 use crate::process::{command_output, windows_command};
 
-const RUNTIME_NAME: &str = "DroneDreamRuntime";
 const MANAGER_PATH: &str = "/usr/lib/dronedream/engine-pack-manager.py";
 const STATE_PATH: &str = "/var/lib/dronedream/engine-pack-state.json";
 const ARCHIVE_FILENAME: &str = "DroneDreamEnginePack.tar.gz";
@@ -90,6 +89,10 @@ fn is_pack_id(value: &str) -> bool {
         .is_some_and(|digest| is_lower_hex(digest, 64))
 }
 
+fn is_runtime_build_id(value: &str) -> bool {
+    uuid::Uuid::parse_str(value).is_ok_and(|parsed| parsed.hyphenated().to_string() == value)
+}
+
 fn embedded_descriptor() -> Result<EmbeddedDescriptor, String> {
     let descriptor: EmbeddedDescriptor = serde_json::from_slice(EMBEDDED_DESCRIPTOR)
         .map_err(|error| format!("Embedded Engine Pack descriptor is invalid: {error}"))?;
@@ -160,7 +163,7 @@ fn installed_receipt() -> Result<Option<InstalledReceipt>, String> {
     let receipt: InstalledReceipt = serde_json::from_slice(&output)
         .map_err(|error| format!("Installed Engine Pack receipt is invalid: {error}"))?;
     if receipt.schema_version != 1
-        || receipt.runtime_id != RUNTIME_NAME
+        || !is_runtime_build_id(&receipt.runtime_id)
         || !is_pack_id(&receipt.current_pack_id)
         || !is_lower_hex(&receipt.source_commit, 40)
         || !is_lower_hex(&receipt.archive_sha256, 64)
@@ -415,6 +418,13 @@ mod tests {
         assert_eq!(descriptor.source_commit, env!("DRONEDREAM_SOURCE_COMMIT"));
         assert_eq!(descriptor.archive.sha256, sha256(EMBEDDED_ARCHIVE));
         assert_eq!(descriptor.manifest.sha256, sha256(EMBEDDED_MANIFEST));
+    }
+
+    #[test]
+    fn accepts_only_canonical_runtime_build_ids() {
+        assert!(is_runtime_build_id("c75ae324-c247-50b5-bd74-fa8325e9e616"));
+        assert!(!is_runtime_build_id("DroneDreamRuntime"));
+        assert!(!is_runtime_build_id("C75AE324-C247-50B5-BD74-FA8325E9E616"));
     }
 
     #[cfg(target_os = "windows")]
