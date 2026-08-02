@@ -2230,6 +2230,64 @@ def test_real_cli_artifacts_are_persisted_before_transient_run_cleanup(
         get_settings.cache_clear()
 
 
+def test_real_cli_shared_root_cleanup_preserves_persisted_artifacts(
+    orchestration_ctx, monkeypatch, tmp_path
+):
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    shared_root = tmp_path / "shared-artifacts"
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{_EXAMPLE_SIM}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(shared_root))
+    monkeypatch.setenv("REAL_SIMULATOR_KEEP_RUN_DIRS", "false")
+    monkeypatch.setenv("ARTIFACT_ROOT", str(shared_root))
+
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        with ctx["db_module"].SessionLocal() as db:
+            claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+                db,
+                "worker-real-cli-shared-root",
+                adapter=RealCliSimulatorAdapter(),
+            )
+        assert claimed == trial_id
+
+        with ctx["db_module"].SessionLocal() as db:
+            models = ctx["models"]
+            trial = db.get(models.Trial, trial_id)
+            assert trial is not None
+            assert trial.status == "COMPLETED"
+            artifacts = (
+                db.query(models.Artifact)
+                .filter(
+                    models.Artifact.owner_type == "trial",
+                    models.Artifact.owner_id == trial_id,
+                )
+                .all()
+            )
+            assert artifacts
+            for artifact in artifacts:
+                stored = Path(artifact.storage_path)
+                assert stored.is_file()
+                assert stored.resolve().is_relative_to(shared_root.resolve())
+                assert "_simulator_runs" not in stored.parts
+                assert artifact.digest_receipt is not None
+                assert artifact.digest_receipt.content_size_bytes == stored.stat().st_size
+
+        transient_dir = (
+            shared_root
+            / "jobs"
+            / "_simulator_runs"
+            / trial.job_id
+            / "trials"
+            / trial_id
+        )
+        assert not transient_dir.exists()
+    finally:
+        get_settings.cache_clear()
+
+
 @pytest.mark.parametrize("simulation_success", [True, False])
 def test_artifact_copy_failure_is_terminal_and_retains_transient_run(
     orchestration_ctx,

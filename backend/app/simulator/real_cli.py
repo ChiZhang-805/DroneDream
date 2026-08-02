@@ -510,7 +510,17 @@ def _run_directory(artifact_root: Path, ctx: TrialContext) -> Path:
     trial_id = _safe_path_segment(ctx.trial_id, field_name="trial_id")
     if isinstance(ctx.attempt_count, bool) or ctx.attempt_count < 1:
         raise ValueError("attempt_count must be a positive integer")
-    base = (root / "jobs" / job_id / "trials" / trial_id).resolve()
+    jobs_root = root / "jobs"
+    # A Runtime Base can intentionally expose one operator-managed artifact
+    # volume for both transient simulator runs and durable Trial evidence.
+    # Durable evidence is persisted below ``<ARTIFACT_ROOT>/jobs/<job>`` before
+    # ``finalize_trial`` removes the successful run directory.  Keep the
+    # transient hierarchy disjoint when both configured roots resolve to the
+    # same directory so cleanup can never delete the byte-sealed evidence it
+    # has just produced.
+    if root == get_settings().default_artifact_root_path.resolve():
+        jobs_root = jobs_root / "_simulator_runs"
+    base = (jobs_root / job_id / "trials" / trial_id).resolve()
     if not base.is_relative_to(root):  # pragma: no cover - guarded by safe segments.
         raise ValueError("trial run directory escaped REAL_SIMULATOR_ARTIFACT_ROOT")
     if ctx.attempt_count == 1:

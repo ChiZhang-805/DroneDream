@@ -1843,6 +1843,37 @@ def test_keep_run_dirs_false_defers_cleanup_until_finalize(monkeypatch, tmp_path
     assert not run_dir.exists()
 
 
+def test_shared_artifact_root_isolates_transient_run_cleanup(monkeypatch, tmp_path) -> None:
+    shared_root = tmp_path / "shared-artifacts"
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{_EXAMPLE_SIM}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(shared_root))
+    monkeypatch.setenv("ARTIFACT_ROOT", str(shared_root))
+    monkeypatch.setenv("REAL_SIMULATOR_KEEP_RUN_DIRS", "false")
+
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        adapter = RealCliSimulatorAdapter()
+        ctx = _ctx()
+        result = adapter.run_trial(ctx)
+        run_dir = (
+            shared_root
+            / "jobs"
+            / "_simulator_runs"
+            / "job-1"
+            / "trials"
+            / "trial-1"
+        )
+
+        assert result.success is True
+        assert run_dir.is_dir()
+        adapter.finalize_trial(ctx, result)
+        assert not run_dir.exists()
+    finally:
+        get_settings.cache_clear()
+
+
 def test_real_cli_artifact_schema_doc_exists() -> None:
     doc = Path(__file__).resolve().parents[2] / "docs" / "REAL_CLI_ARTIFACT_SCHEMA.md"
     assert doc.exists()
