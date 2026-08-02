@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import csv
+import hashlib
 import io
 import json
 import math
@@ -98,6 +99,8 @@ _MAX_TELEMETRY_SAMPLES = 50_000
 _MAX_TRIAL_INPUT_BYTES = 8 * 1024 * 1024
 _MAX_OFFBOARD_TIMING_BYTES = 1024 * 1024
 _MAX_LAUNCHER_FAILURE_BYTES = 64 * 1024
+_MAX_ENGINE_PACK_MANIFEST_BYTES = 8 * 1024 * 1024
+_MAX_ENGINE_PACK_STATE_BYTES = 64 * 1024
 _MAX_REFERENCE_TRACK_POINTS = 10_000
 _HOVER_DURATION_SECONDS = 10.0
 _HOVER_REFERENCE_SAMPLE_COUNT = 101
@@ -247,6 +250,10 @@ class UnsupportedScenarioEffectRunnerError(RunnerError):
 _SAFE_PROFILE_TOKEN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _REQUESTED_FIRMWARE_SHA = re.compile(r"^[0-9a-fA-F]{7,40}$")
 _OBSERVED_FIRMWARE_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
+_SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
+_ENGINE_PACK_ID = re.compile(r"^sha256:[0-9a-f]{64}$")
+_ENGINE_PACK_STATE_PATH = Path("/var/lib/dronedream/engine-pack-state.json")
+_ENGINE_PACK_ACTIVE_PATH = Path("/opt/dronedream/engine/current")
 
 
 def _profile_token(name: str, value: Any, *, default: str) -> str:
@@ -365,6 +372,205 @@ def _firmware_identity(requested_commit: str | None) -> dict[str, Any]:
         "status": status,
         "error": observation_error,
     }
+
+
+def _load_engine_identity_json(
+    path: Path,
+    *,
+    label: str,
+    max_bytes: int,
+) -> tuple[bytes, dict[str, Any]]:
+    size = _regular_file_size(path, label=label, required=True)
+    if size is None or size > max_bytes:
+        raise RunnerError(f"{label} exceeds the {max_bytes}-byte contract limit")
+    try:
+        with path.open("rb") as stream:
+            encoded = stream.read(max_bytes + 1)
+    except OSError as exc:
+        raise RunnerError(f"{label} could not be read") from exc
+    if len(encoded) > max_bytes:
+        raise RunnerError(f"{label} exceeds the {max_bytes}-byte contract limit")
+    try:
+        payload = json.loads(
+            encoded.decode("utf-8"),
+            parse_constant=_reject_nonfinite_json,
+        )
+    except (UnicodeError, json.JSONDecodeError, RecursionError, ValueError) as exc:
+        raise RunnerError(f"{label} is not valid bounded JSON") from exc
+    if not isinstance(payload, dict):
+        raise RunnerError(f"{label} must contain a JSON object")
+    return encoded, payload
+
+
+def _engine_pack_identity(
+    *,
+    manifest_path: Path | None = None,
+    state_path: Path = _ENGINE_PACK_STATE_PATH,
+    active_path: Path | None = None,
+) -> dict[str, Any]:
+    """Bind a trial to the immutable Engine Pack and its activation receipt.
+
+    Repository and CI runs legitimately have neither file and report an
+    explicit unmanaged identity. A managed Runtime must expose both files;
+    partial or mismatched state fails closed before PX4/Gazebo is launched.
+    """
+
+    if manifest_path is None:
+        payload_root = Path(__file__).resolve().parents[2]
+        manifest_path = payload_root.parent / "engine-pack-manifest.json"
+        active_path = active_path or _ENGINE_PACK_ACTIVE_PATH
+
+    manifest_exists = manifest_path.exists()
+    state_exists = state_path.exists()
+    if not manifest_exists and not state_exists:
+        return {
+            "status": "unavailable",
+            "reason": "runner is not executing from a managed Engine Pack",
+        }
+    if manifest_exists != state_exists:
+        missing = "activation state" if manifest_exists else "Engine Pack manifest"
+        raise RunnerError(f"managed Engine Pack identity is incomplete: missing {missing}")
+
+    manifest_bytes, manifest = _load_engine_identity_json(
+        manifest_path,
+        label="Engine Pack manifest",
+        max_bytes=_MAX_ENGINE_PACK_MANIFEST_BYTES,
+    )
+    pack_id = manifest.get("packId")
+    source = manifest.get("source")
+    compatibility = manifest.get("runtimeCompatibility")
+    source_commit = source.get("gitCommit") if isinstance(source, dict) else None
+    source_date_epoch = source.get("sourceDateEpoch") if isinstance(source, dict) else None
+    if manifest.get("schemaVersion") != 1 or manifest.get("kind") != "dronedream-engine-pack":
+        raise RunnerError("Engine Pack manifest kind or schemaVersion is unsupported")
+    if manifest.get("engineApiVersion") != 1:
+        raise RunnerError("Engine Pack manifest engineApiVersion is unsupported")
+    if not isinstance(pack_id, str) or not _ENGINE_PACK_ID.fullmatch(pack_id):
+        raise RunnerError("Engine Pack manifest packId is invalid")
+    if not isinstance(source_commit, str) or not _OBSERVED_FIRMWARE_SHA.fullmatch(source_commit):
+        raise RunnerError("Engine Pack manifest source.gitCommit is invalid")
+    if (
+        isinstance(source_date_epoch, bool)
+        or not isinstance(source_date_epoch, int)
+        or source_date_epoch < 0
+    ):
+        raise RunnerError("Engine Pack manifest source.sourceDateEpoch is invalid")
+    if not isinstance(compatibility, dict):
+        raise RunnerError("Engine Pack manifest runtimeCompatibility is invalid")
+
+    px4_commit = compatibility.get("px4Commit")
+    dependency_lock = compatibility.get("dependencyLockSha256")
+    runtime_version = compatibility.get("runtimeVersion")
+    if not isinstance(px4_commit, str) or not _OBSERVED_FIRMWARE_SHA.fullmatch(px4_commit):
+        raise RunnerError("Engine Pack runtimeCompatibility.px4Commit is invalid")
+    if not isinstance(dependency_lock, str) or not _SHA256_HEX.fullmatch(dependency_lock):
+        raise RunnerError("Engine Pack runtimeCompatibility.dependencyLockSha256 is invalid")
+    if not isinstance(runtime_version, str) or not runtime_version.strip():
+        raise RunnerError("Engine Pack runtimeCompatibility.runtimeVersion is invalid")
+
+    try:
+        _, state = _load_engine_identity_json(
+            state_path,
+            label="Engine Pack activation state",
+            max_bytes=_MAX_ENGINE_PACK_STATE_BYTES,
+        )
+    except RunnerError as exc:
+        if not isinstance(exc.__cause__, PermissionError) or active_path is None:
+            raise
+        manager_state_binding = _active_engine_pack_binding(
+            active_path=active_path,
+            manifest_path=manifest_path,
+            pack_id=pack_id,
+        )
+    else:
+        archive_sha256 = state.get("archiveSha256")
+        state_runtime_version = state.get("runtimeVersion")
+        if state.get("schemaVersion") != 1:
+            raise RunnerError("Engine Pack activation state schemaVersion is unsupported")
+        if state.get("currentPackId") != pack_id:
+            raise RunnerError(
+                "Engine Pack activation state currentPackId does not match the manifest"
+            )
+        if state.get("sourceCommit") != source_commit:
+            raise RunnerError(
+                "Engine Pack activation state sourceCommit does not match the manifest"
+            )
+        if not isinstance(archive_sha256, str) or not _SHA256_HEX.fullmatch(archive_sha256):
+            raise RunnerError("Engine Pack activation state archiveSha256 is invalid")
+        if state_runtime_version != runtime_version:
+            raise RunnerError(
+                "Engine Pack activation state runtimeVersion does not match the manifest"
+            )
+        manager_state_binding = {
+            "status": "verified",
+            "activation_method": "manager_state",
+            "archive_sha256": archive_sha256,
+            "runtime_id": state.get("runtimeId"),
+            "runtime_version": state_runtime_version,
+        }
+
+    return {
+        "status": "verified",
+        "pack_id": pack_id,
+        "source_commit": source_commit,
+        "source_date_epoch": source_date_epoch,
+        "manifest_file": "engine-pack-manifest.json",
+        "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "engine_api_version": 1,
+        "runtime_compatibility": {
+            "runtime_product_id": compatibility.get("runtimeProductId"),
+            "runtime_version": runtime_version,
+            "python_version": compatibility.get("pythonVersion"),
+            "px4_commit": px4_commit,
+            "gazebo_version": compatibility.get("gazeboVersion"),
+            "dependency_lock_sha256": dependency_lock,
+        },
+        "manager_state_binding": manager_state_binding,
+    }
+
+
+def _active_engine_pack_binding(
+    *,
+    active_path: Path,
+    manifest_path: Path,
+    pack_id: str,
+) -> dict[str, Any]:
+    """Verify the manager-owned active symlink without weakening state-file permissions."""
+
+    try:
+        if not active_path.is_symlink():
+            raise RunnerError("Engine Pack active path is not a manager-owned symbolic link")
+        active_release = active_path.resolve(strict=True)
+        manifest_release = manifest_path.resolve(strict=True).parent
+    except OSError as exc:
+        raise RunnerError("Engine Pack active symbolic link could not be resolved") from exc
+    expected_release_id = pack_id.removeprefix("sha256:")
+    if active_release != manifest_release or active_release.name != expected_release_id:
+        raise RunnerError("Engine Pack active symbolic link does not match the manifest packId")
+    return {
+        "status": "permission_restricted",
+        "activation_method": "active_symlink",
+        "active_release_id": expected_release_id,
+    }
+
+
+def _enforce_engine_pack_firmware_binding(
+    engine_pack_identity: dict[str, Any],
+    firmware_identity: dict[str, Any],
+) -> None:
+    if engine_pack_identity.get("status") != "verified":
+        return
+    compatibility = engine_pack_identity.get("runtime_compatibility")
+    expected = compatibility.get("px4_commit") if isinstance(compatibility, dict) else None
+    observed = firmware_identity.get("observed_commit")
+    if observed is None:
+        raise RunnerError(
+            "managed Engine Pack PX4 identity could not be bound to an observed firmware checkout"
+        )
+    if observed != expected:
+        raise RunnerError(
+            f"managed Engine Pack PX4 commit {expected} does not match observed firmware {observed}"
+        )
 
 
 def _enforce_firmware_identity(identity: dict[str, Any]) -> None:
@@ -2939,6 +3145,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             float(meta["simulation_speed_factor"]),
         )
         firmware_identity = _firmware_identity(meta.get("firmware_commit"))
+        engine_pack_identity = _engine_pack_identity()
         scenario_effect_request = meta["scenario_effect_request"]
         scenario_effect_contract = _scenario_effect_contract(
             meta.get("advanced_scenario_config"),
@@ -2966,6 +3173,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             "advanced_scenario_config": meta.get("advanced_scenario_config", {}),
             "px4_version": meta["px4_version"],
             "firmware_identity": firmware_identity,
+            "engine_pack_identity": engine_pack_identity,
             "scenario_effect_contract": scenario_effect_contract,
             "scenario_effect_request": {
                 "path": str(scenario_effect_request_json),
@@ -2994,6 +3202,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 },
                 "px4_version": meta["px4_version"],
                 "firmware_identity": firmware_identity,
+                "engine_pack_identity": engine_pack_identity,
                 "scenario_effect_contract": scenario_effect_contract,
                 "scenario_effect_request": {
                     "path": str(scenario_effect_request_json),
@@ -3020,6 +3229,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             },
         )
         _enforce_firmware_identity(firmware_identity)
+        _enforce_engine_pack_firmware_binding(engine_pack_identity, firmware_identity)
         _enforce_scenario_effect_contract(scenario_effect_contract)
 
         reference_track = _make_reference_track(

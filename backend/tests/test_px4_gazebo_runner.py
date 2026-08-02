@@ -26,6 +26,162 @@ sys.modules[RUNNER_SPEC.name] = runner_module
 RUNNER_SPEC.loader.exec_module(runner_module)
 
 
+def _write_engine_pack_identity_files(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
+    source_commit = "1" * 40
+    px4_commit = "2" * 40
+    pack_id = f"sha256:{'3' * 64}"
+    manifest = {
+        "schemaVersion": 1,
+        "kind": "dronedream-engine-pack",
+        "packId": pack_id,
+        "engineApiVersion": 1,
+        "source": {"gitCommit": source_commit, "sourceDateEpoch": 1_785_693_271},
+        "runtimeCompatibility": {
+            "runtimeProductId": "DroneDreamRuntime",
+            "runtimeVersion": "0.1.0",
+            "pythonVersion": "3.12",
+            "px4Commit": px4_commit,
+            "gazeboVersion": "harmonic@test",
+            "dependencyLockSha256": "4" * 64,
+        },
+        "files": [{"path": "backend/app/main.py", "sizeBytes": 1, "sha256": "5" * 64}],
+    }
+    manifest_path = tmp_path / "engine-pack-manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    state_path = tmp_path / "engine-pack-state.json"
+    state_path.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "currentPackId": pack_id,
+                "previousPackId": None,
+                "sourceCommit": source_commit,
+                "archiveSha256": "6" * 64,
+                "activatedAt": "2026-08-02T00:00:00+00:00",
+                "runtimeId": "runtime-test-id",
+                "runtimeVersion": "0.1.0",
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+    return manifest_path, state_path, manifest
+
+
+def test_runner_binds_engine_pack_manifest_to_activation_state(tmp_path: Path) -> None:
+    manifest_path, state_path, manifest = _write_engine_pack_identity_files(tmp_path)
+
+    identity = runner_module._engine_pack_identity(
+        manifest_path=manifest_path,
+        state_path=state_path,
+    )
+
+    assert identity["status"] == "verified"
+    assert identity["pack_id"] == manifest["packId"]
+    assert identity["source_commit"] == manifest["source"]["gitCommit"]
+    assert (
+        identity["manifest_sha256"]
+        == runner_module.hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    )
+    assert (
+        identity["runtime_compatibility"]["px4_commit"]
+        == (manifest["runtimeCompatibility"]["px4Commit"])
+    )
+    assert identity["manager_state_binding"] == {
+        "status": "verified",
+        "activation_method": "manager_state",
+        "archive_sha256": "6" * 64,
+        "runtime_id": "runtime-test-id",
+        "runtime_version": "0.1.0",
+    }
+
+
+def test_runner_binds_permission_restricted_manager_state_to_active_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release_id = "3" * 64
+    release = tmp_path / "releases" / release_id
+    release.mkdir(parents=True)
+    manifest_path, state_path, _ = _write_engine_pack_identity_files(release)
+    active_path = tmp_path / "current"
+    try:
+        active_path.symlink_to(release, target_is_directory=True)
+    except OSError:
+        pytest.skip("symbolic links are not available for this test user")
+    original_loader = runner_module._load_engine_identity_json
+
+    def permission_restricted_loader(path: Path, *, label: str, max_bytes: int):
+        if path == state_path:
+            try:
+                raise PermissionError("manager state is root-private")
+            except PermissionError as exc:
+                raise runner_module.RunnerError(
+                    "Engine Pack activation state could not be read"
+                ) from exc
+        return original_loader(path, label=label, max_bytes=max_bytes)
+
+    monkeypatch.setattr(runner_module, "_load_engine_identity_json", permission_restricted_loader)
+    identity = runner_module._engine_pack_identity(
+        manifest_path=manifest_path,
+        state_path=state_path,
+        active_path=active_path,
+    )
+
+    assert identity["manager_state_binding"] == {
+        "status": "permission_restricted",
+        "activation_method": "active_symlink",
+        "active_release_id": release_id,
+    }
+
+
+@pytest.mark.parametrize("mismatch_field", ["currentPackId", "sourceCommit", "runtimeVersion"])
+def test_runner_rejects_engine_pack_activation_state_mismatch(
+    tmp_path: Path,
+    mismatch_field: str,
+) -> None:
+    manifest_path, state_path, _ = _write_engine_pack_identity_files(tmp_path)
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state[mismatch_field] = "mismatched"
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+    with pytest.raises(runner_module.RunnerError, match=f"{mismatch_field} does not match"):
+        runner_module._engine_pack_identity(
+            manifest_path=manifest_path,
+            state_path=state_path,
+        )
+
+
+@pytest.mark.parametrize("missing", ["manifest", "state"])
+def test_runner_rejects_partial_managed_engine_pack_identity(
+    tmp_path: Path,
+    missing: str,
+) -> None:
+    manifest_path, state_path, _ = _write_engine_pack_identity_files(tmp_path)
+    (manifest_path if missing == "manifest" else state_path).unlink()
+
+    with pytest.raises(runner_module.RunnerError, match="identity is incomplete"):
+        runner_module._engine_pack_identity(
+            manifest_path=manifest_path,
+            state_path=state_path,
+        )
+
+
+def test_runner_rejects_engine_pack_firmware_mismatch() -> None:
+    with pytest.raises(runner_module.RunnerError, match="does not match observed firmware"):
+        runner_module._enforce_engine_pack_firmware_binding(
+            {
+                "status": "verified",
+                "runtime_compatibility": {"px4_commit": "1" * 40},
+            },
+            {"observed_commit": "2" * 40},
+        )
+
+
 def test_track_projection_rejects_empty_candidate_set():
     geometry = runner_module.TrackGeometry(segments=(), total_length=0.0, closed=False)
 
@@ -547,6 +703,10 @@ def test_px4_runner_verifies_requested_firmware_against_git_head(tmp_path: Path)
         (verified_dir / "simulator_runtime_manifest.json").read_text(encoding="utf-8")
     )
     assert runtime_manifest["firmware_identity"]["observed_commit"] == head
+    assert runtime_manifest["engine_pack_identity"] == {
+        "status": "unavailable",
+        "reason": "runner is not executing from a managed Engine Pack",
+    }
 
     mismatch_dir = tmp_path / "mismatch"
     proc, result = _run_runner(
