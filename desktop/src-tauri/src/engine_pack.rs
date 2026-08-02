@@ -15,6 +15,15 @@ const STATE_PATH: &str = "/var/lib/dronedream/engine-pack-state.json";
 const ARCHIVE_FILENAME: &str = "DroneDreamEnginePack.tar.gz";
 const DESCRIPTOR_FILENAME: &str = "engine-pack-bundle.json";
 const MANIFEST_FILENAME: &str = "engine-pack-manifest.json";
+const RECONCILER_FILENAME: &str = "reconcile_engine_pack_runtime_env.py";
+const RUNTIME_ENVIRONMENT_PATH: &str = "/etc/dronedream/runtime.env";
+const ENGINE_PACK_ACTIVE_ROOT: &str = "/opt/dronedream/engine/current";
+const EXPECTED_RUNTIME_EXECUTION_LINES: &[&str] = &[
+    "REAL_SIMULATOR_COMMAND=\"/opt/dronedream/venv/bin/python /opt/dronedream/engine/current/scripts/simulators/px4_gazebo_runner.py\"",
+    "PX4_GAZEBO_WORKDIR=/opt/dronedream/engine/current",
+    "PX4_GAZEBO_LAUNCH_COMMAND=\"/opt/dronedream/venv/bin/python /opt/dronedream/engine/current/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --px4-params {px4_params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --airframe {airframe} --simulator-model {simulator_model} --world {world} --px4-version {px4_version} --headless {headless}\"",
+    "PX4_OFFBOARD_EXECUTOR_COMMAND=\"/opt/dronedream/venv/bin/python /opt/dronedream/engine/current/scripts/simulators/px4_offboard_track_executor.py\"",
+];
 const EMBEDDED_ARCHIVE: &[u8] = include_bytes!(concat!(
     env!("OUT_DIR"),
     "/engine-pack/DroneDreamEnginePack.tar.gz"
@@ -27,6 +36,8 @@ const EMBEDDED_MANIFEST: &[u8] = include_bytes!(concat!(
     env!("OUT_DIR"),
     "/engine-pack/engine-pack-manifest.json"
 ));
+const EMBEDDED_RECONCILER: &[u8] =
+    include_bytes!("../scripts/reconcile_engine_pack_runtime_env.py");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -143,6 +154,42 @@ fn manager_available() -> bool {
 }
 
 #[cfg(target_os = "windows")]
+fn runtime_execution_paths_current() -> bool {
+    EXPECTED_RUNTIME_EXECUTION_LINES.iter().all(|line| {
+        wsl_output(
+            "/usr/bin/grep",
+            &[
+                "--fixed-strings",
+                "--line-regexp",
+                "--quiet",
+                "--",
+                line,
+                RUNTIME_ENVIRONMENT_PATH,
+            ],
+            Duration::from_secs(8),
+            "Runtime execution path probe",
+        )
+        .is_ok()
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn ensure_manager_idle(label: &str) -> Result<(), String> {
+    let output = wsl_output(
+        MANAGER_PATH,
+        &["--check-idle"],
+        Duration::from_secs(15),
+        label,
+    )?;
+    let receipt: serde_json::Value = serde_json::from_slice(&output)
+        .map_err(|error| format!("{label} receipt was invalid: {error}"))?;
+    if receipt.get("idle").and_then(serde_json::Value::as_bool) != Some(true) {
+        return Err(format!("{label} did not confirm an idle Runtime."));
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
 fn installed_receipt() -> Result<Option<InstalledReceipt>, String> {
     if wsl_output(
         "/usr/bin/test",
@@ -214,9 +261,11 @@ fn status() -> Result<EnginePackStatus, String> {
     let receipt = installed_receipt()?;
     let installed_pack_id = receipt.as_ref().map(|value| value.current_pack_id.clone());
     let installed_source_commit = receipt.as_ref().map(|value| value.source_commit.clone());
+    let execution_paths_current = runtime_execution_paths_current();
     Ok(EnginePackStatus {
         supported: true,
-        update_required: installed_pack_id.as_deref() != Some(embedded.pack_id.as_str()),
+        update_required: installed_pack_id.as_deref() != Some(embedded.pack_id.as_str())
+            || !execution_paths_current,
         embedded_pack_id: embedded.pack_id,
         embedded_source_commit: embedded.source_commit,
         installed_pack_id,
@@ -322,20 +371,7 @@ pub(crate) fn ensure_app_update_idle() -> Result<(), String> {
                     .to_string(),
             );
         }
-        let output = wsl_output(
-            MANAGER_PATH,
-            &["--check-idle"],
-            Duration::from_secs(15),
-            "application update idle check",
-        )?;
-        let receipt: serde_json::Value = serde_json::from_slice(&output)
-            .map_err(|error| format!("Application update idle receipt was invalid: {error}"))?;
-        if receipt.get("idle").and_then(serde_json::Value::as_bool) != Some(true) {
-            return Err(
-                "Application update idle check did not confirm an idle Runtime.".to_string(),
-            );
-        }
-        Ok(())
+        ensure_manager_idle("application update idle check")
     }
 }
 
@@ -378,12 +414,64 @@ pub(crate) async fn install_embedded_engine_pack(
             let archive_path = cache.join(ARCHIVE_FILENAME);
             let descriptor_path = cache.join(DESCRIPTOR_FILENAME);
             let manifest_path = cache.join(MANIFEST_FILENAME);
+            let reconciler_path = cache.join(RECONCILER_FILENAME);
             write_verified(&archive_path, EMBEDDED_ARCHIVE)?;
             write_verified(&descriptor_path, EMBEDDED_DESCRIPTOR)?;
             write_verified(&manifest_path, EMBEDDED_MANIFEST)?;
+            write_verified(&reconciler_path, EMBEDDED_RECONCILER)?;
             let archive_wsl = windows_path_to_wsl(&archive_path)?;
             let descriptor_wsl = windows_path_to_wsl(&descriptor_path)?;
-            let output = wsl_output(
+            let reconciler_wsl = windows_path_to_wsl(&reconciler_path)?;
+            let execution_paths_need_reconciliation = !runtime_execution_paths_current();
+            if execution_paths_need_reconciliation {
+                ensure_manager_idle("pre-reconciliation Engine Pack idle check")?;
+                wsl_output(
+                    "/usr/bin/systemctl",
+                    &["stop", "dronedream-api.service"],
+                    Duration::from_secs(20),
+                    "Runtime API intake stop",
+                )?;
+                let reconciliation = (|| {
+                    ensure_manager_idle("post-intake Engine Pack idle check")?;
+                    let receipt = wsl_output(
+                        "/opt/dronedream/venv/bin/python",
+                        &[
+                            reconciler_wsl.as_str(),
+                            "--environment",
+                            RUNTIME_ENVIRONMENT_PATH,
+                            "--active-root",
+                            ENGINE_PACK_ACTIVE_ROOT,
+                            "--apply",
+                        ],
+                        Duration::from_secs(20),
+                        "Runtime execution path reconciliation",
+                    )?;
+                    let receipt: serde_json::Value =
+                        serde_json::from_slice(&receipt).map_err(|error| {
+                            format!("Runtime execution path receipt was invalid: {error}")
+                        })?;
+                    let reconciliation_status =
+                        receipt.get("status").and_then(serde_json::Value::as_str);
+                    if reconciliation_status != Some("reconciled")
+                        && reconciliation_status != Some("current")
+                    {
+                        return Err(
+                            "Runtime execution path reconciliation was not verified.".to_string()
+                        );
+                    }
+                    Ok(())
+                })();
+                if let Err(error) = reconciliation {
+                    let _ = wsl_output(
+                        "/usr/bin/systemctl",
+                        &["start", "dronedream-api.service"],
+                        Duration::from_secs(20),
+                        "Runtime API intake recovery",
+                    );
+                    return Err(error);
+                }
+            }
+            let output = match wsl_output(
                 MANAGER_PATH,
                 &[
                     "--descriptor",
@@ -393,7 +481,20 @@ pub(crate) async fn install_embedded_engine_pack(
                 ],
                 Duration::from_secs(420),
                 "Engine Pack activation",
-            )?;
+            ) {
+                Ok(output) => output,
+                Err(error) => {
+                    if execution_paths_need_reconciliation {
+                        let _ = wsl_output(
+                            "/usr/bin/systemctl",
+                            &["start", "dronedream-api.service"],
+                            Duration::from_secs(20),
+                            "Runtime API intake recovery",
+                        );
+                    }
+                    return Err(error);
+                }
+            };
             serde_json::from_slice::<serde_json::Value>(&output)
                 .map_err(|error| format!("Engine Pack activation receipt was invalid: {error}"))?;
             let updated = status()?;
@@ -425,6 +526,20 @@ mod tests {
         assert!(is_runtime_build_id("c75ae324-c247-50b5-bd74-fa8325e9e616"));
         assert!(!is_runtime_build_id("DroneDreamRuntime"));
         assert!(!is_runtime_build_id("C75AE324-C247-50B5-BD74-FA8325E9E616"));
+    }
+
+    #[test]
+    fn runtime_execution_path_contract_matches_the_fresh_runtime_template() {
+        let template = include_str!("../../../runtime/config/runtime.env.default");
+        for expected in EXPECTED_RUNTIME_EXECUTION_LINES {
+            assert!(
+                template.lines().any(|line| line == *expected),
+                "fresh Runtime template is missing {expected}"
+            );
+        }
+        let reconciler = std::str::from_utf8(EMBEDDED_RECONCILER).expect("UTF-8 reconciler");
+        assert!(reconciler.contains("_LEGACY_ROOT = \"/opt/dronedream/source\""));
+        assert!(reconciler.contains("_ENGINE_ROOT = \"/opt/dronedream/engine/current\""));
     }
 
     #[cfg(target_os = "windows")]
