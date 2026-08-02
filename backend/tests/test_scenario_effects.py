@@ -277,6 +277,29 @@ def test_compile_bundled_runtime_profile_binds_dropout_and_battery() -> None:
     }
 
 
+def test_compile_bundled_runtime_profile_stages_wind_after_stable_hover() -> None:
+    request = _request(advanced={}, wind=True)
+
+    profile = compile_bundled_runtime_profile(request)
+
+    assert profile is not None
+    assert profile["wind_activation"] == {
+        "linear_velocity_mps": {
+            "x": pytest.approx(-1.752621512767),
+            "y": pytest.approx(3.43481371628),
+            "z": 0.0,
+        },
+        "activation_phase": "after_stable_hover_before_track_entry",
+        "topic_suffix": "/wind",
+        "readback_service_suffix": "/wind_info",
+        "effect_ids": ["job_config.wind", "scenario_config.wind_mps"],
+    }
+    assert profile["requested_effect_ids"] == [
+        "job_config.wind",
+        "scenario_config.wind_mps",
+    ]
+
+
 def test_runtime_profile_rejects_conflicting_dropout_sources() -> None:
     with pytest.raises(ScenarioEffectContractError, match="conflicting dropout rates"):
         build_scenario_effect_request(

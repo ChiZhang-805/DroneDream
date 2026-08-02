@@ -1360,7 +1360,6 @@ def test_steady_wind_application_requires_readback_and_runtime_sdf(
     request = _wind_request()
     compiled = compile_bundled_steady_wind(request)
     assert compiled is not None
-    vector = compiled["linear_velocity_mps"]
     generated_sdf = """
 <sdf version="1.9">
   <world name="default">
@@ -1382,9 +1381,9 @@ def test_steady_wind_application_requires_readback_and_runtime_sdf(
             returncode=0,
             stdout=(
                 "linear_velocity {\n"
-                f"  x: {vector['x']}\n"
-                f"  y: {vector['y']}\n"
-                f"  z: {vector['z']}\n"
+                "  x: 0\n"
+                "  y: 0\n"
+                "  z: 0\n"
                 "}\nenable_wind: true\n"
             ),
             stderr="",
@@ -1421,11 +1420,56 @@ def test_steady_wind_application_requires_readback_and_runtime_sdf(
     )
 
     assert set(records) == {"job_config.wind", "scenario_config.wind_mps"}
+    assert all(record["_activation_pending"] is True for record in records.values())
+    runtime_records: dict[str, dict] = {}
+    for effect in request["effects"]:
+        effect_id = effect["effect_id"]
+        runtime_records[effect_id] = {
+            "effect_id": effect_id,
+            "mechanism": effect["mechanism"],
+            "status": "applied",
+            "capability": {"status": "available", "reason": "post-hover wind verified"},
+            "evidence": {
+                "requested_value_sha256": scenario_effects.scenario_effect_value_sha256(
+                    effect["requested_value"]
+                ),
+                "compiled_runtime_profile": scenario_effects.compile_bundled_runtime_profile(
+                    request
+                ),
+                "verification": {
+                    "status": "verified",
+                    "method": "gazebo_wind_topic_after_stable_hover_and_exact_readback",
+                    "observations": [
+                        {
+                            "source": "/world/default/wind_info",
+                            "kind": "readback",
+                            "value": {
+                                "linear_velocity_mps": compiled["linear_velocity_mps"],
+                                "enable_wind": True,
+                            },
+                        },
+                        {
+                            "source": "/world/default/wind",
+                            "kind": "acknowledgement",
+                            "value": {
+                                "phase": "after_stable_hover_before_track_entry",
+                                "activation_t_s": 1.25,
+                            },
+                        },
+                    ],
+                },
+            },
+        }
+    merged = wrapper._merge_staged_wind_effect_records(
+        scenario_effects,
+        records,
+        runtime_records,
+    )
     payload = scenario_effects.build_scenario_effect_evidence(
         request,
         launcher="test",
         world="default",
-        effects=[records[effect["effect_id"]] for effect in request["effects"]],
+        effects=[merged[effect["effect_id"]] for effect in request["effects"]],
     )
     normalized = validate_scenario_effect_evidence(request, payload)
     assert normalized["verification_status"] == "verified_applied"
@@ -1461,7 +1505,7 @@ def test_steady_wind_application_rejects_mismatched_readback(
     monkeypatch.setattr(wrapper.subprocess, "run", lambda *_args, **_kwargs: responses.pop(0))
     monkeypatch.setenv("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "1")
 
-    with pytest.raises(RuntimeError, match="never matched"):
+    with pytest.raises(RuntimeError, match="never proved the zero-wind takeoff profile"):
         wrapper._apply_steady_wind_effects(
             request,
             scenario_effects,
@@ -1469,6 +1513,31 @@ def test_steady_wind_application_rejects_mismatched_readback(
             run_dir=tmp_path / "run",
             world="default",
         )
+
+
+def test_pending_wind_activation_is_not_reported_as_applied_after_earlier_failure() -> None:
+    request = _wind_request()
+    preliminary = {
+        effect["effect_id"]: {
+            "effect_id": effect["effect_id"],
+            "mechanism": effect["mechanism"],
+            "status": "applied",
+            "capability": {"status": "available", "reason": "zero-wind preflight"},
+            "_activation_pending": True,
+        }
+        for effect in request["effects"]
+    }
+
+    records = wrapper._scenario_effect_failure_records(
+        request,
+        applied_by_id=preliminary,
+        failing_ids=set(),
+        reason="another effect failed before takeoff",
+        unsupported=False,
+    )
+
+    assert all(record["status"] == "skipped" for record in records)
+    assert all("_activation_pending" not in record for record in records)
 
 
 def test_site_dry_run_writes_explicit_unphysical_effect_evidence(

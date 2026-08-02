@@ -60,6 +60,13 @@ BUNDLED_RUNTIME_EFFECT_IDS = frozenset(
         "scenario_type.battery_degraded",
     }
 )
+BUNDLED_WIND_ACTIVATION_EFFECT_IDS = frozenset(
+    {
+        *BUNDLED_STEADY_WIND_EFFECT_IDS,
+        "wind_gusts",
+        "scenario_type.turbulence",
+    }
+)
 BAROMETER_PRESSURE_PA_PER_ALTITUDE_M = 12.0
 # Gazebo Harmonic 8 applies NavSat horizontal Gaussian noise directly to the
 # latitude/longitude degree values even though the SDFormat 1.11 schema labels
@@ -713,7 +720,8 @@ def _compile_bundled_runtime_profile_unchecked(
     effects = [
         effect
         for effect in request.get("effects", [])
-        if effect.get("effect_id") in BUNDLED_RUNTIME_EFFECT_IDS
+        if effect.get("effect_id")
+        in (BUNDLED_RUNTIME_EFFECT_IDS | BUNDLED_WIND_ACTIVATION_EFFECT_IDS)
     ]
     if not effects:
         return None
@@ -723,6 +731,30 @@ def _compile_bundled_runtime_profile_unchecked(
         "requested_effect_ids": sorted(by_id),
         "execution_identity_sha256": _value_hash(request.get("execution_identity", {})),
     }
+
+    requested_wind_ids = sorted(BUNDLED_WIND_ACTIVATION_EFFECT_IDS & set(by_id))
+    if requested_wind_ids:
+        compiled_wind = _compile_bundled_steady_wind_unchecked(request)
+        compiled_sdf = _compile_bundled_sdf_profile_unchecked(request)
+        gust_profile = compiled_sdf.get("wind_gust") if compiled_sdf is not None else None
+        vector = (
+            gust_profile["mean_linear_velocity_mps"]
+            if isinstance(gust_profile, dict)
+            else compiled_wind["linear_velocity_mps"]
+            if compiled_wind is not None
+            else None
+        )
+        if vector is None:
+            raise ScenarioEffectContractError(
+                "wind activation effects did not compile a target Gazebo wind vector"
+            )
+        profile["wind_activation"] = {
+            "linear_velocity_mps": vector,
+            "activation_phase": "after_stable_hover_before_track_entry",
+            "topic_suffix": "/wind",
+            "readback_service_suffix": "/wind_info",
+            "effect_ids": requested_wind_ids,
+        }
 
     gps_ids = {
         "sensor_degradation.dropout_rate",
@@ -2074,6 +2106,7 @@ def bundled_launcher_capabilities() -> dict[str, Any]:
 __all__ = [
     "BUNDLED_RUNTIME_EFFECT_IDS",
     "BUNDLED_STEADY_WIND_EFFECT_IDS",
+    "BUNDLED_WIND_ACTIVATION_EFFECT_IDS",
     "BUNDLED_SDF_PROFILE_EFFECT_IDS",
     "DEFAULT_SCENARIO_STEADY_WIND_MPS",
     "EVIDENCE_ARTIFACT_NAME",

@@ -213,6 +213,70 @@ def test_fixed_duty_dropout_schedule_is_seeded_and_rate_bounded():
     assert sum(first) == 3
 
 
+def test_gazebo_wind_activator_publishes_and_reads_back_exact_vector(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = [
+        subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+        subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout=(
+                "linear_velocity { x: 0 y: 3 z: 0 }\n"
+                "enable_wind: true\n"
+            ),
+            stderr="",
+        ),
+    ]
+    commands: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        return responses.pop(0)
+
+    monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
+    monkeypatch.setattr(executor.subprocess, "run", fake_run)
+    result = executor._activate_gazebo_wind_profile(
+        world="default",
+        profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
+        activation_t_s=2.5,
+    )
+
+    assert commands[0][1:3] == ["topic", "-t"]
+    assert commands[0][3] == "/world/default/wind"
+    assert "y: 3" in commands[0][-1]
+    assert commands[1][1:4] == ["service", "-s", "/world/default/wind_info"]
+    assert result["readback"]["value"] == {
+        "linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0},
+        "enable_wind": True,
+    }
+    assert result["activation"]["value"]["activation_t_s"] == 2.5
+
+
+def test_gazebo_wind_activator_rejects_mismatched_readback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = [
+        subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr=""),
+        subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="linear_velocity { x: 0 y: 2 z: 0 }\nenable_wind: true\n",
+            stderr="",
+        ),
+    ]
+    monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
+    monkeypatch.setattr(executor.subprocess, "run", lambda *_args, **_kwargs: responses.pop(0))
+    monkeypatch.setenv("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "1")
+
+    with pytest.raises(RuntimeError, match="post-hover wind activation was not verified"):
+        executor._activate_gazebo_wind_profile(
+            world="default",
+            profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
+            activation_t_s=2.5,
+        )
+
+
 def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
     tmp_path: Path,
 ) -> None:
@@ -468,6 +532,152 @@ def test_executor_waits_for_continuously_stable_hover_before_track_entry(
         "land": "command_sent",
         "close": "completed",
     }
+
+
+def test_executor_activates_wind_after_hover_and_before_track_entry(tmp_path: Path) -> None:
+    request = scenario_effects.build_scenario_effect_request(
+        execution_identity={
+            "trial_id": "trial-wind",
+            "job_id": "job-wind",
+            "candidate_id": "candidate-wind",
+            "seed": 17,
+            "attempt_count": 1,
+        },
+        scenario_type="nominal",
+        scenario_config={"wind_mps": 3.0},
+        job_config={
+            "wind": {"north": 3.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+    profile = scenario_effects.compile_bundled_runtime_profile(request)
+    assert profile is not None
+    events: list[str] = []
+
+    class RecordingClient(executor.FakeOffboardClient):
+        async def set_position_ned(self, setpoint: executor.Setpoint) -> None:
+            if setpoint.north_m == 2.0:
+                events.append("track")
+            await super().set_position_ned(setpoint)
+
+    def activate_wind(**kwargs):
+        events.append("wind")
+        value = {
+            "linear_velocity_mps": kwargs["profile"]["linear_velocity_mps"],
+            "enable_wind": True,
+        }
+        return {
+            "readback": {
+                "source": "/world/default/wind_info",
+                "kind": "readback",
+                "value": value,
+                "sha256": scenario_effects.scenario_effect_value_sha256(value),
+            },
+            "activation": {
+                "source": "/world/default/wind",
+                "kind": "acknowledgement",
+                "value": {
+                    "phase": "after_stable_hover_before_track_entry",
+                    "activation_t_s": kwargs["activation_t_s"],
+                },
+            },
+        }
+
+    evidence_path = tmp_path / scenario_effects.RUNTIME_EVIDENCE_ARTIFACT_NAME
+    timing_path = tmp_path / "offboard_timing.json"
+    asyncio.run(
+        executor.run_executor(
+            RecordingClient(),
+            [
+                executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+                executor.Setpoint(2.0, 0.0, -3.0, 0.0),
+            ],
+            connection="udp://:14540",
+            takeoff_timeout_seconds=1.0,
+            track_timeout_seconds=5.0,
+            rate_hz=100.0,
+            land_after=True,
+            log_path=tmp_path / "offboard.log",
+            track_start_index=1,
+            track_end_index=1,
+            timing_path=timing_path,
+            scenario_engine=scenario_effects,
+            scenario_request=request,
+            runtime_profile=profile,
+            runtime_evidence_path=evidence_path,
+            world="default",
+            wind_activator=activate_wind,
+        )
+    )
+
+    assert events == ["wind", "track"]
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["takeoff_stable_t"] <= timing["wind_activation"]["activation_t_s"]
+    assert timing["wind_activation"]["activation_t_s"] <= timing["track_start_t"]
+    artifact = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert artifact["status"] == "complete"
+    assert {item["effect_id"] for item in artifact["records"]} == {
+        "job_config.wind",
+        "scenario_config.wind_mps",
+    }
+
+
+def test_executor_fails_closed_when_post_hover_wind_readback_fails(tmp_path: Path) -> None:
+    request = scenario_effects.build_scenario_effect_request(
+        execution_identity={
+            "trial_id": "trial-wind-fail",
+            "job_id": "job-wind-fail",
+            "candidate_id": "candidate-wind-fail",
+            "seed": 18,
+            "attempt_count": 1,
+        },
+        scenario_type="nominal",
+        scenario_config={"wind_mps": 3.0},
+        job_config={
+            "wind": {"north": 3.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+    profile = scenario_effects.compile_bundled_runtime_profile(request)
+    assert profile is not None
+    client = executor.FakeOffboardClient()
+    evidence_path = tmp_path / scenario_effects.RUNTIME_EVIDENCE_ARTIFACT_NAME
+
+    def reject_wind(**_kwargs):
+        raise RuntimeError("wind readback mismatch")
+
+    with pytest.raises(RuntimeError, match="wind readback mismatch"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [
+                    executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+                    executor.Setpoint(2.0, 0.0, -3.0, 0.0),
+                ],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=5.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                track_start_index=1,
+                track_end_index=1,
+                scenario_engine=scenario_effects,
+                scenario_request=request,
+                runtime_profile=profile,
+                runtime_evidence_path=evidence_path,
+                wind_activator=reject_wind,
+            )
+        )
+
+    assert all(setpoint.north_m == 0.0 for setpoint in client.setpoints)
+    assert client.landed is True
+    assert client.closed is True
+    artifact = json.loads(evidence_path.read_text(encoding="utf-8"))
+    assert artifact["status"] == "failed"
+    assert all(item["status"] == "failed" for item in artifact["records"])
 
 
 def test_executor_fails_closed_when_hover_velocity_never_stabilizes(

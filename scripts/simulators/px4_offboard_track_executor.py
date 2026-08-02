@@ -22,8 +22,12 @@ import hashlib
 import json
 import math
 import os
+import re
+import shutil
+import subprocess
 import sys
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -559,6 +563,143 @@ def _canonical_sha256(value: object) -> str:
     ).hexdigest()
 
 
+def _parse_gazebo_wind_info(response_text: str) -> dict[str, Any]:
+    block = re.search(r"linear_velocity\s*\{(?P<body>.*?)\}", response_text, re.DOTALL)
+    if block is None:
+        raise RuntimeError("Gazebo wind_info response omitted linear_velocity")
+    vector: dict[str, float] = {}
+    for axis in ("x", "y", "z"):
+        match = re.search(
+            rf"\b{axis}\s*:\s*([-+0-9.eE]+)",
+            block.group("body"),
+        )
+        if match is None:
+            raise RuntimeError(f"Gazebo wind_info response omitted {axis}")
+        value = float(match.group(1))
+        if not math.isfinite(value):
+            raise RuntimeError(f"Gazebo wind_info returned non-finite {axis}")
+        vector[axis] = round(value, 12)
+    enabled = re.search(r"\benable_wind\s*:\s*(true|false)", response_text)
+    if enabled is None:
+        raise RuntimeError("Gazebo wind_info response omitted enable_wind")
+    return {
+        "linear_velocity_mps": vector,
+        "enable_wind": enabled.group(1) == "true",
+    }
+
+
+def _activate_gazebo_wind_profile(
+    *,
+    world: str,
+    profile: dict[str, Any],
+    activation_t_s: float,
+) -> dict[str, Any]:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", world):
+        raise RuntimeError("Gazebo world name is invalid for post-hover wind activation")
+    vector = profile.get("linear_velocity_mps")
+    if not isinstance(vector, dict) or set(vector) != {"x", "y", "z"}:
+        raise RuntimeError("compiled wind activation vector is invalid")
+    requested = {
+        axis: _finite_float(vector[axis], f"wind_activation.{axis}")
+        for axis in ("x", "y", "z")
+    }
+    gz_cli = shutil.which("gz")
+    if not gz_cli:
+        raise RuntimeError("Gazebo gz CLI is unavailable for post-hover wind activation")
+    topic = f"/world/{world}/wind"
+    service = f"/world/{world}/wind_info"
+    message = (
+        "linear_velocity { "
+        f"x: {requested['x']:.17g} y: {requested['y']:.17g} z: {requested['z']:.17g}"
+        " } enable_wind: true"
+    )
+    publish = subprocess.run(  # noqa: S603
+        [gz_cli, "topic", "-t", topic, "-m", "gz.msgs.Wind", "-p", message],
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=10.0,
+    )
+    if publish.returncode != 0:
+        raise RuntimeError(
+            "Gazebo post-hover wind publish failed: "
+            f"exit={publish.returncode}, stderr={publish.stderr.strip()[:400]}"
+        )
+    try:
+        attempts = int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "10"))
+    except ValueError:
+        attempts = 10
+    attempts = min(50, max(1, attempts))
+    last_error = "no wind_info response"
+    readback: dict[str, Any] | None = None
+    for attempt in range(attempts):
+        response = subprocess.run(  # noqa: S603
+            [
+                gz_cli,
+                "service",
+                "-s",
+                service,
+                "--reqtype",
+                "gz.msgs.Empty",
+                "--reptype",
+                "gz.msgs.Wind",
+                "--timeout",
+                "5000",
+                "--req",
+                "",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=8.0,
+        )
+        try:
+            if response.returncode != 0:
+                raise RuntimeError(
+                    f"exit={response.returncode}, response="
+                    f"{(response.stdout + response.stderr).strip()[:400]}"
+                )
+            candidate = _parse_gazebo_wind_info(response.stdout + response.stderr)
+            matches = candidate["enable_wind"] is True and all(
+                math.isclose(
+                    candidate["linear_velocity_mps"][axis],
+                    requested[axis],
+                    rel_tol=1e-9,
+                    abs_tol=1e-9,
+                )
+                for axis in ("x", "y", "z")
+            )
+            if matches:
+                readback = candidate
+                break
+            last_error = f"mismatched readback {candidate}"
+        except (RuntimeError, ValueError) as exc:
+            last_error = str(exc)
+        if attempt + 1 < attempts:
+            time.sleep(0.1)
+    if readback is None:
+        raise RuntimeError(
+            "Gazebo post-hover wind activation was not verified: " + last_error
+        )
+    return {
+        "readback": {
+            "source": service,
+            "kind": "readback",
+            "value": readback,
+            "sha256": _canonical_sha256(readback),
+        },
+        "activation": {
+            "source": topic,
+            "kind": "acknowledgement",
+            "value": {
+                "phase": "after_stable_hover_before_track_entry",
+                "activation_t_s": round(activation_t_s, 12),
+                "readback_service": service,
+            },
+        },
+    }
+
+
 def compile_fixed_duty_schedule(
     *,
     requested_rate: float,
@@ -604,11 +745,12 @@ def _runtime_effect_records(
     records: list[dict[str, Any]] = []
     for effect_id in profile["requested_effect_ids"]:
         effect = requested_by_id[effect_id]
-        section = (
-            "gps_dropout"
-            if effect_id in profile.get("gps_dropout", {}).get("effect_ids", [])
-            else "battery"
-        )
+        if effect_id in profile.get("wind_activation", {}).get("effect_ids", []):
+            section = "wind_activation"
+        elif effect_id in profile.get("gps_dropout", {}).get("effect_ids", []):
+            section = "gps_dropout"
+        else:
+            section = "battery"
         if status != "complete":
             reason = error or "flight-timed scenario effect did not complete"
             records.append(
@@ -627,6 +769,26 @@ def _runtime_effect_records(
         observation = observations.get(section)
         if observation is None:
             raise RuntimeError(f"runtime effect evidence omitted {section}")
+        verification_observations = (
+            [observation["readback"], observation["activation"]]
+            if section == "wind_activation"
+            else [observation]
+        )
+        if section == "wind_activation":
+            capability_reason = (
+                "Gazebo wind was enabled only after the stable-hover gate and exact readback"
+            )
+            method = "gazebo_wind_topic_after_stable_hover_and_exact_readback"
+        elif section == "gps_dropout":
+            capability_reason = (
+                "PX4 GPS availability parameter and telemetry verified the schedule"
+            )
+            method = "mavsdk_sim_gps_used_plus_gps_info_telemetry_and_reset"
+        else:
+            capability_reason = (
+                "PX4 parameter readback and battery telemetry verified the profile"
+            )
+            method = "mavsdk_parameter_readback_and_battery_telemetry"
         records.append(
             {
                 "effect_id": effect_id,
@@ -634,11 +796,7 @@ def _runtime_effect_records(
                 "status": "applied",
                 "capability": {
                     "status": "available",
-                    "reason": (
-                        "PX4 GPS availability parameter and telemetry verified the schedule"
-                        if section == "gps_dropout"
-                        else "PX4 parameter readback and battery telemetry verified the profile"
-                    ),
+                    "reason": capability_reason,
                 },
                 "evidence": {
                     "requested_value_sha256": engine.scenario_effect_value_sha256(
@@ -647,12 +805,8 @@ def _runtime_effect_records(
                     "compiled_runtime_profile": profile,
                     "verification": {
                         "status": "verified",
-                        "method": (
-                            "mavsdk_sim_gps_used_plus_gps_info_telemetry_and_reset"
-                            if section == "gps_dropout"
-                            else "mavsdk_parameter_readback_and_battery_telemetry"
-                        ),
-                        "observations": [observation],
+                        "method": method,
+                        "observations": verification_observations,
                     },
                 },
             }
@@ -1243,6 +1397,8 @@ async def run_executor(
     takeoff_vertical_tolerance_m: float = 0.25,
     takeoff_horizontal_speed_tolerance_m_s: float = 0.35,
     takeoff_vertical_speed_tolerance_m_s: float = 0.25,
+    world: str = "default",
+    wind_activator: Callable[..., dict[str, Any]] = _activate_gazebo_wind_profile,
 ) -> None:
     if not math.isfinite(rate_hz) or rate_hz <= 0 or rate_hz > MAX_SETPOINT_RATE_HZ:
         raise ValueError(f"rate_hz must be finite and in (0, {MAX_SETPOINT_RATE_HZ:g}]")
@@ -1289,6 +1445,7 @@ async def run_executor(
     battery_details: dict[str, Any] | None = None
     gps_profile = runtime_profile.get("gps_dropout") if runtime_profile else None
     battery_profile = runtime_profile.get("battery") if runtime_profile else None
+    wind_profile = runtime_profile.get("wind_activation") if runtime_profile else None
     gps_schedule: list[bool] = []
     gps_last_tick = -1
     gps_off = False
@@ -1371,6 +1528,24 @@ async def run_executor(
         )
         timing["takeoff_stable_t"] = time.monotonic() - exec_start
         _log(log_path, "takeoff telemetry gate achieved stable hover")
+
+        if isinstance(wind_profile, dict):
+            activation_t_s = time.monotonic() - exec_start
+            wind_observation = await asyncio.to_thread(
+                wind_activator,
+                world=world,
+                profile=wind_profile,
+                activation_t_s=activation_t_s,
+            )
+            if not isinstance(wind_observation, dict):
+                raise RuntimeError("post-hover wind activator returned invalid evidence")
+            runtime_observations["wind_activation"] = wind_observation
+            timing["wind_activation"] = {
+                "status": "verified",
+                "phase": "after_stable_hover_before_track_entry",
+                "activation_t_s": round(activation_t_s, 12),
+            }
+            _log(log_path, "post-hover Gazebo wind activation readback verified")
 
         if isinstance(battery_profile, dict):
             battery_details = await _prepare_battery_profile(
@@ -1693,6 +1868,7 @@ def main(argv: list[str] | None = None) -> int:
                     args.takeoff_horizontal_speed_tolerance_m_s
                 ),
                 takeoff_vertical_speed_tolerance_m_s=(args.takeoff_vertical_speed_tolerance_m_s),
+                world=args.world,
             )
         )
         _log(args.log, "executor completed successfully")

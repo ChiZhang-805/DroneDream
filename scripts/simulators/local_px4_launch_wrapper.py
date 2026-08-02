@@ -415,6 +415,62 @@ def _load_runtime_effect_records(
     return by_id
 
 
+def _merge_staged_wind_effect_records(
+    engine: Any,
+    preliminary_by_id: dict[str, dict[str, Any]],
+    runtime_by_id: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    merged = dict(runtime_by_id)
+    for effect_id in engine.BUNDLED_WIND_ACTIVATION_EFFECT_IDS:
+        preliminary = preliminary_by_id.get(effect_id)
+        runtime = runtime_by_id.get(effect_id)
+        if preliminary is None or runtime is None or runtime.get("status") != "applied":
+            continue
+        preliminary_details = preliminary.get("evidence")
+        runtime_details = runtime.get("evidence")
+        if not isinstance(preliminary_details, dict) or not isinstance(runtime_details, dict):
+            raise RuntimeError(f"staged wind evidence for {effect_id} is malformed")
+        preliminary_verification = preliminary_details.get("verification")
+        runtime_verification = runtime_details.get("verification")
+        if not isinstance(preliminary_verification, dict) or not isinstance(
+            runtime_verification, dict
+        ):
+            raise RuntimeError(f"staged wind verification for {effect_id} is malformed")
+        structural_observations = [
+            item
+            for item in preliminary_verification.get("observations", [])
+            if not (
+                isinstance(item, dict)
+                and item.get("kind") == "readback"
+                and isinstance(item.get("source"), str)
+                and item["source"].endswith("/wind_info")
+            )
+        ]
+        activation_observations = runtime_verification.get("observations")
+        if not isinstance(activation_observations, list) or not structural_observations:
+            raise RuntimeError(f"staged wind observations for {effect_id} are incomplete")
+        combined = copy.deepcopy(runtime)
+        combined_details = combined["evidence"]
+        for field in ("compiled_wind", "compiled_sdf_profile"):
+            if field in preliminary_details:
+                combined_details[field] = copy.deepcopy(preliminary_details[field])
+        combined_details["verification"] = {
+            "status": "verified",
+            "method": "gazebo_zero_wind_takeoff_then_post_hover_activation_and_sdf_readback",
+            "observations": copy.deepcopy(activation_observations)
+            + copy.deepcopy(structural_observations),
+        }
+        combined["capability"] = {
+            "status": "available",
+            "reason": (
+                "Gazebo started at zero wind, stable hover was verified, then the requested "
+                "wind was activated and read back before track entry"
+            ),
+        }
+        merged[effect_id] = combined
+    return merged
+
+
 def _scenario_effect_failure_records(
     request: dict[str, Any],
     *,
@@ -430,7 +486,9 @@ def _scenario_effect_failure_records(
     records: list[dict[str, Any]] = []
     for effect in request["effects"]:
         effect_id = effect["effect_id"]
-        if effect_id in applied_by_id:
+        if effect_id in applied_by_id and not applied_by_id[effect_id].get(
+            "_activation_pending"
+        ):
             records.append(applied_by_id[effect_id])
         elif effect_id in failing_ids:
             records.append(
@@ -1069,7 +1127,6 @@ def _prepare_steady_wind_overlay(
         raise RuntimeError("pinned PX4 Gazebo server config has no system plugins")
     materialized_plugins: list[ET.Element] = []
     wind_plugin_observation: dict[str, Any] | None = None
-    vector: dict[str, float] | None = None
     if wind_requested:
         plugin_keys = {
             (plugin.get("filename"), plugin.get("name")) for plugin in world_xml.findall("plugin")
@@ -1096,12 +1153,7 @@ def _prepare_steady_wind_overlay(
         linear_velocity = wind_xml.find("linear_velocity")
         if linear_velocity is None:
             linear_velocity = ET.SubElement(wind_xml, "linear_velocity")
-        vector = (
-            gust_profile["mean_linear_velocity_mps"]
-            if gust_profile is not None
-            else compiled["linear_velocity_mps"]
-        )
-        linear_velocity.text = f"{vector['x']:.17g} {vector['y']:.17g} {vector['z']:.17g}"
+        linear_velocity.text = "0 0 0"
 
         plugins = [
             plugin
@@ -1713,6 +1765,7 @@ def _apply_steady_wind_effects(
         _parse_int(os.environ.get("PX4_GAZEBO_WIND_TIMEOUT_MS"), default=5000),
     )
     vector: dict[str, float] | None = None
+    initial_vector = {"x": 0.0, "y": 0.0, "z": 0.0}
     readback: dict[str, Any] | None = None
     if wind_requested:
         vector = (
@@ -1722,7 +1775,8 @@ def _apply_steady_wind_effects(
         )
         wind_message = (
             "linear_velocity { "
-            f"x: {vector['x']:.17g} y: {vector['y']:.17g} z: {vector['z']:.17g}"
+            f"x: {initial_vector['x']:.17g} y: {initial_vector['y']:.17g} "
+            f"z: {initial_vector['z']:.17g}"
             " } enable_wind: true"
         )
         _run_gazebo_command(
@@ -1775,7 +1829,7 @@ def _apply_steady_wind_effects(
                 vector_matches = all(
                     math.isclose(
                         candidate["linear_velocity_mps"][axis],
-                        vector[axis],
+                        initial_vector[axis],
                         rel_tol=1e-9,
                         abs_tol=1e-9,
                     )
@@ -1797,7 +1851,7 @@ def _apply_steady_wind_effects(
                 time.sleep(0.1)
         if readback is None:
             raise RuntimeError(
-                "Gazebo wind_info never matched the requested wind profile: " + readback_error
+                "Gazebo wind_info never proved the zero-wind takeoff profile: " + readback_error
             )
 
     runtime_sdf: dict[str, Any] | None = None
@@ -1937,8 +1991,9 @@ def _apply_steady_wind_effects(
             capability_status="available",
             reason=(
                 (
-                    "Gazebo wind_info matched the compiled ENU vector and generated "
-                    f"runtime SDF proved {expected_vehicle_model}/base_link WindMode"
+                    "Gazebo wind_info proved zero wind for safe takeoff and generated runtime "
+                    f"SDF proved {expected_vehicle_model}/base_link WindMode; requested wind "
+                    "must be activated after the stable-hover gate"
                 )
                 if is_steady_wind
                 else (
@@ -1955,7 +2010,7 @@ def _apply_steady_wind_effects(
                 "verification": {
                     "status": "verified",
                     "method": (
-                        "gazebo_wind_info_and_generated_world_sdf"
+                        "gazebo_zero_wind_takeoff_and_generated_world_sdf"
                         if is_steady_wind
                         else "trial_local_sdf_and_generated_world_sdf"
                     ),
@@ -1963,6 +2018,8 @@ def _apply_steady_wind_effects(
                 },
             },
         )
+        if effect_id in engine.BUNDLED_WIND_ACTIVATION_EFFECT_IDS:
+            records[effect_id]["_activation_pending"] = True
     return records
 
 
@@ -3678,7 +3735,11 @@ def main() -> int:
             runtime_effect_ids = {
                 effect["effect_id"]
                 for effect in scenario_effect_request["effects"]
-                if effect["effect_id"] in scenario_engine.BUNDLED_RUNTIME_EFFECT_IDS
+                if effect["effect_id"]
+                in (
+                    scenario_engine.BUNDLED_RUNTIME_EFFECT_IDS
+                    | scenario_engine.BUNDLED_WIND_ACTIVATION_EFFECT_IDS
+                )
             }
             actuator_failure_ids = {
                 effect["effect_id"]
@@ -3995,6 +4056,11 @@ def main() -> int:
                     scenario_engine,
                     scenario_effect_request,
                     run_dir=args.run_dir,
+                )
+                runtime_records = _merge_staged_wind_effect_records(
+                    scenario_engine,
+                    scenario_applied_by_id,
+                    runtime_records,
                 )
                 scenario_applied_by_id.update(runtime_records)
                 expected_effect_ids = {
