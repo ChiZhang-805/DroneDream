@@ -214,7 +214,6 @@ class MavsdkOffboardClient:
                         return sample
                     if (
                         allow_gnss_warning_arm_authority
-                        and sample.global_position_ok
                         and sample.home_position_ok
                         and sample.local_position_ok
                         and not sample.armable
@@ -1773,7 +1772,6 @@ async def run_executor(
             takeoff_gate["gnss_warning_arm_authority"] = {
                 "requested_by_effect": "sensor_degradation.gps_noise_m",
                 "required_continuous_health": {
-                    "global_position_ok": True,
                     "home_position_ok": True,
                     "local_position_ok": True,
                     "sample_count": GNSS_WARNING_READINESS_SAMPLE_COUNT,
@@ -1797,12 +1795,14 @@ async def run_executor(
                 name: takeoff_gate["readiness"][name]
                 for name in (
                     "connected",
-                    "global_position_ok",
                     "home_position_ok",
                     "local_position_ok",
                 )
             }
-            takeoff_gate["advisory_readiness"] = {"armable": health.armable}
+            takeoff_gate["advisory_readiness"] = {
+                "global_position_ok": health.global_position_ok,
+                "armable": health.armable,
+            }
             takeoff_gate["readiness_observed"] = all(
                 takeoff_gate["required_readiness"].values()
             )

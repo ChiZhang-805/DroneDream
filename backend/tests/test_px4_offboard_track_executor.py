@@ -1267,7 +1267,7 @@ def test_executor_defers_intentional_gnss_warning_to_verified_px4_arm_authority(
             self.allow_policy_seen = allow_gnss_warning_arm_authority
             return executor.TelemetryHealth(
                 connected=True,
-                global_position_ok=True,
+                global_position_ok=False,
                 home_position_ok=True,
                 local_position_ok=True,
                 armable=False,
@@ -1310,7 +1310,10 @@ def test_executor_defers_intentional_gnss_warning_to_verified_px4_arm_authority(
         "intentional_gnss_warning_with_px4_arm_command_authority"
     )
     assert gate["readiness_observed"] is True
-    assert gate["advisory_readiness"] == {"armable": False}
+    assert gate["advisory_readiness"] == {
+        "global_position_ok": False,
+        "armable": False,
+    }
     assert gate["gnss_warning_arm_authority"]["px4_parameter"] == {
         "name": "COM_ARM_WO_GPS",
         "required": 1,
@@ -1556,7 +1559,44 @@ def test_mavsdk_readiness_accepts_stable_intentional_gnss_warning_for_px4_arm_au
     )
 
 
-def test_mavsdk_gnss_warning_readiness_still_requires_global_position():
+def test_mavsdk_gnss_warning_readiness_allows_advisory_global_position_failure():
+    class CoreStub:
+        async def connection_state(self):
+            yield type("ConnectionState", (), {"is_connected": True})()
+
+    class TelemetryStub:
+        async def health(self):
+            for _ in range(executor.GNSS_WARNING_READINESS_SAMPLE_COUNT):
+                yield type(
+                    "Health",
+                    (),
+                    {
+                        "is_global_position_ok": False,
+                        "is_home_position_ok": True,
+                        "is_local_position_ok": True,
+                        "is_armable": False,
+                    },
+                )()
+
+    class SystemStub:
+        core = CoreStub()
+        telemetry = TelemetryStub()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = SystemStub()
+
+    assert asyncio.run(
+        client.wait_until_ready(1.0, allow_gnss_warning_arm_authority=True)
+    ) == executor.TelemetryHealth(
+        connected=True,
+        global_position_ok=False,
+        home_position_ok=True,
+        local_position_ok=True,
+        armable=False,
+    )
+
+
+def test_mavsdk_gnss_warning_readiness_still_requires_local_position():
     class CoreStub:
         async def connection_state(self):
             yield type("ConnectionState", (), {"is_connected": True})()
@@ -1570,7 +1610,7 @@ def test_mavsdk_gnss_warning_readiness_still_requires_global_position():
                     {
                         "is_global_position_ok": False,
                         "is_home_position_ok": True,
-                        "is_local_position_ok": True,
+                        "is_local_position_ok": False,
                         "is_armable": False,
                     },
                 )()
@@ -1583,7 +1623,7 @@ def test_mavsdk_gnss_warning_readiness_still_requires_global_position():
     client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
     client._system = SystemStub()
 
-    with pytest.raises(TimeoutError, match="global_position_ok=false"):
+    with pytest.raises(TimeoutError, match="local_position_ok=false"):
         asyncio.run(
             client.wait_until_ready(0.01, allow_gnss_warning_arm_authority=True)
         )
