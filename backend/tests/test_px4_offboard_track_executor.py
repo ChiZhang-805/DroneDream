@@ -393,6 +393,38 @@ def test_gazebo_wind_activator_treats_connection_hint_as_advisory(
     assert result["activation"]["value"]["publisher_connections_observed"] is False
 
 
+def test_gazebo_wind_activator_reuses_prepared_transport(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    publisher = mock.Mock()
+    publisher.has_connections.return_value = True
+    publisher.publish.return_value = True
+    prepared = (object(), publisher, object())
+    response = subprocess.CompletedProcess(
+        args=[],
+        returncode=0,
+        stdout="linear_velocity { y: 3 }\nenable_wind: true\n",
+        stderr="",
+    )
+    monkeypatch.setattr(executor.shutil, "which", lambda _name: "/usr/bin/gz")
+    monkeypatch.setattr(executor.subprocess, "run", lambda *_args, **_kwargs: response)
+    monkeypatch.setattr(
+        executor,
+        "_create_gazebo_wind_publisher",
+        lambda *_args, **_kwargs: pytest.fail("prepared publisher must be reused"),
+    )
+
+    result = executor._activate_gazebo_wind_profile(
+        world="default",
+        profile={"linear_velocity_mps": {"x": 0.0, "y": 3.0, "z": 0.0}},
+        activation_t_s=2.5,
+        prepared_transport=prepared,
+    )
+
+    assert publisher.publish.call_count == 1
+    assert result["activation"]["value"]["transport_prepared_before_takeoff"] is True
+
+
 def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
     tmp_path: Path,
 ) -> None:
