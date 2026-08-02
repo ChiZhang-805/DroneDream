@@ -726,6 +726,27 @@ def _set_gaussian_stddev(container: ET.Element, value: float) -> None:
     _ensure_xml_path(noise, "stddev").text = f"{value:.17g}"
 
 
+def _set_navsat_noise(
+    container: ET.Element,
+    *,
+    white_stddev_m: float,
+    dynamic_bias_stddev_m: float,
+    dynamic_bias_correlation_time_s: float,
+) -> None:
+    noise = _ensure_xml_path(container, "noise")
+    noise.set("type", "gaussian")
+    _ensure_xml_path(noise, "mean").text = "0"
+    _ensure_xml_path(noise, "stddev").text = f"{white_stddev_m:.17g}"
+    _ensure_xml_path(noise, "bias_mean").text = "0"
+    _ensure_xml_path(noise, "bias_stddev").text = "0"
+    _ensure_xml_path(noise, "dynamic_bias_stddev").text = (
+        f"{dynamic_bias_stddev_m:.17g}"
+    )
+    _ensure_xml_path(noise, "dynamic_bias_correlation_time").text = (
+        f"{dynamic_bias_correlation_time_s:.17g}"
+    )
+
+
 def _apply_sensor_noise_sdf(
     base_link: ET.Element,
     profile: dict[str, Any],
@@ -737,11 +758,19 @@ def _apply_sensor_noise_sdf(
         raise RuntimeError("pinned x500_base model is missing a required physical sensor")
 
     gps_stddev_m = float(profile["gps_position_stddev_m"])
-    gps_horizontal_stddev_m = float(profile["gazebo_navsat_horizontal_stddev_m"])
-    gps_vertical_stddev_m = float(profile["gazebo_navsat_vertical_stddev_m"])
+    gps_white_stddev_m = float(profile["gazebo_navsat_white_stddev_m"])
+    gps_dynamic_bias_stddev_m = float(profile["gazebo_navsat_dynamic_bias_stddev_m"])
+    gps_dynamic_bias_correlation_time_s = float(
+        profile["gazebo_navsat_dynamic_bias_correlation_time_s"]
+    )
     navsat = _ensure_xml_path(gps, "navsat", "position_sensing")
-    _set_gaussian_stddev(_ensure_xml_path(navsat, "horizontal"), gps_horizontal_stddev_m)
-    _set_gaussian_stddev(_ensure_xml_path(navsat, "vertical"), gps_vertical_stddev_m)
+    for axis in ("horizontal", "vertical"):
+        _set_navsat_noise(
+            _ensure_xml_path(navsat, axis),
+            white_stddev_m=gps_white_stddev_m,
+            dynamic_bias_stddev_m=gps_dynamic_bias_stddev_m,
+            dynamic_bias_correlation_time_s=gps_dynamic_bias_correlation_time_s,
+        )
 
     barometer_stddev = float(profile["barometer_pressure_stddev_pa"])
     pressure = _ensure_xml_path(barometer, "air_pressure", "pressure")
@@ -767,8 +796,14 @@ def _apply_sensor_noise_sdf(
             expected_imu[f"{group}.{axis}"] = scaled
     return {
         "gps_position_stddev_m": gps_stddev_m,
-        "gazebo_navsat_horizontal_stddev_m": gps_horizontal_stddev_m,
-        "gazebo_navsat_vertical_stddev_m": gps_vertical_stddev_m,
+        "gazebo_navsat_white_stddev_m": gps_white_stddev_m,
+        "gazebo_navsat_dynamic_bias_stddev_m": gps_dynamic_bias_stddev_m,
+        "gazebo_navsat_dynamic_bias_correlation_time_s": (
+            gps_dynamic_bias_correlation_time_s
+        ),
+        "gazebo_navsat_noise_composition_policy": str(
+            profile["gazebo_navsat_noise_composition_policy"]
+        ),
         "gazebo_navsat_unit_policy": str(profile["gazebo_navsat_unit_policy"]),
         "barometer_pressure_stddev_pa": barometer_stddev,
         "imu_stddev": expected_imu,
@@ -1508,20 +1543,30 @@ def _runtime_sdf_profile_observation(
         imu = base_link.find("./sensor[@name='imu_sensor']")
         if gps is None or barometer is None or imu is None:
             raise RuntimeError("generated runtime SDF omitted a profiled x500 sensor")
-        for axis, expected_key in (
-            ("horizontal", "gazebo_navsat_horizontal_stddev_m"),
-            ("vertical", "gazebo_navsat_vertical_stddev_m"),
-        ):
-            actual = _required_float_text(
-                gps,
-                f"./navsat/position_sensing/{axis}/noise/stddev",
-                context=f"navsat {axis} position noise",
-            )
-            _assert_runtime_float(
-                actual,
-                float(expected_sensor[expected_key]),
-                context=f"navsat {axis} position noise",
-            )
+        for axis in ("horizontal", "vertical"):
+            for path, expected_key, label in (
+                ("stddev", "gazebo_navsat_white_stddev_m", "white noise"),
+                (
+                    "dynamic_bias_stddev",
+                    "gazebo_navsat_dynamic_bias_stddev_m",
+                    "dynamic bias",
+                ),
+                (
+                    "dynamic_bias_correlation_time",
+                    "gazebo_navsat_dynamic_bias_correlation_time_s",
+                    "dynamic bias correlation time",
+                ),
+            ):
+                actual = _required_float_text(
+                    gps,
+                    f"./navsat/position_sensing/{axis}/noise/{path}",
+                    context=f"navsat {axis} {label}",
+                )
+                _assert_runtime_float(
+                    actual,
+                    float(expected_sensor[expected_key]),
+                    context=f"navsat {axis} {label}",
+                )
         actual_baro = _required_float_text(
             barometer,
             "./air_pressure/pressure/noise/stddev",

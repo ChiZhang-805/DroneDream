@@ -848,8 +848,16 @@ def test_sdf_profile_mutators_round_trip_generated_runtime_sdf(tmp_path: Path) -
     }
     navsat = base_link.find("./sensor[@name='navsat_sensor']/navsat/position_sensing")
     assert navsat is not None
-    assert float(navsat.findtext("./horizontal/noise/stddev", default="nan")) == 2.0
-    assert float(navsat.findtext("./vertical/noise/stddev", default="nan")) == 2.0
+    for axis in ("horizontal", "vertical"):
+        assert float(navsat.findtext(f"./{axis}/noise/stddev", default="nan")) == 0.02
+        assert float(
+            navsat.findtext(f"./{axis}/noise/dynamic_bias_stddev", default="nan")
+        ) == pytest.approx(math.sqrt(4.0 - 0.0004))
+        assert float(
+            navsat.findtext(
+                f"./{axis}/noise/dynamic_bias_correlation_time", default="nan"
+            )
+        ) == 60.0
     vehicle_root = ET.fromstring(
         """
 <sdf version="1.9">

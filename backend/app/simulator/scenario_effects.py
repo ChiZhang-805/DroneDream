@@ -68,6 +68,8 @@ BUNDLED_WIND_ACTIVATION_EFFECT_IDS = frozenset(
     }
 )
 BAROMETER_PRESSURE_PA_PER_ALTITUDE_M = 12.0
+NAVSAT_WHITE_NOISE_FRACTION = 0.01
+NAVSAT_DYNAMIC_BIAS_CORRELATION_TIME_S = 60.0
 DEFAULT_TURBULENCE_PEAK_MPS = 5.0
 DEFAULT_TURBULENCE_PERIOD_S = 5.0
 DEFAULT_PAYLOAD_MASS_KG = 1.0
@@ -602,6 +604,10 @@ def _compile_bundled_sdf_profile_unchecked(
                 lower=0.0,
                 upper=10.0,
             )
+        navsat_white_stddev_m = gps_stddev * NAVSAT_WHITE_NOISE_FRACTION
+        navsat_dynamic_bias_stddev_m = math.sqrt(
+            max(0.0, gps_stddev**2 - navsat_white_stddev_m**2)
+        )
         profile["sensor_noise"] = {
             "preset": preset_name,
             "gps_position_stddev_m": gps_stddev,
@@ -609,8 +615,14 @@ def _compile_bundled_sdf_profile_unchecked(
             # directions in metres.  Gazebo converts the horizontal offset to
             # geodetic coordinates internally; pre-converting it to degrees
             # made the applied disturbance 111,319x smaller than requested.
-            "gazebo_navsat_horizontal_stddev_m": gps_stddev,
-            "gazebo_navsat_vertical_stddev_m": gps_stddev,
+            "gazebo_navsat_white_stddev_m": navsat_white_stddev_m,
+            "gazebo_navsat_dynamic_bias_stddev_m": navsat_dynamic_bias_stddev_m,
+            "gazebo_navsat_dynamic_bias_correlation_time_s": (
+                NAVSAT_DYNAMIC_BIAS_CORRELATION_TIME_S
+            ),
+            "gazebo_navsat_noise_composition_policy": (
+                "requested-total-stddev-as-slow-bias-with-one-percent-white-noise-v1"
+            ),
             "gazebo_navsat_unit_policy": "sdformat-1.11-horizontal-metres-vertical-metres-v2",
             "barometer_pressure_stddev_pa": barometer_stddev_pa,
             "barometer_altitude_stddev_m": barometer_altitude_stddev_m,

@@ -1251,7 +1251,7 @@ def test_executor_fails_closed_when_px4_rejects_arm_after_preflight_readiness(
     assert gate["failure_reason"] == "readiness_or_preflight_failure"
 
 
-def test_executor_defers_intentional_gnss_warning_to_verified_px4_arm_authority(
+def test_executor_never_bypasses_non_armable_sensor_degradation(
     tmp_path: Path,
 ) -> None:
     class GnssWarningClient(executor.FakeOffboardClient):
@@ -1260,11 +1260,9 @@ def test_executor_defers_intentional_gnss_warning_to_verified_px4_arm_authority(
         async def wait_until_ready(
             self,
             timeout_seconds: float,
-            *,
-            allow_gnss_warning_arm_authority: bool = False,
         ) -> executor.TelemetryHealth:
             _ = timeout_seconds
-            self.allow_policy_seen = allow_gnss_warning_arm_authority
+            self.allow_policy_seen = False
             return executor.TelemetryHealth(
                 connected=True,
                 global_position_ok=False,
@@ -1285,68 +1283,7 @@ def test_executor_defers_intentional_gnss_warning_to_verified_px4_arm_authority(
         ]
     }
 
-    asyncio.run(
-        executor.run_executor(
-            client,
-            [executor.Setpoint(0.0, 0.0, -3.0, 0.0)],
-            connection="udp://:14540",
-            takeoff_timeout_seconds=1.0,
-            takeoff_climb_rate_m_s=5.0,
-            track_timeout_seconds=5.0,
-            rate_hz=100.0,
-            land_after=True,
-            log_path=tmp_path / "offboard.log",
-            timing_path=timing_path,
-            scenario_request=scenario_request,
-        )
-    )
-
-    assert client.allow_policy_seen is True
-    assert client.armed is True
-    assert client.landed is True
-    timing = json.loads(timing_path.read_text(encoding="utf-8"))
-    gate = timing["takeoff_gate"]
-    assert gate["readiness_policy"] == (
-        "intentional_gnss_warning_with_px4_arm_command_authority"
-    )
-    assert gate["readiness_observed"] is True
-    assert gate["advisory_readiness"] == {
-        "global_position_ok": False,
-        "armable": False,
-    }
-    assert gate["gnss_warning_arm_authority"]["px4_parameter"] == {
-        "name": "COM_ARM_WO_GPS",
-        "required": 1,
-        "readback": 1,
-    }
-    assert gate["px4_arm_command"] == "accepted"
-
-
-def test_executor_rejects_gnss_warning_path_without_warning_only_px4_policy(
-    tmp_path: Path,
-) -> None:
-    class GnssWarningClient(executor.FakeOffboardClient):
-        async def wait_until_ready(
-            self,
-            timeout_seconds: float,
-            *,
-            allow_gnss_warning_arm_authority: bool = False,
-        ) -> executor.TelemetryHealth:
-            _ = timeout_seconds
-            assert allow_gnss_warning_arm_authority is True
-            return executor.TelemetryHealth(
-                connected=True,
-                global_position_ok=True,
-                home_position_ok=True,
-                local_position_ok=True,
-                armable=False,
-            )
-
-    client = GnssWarningClient()
-    client.int_params["COM_ARM_WO_GPS"] = 0
-    timing_path = tmp_path / "offboard_timing.json"
-
-    with pytest.raises(RuntimeError, match="COM_ARM_WO_GPS=1, got 0"):
+    with pytest.raises(RuntimeError, match="must never bypass the preflight safety gate"):
         asyncio.run(
             executor.run_executor(
                 client,
@@ -1358,23 +1295,18 @@ def test_executor_rejects_gnss_warning_path_without_warning_only_px4_policy(
                 land_after=True,
                 log_path=tmp_path / "offboard.log",
                 timing_path=timing_path,
-                scenario_request={
-                    "effects": [
-                        {
-                            "effect_id": "sensor_degradation.gps_noise_m",
-                            "mechanism": "sdformat_sensor_noise",
-                            "requested_value": 0.6,
-                        }
-                    ]
-                },
+                scenario_request=scenario_request,
             )
         )
 
+    assert client.allow_policy_seen is False
     assert client.armed is False
     assert client.landed is False
     timing = json.loads(timing_path.read_text(encoding="utf-8"))
     gate = timing["takeoff_gate"]
-    assert gate["gnss_warning_arm_authority"]["px4_parameter"]["readback"] == 0
+    assert gate["readiness_observed"] is False
+    assert gate["advisory_readiness"] == {"global_position_ok": False}
+    assert "gnss_warning_arm_authority" not in gate
     assert gate["failure_reason"] == "readiness_or_preflight_failure"
 
 
@@ -1520,113 +1452,6 @@ def test_mavsdk_readiness_accepts_armable_local_navigation_without_global_positi
         local_position_ok=True,
         armable=True,
     )
-
-
-def test_mavsdk_readiness_accepts_stable_intentional_gnss_warning_for_px4_arm_authority():
-    class CoreStub:
-        async def connection_state(self):
-            yield type("ConnectionState", (), {"is_connected": True})()
-
-    class TelemetryStub:
-        async def health(self):
-            for _ in range(executor.GNSS_WARNING_READINESS_SAMPLE_COUNT):
-                yield type(
-                    "Health",
-                    (),
-                    {
-                        "is_global_position_ok": True,
-                        "is_home_position_ok": True,
-                        "is_local_position_ok": True,
-                        "is_armable": False,
-                    },
-                )()
-
-    class SystemStub:
-        core = CoreStub()
-        telemetry = TelemetryStub()
-
-    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
-    client._system = SystemStub()
-
-    assert asyncio.run(
-        client.wait_until_ready(1.0, allow_gnss_warning_arm_authority=True)
-    ) == executor.TelemetryHealth(
-        connected=True,
-        global_position_ok=True,
-        home_position_ok=True,
-        local_position_ok=True,
-        armable=False,
-    )
-
-
-def test_mavsdk_gnss_warning_readiness_allows_advisory_global_position_failure():
-    class CoreStub:
-        async def connection_state(self):
-            yield type("ConnectionState", (), {"is_connected": True})()
-
-    class TelemetryStub:
-        async def health(self):
-            for _ in range(executor.GNSS_WARNING_READINESS_SAMPLE_COUNT):
-                yield type(
-                    "Health",
-                    (),
-                    {
-                        "is_global_position_ok": False,
-                        "is_home_position_ok": True,
-                        "is_local_position_ok": True,
-                        "is_armable": False,
-                    },
-                )()
-
-    class SystemStub:
-        core = CoreStub()
-        telemetry = TelemetryStub()
-
-    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
-    client._system = SystemStub()
-
-    assert asyncio.run(
-        client.wait_until_ready(1.0, allow_gnss_warning_arm_authority=True)
-    ) == executor.TelemetryHealth(
-        connected=True,
-        global_position_ok=False,
-        home_position_ok=True,
-        local_position_ok=True,
-        armable=False,
-    )
-
-
-def test_mavsdk_gnss_warning_readiness_still_requires_local_position():
-    class CoreStub:
-        async def connection_state(self):
-            yield type("ConnectionState", (), {"is_connected": True})()
-
-    class TelemetryStub:
-        async def health(self):
-            while True:
-                yield type(
-                    "Health",
-                    (),
-                    {
-                        "is_global_position_ok": False,
-                        "is_home_position_ok": True,
-                        "is_local_position_ok": False,
-                        "is_armable": False,
-                    },
-                )()
-                await asyncio.sleep(0.001)
-
-    class SystemStub:
-        core = CoreStub()
-        telemetry = TelemetryStub()
-
-    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
-    client._system = SystemStub()
-
-    with pytest.raises(TimeoutError, match="local_position_ok=false"):
-        asyncio.run(
-            client.wait_until_ready(0.01, allow_gnss_warning_arm_authority=True)
-        )
 
 
 def test_mavsdk_readiness_rejects_local_navigation_that_is_not_armable():

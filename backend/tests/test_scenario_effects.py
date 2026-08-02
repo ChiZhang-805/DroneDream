@@ -301,8 +301,14 @@ def test_compile_bundled_sdf_profile_binds_explicit_physics() -> None:
         "effect_ids": ["wind_gusts"],
     }
     assert profile["sensor_noise"]["gps_position_stddev_m"] == 2.0
-    assert profile["sensor_noise"]["gazebo_navsat_horizontal_stddev_m"] == 2.0
-    assert profile["sensor_noise"]["gazebo_navsat_vertical_stddev_m"] == 2.0
+    assert profile["sensor_noise"]["gazebo_navsat_white_stddev_m"] == 0.02
+    assert profile["sensor_noise"]["gazebo_navsat_dynamic_bias_stddev_m"] == pytest.approx(
+        math.sqrt(4.0 - 0.0004)
+    )
+    assert profile["sensor_noise"]["gazebo_navsat_dynamic_bias_correlation_time_s"] == 60.0
+    assert profile["sensor_noise"]["gazebo_navsat_noise_composition_policy"] == (
+        "requested-total-stddev-as-slow-bias-with-one-percent-white-noise-v1"
+    )
     assert profile["sensor_noise"]["gazebo_navsat_unit_policy"] == (
         "sdformat-1.11-horizontal-metres-vertical-metres-v2"
     )
