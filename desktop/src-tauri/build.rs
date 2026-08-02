@@ -70,6 +70,35 @@ fn emit_git_provenance_reruns(repository_root: &std::path::Path) {
     println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_BUILD_NUMBER");
 }
 
+fn prepare_generated_directory(path: &std::path::Path) {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            assert!(
+                metadata.is_dir() && !metadata.file_type().is_symlink(),
+                "refusing to replace an unsafe generated Engine Pack path: {}",
+                path.display()
+            );
+            std::fs::remove_dir_all(path).unwrap_or_else(|error| {
+                panic!(
+                    "unable to reset the generated Engine Pack directory {}: {error}",
+                    path.display()
+                )
+            });
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => panic!(
+            "unable to inspect the generated Engine Pack directory {}: {error}",
+            path.display()
+        ),
+    }
+    std::fs::create_dir(path).unwrap_or_else(|error| {
+        panic!(
+            "unable to create the generated Engine Pack directory {}: {error}",
+            path.display()
+        )
+    });
+}
+
 fn build_engine_pack(manifest_dir: &std::path::Path) {
     let repository_root = manifest_dir
         .join("../..")
@@ -116,8 +145,7 @@ fn build_engine_pack(manifest_dir: &std::path::Path) {
         std::env::var("OUT_DIR").expect("Cargo must set OUT_DIR for the Engine Pack build"),
     )
     .join("engine-pack");
-    std::fs::create_dir_all(&output_directory)
-        .expect("unable to create the generated Engine Pack directory");
+    prepare_generated_directory(&output_directory);
     let tool = repository_root.join("engine-pack/tools/engine_pack.py");
     let python = std::env::var("PYTHON").unwrap_or_else(|_| {
         if cfg!(windows) {

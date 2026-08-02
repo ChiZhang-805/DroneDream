@@ -33,6 +33,15 @@ Assert-Contract ($buildScript.Contains('cargo:rerun-if-env-changed=DRONEDREAM_RE
 Assert-Contract ($buildScript.Contains('["rev-parse", "--git-path", &symbolic_ref]')) `
     "The embedded Engine Pack must track the active Git branch ref."
 foreach ($requiredText in @(
+    'prepare_generated_directory(&output_directory)',
+    'std::fs::symlink_metadata(path)',
+    'metadata.is_dir() && !metadata.file_type().is_symlink()',
+    'std::fs::remove_dir_all(path)'
+)) {
+    Assert-Contract ($buildScript.Contains($requiredText)) `
+        "Repeated builds are missing the safe generated Engine Pack reset contract: $requiredText"
+}
+foreach ($requiredText in @(
     'status --porcelain=v1 --untracked-files=all',
     '$env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $releaseSourceCommit',
     '-SourceCommit $releaseSourceCommit',
