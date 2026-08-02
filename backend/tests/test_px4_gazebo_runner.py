@@ -100,6 +100,26 @@ def test_runner_binds_engine_pack_manifest_to_activation_state(tmp_path: Path) -
     }
 
 
+def test_runner_discovers_manifest_from_the_real_engine_pack_layout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    release = tmp_path / "releases" / ("3" * 64)
+    release.mkdir(parents=True)
+    manifest_path, state_path, manifest = _write_engine_pack_identity_files(release)
+    runner_path = release / "scripts" / "simulators" / "px4_gazebo_runner.py"
+    runner_path.parent.mkdir(parents=True)
+    runner_path.write_text("# layout probe\n", encoding="utf-8")
+    monkeypatch.setattr(runner_module, "__file__", str(runner_path))
+
+    identity = runner_module._engine_pack_identity(state_path=state_path)
+
+    assert manifest_path == release / "engine-pack-manifest.json"
+    assert identity["status"] == "verified"
+    assert identity["pack_id"] == manifest["packId"]
+    assert identity["source_commit"] == manifest["source"]["gitCommit"]
+
+
 def test_runner_binds_permission_restricted_manager_state_to_active_symlink(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

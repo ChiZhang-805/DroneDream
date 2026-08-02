@@ -417,7 +417,7 @@ def _engine_pack_identity(
 
     if manifest_path is None:
         payload_root = Path(__file__).resolve().parents[2]
-        manifest_path = payload_root.parent / "engine-pack-manifest.json"
+        manifest_path = payload_root / "engine-pack-manifest.json"
         active_path = active_path or _ENGINE_PACK_ACTIVE_PATH
 
     manifest_exists = manifest_path.exists()
