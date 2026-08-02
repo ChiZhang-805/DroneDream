@@ -10,12 +10,42 @@ import { createServer } from "vite";
 
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const repoRoot = path.resolve(frontendRoot, "..");
-const args = new Map(
-  process.argv.slice(2).map((argument) => {
-    const [key, ...value] = argument.split("=");
-    return [key, value.join("=") || true];
-  }),
-);
+function parseArguments(argv) {
+  const valueOptions = new Set(["--label", "--output", "--port"]);
+  const booleanOptions = new Set([
+    "--expect-overflow",
+    "--expect-job-id-collision",
+  ]);
+  const parsed = new Map();
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index];
+    const separator = argument.indexOf("=");
+    const key = separator >= 0 ? argument.slice(0, separator) : argument;
+    if (!valueOptions.has(key) && !booleanOptions.has(key)) {
+      throw new Error(`Unknown history layout option: ${argument}`);
+    }
+    if (parsed.has(key)) {
+      throw new Error(`Duplicate history layout option: ${key}`);
+    }
+    if (booleanOptions.has(key)) {
+      if (separator >= 0) {
+        throw new Error(`Boolean history layout option cannot have a value: ${key}`);
+      }
+      parsed.set(key, true);
+      continue;
+    }
+    const inlineValue = separator >= 0 ? argument.slice(separator + 1) : null;
+    const value = inlineValue ?? argv[index + 1];
+    if (!value || value.startsWith("--")) {
+      throw new Error(`History layout option requires a value: ${key}`);
+    }
+    parsed.set(key, value);
+    if (inlineValue === null) index += 1;
+  }
+  return parsed;
+}
+
+const args = parseArguments(process.argv.slice(2));
 const expectOverflow = args.has("--expect-overflow");
 const expectJobIdCollision = args.has("--expect-job-id-collision");
 const label = String(
@@ -255,6 +285,72 @@ function containmentViolations(metrics) {
   return violations;
 }
 
+async function verifyMobileNavigation(page, viewportWidth) {
+  const trigger = page.locator(".app-mobile-menu-button");
+  const panel = page.locator("#app-mobile-navigation");
+  const wasClosed =
+    await trigger.isVisible()
+    && await trigger.getAttribute("aria-expanded") === "false"
+    && await panel.isHidden();
+  await trigger.click();
+  await panel.waitFor({ state: "visible" });
+
+  const actions = [];
+  for (const [name, selector] of [
+    ["history navigation", '.app-mobile-menu-panel .app-nav a[href$="/history"]'],
+    ["account", ".app-mobile-menu-panel .app-account-button"],
+    ["settings", ".app-mobile-menu-panel .app-mobile-settings-entry"],
+  ]) {
+    const locator = page.locator(selector);
+    const bounds = await locator.boundingBox();
+    actions.push({
+      name,
+      selector,
+      visible: await locator.isVisible(),
+      enabled: await locator.isEnabled(),
+      left: bounds ? Number(bounds.x.toFixed(2)) : null,
+      right: bounds ? Number((bounds.x + bounds.width).toFixed(2)) : null,
+      horizontallyReachable: Boolean(
+        bounds
+        && bounds.width > 0
+        && bounds.x >= -1
+        && bounds.x + bounds.width <= viewportWidth + 1,
+      ),
+    });
+  }
+
+  await page.locator(".app-mobile-menu-panel .app-mobile-settings-entry").focus();
+  await page.keyboard.press("Escape");
+  await panel.waitFor({ state: "hidden" });
+  await page.waitForFunction(
+    () => document.activeElement?.classList.contains("app-mobile-menu-button"),
+    null,
+    { timeout: 1_000 },
+  ).catch(() => undefined);
+  const focusReturned = await trigger.evaluate(
+    (element) => document.activeElement === element,
+  );
+  const closedAfterEscape =
+    await trigger.getAttribute("aria-expanded") === "false"
+    && await panel.isHidden();
+  return {
+    wasClosed,
+    opened: actions.every(
+      (entry) => entry.visible && entry.enabled && entry.horizontallyReachable,
+    ),
+    actions,
+    closedAfterEscape,
+    focusReturned,
+    passed:
+      wasClosed
+      && actions.every(
+        (entry) => entry.visible && entry.enabled && entry.horizontallyReachable,
+      )
+      && closedAfterEscape
+      && focusReturned,
+  };
+}
+
 await mkdir(path.dirname(outputRoot), { recursive: true });
 try {
   await mkdir(outputRoot);
@@ -342,6 +438,9 @@ try {
     });
     const initial = await measure(page);
     const violations = containmentViolations(initial);
+    const mobileNavigation = testCase.viewport.width <= 520
+      ? await verifyMobileNavigation(page, testCase.viewport.width)
+      : null;
     await page.screenshot({
       path: path.join(outputRoot, `${testCase.id}-initial.png`),
       fullPage: false,
@@ -406,9 +505,11 @@ try {
       initial.historyResults
       && initial.historyResults.scrollWidth > initial.historyResults.clientWidth
       && ["auto", "scroll"].includes(initial.historyResults.overflowX);
-    const actionsReachable = initial.actions.every(
-      (entry) => entry.exists && entry.horizontallyReachable,
-    );
+    const actionsReachable = mobileNavigation
+      ? mobileNavigation.passed
+      : initial.actions.every(
+        (entry) => entry.exists && entry.horizontallyReachable,
+      );
     const commonChecksPassed =
       expectedLanguage
       && unsafeRequests.length === 0
@@ -455,6 +556,7 @@ try {
       passed,
       containmentViolations: violations,
       initial,
+      mobileNavigation,
       rightEdge,
       apiRequests,
       unsafeRequests,
