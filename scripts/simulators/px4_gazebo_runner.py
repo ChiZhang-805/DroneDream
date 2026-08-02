@@ -53,6 +53,7 @@ from app.parameters import (  # noqa: E402 - path bootstrap must precede backend
     validate_parameter_values,
 )
 from app.simulator.px4_metric_evidence import (  # noqa: E402 - see path bootstrap above
+    PX4_TELEMETRY_TIMING_TIME_BASE,
     Px4CoreMetricEvidenceError,
     compile_px4_core_metric_evidence,
     compile_px4_evaluation_policy,
@@ -2158,6 +2159,11 @@ def _find_eval_window_from_timing(
     near_track_threshold: float,
     consecutive_samples: int,
 ) -> EvaluationWindow | None:
+    # Do not compare executor-relative timing values with PX4 ULog sample
+    # timestamps.  A producer must explicitly attest that both fields use the
+    # telemetry sample clock before they can delimit the evaluation window.
+    if timing.get("time_base") != PX4_TELEMETRY_TIMING_TIME_BASE:
+        return None
     start_t_raw = timing.get("track_start_t")
     end_t_raw = timing.get("track_end_t")
     if not isinstance(start_t_raw, (int, float)) or not isinstance(end_t_raw, (int, float)):

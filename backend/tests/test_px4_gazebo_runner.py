@@ -2075,7 +2075,7 @@ def test_offboard_timing_window_source_is_used_when_present(tmp_path: Path):
         offboard_timing_payload={
             "track_start_t": _find_sample_time(samples, 10),
             "track_end_t": _find_sample_time(samples, 210),
-            "time_base": "executor_relative_seconds",
+            "time_base": "telemetry_sample_seconds",
         },
     )
     proc, result = _run_runner(
@@ -2098,6 +2098,37 @@ def test_offboard_timing_window_source_is_used_when_present(tmp_path: Path):
     assert result["metrics"]["crash_flag"] is False
     assert raw["evaluation_sample_count"] < raw["total_sample_count"]
     assert result["metrics"]["max_error"] < 3.5
+
+
+def test_executor_relative_timing_is_not_applied_to_telemetry_clock(tmp_path: Path):
+    telemetry = _track_following_telemetry()
+    samples = telemetry["samples"]
+    assert isinstance(samples, list)
+    launcher = _write_launcher_with_payloads(
+        tmp_path / "launcher.py",
+        telemetry,
+        offboard_timing_payload={
+            "track_start_t": _find_sample_time(samples, 10),
+            "track_end_t": _find_sample_time(samples, 20),
+            "time_base": "executor_relative_seconds",
+        },
+    )
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f"{sys.executable} {launcher} --telemetry {{telemetry_json}}"
+            ),
+        },
+    )
+    assert proc.returncode == 0
+    assert result["success"] is True
+    raw = result["metrics"]["raw_metric_json"]
+    assert raw["evaluation_window_source"] == "telemetry_derived_refined"
+    assert raw["evaluation_window_raw_source"] == "telemetry_derived"
+    assert raw["raw_track_start_t"] is None
+    assert raw["raw_track_end_t"] is None
 
 
 def test_telemetry_derived_window_source_used_when_timing_missing(tmp_path: Path):

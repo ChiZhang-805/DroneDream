@@ -1267,6 +1267,25 @@ def test_px4_metric_evidence_rejects_offboard_timing_mutation(
         )
 
 
+def test_px4_metric_evidence_does_not_mix_executor_and_telemetry_clocks(
+    tmp_path: Path,
+) -> None:
+    _raw, metrics, _artifacts, _ = _px4_metric_evidence(
+        tmp_path,
+        offboard_timing_payload={
+            "track_start_t": 0.1,
+            "track_end_t": 0.2,
+            "time_base": "executor_relative_seconds",
+        },
+    )
+    evidence = metrics.raw_metric_json["evaluation_window_evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["source"] == "telemetry_derived_refined"
+    assert evidence["raw_source"] == "telemetry_derived"
+    assert evidence["raw_start_time_s"] is None
+    assert evidence["raw_end_time_s"] is None
+
+
 def test_px4_metric_evidence_rejects_compiled_evidence_mutation(
     tmp_path: Path,
 ) -> None:

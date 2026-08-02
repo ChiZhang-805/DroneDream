@@ -29,6 +29,7 @@ PX4_STATIONARY_PROJECTION_REVISION = "stationary-point-3d-projection-1.0"
 PX4_RMSE_INTEGRATION_REVISION = "time_weighted_trapezoidal"
 PX4_EVALUATION_POLICY_V1 = "dronedream.px4-evaluation-policy/v1"
 PX4_EVALUATION_WINDOW_EVIDENCE_V1 = "dronedream.px4-evaluation-window-evidence/v1"
+PX4_TELEMETRY_TIMING_TIME_BASE = "telemetry_sample_seconds"
 PX4_EVALUATION_WINDOW_VERIFIER_REVISION = "px4-evaluation-window-verifier-1.0"
 PX4_OUTCOME_POLICY_V1 = "dronedream.px4-outcome-policy/v1"
 PX4_OUTCOME_EVIDENCE_V1 = "dronedream.px4-outcome-evidence/v1"
@@ -1010,6 +1011,13 @@ def _window_from_timing(
     timing: Mapping[str, object],
     policy: Px4EvaluationPolicyV1,
 ) -> _EvaluationWindow | None:
+    # The offboard executor currently records its own process-relative clock,
+    # while PX4 ULog telemetry is expressed on the vehicle boot clock.  Numeric
+    # values from those clocks are not interchangeable.  Only consume timing
+    # evidence when the producer explicitly binds it to the telemetry sample
+    # clock; otherwise derive the window from the telemetry itself.
+    if timing.get("time_base") != PX4_TELEMETRY_TIMING_TIME_BASE:
+        return None
     start_time_raw = timing.get("track_start_t")
     end_time_raw = timing.get("track_end_t")
     if (
