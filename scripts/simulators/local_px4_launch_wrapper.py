@@ -3005,6 +3005,12 @@ def _run_offboard_executor(args: argparse.Namespace, stderr_log: Path) -> int:
             ),
         ),
     )
+    offboard_env = os.environ.copy()
+    # PX4 starts Gazebo with this transport bind address. The offboard child
+    # must advertise its runtime-effect publishers on the same interface;
+    # otherwise WSL may select its virtual Ethernet address while Gazebo is
+    # listening only on loopback, leaving matching topics unable to connect.
+    offboard_env["GZ_IP"] = os.environ.get("GZ_IP", "127.0.0.1")
     try:
         proc = subprocess.run(  # noqa: S603
             argv,
@@ -3012,6 +3018,7 @@ def _run_offboard_executor(args: argparse.Namespace, stderr_log: Path) -> int:
             capture_output=True,
             check=False,
             timeout=timeout_seconds,
+            env=offboard_env,
         )
     except subprocess.TimeoutExpired as exc:
         if exc.stdout:
@@ -3331,6 +3338,7 @@ def _write_launch_config(
         "PX4_AUTOPILOT_DIR": autopilot_dir,
         "PX4_SETUP_COMMANDS": setup_commands,
         "GZ_PARTITION": gazebo_transport_partition,
+        "GZ_IP": os.environ.get("GZ_IP", "127.0.0.1"),
         "PX4_PARAMETER_TRANSPORT": _parameter_transport() if px4_parameters else None,
         "px4_parameter_names": sorted(px4_parameters),
         "PX4_ENABLE_OFFBOARD_EXECUTOR": _parse_bool(

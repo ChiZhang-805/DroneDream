@@ -178,6 +178,7 @@ def test_wrapper_site_dry_run_writes_valid_telemetry(tmp_path: Path):
     assert launch_config["make_target"] == "gz_x500_depth"
     assert launch_config["GZ_PARTITION"] == wrapper._trial_gazebo_partition(tmp_path / "run")
     assert re.fullmatch(r"dronedream_[0-9a-f]{24}", launch_config["GZ_PARTITION"])
+    assert launch_config["GZ_IP"] == "127.0.0.1"
 
 
 def test_gazebo_transport_partition_is_stable_and_trial_isolated(tmp_path: Path) -> None:
@@ -1641,6 +1642,39 @@ def test_offboard_timeout_is_bounded_and_reported(
 
     assert wrapper._run_offboard_executor(args, stderr_log) == 124
     assert "timed out" in stderr_log.read_text()
+
+
+@pytest.mark.parametrize(
+    ("configured_ip", "expected_ip"),
+    [(None, "127.0.0.1"), ("127.0.0.2", "127.0.0.2")],
+)
+def test_offboard_executor_shares_gazebo_transport_interface(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    configured_ip: str | None,
+    expected_ip: str,
+) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    args = SimpleNamespace(run_dir=run_dir, stdout_log=run_dir / "stdout.log")
+    stderr_log = run_dir / "stderr.log"
+    monkeypatch.setattr(wrapper, "_build_offboard_executor_argv", lambda _args: ["offboard"])
+    monkeypatch.setenv("GZ_PARTITION", "dronedream_test_partition")
+    if configured_ip is None:
+        monkeypatch.delenv("GZ_IP", raising=False)
+    else:
+        monkeypatch.setenv("GZ_IP", configured_ip)
+    captured_env: dict[str, str] = {}
+
+    def complete(*_args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured_env.update(kwargs["env"])
+        return subprocess.CompletedProcess(["offboard"], 0, stdout="", stderr="")
+
+    monkeypatch.setattr(wrapper.subprocess, "run", complete)
+
+    assert wrapper._run_offboard_executor(args, stderr_log) == 0
+    assert captured_env["GZ_IP"] == expected_ip
+    assert captured_env["GZ_PARTITION"] == "dronedream_test_partition"
 
 
 def test_json_and_normalized_telemetry_limits_fail_before_unbounded_processing(
