@@ -609,18 +609,6 @@ def _activate_gazebo_wind_profile(
         f"x: {requested['x']:.17g} y: {requested['y']:.17g} z: {requested['z']:.17g}"
         " } enable_wind: true"
     )
-    publish = subprocess.run(  # noqa: S603
-        [gz_cli, "topic", "-t", topic, "-m", "gz.msgs.Wind", "-p", message],
-        text=True,
-        capture_output=True,
-        check=False,
-        timeout=10.0,
-    )
-    if publish.returncode != 0:
-        raise RuntimeError(
-            "Gazebo post-hover wind publish failed: "
-            f"exit={publish.returncode}, stderr={publish.stderr.strip()[:400]}"
-        )
     try:
         attempts = int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "10"))
     except ValueError:
@@ -629,6 +617,41 @@ def _activate_gazebo_wind_profile(
     last_error = "no wind_info response"
     readback: dict[str, Any] | None = None
     for attempt in range(attempts):
+        # Gazebo Transport discovery is asynchronous. A one-shot ``gz topic``
+        # publisher can exit successfully before the WindEffects subscriber
+        # discovers it, leaving wind_info unchanged. Keep each bounded publish
+        # alive long enough for discovery and re-publish before every read-back
+        # attempt; the exact service response below remains the authority.
+        publish = subprocess.run(  # noqa: S603
+            [
+                gz_cli,
+                "topic",
+                "-d",
+                "1.0",
+                "-t",
+                topic,
+                "-m",
+                "gz.msgs.Wind",
+                "-p",
+                message,
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=5.0,
+        )
+        publish_output = publish.stdout + publish.stderr
+        if publish.returncode != 0 or any(
+            marker in publish_output
+            for marker in (
+                "Unable to create message",
+                "Error parsing text-format",
+            )
+        ):
+            raise RuntimeError(
+                "Gazebo post-hover wind publish failed: "
+                f"exit={publish.returncode}, response={publish_output.strip()[:400]}"
+            )
         response = subprocess.run(  # noqa: S603
             [
                 gz_cli,
