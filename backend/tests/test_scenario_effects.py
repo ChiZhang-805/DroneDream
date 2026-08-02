@@ -117,6 +117,84 @@ def _wind_evidence_records(request: dict[str, object]) -> list[dict[str, object]
     ]
 
 
+def _combined_wind_gust_request() -> dict[str, object]:
+    return build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="nominal",
+        scenario_config={},
+        job_config={
+            "wind": {"north": 0.0, "east": 2.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={
+            "wind_gusts": {
+                "enabled": True,
+                "magnitude_mps": 4.0,
+                "direction_deg": 90.0,
+                "period_s": 8.0,
+            }
+        },
+    )
+
+
+def _combined_wind_gust_evidence_records(
+    request: dict[str, object],
+) -> list[dict[str, object]]:
+    compiled_wind = compile_bundled_steady_wind(request)
+    compiled_sdf = compile_bundled_sdf_profile(request)
+    runtime_profile = compile_bundled_runtime_profile(request)
+    assert compiled_wind is not None
+    assert compiled_sdf is not None
+    assert runtime_profile is not None
+    activation_vector = runtime_profile["wind_activation"]["linear_velocity_mps"]
+    readback = {
+        "linear_velocity_mps": dict(activation_vector),
+        "enable_wind": True,
+    }
+    runtime_sdf = {
+        "source_vehicle_model": "x500_base",
+        "vehicle_model": "x500_0",
+        "link_name": "base_link",
+        "enable_wind": True,
+        "verified_profile_sections": ["wind_gust"],
+        "sdf_path": "/tmp/generated_world.sdf",
+        "sdf_sha256": "a" * 64,
+    }
+    observations = [
+        {
+            "source": "/world/default/wind_info",
+            "kind": "readback",
+            "value": readback,
+            "sha256": scenario_effect_value_sha256(readback),
+        },
+        {
+            "source": "/world/default/generate_world_sdf",
+            "kind": "artifact",
+            "value": runtime_sdf,
+            "sha256": scenario_effect_value_sha256(runtime_sdf),
+        },
+    ]
+    return [
+        {
+            "effect_id": effect["effect_id"],
+            "mechanism": effect["mechanism"],
+            "status": "applied",
+            "capability": {"status": "available", "reason": "bundled composed wind"},
+            "evidence": {
+                "requested_value_sha256": scenario_effect_value_sha256(effect["requested_value"]),
+                "compiled_wind": compiled_wind,
+                "compiled_sdf_profile": compiled_sdf,
+                "verification": {
+                    "status": "verified",
+                    "method": "gazebo_composed_wind_and_generated_world_sdf",
+                    "observations": copy.deepcopy(observations),
+                },
+            },
+        }
+        for effect in request["effects"]
+    ]
+
+
 def test_request_maps_every_advanced_field_to_launcher_effect() -> None:
     request = _request(
         wind=True,
@@ -741,6 +819,41 @@ def test_bundled_steady_wind_requires_exact_readback_and_runtime_wind_mode() -> 
     )
     with pytest.raises(ScenarioEffectContractError, match="WindMode"):
         validate_scenario_effect_evidence(request, no_wind_mode)
+
+
+def test_combined_wind_evidence_requires_the_exact_runtime_activation_vector() -> None:
+    request = _combined_wind_gust_request()
+    records = _combined_wind_gust_evidence_records(request)
+    payload = build_scenario_effect_evidence(
+        request,
+        launcher="bundled-test-launcher",
+        world="default",
+        effects=records,
+    )
+
+    normalized = validate_scenario_effect_evidence(request, payload)
+
+    assert normalized["verification_status"] == "verified_applied"
+    assert normalized["applied_effects"] == ["job_config.wind", "wind_gusts"]
+    steady = compile_bundled_steady_wind(request)
+    runtime_profile = compile_bundled_runtime_profile(request)
+    assert steady is not None
+    assert runtime_profile is not None
+    assert steady["linear_velocity_mps"] == {"x": 2.0, "y": 0.0, "z": 0.0}
+    assert runtime_profile["wind_activation"]["linear_velocity_mps"] == {
+        "x": 4.0,
+        "y": 0.0,
+        "z": 0.0,
+    }
+
+    stale_steady_only_readback = copy.deepcopy(payload)
+    observation = stale_steady_only_readback["effects"][0]["evidence"]["verification"][
+        "observations"
+    ][0]
+    observation["value"]["linear_velocity_mps"] = dict(steady["linear_velocity_mps"])
+    observation["sha256"] = scenario_effect_value_sha256(observation["value"])
+    with pytest.raises(ScenarioEffectContractError, match="exact Gazebo wind_info"):
+        validate_scenario_effect_evidence(request, stale_steady_only_readback)
 
 
 def test_extended_evidence_rejects_requested_value_hash_mismatch() -> None:

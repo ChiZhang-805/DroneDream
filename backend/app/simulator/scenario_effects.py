@@ -1593,8 +1593,25 @@ def _validate_bundled_steady_wind_evidence(
         and isinstance(item.get("source"), str)
         and item["source"].endswith("/wind_info")
     ]
+    runtime_profile = _compile_bundled_runtime_profile_unchecked(request)
+    wind_activation = (
+        runtime_profile.get("wind_activation") if isinstance(runtime_profile, dict) else None
+    )
+    activation_vector = (
+        wind_activation.get("linear_velocity_mps")
+        if isinstance(wind_activation, dict)
+        else None
+    )
+    if not isinstance(activation_vector, dict):
+        raise ScenarioEffectContractError(
+            f"effect {requested['effect_id']} did not compile a runtime wind activation vector"
+        )
     expected_readback = {
-        "linear_velocity_mps": expected["linear_velocity_mps"],
+        # Preserve ``compiled_wind`` above as the exact request-bound steady
+        # component, but verify the vector Gazebo actually receives.  When a
+        # compatible gust is present the runtime compiler deliberately activates
+        # their composed mean after stable hover.
+        "linear_velocity_mps": activation_vector,
         "enable_wind": True,
     }
     if len(readbacks) != 1 or readbacks[0].get("value") != expected_readback:
