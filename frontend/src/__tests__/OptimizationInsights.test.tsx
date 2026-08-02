@@ -121,6 +121,8 @@ describe("OptimizationInsights", () => {
       candidate_is_baseline: false,
       candidate_is_best: candidateId === "qualified",
       candidate_generation_index: 1,
+      failure_code: null,
+      failure_reason: null,
     });
     const trials = [
       trial("dominated", "Dominated", 1, false),

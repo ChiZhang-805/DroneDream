@@ -224,6 +224,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: true,
         candidate_generation_index: 2,
+        failure_code: null,
+        failure_reason: null,
       },
       {
         id: "tri_heur_1",
@@ -238,6 +240,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: false,
         candidate_generation_index: 1,
+        failure_code: null,
+        failure_reason: null,
       },
     ];
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
@@ -266,6 +270,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
       candidate_is_baseline: false,
       candidate_is_best: true,
       candidate_generation_index: 1,
+      failure_code: null,
+      failure_reason: null,
     };
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
     vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([
@@ -310,6 +316,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: false,
         candidate_generation_index: 2,
+        failure_code: null,
+        failure_reason: null,
       },
     ];
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
@@ -342,6 +350,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: false,
         candidate_generation_index: 2,
+        failure_code: null,
+        failure_reason: null,
       },
     ];
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
@@ -376,6 +386,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: true,
         candidate_is_best: false,
         candidate_generation_index: 0,
+        failure_code: null,
+        failure_reason: null,
       },
       {
         id: "tri_fail",
@@ -393,6 +405,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: true,
         candidate_generation_index: 1,
+        failure_code: null,
+        failure_reason: null,
       },
       {
         id: "tri_nometric",
@@ -407,6 +421,8 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
         candidate_is_baseline: false,
         candidate_is_best: false,
         candidate_generation_index: 1,
+        failure_code: "SIMULATION_FAILED",
+        failure_reason: "Simulator refused the trial.",
       },
     ];
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);

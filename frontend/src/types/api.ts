@@ -833,6 +833,8 @@ export interface TrialSummary {
   candidate_is_baseline: boolean;
   candidate_is_best: boolean;
   candidate_generation_index: number;
+  failure_code: string | null;
+  failure_reason: string | null;
 }
 
 export interface Trial extends TrialSummary {
@@ -840,8 +842,6 @@ export interface Trial extends TrialSummary {
   attempt_count: number;
   worker_id: string | null;
   simulator_backend: string | null;
-  failure_code: string | null;
-  failure_reason: string | null;
   log_excerpt: string | null;
   metrics: TrialMetrics | null;
   queued_at: string | null;
