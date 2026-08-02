@@ -8,6 +8,7 @@ import math
 import pytest
 
 from app.simulator.scenario_effects import (
+    WGS84_EQUATORIAL_METERS_PER_DEGREE,
     ScenarioEffectContractError,
     build_scenario_effect_evidence,
     build_scenario_effect_request,
@@ -221,6 +222,13 @@ def test_compile_bundled_sdf_profile_binds_explicit_physics() -> None:
         "effect_ids": ["wind_gusts"],
     }
     assert profile["sensor_noise"]["gps_position_stddev_m"] == 2.0
+    assert profile["sensor_noise"]["gazebo_navsat_horizontal_stddev_deg"] == pytest.approx(
+        2.0 / WGS84_EQUATORIAL_METERS_PER_DEGREE
+    )
+    assert profile["sensor_noise"]["gazebo_navsat_vertical_stddev_m"] == 2.0
+    assert profile["sensor_noise"]["gazebo_navsat_unit_policy"] == (
+        "harmonic8-horizontal-degrees-vertical-metres-v1"
+    )
     assert profile["sensor_noise"]["barometer_altitude_stddev_m"] == 0.5
     assert profile["sensor_noise"]["barometer_pressure_stddev_pa"] == 6.0
     assert profile["sensor_noise"]["imu_noise_scale"] == 1.5

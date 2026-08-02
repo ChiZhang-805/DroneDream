@@ -187,14 +187,15 @@ class MavsdkOffboardClient:
                         armable=bool(getattr(health, "is_armable", False)),
                     )
                     last_health = sample
-                    # Every DroneDream reference track is expressed in local
-                    # NED coordinates. A noisy simulated GPS can therefore make
-                    # MAVSDK's global-position/armable advisories remain false
-                    # even after PX4 has a valid home and local estimate. Gate
-                    # here on the navigation signals the controller actually
-                    # consumes; the immediately following PX4 arm command is
-                    # still authoritative and fails closed if PX4 rejects it.
-                    if sample.home_position_ok and sample.local_position_ok:
+                    # Every reference track is local NED, so global position is
+                    # advisory. PX4 armability is still a required preflight
+                    # signal: numeric local coordinates alone are not proof that
+                    # the estimator considers them stable enough for flight.
+                    if (
+                        sample.home_position_ok
+                        and sample.local_position_ok
+                        and sample.armable
+                    ):
                         return sample
                 raise RuntimeError("PX4 health stream ended before the vehicle became ready")
         except TimeoutError:
@@ -1313,14 +1314,14 @@ async def run_executor(
         _log(log_path, f"connected via {connection}")
         health = await client.wait_until_ready(takeoff_timeout_seconds)
         takeoff_gate["readiness"] = _health_payload(health)
-        takeoff_gate["readiness_policy"] = "local_ned_with_px4_arm_authority"
+        takeoff_gate["readiness_policy"] = "local_ned_with_px4_preflight_authority"
         takeoff_gate["required_readiness"] = {
             name: takeoff_gate["readiness"][name]
-            for name in ("connected", "home_position_ok", "local_position_ok")
+            for name in ("connected", "home_position_ok", "local_position_ok", "armable")
         }
         takeoff_gate["advisory_readiness"] = {
             name: takeoff_gate["readiness"][name]
-            for name in ("global_position_ok", "armable")
+            for name in ("global_position_ok",)
         }
         takeoff_gate["readiness_observed"] = all(
             takeoff_gate["required_readiness"].values()

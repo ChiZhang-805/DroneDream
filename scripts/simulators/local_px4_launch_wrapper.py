@@ -601,10 +601,12 @@ def _apply_sensor_noise_sdf(
     if gps is None or barometer is None or imu is None:
         raise RuntimeError("pinned x500_base model is missing a required physical sensor")
 
-    gps_stddev = float(profile["gps_position_stddev_m"])
+    gps_stddev_m = float(profile["gps_position_stddev_m"])
+    gps_horizontal_stddev_deg = float(profile["gazebo_navsat_horizontal_stddev_deg"])
+    gps_vertical_stddev_m = float(profile["gazebo_navsat_vertical_stddev_m"])
     navsat = _ensure_xml_path(gps, "navsat", "position_sensing")
-    for axis in ("horizontal", "vertical"):
-        _set_gaussian_stddev(_ensure_xml_path(navsat, axis), gps_stddev)
+    _set_gaussian_stddev(_ensure_xml_path(navsat, "horizontal"), gps_horizontal_stddev_deg)
+    _set_gaussian_stddev(_ensure_xml_path(navsat, "vertical"), gps_vertical_stddev_m)
 
     barometer_stddev = float(profile["barometer_pressure_stddev_pa"])
     pressure = _ensure_xml_path(barometer, "air_pressure", "pressure")
@@ -629,7 +631,13 @@ def _apply_sensor_noise_sdf(
             _set_gaussian_stddev(axis_element, scaled)
             expected_imu[f"{group}.{axis}"] = scaled
     return {
-        "gps_position_stddev_m": gps_stddev,
+        "gps_position_stddev_m": gps_stddev_m,
+        "gazebo_navsat_horizontal_stddev_deg": gps_horizontal_stddev_deg,
+        "gazebo_navsat_vertical_stddev_m": gps_vertical_stddev_m,
+        "gazebo_navsat_meters_per_degree_reference": float(
+            profile["gazebo_navsat_meters_per_degree_reference"]
+        ),
+        "gazebo_navsat_unit_policy": str(profile["gazebo_navsat_unit_policy"]),
         "barometer_pressure_stddev_pa": barometer_stddev,
         "imu_stddev": expected_imu,
     }
@@ -1379,7 +1387,10 @@ def _runtime_sdf_profile_observation(
         imu = base_link.find("./sensor[@name='imu_sensor']")
         if gps is None or barometer is None or imu is None:
             raise RuntimeError("generated runtime SDF omitted a profiled x500 sensor")
-        for axis in ("horizontal", "vertical"):
+        for axis, expected_key in (
+            ("horizontal", "gazebo_navsat_horizontal_stddev_deg"),
+            ("vertical", "gazebo_navsat_vertical_stddev_m"),
+        ):
             actual = _required_float_text(
                 gps,
                 f"./navsat/position_sensing/{axis}/noise/stddev",
@@ -1387,7 +1398,7 @@ def _runtime_sdf_profile_observation(
             )
             _assert_runtime_float(
                 actual,
-                float(expected_sensor["gps_position_stddev_m"]),
+                float(expected_sensor[expected_key]),
                 context=f"navsat {axis} position noise",
             )
         actual_baro = _required_float_text(
