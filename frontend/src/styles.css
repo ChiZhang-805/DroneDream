@@ -11061,3 +11061,200 @@ a {
     flex-direction: column-reverse;
   }
 }
+
+/* ---------- Compact mobile workspace navigation ---------- */
+
+.app-mobile-menu-panel {
+  display: contents;
+}
+
+.app-mobile-menu-button,
+.app-mobile-settings-entry {
+  display: none;
+}
+
+@media (max-width: 520px) {
+  .app-shell:not(.app-shell-launcher) .app-sidebar {
+    position: relative;
+    z-index: 800;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 60px;
+    padding: 0.58rem 0.9rem;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 8px 24px rgba(67, 42, 74, 0.07);
+  }
+
+  .app-shell:not(.app-shell-launcher) .app-title {
+    width: min(12.4rem, calc(100vw - 5.4rem));
+    padding: 0.35rem 0;
+  }
+
+  .app-shell:not(.app-shell-launcher) .app-title .brand-lockup {
+    width: 100%;
+    height: auto;
+    max-height: 30px;
+    object-position: left center;
+  }
+
+  .app-mobile-menu-button {
+    display: inline-grid;
+    width: 2.55rem;
+    height: 2.55rem;
+    place-items: center;
+    align-self: center;
+    padding: 0;
+    border: 1px solid #e5d9e8;
+    border-radius: 0.8rem;
+    background: #ffffff;
+    color: #5a4d5e;
+    box-shadow: 0 4px 14px rgba(63, 39, 69, 0.07);
+  }
+
+  .app-mobile-menu-button:hover,
+  .app-mobile-menu-button:focus-visible,
+  .app-mobile-menu-button[aria-expanded="true"] {
+    border-color: #d6b6dc;
+    background: #fcf6fc;
+    color: #8b328f;
+  }
+
+  .app-mobile-menu-button:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+
+  .app-mobile-menu-button svg {
+    width: 1.32rem;
+    height: 1.32rem;
+  }
+
+  .app-mobile-menu-panel {
+    position: absolute;
+    top: calc(100% + 1px);
+    right: 0.55rem;
+    left: 0.55rem;
+    z-index: 820;
+    display: none;
+    max-height: calc(100dvh - 5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid #e7dfe9;
+    border-radius: 0 0 1rem 1rem;
+    background: #ffffff;
+    box-shadow: 0 22px 50px rgba(52, 30, 58, 0.2);
+  }
+
+  .app-mobile-menu-panel.is-open {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-mobile-menu-panel .app-sidebar-footer {
+    order: 1;
+    width: 100%;
+    margin: 0;
+    padding: 0.42rem 0.5rem;
+    border: 0;
+    border-bottom: 1px solid #eee6ef;
+  }
+
+  .app-mobile-menu-panel .app-account-button {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 3.8rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.72rem;
+  }
+
+  .app-mobile-menu-panel .app-account-copy {
+    display: grid;
+  }
+
+  .app-mobile-menu-panel .app-account-button > svg {
+    display: none;
+  }
+
+  .app-mobile-menu-panel .app-account-avatar {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .app-mobile-menu-panel .app-account-copy strong {
+    font-size: 0.9rem;
+  }
+
+  .app-mobile-menu-panel .app-account-copy small {
+    display: none;
+  }
+
+  .app-mobile-menu-panel .app-nav {
+    order: 2;
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .app-mobile-menu-panel .app-nav a,
+  .app-mobile-menu-panel .app-nav > a:nth-last-of-type(2):nth-of-type(3n + 1),
+  .app-mobile-menu-panel .app-nav > a:last-of-type:nth-of-type(odd) {
+    display: flex;
+    width: 100%;
+    min-height: 3.05rem;
+    grid-column: auto;
+    justify-content: flex-start;
+    padding: 0.68rem 1rem;
+    border-bottom: 1px solid #f0e9f1;
+    border-radius: 0;
+    font-size: 0.9rem;
+  }
+
+  .app-mobile-menu-panel .app-nav-entry {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 0.72rem;
+  }
+
+  .app-mobile-menu-panel .app-nav-entry > span {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .app-mobile-settings-entry {
+    order: 3;
+    display: flex;
+    width: 100%;
+    min-height: 3.05rem;
+    align-items: center;
+    gap: 0.72rem;
+    padding: 0.68rem 1rem;
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
+    color: #554b59;
+    font: inherit;
+    font-size: 0.9rem;
+    text-align: left;
+  }
+
+  .app-mobile-settings-entry:hover,
+  .app-mobile-settings-entry:focus-visible {
+    background: #faf1f9;
+    color: #8b328f;
+  }
+
+  .app-mobile-settings-entry:focus-visible {
+    outline: 2px solid #c642ad;
+    outline-offset: -3px;
+  }
+
+  .app-mobile-settings-entry svg {
+    width: 1.18rem;
+    height: 1.18rem;
+    flex: 0 0 auto;
+  }
+
+  .app-shell:not(.app-shell-launcher) .app-header {
+    display: none;
+  }
+}

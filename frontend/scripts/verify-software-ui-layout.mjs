@@ -121,7 +121,11 @@ async function screenshot(page, id, surface) {
 async function openAccountCropper(page, avatarBytes) {
   const account = page.locator(".account-dialog");
   if (!(await account.isVisible())) {
-    await page.locator(".app-account-button").click();
+    const accountButton = page.locator(".app-account-button");
+    if (!(await accountButton.isVisible())) {
+      await page.locator(".app-mobile-menu-button").click();
+    }
+    await accountButton.click();
   }
   await account.waitFor();
   await account.locator('input[type="file"]').setInputFiles({
@@ -155,7 +159,12 @@ async function verifySettings(page, testCase) {
   );
   await assistantModel.scrollIntoViewIfNeeded();
   const assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
-  await page.locator(".launcher-settings-button").click();
+  if (testCase.viewport.width <= 520) {
+    await page.locator(".app-mobile-menu-button").click();
+    await page.locator(".app-mobile-settings-entry").click();
+  } else {
+    await page.locator(".launcher-settings-button").click();
+  }
   const dialog = page.locator(".launcher-settings-dialog");
   await dialog.waitFor();
   const usage = dialog.locator(".settings-model-usage");
@@ -300,6 +309,9 @@ async function verifyEce498ExternalEntry(page, testCase) {
   const courseUrl =
     "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
   await page.goto(`${origin}/dashboard?docsPreview=1`, { waitUntil: "networkidle" });
+  if (testCase.viewport.width <= 520) {
+    await page.locator(".app-mobile-menu-button").click();
+  }
   const courseLink = page.getByRole("link", { name: "ECE498BH" });
   await courseLink.waitFor();
   assert.equal(await courseLink.getAttribute("href"), courseUrl);
@@ -343,6 +355,51 @@ async function verifyFixedScenarios(page, testCase) {
   const navEntries = nav.locator(":scope > a");
   const activeEntry = nav.locator('a[href="/scenarios"]');
   const cards = page.locator(".fixed-scenario-card");
+  let mobileMenuImage = null;
+  if (testCase.viewport.width <= 520) {
+    const menuButton = page.locator(".app-mobile-menu-button");
+    assert(await menuButton.isVisible(), `${testCase.id}: mobile menu trigger is missing`);
+    assert.equal(await page.locator(".app-header").isVisible(), false);
+    await menuButton.click();
+    const panel = page.locator(".app-mobile-menu-panel");
+    await panel.waitFor();
+    const mobileMenu = await panel.evaluate((element) => {
+      const bounds = (target) => {
+        const rect = target.getBoundingClientRect();
+        return {
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          width: rect.width,
+        };
+      };
+      const account = element.querySelector(".app-sidebar-footer");
+      const settings = element.querySelector(".app-mobile-settings-entry");
+      const links = Array.from(element.querySelectorAll(".app-nav > a"));
+      if (!(account instanceof HTMLElement) || !(settings instanceof HTMLElement)) {
+        throw new Error("Mobile navigation is missing its account or settings row");
+      }
+      return {
+        panel: bounds(element),
+        account: bounds(account),
+        settings: bounds(settings),
+        links: links.map(bounds),
+        documentWidth: document.documentElement.clientWidth,
+        documentScrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+    assert.equal(mobileMenu.links.length, 5);
+    assert(mobileMenu.account.bottom <= mobileMenu.links[0].top + 1);
+    assert(mobileMenu.links.at(-1).bottom <= mobileMenu.settings.top + 1);
+    assert(mobileMenu.links.every((entry) => closeEnough(
+      entry.width,
+      mobileMenu.panel.width,
+      2,
+    )));
+    assert.equal(mobileMenu.documentScrollWidth, mobileMenu.documentWidth);
+    mobileMenuImage = await screenshot(page, testCase.id, "mobile-navigation");
+  }
   await activeEntry.waitFor();
   assert.equal(await navEntries.count(), 5);
   assert.equal(await cards.count(), 4);
@@ -453,6 +510,9 @@ async function verifyFixedScenarios(page, testCase) {
     }
   }
 
+  if (testCase.viewport.width <= 520) {
+    await page.locator(".app-mobile-menu-button").click();
+  }
   const image = await screenshot(page, testCase.id, "fixed-scenarios");
   let createRequests = 0;
   const countCreateRequest = (request) => {
@@ -480,6 +540,7 @@ async function verifyFixedScenarios(page, testCase) {
     keyboardScenarioSelection: true,
     freshNameRequired: true,
     createRequests,
+    mobileMenuImage,
     image,
   };
 }

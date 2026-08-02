@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -19,6 +20,7 @@ import {
   LogIn,
   MailCheck,
   MapPinned,
+  Menu,
   MoreHorizontal,
   Save,
   Settings,
@@ -178,6 +180,19 @@ const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
 const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
 const ACTIVE_JOB_PAGE_SIZE = 100;
+const MOBILE_NAVIGATION_QUERY = "(max-width: 520px)";
+
+function subscribeToMobileNavigation(onChange: () => void): () => void {
+  if (typeof window === "undefined" || !window.matchMedia) return () => undefined;
+  const query = window.matchMedia(MOBILE_NAVIGATION_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function mobileNavigationSnapshot(): boolean {
+  return typeof window !== "undefined"
+    && Boolean(window.matchMedia?.(MOBILE_NAVIGATION_QUERY).matches);
+}
 const MAX_ACTIVE_JOB_PAGES_PER_STATUS = 10;
 
 interface ExperiencePreferenceDraft {
@@ -1990,14 +2005,22 @@ function AppShellContent() {
   const updater = useAppUpdaterState();
   const { locale, t } = useI18n();
   const accountCopy = ACCOUNT_COPY[locale];
+  const mobileNavigationEnabled = useSyncExternalStore(
+    subscribeToMobileNavigation,
+    mobileNavigationSnapshot,
+    () => false,
+  );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
   const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
   const accountCloseRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
   const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
   const currentPathRef = useRef(location.pathname);
   const exitPromptRef = useRef<ExitPromptState | null>(null);
@@ -2025,6 +2048,7 @@ function AppShellContent() {
     && !auth.account;
   const accountDialogRequired = accountRequired && !launcherMode;
   const accountDialogOpen = accountOpen || accountDialogRequired;
+  const mobileMenuExpanded = mobileNavigationEnabled && mobileMenuOpen;
   const sidebarUpdateVisible = desktopRuntime && ![
     "checking",
     "current",
@@ -2162,14 +2186,50 @@ function AppShellContent() {
     setLauncherSettingsOpen(false);
     // The trigger is inert while the modal is open. Restore focus on the next
     // frame, after the dialog effect has removed inert from the app shell.
-    requestAnimationFrame(() => launcherSettingsButtonRef.current?.focus());
-  }, []);
+    requestAnimationFrame(() => {
+      if (mobileNavigationEnabled) mobileMenuButtonRef.current?.focus();
+      else launcherSettingsButtonRef.current?.focus();
+    });
+  }, [mobileNavigationEnabled]);
 
   const closeAccount = useCallback(() => {
     if (accountRequired) return;
     setAccountOpen(false);
-    requestAnimationFrame(() => accountButtonRef.current?.focus());
-  }, [accountRequired]);
+    requestAnimationFrame(() => {
+      if (mobileNavigationEnabled) mobileMenuButtonRef.current?.focus();
+      else accountButtonRef.current?.focus();
+    });
+  }, [accountRequired, mobileNavigationEnabled]);
+
+  useEffect(() => {
+    if (!mobileMenuExpanded) return;
+    const closeMobileMenu = (restoreFocus: boolean) => {
+      setMobileMenuOpen(false);
+      if (restoreFocus) {
+        requestAnimationFrame(() => mobileMenuButtonRef.current?.focus());
+      }
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        mobileMenuPanelRef.current?.contains(target)
+        || mobileMenuButtonRef.current?.contains(target)
+      ) return;
+      closeMobileMenu(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeMobileMenu(true);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuExpanded]);
 
   useEffect(() => {
     if (launcherMode) return;
@@ -2508,7 +2568,26 @@ function AppShellContent() {
             <BrandLockup variant="compact" />
           </a>
         )}
-        <nav className="app-nav" aria-label={t("app.primaryNav")}>
+        {mobileNavigationEnabled ? (
+          <button
+            ref={mobileMenuButtonRef}
+            type="button"
+            className="app-mobile-menu-button"
+            aria-label={t(mobileMenuExpanded ? "app.closeMenu" : "app.openMenu")}
+            aria-controls="app-mobile-navigation"
+            aria-expanded={mobileMenuExpanded}
+            onClick={() => setMobileMenuOpen((current) => !current)}
+          >
+            <Menu aria-hidden="true" strokeWidth={1.9} />
+          </button>
+        ) : null}
+        <div
+          ref={mobileMenuPanelRef}
+          id="app-mobile-navigation"
+          className={`app-mobile-menu-panel${mobileMenuExpanded ? " is-open" : ""}`}
+          hidden={mobileNavigationEnabled && !mobileMenuExpanded}
+        >
+          <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">
             {runtimeNavDescription}
           </span>
@@ -2548,7 +2627,10 @@ function AppShellContent() {
                   href={externalUrl}
                   target="_blank"
                   rel="noreferrer"
-                  onClick={(event) => openExternalNavigation(event, externalUrl)}
+                  onClick={(event) => {
+                    setMobileMenuOpen(false);
+                    openExternalNavigation(event, externalUrl);
+                  }}
                 >
                   {itemContent}
                 </a>
@@ -2562,6 +2644,7 @@ function AppShellContent() {
                 end={item.end}
                 title={runtimeLocked ? runtimeNavDescription : undefined}
                 aria-describedby={runtimeLocked ? "runtime-nav-description" : undefined}
+                onClick={() => setMobileMenuOpen(false)}
                 className={({ isActive }) => {
                   const classes = runtimeLocked ? ["runtime-locked"] : [];
                   if (isActive) classes.push("active");
@@ -2575,6 +2658,7 @@ function AppShellContent() {
           {!desktopRuntime && adminAccess.status === "allowed" ? (
             <NavLink
               to="/admin"
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) => isActive ? "active" : undefined}
             >
               <span className="app-nav-entry">
@@ -2583,12 +2667,12 @@ function AppShellContent() {
               </span>
             </NavLink>
           ) : null}
-        </nav>
-        <ExperimentWorkspaceSidebar
-          ownerId={auth.account?.id ?? "local"}
-          locale={locale}
-        />
-        <div className="app-sidebar-footer">
+          </nav>
+          <ExperimentWorkspaceSidebar
+            ownerId={auth.account?.id ?? "local"}
+            locale={locale}
+          />
+          <div className="app-sidebar-footer">
           <button
             ref={accountButtonRef}
             type="button"
@@ -2597,6 +2681,7 @@ function AppShellContent() {
             aria-haspopup="dialog"
             aria-expanded={accountDialogOpen}
             onClick={() => {
+              setMobileMenuOpen(false);
               setLauncherSettingsOpen(false);
               setAccountOpen(true);
             }}
@@ -2629,24 +2714,44 @@ function AppShellContent() {
               <Download aria-hidden="true" strokeWidth={2} />
             </button>
           ) : null}
+          </div>
+          {mobileNavigationEnabled ? (
+            <button
+              ref={launcherSettingsButtonRef}
+              type="button"
+              className="app-mobile-settings-entry"
+              aria-label={t("app.settings")}
+              aria-haspopup="dialog"
+              aria-expanded={launcherSettingsOpen}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setLauncherSettingsOpen(true);
+              }}
+            >
+              <Settings aria-hidden="true" strokeWidth={1.75} />
+              <span>{t("app.settings")}</span>
+            </button>
+          ) : null}
         </div>
       </aside>
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">DroneDream — {t("app.platform")}</div>
-          <div className="app-header-meta">
-            <button
-              ref={launcherSettingsButtonRef}
-              type="button"
-              className="launcher-settings-button"
-              aria-label={t("app.settings")}
-              aria-haspopup="dialog"
-              aria-expanded={launcherSettingsOpen}
-              onClick={() => setLauncherSettingsOpen(true)}
-            >
-              <Settings aria-hidden="true" strokeWidth={1.85} />
-            </button>
-          </div>
+          {!mobileNavigationEnabled ? (
+            <div className="app-header-meta">
+              <button
+                ref={launcherSettingsButtonRef}
+                type="button"
+                className="launcher-settings-button"
+                aria-label={t("app.settings")}
+                aria-haspopup="dialog"
+                aria-expanded={launcherSettingsOpen}
+                onClick={() => setLauncherSettingsOpen(true)}
+              >
+                <Settings aria-hidden="true" strokeWidth={1.85} />
+              </button>
+            </div>
+          ) : null}
         </header>
         {launcherSettingsOpen ? (
           <div
