@@ -2557,58 +2557,113 @@ a {
 .experience-preview {
   min-width: 0;
   margin: 0;
-  padding: 0.55rem;
+  padding: 0.62rem;
   border: 1px solid rgba(125, 231, 255, 0.2);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(17, 7, 35, 0.74);
 }
 
-.experience-preview figcaption,
-.experience-preview-meta {
+.experience-preview figcaption {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.7rem;
 }
 
 .experience-preview figcaption strong {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
 
-.experience-preview figcaption span,
-.experience-preview-meta {
-  color: var(--text-muted);
-  font-size: 0.66rem;
+.experience-preview-view-switcher {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 0.14rem;
+  border: 1px solid rgba(189, 117, 255, 0.22);
+  border-radius: 9px;
+  background: rgba(18, 5, 31, 0.58);
+}
+
+.experience-preview-view-switcher button {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #e7dff2;
+}
+
+.experience-preview-view-switcher button:hover,
+.experience-preview-view-switcher button:focus-visible {
+  background: rgba(184, 74, 205, 0.24);
+  color: #ffffff;
+}
+
+.experience-preview-view-switcher button:focus-visible {
+  outline: 2px solid #7de7ff;
+  outline-offset: 1px;
+}
+
+.experience-preview-view-switcher button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.experience-preview-view-switcher span {
+  min-width: 58px;
+  color: #f4edf8;
+  font-size: 0.68rem;
+  font-weight: 750;
+  text-align: center;
 }
 
 .experience-preview-canvas {
   display: block;
   width: 100%;
-  height: 108px;
-  margin: 0.35rem 0;
+  height: 174px;
+  margin-top: 0.48rem;
 }
 
 .experience-preview-bg {
   fill: rgba(20, 8, 41, 0.96);
 }
 
-.experience-preview-axis {
-  fill: none;
-  stroke: rgba(189, 117, 255, 0.2);
-  stroke-width: 1;
+.experience-preview-floor {
+  fill: rgba(92, 55, 139, 0.14);
+  stroke: rgba(172, 112, 232, 0.34);
+  stroke-width: 1.2;
+}
+
+.experience-preview-grid line {
+  stroke: rgba(177, 117, 231, 0.19);
+  stroke-width: 0.85;
+  vector-effect: non-scaling-stroke;
 }
 
 .experience-preview-route,
 .experience-preview-climb {
   fill: none;
   stroke: #ff73d5;
-  stroke-width: 3;
+  stroke-width: 3.2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(255, 82, 201, 0.48));
+  vector-effect: non-scaling-stroke;
 }
 
 .experience-preview-climb {
   marker-end: none;
+}
+
+.experience-preview-shadow {
+  fill: none;
+  stroke: rgba(125, 231, 255, 0.28);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
 }
 
 .experience-preview-hover-ring {
@@ -2616,15 +2671,24 @@ a {
   stroke: #7de7ff;
   stroke-width: 2;
   stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
 }
 
 .experience-preview-marker {
   fill: #ff73d5;
   stroke: #ffd7f2;
   stroke-width: 2;
+  filter: drop-shadow(0 0 5px rgba(255, 87, 207, 0.65));
+  vector-effect: non-scaling-stroke;
 }
 
-.experience-preview-altitude,
+.experience-preview-start {
+  fill: #7de7ff;
+  stroke: #e4fbff;
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+}
+
 .experience-preview-empty {
   fill: #a7efff;
   font-size: 12px;

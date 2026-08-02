@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
@@ -23,8 +23,23 @@ describe("ExperienceTrackPreview", () => {
     );
 
     expect(screen.getByTestId("hover-preview")).toBeInTheDocument();
-    expect(screen.getByText("3 m")).toBeVisible();
-    expect(screen.getByText(/no Job created/i)).toBeVisible();
+    expect(screen.getByRole("img", { name: /3D view.*Vertical climb/i }))
+      .toHaveAttribute("data-view", "3d");
+    expect(screen.getByText(/no Job created/i)).toHaveClass("sr-only");
+    expect(screen.queryByText("3 m")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Next view" }));
+    expect(screen.getByRole("img", { name: /XY view.*Vertical climb/i }))
+      .toHaveAttribute("data-view", "xy");
+    fireEvent.click(screen.getByRole("button", { name: "Next view" }));
+    expect(screen.getByRole("img", { name: /XZ view.*Vertical climb/i }))
+      .toHaveAttribute("data-view", "xz");
+    fireEvent.click(screen.getByRole("button", { name: "Next view" }));
+    expect(screen.getByRole("img", { name: /YZ view.*Vertical climb/i }))
+      .toHaveAttribute("data-view", "yz");
+    fireEvent.click(screen.getByRole("button", { name: "Next view" }));
+    expect(screen.getByRole("img", { name: /3D view.*Vertical climb/i }))
+      .toHaveAttribute("data-view", "3d");
   });
 
   it("renders a finite planar route when waypoint altitude is inherited", () => {
@@ -43,5 +58,6 @@ describe("ExperienceTrackPreview", () => {
 
     expect(screen.getByTestId("route-preview")).toBeInTheDocument();
     expect(screen.queryByTestId("hover-preview")).toBeNull();
+    expect(screen.getByRole("group", { name: "Track view" })).toBeVisible();
   });
 });

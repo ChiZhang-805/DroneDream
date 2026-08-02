@@ -30,6 +30,7 @@ const host = "127.0.0.1";
 const port = Number(args.get("--port") || 5197);
 const origin = `http://${host}:${port}`;
 const mobileMenuOnly = Boolean(args.get("--mobile-menu-only"));
+const fixedScenariosOnly = Boolean(args.get("--fixed-scenarios-only"));
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
@@ -534,6 +535,27 @@ async function verifyFixedScenarios(page, testCase) {
   if (testCase.viewport.width <= 520) {
     await page.locator(".app-mobile-menu-button").click();
   }
+  const previews = page.locator(".experience-preview");
+  assert.equal(await previews.count(), 4);
+  assert.equal(await page.locator(".experience-preview-meta").count(), 0);
+  assert.equal(await page.locator('.experience-preview-canvas[data-view="3d"]').count(), 4);
+  assert.equal(await page.locator(".experience-preview-view-switcher").count(), 4);
+  assert(await previews.evaluateAll((elements) => elements.every((element) => (
+    element.scrollWidth <= element.clientWidth + 1
+  ))), `${testCase.id}: a 3D scenario preview overflows its card`);
+  const firstPreview = previews.first();
+  const nextViewButton = firstPreview.getByRole("button", {
+    name: testCase.locale === "en" ? "Next view" : "下一个视图",
+  });
+  await nextViewButton.focus();
+  assert(await nextViewButton.evaluate((element) => element === document.activeElement));
+  await page.keyboard.press("Enter");
+  assert.equal(await firstPreview.locator('.experience-preview-canvas[data-view="xy"]').count(), 1);
+  const switchedViewImage = await screenshot(page, testCase.id, "fixed-scenarios-xy-view");
+  await firstPreview.getByRole("button", {
+    name: testCase.locale === "en" ? "Previous view" : "上一个视图",
+  }).click();
+  assert.equal(await firstPreview.locator('.experience-preview-canvas[data-view="3d"]').count(), 1);
   const image = await screenshot(page, testCase.id, "fixed-scenarios");
   let createRequests = 0;
   const countCreateRequest = (request) => {
@@ -563,6 +585,7 @@ async function verifyFixedScenarios(page, testCase) {
     createRequests,
     mobileMenu: mobileMenuMetrics,
     mobileMenuImage,
+    switchedViewImage,
     image,
   };
 }
@@ -903,8 +926,8 @@ try {
       entry.settings = await verifySettings(page, testCase);
       entry.avatar = await verifyAvatar(page, testCase, avatarBytes);
       entry.fixedScenarios = await verifyFixedScenarios(page, testCase);
-      if (mobileMenuOnly) {
-        entry.scope = "mobile-menu-only";
+      if (mobileMenuOnly || fixedScenariosOnly) {
+        entry.scope = mobileMenuOnly ? "mobile-menu-only" : "fixed-scenarios-only";
         entry.pageErrors = pageErrors;
         assert.deepEqual(pageErrors, [], `${testCase.id}: page errors`);
         entry.status = "pass";
