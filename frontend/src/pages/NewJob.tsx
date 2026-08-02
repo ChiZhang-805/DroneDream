@@ -97,6 +97,7 @@ import {
   updateExperimentWorkspace,
 } from "../features/experiment/workspaceRegistry";
 import { generateReferenceTrack } from "../utils/referenceTrack";
+import { formatNumber } from "../utils/format";
 import { useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey, TranslationParams } from "../i18n/I18nProvider";
 
@@ -796,6 +797,30 @@ function validate(
       if (magnitude === null || magnitude < 0 || magnitude > 30) errors.gust_magnitude_mps = t("wizard.validation.gustMagnitude");
       if (direction === null || direction < 0 || direction >= 360) errors.gust_direction_deg = t("wizard.validation.gustDirection");
       if (period === null || period <= 0 || period > 300) errors.gust_period_s = t("wizard.validation.gustPeriod");
+      const northMps = parseNumber(form.wind_north);
+      const eastMps = parseNumber(form.wind_east);
+      const southMps = parseNumber(form.wind_south);
+      const westMps = parseNumber(form.wind_west);
+      if (
+        magnitude !== null && magnitude > 0 &&
+        direction !== null && direction >= 0 && direction < 360 &&
+        northMps !== null && eastMps !== null && southMps !== null && westMps !== null
+      ) {
+        const netNorthMps = northMps - southMps;
+        const netEastMps = eastMps - westMps;
+        if (Math.hypot(netNorthMps, netEastMps) > 1e-9) {
+          const steadyDirectionDeg =
+            ((Math.atan2(netEastMps, netNorthMps) * 180) / Math.PI + 360) % 360;
+          const angularDeltaDeg = Math.abs(
+            ((direction - steadyDirectionDeg + 540) % 360) - 180,
+          );
+          if (angularDeltaDeg > 0.001) {
+            errors.gust_direction_deg = t("wizard.validation.gustDirectionAlignment", {
+              direction: formatNumber(steadyDirectionDeg, 3),
+            });
+          }
+        }
+      }
     }
     const obstacleResult = parseObstacles(form.obstacles_json, t);
     if (obstacleResult.error) errors.obstacles_json = obstacleResult.error;
@@ -2517,7 +2542,7 @@ export function NewJob() {
                   <Field label={t("wizard.field.advancedScenario")} htmlFor="advanced_enabled"><BooleanSelect id="advanced_enabled" value={form.advanced_enabled} onChange={(value) => update("advanced_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
                   <Field label={t("wizard.field.gustEnabled")} htmlFor="gust_enabled"><BooleanSelect id="gust_enabled" value={form.gust_enabled} disabled={!form.advanced_enabled} onChange={(value) => update("gust_enabled", value)} trueLabel={t("wizard.option.enabled")} falseLabel={t("wizard.option.disabled")} /></Field>
                   <Field label={t("wizard.field.gustMagnitude")} htmlFor="gust_magnitude_mps" error={errors.gust_magnitude_mps}><input id="gust_magnitude_mps" type="number" min="0" max="30" step="0.1" placeholder="0–30" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_magnitude_mps} onChange={handleTextChange("gust_magnitude_mps")} /></Field>
-                  <Field label={t("wizard.field.gustDirection")} htmlFor="gust_direction_deg" error={errors.gust_direction_deg}><input id="gust_direction_deg" type="number" min="0" max="359" step="1" placeholder="0–359" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} /></Field>
+                  <Field label={t("wizard.field.gustDirection")} htmlFor="gust_direction_deg" error={errors.gust_direction_deg ?? preflightErrors.gust_direction_deg}><input id="gust_direction_deg" type="number" min="0" max="359" step="1" placeholder="0–359" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_direction_deg} onChange={handleTextChange("gust_direction_deg")} /></Field>
                   <Field label={t("wizard.field.gustPeriod")} htmlFor="gust_period_s" error={errors.gust_period_s}><input id="gust_period_s" type="number" min="0" max="300" step="0.1" placeholder="0–300" disabled={!form.advanced_enabled || !form.gust_enabled} value={form.gust_period_s} onChange={handleTextChange("gust_period_s")} /></Field>
                 </div>
               </div>

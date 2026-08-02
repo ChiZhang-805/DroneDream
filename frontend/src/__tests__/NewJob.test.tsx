@@ -660,6 +660,13 @@ describe("NewJob experiment wizard", () => {
     expect(screen.getByLabelText(/Gust magnitude/i)).toHaveValue(10);
     expect(screen.getByLabelText(/Gust direction/i)).toHaveValue(26.565051);
     expect(screen.getByLabelText(/GPS noise/i)).toHaveValue(0);
+    fireEvent.change(screen.getByLabelText(/Gust direction/i), {
+      target: { value: "70" },
+    });
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Gust direction/i), {
+      target: { value: "26.565051" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /Edit obstacles/i }));
     const obstacleDialog = screen.getByRole("dialog", { name: /Obstacles.*JSON/i });
     fireEvent.change(within(obstacleDialog).getByRole("textbox"), {
