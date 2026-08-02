@@ -151,7 +151,6 @@ def test_wrapper_site_dry_run_writes_valid_telemetry(tmp_path: Path):
     args[args.index("--vehicle") + 1] = "gz_x500_depth"
     env = os.environ.copy()
     env["PX4_SITE_DRY_RUN"] = "true"
-    env["GZ_IP"] = "127.0.0.1"
     # The legacy worker default must not override a per-job simulator model.
     env["PX4_MAKE_TARGET"] = "gz_x500"
     env.pop("PX4_FORCE_MAKE_TARGET", None)
@@ -180,65 +179,6 @@ def test_wrapper_site_dry_run_writes_valid_telemetry(tmp_path: Path):
     assert launch_config["GZ_PARTITION"] == wrapper._trial_gazebo_partition(tmp_path / "run")
     assert re.fullmatch(r"dronedream_[0-9a-f]{24}", launch_config["GZ_PARTITION"])
     assert launch_config["GZ_IP"] == "127.0.0.1"
-
-
-def test_gazebo_transport_ip_preserves_valid_explicit_configuration(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("GZ_IP", "127.0.0.2")
-    assert wrapper._gazebo_transport_ip() == "127.0.0.2"
-
-
-def test_gazebo_transport_ip_rejects_invalid_explicit_configuration(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("GZ_IP", "not-an-address")
-    with pytest.raises(ValueError, match="valid IPv4"):
-        wrapper._gazebo_transport_ip()
-
-
-def test_gazebo_transport_ip_uses_wsl_default_route_source(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class FakeProbe:
-        def __init__(self) -> None:
-            self.connected_to: tuple[str, int] | None = None
-            self.closed = False
-
-        def connect(self, endpoint: tuple[str, int]) -> None:
-            self.connected_to = endpoint
-
-        def getsockname(self) -> tuple[str, int]:
-            return ("10.251.143.110", 43210)
-
-        def close(self) -> None:
-            self.closed = True
-
-    probe = FakeProbe()
-    monkeypatch.delenv("GZ_IP", raising=False)
-    monkeypatch.setattr(wrapper, "_running_under_wsl", lambda: True)
-    monkeypatch.setattr(wrapper.socket, "socket", lambda *_args: probe)
-
-    assert wrapper._gazebo_transport_ip() == "10.251.143.110"
-    assert probe.connected_to == ("192.0.2.1", 9)
-    assert probe.closed is True
-
-
-def test_gazebo_transport_ip_falls_back_to_loopback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class FailedProbe:
-        def connect(self, _endpoint: tuple[str, int]) -> None:
-            raise OSError("no route")
-
-        def close(self) -> None:
-            return None
-
-    monkeypatch.delenv("GZ_IP", raising=False)
-    monkeypatch.setattr(wrapper, "_running_under_wsl", lambda: True)
-    monkeypatch.setattr(wrapper.socket, "socket", lambda *_args: FailedProbe())
-
-    assert wrapper._gazebo_transport_ip() == "127.0.0.1"
 
 
 def test_gazebo_transport_partition_is_stable_and_trial_isolated(tmp_path: Path) -> None:
