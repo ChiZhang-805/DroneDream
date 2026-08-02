@@ -1621,6 +1621,8 @@ def to_trial_summary(trial: models.Trial) -> schemas.TrialSummary:
         status=trial.status,  # type: ignore[arg-type]
         score=trial.metric.score if trial.metric is not None else None,
         pass_flag=(trial.metric.pass_flag if trial.metric is not None else None),
+        failure_code=trial.failure_code,
+        failure_reason=trial.failure_reason,
         candidate_label=candidate.label if candidate is not None else None,
         candidate_source_type=source_type,
         candidate_optimizer_strategy=candidate_optimizer_strategy,
@@ -1653,8 +1655,6 @@ def to_trial_schema(trial: models.Trial) -> schemas.Trial:
         attempt_count=trial.attempt_count,
         worker_id=trial.worker_id,
         simulator_backend=trial.simulator_backend,
-        failure_code=trial.failure_code,
-        failure_reason=trial.failure_reason,
         log_excerpt=trial.log_excerpt,
         metrics=metrics,
         queued_at=trial.queued_at,

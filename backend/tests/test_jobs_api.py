@@ -500,6 +500,40 @@ def test_list_trials_for_job_is_empty(client: TestClient) -> None:
     assert resp.json() == {"success": True, "data": [], "error": None}
 
 
+def test_list_trials_surfaces_persisted_failure_diagnosis(client: TestClient) -> None:
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        candidate = models.CandidateParameterSet(
+            job_id=job["id"],
+            parameter_json={},
+            label="failed candidate",
+        )
+        db.add(candidate)
+        db.flush()
+        db.add(
+            models.Trial(
+                job_id=job["id"],
+                candidate_id=candidate.id,
+                seed=42,
+                status="FAILED",
+                failure_code="SIMULATION_FAILED",
+                failure_reason="PX4 rejected the arm command",
+            )
+        )
+        db.commit()
+
+    response = client.get(f"/api/v1/jobs/{job['id']}/trials")
+
+    assert response.status_code == 200, response.text
+    [trial] = response.json()["data"]
+    assert trial["failure_code"] == "SIMULATION_FAILED"
+    assert trial["failure_reason"] == "PX4 rejected the arm command"
+
+
 def test_list_trials_keeps_array_contract_and_exposes_page_metadata(
     client: TestClient,
 ) -> None:

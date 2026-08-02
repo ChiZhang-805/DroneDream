@@ -987,6 +987,11 @@ class TrialSummary(BaseModel):
     # Job Detail table can render PASS / FAIL alongside the COMPLETED status.
     # ``None`` means "no metric yet" (queued/running/failed-without-metrics).
     pass_flag: bool | None = None
+    # Failed rows must carry their canonical persisted diagnosis in the list
+    # response.  Requiring a separate detail request for every failed row made
+    # the Job Detail table and evidence collectors silently lose the reason.
+    failure_code: str | None = None
+    failure_reason: str | None = None
     # Phase 5: candidate metadata surfaced so the frontend can distinguish
     # baseline vs optimizer rows and highlight the best candidate without
     # needing a second API call.
@@ -1003,8 +1008,6 @@ class Trial(TrialSummary):
     attempt_count: int
     worker_id: str | None = None
     simulator_backend: str | None = None
-    failure_code: str | None = None
-    failure_reason: str | None = None
     log_excerpt: str | None = None
     metrics: TrialMetrics | None = None
     queued_at: datetime | None = None
