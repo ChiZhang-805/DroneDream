@@ -52,6 +52,7 @@ from app.simulator.base import (
     FAILURE_CANCELLED,
     FAILURE_EXECUTION_TIMEOUT,
     FAILURE_INVALID_RESULT,
+    FAILURE_SIM_ERROR,
     FAILURE_UNVERIFIED_REPORT,
     ArtifactMetadata,
     SimulatorAdapter,
@@ -59,6 +60,14 @@ from app.simulator.base import (
     TrialFailure,
     TrialMetricsPayload,
     TrialResult,
+)
+from app.simulator.px4_actuator_link_evidence import (
+    DIAGNOSTIC_FAILURE_CODE as FAILURE_ACTUATOR_LINK_STALLED,
+)
+from app.simulator.px4_actuator_link_evidence import (
+    actuator_link_evidence_eligibility,
+    compile_actuator_link_health_evidence,
+    validate_actuator_link_health_evidence,
 )
 from app.simulator.px4_metric_evidence import (
     compile_px4_core_metric_evidence,
@@ -1054,6 +1063,146 @@ def _hash_bounded_artifact(
     return "sha256:" + digest.hexdigest(), byte_count
 
 
+def _has_verified_actuator_link_stall(
+    *,
+    claimed_code: str,
+    artifacts: list[ArtifactMetadata],
+    ctx: TrialContext,
+) -> bool:
+    """Admit one narrow infrastructure failure from sealed PX4 evidence."""
+
+    if claimed_code != FAILURE_ACTUATOR_LINK_STALLED:
+        return False
+    health = [
+        artifact for artifact in artifacts if artifact.artifact_type == "actuator_link_health_json"
+    ]
+    ulogs = [artifact for artifact in artifacts if artifact.artifact_type == "px4_ulog"]
+    transient_health = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "sim_transient_health_json"
+    ]
+    transient_ulogs = [
+        artifact
+        for artifact in artifacts
+        if artifact.artifact_type == "sim_transient_px4_ulog"
+    ]
+    retry_receipts = [
+        artifact for artifact in artifacts if artifact.artifact_type == "sim_transient_retry_json"
+    ]
+    if (
+        len(health) != 1
+        or len(ulogs) != 1
+        or len(transient_health) != 1
+        or len(transient_ulogs) != 1
+        or len(retry_receipts) != 1
+    ):
+        return False
+    try:
+        retry = _load_bounded_json_artifact(retry_receipts[0])
+        if not isinstance(retry, dict):
+            return False
+        expected_identity = {
+            "trial_id": ctx.trial_id,
+            "job_id": ctx.job_id,
+            "candidate_id": ctx.candidate_id,
+            "seed": ctx.seed,
+            "attempt_count": ctx.attempt_count,
+        }
+        if (
+            retry.get("schema_id") != "dronedream.simulator-transient-retry/v1"
+            or retry.get("execution_identity") != expected_identity
+            or retry.get("diagnostic_failure_code") != FAILURE_ACTUATOR_LINK_STALLED
+            or retry.get("maximum_launcher_attempts") != 2
+            or retry.get("retry_index") != 1
+        ):
+            return False
+        current_ulog_sha, _ = _hash_bounded_artifact(
+            ulogs[0],
+            max_bytes=_MAX_PX4_ULOG_BYTES,
+        )
+        first_ulog_sha, first_ulog_bytes = _hash_bounded_artifact(
+            transient_ulogs[0],
+            max_bytes=_MAX_PX4_ULOG_BYTES,
+        )
+        first_health_sha, first_health_bytes = _hash_bounded_artifact(
+            transient_health[0],
+            max_bytes=_MAX_KNOWN_JSON_ARTIFACT_BYTES,
+        )
+        current_ulog_sha = current_ulog_sha.removeprefix("sha256:")
+        first_ulog_sha = first_ulog_sha.removeprefix("sha256:")
+        first_health_sha = first_health_sha.removeprefix("sha256:")
+        preserved_files = retry.get("preserved_files")
+        if not isinstance(preserved_files, list):
+            return False
+        required_preserved = {
+            "actuator_link_transient_attempt_1.ulg": (
+                transient_ulogs[0],
+                first_ulog_sha,
+                first_ulog_bytes,
+            ),
+            "actuator_link_transient_attempt_1.health.json": (
+                transient_health[0],
+                first_health_sha,
+                first_health_bytes,
+            ),
+        }
+        for expected_path, (artifact, expected_sha, expected_bytes) in required_preserved.items():
+            matches = [
+                item
+                for item in preserved_files
+                if isinstance(item, dict) and item.get("path") == expected_path
+            ]
+            if (
+                len(matches) != 1
+                or Path(artifact.storage_path).name != expected_path
+                or matches[0].get("sha256") != expected_sha
+                or matches[0].get("bytes") != expected_bytes
+            ):
+                return False
+        if retry.get("first_attempt_health_ulog_sha256") != first_ulog_sha:
+            return False
+        trusted_input = _trial_input_payload(ctx, Path("unused-trial-result.json"))
+        vehicle_profile = trusted_input.get("vehicle_profile")
+        vehicle = (
+            vehicle_profile.get("simulator_model")
+            if isinstance(vehicle_profile, dict)
+            else None
+        ) or os.environ.get("PX4_VEHICLE", "x500")
+        eligibility = actuator_link_evidence_eligibility(
+            vehicle=vehicle,
+            selected_parameters=trusted_input.get("px4_parameters", {}),
+            scenario_effect_request=trusted_input.get("scenario_effect_request"),
+        )
+        first_health_payload = _load_bounded_json_artifact(transient_health[0])
+        current_health_payload = _load_bounded_json_artifact(health[0])
+        validate_actuator_link_health_evidence(
+            first_health_payload,
+            expected_identity=expected_identity,
+            expected_ulog_sha256=first_ulog_sha,
+        )
+        validate_actuator_link_health_evidence(
+            current_health_payload,
+            expected_identity=expected_identity,
+            expected_ulog_sha256=current_ulog_sha,
+        )
+        if first_health_payload != compile_actuator_link_health_evidence(
+            ulog_path=Path(transient_ulogs[0].storage_path),
+            execution_identity=expected_identity,
+            eligibility=eligibility,
+        ):
+            return False
+        if current_health_payload != compile_actuator_link_health_evidence(
+            ulog_path=Path(ulogs[0].storage_path),
+            execution_identity=expected_identity,
+            eligibility=eligibility,
+        ):
+            return False
+    except (OSError, TypeError, ValueError):
+        return False
+    return True
+
+
 def _require_px4_metric_evidence(
     raw: Mapping[str, Any],
     *,
@@ -1542,6 +1691,25 @@ class RealCliSimulatorAdapter(SimulatorAdapter):
                 )
             except ValueError:
                 failure_artifacts = []
+            if _has_verified_actuator_link_stall(
+                claimed_code=claimed_code,
+                artifacts=failure_artifacts,
+                ctx=ctx,
+            ):
+                return TrialResult(
+                    success=False,
+                    backend=self.backend_name,
+                    failure=TrialFailure(
+                        code=FAILURE_SIM_ERROR,
+                        reason=(
+                            "PX4-to-Gazebo actuator-link stall remained after the one "
+                            "allowed fresh launcher retry; ULog proves sustained actuation "
+                            "with a stationary Gazebo ground-truth vehicle."
+                        ),
+                    ),
+                    artifacts=failure_artifacts,
+                    log_excerpt=log_text,
+                )
             return TrialResult(
                 success=False,
                 backend=self.backend_name,

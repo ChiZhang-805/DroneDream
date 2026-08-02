@@ -24,6 +24,7 @@ from app.simulator.base import (
     FAILURE_CANCELLED,
     FAILURE_EXECUTION_TIMEOUT,
     FAILURE_INVALID_RESULT,
+    FAILURE_SIM_ERROR,
     FAILURE_UNVERIFIED_REPORT,
     ArtifactMetadata,
     JobConfig,
@@ -714,12 +715,209 @@ def test_real_cli_quarantines_structured_failure_claim(monkeypatch, tmp_path):
     assert "injected simulation_failed" in result.failure.reason
 
 
+def test_real_cli_admits_verified_actuator_link_stall_as_infrastructure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    simulator = tmp_path / "verified_link_stall.py"
+    simulator.write_text(
+        """
+import hashlib, json, pathlib, sys
+input_path = pathlib.Path(sys.argv[sys.argv.index('--input') + 1])
+output_path = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])
+payload = json.loads(input_path.read_text(encoding='utf-8'))
+identity = payload['execution_identity']
+ulog = output_path.parent / 'px4_source.ulg'
+ulog.write_bytes(b'verified-physical-log')
+ulog_sha = hashlib.sha256(ulog.read_bytes()).hexdigest()
+first_ulog = output_path.parent / 'actuator_link_transient_attempt_1.ulg'
+first_ulog.write_bytes(b'first-attempt-verified-physical-log')
+first_ulog_sha = hashlib.sha256(first_ulog.read_bytes()).hexdigest()
+health = {
+  'schema_id': 'dronedream.px4-actuator-link-health/v1',
+  'diagnostic_failure_code': 'SIMULATOR_ACTUATOR_LINK_STALLED',
+  'execution_identity': identity,
+  'ulog_sha256': ulog_sha,
+  'eligibility': {
+    'eligible': True, 'reasons': [], 'vehicle': 'x500',
+    'selected_px4_parameters': [], 'unexpected_px4_parameters': [],
+    'scenario_effect_ids': [], 'disqualifying_effect_ids': [],
+  },
+  'thresholds': {}, 'observations': {}, 'missing_series': [],
+  'stall_verified': True,
+}
+(output_path.parent / 'actuator_link_health.json').write_text(
+  json.dumps(health), encoding='utf-8')
+first_health = {**health, 'ulog_sha256': first_ulog_sha}
+first_health_path = output_path.parent / 'actuator_link_transient_attempt_1.health.json'
+first_health_path.write_text(json.dumps(first_health), encoding='utf-8')
+retry = {
+  'schema_id': 'dronedream.simulator-transient-retry/v1',
+  'execution_identity': identity,
+  'diagnostic_failure_code': 'SIMULATOR_ACTUATOR_LINK_STALLED',
+  'maximum_launcher_attempts': 2,
+  'retry_index': 1,
+  'first_attempt_health_ulog_sha256': first_ulog_sha,
+  'preserved_files': [
+    {'path': first_ulog.name, 'bytes': first_ulog.stat().st_size,
+     'sha256': first_ulog_sha},
+    {'path': first_health_path.name, 'bytes': first_health_path.stat().st_size,
+     'sha256': hashlib.sha256(first_health_path.read_bytes()).hexdigest()},
+  ],
+}
+(output_path.parent / 'actuator_link_transient_retry.json').write_text(
+  json.dumps(retry), encoding='utf-8')
+result = {
+  'schema_version': 'dronedream.trial_result.v2',
+  'execution_identity': identity,
+  'success': False,
+  'failure': {
+    'code': 'SIMULATOR_ACTUATOR_LINK_STALLED',
+    'reason': 'producer claim is admitted only with validated evidence',
+  },
+  'artifacts': [
+    {'artifact_type': 'px4_ulog', 'storage_path': str(ulog)},
+    {'artifact_type': 'actuator_link_health_json',
+     'storage_path': str(output_path.parent / 'actuator_link_health.json')},
+    {'artifact_type': 'sim_transient_px4_ulog',
+     'storage_path': str(first_ulog)},
+    {'artifact_type': 'sim_transient_health_json',
+     'storage_path': str(first_health_path)},
+    {'artifact_type': 'sim_transient_retry_json',
+     'storage_path': str(output_path.parent / 'actuator_link_transient_retry.json')},
+  ],
+}
+output_path.write_text(json.dumps(result), encoding='utf-8')
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{simulator}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path / "runs"))
+
+    def compile_fixture_evidence(*, ulog_path, execution_identity, eligibility):
+        health_name = (
+            "actuator_link_transient_attempt_1.health.json"
+            if Path(ulog_path).name == "actuator_link_transient_attempt_1.ulg"
+            else "actuator_link_health.json"
+        )
+        payload = json.loads((Path(ulog_path).parent / health_name).read_text(encoding="utf-8"))
+        assert payload["execution_identity"] == execution_identity
+        assert payload["eligibility"] == eligibility
+        return payload
+
+    monkeypatch.setattr(
+        real_cli_module,
+        "compile_actuator_link_health_evidence",
+        compile_fixture_evidence,
+    )
+
+    result = RealCliSimulatorAdapter().run_trial(_ctx())
+
+    assert result.success is False
+    assert result.failure is not None
+    assert result.failure.code == FAILURE_SIM_ERROR
+    assert "one allowed fresh launcher retry" in result.failure.reason
+    assert {artifact.artifact_type for artifact in result.artifacts} == {
+        "px4_ulog",
+        "actuator_link_health_json",
+        "sim_transient_px4_ulog",
+        "sim_transient_health_json",
+        "sim_transient_retry_json",
+    }
+
+
+def test_real_cli_rejects_retry_receipt_with_mismatched_first_ulog_digest(
+    tmp_path: Path,
+) -> None:
+    ctx = _ctx()
+    identity = {
+        "trial_id": ctx.trial_id,
+        "job_id": ctx.job_id,
+        "candidate_id": ctx.candidate_id,
+        "seed": ctx.seed,
+        "attempt_count": ctx.attempt_count,
+    }
+    current_ulog = tmp_path / "px4_source.ulg"
+    first_ulog = tmp_path / "actuator_link_transient_attempt_1.ulg"
+    current_ulog.write_bytes(b"current")
+    first_ulog.write_bytes(b"first")
+    current_sha = hashlib.sha256(current_ulog.read_bytes()).hexdigest()
+    first_sha = hashlib.sha256(first_ulog.read_bytes()).hexdigest()
+
+    def write_health(path: Path, ulog_sha256: str) -> None:
+        path.write_text(
+            json.dumps(
+                {
+                    "schema_id": "dronedream.px4-actuator-link-health/v1",
+                    "diagnostic_failure_code": "SIMULATOR_ACTUATOR_LINK_STALLED",
+                    "execution_identity": identity,
+                    "ulog_sha256": ulog_sha256,
+                    "eligibility": {"eligible": True, "reasons": []},
+                    "thresholds": {},
+                    "observations": {},
+                    "missing_series": [],
+                    "stall_verified": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    current_health = tmp_path / "actuator_link_health.json"
+    first_health = tmp_path / "actuator_link_transient_attempt_1.health.json"
+    write_health(current_health, current_sha)
+    write_health(first_health, first_sha)
+    retry = tmp_path / "actuator_link_transient_retry.json"
+    retry.write_text(
+        json.dumps(
+            {
+                "schema_id": "dronedream.simulator-transient-retry/v1",
+                "execution_identity": identity,
+                "diagnostic_failure_code": "SIMULATOR_ACTUATOR_LINK_STALLED",
+                "maximum_launcher_attempts": 2,
+                "retry_index": 1,
+                "first_attempt_health_ulog_sha256": "0" * 64,
+                "preserved_files": [
+                    {
+                        "path": first_ulog.name,
+                        "bytes": first_ulog.stat().st_size,
+                        "sha256": first_sha,
+                    },
+                    {
+                        "path": first_health.name,
+                        "bytes": first_health.stat().st_size,
+                        "sha256": hashlib.sha256(first_health.read_bytes()).hexdigest(),
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    artifacts = [
+        ArtifactMetadata("px4_ulog", "Current ULog", str(current_ulog)),
+        ArtifactMetadata(
+            "actuator_link_health_json", "Current health", str(current_health)
+        ),
+        ArtifactMetadata("sim_transient_px4_ulog", "First ULog", str(first_ulog)),
+        ArtifactMetadata(
+            "sim_transient_health_json", "First health", str(first_health)
+        ),
+        ArtifactMetadata("sim_transient_retry_json", "Retry", str(retry)),
+    ]
+
+    assert not real_cli_module._has_verified_actuator_link_stall(
+        claimed_code="SIMULATOR_ACTUATOR_LINK_STALLED",
+        artifacts=artifacts,
+        ctx=ctx,
+    )
+
+
 @pytest.mark.parametrize(
     "claimed_code",
     [
         "TIMEOUT",
         "ADAPTER_UNAVAILABLE",
         "UNSTABLE_CANDIDATE",
+        "SIMULATOR_ACTUATOR_LINK_STALLED",
         "SOME_NEW_DOMAIN_FAILURE",
     ],
 )

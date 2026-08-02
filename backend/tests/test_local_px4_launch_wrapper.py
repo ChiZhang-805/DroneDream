@@ -76,6 +76,23 @@ def test_wrapper_prefers_checkout_backend_over_stale_installed_app(tmp_path: Pat
     assert Path(proc.stdout.strip()).resolve() == expected.resolve()
 
 
+def test_wrapper_uses_a_fresh_gazebo_partition_for_the_one_launcher_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("PX4_TRIAL_LAUNCH_ATTEMPT", "1")
+    first = wrapper._trial_gazebo_partition(tmp_path)
+    assert first == wrapper._trial_gazebo_partition(tmp_path)
+
+    monkeypatch.setenv("PX4_TRIAL_LAUNCH_ATTEMPT", "2")
+    second = wrapper._trial_gazebo_partition(tmp_path)
+    assert second != first
+
+    monkeypatch.setenv("PX4_TRIAL_LAUNCH_ATTEMPT", "3")
+    with pytest.raises(ValueError, match="must be 1 or 2"):
+        wrapper._trial_gazebo_partition(tmp_path)
+
+
 def _make_args(tmp_path: Path) -> list[str]:
     run_dir = tmp_path / "run"
     input_path = _write_json(tmp_path / "trial_input.json", {"trial_id": "t"})

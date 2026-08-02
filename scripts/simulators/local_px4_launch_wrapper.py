@@ -45,6 +45,14 @@ if _BACKEND_ROOT.is_dir():
         sys.path.remove(_backend_root_text)
     sys.path.insert(0, _backend_root_text)
 
+from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
+    ARTIFACT_NAME as ACTUATOR_LINK_HEALTH_NAME,
+)
+from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
+    actuator_link_evidence_eligibility,
+    compile_actuator_link_health_evidence,
+)
+
 DEFAULT_MAKE_TARGET = "gz_x500"
 DEFAULT_RUN_SECONDS = 30
 DEFAULT_READY_TIMEOUT_SECONDS = 30
@@ -2280,9 +2288,14 @@ def _prepare_px4_launch_environment(
 
 
 def _trial_gazebo_partition(run_dir: Path) -> str:
-    """Return a deterministic, collision-resistant transport partition per Trial."""
+    """Return a deterministic transport partition per Trial launcher attempt."""
 
-    identity = str(run_dir.resolve(strict=False)).encode("utf-8")
+    launch_attempt_raw = os.environ.get("PX4_TRIAL_LAUNCH_ATTEMPT", "1").strip()
+    if launch_attempt_raw not in {"1", "2"}:
+        raise ValueError("PX4_TRIAL_LAUNCH_ATTEMPT must be 1 or 2")
+    identity = (
+        f"{run_dir.resolve(strict=False)}\0launcher-attempt={launch_attempt_raw}"
+    ).encode()
     return f"dronedream_{hashlib.sha256(identity).hexdigest()[:24]}"
 
 
@@ -3633,11 +3646,50 @@ def _finalize_real_telemetry(
     raise ValueError(f"Unsupported PX4_TELEMETRY_MODE: {telemetry_mode}")
 
 
+def _execution_identity_from_environment() -> dict[str, object]:
+    fields = {
+        "trial_id": os.environ.get("DRONEDREAM_TRIAL_ID", "").strip(),
+        "job_id": os.environ.get("DRONEDREAM_JOB_ID", "").strip(),
+        "candidate_id": os.environ.get("DRONEDREAM_CANDIDATE_ID", "").strip(),
+    }
+    if not all(fields.values()):
+        raise RuntimeError("actuator-link evidence is missing the Trial execution identity")
+    try:
+        seed = int(os.environ["DRONEDREAM_TRIAL_SEED"])
+        attempt_count = int(os.environ["DRONEDREAM_TRIAL_ATTEMPT"])
+    except (KeyError, ValueError) as exc:
+        raise RuntimeError("actuator-link evidence has an invalid numeric identity") from exc
+    return {**fields, "seed": seed, "attempt_count": attempt_count}
+
+
+def _write_actuator_link_health_evidence(
+    args: argparse.Namespace,
+    *,
+    px4_parameters: dict[str, float | int],
+    scenario_effect_request: dict[str, Any] | None,
+) -> dict[str, Any]:
+    ulog_path = args.run_dir / RETAINED_ULOG_NAME
+    if not ulog_path.is_file():
+        raise RuntimeError("retained PX4 ULog is unavailable for actuator-link diagnosis")
+    evidence = compile_actuator_link_health_evidence(
+        ulog_path=ulog_path,
+        execution_identity=_execution_identity_from_environment(),
+        eligibility=actuator_link_evidence_eligibility(
+            vehicle=args.simulator_model or args.vehicle,
+            selected_parameters=px4_parameters,
+            scenario_effect_request=scenario_effect_request,
+        ),
+    )
+    _json_dump(args.run_dir / ACTUATOR_LINK_HEALTH_NAME, evidence)
+    return evidence
+
+
 def main() -> int:
     args = _parse_args()
     args.run_dir.mkdir(parents=True, exist_ok=True)
     with contextlib.suppress(OSError):
         (args.run_dir / LAUNCHER_FAILURE_NAME).unlink(missing_ok=True)
+        (args.run_dir / ACTUATOR_LINK_HEALTH_NAME).unlink(missing_ok=True)
 
     make_target = _make_target_for_vehicle(args.simulator_model or args.vehicle)
     setup_commands = os.environ.get("PX4_SETUP_COMMANDS", "").strip()
@@ -4319,6 +4371,24 @@ def main() -> int:
     except Exception as exc:
         _cleanup_process(gui_proc, args.stderr_log, label="GUI")
         _cleanup_process(px4_proc, args.stderr_log, label="PX4")
+        try:
+            _finalize_real_telemetry(args, automatic_ulog=automatic_ulog)
+            health = _write_actuator_link_health_evidence(
+                args,
+                px4_parameters=px4_parameters,
+                scenario_effect_request=scenario_effect_request,
+            )
+            _append_log(
+                args.stderr_log,
+                "[local_px4_launch_wrapper] Actuator-link health evidence: "
+                f"stall_verified={health.get('stall_verified')}",
+            )
+        except Exception as diagnostic_exc:
+            _append_log(
+                args.stderr_log,
+                "[local_px4_launch_wrapper] Actuator-link diagnosis unavailable: "
+                f"{diagnostic_exc}",
+            )
         _write_launcher_failure(args.run_dir, stage="real_execution", exc=exc)
         _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Real mode failure: {exc}")
         return 1

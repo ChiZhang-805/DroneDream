@@ -52,6 +52,18 @@ from app.parameters import (  # noqa: E402 - path bootstrap must precede backend
     normalize_px4_version,
     validate_parameter_values,
 )
+from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
+    ARTIFACT_NAME as ACTUATOR_LINK_HEALTH_NAME,
+)
+from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
+    DIAGNOSTIC_FAILURE_CODE as FAILURE_ACTUATOR_LINK_STALLED,
+)
+from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
+    TRANSIENT_RETRY_RECEIPT_NAME,
+    actuator_link_evidence_eligibility,
+    sha256_file,
+    validate_actuator_link_health_evidence,
+)
 from app.simulator.px4_metric_evidence import (  # noqa: E402 - see path bootstrap above
     PX4_TELEMETRY_TIMING_TIME_BASE,
     Px4CoreMetricEvidenceError,
@@ -94,6 +106,7 @@ FAILURE_ADAPTER_UNAVAILABLE = "ADAPTER_UNAVAILABLE"
 FAILURE_TIMEOUT = "TIMEOUT"
 FAILURE_SIMULATION = "SIMULATION_FAILED"
 FAILURE_UNSUPPORTED_SCENARIO_EFFECT = "UNSUPPORTED_SCENARIO_EFFECT"
+_MAX_ACTUATOR_LINK_HEALTH_BYTES = 256 * 1024
 _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER = 10.0
 _MAX_TELEMETRY_BYTES = 16 * 1024 * 1024
 _MAX_TELEMETRY_SAMPLES = 50_000
@@ -2967,6 +2980,78 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "application/json",
         ),
         _artifact_record(
+            run_dir / ACTUATOR_LINK_HEALTH_NAME,
+            "actuator_link_health_json",
+            "Actuator Link Health",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / TRANSIENT_RETRY_RECEIPT_NAME,
+            "sim_transient_retry_json",
+            "Simulator Transient Retry Receipt",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.ulg",
+            "sim_transient_px4_ulog",
+            "Transient Failure PX4 ULog",
+            "application/octet-stream",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.health.json",
+            "sim_transient_health_json",
+            "Transient Failure Actuator Link Health",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.offboard_timing.json",
+            "sim_transient_timing_json",
+            "Transient Failure Offboard Timing",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.offboard_executor.log",
+            "sim_transient_offboard_log",
+            "Transient Failure Offboard Executor Log",
+            "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.launcher_failure.json",
+            "sim_transient_launcher_json",
+            "Transient Failure Launcher Error",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.stdout.log",
+            "sim_transient_stdout",
+            "Transient Failure Simulator stdout",
+            "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.stderr.log",
+            "sim_transient_stderr",
+            "Transient Failure Simulator stderr",
+            "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.telemetry.json",
+            "sim_transient_telemetry_json",
+            "Transient Failure Telemetry",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.px4_parameters.applied.json",
+            "sim_transient_px4_params_json",
+            "Transient Failure PX4 Parameters Applied",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.scenario_effects.applied.json",
+            "sim_transient_effects_json",
+            "Transient Failure Scenario Effects Applied",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "gui_stdout.log",
             "gazebo_gui_stdout_log",
             "Gazebo GUI stdout",
@@ -3010,6 +3095,124 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
         ),
     ]
     return [r for r in records if r]
+
+
+def _execution_identity_from_meta(meta: dict[str, Any]) -> dict[str, object]:
+    return {
+        "trial_id": meta["trial_id"],
+        "job_id": meta["job_id"],
+        "candidate_id": meta["candidate_id"],
+        "seed": meta["seed"],
+        "attempt_count": meta["attempt_count"],
+    }
+
+
+def _verified_actuator_link_stall(
+    run_dir: Path,
+    *,
+    meta: dict[str, Any],
+    expected_eligibility: dict[str, Any],
+) -> dict[str, Any] | None:
+    health_path = run_dir / ACTUATOR_LINK_HEALTH_NAME
+    ulog_path = run_dir / "px4_source.ulg"
+    if not health_path.is_file() or not ulog_path.is_file():
+        return None
+    try:
+        health = _load_bounded_json(
+            health_path,
+            label="actuator-link health evidence",
+            max_bytes=_MAX_ACTUATOR_LINK_HEALTH_BYTES,
+        )
+        health = validate_actuator_link_health_evidence(
+            health,
+            expected_identity=_execution_identity_from_meta(meta),
+            expected_ulog_sha256=sha256_file(ulog_path),
+        )
+        if health.get("eligibility") != expected_eligibility:
+            return None
+        return health
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _preserve_actuator_link_failure_for_retry(
+    run_dir: Path,
+    *,
+    meta: dict[str, Any],
+    health: dict[str, Any],
+) -> dict[str, Any]:
+    receipt_path = run_dir / TRANSIENT_RETRY_RECEIPT_NAME
+    if receipt_path.exists():
+        raise RunnerError("actuator-link transient retry was already consumed")
+    moves = {
+        "px4_source.ulg": "actuator_link_transient_attempt_1.ulg",
+        ACTUATOR_LINK_HEALTH_NAME: "actuator_link_transient_attempt_1.health.json",
+        "offboard_timing.json": "actuator_link_transient_attempt_1.offboard_timing.json",
+        "offboard_executor.log": "actuator_link_transient_attempt_1.offboard_executor.log",
+        "launcher_failure.json": "actuator_link_transient_attempt_1.launcher_failure.json",
+        "stdout.log": "actuator_link_transient_attempt_1.stdout.log",
+        "stderr.log": "actuator_link_transient_attempt_1.stderr.log",
+        "telemetry.json": "actuator_link_transient_attempt_1.telemetry.json",
+        APPLIED_EVIDENCE_NAME: (
+            "actuator_link_transient_attempt_1.px4_parameters.applied.json"
+        ),
+        EVIDENCE_ARTIFACT_NAME: (
+            "actuator_link_transient_attempt_1.scenario_effects.applied.json"
+        ),
+    }
+    required_sources = {
+        "px4_source.ulg",
+        ACTUATOR_LINK_HEALTH_NAME,
+        "offboard_timing.json",
+        "stdout.log",
+        "stderr.log",
+    }
+    missing_required = sorted(
+        source_name
+        for source_name in required_sources
+        if not (run_dir / source_name).is_file()
+        or (run_dir / source_name).is_symlink()
+    )
+    if missing_required:
+        raise RunnerError(
+            "actuator-link retry could not preserve its required failure evidence: "
+            + ", ".join(missing_required)
+        )
+    present_moves: list[tuple[Path, Path, str]] = []
+    for source_name, target_name in moves.items():
+        source = run_dir / source_name
+        if not source.exists():
+            continue
+        if not source.is_file() or source.is_symlink():
+            raise RunnerError(
+                f"transient retry evidence is not a regular file: {source_name}"
+            )
+        target = run_dir / target_name
+        if target.exists() or target.is_symlink():
+            raise RunnerError(f"transient retry evidence already exists: {target_name}")
+        present_moves.append((source, target, target_name))
+
+    preserved: list[dict[str, object]] = []
+    for source, target, target_name in present_moves:
+        source.replace(target)
+        preserved.append(
+            {
+                "path": target_name,
+                "bytes": target.stat().st_size,
+                "sha256": sha256_file(target),
+            }
+        )
+    receipt = {
+        "schema_id": "dronedream.simulator-transient-retry/v1",
+        "execution_identity": _execution_identity_from_meta(meta),
+        "diagnostic_failure_code": FAILURE_ACTUATOR_LINK_STALLED,
+        "maximum_launcher_attempts": 2,
+        "retry_index": 1,
+        "first_attempt_health_ulog_sha256": health["ulog_sha256"],
+        "preserved_files": preserved,
+    }
+    _json_dump(receipt_path, receipt)
+    return receipt
 
 
 def _remove_success_raw_logs(run_dir: Path) -> None:
@@ -3386,6 +3589,10 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     "PX4_TRIAL_PX4_VERSION": str(meta["px4_version"]),
                     "PX4_TRIAL_SEED": str(meta["seed"]),
                     "PX4_TRIAL_ATTEMPT": str(meta["attempt_count"]),
+                    # Launcher-attempt identity is independent from the backend
+                    # Trial retry counter. Never inherit a stale value from the
+                    # desktop or service environment.
+                    "PX4_TRIAL_LAUNCH_ATTEMPT": "1",
                     "PX4_TRIAL_SCENARIO_TYPE": str(meta["scenario_type"]),
                     "PX4_TRIAL_SCENARIO_CONFIG_PATH": str(scenario_config_json),
                     "PX4_TRIAL_SCENARIO_EFFECT_REQUEST_PATH": str(scenario_effect_request_json),
@@ -3429,6 +3636,11 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 f"effective={effective_launcher_timeout:g}s"
             )
             try:
+                actuator_link_eligibility = actuator_link_evidence_eligibility(
+                    vehicle=meta["simulator_model"] or meta["vehicle"],
+                    selected_parameters=px4_params,
+                    scenario_effect_request=scenario_effect_request,
+                )
                 exit_code = _run_lower_level_launcher(
                     launch_argv=argv,
                     cwd=cwd,
@@ -3437,6 +3649,33 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     timeout_seconds=effective_launcher_timeout,
                     launch_env=launch_env,
                 )
+                if exit_code != 0:
+                    actuator_link_health = _verified_actuator_link_stall(
+                        run_dir,
+                        meta=meta,
+                        expected_eligibility=actuator_link_eligibility,
+                    )
+                    if actuator_link_health is not None:
+                        retry_receipt = _preserve_actuator_link_failure_for_retry(
+                            run_dir,
+                            meta=meta,
+                            health=actuator_link_health,
+                        )
+                        runner_launch_config["transient_actuator_link_retry"] = retry_receipt
+                        log(
+                            "verified PX4-to-Gazebo actuator-link stall; preserving "
+                            "attempt-1 evidence and starting the one allowed launcher retry"
+                        )
+                        retry_env = dict(launch_env)
+                        retry_env["PX4_TRIAL_LAUNCH_ATTEMPT"] = "2"
+                        exit_code = _run_lower_level_launcher(
+                            launch_argv=argv,
+                            cwd=cwd,
+                            stdout_log=stdout_log,
+                            stderr_log=stderr_log,
+                            timeout_seconds=effective_launcher_timeout,
+                            launch_env=retry_env,
+                        )
             except TimeoutRunnerError as exc:
                 _merge_json_object(run_dir / "launch_config.json", runner_launch_config)
                 timeout_flag = True
@@ -3508,9 +3747,19 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 _enforce_scenario_effect_contract(scenario_effect_contract)
             if exit_code != 0:
                 failure_reason = _lower_level_failure_reason(run_dir, exit_code)
+                final_actuator_link_health = _verified_actuator_link_stall(
+                    run_dir,
+                    meta=meta,
+                    expected_eligibility=actuator_link_eligibility,
+                )
+                failure_code = (
+                    FAILURE_ACTUATOR_LINK_STALLED
+                    if final_actuator_link_health is not None
+                    else FAILURE_SIMULATION
+                )
                 result = _failure_result(
                     failure_reason,
-                    FAILURE_SIMULATION,
+                    failure_code,
                     _collect_artifacts(run_dir),
                     failure_reason,
                 )

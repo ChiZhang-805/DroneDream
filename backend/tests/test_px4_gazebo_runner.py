@@ -249,6 +249,147 @@ def test_runner_collects_retained_px4_ulog_as_trial_artifact(
     assert ulog_artifact["file_size_bytes"] == len(b"retained ULog")
 
 
+def _actuator_link_retry_meta() -> dict[str, object]:
+    return {
+        "trial_id": "tri-link-stall",
+        "job_id": "job-link-stall",
+        "candidate_id": "cand-link-stall",
+        "seed": 42,
+        "attempt_count": 1,
+    }
+
+
+def _write_verified_actuator_link_failure(
+    run_dir: Path,
+    *,
+    include_required_logs: bool = True,
+) -> tuple[dict[str, object], dict[str, object]]:
+    meta = _actuator_link_retry_meta()
+    ulog = run_dir / "px4_source.ulg"
+    ulog.write_bytes(b"PX4 ULog proving a static Gazebo ground-truth pose")
+    health = {
+        "schema_id": "dronedream.px4-actuator-link-health/v1",
+        "diagnostic_failure_code": "SIMULATOR_ACTUATOR_LINK_STALLED",
+        "execution_identity": meta,
+        "ulog_sha256": runner_module.sha256_file(ulog),
+        "eligibility": {
+            "eligible": True,
+            "reasons": [],
+            "vehicle": "x500",
+            "selected_px4_parameters": [],
+            "unexpected_px4_parameters": [],
+            "scenario_effect_ids": [],
+            "disqualifying_effect_ids": [],
+        },
+        "thresholds": {},
+        "observations": {},
+        "missing_series": [],
+        "stall_verified": True,
+    }
+    (run_dir / runner_module.ACTUATOR_LINK_HEALTH_NAME).write_text(
+        json.dumps(health),
+        encoding="utf-8",
+    )
+    (run_dir / "offboard_timing.json").write_text("{}", encoding="utf-8")
+    if include_required_logs:
+        (run_dir / "stdout.log").write_text("simulator stdout", encoding="utf-8")
+        (run_dir / "stderr.log").write_text("simulator stderr", encoding="utf-8")
+    return meta, health
+
+
+def test_runner_preserves_verified_actuator_link_failure_before_one_retry(
+    tmp_path: Path,
+) -> None:
+    meta, health = _write_verified_actuator_link_failure(tmp_path)
+
+    verified = runner_module._verified_actuator_link_stall(
+        tmp_path,
+        meta=meta,
+        expected_eligibility=health["eligibility"],
+    )
+    assert verified == health
+
+    receipt = runner_module._preserve_actuator_link_failure_for_retry(
+        tmp_path,
+        meta=meta,
+        health=verified,
+    )
+
+    assert receipt["maximum_launcher_attempts"] == 2
+    assert receipt["retry_index"] == 1
+    assert receipt["first_attempt_health_ulog_sha256"] == health["ulog_sha256"]
+    assert not (tmp_path / "px4_source.ulg").exists()
+    assert (tmp_path / "actuator_link_transient_attempt_1.ulg").is_file()
+    assert (tmp_path / runner_module.TRANSIENT_RETRY_RECEIPT_NAME).is_file()
+    artifact_types = {
+        artifact["artifact_type"]
+        for artifact in runner_module._collect_artifacts(tmp_path)
+    }
+    assert "sim_transient_retry_json" in artifact_types
+    assert "sim_transient_px4_ulog" in artifact_types
+
+    with pytest.raises(runner_module.RunnerError, match="already consumed"):
+        runner_module._preserve_actuator_link_failure_for_retry(
+            tmp_path,
+            meta=meta,
+            health=health,
+        )
+
+
+def test_runner_rejects_tampered_actuator_link_digest(tmp_path: Path) -> None:
+    meta, _ = _write_verified_actuator_link_failure(tmp_path)
+    health_path = tmp_path / runner_module.ACTUATOR_LINK_HEALTH_NAME
+    health = json.loads(health_path.read_text(encoding="utf-8"))
+    health["ulog_sha256"] = "0" * 64
+    health_path.write_text(json.dumps(health), encoding="utf-8")
+
+    assert (
+        runner_module._verified_actuator_link_stall(
+            tmp_path,
+            meta=meta,
+            expected_eligibility=health["eligibility"],
+        )
+        is None
+    )
+
+
+def test_runner_rejects_link_stall_claim_outside_the_trusted_trial_contract(
+    tmp_path: Path,
+) -> None:
+    meta, health = _write_verified_actuator_link_failure(tmp_path)
+    trusted_eligibility = dict(health["eligibility"])
+    trusted_eligibility["eligible"] = False
+    trusted_eligibility["reasons"] = ["payload_battery_or_actuator_effect_requested"]
+
+    assert (
+        runner_module._verified_actuator_link_stall(
+            tmp_path,
+            meta=meta,
+            expected_eligibility=trusted_eligibility,
+        )
+        is None
+    )
+
+
+def test_runner_does_not_partially_move_incomplete_retry_evidence(tmp_path: Path) -> None:
+    meta, health = _write_verified_actuator_link_failure(
+        tmp_path,
+        include_required_logs=False,
+    )
+
+    with pytest.raises(runner_module.RunnerError, match="stderr.log, stdout.log"):
+        runner_module._preserve_actuator_link_failure_for_retry(
+            tmp_path,
+            meta=meta,
+            health=health,
+        )
+
+    assert (tmp_path / "px4_source.ulg").is_file()
+    assert (tmp_path / runner_module.ACTUATOR_LINK_HEALTH_NAME).is_file()
+    assert not (tmp_path / "actuator_link_transient_attempt_1.ulg").exists()
+    assert not (tmp_path / runner_module.TRANSIENT_RETRY_RECEIPT_NAME).exists()
+
+
 def test_runner_rejects_oversized_trial_input_before_json_decode(tmp_path: Path) -> None:
     input_path = tmp_path / "trial_input.json"
     with input_path.open("wb") as stream:
@@ -1628,6 +1769,94 @@ def test_px4_runner_treats_nonzero_launcher_exit_as_failure(tmp_path: Path):
     assert result["success"] is False
     assert result["failure"]["code"] == "SIMULATION_FAILED"
     assert "exited with code 7" in result["failure"]["reason"]
+
+
+def test_px4_runner_retries_one_verified_actuator_link_stall_end_to_end(
+    tmp_path: Path,
+) -> None:
+    launcher = tmp_path / "actuator_link_retry_launcher.py"
+    telemetry_payload = json.dumps(_track_following_telemetry())
+    launcher.write_text(
+        """
+import hashlib
+import json
+import os
+import pathlib
+import sys
+
+telemetry_path = pathlib.Path(sys.argv[sys.argv.index("--telemetry") + 1])
+input_path = pathlib.Path(sys.argv[sys.argv.index("--input") + 1])
+run_dir = telemetry_path.parent
+attempt_path = run_dir / "launcher_attempts.json"
+attempts = json.loads(attempt_path.read_text(encoding="utf-8")) if attempt_path.exists() else []
+attempt = os.environ.get("PX4_TRIAL_LAUNCH_ATTEMPT", "1")
+attempts.append(attempt)
+attempt_path.write_text(json.dumps(attempts), encoding="utf-8")
+
+if attempt == "1":
+    identity = json.loads(input_path.read_text(encoding="utf-8"))["execution_identity"]
+    ulog_path = run_dir / "px4_source.ulg"
+    ulog_path.write_bytes(b"fixture ULog proving a stationary actuator link")
+    ulog_sha = hashlib.sha256(ulog_path.read_bytes()).hexdigest()
+    health = {
+        "schema_id": "dronedream.px4-actuator-link-health/v1",
+        "diagnostic_failure_code": "SIMULATOR_ACTUATOR_LINK_STALLED",
+        "execution_identity": identity,
+        "ulog_sha256": ulog_sha,
+        "eligibility": {
+            "eligible": True,
+            "reasons": [],
+            "vehicle": "x500",
+            "selected_px4_parameters": [],
+            "unexpected_px4_parameters": [],
+            "scenario_effect_ids": [],
+            "disqualifying_effect_ids": [],
+        },
+        "thresholds": {},
+        "observations": {},
+        "missing_series": [],
+        "stall_verified": True,
+    }
+    (run_dir / "actuator_link_health.json").write_text(
+        json.dumps(health), encoding="utf-8"
+    )
+    (run_dir / "offboard_timing.json").write_text("{}", encoding="utf-8")
+    raise SystemExit(7)
+
+telemetry_path.write_text(TELEMETRY_PAYLOAD, encoding="utf-8")
+""".replace("TELEMETRY_PAYLOAD", repr(telemetry_payload)).strip()
+        + "\n",
+        encoding="utf-8",
+    )
+
+    proc, result = _run_runner(
+        tmp_path,
+        env_overrides={
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_TRIAL_LAUNCH_ATTEMPT": "2",
+            "PX4_GAZEBO_LAUNCH_COMMAND": (
+                f'"{sys.executable}" "{launcher}" --input {{trial_input}} '
+                "--telemetry {telemetry_json}"
+            ),
+        },
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert result["success"] is True, result
+    assert json.loads((tmp_path / "launcher_attempts.json").read_text(encoding="utf-8")) == [
+        "1",
+        "2",
+    ]
+    retry = json.loads(
+        (tmp_path / runner_module.TRANSIENT_RETRY_RECEIPT_NAME).read_text(encoding="utf-8")
+    )
+    assert retry["maximum_launcher_attempts"] == 2
+    assert retry["retry_index"] == 1
+    assert (tmp_path / "actuator_link_transient_attempt_1.ulg").is_file()
+    assert (tmp_path / "actuator_link_transient_attempt_1.health.json").is_file()
+    artifact_types = {artifact["artifact_type"] for artifact in result["artifacts"]}
+    assert "sim_transient_retry_json" in artifact_types
+    assert "sim_transient_px4_ulog" in artifact_types
 
 
 def test_px4_runner_surfaces_bounded_structured_launcher_failure(tmp_path: Path):
