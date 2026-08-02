@@ -585,6 +585,37 @@ def _parse_gazebo_wind_info(response_text: str) -> dict[str, Any]:
     }
 
 
+def _create_gazebo_wind_publisher(
+    topic: str,
+    requested: dict[str, float],
+) -> tuple[Any, Any, Any]:
+    # DroneDream's Runtime Base installs the Gazebo Python bindings as an OS
+    # package. The Engine Pack virtual environment deliberately excludes OS
+    # site packages, so expose only the standard Debian dist-packages location
+    # before importing this Runtime-owned transport dependency.
+    system_packages = "/usr/lib/python3/dist-packages"
+    if system_packages not in sys.path:
+        sys.path.append(system_packages)
+    try:
+        from gz.msgs10.wind_pb2 import Wind
+        from gz.transport13 import Node
+    except (ImportError, ModuleNotFoundError) as exc:
+        raise RuntimeError(
+            "Gazebo Python transport bindings are unavailable for verified wind activation"
+        ) from exc
+
+    node = Node()
+    publisher = node.advertise(topic, Wind)
+    if not publisher.valid():
+        raise RuntimeError(f"Gazebo wind publisher could not advertise {topic}")
+    message = Wind()
+    message.linear_velocity.x = requested["x"]
+    message.linear_velocity.y = requested["y"]
+    message.linear_velocity.z = requested["z"]
+    message.enable_wind = True
+    return node, publisher, message
+
+
 def _activate_gazebo_wind_profile(
     *,
     world: str,
@@ -604,11 +635,25 @@ def _activate_gazebo_wind_profile(
         raise RuntimeError("Gazebo gz CLI is unavailable for post-hover wind activation")
     topic = f"/world/{world}/wind"
     service = f"/world/{world}/wind_info"
-    message = (
-        "linear_velocity { "
-        f"x: {requested['x']:.17g} y: {requested['y']:.17g} z: {requested['z']:.17g}"
-        " } enable_wind: true"
-    )
+    # Retain the node for the entire publish/read-back handshake. Gazebo
+    # Transport discovery is asynchronous; publishing only after the
+    # WindEffects subscriber is connected removes the cold-start race that can
+    # make a short-lived command report success while delivering no message.
+    _node, publisher, wind_message = _create_gazebo_wind_publisher(topic, requested)
+    try:
+        discovery_timeout = float(
+            os.environ.get("PX4_GAZEBO_WIND_DISCOVERY_TIMEOUT_SECONDS", "5.0")
+        )
+    except ValueError:
+        discovery_timeout = 5.0
+    discovery_timeout = min(30.0, max(0.1, discovery_timeout))
+    discovery_deadline = time.monotonic() + discovery_timeout
+    while not publisher.has_connections() and time.monotonic() < discovery_deadline:
+        time.sleep(0.05)
+    if not publisher.has_connections():
+        raise RuntimeError(
+            "Gazebo WindEffects subscriber was not discovered before post-hover activation"
+        )
     try:
         attempts = int(os.environ.get("PX4_GAZEBO_WIND_READBACK_ATTEMPTS", "10"))
     except ValueError:
@@ -617,41 +662,8 @@ def _activate_gazebo_wind_profile(
     last_error = "no wind_info response"
     readback: dict[str, Any] | None = None
     for attempt in range(attempts):
-        # Gazebo Transport discovery is asynchronous. A one-shot ``gz topic``
-        # publisher can exit successfully before the WindEffects subscriber
-        # discovers it, leaving wind_info unchanged. Keep each bounded publish
-        # alive long enough for discovery and re-publish before every read-back
-        # attempt; the exact service response below remains the authority.
-        publish = subprocess.run(  # noqa: S603
-            [
-                gz_cli,
-                "topic",
-                "-d",
-                "1.0",
-                "-t",
-                topic,
-                "-m",
-                "gz.msgs.Wind",
-                "-p",
-                message,
-            ],
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=5.0,
-        )
-        publish_output = publish.stdout + publish.stderr
-        if publish.returncode != 0 or any(
-            marker in publish_output
-            for marker in (
-                "Unable to create message",
-                "Error parsing text-format",
-            )
-        ):
-            raise RuntimeError(
-                "Gazebo post-hover wind publish failed: "
-                f"exit={publish.returncode}, response={publish_output.strip()[:400]}"
-            )
+        if not publisher.publish(wind_message):
+            raise RuntimeError("Gazebo post-hover wind publish failed after subscriber discovery")
         response = subprocess.run(  # noqa: S603
             [
                 gz_cli,
