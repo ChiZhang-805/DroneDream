@@ -599,6 +599,40 @@ def test_battery_track_start_keeps_offboard_setpoints_alive_during_slow_sample()
     assert all(setpoint == hold for setpoint in client.setpoints)
 
 
+def test_battery_track_start_retries_transient_telemetry_timeout() -> None:
+    class IntermittentBatteryClient(executor.FakeOffboardClient):
+        battery_call_count = 0
+
+        async def sample_battery(self, timeout_seconds: float) -> dict[str, float]:
+            del timeout_seconds
+            self.battery_call_count += 1
+            if self.battery_call_count == 1:
+                raise TimeoutError("first subscription sample unavailable")
+            return {"remaining_percent": 74.0, "voltage_v": 15.8}
+
+    client = IntermittentBatteryClient()
+
+    details = asyncio.run(
+        executor._transition_battery_at_track_start(
+            client,
+            {
+                "target_track_start_percent": 70.0,
+                "voltage_sag": True,
+                "sag_drain_seconds": 300.0,
+                "no_sag_hold_drain_seconds": 86400.0,
+            },
+            {"pretrack_drain_seconds": 6.666666666666667},
+            hold_setpoint=executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+            rate_hz=100.0,
+            settle_timeout_seconds=1.0,
+        )
+    )
+
+    assert details["conditioning_sample_timeout_count"] == 1
+    assert details["conditioning_sample_count"] == 1
+    assert details["track_start_sample"]["remaining_percent"] == 74.0
+
+
 def test_battery_track_start_fails_closed_when_telemetry_does_not_converge() -> None:
     client = executor.FakeOffboardClient()
     client.battery_samples = [{"remaining_percent": 81.0, "voltage_v": 16.1}]

@@ -1407,7 +1407,7 @@ async def _sample_battery_while_holding(
     remaining = deadline - time.monotonic()
     if remaining <= 0.0:
         return None
-    sample_task = asyncio.create_task(client.sample_battery(min(1.0, remaining)))
+    sample_task = asyncio.create_task(client.sample_battery(min(5.0, remaining)))
     try:
         while not sample_task.done():
             await client.set_position_ned(hold_setpoint)
@@ -1445,14 +1445,21 @@ async def _transition_battery_at_track_start(
         raise ValueError("battery settle timeout must be finite and greater than zero")
     deadline = time.monotonic() + settle_timeout_seconds
     conditioning_samples: list[dict[str, float]] = []
+    conditioning_sample_timeout_count = 0
     track_start_sample: dict[str, float] | None = None
     while True:
-        sample = await _sample_battery_while_holding(
-            client,
-            hold_setpoint=hold_setpoint,
-            rate_hz=rate_hz,
-            deadline=deadline,
-        )
+        try:
+            sample = await _sample_battery_while_holding(
+                client,
+                hold_setpoint=hold_setpoint,
+                rate_hz=rate_hz,
+                deadline=deadline,
+            )
+        except TimeoutError:
+            conditioning_sample_timeout_count += 1
+            if time.monotonic() >= deadline:
+                break
+            continue
         if sample is None:
             break
         conditioning_samples.append(sample)
@@ -1465,6 +1472,7 @@ async def _transition_battery_at_track_start(
                 "PX4 battery overshot the requested track-start state: "
                 f"target={target:g}%, observed={sample_percent:g}%, tolerance={tolerance:g}%"
             )
+        await asyncio.sleep(min(1.0 / rate_hz, max(0.0, deadline - time.monotonic())))
     if track_start_sample is None:
         observed = (
             float(conditioning_samples[-1]["remaining_percent"])
@@ -1493,6 +1501,7 @@ async def _transition_battery_at_track_start(
     return {
         **prepared,
         "conditioning_sample_count": len(conditioning_samples),
+        "conditioning_sample_timeout_count": conditioning_sample_timeout_count,
         "conditioning_samples": conditioning_samples,
         "conditioning_timeout_seconds": settle_timeout_seconds,
         "track_start_sample": track_start_sample,
