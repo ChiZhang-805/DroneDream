@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+from app.simulator import real_cli as real_cli_module
 from app.simulator.artifact_schema import (
     _MAX_REFERENCE_POINTS,
     _MAX_TELEMETRY_SAMPLES,
@@ -49,6 +50,7 @@ from app.simulator.real_cli import (
     _parse_artifacts,
     _parse_metrics,
     _read_log_tail,
+    _run_directory,
     _sanitize_artifacts_for_trial,
     _trial_input_payload,
 )
@@ -1872,6 +1874,25 @@ def test_shared_artifact_root_isolates_transient_run_cleanup(monkeypatch, tmp_pa
         assert not run_dir.exists()
     finally:
         get_settings.cache_clear()
+
+
+def test_shared_root_isolation_uses_current_environment_when_settings_reference_is_stale(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    shared_root = tmp_path / "shared-artifacts"
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(shared_root))
+    monkeypatch.setenv("ARTIFACT_ROOT", str(shared_root))
+
+    class StaleSettings:
+        default_artifact_root_path = tmp_path / "stale-artifacts"
+
+    monkeypatch.setattr(real_cli_module, "get_settings", lambda: StaleSettings())
+
+    run_dir = _run_directory(shared_root, _ctx())
+
+    assert run_dir.is_relative_to(shared_root.resolve())
+    assert "_simulator_runs" in run_dir.parts
 
 
 def test_real_cli_artifact_schema_doc_exists() -> None:

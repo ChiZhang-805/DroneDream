@@ -518,7 +518,13 @@ def _run_directory(artifact_root: Path, ctx: TrialContext) -> Path:
     # transient hierarchy disjoint when both configured roots resolve to the
     # same directory so cleanup can never delete the byte-sealed evidence it
     # has just produced.
-    if root == get_settings().default_artifact_root_path.resolve():
+    configured_durable_root = os.environ.get("ARTIFACT_ROOT", "").strip()
+    durable_root = (
+        Path(configured_durable_root).expanduser().resolve()
+        if configured_durable_root
+        else get_settings().default_artifact_root_path.resolve()
+    )
+    if root == durable_root:
         jobs_root = jobs_root / "_simulator_runs"
     base = (jobs_root / job_id / "trials" / trial_id).resolve()
     if not base.is_relative_to(root):  # pragma: no cover - guarded by safe segments.
