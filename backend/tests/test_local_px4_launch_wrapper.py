@@ -832,9 +832,7 @@ def test_sdf_profile_mutators_round_trip_generated_runtime_sdf(tmp_path: Path) -
         "actuator_dynamics",
         "wind_gust",
     ]
-    assert observation["sdf_sha256"] == wrapper._sha256_hex(
-        tmp_path / "generated_world.sdf"
-    )
+    assert observation["sdf_sha256"] == wrapper._sha256_hex(tmp_path / "generated_world.sdf")
     runtime_observation = {
         "source": "/world/default/generate_world_sdf",
         "kind": "artifact",
@@ -854,9 +852,7 @@ def test_sdf_profile_mutators_round_trip_generated_runtime_sdf(tmp_path: Path) -
                 },
                 "evidence": {
                     "requested_value_sha256": (
-                        scenario_effects.scenario_effect_value_sha256(
-                            effect["requested_value"]
-                        )
+                        scenario_effects.scenario_effect_value_sha256(effect["requested_value"])
                     ),
                     "compiled_sdf_profile": profile,
                     "verification": {
@@ -1155,9 +1151,7 @@ def test_actuator_failure_sdf_and_joint_state_prove_one_hard_stopped_motor(
         )
     }
     assert motor_maxima == {0: 1000.0, 1: 1000.0, 2: 0.0, 3: 1000.0}
-    publisher = source_vehicle.find(
-        "./plugin[@name='gz::sim::systems::JointStatePublisher']"
-    )
+    publisher = source_vehicle.find("./plugin[@name='gz::sim::systems::JointStatePublisher']")
     assert publisher is not None
     assert publisher.findtext("topic") == profile["actuator_failure"]["joint_state_topic"]
     assert [item.text for item in publisher.findall("joint_name")] == [
@@ -1183,9 +1177,7 @@ def test_actuator_failure_sdf_and_joint_state_prove_one_hard_stopped_motor(
         applied_sdf_profile=applied,
         require_wind_mode=False,
     )
-    assert runtime_observation["verified_profile_sections"] == [
-        "actuator_failure"
-    ]
+    assert runtime_observation["verified_profile_sections"] == ["actuator_failure"]
 
     raw_path = tmp_path / "run" / "actuator_failure_joint_state.log"
     raw_path.write_text(
@@ -1215,9 +1207,7 @@ joint { name: "rotor_3_joint" axis1 { velocity: -68 } }
         "source": "/world/default/generate_world_sdf",
         "kind": "artifact",
         "value": runtime_observation,
-        "sha256": scenario_effects.scenario_effect_value_sha256(
-            runtime_observation
-        ),
+        "sha256": scenario_effects.scenario_effect_value_sha256(runtime_observation),
     }
     record = wrapper._scenario_effect_record(
         effect,
@@ -1226,9 +1216,7 @@ joint { name: "rotor_3_joint" axis1 { velocity: -68 } }
         reason="test",
         evidence={
             "requested_value_sha256": (
-                scenario_effects.scenario_effect_value_sha256(
-                    effect["requested_value"]
-                )
+                scenario_effects.scenario_effect_value_sha256(effect["requested_value"])
             ),
             "compiled_sdf_profile": profile,
             "verification": {
@@ -1251,9 +1239,7 @@ joint { name: "rotor_3_joint" axis1 { velocity: -68 } }
         effects=[record],
     )
     assert (
-        validate_scenario_effect_evidence(request, evidence)[
-            "verification_status"
-        ]
+        validate_scenario_effect_evidence(request, evidence)["verification_status"]
         == "verified_applied"
     )
 
@@ -1379,13 +1365,7 @@ def test_steady_wind_application_requires_readback_and_runtime_sdf(
         SimpleNamespace(returncode=0, stdout="", stderr=""),
         SimpleNamespace(
             returncode=0,
-            stdout=(
-                "linear_velocity {\n"
-                "  x: 0\n"
-                "  y: 0\n"
-                "  z: 0\n"
-                "}\nenable_wind: true\n"
-            ),
+            stdout=("linear_velocity {\n  x: 0\n  y: 0\n  z: 0\n}\nenable_wind: true\n"),
             stderr="",
         ),
         SimpleNamespace(
@@ -1538,6 +1518,28 @@ def test_pending_wind_activation_is_not_reported_as_applied_after_earlier_failur
 
     assert all(record["status"] == "skipped" for record in records)
     assert all("_activation_pending" not in record for record in records)
+
+
+def test_pre_executor_validation_accepts_staged_wind_prerequisite_records() -> None:
+    request = _wind_request()
+    staged_ids = {effect["effect_id"] for effect in request["effects"]}
+
+    wrapper._validate_pre_executor_effect_records(
+        scenario_effects,
+        {effect_id: {"_activation_pending": True} for effect_id in staged_ids},
+        expected_preflight_ids=set(),
+        runtime_effect_ids=staged_ids,
+    )
+
+
+def test_pre_executor_validation_reports_unexpected_records() -> None:
+    with pytest.raises(RuntimeError, match=r"unexpected=unrelated\.effect"):
+        wrapper._validate_pre_executor_effect_records(
+            scenario_effects,
+            {"unrelated.effect": {}},
+            expected_preflight_ids=set(),
+            runtime_effect_ids=set(),
+        )
 
 
 def test_site_dry_run_writes_explicit_unphysical_effect_evidence(

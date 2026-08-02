@@ -471,6 +471,38 @@ def _merge_staged_wind_effect_records(
     return merged
 
 
+def _validate_pre_executor_effect_records(
+    engine: Any,
+    applied_by_id: dict[str, dict[str, Any]],
+    *,
+    expected_preflight_ids: set[str],
+    runtime_effect_ids: set[str],
+) -> None:
+    """Require every pre-executor record, including staged wind prerequisites.
+
+    Wind is a flight-timed effect, but its zero-wind takeoff and generated-SDF
+    proof is collected before the executor starts.  Those preliminary records
+    must remain available for the post-hover merge instead of being mistaken
+    for unexpected fully-applied runtime effects.
+    """
+
+    staged_wind_ids = runtime_effect_ids & set(engine.BUNDLED_WIND_ACTIVATION_EFFECT_IDS)
+    expected_ids = expected_preflight_ids | staged_wind_ids
+    observed_ids = set(applied_by_id)
+    if observed_ids == expected_ids:
+        return
+    missing = sorted(expected_ids - observed_ids)
+    unexpected = sorted(observed_ids - expected_ids)
+    details: list[str] = []
+    if missing:
+        details.append("missing=" + ", ".join(missing))
+    if unexpected:
+        details.append("unexpected=" + ", ".join(unexpected))
+    raise RuntimeError(
+        "scenario-effect dispatcher record mismatch before flight: " + "; ".join(details)
+    )
+
+
 def _scenario_effect_failure_records(
     request: dict[str, Any],
     *,
@@ -486,9 +518,7 @@ def _scenario_effect_failure_records(
     records: list[dict[str, Any]] = []
     for effect in request["effects"]:
         effect_id = effect["effect_id"]
-        if effect_id in applied_by_id and not applied_by_id[effect_id].get(
-            "_activation_pending"
-        ):
+        if effect_id in applied_by_id and not applied_by_id[effect_id].get("_activation_pending"):
             records.append(applied_by_id[effect_id])
         elif effect_id in failing_ids:
             records.append(
@@ -3860,11 +3890,12 @@ def main() -> int:
                 for effect in scenario_effect_request["effects"]
                 if effect["effect_id"] not in runtime_effect_ids
             }
-            if set(applied_by_id) != expected_preflight_ids:
-                missing = sorted(expected_preflight_ids - set(applied_by_id))
-                raise RuntimeError(
-                    "scenario-effect dispatcher omitted available effects: " + ", ".join(missing)
-                )
+            _validate_pre_executor_effect_records(
+                scenario_engine,
+                applied_by_id,
+                expected_preflight_ids=expected_preflight_ids,
+                runtime_effect_ids=runtime_effect_ids,
+            )
             if not runtime_effect_ids and not actuator_failure_ids:
                 _write_scenario_effect_evidence(
                     scenario_engine,
