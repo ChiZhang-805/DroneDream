@@ -29,6 +29,7 @@ const outputRoot = path.resolve(
 const host = "127.0.0.1";
 const port = Number(args.get("--port") || 5197);
 const origin = `http://${host}:${port}`;
+const mobileMenuOnly = Boolean(args.get("--mobile-menu-only"));
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
@@ -38,7 +39,7 @@ const cases = [
   { id: "desktop-zh", locale: "zh-CN", viewport: { width: 1440, height: 1000 } },
   { id: "mobile-en", locale: "en", viewport: { width: 390, height: 844 } },
   { id: "mobile-zh", locale: "zh-CN", viewport: { width: 390, height: 844 } },
-];
+].filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
 const fixedScenarioOnlyCases = [
   {
     id: "tablet-fixed-scenarios-en",
@@ -356,6 +357,7 @@ async function verifyFixedScenarios(page, testCase) {
   const activeEntry = nav.locator('a[href="/scenarios"]');
   const cards = page.locator(".fixed-scenario-card");
   let mobileMenuImage = null;
+  let mobileMenuMetrics = null;
   if (testCase.viewport.width <= 520) {
     const menuButton = page.locator(".app-mobile-menu-button");
     assert(await menuButton.isVisible(), `${testCase.id}: mobile menu trigger is missing`);
@@ -363,6 +365,10 @@ async function verifyFixedScenarios(page, testCase) {
     await menuButton.click();
     const panel = page.locator(".app-mobile-menu-panel");
     await panel.waitFor();
+    const menuButtonBounds = await menuButton.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, width: rect.width };
+    });
     const mobileMenu = await panel.evaluate((element) => {
       const bounds = (target) => {
         const rect = target.getBoundingClientRect();
@@ -385,6 +391,10 @@ async function verifyFixedScenarios(page, testCase) {
         account: bounds(account),
         settings: bounds(settings),
         links: links.map(bounds),
+        rowsFit: [account, ...links, settings].every((row) => (
+          row.scrollWidth <= row.clientWidth + 1
+          && row.scrollHeight <= row.clientHeight + 1
+        )),
         documentWidth: document.documentElement.clientWidth,
         documentScrollWidth: document.documentElement.scrollWidth,
       };
@@ -397,7 +407,18 @@ async function verifyFixedScenarios(page, testCase) {
       mobileMenu.panel.width,
       2,
     )));
+    assert(mobileMenu.rowsFit, `${testCase.id}: mobile menu text is clipped or wrapped`);
+    assert(closeEnough(
+      mobileMenu.panel.right,
+      menuButtonBounds.right,
+      2,
+    ), `${testCase.id}: mobile menu is not right-aligned with its trigger`);
+    assert(
+      mobileMenu.panel.width < mobileMenu.documentWidth - 64,
+      `${testCase.id}: mobile menu still spans almost the full viewport`,
+    );
     assert.equal(mobileMenu.documentScrollWidth, mobileMenu.documentWidth);
+    mobileMenuMetrics = { ...mobileMenu, trigger: menuButtonBounds };
     mobileMenuImage = await screenshot(page, testCase.id, "mobile-navigation");
   }
   await activeEntry.waitFor();
@@ -540,6 +561,7 @@ async function verifyFixedScenarios(page, testCase) {
     keyboardScenarioSelection: true,
     freshNameRequired: true,
     createRequests,
+    mobileMenu: mobileMenuMetrics,
     mobileMenuImage,
     image,
   };
@@ -881,6 +903,15 @@ try {
       entry.settings = await verifySettings(page, testCase);
       entry.avatar = await verifyAvatar(page, testCase, avatarBytes);
       entry.fixedScenarios = await verifyFixedScenarios(page, testCase);
+      if (mobileMenuOnly) {
+        entry.scope = "mobile-menu-only";
+        entry.pageErrors = pageErrors;
+        assert.deepEqual(pageErrors, [], `${testCase.id}: page errors`);
+        entry.status = "pass";
+        results.push(entry);
+        await context.close();
+        continue;
+      }
       entry.ece498 = await verifyEce498ExternalEntry(page, testCase);
       entry.wizard = await verifyTrackAndScenario(page, testCase);
       entry.workspace = await verifyWorkspaceLifecycle(page, testCase);
@@ -896,7 +927,7 @@ try {
     await context.close();
     if (failure) break;
   }
-  if (!failure) {
+  if (!failure && !mobileMenuOnly) {
     for (const testCase of fixedScenarioOnlyCases) {
       const context = await browser.newContext({ viewport: testCase.viewport });
       await context.addInitScript((locale) => {
