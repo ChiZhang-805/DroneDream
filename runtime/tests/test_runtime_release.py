@@ -11,6 +11,7 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME = ROOT / "runtime"
@@ -233,6 +234,59 @@ class RuntimeReleaseTests(unittest.TestCase):
                         part_bytes=7,
                     )
                 self.assertFalse((directory / "release").exists())
+
+    def test_smoke_completion_time_must_match_promoted_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            rootfs, promoted, report_path = self._inputs(directory)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            report["completedAt"] = "2026-07-12T02:03:04+00:00"
+            report_path.write_text(json.dumps(report), encoding="utf-8")
+
+            with self.assertRaisesRegex(runtime_release.ReleaseError, "completedAt"):
+                runtime_release.package_release(
+                    rootfs=rootfs,
+                    runtime_manifest_path=promoted,
+                    smoke_report_path=report_path,
+                    output_directory=directory / "release",
+                    base_url="https://example.test/runtime",
+                    build_timestamp="2026-07-12T00:00:00Z",
+                    part_bytes=1024,
+                )
+            self.assertFalse((directory / "release").exists())
+
+    def test_new_file_write_failure_removes_partial_output(self) -> None:
+        with tempfile.TemporaryDirectory() as name:
+            output = Path(name) / "partial.json"
+            with (
+                mock.patch.object(runtime_release.os, "fsync", side_effect=OSError("disk full")),
+                self.assertRaisesRegex(OSError, "disk full"),
+            ):
+                runtime_release._write_new(output, b"partial")
+            self.assertFalse(output.exists())
+
+    def test_signature_is_rolled_back_when_public_key_output_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            _, manifest_path = self._package(directory)
+            private_key = directory / "private-key.txt"
+            initial_keyring = directory / "initial-keyring.json"
+            runtime_release.generate_key(private_key, initial_keyring)
+            variable = "DRONEDREAM_TEST_RELEASE_PRIVATE_KEY"
+            public_output = directory / "existing-keyring.json"
+            public_output.write_bytes(b"preserve-me")
+            signature = Path(f"{manifest_path}{runtime_release.SIGNATURE_SUFFIX}")
+
+            with (
+                _temporary_environment(
+                    variable, private_key.read_text(encoding="ascii").strip()
+                ),
+                self.assertRaisesRegex(runtime_release.ReleaseError, "refusing to overwrite"),
+            ):
+                runtime_release.sign_manifest(manifest_path, variable, public_output)
+
+            self.assertFalse(signature.exists())
+            self.assertEqual(public_output.read_bytes(), b"preserve-me")
 
     def test_package_rejects_rootfs_manifest_sidecar_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as name:

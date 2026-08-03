@@ -206,8 +206,10 @@ def read_regular_bytes(path: Path, label: str) -> bytes:
 def _write_new(path: Path, content: bytes, mode: int = 0o644) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor: int | None = None
+    created = False
     try:
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
+        created = True
         with os.fdopen(descriptor, "wb") as stream:
             descriptor = None
             stream.write(content)
@@ -215,6 +217,13 @@ def _write_new(path: Path, content: bytes, mode: int = 0o644) -> None:
             os.fsync(stream.fileno())
     except FileExistsError as exc:
         raise ReleaseError(f"refusing to overwrite existing file: {path}") from exc
+    except Exception:
+        if descriptor is not None:
+            os.close(descriptor)
+            descriptor = None
+        if created:
+            path.unlink(missing_ok=True)
+        raise
     finally:
         if descriptor is not None:
             os.close(descriptor)
@@ -640,7 +649,7 @@ def _validate_promoted_runtime_manifest(manifest: Any, smoke_report: Any) -> Non
     embedded_report = manifest.get("smokeReport")
     if not isinstance(embedded_report, dict) or embedded_report.get("passed") is not True:
         raise ReleaseError("embedded smoke report is missing or failed")
-    for field in ("runtimeId", "imageId", "passed", "mode", "checks"):
+    for field in ("runtimeId", "imageId", "passed", "mode", "completedAt", "checks"):
         if embedded_report.get(field) != smoke_report.get(field):
             raise ReleaseError(f"smoke report differs from promoted manifest: {field}")
     checks = smoke_report.get("checks")
@@ -895,12 +904,19 @@ def sign_manifest(manifest_path: Path, private_key_env: str, public_output: Path
     }
     validate_signature_envelope(envelope)
     signature_path = Path(str(manifest_path) + SIGNATURE_SUFFIX)
-    _write_canonical_new(signature_path, envelope)
-    if public_output is not None:
-        _write_canonical_new(
-            public_output,
-            {"schemaVersion": KEYRING_SCHEMA_VERSION, "keys": [entry]},
-        )
+    signature_created = False
+    try:
+        _write_canonical_new(signature_path, envelope)
+        signature_created = True
+        if public_output is not None:
+            _write_canonical_new(
+                public_output,
+                {"schemaVersion": KEYRING_SCHEMA_VERSION, "keys": [entry]},
+            )
+    except Exception:
+        if signature_created:
+            signature_path.unlink(missing_ok=True)
+        raise
     return signature_path
 
 
