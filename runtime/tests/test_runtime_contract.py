@@ -147,6 +147,39 @@ class RuntimeManifestContractTests(unittest.TestCase):
             with self.assertRaisesRegex(runtime_manifest.ManifestError, "unsupported"):
                 runtime_manifest.validate_manifest(manifest)
 
+    def test_manifest_rejects_boolean_schema_and_incomplete_component_details(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["schemaVersion"] = True
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "schema"):
+                runtime_manifest.validate_manifest(manifest)
+
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["componentDetails"]["worker"]["version"] = ""
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "worker"):
+                runtime_manifest.validate_manifest(manifest)
+
+        with tempfile.TemporaryDirectory() as directory:
+            manifest, _ = self._generate(Path(directory))
+            manifest["componentDetails"]["python"]["unexpected"] = "drift"
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "unsupported"):
+                runtime_manifest.validate_manifest(manifest)
+
+    def test_runtime_pin_urls_require_a_credential_free_https_host(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            pins_path = Path(directory) / "pins.env"
+            pins = (RUNTIME / "pins.env").read_text(encoding="utf-8")
+            pins_path.write_text(
+                pins.replace(
+                    "GAZEBO_APT_KEY_URL=https://packages.osrfoundation.org/gazebo.gpg",
+                    "GAZEBO_APT_KEY_URL=https://",
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(runtime_manifest.ManifestError, "GAZEBO_APT_KEY_URL"):
+                runtime_manifest.load_pins(pins_path)
+
     def test_manifest_validation_recomputes_runtime_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manifest, _ = self._generate(Path(directory))
