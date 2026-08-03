@@ -433,22 +433,29 @@ function parseReferenceTrackInput(raw: string, t?: Translate): {
     return { points: null, error: localizedIssue(t, "wizard.validation.jsonArrayValid") };
   }
   if (!Array.isArray(parsed)) return { points: null, error: localizedIssue(t, "wizard.validation.jsonArray") };
+  if (parsed.length > 10_000) {
+    return {
+      points: null,
+      error: localizedIssue(t, "wizard.validation.trackPointMax", { max: 10_000 }),
+    };
+  }
   const points: TrackPoint[] = [];
   for (let index = 0; index < parsed.length; index += 1) {
     const value = parsed[index];
     if (!value || typeof value !== "object") {
       return { points: null, error: localizedIssue(t, "wizard.validation.trackPointObject", { index: index + 1 }) };
     }
-    const x = Number((value as { x?: unknown }).x);
-    const y = Number((value as { y?: unknown }).y);
-    const zValue = (value as { z?: unknown }).z;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    const candidate = value as { x?: unknown; y?: unknown; z?: unknown };
+    const x = candidate.x;
+    const y = candidate.y;
+    const zValue = candidate.z;
+    if (typeof x !== "number" || !Number.isFinite(x) || typeof y !== "number" || !Number.isFinite(y)) {
       return { points: null, error: localizedIssue(t, "wizard.validation.trackPointXY", { index: index + 1 }) };
     }
-    if (zValue !== undefined && zValue !== null && !Number.isFinite(Number(zValue))) {
+    if (zValue !== undefined && zValue !== null && (typeof zValue !== "number" || !Number.isFinite(zValue))) {
       return { points: null, error: localizedIssue(t, "wizard.validation.trackPointZ", { index: index + 1 }) };
     }
-    points.push({ x, y, z: zValue === undefined || zValue === null ? null : Number(zValue) });
+    points.push({ x, y, z: zValue === undefined || zValue === null ? null : zValue });
   }
   return { points, error: null };
 }
