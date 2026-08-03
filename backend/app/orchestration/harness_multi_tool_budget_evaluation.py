@@ -686,21 +686,17 @@ def _verify_multi_tool_artifact_semantics(
         raise ValueError("multi-tool evaluation summary does not recompute")
 
 
-def build_harness_multi_tool_budget_manifest(
-    *,
-    source_commit: str,
-    generated_at: str,
-    artifact: dict[str, object],
+def verify_harness_multi_tool_budget_artifact(
+    payload: object,
 ) -> dict[str, object]:
-    """Bind the measured artifact to exact code, policy, and claim scope."""
+    """Verify artifact identity, claim boundaries, accounting, and summaries."""
 
-    if (
-        artifact.get("source_commit") != source_commit
-        or artifact.get("generated_at") != generated_at
-    ):
-        raise ValueError("multi-tool artifact provenance drifted")
-    _verify_provenance(source_commit, generated_at)
-    artifact_unsigned = {key: value for key, value in artifact.items() if key != "artifact_sha256"}
+    if not isinstance(payload, dict):
+        raise ValueError("multi-tool artifact must be an object")
+    artifact = payload
+    artifact_unsigned = {
+        key: value for key, value in artifact.items() if key != "artifact_sha256"
+    }
     seed_blocks = artifact.get("seed_blocks")
     expected_budget = {
         "max_iterations": HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS,
@@ -732,6 +728,33 @@ def build_harness_multi_tool_budget_manifest(
     ):
         raise ValueError("multi-tool artifact provenance or integrity drifted")
     _verify_multi_tool_artifact_semantics(artifact)
+    return artifact
+
+
+def build_harness_multi_tool_budget_manifest(
+    *,
+    source_commit: str,
+    generated_at: str,
+    artifact: dict[str, object],
+) -> dict[str, object]:
+    """Bind the measured artifact to exact code, policy, and claim scope."""
+
+    if (
+        artifact.get("source_commit") != source_commit
+        or artifact.get("generated_at") != generated_at
+    ):
+        raise ValueError("multi-tool artifact provenance drifted")
+    _verify_provenance(source_commit, generated_at)
+    verified_artifact = verify_harness_multi_tool_budget_artifact(artifact)
+    seed_blocks = verified_artifact["seed_blocks"]
+    expected_budget = {
+        "max_iterations": HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS,
+        "max_total_trials": HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS,
+    }
+    expected_contracts = {
+        "evidence_schema_version": HARNESS_EVIDENCE_SCHEMA_VERSION,
+        "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
+    }
     unsigned: dict[str, object] = {
         "schema_version": HARNESS_MULTI_TOOL_BUDGET_EVAL_MANIFEST_SCHEMA_VERSION,
         "generated_at": generated_at,
@@ -761,4 +784,5 @@ __all__ = [
     "HARNESS_MULTI_TOOL_BUDGET_EVAL_SEED_BLOCKS",
     "build_harness_multi_tool_budget_evaluation",
     "build_harness_multi_tool_budget_manifest",
+    "verify_harness_multi_tool_budget_artifact",
 ]

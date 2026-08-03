@@ -40,6 +40,7 @@ from app.orchestration.harness_multi_tool_budget_evaluation import (
     HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
     HARNESS_MULTI_TOOL_BUDGET_EVAL_MANIFEST_SCHEMA_VERSION,
     HARNESS_MULTI_TOOL_BUDGET_EVAL_SCHEMA_VERSION,
+    verify_harness_multi_tool_budget_artifact,
 )
 from app.simulator.advanced_physics_closure_evidence import (
     verify_advanced_physics_closure,
@@ -612,6 +613,7 @@ def _verify_multi_tool_budget(
         ),
     }
     artifact = _load_json(_repo_path(repository_root, paths.multi_tool_artifact))
+    verify_harness_multi_tool_budget_artifact(artifact)
     manifest = _load_json(_repo_path(repository_root, paths.multi_tool_manifest))
     receipt = _load_json(_repo_path(repository_root, paths.multi_tool_generation_receipt))
     if artifact.get("schema_version") != HARNESS_MULTI_TOOL_BUDGET_EVAL_SCHEMA_VERSION:
