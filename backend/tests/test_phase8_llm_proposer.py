@@ -7,6 +7,7 @@ import sys
 import time
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -1430,6 +1431,35 @@ def _compiled_budget_decision(ctx: dict[str, object], db, job):
         opportunity=_budget_opportunity(ctx),
         client=FakeOpenAIClient(_valid_budget_plan()),
     )
+
+
+def test_harness_incumbent_excludes_evidence_incomplete_candidate(llm_ctx, monkeypatch):
+    ctx = llm_ctx
+    incomplete = SimpleNamespace(
+        id="candidate_incomplete",
+        generation_index=1,
+        aggregated_score=0.01,
+        parameter_json={"kp_xy": 2.0},
+        publishable=False,
+    )
+    verified = SimpleNamespace(
+        id="candidate_verified",
+        generation_index=0,
+        aggregated_score=0.8,
+        parameter_json={"kp_xy": 1.1},
+        publishable=True,
+    )
+    monkeypatch.setattr(
+        ctx["job_manager"],
+        "candidate_is_publishable",
+        lambda candidate: candidate.publishable,
+    )
+
+    incumbent = ctx["job_manager"]._harness_incumbent_parameters(
+        SimpleNamespace(candidates=[incomplete, verified])
+    )
+
+    assert incumbent == {"kp_xy": 1.1}
 
 
 def test_harness_accepts_one_bounded_post_tool_revision(llm_ctx):

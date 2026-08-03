@@ -1570,7 +1570,8 @@ def _harness_incumbent_parameters(job: models.Job) -> dict[str, float]:
     scored = [
         candidate
         for candidate in job.candidates
-        if not isinstance(candidate.aggregated_score, bool)
+        if candidate_is_publishable(candidate)
+        and not isinstance(candidate.aggregated_score, bool)
         and isinstance(candidate.aggregated_score, int | float)
         and math.isfinite(float(candidate.aggregated_score))
         and isinstance(candidate.parameter_json, dict)
