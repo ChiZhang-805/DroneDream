@@ -187,6 +187,24 @@ def test_real_motion_or_low_thrust_does_not_claim_link_stall(change, expected) -
     assert _compile(**change)["stall_verified"] is expected
 
 
+def test_isolated_motor_command_spikes_do_not_claim_a_sustained_link_stall() -> None:
+    series = _series()
+    timestamps = series["actuator_motors"]["timestamp"]
+    for index in range(4):
+        commands = [0.0 for _ in timestamps]
+        commands[index + 1] = 0.9
+        series["actuator_motors"][f"control[{index}]"] = commands
+
+    evidence = compile_actuator_link_health_evidence_from_series(
+        datasets=series,
+        execution_identity=IDENTITY,
+        ulog_sha256="a" * 64,
+        eligibility={"eligible": True, "reasons": []},
+    )
+
+    assert evidence["stall_verified"] is False
+
+
 def test_ineligible_payload_or_actuator_trial_never_claims_link_stall() -> None:
     evidence = compile_actuator_link_health_evidence_from_series(
         datasets=_series(),

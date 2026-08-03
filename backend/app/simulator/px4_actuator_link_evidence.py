@@ -32,6 +32,7 @@ _MIN_CLIMB_REQUEST_M = 1.0
 _MIN_THRUST_MAGNITUDE = 0.8
 _MIN_HIGH_THRUST_FRACTION = 0.8
 _MIN_ACTIVE_MOTOR_COMMAND = 0.3
+_MIN_ACTIVE_MOTOR_FRACTION = 0.8
 _MIN_ACTIVE_MOTOR_COUNT = 4
 _MAX_GROUNDTRUTH_VERTICAL_DISPLACEMENT_M = 0.05
 _MAX_GROUNDTRUTH_HORIZONTAL_DISPLACEMENT_M = 0.05
@@ -265,7 +266,17 @@ def compile_actuator_link_health_evidence_from_series(
         else 0.0
     )
     motor_maxima = [max((abs(value) for value in values), default=0.0) for values in motor_columns]
-    active_motor_count = sum(value >= _MIN_ACTIVE_MOTOR_COMMAND for value in motor_maxima)
+    motor_active_fractions = [
+        (
+            sum(abs(value) >= _MIN_ACTIVE_MOTOR_COMMAND for value in values) / len(values)
+            if values
+            else 0.0
+        )
+        for values in motor_columns
+    ]
+    active_motor_count = sum(
+        fraction >= _MIN_ACTIVE_MOTOR_FRACTION for fraction in motor_active_fractions
+    )
 
     if groundtruth_x and groundtruth_y and groundtruth_z:
         x0, y0, z0 = groundtruth_x[0], groundtruth_y[0], groundtruth_z[0]
@@ -296,6 +307,9 @@ def compile_actuator_link_health_evidence_from_series(
         "max_thrust_magnitude": round(max_thrust_magnitude, 6),
         "high_thrust_sample_fraction": round(high_thrust_fraction, 6),
         "motor_max_abs_commands": [round(value, 6) for value in motor_maxima],
+        "motor_active_sample_fractions": [
+            round(value, 6) for value in motor_active_fractions
+        ],
         "active_motor_count": active_motor_count,
         "groundtruth_vertical_displacement_m": (
             round(vertical_displacement_m, 6) if math.isfinite(vertical_displacement_m) else None
@@ -318,6 +332,7 @@ def compile_actuator_link_health_evidence_from_series(
             "minimum_thrust_magnitude": _MIN_THRUST_MAGNITUDE,
             "minimum_high_thrust_sample_fraction": _MIN_HIGH_THRUST_FRACTION,
             "minimum_active_motor_command": _MIN_ACTIVE_MOTOR_COMMAND,
+            "minimum_active_motor_sample_fraction": _MIN_ACTIVE_MOTOR_FRACTION,
             "minimum_active_motor_count": _MIN_ACTIVE_MOTOR_COUNT,
             "maximum_groundtruth_vertical_displacement_m": (
                 _MAX_GROUNDTRUTH_VERTICAL_DISPLACEMENT_M
