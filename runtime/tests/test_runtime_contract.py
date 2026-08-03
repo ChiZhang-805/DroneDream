@@ -346,14 +346,30 @@ class RuntimeReleaseImmutabilityContractTests(unittest.TestCase):
 
     def test_rootfs_export_refuses_every_existing_release_artifact(self) -> None:
         script = (RUNTIME / "export-rootfs.sh").read_text(encoding="utf-8")
-        self.assertIn(
-            'for artifact in "$output" "$partial" "$output.sha256" "$output.manifest.json"',
-            script,
-        )
+        for artifact in (
+            '"$output"',
+            '"$partial"',
+            '"$checksum"',
+            '"$checksum_partial"',
+            '"$manifest"',
+            '"$manifest_partial"',
+        ):
+            self.assertIn(artifact, script)
         self.assertIn('if [[ -e "$artifact" || -L "$artifact" ]]', script)
-        # The only deletion is cleanup of the just-created partial when it
-        # breaches the hard size cap; pre-existing partials are never removed.
-        self.assertEqual(script.count('rm -f "$partial"'), 1)
+
+    def test_rootfs_is_the_last_fail_closed_publication_signal(self) -> None:
+        script = (RUNTIME / "export-rootfs.sh").read_text(encoding="utf-8")
+        checksum_publish = 'ln -- "$checksum_partial" "$checksum"'
+        manifest_publish = 'ln -- "$manifest_partial" "$manifest"'
+        rootfs_publish = 'ln -- "$partial" "$output"'
+        self.assertLess(script.index(checksum_publish), script.index(manifest_publish))
+        self.assertLess(script.index(manifest_publish), script.index(rootfs_publish))
+        self.assertIn('"$output" -ef "$partial"', script)
+        self.assertIn('"$checksum" -ef "$checksum_partial"', script)
+        self.assertIn('"$manifest" -ef "$manifest_partial"', script)
+        self.assertIn('rm -f -- "$checksum" || true', script)
+        self.assertIn('rm -f -- "$manifest" || true', script)
+        self.assertIn("printf '%s  %s\\n'", script)
 
 
 class Px4LogCleanupPortableTests(unittest.TestCase):

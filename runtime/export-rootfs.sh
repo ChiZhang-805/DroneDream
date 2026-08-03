@@ -9,11 +9,18 @@ max_bytes=$((12 * 1024 * 1024 * 1024))
 work=$(mktemp -d)
 container=
 partial="$output.partial"
+checksum="$output.sha256"
+checksum_partial="$checksum.partial"
+manifest="$output.manifest.json"
+manifest_partial="$manifest.partial"
 
 # Release artifacts are immutable.  Refuse stale or operator-supplied paths
 # before Docker is touched; silently replacing a tarball or one of its
 # integrity sidecars could make smoke evidence describe different bytes.
-for artifact in "$output" "$partial" "$output.sha256" "$output.manifest.json"; do
+for artifact in \
+  "$output" "$partial" \
+  "$checksum" "$checksum_partial" \
+  "$manifest" "$manifest_partial"; do
   if [[ -e "$artifact" || -L "$artifact" ]]; then
     echo "release export refuses to overwrite existing path: $artifact" >&2
     exit 2
@@ -24,6 +31,21 @@ cleanup() {
   if [[ -n "$container" ]]; then
     docker rm --force "$container" >/dev/null 2>&1 || true
   fi
+  committed=false
+  if [[ -e "$output" && -e "$partial" && "$output" -ef "$partial" ]]; then
+    committed=true
+  fi
+  if [[ "$committed" != true ]]; then
+    if [[ -e "$checksum" && -e "$checksum_partial" \
+      && "$checksum" -ef "$checksum_partial" ]]; then
+      rm -f -- "$checksum" || true
+    fi
+    if [[ -e "$manifest" && -e "$manifest_partial" \
+      && "$manifest" -ef "$manifest_partial" ]]; then
+      rm -f -- "$manifest" || true
+    fi
+  fi
+  rm -f -- "$partial" "$checksum_partial" "$manifest_partial" || true
   rm -rf "$work"
 }
 trap cleanup EXIT
@@ -61,11 +83,23 @@ mkdir -p "$(dirname "$output")"
 docker export --output "$partial" "$container"
 bytes=$(stat --format='%s' "$partial")
 if (( bytes > max_bytes )); then
-  rm -f "$partial"
   echo "release rootfs is $bytes bytes; hard limit is $max_bytes bytes (12 GiB)" >&2
   exit 1
 fi
-mv "$partial" "$output"
-sha256sum "$output" >"$output.sha256"
-cp "$work/promoted.json" "$output.manifest.json"
+digest=$(sha256sum "$partial" | cut -d ' ' -f 1)
+[[ "$digest" =~ ^[0-9a-f]{64}$ ]] || {
+  echo "release rootfs checksum is malformed" >&2
+  exit 1
+}
+printf '%s  %s\n' "$digest" "$(basename "$output")" >"$checksum_partial"
+cp "$work/promoted.json" "$manifest_partial"
+
+# Publish the two integrity sidecars first and the rootfs last.  The final
+# rootfs path is the commit signal: whenever it exists, both sidecars already
+# exist.  Same-filesystem hard links are atomic, never replace a competing
+# path, and leave an inode-identical staging name so cleanup can prove which
+# files belong to this process even if it is interrupted between commands.
+ln -- "$checksum_partial" "$checksum"
+ln -- "$manifest_partial" "$manifest"
+ln -- "$partial" "$output"
 echo "exported $output ($bytes bytes)"
