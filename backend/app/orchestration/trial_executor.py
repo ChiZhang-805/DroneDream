@@ -26,6 +26,7 @@ import math
 import os
 import shutil
 import threading
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
@@ -269,6 +270,7 @@ class _TrialLeaseHeartbeat:
     def _run(self) -> None:
         from app.db import SessionLocal
 
+        renewal_deadline = time.monotonic() + float(self._lease_seconds)
         while not self._stop.wait(self._interval_seconds):
             try:
                 with SessionLocal() as heartbeat_db:
@@ -283,14 +285,29 @@ class _TrialLeaseHeartbeat:
                             self._cancellation_event.set()
                         return
                     heartbeat_db.commit()
+                    renewal_deadline = time.monotonic() + float(self._lease_seconds)
             except Exception:
-                # A transient database outage should not kill a simulator
-                # process. The completion fence below remains authoritative.
                 logger.warning(
                     "failed to renew lease for trial %s",
                     self._token.trial_id,
                     exc_info=True,
                 )
+                # A short database outage does not invalidate the current
+                # ownership proof. Once the last confirmed lease window has
+                # elapsed, however, another worker may legally reclaim the
+                # Trial. Stop this adapter through its cancellation event so
+                # two physical simulations do not keep running in parallel;
+                # the completion fence remains the final persistence guard.
+                if time.monotonic() >= renewal_deadline:
+                    self.lost.set()
+                    if self._cancellation_event is not None:
+                        self._cancellation_event.set()
+                    logger.error(
+                        "trial %s lease could not be confirmed before expiry; "
+                        "requesting simulator cancellation",
+                        self._token.trial_id,
+                    )
+                    return
 
 
 def _acquire_completion_fence(

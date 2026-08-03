@@ -1824,6 +1824,84 @@ def test_long_trial_renews_lease_while_simulator_runs(orchestration_ctx, monkeyp
         get_settings.cache_clear()
 
 
+def test_lease_heartbeat_cancels_after_database_outage_exceeds_lease(
+    orchestration_ctx,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = orchestration_ctx
+
+    def unavailable_session():
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(ctx["db_module"], "SessionLocal", unavailable_session)
+    cancellation_event = threading.Event()
+    heartbeat = ctx["trial_executor"]._TrialLeaseHeartbeat(
+        ctx["trial_executor"]._TrialLeaseToken(
+            trial_id="trial-heartbeat-outage",
+            worker_id="worker-heartbeat-outage",
+            attempt_count=1,
+        ),
+        lease_seconds=0.02,
+        interval_seconds=0.03,
+        cancellation_event=cancellation_event,
+    )
+
+    heartbeat.start()
+    try:
+        assert cancellation_event.wait(timeout=0.15)
+        assert heartbeat.lost.is_set()
+    finally:
+        heartbeat.stop()
+
+
+def test_lease_heartbeat_tolerates_database_outage_within_lease(
+    orchestration_ctx,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = orchestration_ctx
+    recovered = threading.Event()
+    call_count = 0
+
+    class FakeSession:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def commit(self) -> None:
+            recovered.set()
+
+    def transient_session():
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise RuntimeError("transient database outage")
+        return FakeSession()
+
+    monkeypatch.setattr(ctx["db_module"], "SessionLocal", transient_session)
+    monkeypatch.setattr(ctx["trial_executor"], "_renew_owned_lease", lambda *_args, **_kwargs: True)
+    cancellation_event = threading.Event()
+    heartbeat = ctx["trial_executor"]._TrialLeaseHeartbeat(
+        ctx["trial_executor"]._TrialLeaseToken(
+            trial_id="trial-heartbeat-transient",
+            worker_id="worker-heartbeat-transient",
+            attempt_count=1,
+        ),
+        lease_seconds=0.2,
+        interval_seconds=0.02,
+        cancellation_event=cancellation_event,
+    )
+
+    heartbeat.start()
+    try:
+        assert recovered.wait(timeout=0.15)
+        assert not cancellation_event.is_set()
+        assert not heartbeat.lost.is_set()
+    finally:
+        heartbeat.stop()
+
+
 def test_process_control_exception_from_cleanup_stops_lease_heartbeat(
     orchestration_ctx, monkeypatch: pytest.MonkeyPatch
 ) -> None:
