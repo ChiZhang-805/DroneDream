@@ -573,6 +573,29 @@ def _read_log_tail(path: Path, *, limit: int = 2000) -> str:
     return f"... [tail of {size} bytes]\n{text[-limit:]}"
 
 
+def _terminate_posix_process_group(process_group_id: int) -> None:
+    """Reap every process in a POSIX simulator session, including orphans."""
+
+    kill_process_group = getattr(os, "killpg", None)
+    if kill_process_group is None or process_group_id <= 0:
+        return
+    try:
+        kill_process_group(process_group_id, signal.SIGTERM)
+    except OSError:
+        return
+
+    deadline = time.monotonic() + _TERMINATE_GRACE_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            kill_process_group(process_group_id, 0)
+        except OSError:
+            return
+        time.sleep(_PROCESS_POLL_SECONDS)
+
+    with suppress(OSError):
+        kill_process_group(process_group_id, getattr(signal, "SIGKILL", 9))
+
+
 def _terminate_process_tree(proc: subprocess.Popen[bytes]) -> None:
     """Terminate the simulator and descendants after timeout/cancellation."""
 
@@ -592,16 +615,7 @@ def _terminate_process_tree(proc: subprocess.Popen[bytes]) -> None:
                 timeout=10,
             )
     else:
-        kill_process_group = getattr(os, "killpg", None)
-        with suppress(OSError):
-            if kill_process_group is not None:
-                kill_process_group(proc.pid, signal.SIGTERM)
-        try:
-            proc.wait(timeout=_TERMINATE_GRACE_SECONDS)
-        except subprocess.TimeoutExpired:
-            with suppress(OSError):
-                if kill_process_group is not None:
-                    kill_process_group(proc.pid, getattr(signal, "SIGKILL", 9))
+        _terminate_posix_process_group(proc.pid)
     if proc.poll() is None:
         with suppress(OSError):
             proc.kill()
@@ -621,6 +635,7 @@ def _execute_command(
 ) -> _ProcessOutcome:
     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
     windows_job = _WindowsKillOnCloseJob.create()
+    proc: subprocess.Popen[bytes] | None = None
     try:
         with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
             proc = subprocess.Popen(  # noqa: S603 - trusted operator command, no shell.
@@ -666,6 +681,8 @@ def _execute_command(
         # the worker simply by returning before its own children.
         if windows_job is not None:
             windows_job.close()
+        elif os.name != "nt" and proc is not None:
+            _terminate_posix_process_group(proc.pid)
     return _ProcessOutcome(
         returncode=returncode,
         stdout=_read_log_tail(stdout_path),

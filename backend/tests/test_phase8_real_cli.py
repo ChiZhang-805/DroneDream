@@ -1992,6 +1992,43 @@ def _write_process_tree_fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
     return parent, child, sentinel
 
 
+def test_posix_normal_exit_cleans_the_remaining_process_group(monkeypatch) -> None:
+    calls: list[tuple[int, int]] = []
+
+    def fake_killpg(process_group_id: int, signal_number: int) -> None:
+        calls.append((process_group_id, signal_number))
+        if signal_number == 0:
+            raise ProcessLookupError
+
+    monkeypatch.setattr(real_cli_module.os, "killpg", fake_killpg, raising=False)
+
+    real_cli_module._terminate_posix_process_group(4312)
+
+    assert calls == [
+        (4312, real_cli_module.signal.SIGTERM),
+        (4312, 0),
+    ]
+
+
+def test_process_start_failure_is_not_masked_by_posix_cleanup(monkeypatch, tmp_path) -> None:
+    def fail_to_start(*_args, **_kwargs):
+        raise FileNotFoundError("simulator executable is missing")
+
+    monkeypatch.setattr(real_cli_module.subprocess, "Popen", fail_to_start)
+    monkeypatch.setattr(real_cli_module.os, "name", "posix")
+
+    with pytest.raises(FileNotFoundError, match="simulator executable is missing"):
+        real_cli_module._execute_command(
+            ["missing-simulator"],
+            cwd=None,
+            env={},
+            timeout_seconds=1.0,
+            cancellation_event=None,
+            stdout_path=tmp_path / "stdout.log",
+            stderr_path=tmp_path / "stderr.log",
+        )
+
+
 def test_real_cli_timeout_terminates_descendant_processes(monkeypatch, tmp_path) -> None:
     parent, child, sentinel = _write_process_tree_fixture(tmp_path)
     monkeypatch.setenv(
