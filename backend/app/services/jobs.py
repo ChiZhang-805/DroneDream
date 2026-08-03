@@ -501,7 +501,10 @@ def _create_job_from_config(
         completion_policy=req.completion_policy,
         job_kind=job_kind,
         provider_turn_cap=req.provider_turn_cap,
-        continue_exploration_requested=req.continue_exploration_after_qualified,
+        # A creation-time budget is only a preregistration.  It must not look
+        # like the authenticated post-qualification continuation action has
+        # already happened; that flag flips only when the child Job is claimed.
+        continue_exploration_requested=False,
         exploration_budget_json=(
             req.exploration_budget.model_dump(mode="json")
             if req.exploration_budget is not None
@@ -550,7 +553,7 @@ def _create_job_from_config(
                 "completion_policy": req.completion_policy,
                 "job_kind": job_kind,
                 "provider_turn_cap": req.provider_turn_cap,
-                "continue_exploration_requested": (
+                "continue_exploration_preregistered": (
                     req.continue_exploration_after_qualified
                 ),
                 "continuation_parent_job_id": continuation_parent_job_id,
@@ -1125,8 +1128,7 @@ def continue_exploration(
         )
     requested_budget = request.budget.model_dump(mode="json")
     if (
-        parent.continue_exploration_requested
-        and parent.exploration_budget_json is not None
+        parent.exploration_budget_json is not None
         and parent.exploration_budget_json != requested_budget
     ):
         raise JobServiceError(

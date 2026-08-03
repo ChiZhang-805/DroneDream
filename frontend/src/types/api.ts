@@ -251,6 +251,10 @@ export interface JobCreateRequest {
   objective_config?: ObjectiveConfig;
   scenario_suite?: ScenarioSuiteConfig;
   max_total_trials?: number;
+  completion_policy?: CompletionPolicy;
+  provider_turn_cap?: number;
+  continue_exploration_after_qualified?: boolean;
+  exploration_budget?: ContinueExplorationBudget | null;
 }
 
 export interface JobUpdateRequest {
@@ -258,6 +262,25 @@ export interface JobUpdateRequest {
 }
 
 export interface JobRerunRequest {
+  openai?: OpenAIConfig | null;
+  llm?: LLMProviderConfig | null;
+}
+
+export type CompletionPolicy =
+  | "first_qualified_stop"
+  | "exploration_budget_stop";
+
+export type JobKind = "primary" | "continue_exploration";
+
+export interface ContinueExplorationBudget {
+  additional_generation_cap: number;
+  additional_trial_cap: number;
+  additional_provider_turn_cap: number;
+  additional_time_budget_seconds: number;
+}
+
+export interface ContinueExplorationRequest {
+  budget: ContinueExplorationBudget;
   openai?: OpenAIConfig | null;
   llm?: LLMProviderConfig | null;
 }
@@ -315,6 +338,19 @@ export interface Job {
   objective_config?: ObjectiveConfig;
   scenario_suite?: ScenarioSuiteConfig;
   max_total_trials?: number;
+  completion_policy?: CompletionPolicy;
+  job_kind?: JobKind;
+  cognitive_policy_version?: string;
+  provider_turn_cap?: number;
+  provider_turns_attempted?: number;
+  provider_turns_succeeded?: number;
+  first_qualified_candidate_id?: string | null;
+  first_qualified_at?: string | null;
+  continue_exploration_requested?: boolean;
+  exploration_budget?: ContinueExplorationBudget | null;
+  continuation_parent_job_id?: string | null;
+  continuation_root_job_id?: string | null;
+  holdout_policy_version?: string;
 }
 
 export interface TrialMetrics {
@@ -386,7 +422,10 @@ export type OptimizationOutcome =
   | "max_iterations_reached"
   | "no_usable_candidate"
   | "simulator_unavailable"
-  | "llm_failed";
+  | "llm_failed"
+  | "exploration_improved"
+  | "exploration_no_improvement"
+  | "exploration_budget_exhausted";
 
 export interface AcceptanceCriteria {
   target_rmse: number | null;

@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiClient, ApiClientError } from "../api/client";
 import type {
+  ContinueExplorationBudget,
+  ContinueExplorationRequest,
   Job,
   JobEventInfo,
   JobReport,
@@ -162,7 +164,19 @@ export function JobDetail() {
   const queryClient = useQueryClient();
   const safeId = jobId ?? "";
   const [pdfDownloadError, setPdfDownloadError] = useState(false);
+  const [showContinuationDialog, setShowContinuationDialog] = useState(false);
+  const [continuationConfirmed, setContinuationConfirmed] = useState(false);
+  const [continuationApiKey, setContinuationApiKey] = useState("");
+  const [continuationError, setContinuationError] = useState<string | null>(null);
+  const [continuationBudget, setContinuationBudget] = useState({
+    generations: "4",
+    trials: "80",
+    providerTurns: "16",
+    minutes: "60",
+  });
   const terminalReconciledJobRef = useRef<string | null>(null);
+  const continuationDialogRef = useRef<HTMLElement | null>(null);
+  const continuationReturnFocusRef = useRef<HTMLElement | null>(null);
   const rerunInFlightRef = useRef(false);
   const cancelInFlightRef = useRef(false);
 
@@ -210,6 +224,75 @@ export function JobDetail() {
       queryClient.invalidateQueries({ queryKey: ["jobs", "history"] });
     },
   });
+
+  const continuationMutation = useMutation({
+    mutationFn: async ({
+      id,
+      controlVersion,
+      request,
+      managedAccess,
+    }: {
+      id: string;
+      controlVersion: number;
+      request: ContinueExplorationRequest;
+      managedAccess: boolean;
+    }) => {
+      if (!managedAccess) {
+        return apiClient.continueExploration(id, controlVersion, request);
+      }
+      const grant = await issueManagedModelGrant("job", id);
+      return apiClient.continueExploration(id, controlVersion, {
+        ...request,
+        llm: {
+          access_mode: "platform",
+          provider: "dronedream",
+          api_key: null,
+          platform_grant: grant.grant,
+          model: null,
+          base_url: null,
+        },
+      });
+    },
+    onSuccess: (child) => {
+      setContinuationApiKey("");
+      setShowContinuationDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["job", safeId] });
+      queryClient.invalidateQueries({ queryKey: ["jobs", "dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs", "history"] });
+      navigate(`/jobs/${child.id}`);
+    },
+  });
+
+  useEffect(() => {
+    if (!showContinuationDialog) return;
+    const dialog = continuationDialogRef.current;
+    if (!dialog) return;
+    const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+      "button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex='-1'])",
+    ));
+    focusable[0]?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !continuationMutation.isPending) {
+        event.preventDefault();
+        setContinuationApiKey("");
+        setShowContinuationDialog(false);
+        window.setTimeout(() => continuationReturnFocusRef.current?.focus(), 0);
+        return;
+      }
+      if (event.key !== "Tab" || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [continuationMutation.isPending, showContinuationDialog]);
 
   const jobQuery = useQuery({
     queryKey: ["job", safeId],
@@ -401,6 +484,81 @@ export function JobDetail() {
     submitRerun({ id: job.id });
   };
 
+  const openContinuationDialog = () => {
+    const budget = job.exploration_budget;
+    setContinuationBudget({
+      generations: String(budget?.additional_generation_cap ?? 4),
+      trials: String(budget?.additional_trial_cap ?? 80),
+      providerTurns: String(
+        optimizerUsesModelAccess(job.optimizer_strategy)
+          ? (budget?.additional_provider_turn_cap ?? 16)
+          : 0,
+      ),
+      minutes: String(
+        Math.max(1, Math.round((budget?.additional_time_budget_seconds ?? 3600) / 60)),
+      ),
+    });
+    setContinuationApiKey("");
+    setContinuationConfirmed(false);
+    setContinuationError(null);
+    continuationMutation.reset();
+    continuationReturnFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setShowContinuationDialog(true);
+  };
+
+  const submitContinuation = () => {
+    const generationCap = Number(continuationBudget.generations);
+    const trialCap = Number(continuationBudget.trials);
+    const providerTurnCap = optimizerUsesModelAccess(job.optimizer_strategy)
+      ? Number(continuationBudget.providerTurns)
+      : 0;
+    const timeMinutes = Number(continuationBudget.minutes);
+    const valid = Number.isInteger(generationCap) && generationCap >= 1 && generationCap <= 32
+      && Number.isInteger(trialCap) && trialCap >= 2 && trialCap <= 5000
+      && Number.isInteger(providerTurnCap) && providerTurnCap >= 0
+      && providerTurnCap <= Math.min(128, generationCap * 4)
+      && Number.isInteger(timeMinutes) && timeMinutes >= 1 && timeMinutes <= 1440;
+    if (!valid) {
+      setContinuationError(t("jobDetail.continuation.invalidBudget"));
+      return;
+    }
+    const budget: ContinueExplorationBudget = {
+      additional_generation_cap: generationCap,
+      additional_trial_cap: trialCap,
+      additional_provider_turn_cap: providerTurnCap,
+      additional_time_budget_seconds: timeMinutes * 60,
+    };
+    const request: ContinueExplorationRequest = { budget };
+    const accessMode = job.llm_access_mode
+      ?? (job.llm_provider === "dronedream" ? "platform" : "byok");
+    const managedAccess = optimizerUsesModelAccess(job.optimizer_strategy)
+      && accessMode === "platform";
+    if (optimizerUsesModelAccess(job.optimizer_strategy) && !managedAccess) {
+      const key = continuationApiKey.trim();
+      if (!key) {
+        setContinuationError(t("jobDetail.continuation.freshKeyRequired"));
+        return;
+      }
+      request.llm = {
+        access_mode: "byok",
+        provider: job.llm_provider?.trim() || "openai",
+        api_key: key,
+        platform_grant: null,
+        model: job.openai_model,
+        base_url: job.llm_base_url,
+      };
+    }
+    setContinuationError(null);
+    continuationMutation.mutate({
+      id: job.id,
+      controlVersion: job.control_version,
+      request,
+      managedAccess,
+    });
+  };
+
   return (
     <section className="stack-md">
       <JobHeader
@@ -450,6 +608,11 @@ export function JobDetail() {
       <ProgressSection job={job} />
 
       <StatusSpecificTop job={job} report={report} />
+
+      <QualificationAndExplorationCard
+        job={job}
+        onContinue={openContinuationDialog}
+      />
 
       <MetricsCards job={job} report={report} />
       {report?.optimized_metrics.holdout ? (
@@ -584,7 +747,188 @@ export function JobDetail() {
       ) : null}
 
       <DiagnosticsPanel job={job} />
+      {showContinuationDialog ? (
+        <div
+          className="confirm-dialog-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !continuationMutation.isPending) {
+              setContinuationApiKey("");
+              setShowContinuationDialog(false);
+              window.setTimeout(() => continuationReturnFocusRef.current?.focus(), 0);
+            }
+          }}
+        >
+          <section
+            ref={continuationDialogRef}
+            className="confirm-dialog-card continuation-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="continuation-dialog-title"
+          >
+            <h2 id="continuation-dialog-title">{t("jobDetail.continuation.dialogTitle")}</h2>
+            <p>{t("jobDetail.continuation.dialogBody")}</p>
+            <div className="form-grid continuation-dialog-budget">
+              {([
+                ["generations", "jobDetail.continuation.generations", 1, 32],
+                ["trials", "jobDetail.continuation.trials", 2, 5000],
+                ["providerTurns", "jobDetail.continuation.providerTurns", 0, 128],
+                ["minutes", "jobDetail.continuation.minutes", 1, 1440],
+              ] as const).map(([key, label, minimum, maximum]) => (
+                <label key={key} className="form-field">
+                  <span>{t(label)}</span>
+                  <input
+                    type="number"
+                    min={minimum}
+                    max={maximum}
+                    step="1"
+                    disabled={Boolean(job.exploration_budget) || (key === "providerTurns" && !optimizerUsesModelAccess(job.optimizer_strategy))}
+                    value={continuationBudget[key]}
+                    onChange={(event) => setContinuationBudget((current) => ({
+                      ...current,
+                      [key]: event.target.value,
+                    }))}
+                  />
+                </label>
+              ))}
+            </div>
+            {optimizerUsesModelAccess(job.optimizer_strategy)
+              && (job.llm_access_mode ?? (job.llm_provider === "dronedream" ? "platform" : "byok")) === "byok" ? (
+                <label className="form-field">
+                  <span>{t("jobDetail.continuation.freshKey")}</span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={continuationApiKey}
+                    onChange={(event) => setContinuationApiKey(event.target.value)}
+                  />
+                </label>
+              ) : null}
+            <p className="continuation-dialog-warning">
+              {t("jobDetail.continuation.costWarning")}
+            </p>
+            <label className="continuation-dialog-consent">
+              <input
+                type="checkbox"
+                checked={continuationConfirmed}
+                onChange={(event) => setContinuationConfirmed(event.target.checked)}
+              />
+              <span>{t("jobDetail.continuation.confirmation")}</span>
+            </label>
+            {continuationError ? <p className="form-error" role="alert">{continuationError}</p> : null}
+            {continuationMutation.isError ? (
+              <p className="form-error" role="alert">
+                {continuationMutation.error instanceof ApiClientError
+                  ? continuationMutation.error.message
+                  : t("jobDetail.continuation.failed")}
+              </p>
+            ) : null}
+            <div className="confirm-dialog-actions">
+              <button
+                type="button"
+                className="btn"
+                disabled={continuationMutation.isPending}
+                onClick={() => {
+                  setContinuationApiKey("");
+                  setShowContinuationDialog(false);
+                  window.setTimeout(() => continuationReturnFocusRef.current?.focus(), 0);
+                }}
+              >
+                {t("jobDetail.continuation.close")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={!continuationConfirmed || continuationMutation.isPending}
+                onClick={submitContinuation}
+              >
+                {continuationMutation.isPending
+                  ? t("jobDetail.continuation.starting")
+                  : t("jobDetail.continuation.confirmStart")}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function QualificationAndExplorationCard({
+  job,
+  onContinue,
+}: {
+  job: Job;
+  onContinue: () => void;
+}) {
+  const { t } = useI18n();
+  if (job.job_kind === "continue_exploration") {
+    return (
+      <SectionCard
+        title={t("jobDetail.continuation.resultTitle")}
+        description={t("jobDetail.continuation.childIsolation")}
+      >
+        <div className="qualification-card-actions">
+          {job.continuation_parent_job_id ? (
+            <Link className="btn" to={`/jobs/${job.continuation_parent_job_id}`}>
+              {t("jobDetail.continuation.openFirstQualified")}
+            </Link>
+          ) : null}
+        </div>
+      </SectionCard>
+    );
+  }
+  if (!job.first_qualified_candidate_id) {
+    if (
+      job.status === "COMPLETED"
+      && job.optimization_outcome === "success"
+      && job.completion_policy === undefined
+    ) {
+      return (
+        <Alert tone="warning" title={t("jobDetail.continuation.legacyTitle")}>
+          {t("jobDetail.continuation.legacyBody")}
+        </Alert>
+      );
+    }
+    return null;
+  }
+  return (
+    <SectionCard
+      title={t("jobDetail.firstQualified.title")}
+      description={t("jobDetail.firstQualified.body")}
+    >
+      <ul className="kv-list qualification-receipt-list">
+        <li>
+          <span className="kv-key">{t("jobDetail.firstQualified.candidate")}</span>
+          <span className="kv-value"><code>{job.first_qualified_candidate_id}</code></span>
+        </li>
+        <li>
+          <span className="kv-key">{t("jobDetail.firstQualified.frozenAt")}</span>
+          <span className="kv-value">{formatDateTime(job.first_qualified_at ?? null)}</span>
+        </li>
+        <li>
+          <span className="kv-key">{t("jobDetail.firstQualified.providerTurns")}</span>
+          <span className="kv-value">
+            {t("jobDetail.firstQualified.providerTurnsValue", {
+              attempted: job.provider_turns_attempted ?? 0,
+              succeeded: job.provider_turns_succeeded ?? 0,
+            })}
+          </span>
+        </li>
+      </ul>
+      <div className="qualification-card-actions">
+        {job.continue_exploration_requested ? (
+          <span className="completion-policy-badge">
+            {t("jobDetail.continuation.alreadyStarted")}
+          </span>
+        ) : (
+          <button type="button" className="btn btn-primary" onClick={onContinue}>
+            {t("jobDetail.continuation.openDialog")}
+          </button>
+        )}
+        <span className="form-hint">{t("jobDetail.firstQualified.immutable")}</span>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -782,6 +1126,28 @@ function ExecutionBackendCard({ job }: { job: Job }) {
           </span>
         </li>
         <li>
+          <span className="kv-key">{t("jobDetail.completionPolicy")}</span>
+          <span className="kv-value">
+            {job.completion_policy === "exploration_budget_stop"
+              ? t("jobDetail.completionPolicy.explorationBudget")
+              : job.completion_policy === "first_qualified_stop"
+                ? t("jobDetail.completionPolicy.firstQualified")
+                : t("jobDetail.completionPolicy.legacy")}
+          </span>
+        </li>
+        {job.provider_turn_cap !== undefined ? (
+          <li>
+            <span className="kv-key">{t("jobDetail.providerTurnBudget")}</span>
+            <span className="kv-value">
+              {t("jobDetail.providerTurnBudgetValue", {
+                attempted: job.provider_turns_attempted ?? 0,
+                succeeded: job.provider_turns_succeeded ?? 0,
+                cap: job.provider_turn_cap,
+              })}
+            </span>
+          </li>
+        ) : null}
+        <li>
           <span className="kv-key">{t("jobDetail.trialsPerCandidate")}</span>
           <span className="kv-value">{job.trials_per_candidate}</span>
         </li>
@@ -939,10 +1305,33 @@ function StatusSpecificTop({
     );
   }
   if (job.status === "COMPLETED") {
+    if (
+      job.optimization_outcome === "exploration_improved"
+      || job.optimization_outcome === "exploration_no_improvement"
+      || job.optimization_outcome === "exploration_budget_exhausted"
+    ) {
+      const messageKey = job.optimization_outcome === "exploration_improved"
+        ? "jobDetail.continuation.improved"
+        : job.optimization_outcome === "exploration_no_improvement"
+          ? "jobDetail.continuation.noImprovement"
+          : "jobDetail.continuation.budgetExhausted";
+      return (
+        <Alert
+          tone={job.optimization_outcome === "exploration_improved" ? "success" : "warning"}
+          title={t("jobDetail.continuation.resultTitle")}
+        >
+          {t(messageKey)}
+        </Alert>
+      );
+    }
     if (job.optimization_outcome === "success") {
       return (
-        <Alert tone="success" title={t("jobDetail.acceptanceSatisfied")}>
-          {t("jobDetail.acceptanceSatisfiedBody")}
+        <Alert tone="success" title={t(job.first_qualified_candidate_id
+          ? "jobDetail.firstQualified.title"
+          : "jobDetail.acceptanceSatisfied")}>
+          {t(job.first_qualified_candidate_id
+            ? "jobDetail.firstQualified.body"
+            : "jobDetail.acceptanceSatisfiedBody")}
         </Alert>
       );
     }
@@ -1074,17 +1463,27 @@ function BestParametersSection({
   const baselineWon = report.best_candidate_id === job.baseline_candidate_id;
   const recommendationValidated = reportHasValidatedRecommendation(job, report);
   const diagnosticFallback = !recommendationValidated;
+  const isContinuation = job.job_kind === "continue_exploration";
+  const isFirstQualified = Boolean(job.first_qualified_candidate_id);
   return (
     <SectionCard
       title={diagnosticFallback
         ? t("jobDetail.diagnosticParameters")
-        : t("jobDetail.bestParameters")}
+        : isContinuation
+          ? t("jobDetail.continuation.resultTitle")
+          : isFirstQualified
+            ? t("jobDetail.firstQualified.parametersTitle")
+            : t("jobDetail.bestParameters")}
       description={
         diagnosticFallback
           ? t("jobDetail.diagnosticParametersDescription")
-          : baselineWon
-          ? t("jobDetail.baselineWinnerDescription")
-          : t("jobDetail.optimizerWinnerDescription")
+          : isContinuation
+            ? t("jobDetail.continuation.parametersDescription")
+            : isFirstQualified
+              ? t("jobDetail.firstQualified.parametersDescription")
+              : baselineWon
+                ? t("jobDetail.baselineWinnerDescription")
+                : t("jobDetail.optimizerWinnerDescription")
       }
     >
       <div className="best-parameters-head">
@@ -1097,9 +1496,13 @@ function BestParametersSection({
         >
           {diagnosticFallback
             ? t("jobDetail.noValidatedWinner")
-            : baselineWon
-              ? t("jobDetail.baselineWinner")
-              : t("jobDetail.optimizerWinner")}
+            : isContinuation
+              ? t("jobDetail.continuation.validatedCandidate")
+              : isFirstQualified
+                ? t("jobDetail.firstQualified.candidateTag")
+                : baselineWon
+                  ? t("jobDetail.baselineWinner")
+                  : t("jobDetail.optimizerWinner")}
         </span>
         <code className="candidate-id">{report.best_candidate_id}</code>
       </div>

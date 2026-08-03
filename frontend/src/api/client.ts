@@ -34,6 +34,7 @@ import type {
   DeleteUserExperiencePreferencesResponse,
   JobUpdateRequest,
   JobRerunRequest,
+  ContinueExplorationRequest,
   JobReport,
   PaginatedBatchJobs,
   JobStatus,
@@ -734,6 +735,25 @@ export const apiClient = {
       requireRuntimeLiveness: true,
       idempotentMutation: true,
     });
+  },
+
+  async continueExploration(
+    jobId: string,
+    controlVersion: number,
+    req: ContinueExplorationRequest,
+  ): Promise<Job> {
+    const qs = buildQuery({ control_version: controlVersion });
+    return request<Job>(
+      `/jobs/${encodeURIComponent(jobId)}/continue-exploration${qs}`,
+      {
+        method: "POST",
+        body: JSON.stringify(req),
+      },
+      {
+        requireRuntimeLiveness: true,
+        idempotentMutation: true,
+      },
+    );
   },
 
   async compareJobs(jobIds: string[]): Promise<JobCompareResponse> {

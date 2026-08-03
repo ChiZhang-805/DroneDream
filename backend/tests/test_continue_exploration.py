@@ -216,6 +216,8 @@ def test_preregistered_continuation_budget_cannot_drift_at_confirmation(
             exploration_budget=_budget(),
         ),
     )
+    assert parent["continue_exploration_requested"] is False
+    assert parent["exploration_budget"] == _budget()
     from app.services import jobs as job_service
 
     monkeypatch.setattr(job_service, "candidate_is_publishable", lambda _candidate: True)

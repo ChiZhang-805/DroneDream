@@ -128,6 +128,44 @@ describe("apiClient envelope handling", () => {
     );
   });
 
+  it("binds a continuation child request to the viewed parent control version", async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: { id: "job_child", status: "QUEUED" },
+          error: null,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await apiClient.continueExploration("job/parent", 7, {
+      budget: {
+        additional_generation_cap: 3,
+        additional_trial_cap: 24,
+        additional_provider_turn_cap: 8,
+        additional_time_budget_seconds: 1800,
+      },
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/api/v1/jobs/job%2Fparent/continue-exploration?control_version=7",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          budget: {
+            additional_generation_cap: 3,
+            additional_trial_cap: 24,
+            additional_provider_turn_cap: 8,
+            additional_time_budget_seconds: 1800,
+          },
+        }),
+      }),
+    );
+  });
+
   it("loads runtime capability preflight metadata", async () => {
     mockFetchOnce({
       success: true,

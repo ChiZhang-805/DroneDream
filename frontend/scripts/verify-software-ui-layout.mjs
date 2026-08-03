@@ -38,6 +38,8 @@ process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 const cases = [
   { id: "desktop-en", locale: "en", viewport: { width: 1440, height: 1000 } },
   { id: "desktop-zh", locale: "zh-CN", viewport: { width: 1440, height: 1000 } },
+  { id: "tablet-en", locale: "en", viewport: { width: 760, height: 900 } },
+  { id: "tablet-zh", locale: "zh-CN", viewport: { width: 760, height: 900 } },
   { id: "mobile-en", locale: "en", viewport: { width: 390, height: 844 } },
   { id: "mobile-zh", locale: "zh-CN", viewport: { width: 390, height: 844 } },
 ].filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
@@ -633,7 +635,15 @@ async function verifyTrackAndScenario(page, testCase) {
   });
   assert(track.switcher && track.actions && track.visual && track.data);
   assert(track.switcher.bottom <= track.visual.top + 1);
-  assert(closeEnough(track.switcher.right, track.visual.right, 2));
+  if (testCase.viewport.width >= 1000) {
+    assert(closeEnough(track.switcher.right, track.visual.right, 2));
+  } else {
+    assert(
+      track.switcher.left >= track.visual.left - 1
+        && track.switcher.right <= track.visual.right + 1,
+      `${testCase.id}: track view switcher escaped the visual column`,
+    );
+  }
   assert(track.actions.bottom <= track.data.top + 1);
   assert(track.data.left - track.visual.right <= 12);
   assert.equal(track.documentScrollWidth, track.documentWidth);
@@ -714,6 +724,66 @@ async function verifyTrackAndScenario(page, testCase) {
   const scenarioImage = await screenshot(page, testCase.id, "scenario");
 
   await actions.last().click();
+  const constraintsPanel = page.locator(".wizard-panel:not([hidden])");
+  const completionPolicy = constraintsPanel.locator(".completion-policy-card");
+  await completionPolicy.waitFor();
+  const continuationToggle = completionPolicy.locator('input[type="checkbox"]');
+  assert.equal(await continuationToggle.isChecked(), false);
+  await continuationToggle.check();
+  const continuationBudget = completionPolicy.locator(".completion-policy-budget");
+  await continuationBudget.waitFor();
+  const completion = await completionPolicy.evaluate((element) => {
+    const policyBounds = element.getBoundingClientRect();
+    const panel = element.closest(".wizard-panel");
+    if (!(panel instanceof HTMLElement)) {
+      throw new Error("Completion policy is not inside the active wizard panel");
+    }
+    const panelBounds = panel.getBoundingClientRect();
+    const budget = element.querySelector(".completion-policy-budget");
+    const inputs = Array.from(element.querySelectorAll('input[type="number"]'));
+    const providerTurns = element.querySelector("#exploration_additional_provider_turns");
+    return {
+      policy: {
+        left: policyBounds.left,
+        right: policyBounds.right,
+        top: policyBounds.top,
+        bottom: policyBounds.bottom,
+        scrollWidth: element.scrollWidth,
+        clientWidth: element.clientWidth,
+      },
+      panel: {
+        left: panelBounds.left,
+        right: panelBounds.right,
+        top: panelBounds.top,
+        bottom: panelBounds.bottom,
+      },
+      budgetVisible: budget instanceof HTMLElement
+        && getComputedStyle(budget).display !== "none",
+      numberInputCount: inputs.length,
+      allInputsInsideCard: inputs.every((input) => {
+        const bounds = input.getBoundingClientRect();
+        return bounds.left >= policyBounds.left - 1 && bounds.right <= policyBounds.right + 1;
+      }),
+      providerTurnsDisabled: providerTurns instanceof HTMLInputElement
+        && providerTurns.disabled,
+      providerTurnsValue: providerTurns instanceof HTMLInputElement
+        ? providerTurns.value
+        : null,
+      documentWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+    };
+  });
+  assert(completion.budgetVisible, `${testCase.id}: continuation budget is hidden`);
+  assert.equal(completion.numberInputCount, 4);
+  assert(completion.allInputsInsideCard, `${testCase.id}: continuation field escaped its card`);
+  assert.equal(completion.providerTurnsDisabled, true);
+  assert.equal(completion.providerTurnsValue, "0");
+  assert(completion.policy.left >= completion.panel.left - 1);
+  assert(completion.policy.right <= completion.panel.right + 1);
+  assert(completion.policy.scrollWidth <= completion.policy.clientWidth + 1);
+  assert.equal(completion.documentScrollWidth, completion.documentWidth);
+  const completionImage = await screenshot(page, testCase.id, "completion-policy");
+
   await actions.last().click();
   const parameterPreview = page.locator(".review-parameter-preview");
   await parameterPreview.waitFor();
@@ -786,6 +856,7 @@ async function verifyTrackAndScenario(page, testCase) {
   return {
     track: { ...track, image: trackImage },
     scenario: { ...scenario, image: scenarioImage },
+    completionPolicy: { ...completion, image: completionImage },
     parameterWheel: { ...parameterWheel, image: parameterImage },
   };
 }

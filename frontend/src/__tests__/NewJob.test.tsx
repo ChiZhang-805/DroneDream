@@ -686,6 +686,52 @@ describe("NewJob experiment wizard", () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
+  it("defaults to first-qualified stop and preregisters bounded exploration without starting it", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createJob")
+      .mockResolvedValue({ id: "job_first_qualified" } as Job);
+    renderPage();
+    openStep(/Constraints & budget/i);
+
+    expect(screen.getAllByText("First qualified, then stop")[0]).toBeVisible();
+    fireEvent.click(screen.getByLabelText(/Prepare an optional exploration budget/i));
+    fireEvent.change(screen.getByLabelText(/Extra generations/i), {
+      target: { value: "3" },
+    });
+    fireEvent.change(screen.getByLabelText(/Extra trials/i), {
+      target: { value: "48" },
+    });
+    fireEvent.change(screen.getByLabelText(/Extra time/i), {
+      target: { value: "45" },
+    });
+    createExperiment();
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
+    expect(createSpy.mock.calls[0][0]).toMatchObject({
+      completion_policy: "first_qualified_stop",
+      continue_exploration_after_qualified: true,
+      exploration_budget: {
+        additional_generation_cap: 3,
+        additional_trial_cap: 48,
+        additional_provider_turn_cap: 0,
+        additional_time_budget_seconds: 2700,
+      },
+    });
+  });
+
+  it("never erases a continuation preregistration to fit an old backend", async () => {
+    const createSpy = vi.spyOn(apiClient, "createJob").mockRejectedValue(
+      new ApiClientError("INVALID_INPUT", "Unknown exploration_budget field", null, 422),
+    );
+    renderPage();
+    openStep(/Constraints & budget/i);
+    fireEvent.click(screen.getByLabelText(/Prepare an optional exploration budget/i));
+    createExperiment();
+
+    expect(await screen.findByText(/experiment could not be created.*INVALID_INPUT/i)).toBeVisible();
+    expect(createSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("applies scenario presets and validates obstacle geometry", async () => {
     const createSpy = vi
       .spyOn(apiClient, "createJob")
