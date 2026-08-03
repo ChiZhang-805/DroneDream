@@ -19,8 +19,10 @@ from app.orchestration.cognitive_budget import (
     CognitiveTriggerEvaluation,
     CognitiveTurnAttempt,
     CognitiveTurnBlocked,
+    CognitiveTurnPending,
     begin_cognitive_turn,
     finish_cognitive_turn,
+    recover_existing_cognitive_turn,
     sha256_json,
     sha256_text,
 )
@@ -237,6 +239,17 @@ def _run_review_turn(
     if len(user.encode("utf-8")) > settings.llm_max_prompt_bytes:
         return None, None, f"{role}_prompt_too_large"
     model = job.openai_model or _DEFAULT_MODEL
+    turn_index = 3 if role == "diagnosis" else 4
+    recovered_turn = recover_existing_cognitive_turn(
+        db,
+        job,
+        generation_index=generation_index,
+        turn_index=turn_index,
+    )
+    if recovered_turn == "pending":
+        raise CognitiveTurnPending()
+    if recovered_turn == "consumed":
+        return None, None, f"{role}_turn_consumed_without_replayable_result"
     effective_client = client
     if effective_client is None:
         api_key = load_job_api_key(db, job)
@@ -254,7 +267,7 @@ def _run_review_turn(
         db,
         job,
         generation_index=generation_index,
-        turn_index=3 if role == "diagnosis" else 4,
+        turn_index=turn_index,
         turn_role=role,
         trigger_reasons=trigger_reasons,
         model_snapshot=model,

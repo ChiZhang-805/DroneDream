@@ -3164,6 +3164,9 @@ def test_harness_first_qualified_stop_uses_zero_provider_turns(llm_ctx):
     with ctx["db_module"].SessionLocal() as db:
         job = db.get(ctx["models"].Job, job_id)
         job.first_qualified_candidate_id = "frozen-qualified-candidate"
+        # A preset continuation is an intent to create a child Job. It must
+        # never resume provider turns inside the immutable parent.
+        job.continue_exploration_requested = True
         db.commit()
         db.refresh(job)
 

@@ -264,6 +264,47 @@ def rerun_job(
     return gate.complete(response, resource_type="job", resource_id=job.id)
 
 
+@router.post("/jobs/{job_id}/continue-exploration")
+def continue_exploration(
+    job_id: str,
+    req: schemas.ContinueExplorationRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
+) -> dict[str, object]:
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.continue_exploration",
+        idempotency_key=idempotency_key,
+        payload={
+            "job_id": job_id,
+            "control_version": control_version,
+            "request": req.model_dump(mode="json"),
+        },
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        child = job_service.continue_exploration(
+            db,
+            job_id,
+            req,
+            user=user,
+            expected_control_version=control_version,
+            commit=False,
+        )
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    response = ok(_job_payload_with_alias(job_service.to_job_schema(child)))
+    return gate.complete(response, resource_type="job", resource_id=child.id)
+
+
 @router.post("/jobs/{job_id}/cancel")
 def cancel_job(
     job_id: str,

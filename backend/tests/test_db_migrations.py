@@ -725,7 +725,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0021 (head)"]
+    assert heads == ["20260804_0022 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -810,8 +810,19 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "'harness_cognitive_turn_delete_authorizations'"
             ).fetchall()
         }
+        continuation_parent_is_unique = any(
+            row[2] == 1
+            and [
+                column[2]
+                for column in connection.execute(
+                    f"PRAGMA index_info('{row[1]}')"
+                ).fetchall()
+            ]
+            == ["continuation_parent_job_id"]
+            for row in connection.execute("PRAGMA index_list('jobs')").fetchall()
+        )
 
-    assert version == ("20260804_0021",)
+    assert version == ("20260804_0022",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
@@ -837,6 +848,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
     assert cognitive_authorization_tables == {
         "harness_cognitive_turn_delete_authorizations"
     }
+    assert continuation_parent_is_unique is True
 
 
 def test_postgresql_first_qualified_migration_emits_immutable_guard(

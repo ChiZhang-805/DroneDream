@@ -861,11 +861,18 @@ def test_llm_harness_expired_claim_cannot_duplicate_generation(
 
         with ctx["db_module"].SessionLocal() as db:
             assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == []
-        assert client.calls == 3
+        assert client.calls == 1
 
         release_first_call.set()
         stale_worker.join(timeout=10)
         assert not stale_worker.is_alive(), "stale finalizer did not exit"
+        # The stale plan/revision responses remain charged but cannot be
+        # adopted after their finalization fence is lost. A later finalizer
+        # continues through explicit deterministic fallbacks without replaying
+        # either provider turn.
+        with ctx["db_module"].SessionLocal() as db:
+            assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == []
+        assert client.calls == 2
     finally:
         release_first_call.set()
         ctx["aggregation"].set_llm_client_override(None)
@@ -890,9 +897,11 @@ def test_llm_harness_expired_claim_cannot_duplicate_generation(
         )
         event_types = [event.event_type for event in job.events]
         assert event_types.count("generation_dispatched") == 1
-        assert event_types.count("harness_budget_plan_accepted") == 1
+        assert event_types.count("harness_budget_plan_accepted") == 0
+        assert event_types.count("harness_budget_plan_fallback") == 1
+        assert event_types.count("harness_plan_revision_accepted") == 1
         assert event_types.count("harness_multi_tool_execution_result") == 1
-        assert client.calls == 3
+        assert client.calls == 2
         assert "job_failed" not in event_types
 
 

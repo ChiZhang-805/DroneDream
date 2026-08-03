@@ -174,6 +174,10 @@ class BatchJob(Base):
 class Job(Base):
     __tablename__ = "jobs"
     __table_args__ = (
+        UniqueConstraint(
+            "continuation_parent_job_id",
+            name="uq_jobs_continuation_parent_job_id",
+        ),
         CheckConstraint(
             "provider_turn_cap >= 0 AND provider_turn_cap <= 128",
             name="ck_jobs_provider_turn_cap",

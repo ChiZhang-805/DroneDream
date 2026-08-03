@@ -69,6 +69,9 @@ ConstraintOperator = Literal["lt", "lte", "gt", "gte", "eq"]
 RobustAggregation = Literal["mean", "worst", "cvar", "percentile"]
 OptimizationOutcome = Literal[
     "success",
+    "exploration_improved",
+    "exploration_no_improvement",
+    "exploration_budget_exhausted",
     "max_iterations_reached",
     "no_usable_candidate",
     "simulator_unavailable",
@@ -87,7 +90,7 @@ StarterExperienceTemplateKey = Literal[
     "first-circle@1",
     "light-wind-circle@1",
 ]
-CompletionPolicy = Literal["first_qualified_stop"]
+CompletionPolicy = Literal["first_qualified_stop", "exploration_budget_stop"]
 JobKind = Literal["primary", "continue_exploration"]
 CognitiveTurnRole = Literal["plan", "revision", "diagnosis", "critic"]
 CognitiveTurnOutcomeStatus = Literal[
@@ -96,6 +99,7 @@ CognitiveTurnOutcomeStatus = Literal[
     "invalid_schema",
     "source_drift",
     "cancelled",
+    "indeterminate",
 ]
 
 MAX_PROVIDER_TURNS_PER_JOB = 128
@@ -274,6 +278,41 @@ class LLMProviderConfig(_Strict):
                 raise ValueError("llm base_url cannot contain credentials, query, or fragment")
         if self.provider != "openai" and (not self.model or not self.base_url):
             raise ValueError("non-openai providers require model and base_url")
+        return self
+
+
+class ContinueExplorationBudget(_Strict):
+    """Additional, independently bounded budget for a continuation child Job."""
+
+    additional_generation_cap: Annotated[int, Field(ge=1, le=32)]
+    additional_trial_cap: Annotated[int, Field(ge=2, le=5000)]
+    additional_provider_turn_cap: Annotated[
+        int,
+        Field(ge=0, le=MAX_PROVIDER_TURNS_PER_JOB),
+    ]
+    additional_time_budget_seconds: Annotated[int, Field(ge=60, le=86_400)]
+
+    @model_validator(mode="after")
+    def _validate_worst_case_provider_budget(self) -> ContinueExplorationBudget:
+        worst_case = self.additional_generation_cap * 4
+        if self.additional_provider_turn_cap > worst_case:
+            raise ValueError(
+                "additional_provider_turn_cap cannot exceed four turns per generation"
+            )
+        return self
+
+
+class ContinueExplorationRequest(_Strict):
+    """Explicit post-qualification authorization for one continuation child."""
+
+    budget: ContinueExplorationBudget
+    openai: OpenAIConfig | None = None
+    llm: LLMProviderConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_provider_shape(self) -> ContinueExplorationRequest:
+        if self.openai is not None and self.llm is not None:
+            raise ValueError("provide either openai or llm, not both")
         return self
 
 
@@ -771,6 +810,8 @@ class JobCreateRequest(_Strict):
         int,
         Field(ge=0, le=MAX_PROVIDER_TURNS_PER_JOB),
     ] = 64
+    continue_exploration_after_qualified: bool = False
+    exploration_budget: ContinueExplorationBudget | None = None
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
     openai: OpenAIConfig | None = None
     llm: LLMProviderConfig | None = None
@@ -819,10 +860,28 @@ class JobCreateRequest(_Strict):
             raise ValueError("parameter_space requires at least one enabled, unlocked parameter")
         if self.openai is not None and self.llm is not None:
             raise ValueError("provide either openai or llm, not both")
+        if self.continue_exploration_after_qualified != (self.exploration_budget is not None):
+            raise ValueError(
+                "continue_exploration_after_qualified and exploration_budget must be set together"
+            )
         if self.optimizer_strategy == "llm_harness" and not any(
             case.enabled and case.holdout for case in self.scenario_suite.cases
         ):
             raise ValueError("llm_harness requires at least one enabled holdout scenario case")
+        if self.optimizer_strategy in {"gpt", "llm_harness"}:
+            worst_case_provider_turns = min(
+                MAX_PROVIDER_TURNS_PER_JOB,
+                self.max_iterations * 4,
+            )
+            if "provider_turn_cap" not in self.model_fields_set:
+                self.provider_turn_cap = min(
+                    self.provider_turn_cap,
+                    worst_case_provider_turns,
+                )
+            elif self.provider_turn_cap > worst_case_provider_turns:
+                raise ValueError(
+                    "provider_turn_cap cannot exceed four turns per generation"
+                )
         scenario_trial_count = sum(
             len(case.seeds) for case in self.scenario_suite.cases if case.enabled
         )
@@ -905,6 +964,7 @@ class Job(BaseModel):
     first_qualified_candidate_id: str | None = None
     first_qualified_at: datetime | None = None
     continue_exploration_requested: bool = False
+    exploration_budget: ContinueExplorationBudget | None = None
     continuation_parent_job_id: str | None = None
     continuation_root_job_id: str | None = None
     holdout_policy_version: str = "legacy-visible-v0"
@@ -1303,6 +1363,8 @@ __all__ = [
     "CognitiveTurnOutcomeStatus",
     "CognitiveTurnRole",
     "CompletionPolicy",
+    "ContinueExplorationBudget",
+    "ContinueExplorationRequest",
     "FirstQualifiedAccounting",
     "FirstQualifiedFreezeReceipt",
     "HarnessCognitiveTurnOutcome",

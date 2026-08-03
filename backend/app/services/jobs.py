@@ -8,6 +8,8 @@ process — never inside a request handler.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
 from collections import Counter
@@ -37,6 +39,10 @@ from app.orchestration.attempt_evidence import (
     record_accepted_trial_attempt_outcome,
 )
 from app.orchestration.events import record_event
+from app.orchestration.first_qualified import (
+    FirstQualifiedFreezeError,
+    require_first_qualified_freeze_receipt,
+)
 from app.orchestration.winner_freeze import (
     WinnerFreezeError,
     require_winner_freeze_receipt,
@@ -384,6 +390,11 @@ def _create_job_from_config(
     batch_id: str | None = None,
     persist_objective_config: bool | None = None,
     persist_scenario_suite: bool | None = None,
+    job_kind: schemas.JobKind = "primary",
+    continuation_parent_job_id: str | None = None,
+    continuation_root_job_id: str | None = None,
+    holdout_policy_version: str = "legacy-visible-v0",
+    holdout_contract: dict[str, object] | None = None,
 ) -> models.Job:
     _validate_real_cli_scenario_effect_contract(req)
     try:
@@ -488,7 +499,18 @@ def _create_job_from_config(
         trials_per_candidate=req.trials_per_candidate,
         max_total_trials=req.max_total_trials,
         completion_policy=req.completion_policy,
+        job_kind=job_kind,
         provider_turn_cap=req.provider_turn_cap,
+        continue_exploration_requested=req.continue_exploration_after_qualified,
+        exploration_budget_json=(
+            req.exploration_budget.model_dump(mode="json")
+            if req.exploration_budget is not None
+            else None
+        ),
+        continuation_parent_job_id=continuation_parent_job_id,
+        continuation_root_job_id=continuation_root_job_id,
+        holdout_policy_version=holdout_policy_version,
+        holdout_contract_json=holdout_contract,
         target_rmse=req.acceptance_criteria.target_rmse,
         target_max_error=req.acceptance_criteria.target_max_error,
         min_pass_rate=req.acceptance_criteria.min_pass_rate,
@@ -526,7 +548,14 @@ def _create_job_from_config(
                 "max_iterations": req.max_iterations,
                 "trials_per_candidate": req.trials_per_candidate,
                 "completion_policy": req.completion_policy,
+                "job_kind": job_kind,
                 "provider_turn_cap": req.provider_turn_cap,
+                "continue_exploration_requested": (
+                    req.continue_exploration_after_qualified
+                ),
+                "continuation_parent_job_id": continuation_parent_job_id,
+                "continuation_root_job_id": continuation_root_job_id,
+                "holdout_policy_version": holdout_policy_version,
                 "baseline_parameters": req.baseline_parameters.model_dump(mode="json"),
                 "vehicle_profile": req.vehicle_profile.model_dump(mode="json"),
                 "parameter_catalog_version": req.parameter_catalog_version,
@@ -583,6 +612,12 @@ def create_job(
     user: models.User | None = None,
     commit: bool = True,
 ) -> models.Job:
+    if req.completion_policy != "first_qualified_stop":
+        raise JobServiceError(
+            "INVALID_COMPLETION_POLICY",
+            "exploration_budget_stop is reserved for server-created continuation Jobs.",
+            http_status=422,
+        )
     _validate_parameter_space(req)
     _validate_gpt_request(req)
     job = _create_job_from_config(db, user=_resolve_user(db, user), req=req, source_job_id=None)
@@ -702,6 +737,12 @@ def rerun_job(
 ) -> models.Job:
     resolved_user = _resolve_user(db, user)
     source = get_job(db, job_id, user=resolved_user)
+    if source.job_kind == "continue_exploration":
+        raise JobServiceError(
+            "CONTINUATION_RERUN_NOT_ALLOWED",
+            "Restart exploration from its immutable parent instead of rerunning a continuation.",
+            http_status=409,
+        )
     rerun_suffix = " (rerun)"
     rerun_display_name = (
         f"{source.display_name[: 255 - len(rerun_suffix)]}{rerun_suffix}"
@@ -819,6 +860,465 @@ def rerun_job(
     return new_job
 
 
+_CONTINUATION_HOLDOUT_POLICY = "continuation-independent-holdout-v1"
+_CONTINUATION_HOLDOUT_SCHEMA = "dronedream.continuation-holdout-contract/v1"
+
+
+def _sha256_json(value: object) -> str:
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _independent_continuation_suite(
+    source: models.Job,
+    *,
+    freeze: models.FirstQualifiedFreezeReceipt,
+) -> tuple[schemas.ScenarioSuiteConfig, dict[str, object]]:
+    """Derive a preregistered holdout split without reading parent outcomes."""
+
+    if not isinstance(source.scenario_suite_json, dict):
+        raise JobServiceError(
+            "CONTINUATION_HOLDOUT_REQUIRED",
+            "Continue exploration requires an explicit persisted scenario suite.",
+            http_status=409,
+        )
+    source_suite = schemas.ScenarioSuiteConfig(**source.scenario_suite_json)
+    used_seeds = {
+        seed
+        for case in source_suite.cases
+        if case.enabled
+        for seed in case.seeds
+    }
+    child_cases: list[schemas.ScenarioCaseConfig] = []
+    derivations: list[dict[str, object]] = []
+    enabled_holdout_count = 0
+    for case in source_suite.cases:
+        payload = case.model_dump(mode="json")
+        if not case.enabled or not case.holdout:
+            child_cases.append(schemas.ScenarioCaseConfig(**payload))
+            continue
+        enabled_holdout_count += 1
+        replacement: list[int] = []
+        for ordinal, _old_seed in enumerate(case.seeds):
+            counter = 0
+            while True:
+                material = (
+                    f"{_CONTINUATION_HOLDOUT_POLICY}|{freeze.evidence_id}|"
+                    f"{case.id}|{ordinal}|{counter}"
+                ).encode()
+                derived = int.from_bytes(hashlib.sha256(material).digest()[:4], "big")
+                derived &= 0x7FFF_FFFF
+                if derived not in used_seeds:
+                    used_seeds.add(derived)
+                    replacement.append(derived)
+                    break
+                counter += 1
+        payload["seeds"] = replacement
+        child_cases.append(schemas.ScenarioCaseConfig(**payload))
+        derivations.append(
+            {
+                "case_id": case.id,
+                "seed_count": len(replacement),
+                "derivation": "sha256-policy-receipt-case-ordinal-counter",
+            }
+        )
+    if enabled_holdout_count == 0:
+        raise JobServiceError(
+            "CONTINUATION_HOLDOUT_REQUIRED",
+            "Continue exploration requires at least one enabled holdout case.",
+            http_status=409,
+        )
+    child_suite = schemas.ScenarioSuiteConfig(
+        cases=child_cases,
+        common_random_numbers=source_suite.common_random_numbers,
+    )
+    suite_payload = child_suite.model_dump(mode="json")
+    contract: dict[str, object] = {
+        "schema": _CONTINUATION_HOLDOUT_SCHEMA,
+        "policy_version": _CONTINUATION_HOLDOUT_POLICY,
+        "parent_job_id": source.id,
+        "parent_first_qualified_receipt_id": freeze.id,
+        "parent_holdout_contract_sha256": freeze.holdout_contract_sha256,
+        "scenario_suite_sha256": _sha256_json(suite_payload),
+        "derivations": derivations,
+        "parent_holdout_outcomes_visible_to_child_model": False,
+        "child_holdout_outcomes_visible_during_selection": False,
+    }
+    contract["contract_sha256"] = _sha256_json(contract)
+    return child_suite, contract
+
+
+def _continuation_parameter_inputs(
+    source: models.Job,
+    *,
+    candidate: models.CandidateParameterSet,
+) -> tuple[schemas.BaselineParameters, list[schemas.ParameterSelection]]:
+    """Use the immutable parent result as the child baseline, within frozen bounds."""
+
+    raw_parameters = candidate.parameter_json
+    if not isinstance(raw_parameters, dict):
+        raise JobServiceError(
+            "FIRST_QUALIFIED_EVIDENCE_INVALID",
+            "The first-qualified candidate parameter payload is malformed.",
+            http_status=409,
+        )
+    by_upper = {str(key).strip().upper(): value for key, value in raw_parameters.items()}
+    legacy = schemas.BaselineParameters(**(source.baseline_parameter_json or {})).model_dump()
+    for key in schemas.BaselineParameters.model_fields:
+        value = by_upper.get(key.upper())
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            continue
+        numeric = float(value)
+        if math.isfinite(numeric):
+            legacy[key] = numeric
+    baseline = schemas.BaselineParameters(**legacy)
+
+    selections: list[schemas.ParameterSelection] = []
+    for raw in source.parameter_space_json or []:
+        if not isinstance(raw, dict):
+            raise JobServiceError(
+                "FIRST_QUALIFIED_EVIDENCE_INVALID",
+                "The persisted parameter space is malformed.",
+                http_status=409,
+            )
+        payload = dict(raw)
+        name = str(payload.get("name", "")).strip().upper()
+        value = by_upper.get(name)
+        if payload.get("enabled", True) is True:
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                raise JobServiceError(
+                    "FIRST_QUALIFIED_EVIDENCE_INVALID",
+                    f"The first-qualified candidate is missing parameter {name}.",
+                    http_status=409,
+                )
+            numeric = float(value)
+            if not math.isfinite(numeric):
+                raise JobServiceError(
+                    "FIRST_QUALIFIED_EVIDENCE_INVALID",
+                    f"The first-qualified candidate parameter {name} is not finite.",
+                    http_status=409,
+                )
+            payload["baseline"] = numeric
+        selections.append(schemas.ParameterSelection(**payload))
+    return baseline, selections
+
+
+def _continuation_provider_config(
+    source: models.Job,
+    request: schemas.ContinueExplorationRequest,
+) -> tuple[schemas.OpenAIConfig | None, schemas.LLMProviderConfig | None]:
+    """Validate a fresh child binding without reading or copying the parent secret."""
+
+    if source.optimizer_strategy not in {"gpt", "llm_harness"}:
+        if request.openai is not None or request.llm is not None:
+            raise JobServiceError(
+                "CONTINUATION_PROVIDER_NOT_USED",
+                "This optimizer does not use a model credential.",
+                http_status=422,
+            )
+        if request.budget.additional_provider_turn_cap != 0:
+            raise JobServiceError(
+                "CONTINUATION_PROVIDER_BUDGET_INVALID",
+                "A non-model continuation must use zero provider turns.",
+                http_status=422,
+            )
+        return None, None
+    if request.budget.additional_provider_turn_cap < 1:
+        raise JobServiceError(
+            "CONTINUATION_PROVIDER_BUDGET_INVALID",
+            "A model-guided continuation requires at least one provider turn.",
+            http_status=422,
+        )
+    provided = request.llm or request.openai
+    if provided is None:
+        raise JobServiceError(
+            "CONTINUATION_FRESH_GRANT_REQUIRED",
+            "Continue exploration requires a fresh model credential or platform grant.",
+            http_status=422,
+        )
+    if isinstance(provided, schemas.OpenAIConfig):
+        if source.llm_access_mode != "byok" or source.llm_provider not in {None, "openai"}:
+            raise JobServiceError(
+                "CONTINUATION_PROVIDER_MISMATCH",
+                "The continuation provider must match the parent Job.",
+                http_status=409,
+            )
+        model = provided.model or source.openai_model
+        if source.openai_model and model != source.openai_model:
+            raise JobServiceError(
+                "CONTINUATION_MODEL_MISMATCH",
+                "The continuation model snapshot must match the parent Job.",
+                http_status=409,
+            )
+        return schemas.OpenAIConfig(api_key=provided.api_key, model=model), None
+
+    if provided.access_mode != source.llm_access_mode:
+        raise JobServiceError(
+            "CONTINUATION_PROVIDER_MISMATCH",
+            "The continuation access mode must match the parent Job.",
+            http_status=409,
+        )
+    expected_provider = "dronedream" if provided.access_mode == "platform" else source.llm_provider
+    if expected_provider and provided.provider != expected_provider:
+        raise JobServiceError(
+            "CONTINUATION_PROVIDER_MISMATCH",
+            "The continuation provider must match the parent Job.",
+            http_status=409,
+        )
+    model = provided.model or source.openai_model
+    if provided.access_mode == "byok" and source.openai_model and model != source.openai_model:
+        raise JobServiceError(
+            "CONTINUATION_MODEL_MISMATCH",
+            "The continuation model snapshot must match the parent Job.",
+            http_status=409,
+        )
+    expected_base_url = (source.llm_base_url or "").rstrip("/") or None
+    if provided.access_mode == "byok" and provided.base_url != expected_base_url:
+        raise JobServiceError(
+            "CONTINUATION_PROVIDER_MISMATCH",
+            "The continuation provider endpoint must match the parent Job.",
+            http_status=409,
+        )
+    return None, schemas.LLMProviderConfig(
+        access_mode=provided.access_mode,
+        provider=provided.provider,
+        api_key=provided.api_key,
+        platform_grant=provided.platform_grant,
+        model=(model if provided.access_mode == "byok" else None),
+        base_url=(expected_base_url if provided.access_mode == "byok" else None),
+    )
+
+
+def continue_exploration(
+    db: Session,
+    job_id: str,
+    request: schemas.ContinueExplorationRequest,
+    *,
+    user: models.User | None = None,
+    expected_control_version: int | None = None,
+    commit: bool = True,
+) -> models.Job:
+    """Create one bounded child Job without mutating the parent's frozen result."""
+
+    resolved_user = _resolve_user(db, user)
+    parent = get_job(db, job_id, user=resolved_user)
+    expected_version = _expected_control_version(
+        resource_kind="Job",
+        resource_id=parent.id,
+        current_version=parent.control_version,
+        supplied_version=expected_control_version,
+    )
+    existing_child = db.scalar(
+        select(models.Job).where(models.Job.continuation_parent_job_id == parent.id)
+    )
+    if existing_child is not None:
+        raise JobServiceError(
+            "CONTINUATION_ALREADY_EXISTS",
+            f"Job {parent.id} already has continuation child {existing_child.id}.",
+            http_status=409,
+        )
+    requested_budget = request.budget.model_dump(mode="json")
+    if (
+        parent.continue_exploration_requested
+        and parent.exploration_budget_json is not None
+        and parent.exploration_budget_json != requested_budget
+    ):
+        raise JobServiceError(
+            "CONTINUATION_BUDGET_MISMATCH",
+            "The confirmed continuation budget differs from the preregistered parent budget.",
+            http_status=409,
+        )
+    if parent.status != "COMPLETED":
+        raise JobServiceError(
+            "CONTINUATION_PARENT_NOT_COMPLETE",
+            "Continue exploration is available only after the parent Job is complete.",
+            http_status=409,
+        )
+    if parent.first_qualified_freeze is None:
+        raise JobServiceError(
+            "CONTINUATION_FIRST_QUALIFIED_REQUIRED",
+            "Continue exploration requires an immutable first-qualified receipt.",
+            http_status=409,
+        )
+    try:
+        require_first_qualified_freeze_receipt(parent.first_qualified_freeze, job=parent)
+    except FirstQualifiedFreezeError as exc:
+        raise JobServiceError(
+            "FIRST_QUALIFIED_EVIDENCE_INVALID",
+            "The parent first-qualified receipt failed verification.",
+            http_status=409,
+        ) from exc
+    incumbent = next(
+        (
+            candidate
+            for candidate in parent.candidates
+            if candidate.id == parent.first_qualified_candidate_id
+        ),
+        None,
+    )
+    if incumbent is None or not candidate_is_publishable(incumbent):
+        raise JobServiceError(
+            "FIRST_QUALIFIED_EVIDENCE_INVALID",
+            "The parent first-qualified candidate is not publishable.",
+            http_status=409,
+        )
+
+    child_suite, holdout_contract = _independent_continuation_suite(
+        parent,
+        freeze=parent.first_qualified_freeze,
+    )
+    baseline, parameter_space = _continuation_parameter_inputs(
+        parent,
+        candidate=incumbent,
+    )
+    scenario_trial_count = sum(
+        len(case.seeds) for case in child_suite.cases if case.enabled
+    )
+    minimum_trial_cap = scenario_trial_count * 2
+    if request.budget.additional_trial_cap < minimum_trial_cap:
+        raise JobServiceError(
+            "CONTINUATION_TRIAL_BUDGET_TOO_SMALL",
+            (
+                "The continuation trial cap must cover the incumbent and at least "
+                f"one new candidate ({minimum_trial_cap} Trials required)."
+            ),
+            http_status=422,
+        )
+    fresh_openai, fresh_llm = _continuation_provider_config(parent, request)
+    suffix = " (continue exploration)"
+    display_name = (
+        f"{parent.display_name[: 255 - len(suffix)]}{suffix}"
+        if parent.display_name
+        else None
+    )
+    child_request = schemas.JobCreateRequest(
+        track_type=parent.track_type,  # type: ignore[arg-type]
+        start_point=schemas.StartPoint(x=parent.start_point_x, y=parent.start_point_y),
+        altitude_m=parent.altitude_m,
+        wind=schemas.WindVector(
+            north=parent.wind_north,
+            east=parent.wind_east,
+            south=parent.wind_south,
+            west=parent.wind_west,
+        ),
+        sensor_noise_level=parent.sensor_noise_level,  # type: ignore[arg-type]
+        objective_profile=parent.objective_profile,  # type: ignore[arg-type]
+        reference_track=(
+            [schemas.TrackPoint(**point) for point in parent.reference_track_json]
+            if parent.reference_track_json
+            else None
+        ),
+        advanced_scenario_config=(
+            schemas.AdvancedScenarioConfig(**parent.advanced_scenario_config_json)
+            if parent.advanced_scenario_config_json
+            else None
+        ),
+        display_name=display_name,
+        baseline_parameters=baseline,
+        vehicle_profile=schemas.VehicleProfileConfig(**(parent.vehicle_profile_json or {})),
+        parameter_catalog_version=parent.parameter_catalog_version,
+        parameter_space=parameter_space,
+        objective_config=schemas.ObjectiveConfig(**(parent.objective_config_json or {})),
+        scenario_suite=child_suite,
+        simulator_backend=parent.simulator_backend_requested,  # type: ignore[arg-type]
+        optimizer_strategy=parent.optimizer_strategy,  # type: ignore[arg-type]
+        max_iterations=request.budget.additional_generation_cap,
+        trials_per_candidate=parent.trials_per_candidate,
+        max_total_trials=request.budget.additional_trial_cap,
+        completion_policy="exploration_budget_stop",
+        provider_turn_cap=request.budget.additional_provider_turn_cap,
+        acceptance_criteria=schemas.AcceptanceCriteria(
+            target_rmse=parent.target_rmse,
+            target_max_error=parent.target_max_error,
+            min_pass_rate=parent.min_pass_rate,
+        ),
+        openai=fresh_openai,
+        llm=fresh_llm,
+    )
+    _validate_parameter_space(child_request)
+    _validate_gpt_request(child_request)
+    claimed = db.execute(
+        update(models.Job)
+        .where(
+            models.Job.id == parent.id,
+            models.Job.user_id == resolved_user.id,
+            models.Job.control_version == expected_version,
+            models.Job.status == "COMPLETED",
+            models.Job.first_qualified_candidate_id == parent.first_qualified_candidate_id,
+        )
+        .values(
+            control_version=models.Job.control_version + 1,
+            continue_exploration_requested=True,
+            exploration_budget_json=requested_budget,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(claimed, "rowcount", None) != 1:
+        db.expire_all()
+        current = db.get(models.Job, parent.id)
+        _raise_control_version_conflict(
+            resource_kind="Job",
+            resource_id=parent.id,
+            expected_version=expected_version,
+            current_version=current.control_version if current is not None else None,
+        )
+    db.expire(parent)
+    db.refresh(parent)
+    root_id = parent.continuation_root_job_id or parent.id
+    child = _create_job_from_config(
+        db,
+        user=resolved_user,
+        req=child_request,
+        source_job_id=parent.id,
+        persist_objective_config=True,
+        persist_scenario_suite=True,
+        job_kind="continue_exploration",
+        continuation_parent_job_id=parent.id,
+        continuation_root_job_id=root_id,
+        holdout_policy_version=_CONTINUATION_HOLDOUT_POLICY,
+        holdout_contract=holdout_contract,
+    )
+    child.exploration_budget_json = requested_budget
+    record_event(
+        db,
+        parent.id,
+        "continue_exploration_child_created",
+        {
+            "child_job_id": child.id,
+            "budget": request.budget.model_dump(mode="json"),
+            "holdout_policy_version": _CONTINUATION_HOLDOUT_POLICY,
+        },
+    )
+    record_event(
+        db,
+        child.id,
+        "continue_exploration_started",
+        {
+            "parent_job_id": parent.id,
+            "root_job_id": root_id,
+            "first_qualified_candidate_id": parent.first_qualified_candidate_id,
+            "first_qualified_receipt_id": parent.first_qualified_freeze.id,
+            "budget": request.budget.model_dump(mode="json"),
+            "holdout_contract_sha256": holdout_contract["contract_sha256"],
+            "fresh_child_credential_binding": (
+                fresh_openai is not None or fresh_llm is not None
+            ),
+        },
+    )
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+    db.refresh(child)
+    return child
+
+
 def _aggregate_batch_progress(children: list[models.Job]) -> tuple[schemas.BatchProgress, str]:
     by_status = {
         "CREATED": 0,
@@ -899,6 +1399,12 @@ def create_batch(
 ) -> models.BatchJob:
     resolved_user = _resolve_user(db, user)
     for child_req in req.jobs:
+        if child_req.completion_policy != "first_qualified_stop":
+            raise JobServiceError(
+                "INVALID_COMPLETION_POLICY",
+                "Batch clients cannot create continuation completion policies directly.",
+                http_status=422,
+            )
         _validate_parameter_space(child_req)
         _validate_gpt_request(child_req)
     batch = models.BatchJob(
@@ -1360,6 +1866,18 @@ def delete_job(
             f"Active job {job.id} cannot be deleted.",
             http_status=409,
         )
+    continuation_child_id = db.scalar(
+        select(models.Job.id).where(models.Job.continuation_parent_job_id == job.id)
+    )
+    if continuation_child_id is not None:
+        raise JobServiceError(
+            "JOB_HAS_CONTINUATION_CHILD",
+            (
+                f"Job {job.id} remains the immutable recovery parent for "
+                f"continuation child {continuation_child_id}; delete the child first."
+            ),
+            http_status=409,
+        )
     claimed = db.execute(
         update(models.Job)
         .where(
@@ -1634,6 +2152,11 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         first_qualified_candidate_id=job.first_qualified_candidate_id,
         first_qualified_at=job.first_qualified_at,
         continue_exploration_requested=job.continue_exploration_requested,
+        exploration_budget=(
+            schemas.ContinueExplorationBudget(**job.exploration_budget_json)
+            if job.exploration_budget_json is not None
+            else None
+        ),
         continuation_parent_job_id=job.continuation_parent_job_id,
         continuation_root_job_id=job.continuation_root_job_id,
         holdout_policy_version=job.holdout_policy_version,

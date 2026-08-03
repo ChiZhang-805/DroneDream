@@ -17,6 +17,7 @@ import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -51,6 +52,7 @@ TurnOutcomeStatus = Literal[
     "invalid_schema",
     "source_drift",
     "cancelled",
+    "indeterminate",
 ]
 
 _EMPTY_SHA256 = hashlib.sha256(b"[]").hexdigest()
@@ -89,10 +91,79 @@ class CognitiveTurnBlocked(RuntimeError):
         self.code = code
 
 
+class CognitiveTurnPending(CognitiveTurnBlocked):
+    """Another worker still owns an attempted provider turn."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "turn_outcome_pending",
+            "This cognitive turn is already in flight; finalization must be deferred.",
+        )
+
+
 @dataclass(frozen=True)
 class CognitiveTurnAttempt:
     receipt_id: str
     source_commit: str
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def recover_existing_cognitive_turn(
+    db: Session,
+    job: models.Job,
+    *,
+    generation_index: int,
+    turn_index: int,
+) -> Literal["new", "pending", "consumed"]:
+    """Classify a durable turn without ever replaying provider network I/O.
+
+    A receipt without an outcome is normally an in-flight call, so a reclaimed
+    finalizer must defer. Once the configured request/retry window plus its
+    safety margin has elapsed, a missing outcome is frozen as indeterminate and
+    remains charged to the Job cap. A later finalizer may then use an explicit
+    deterministic fallback, but it must not call the provider again.
+    """
+
+    receipt = db.scalar(
+        select(models.HarnessCognitiveTurnReceipt).where(
+            models.HarnessCognitiveTurnReceipt.job_id == job.id,
+            models.HarnessCognitiveTurnReceipt.generation_index == generation_index,
+            models.HarnessCognitiveTurnReceipt.turn_index == turn_index,
+        )
+    )
+    if receipt is None:
+        return "new"
+    if receipt.outcome is not None:
+        return "consumed"
+
+    from app.config import get_settings
+
+    settings = get_settings()
+    outcome_deadline = _as_utc(receipt.attempted_at) + timedelta(
+        seconds=(
+            settings.llm_request_timeout_seconds * (settings.llm_max_retries + 1)
+            + 60
+        )
+    )
+    if datetime.now(timezone.utc) < outcome_deadline:
+        return "pending"
+
+    finish_cognitive_turn(
+        db,
+        job,
+        CognitiveTurnAttempt(
+            receipt_id=receipt.id,
+            source_commit=receipt.source_commit,
+        ),
+        status="indeterminate",
+        error_code="provider_outcome_indeterminate",
+    )
+    return "consumed"
 
 
 @dataclass(frozen=True)
@@ -255,10 +326,10 @@ def begin_cognitive_turn(
             "unsupported_cognitive_policy",
             "The Job cognitive policy is not supported by this Engine Pack.",
         )
-    if job.first_qualified_candidate_id is not None and not job.continue_exploration_requested:
+    if job.first_qualified_candidate_id is not None:
         raise CognitiveTurnBlocked(
             "first_qualified_stop",
-            "A first-qualified result already exists and exploration is not enabled.",
+            "A first-qualified parent never resumes provider turns; exploration uses a child Job.",
         )
     if generation_index != job.current_generation + 1:
         raise CognitiveTurnBlocked(
@@ -308,9 +379,11 @@ def begin_cognitive_turn(
         )
     )
     if existing_turn is not None:
+        if existing_turn.outcome is None:
+            raise CognitiveTurnPending()
         raise CognitiveTurnBlocked(
-            "turn_already_attempted",
-            "This cognitive turn was already attempted; it cannot be replayed.",
+            "turn_result_not_replayable",
+            "This cognitive turn was consumed and cannot be replayed.",
         )
     source_commit = resolve_source_commit()
     duplicate = db.scalar(
@@ -679,12 +752,14 @@ __all__ = [
     "CognitiveTriggerEvaluation",
     "CognitiveTurnAttempt",
     "CognitiveTurnBlocked",
+    "CognitiveTurnPending",
     "begin_cognitive_turn",
     "canonical_json",
     "cognitive_turn_counts",
     "empty_tool_outputs_sha256",
     "evaluate_adaptive_triggers",
     "finish_cognitive_turn",
+    "recover_existing_cognitive_turn",
     "resolve_source_commit",
     "sha256_json",
     "sha256_text",

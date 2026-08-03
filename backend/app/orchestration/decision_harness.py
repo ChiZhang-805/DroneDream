@@ -16,7 +16,7 @@ import math
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeAlias, cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,9 +26,11 @@ from app.config import get_settings
 from app.optimization.experimental_types import ExperimentalOptimizerStrategy
 from app.orchestration.cognitive_budget import (
     CognitiveTurnBlocked,
+    CognitiveTurnPending,
     begin_cognitive_turn,
     empty_tool_outputs_sha256,
     finish_cognitive_turn,
+    recover_existing_cognitive_turn,
     sha256_json,
 )
 from app.orchestration.events import record_event
@@ -83,7 +85,7 @@ from app.orchestration.llm_parameter_proposer import (
 
 logger = logging.getLogger("drone_dream.orchestration.decision_harness")
 
-HarnessDispatchStrategy = HarnessToolId
+HarnessDispatchStrategy: TypeAlias = HarnessToolId
 HarnessDecisionSource = Literal["model", "deterministic_fallback"]
 
 _DEFAULT_MODEL = "gpt-4.1"
@@ -1443,6 +1445,26 @@ def select_optimizer_budget_plan(
         )
     prompt_sha256 = _sha256_text(f"{system}\n{user}")
     plan_schema = generation_plan_schema(opportunity)
+    recovered_turn = recover_existing_cognitive_turn(
+        db,
+        job,
+        generation_index=generation,
+        turn_index=1,
+    )
+    if recovered_turn == "pending":
+        raise CognitiveTurnPending()
+    if recovered_turn == "consumed":
+        return _budget_plan_fallback(
+            db,
+            job,
+            decision_id=decision_id,
+            generation=generation,
+            opportunity=opportunity,
+            reason="cognitive_turn_consumed_without_replayable_result",
+            evidence_sha256=evidence_sha256,
+            prompt_sha256=prompt_sha256,
+            model=chosen_model,
+        )
     effective_client = client
     if effective_client is None:
         api_key = load_job_api_key(db, job)
@@ -1774,6 +1796,33 @@ def select_plan_revision(
         proposals,
         maximum_dispatch_candidates=maximum_dispatch_candidates,
     )
+    revision_evidence = {
+        "compiled_plan": compiled.model_dump(mode="json"),
+        "proposals": [proposal.model_dump(mode="json") for proposal in proposals],
+        "maximum_dispatch_candidates": maximum_dispatch_candidates,
+    }
+    recovered_turn = recover_existing_cognitive_turn(
+        db,
+        job,
+        generation_index=compiled.generation,
+        turn_index=2,
+    )
+    if recovered_turn == "pending":
+        raise CognitiveTurnPending()
+    if recovered_turn == "consumed":
+        return _revision_fallback(
+            db,
+            job,
+            decision_id=plan_decision.decision_id,
+            revision_id=revision_id,
+            generation=compiled.generation,
+            compiled_plan_sha256=compiled.plan_sha256,
+            proposals=proposals,
+            maximum_dispatch_candidates=maximum_dispatch_candidates,
+            reason="cognitive_turn_consumed_without_replayable_result",
+            prompt_sha256=prompt_sha256,
+            model=plan_decision.model,
+        )
     effective_client = client
     if effective_client is None:
         api_key = load_job_api_key(db, job)
@@ -1815,11 +1864,6 @@ def select_plan_revision(
             "revision_prompt_version": HARNESS_PLAN_REVISION_PROMPT_VERSION,
         },
     )
-    revision_evidence = {
-        "compiled_plan": compiled.model_dump(mode="json"),
-        "proposals": [proposal.model_dump(mode="json") for proposal in proposals],
-        "maximum_dispatch_candidates": maximum_dispatch_candidates,
-    }
     attempt = begin_cognitive_turn(
         db,
         job,

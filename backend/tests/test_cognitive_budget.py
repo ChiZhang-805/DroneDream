@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -154,9 +155,9 @@ def test_attempt_is_durable_before_network_and_cannot_be_replayed(
     with Session(cognitive_db.engine) as db:
         job = db.get(models.Job, job_id)
         assert job is not None
-        with pytest.raises(cognitive_budget.CognitiveTurnBlocked) as replay:
+        with pytest.raises(cognitive_budget.CognitiveTurnPending) as replay:
             _attempt(cognitive_budget, db, job, turn_index=1)
-        assert replay.value.code == "turn_already_attempted"
+        assert replay.value.code == "turn_outcome_pending"
 
         status = cognitive_budget.finish_cognitive_turn(
             db,
@@ -193,6 +194,56 @@ def test_attempt_is_durable_before_network_and_cannot_be_replayed(
         db.delete(job)
         db.commit()
         assert db.get(models.Job, job_id) is None
+
+
+def test_abandoned_attempt_becomes_indeterminate_without_replay(
+    cognitive_db,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("DRONEDREAM_SOURCE_COMMIT", "9" * 40)
+    models = cognitive_db.models
+    from app.orchestration import cognitive_budget
+
+    with Session(cognitive_db.engine) as db:
+        job = _create_harness_job(db, models, cognitive_db.schemas)
+        attempt = _attempt(cognitive_budget, db, job, turn_index=1)
+        assert (
+            cognitive_budget.recover_existing_cognitive_turn(
+                db,
+                job,
+                generation_index=1,
+                turn_index=1,
+            )
+            == "pending"
+        )
+        receipt = db.get(models.HarnessCognitiveTurnReceipt, attempt.receipt_id)
+        assert receipt is not None
+        future = cognitive_budget._as_utc(receipt.attempted_at) + timedelta(hours=1)
+        monkeypatch.setattr(
+            cognitive_budget,
+            "datetime",
+            SimpleNamespace(now=lambda tz: future.astimezone(tz or timezone.utc)),
+        )
+
+        assert (
+            cognitive_budget.recover_existing_cognitive_turn(
+                db,
+                job,
+                generation_index=1,
+                turn_index=1,
+            )
+            == "consumed"
+        )
+        db.refresh(receipt)
+        assert receipt.outcome is not None
+        assert receipt.outcome.status == "indeterminate"
+        assert receipt.outcome.error_code == "provider_outcome_indeterminate"
+        assert job.provider_turns_attempted == 1
+        assert job.provider_turns_succeeded == 0
+        with pytest.raises(cognitive_budget.CognitiveTurnBlocked) as replay:
+            _attempt(cognitive_budget, db, job, turn_index=1)
+        assert replay.value.code == "turn_result_not_replayable"
+        assert job.provider_turns_attempted == 1
 
 
 def test_source_drift_is_recorded_and_not_counted_as_success(

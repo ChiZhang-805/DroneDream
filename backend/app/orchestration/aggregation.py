@@ -95,6 +95,7 @@ from app.orchestration.acceptance import (
     criteria_for_job,
     evaluate_candidate,
 )
+from app.orchestration.cognitive_budget import CognitiveTurnPending
 from app.orchestration.events import record_event
 from app.orchestration.first_qualified import (
     FirstQualifiedFreezeError,
@@ -1355,6 +1356,23 @@ def _is_eligible(candidate: models.CandidateParameterSet) -> bool:
     return candidate_is_publishable(candidate)
 
 
+def _candidate_selection_rank_key(
+    candidate: models.CandidateParameterSet,
+) -> tuple[float, ...]:
+    dispatch_ordinal = candidate.dispatch_ordinal
+    if dispatch_ordinal is None or dispatch_ordinal < 1:
+        dispatch_ordinal = 9_223_372_036_854_775_807
+    return (
+        *selection_order_key(
+            candidate.aggregated_metric_json,
+            candidate.aggregated_score,
+        ),
+        float(0 if not candidate.is_baseline else 1),
+        float(candidate.generation_index),
+        float(dispatch_ordinal),
+    )
+
+
 def _rank_and_select_best(
     candidates: list[models.CandidateParameterSet],
 ) -> models.CandidateParameterSet | None:
@@ -1372,17 +1390,7 @@ def _rank_and_select_best(
     if not scorable:
         return None
 
-    scorable.sort(
-        key=lambda c: (
-            *selection_order_key(
-                c.aggregated_metric_json,
-                c.aggregated_score,
-            ),
-            0 if not c.is_baseline else 1,
-            c.generation_index,
-            c.id,
-        )
-    )
+    scorable.sort(key=_candidate_selection_rank_key)
 
     for rank, candidate in enumerate(scorable, start=1):
         candidate.rank_in_job = rank
@@ -1697,7 +1705,9 @@ def finalize_job_if_ready(
         else []
     )
     try:
-        if qualified or job.first_qualified_candidate_id is not None:
+        if job.completion_policy == "first_qualified_stop" and (
+            qualified or job.first_qualified_candidate_id is not None
+        ):
             _acquire_finalization_commit_fence(db, finalization_claim)
             receipt = freeze_first_qualified_candidate(
                 db,
@@ -1915,6 +1925,44 @@ def finalize_job_if_ready(
     return True
 
 
+def _exploration_time_budget_exhausted(job: models.Job) -> bool:
+    if job.job_kind != "continue_exploration":
+        return False
+    budget = job.exploration_budget_json
+    if not isinstance(budget, dict):
+        return True
+    seconds = budget.get("additional_time_budget_seconds")
+    if isinstance(seconds, bool) or not isinstance(seconds, int) or seconds < 60:
+        return True
+    started = job.started_at or job.queued_at or job.created_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return _now() >= started.astimezone(timezone.utc) + timedelta(seconds=seconds)
+
+
+def _is_validated_exploration_improvement(
+    job: models.Job,
+    candidate: models.CandidateParameterSet,
+    criteria: AcceptanceCriteria,
+) -> bool:
+    """Require a strict objective improvement over the immutable child baseline."""
+
+    if candidate.is_baseline or not candidate_is_publishable(candidate):
+        return False
+    if not evaluate_candidate(candidate, criteria).passed:
+        return False
+    baseline = next((item for item in job.candidates if item.is_baseline), None)
+    if baseline is None or not candidate_is_publishable(baseline):
+        return False
+    return selection_order_key(
+        candidate.aggregated_metric_json,
+        candidate.aggregated_score,
+    ) < selection_order_key(
+        baseline.aggregated_metric_json,
+        baseline.aggregated_score,
+    )
+
+
 def _determine_terminal_state(
     job: models.Job,
     best: models.CandidateParameterSet,
@@ -1928,6 +1976,12 @@ def _determine_terminal_state(
     """
 
     result = evaluate_candidate(best, criteria)
+    if job.job_kind == "continue_exploration":
+        if _is_validated_exploration_improvement(job, best, criteria):
+            return "exploration_improved", "COMPLETED", None
+        if _exploration_time_budget_exhausted(job):
+            return "exploration_budget_exhausted", "COMPLETED", None
+        return "exploration_no_improvement", "COMPLETED", None
     if result.passed:
         return "success", "COMPLETED", None
     # No criteria set → treat completion as success by convention.
@@ -1975,7 +2029,14 @@ def _try_continue_iterative_optimizer(
         candidate.source_type == "optimizer" and candidate_is_publishable(candidate)
         for candidate in candidates
     )
-    if passed and not needs_verified_optimizer:
+    if job.job_kind == "continue_exploration":
+        validated_improvement = any(
+            _is_validated_exploration_improvement(job, candidate, criteria)
+            for candidate in candidates
+        )
+        if validated_improvement or _exploration_time_budget_exhausted(job):
+            return False
+    elif passed and not needs_verified_optimizer:
         return False
     if job.current_generation >= job.max_iterations:
         return False
@@ -2270,6 +2331,28 @@ def finalize_ready_jobs(db: Session, *, limit: int = 20) -> list[str]:
                 "job %s finalization claim was reclaimed; stale worker exited",
                 job.id,
             )
+        except CognitiveTurnPending:
+            db.rollback()
+            db.expire_all()
+            pending_job = db.get(models.Job, job.id)
+            if pending_job is None or pending_job.status == "CANCELLED":
+                continue
+            try:
+                _release_partial_finalization_claim(
+                    db,
+                    pending_job,
+                    finalization_claim=claim,
+                )
+                logger.info(
+                    "job %s finalization deferred for an in-flight cognitive turn",
+                    job.id,
+                )
+            except FinalizationClaimLost:
+                db.rollback()
+                logger.info(
+                    "job %s cognitive defer lost its finalization claim",
+                    job.id,
+                )
         except Exception as exc:
             logger.exception("job %s finalization crashed", job.id)
             db.rollback()

@@ -168,6 +168,14 @@ def _apply_sqlite_lightweight_migrations() -> None:
         )
         conn.execute(
             text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS "
+                "ux_jobs_continuation_parent_job_id "
+                "ON jobs(continuation_parent_job_id) "
+                "WHERE continuation_parent_job_id IS NOT NULL"
+            )
+        )
+        conn.execute(
+            text(
                 "CREATE INDEX IF NOT EXISTS "
                 "ix_jobs_continuation_root_job_id "
                 "ON jobs(continuation_root_job_id)"
