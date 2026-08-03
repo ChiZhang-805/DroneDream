@@ -5,6 +5,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -390,7 +391,22 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
     )
     profile = scenario_effects.compile_bundled_runtime_profile(request)
     assert profile is not None
-    client = executor.FakeOffboardClient()
+    class KeepaliveDemandingClient(executor.FakeOffboardClient):
+        gps_parameter_keepalive_observed = False
+
+        async def get_param_int(self, name: str) -> int:
+            if self.offboard_started and not self.gps_parameter_keepalive_observed:
+                required_count = len(self.setpoints) + 1
+                for _ in range(10_000):
+                    if len(self.setpoints) >= required_count:
+                        self.gps_parameter_keepalive_observed = True
+                        break
+                    await asyncio.sleep(0)
+                else:
+                    raise TimeoutError("GPS parameter readback received no Offboard keepalive")
+            return await super().get_param_int(name)
+
+    client = KeepaliveDemandingClient()
     client.battery_samples = [
         {"remaining_percent": 60.0, "voltage_v": 15.2},
         {"remaining_percent": 58.0, "voltage_v": 15.0},
@@ -444,6 +460,7 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
         "fix_type_name": "FIX_3D",
     }
     assert client.int_params["SIM_GPS_USED"] == 10
+    assert client.gps_parameter_keepalive_observed is True
     battery_value = artifact["records"][0]["evidence"]["verification"]["observations"][0]["value"]
     assert battery_value["takeoff_gate_parameters"]["SIM_BAT_MIN_PCT"]["applied"] == 100.0
     assert battery_value["takeoff_gate_parameters"]["SIM_BAT_DRAIN"]["applied"] == 86400.0
@@ -564,7 +581,8 @@ def test_battery_track_start_waits_for_telemetry_convergence() -> None:
 
     assert details["conditioning_sample_count"] == 4
     assert details["track_start_sample"]["remaining_percent"] == 74.0
-    assert client.setpoints == [hold, hold, hold, hold]
+    assert len(client.setpoints) >= 5
+    assert all(setpoint == hold for setpoint in client.setpoints)
     assert client.float_params["SIM_BAT_MIN_PCT"] == 0.0
     assert client.float_params["SIM_BAT_DRAIN"] == 300.0
 
@@ -573,7 +591,10 @@ def test_battery_track_start_keeps_offboard_setpoints_alive_during_slow_sample()
     class SlowBatteryClient(executor.FakeOffboardClient):
         async def sample_battery(self, timeout_seconds: float) -> dict[str, float]:
             del timeout_seconds
-            await asyncio.sleep(0.035)
+            # Avoid wall-clock scheduling assumptions on loaded Windows hosts:
+            # the sample becomes available only after three hold heartbeats.
+            while len(self.setpoints) < 3:
+                await asyncio.sleep(0)
             return {"remaining_percent": 74.0, "voltage_v": 15.8}
 
     client = SlowBatteryClient()
@@ -597,6 +618,52 @@ def test_battery_track_start_keeps_offboard_setpoints_alive_during_slow_sample()
 
     assert details["conditioning_sample_count"] == 1
     assert len(client.setpoints) >= 3
+    assert all(setpoint == hold for setpoint in client.setpoints)
+
+
+def test_battery_track_start_keeps_offboard_alive_during_parameter_readback() -> None:
+    class SlowParameterClient(executor.FakeOffboardClient):
+        require_parameter_keepalive = False
+        required_setpoint_count = 0
+
+        async def sample_battery(self, timeout_seconds: float) -> dict[str, float]:
+            del timeout_seconds
+            self.required_setpoint_count = len(self.setpoints) + 2
+            self.require_parameter_keepalive = True
+            return {"remaining_percent": 74.0, "voltage_v": 15.8}
+
+        async def get_param_float(self, name: str) -> float:
+            if self.require_parameter_keepalive:
+                for _ in range(10_000):
+                    if len(self.setpoints) >= self.required_setpoint_count:
+                        self.require_parameter_keepalive = False
+                        break
+                    await asyncio.sleep(0)
+                else:
+                    raise TimeoutError("parameter readback received no Offboard keepalive")
+            return await super().get_param_float(name)
+
+    client = SlowParameterClient()
+    hold = executor.Setpoint(0.0, 0.0, -3.0, 0.0)
+
+    details = asyncio.run(
+        executor._transition_battery_at_track_start(
+            client,
+            {
+                "target_track_start_percent": 70.0,
+                "voltage_sag": True,
+                "sag_drain_seconds": 300.0,
+                "no_sag_hold_drain_seconds": 86400.0,
+            },
+            {"pretrack_drain_seconds": 6.666666666666667},
+            hold_setpoint=hold,
+            rate_hz=100.0,
+            settle_timeout_seconds=1.0,
+        )
+    )
+
+    assert details["track_parameters"]["SIM_BAT_DRAIN"]["applied"] == 300.0
+    assert len(client.setpoints) >= client.required_setpoint_count
     assert all(setpoint == hold for setpoint in client.setpoints)
 
 
@@ -845,14 +912,21 @@ def test_executor_activates_wind_after_hover_and_before_track_entry(tmp_path: Pa
     profile = scenario_effects.compile_bundled_runtime_profile(request)
     assert profile is not None
     events: list[str] = []
+    wind_activation_started = threading.Event()
+    wind_keepalive_observed = threading.Event()
 
     class RecordingClient(executor.FakeOffboardClient):
         async def set_position_ned(self, setpoint: executor.Setpoint) -> None:
+            if wind_activation_started.is_set():
+                wind_keepalive_observed.set()
             if setpoint.north_m == 2.0:
                 events.append("track")
             await super().set_position_ned(setpoint)
 
     def activate_wind(**kwargs):
+        wind_activation_started.set()
+        if not wind_keepalive_observed.wait(timeout=1.0):
+            raise TimeoutError("wind activation received no Offboard keepalive")
         events.append("wind")
         value = {
             "linear_velocity_mps": kwargs["profile"]["linear_velocity_mps"],
@@ -877,9 +951,10 @@ def test_executor_activates_wind_after_hover_and_before_track_entry(tmp_path: Pa
 
     evidence_path = tmp_path / scenario_effects.RUNTIME_EVIDENCE_ARTIFACT_NAME
     timing_path = tmp_path / "offboard_timing.json"
+    client = RecordingClient()
     asyncio.run(
         executor.run_executor(
-            RecordingClient(),
+            client,
             [
                 executor.Setpoint(0.0, 0.0, -3.0, 0.0),
                 executor.Setpoint(2.0, 0.0, -3.0, 0.0),
@@ -904,6 +979,7 @@ def test_executor_activates_wind_after_hover_and_before_track_entry(tmp_path: Pa
     )
 
     assert events == ["wind", "track"]
+    assert wind_keepalive_observed.is_set()
     timing = json.loads(timing_path.read_text(encoding="utf-8"))
     assert timing["takeoff_stable_t"] <= timing["wind_activation"]["activation_t_s"]
     assert timing["wind_activation"]["activation_t_s"] <= timing["track_start_t"]

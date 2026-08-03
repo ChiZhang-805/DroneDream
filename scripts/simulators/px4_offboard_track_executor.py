@@ -28,10 +28,10 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 MAX_REFERENCE_TRACK_POINTS = 10_000
 MAX_SETPOINT_RATE_HZ = 100.0
@@ -42,6 +42,8 @@ MIN_HOVER_DURATION_SECONDS = 1.0
 MAX_HOVER_DURATION_SECONDS = 300.0
 BATTERY_TRACK_START_SETTLE_TIMEOUT_SECONDS = 15.0
 RUNTIME_EFFECT_SCHEMA_VERSION = "dronedream.scenario_runtime_effects.v1"
+
+_T = TypeVar("_T")
 
 
 def _require_runtime_details(
@@ -1214,6 +1216,32 @@ def _position_velocity_payload(
     }
 
 
+async def _await_with_setpoint_keepalive(
+    client: OffboardClientProtocol,
+    operation: Awaitable[_T],
+    *,
+    hold_setpoint: Setpoint,
+    rate_hz: float,
+) -> _T:
+    """Await a bounded control operation without starving PX4 Offboard input."""
+
+    if not math.isfinite(rate_hz) or rate_hz <= 0.0:
+        raise ValueError("Offboard keepalive rate must be finite and greater than zero")
+    operation_task = asyncio.ensure_future(operation)
+    try:
+        while not operation_task.done():
+            await client.set_position_ned(hold_setpoint)
+            if operation_task.done():
+                break
+            await asyncio.wait({operation_task}, timeout=1.0 / rate_hz)
+        return operation_task.result()
+    finally:
+        if not operation_task.done():
+            operation_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await operation_task
+
+
 async def _wait_for_takeoff_stability(
     client: OffboardClientProtocol,
     target: Setpoint,
@@ -1328,10 +1356,14 @@ async def _wait_for_takeoff_stability(
             down_m=commanded_down_m,
             yaw_deg=target.yaw_deg,
         )
-        await client.set_position_ned(commanded)
         try:
-            sample = await client.sample_position_velocity_ned(
-                min(telemetry_timeout_seconds, remaining)
+            sample = await _await_with_setpoint_keepalive(
+                client,
+                client.sample_position_velocity_ned(
+                    min(telemetry_timeout_seconds, remaining)
+                ),
+                hold_setpoint=commanded,
+                rate_hz=sample_rate_hz,
             )
         except BaseException as exc:
             if evidence["sample_count"] > 0 and time.monotonic() >= deadline:
@@ -1405,6 +1437,16 @@ async def _set_float_parameter_verified(
             f"PX4 parameter {name} readback mismatch: requested={value:g}, applied={applied:g}"
         )
     return {"before": before, "requested": value, "applied": applied}
+
+
+async def _set_float_parameters_verified(
+    client: OffboardClientProtocol,
+    values: dict[str, float],
+) -> dict[str, dict[str, float]]:
+    applied: dict[str, dict[str, float]] = {}
+    for name, value in values.items():
+        applied[name] = await _set_float_parameter_verified(client, name, value)
+    return applied
 
 
 async def _set_int_parameter_verified(
@@ -1524,23 +1566,12 @@ async def _sample_battery_while_holding(
     remaining = deadline - time.monotonic()
     if remaining <= 0.0:
         return None
-    sample_task = asyncio.create_task(client.sample_battery(min(5.0, remaining)))
-    try:
-        while not sample_task.done():
-            await client.set_position_ned(hold_setpoint)
-            remaining = deadline - time.monotonic()
-            if remaining <= 0.0:
-                return None
-            await asyncio.wait(
-                {sample_task},
-                timeout=min(1.0 / rate_hz, remaining),
-            )
-        return sample_task.result()
-    finally:
-        if not sample_task.done():
-            sample_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await sample_task
+    return await _await_with_setpoint_keepalive(
+        client,
+        client.sample_battery(min(5.0, remaining)),
+        hold_setpoint=hold_setpoint,
+        rate_hz=rate_hz,
+    )
 
 
 async def _transition_battery_at_track_start(
@@ -1611,10 +1642,12 @@ async def _transition_battery_at_track_start(
             "SIM_BAT_MIN_PCT": target,
             "SIM_BAT_DRAIN": float(profile["no_sag_hold_drain_seconds"]),
         }
-    transition_parameters = {
-        name: await _set_float_parameter_verified(client, name, value)
-        for name, value in transition_values.items()
-    }
+    transition_parameters = await _await_with_setpoint_keepalive(
+        client,
+        _set_float_parameters_verified(client, transition_values),
+        hold_setpoint=hold_setpoint,
+        rate_hz=rate_hz,
+    )
     return {
         **prepared,
         "conditioning_sample_count": len(conditioning_samples),
@@ -1695,6 +1728,7 @@ async def run_executor(
     armed = False
     offboard_started = False
     offboard_stopped = False
+    last_commanded_setpoint: Setpoint | None = None
     land_command_sent = False
     landing_confirmation_attempted = False
     runtime_failure: str | None = None
@@ -1790,6 +1824,7 @@ async def run_executor(
             yaw_deg=schedule[0].yaw_deg,
         )
         await client.set_position_ned(initial_hold)
+        last_commanded_setpoint = initial_hold
         takeoff_gate["initial_setpoint_ned"] = {
             "north_m": initial_hold.north_m,
             "east_m": initial_hold.east_m,
@@ -1821,17 +1856,23 @@ async def run_executor(
             vertical_speed_tolerance_m_s=takeoff_vertical_speed_tolerance_m_s,
             evidence=takeoff_gate,
         )
+        last_commanded_setpoint = schedule[0]
         timing["takeoff_stable_t"] = time.monotonic() - exec_start
         _log(log_path, "takeoff telemetry gate achieved stable hover")
 
         if isinstance(wind_profile, dict):
             activation_t_s = time.monotonic() - exec_start
             attempted_effect_sections.add("wind_activation")
-            wind_observation = await asyncio.to_thread(
-                wind_activator,
-                world=world,
-                profile=wind_profile,
-                activation_t_s=activation_t_s,
+            wind_observation = await _await_with_setpoint_keepalive(
+                client,
+                asyncio.to_thread(
+                    wind_activator,
+                    world=world,
+                    profile=wind_profile,
+                    activation_t_s=activation_t_s,
+                ),
+                hold_setpoint=schedule[0],
+                rate_hz=rate_hz,
             )
             if not isinstance(wind_observation, dict):
                 raise RuntimeError("post-hover wind activator returned invalid evidence")
@@ -1849,10 +1890,15 @@ async def run_executor(
 
         if isinstance(battery_profile, dict):
             attempted_effect_sections.add("battery")
-            battery_details = await _prepare_battery_profile(
+            battery_details = await _await_with_setpoint_keepalive(
                 client,
-                battery_profile,
-                takeoff_hold_seconds=max(1.0 / rate_hz, track_start / rate_hz),
+                _prepare_battery_profile(
+                    client,
+                    battery_profile,
+                    takeoff_hold_seconds=max(1.0 / rate_hz, track_start / rate_hz),
+                ),
+                hold_setpoint=schedule[0],
+                rate_hz=rate_hz,
             )
             battery_details["takeoff_gate_parameters"] = _require_runtime_details(
                 battery_takeoff_gate_parameters,
@@ -1900,10 +1946,15 @@ async def run_executor(
                             if desired_off
                             else int(gps_control["recovery_value"])
                         )
-                        verification = await _set_gps_availability_verified(
+                        verification = await _await_with_setpoint_keepalive(
                             client,
-                            satellites_used=target_satellites,
-                            unavailable=desired_off,
+                            _set_gps_availability_verified(
+                                client,
+                                satellites_used=target_satellites,
+                                unavailable=desired_off,
+                            ),
+                            hold_setpoint=last_commanded_setpoint or schedule[0],
+                            rate_hz=rate_hz,
                         )
                         gps_off = desired_off
                         gps_transitions.append(
@@ -1916,6 +1967,7 @@ async def run_executor(
                             }
                         )
             await client.set_position_ned(setpoint)
+            last_commanded_setpoint = setpoint
             now_t = time.monotonic() - exec_start
             if idx == track_start:
                 timing["track_start_t"] = now_t
@@ -1926,7 +1978,12 @@ async def run_executor(
                         battery_details,
                         label="battery control details",
                     )
-                    track_end_sample = await client.sample_battery(5.0)
+                    track_end_sample = await _await_with_setpoint_keepalive(
+                        client,
+                        client.sample_battery(5.0),
+                        hold_setpoint=setpoint,
+                        rate_hz=rate_hz,
+                    )
                     start_percent = float(
                         current_battery_details["track_start_sample"]["remaining_percent"]
                     )
@@ -1947,10 +2004,15 @@ async def run_executor(
                 gps_control_details,
                 label="GPS control details",
             )
-            verification = await _set_gps_availability_verified(
+            verification = await _await_with_setpoint_keepalive(
                 client,
-                satellites_used=int(gps_control["recovery_value"]),
-                unavailable=False,
+                _set_gps_availability_verified(
+                    client,
+                    satellites_used=int(gps_control["recovery_value"]),
+                    unavailable=False,
+                ),
+                hold_setpoint=last_commanded_setpoint or schedule[0],
+                rate_hz=rate_hz,
             )
             gps_control["restore"] = verification
             gps_control["restore_verified"] = True
@@ -2027,11 +2089,20 @@ async def run_executor(
             and not gps_reset_verified
         ):
             try:
-                restore = await _set_gps_availability_verified(
+                restore_operation = _set_gps_availability_verified(
                     client,
                     satellites_used=int(gps_control_details["recovery_value"]),
                     unavailable=False,
                 )
+                if offboard_started and not offboard_stopped:
+                    restore = await _await_with_setpoint_keepalive(
+                        client,
+                        restore_operation,
+                        hold_setpoint=last_commanded_setpoint or schedule[0],
+                        rate_hz=rate_hz,
+                    )
+                else:
+                    restore = await restore_operation
                 gps_control_details["restore"] = restore
                 gps_control_details["restore_verified"] = True
                 gps_off = False
