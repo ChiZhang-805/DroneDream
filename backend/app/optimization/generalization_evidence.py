@@ -86,6 +86,22 @@ class GeneralizationObjectiveGap(_FrozenModel):
             raise ValueError("objective improved flag is inconsistent")
         if self.degraded and self.improved:
             raise ValueError("an objective cannot improve and degrade simultaneously")
+        expected_relative = (
+            expected / abs(self.training_value)
+            if abs(self.training_value) > _FLOAT_EPSILON
+            else None
+        )
+        if (expected_relative is None) != (self.relative_degradation is None) or (
+            expected_relative is not None
+            and self.relative_degradation is not None
+            and not math.isclose(
+                self.relative_degradation,
+                expected_relative,
+                rel_tol=0.0,
+                abs_tol=_FLOAT_EPSILON,
+            )
+        ):
+            raise ValueError("objective relative degradation is inconsistent")
         return self
 
 
@@ -138,8 +154,47 @@ class CandidateGeneralizationEvidence(_FrozenModel):
             raise ValueError("configuration shift count exceeds validation cases")
         if self.disjoint_seed_case_count > self.validation_case_count:
             raise ValueError("disjoint seed count exceeds validation cases")
+        classified_case_count = (
+            self.novel_scenario_type_case_count
+            + self.configuration_shift_case_count
+            + self.disjoint_seed_case_count
+        )
+        if classified_case_count > self.validation_case_count:
+            raise ValueError("generalization shift counts exceed validation cases")
+        replicated_case_count = self.validation_case_count - classified_case_count
+        expected_axes: set[ShiftAxis] = set()
+        if replicated_case_count:
+            expected_axes.add("replicated_validation")
+        if self.disjoint_seed_case_count:
+            expected_axes.add("seed_shift")
+        if self.configuration_shift_case_count:
+            expected_axes.add("configuration_shift")
+        if self.novel_scenario_type_case_count:
+            expected_axes.add("scenario_type_shift")
+        if set(self.shift_axes) != expected_axes:
+            raise ValueError("generalization shift axes do not match case counts")
+        expected_claim_scope: ClaimScope = (
+            "mixed_shift_robustness"
+            if len(self.shift_axes) > 1
+            else cast(
+                ClaimScope,
+                {
+                    "replicated_validation": "repeatability",
+                    "seed_shift": "seed_robustness",
+                    "configuration_shift": "configuration_robustness",
+                    "scenario_type_shift": "scenario_type_robustness",
+                }[self.shift_axes[0]],
+            )
+        )
+        if self.claim_scope != expected_claim_scope:
+            raise ValueError("generalization claim scope does not match shift axes")
+        if self.validation_replicate_count < self.validation_case_count:
+            raise ValueError("validation replicate count cannot be smaller than case count")
         if self.validation_completed_trial_count > self.validation_trial_count:
             raise ValueError("completed validation Trial count exceeds actual count")
+        objective_metrics = [item.metric for item in self.objective_gaps]
+        if len(objective_metrics) != len(set(objective_metrics)):
+            raise ValueError("generalization objective gaps must be unique")
         if self.degraded_objective_count != sum(item.degraded for item in self.objective_gaps):
             raise ValueError("degraded objective count does not match objective gaps")
         if self.improved_objective_count != sum(item.improved for item in self.objective_gaps):
@@ -200,6 +255,26 @@ class CandidateGeneralizationEvidence(_FrozenModel):
                 raise ValueError("scalar-loss degradation is inconsistent")
         elif any(value is not None for value in scalar_fields):
             raise ValueError("scalar-loss evidence must be complete or absent")
+        expected_scalar_relative = (
+            scalar_loss_degradation / abs(training_scalar_loss)
+            if scalar_loss_degradation is not None
+            and training_scalar_loss is not None
+            and abs(training_scalar_loss) > _FLOAT_EPSILON
+            else None
+        )
+        if (expected_scalar_relative is None) != (
+            self.scalar_loss_relative_degradation is None
+        ) or (
+            expected_scalar_relative is not None
+            and self.scalar_loss_relative_degradation is not None
+            and not math.isclose(
+                self.scalar_loss_relative_degradation,
+                expected_scalar_relative,
+                rel_tol=0.0,
+                abs_tol=_FLOAT_EPSILON,
+            )
+        ):
+            raise ValueError("scalar-loss relative degradation is inconsistent")
         return self
 
 

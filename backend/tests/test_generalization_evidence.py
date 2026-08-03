@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -27,6 +28,21 @@ def _objective_config() -> schemas.ObjectiveConfig:
             ),
         ]
     )
+
+
+def _rehash_generalization_evidence(payload: dict[str, object]) -> dict[str, object]:
+    canonical = dict(payload)
+    canonical.pop("evidence_id", None)
+    payload["evidence_id"] = hashlib.sha256(
+        json.dumps(
+            canonical,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    return payload
 
 
 def test_seed_shift_receipt_is_direction_aware_and_content_addressed() -> None:
@@ -98,6 +114,45 @@ def test_seed_shift_receipt_is_direction_aware_and_content_addressed() -> None:
             validation_scalar_loss=0.31,
             scenario_suite_sha256="b" * 64,
         )
+
+
+def test_generalization_verifier_rejects_rehashed_semantic_contradictions() -> None:
+    suite = schemas.ScenarioSuiteConfig(
+        cases=[
+            schemas.ScenarioCaseConfig(id="train", seeds=[11]),
+            schemas.ScenarioCaseConfig(id="validation", seeds=[91], holdout=True),
+        ]
+    )
+    evidence = compile_candidate_generalization_evidence(
+        objective_config=_objective_config(),
+        scenario_suite=suite,
+        validation_status="passed",
+        validation_trial_count=1,
+        validation_completed_trial_count=1,
+        training_objectives={"rmse": 0.5, "pass_rate": 0.95},
+        validation_objectives={"rmse": 0.6, "pass_rate": 0.9},
+        training_scalar_loss=0.25,
+        validation_scalar_loss=0.31,
+    )
+    payloads: list[dict[str, object]] = []
+
+    objective_relative = json.loads(json.dumps(evidence.model_dump(mode="json")))
+    objective_relative["objective_gaps"][0]["relative_degradation"] = 99.0
+    payloads.append(_rehash_generalization_evidence(objective_relative))
+
+    scalar_relative = json.loads(json.dumps(evidence.model_dump(mode="json")))
+    scalar_relative["scalar_loss_relative_degradation"] = 99.0
+    payloads.append(_rehash_generalization_evidence(scalar_relative))
+
+    claim_scope = json.loads(json.dumps(evidence.model_dump(mode="json")))
+    claim_scope["claim_scope"] = "repeatability"
+    payloads.append(_rehash_generalization_evidence(claim_scope))
+
+    shift_count = json.loads(json.dumps(evidence.model_dump(mode="json")))
+    shift_count["disjoint_seed_case_count"] = 0
+    payloads.append(_rehash_generalization_evidence(shift_count))
+
+    assert all(verify_candidate_generalization_evidence(payload) is None for payload in payloads)
 
 
 def test_mixed_validation_suite_records_type_and_configuration_shift() -> None:
