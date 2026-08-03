@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -51,7 +51,7 @@ function renderTrial(trialId: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const result = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[`/trials/${trialId}`]}>
         <Routes>
@@ -60,6 +60,7 @@ function renderTrial(trialId: string) {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+  return { ...result, client };
 }
 
 beforeEach(() => {
@@ -67,6 +68,44 @@ beforeEach(() => {
 });
 
 describe("TrialDetail artifacts — Phase 8 polish", () => {
+  it("reconciles trial artifacts when an observed active trial becomes terminal", async () => {
+    const running = makeTrial({
+      status: "RUNNING",
+      metrics: null,
+      finished_at: null,
+    });
+    const completed = makeTrial();
+    const finalArtifact: Artifact = {
+      id: "art_final_telemetry",
+      owner_type: "trial",
+      owner_id: completed.id,
+      artifact_type: "telemetry_json",
+      display_name: "Final telemetry",
+      storage_path: "/workspace/final-telemetry.json",
+      mime_type: "application/json",
+      file_size_bytes: 1024,
+      created_at: "2026-04-22T09:00:40Z",
+    };
+    vi.spyOn(apiClient, "getTrial")
+      .mockResolvedValueOnce(running)
+      .mockResolvedValue(completed);
+    const artifactsSpy = vi.spyOn(apiClient, "listJobArtifacts")
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([finalArtifact]);
+
+    const { client } = renderTrial(running.id);
+    expect(await screen.findByText("Running")).toBeInTheDocument();
+    await waitFor(() => expect(artifactsSpy).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await client.refetchQueries({ queryKey: ["trial", running.id], exact: true });
+    });
+
+    expect(await screen.findByText("Final telemetry")).toBeInTheDocument();
+    expect(artifactsSpy).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+  });
+
   it("shows real_cli trial-level artifacts filtered by owner_type+owner_id", async () => {
     const trial = makeTrial();
     const artifacts: Artifact[] = [
