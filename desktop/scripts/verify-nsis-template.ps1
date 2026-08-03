@@ -161,6 +161,9 @@ foreach ($required in @(
         throw "DroneDream runtime-mode contract is missing: $required"
     }
 }
+if ($runtimeMode -notmatch '(?ms)dronedream_revalidate_without_binary:\s+.*?Push "error"\s+FunctionEnd') {
+    throw "Runtime quiesce revalidation must fail closed when the old binary disappears"
+}
 
 $pathGuard = Get-Content -LiteralPath $pathGuardPath -Raw
 foreach ($required in @(

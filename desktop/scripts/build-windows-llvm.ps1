@@ -261,11 +261,12 @@ if (-not $bundleDirectoryFull.Equals($expectedBundleRoot, [StringComparison]::Or
 }
 $currentArtifacts = @(
     [IO.Path]::GetFullPath($installer),
-    [IO.Path]::GetFullPath($checksumPath)
+    [IO.Path]::GetFullPath($checksumPath),
+    [IO.Path]::GetFullPath($updaterSignature)
 )
 Get-ChildItem -LiteralPath $bundleDirectoryFull -File |
     Where-Object {
-        $_.Name -match '^DroneDream_.+_x64-setup\.exe(?:\.sha256)?$' -and
+        $_.Name -match '^DroneDream_.+_x64-setup\.exe(?:\.sha256|\.sig)?$' -and
         $_.FullName -notin $currentArtifacts
     } |
     ForEach-Object {

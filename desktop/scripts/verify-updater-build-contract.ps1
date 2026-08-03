@@ -45,7 +45,9 @@ foreach ($requiredText in @(
     'status --porcelain=v1 --untracked-files=all',
     '$env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $releaseSourceCommit',
     '-SourceCommit $releaseSourceCommit',
-    '-BuildNumber ([UInt64]$releaseBuildNumber)'
+    '-BuildNumber ([UInt64]$releaseBuildNumber)',
+    '[IO.Path]::GetFullPath($updaterSignature)',
+    '(?:\.sha256|\.sig)?$'
 )) {
     Assert-Contract ($llvmBuildScript.Contains($requiredText)) `
         "The LLVM release build is missing its exact-source contract: $requiredText"

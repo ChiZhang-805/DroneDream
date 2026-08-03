@@ -208,7 +208,11 @@ Var DroneDreamValidatePathOnly
         Return
       ${EndIf}
     dronedream_revalidate_without_binary:
-    Push "ok"
+    ; The preinstall hook calls this only after observing the old binary. If it
+    ; disappears before or during revalidation, the durable quiesce can no
+    ; longer be authenticated; fail closed instead of treating the race as a
+    ; verified update window.
+    Push "error"
   FunctionEnd
 
   Function DroneDreamEndRuntimeQuiesce
