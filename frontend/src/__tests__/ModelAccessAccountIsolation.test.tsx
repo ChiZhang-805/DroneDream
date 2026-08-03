@@ -10,11 +10,15 @@ function Probe() {
     <>
       <output aria-label="provider">{modelAccess.settings.provider}</output>
       <output aria-label="api-key">{modelAccess.settings.apiKey}</output>
+      <output aria-label="model">{modelAccess.settings.model}</output>
+      <output aria-label="base-url">{modelAccess.settings.baseUrl}</output>
       <button
         type="button"
         onClick={() => modelAccess.updateSettings({
           provider: "qwen",
           apiKey: "user-a-secret",
+          model: "user-a-model",
+          baseUrl: "https://user-a.example/v1",
         })}
       >
         Configure key
@@ -29,7 +33,7 @@ describe("model access account isolation", () => {
     window.sessionStorage.clear();
   });
 
-  it("clears every in-memory key when the signed-in account changes", async () => {
+  it("isolates persisted model metadata and clears every key across account changes", async () => {
     const view = render(
       <ModelAccessProvider accountScope="user-a">
         <Probe />
@@ -48,6 +52,23 @@ describe("model access account isolation", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("api-key")).toBeEmptyDOMElement();
     });
-    expect(screen.getByLabelText("provider")).toHaveTextContent("qwen");
+    expect(screen.getByLabelText("provider")).toHaveTextContent("openai");
+    expect(screen.getByLabelText("model")).toBeEmptyDOMElement();
+    expect(screen.getByLabelText("base-url")).toBeEmptyDOMElement();
+
+    view.rerender(
+      <ModelAccessProvider accountScope="user-a">
+        <Probe />
+      </ModelAccessProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("provider")).toHaveTextContent("qwen");
+    });
+    expect(screen.getByLabelText("model")).toHaveTextContent("user-a-model");
+    expect(screen.getByLabelText("base-url")).toHaveTextContent(
+      "https://user-a.example/v1",
+    );
+    expect(screen.getByLabelText("api-key")).toBeEmptyDOMElement();
   });
 });

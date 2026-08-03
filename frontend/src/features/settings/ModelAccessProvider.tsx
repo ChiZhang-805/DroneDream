@@ -31,6 +31,7 @@ interface PersistedModelAccessProfiles {
 }
 
 interface ModelAccessState {
+  storageKey: string;
   activeProfileId: string;
   profiles: ModelAccessProfile[];
 }
@@ -38,6 +39,12 @@ interface ModelAccessState {
 const MODEL_ACCESS_STORAGE_KEY = "dronedream:model-access:v1";
 const LEGACY_MODEL_ACCESS_SESSION_KEY = "dronedream:model-access-key:v1";
 const DEFAULT_PROFILE_ID = "default";
+
+function modelAccessStorageKey(accountScope: string | null | undefined): string {
+  const normalized = accountScope?.trim();
+  if (!normalized) return MODEL_ACCESS_STORAGE_KEY;
+  return `${MODEL_ACCESS_STORAGE_KEY}:${encodeURIComponent(normalized.slice(0, 160))}`;
+}
 
 const DEFAULT_MODEL_ACCESS: ModelAccessSettings = {
   accessMode: "platform",
@@ -119,13 +126,20 @@ function parsePersistedProfile(value: unknown): PersistedModelAccessProfile | nu
   };
 }
 
-function loadModelAccessState(): ModelAccessState {
+function loadModelAccessState(
+  accountScope?: string | null,
+): ModelAccessState {
+  const storageKey = modelAccessStorageKey(accountScope);
   if (typeof window === "undefined") {
-    return { activeProfileId: DEFAULT_PROFILE_ID, profiles: [defaultProfile()] };
+    return {
+      storageKey,
+      activeProfileId: DEFAULT_PROFILE_ID,
+      profiles: [defaultProfile()],
+    };
   }
   let persisted: PersistedModelAccessProfiles | null = null;
   try {
-    const raw = window.localStorage.getItem(MODEL_ACCESS_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     const candidate = raw ? JSON.parse(raw) as Record<string, unknown> : null;
     if (
       candidate
@@ -187,6 +201,7 @@ function loadModelAccessState(): ModelAccessState {
     apiKey: "",
   })) ?? [defaultProfile()];
   return {
+    storageKey,
     activeProfileId: persisted?.activeProfileId ?? DEFAULT_PROFILE_ID,
     profiles,
   };
@@ -203,9 +218,10 @@ export function ModelAccessProvider({
   initialSettings,
   accountScope,
 }: ModelAccessProviderProps) {
-  const previousAccountScope = useRef(accountScope);
+  const storageKey = modelAccessStorageKey(accountScope);
+  const previousStorageKey = useRef(storageKey);
   const [state, setState] = useState<ModelAccessState>(() => {
-    const loaded = loadModelAccessState();
+    const loaded = loadModelAccessState(accountScope);
     if (!initialSettings) return loaded;
     const normalizedInitialSettings = (
       initialSettings.apiKey
@@ -224,30 +240,24 @@ export function ModelAccessProvider({
   });
 
   useEffect(() => {
-    if (
-      accountScope === undefined
-      || accountScope === previousAccountScope.current
-    ) {
-      return;
-    }
-    previousAccountScope.current = accountScope;
-    setState((current) => ({
-      ...current,
-      profiles: current.profiles.map((profile) => ({
-        ...profile,
-        apiKey: "",
-      })),
-    }));
-  }, [accountScope]);
+    if (storageKey === previousStorageKey.current) return;
+    previousStorageKey.current = storageKey;
+    // Provider/model/endpoint metadata belongs to the signed-in account just
+    // as much as its in-memory key does. Loading the next account's scoped
+    // profile avoids sending a newly entered credential to an endpoint left
+    // behind by a different user on the same Windows installation.
+    setState(loadModelAccessState(accountScope));
+  }, [accountScope, storageKey]);
 
   const settings = state.profiles.find(
     (profile) => profile.id === state.activeProfileId,
   ) ?? state.profiles[0] ?? defaultProfile();
 
   useEffect(() => {
+    if (state.storageKey !== storageKey) return;
     try {
       window.localStorage.setItem(
-        MODEL_ACCESS_STORAGE_KEY,
+        storageKey,
         JSON.stringify({
           activeProfileId: state.activeProfileId,
           profiles: state.profiles.map((profile) => ({
@@ -265,7 +275,7 @@ export function ModelAccessProvider({
       // Storage may be unavailable in hardened browser contexts. The provider
       // still keeps the current settings in memory for this app session.
     }
-  }, [state]);
+  }, [state, storageKey]);
 
   const updateSettings = useCallback((values: Partial<ModelAccessSettings>) => {
     setState((current) => ({
@@ -331,6 +341,7 @@ export function ModelAccessProvider({
       if (current.profiles.length >= 12) return current;
       const id = newProfileId();
       return {
+        storageKey: current.storageKey,
         activeProfileId: id,
         profiles: [
           ...current.profiles,
@@ -354,6 +365,7 @@ export function ModelAccessProvider({
         (profile) => profile.id !== current.activeProfileId,
       );
       return {
+        storageKey: current.storageKey,
         activeProfileId: profiles[0].id,
         profiles,
       };
