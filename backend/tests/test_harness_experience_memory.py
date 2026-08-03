@@ -126,7 +126,13 @@ def test_cross_job_memory_is_user_isolated_closed_and_revocable(client) -> None:
                 memory_enabled=True
             ),
         )
-        other = models.User(id="usr_other_sentinel", email="other@example.test")
+        other = models.User(
+            id="usr_other_sentinel",
+            email="other@example.test",
+            experience_preferences=models.UserExperiencePreferences(
+                memory_enabled=True
+            ),
+        )
         source = _job(
             models,
             user_id=owner.id,

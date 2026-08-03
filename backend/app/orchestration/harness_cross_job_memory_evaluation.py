@@ -155,7 +155,12 @@ def _database() -> tuple[Session, models.User, models.User, Engine]:
             memory_enabled=True
         ),
     )
-    other = models.User(id="usr_eval_other")
+    other = models.User(
+        id="usr_eval_other",
+        experience_preferences=models.UserExperiencePreferences(
+            memory_enabled=True
+        ),
+    )
     db.add_all([owner, other])
     db.flush()
     return db, owner, other, engine
