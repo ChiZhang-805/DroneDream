@@ -9,6 +9,8 @@ use std::time::Duration;
 
 #[cfg(target_os = "windows")]
 use crate::process::{command_output, windows_command};
+#[cfg(target_os = "windows")]
+use crate::runtime_installer::RuntimeInstaller;
 
 const MANAGER_PATH: &str = "/usr/lib/dronedream/engine-pack-manager.py";
 const STATE_PATH: &str = "/var/lib/dronedream/engine-pack-state.json";
@@ -126,6 +128,19 @@ fn embedded_descriptor() -> Result<EmbeddedDescriptor, String> {
 }
 
 #[cfg(target_os = "windows")]
+fn command_failure_message(label: &str, code: Option<i32>, stderr: &[u8]) -> String {
+    let code = code
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "terminated without an exit code".to_string());
+    let detail = String::from_utf8_lossy(stderr).trim().to_string();
+    if detail.is_empty() {
+        format!("{label} failed ({code}).")
+    } else {
+        format!("{label} failed ({code}): {detail}")
+    }
+}
+
+#[cfg(target_os = "windows")]
 fn wsl_output(
     program: &str,
     arguments: &[&str],
@@ -137,7 +152,11 @@ fn wsl_output(
     command.args(argv);
     let output = command_output(command, timeout, label)?;
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        return Err(command_failure_message(
+            label,
+            output.status.code(),
+            &output.stderr,
+        ));
     }
     Ok(output.stdout)
 }
@@ -378,6 +397,7 @@ pub(crate) fn ensure_app_update_idle() -> Result<(), String> {
 #[tauri::command]
 pub(crate) async fn install_embedded_engine_pack(
     app: tauri::AppHandle,
+    #[cfg(target_os = "windows")] installer: tauri::State<'_, RuntimeInstaller>,
 ) -> Result<EnginePackStatus, String> {
     #[cfg(not(target_os = "windows"))]
     {
@@ -387,7 +407,13 @@ pub(crate) async fn install_embedded_engine_pack(
     #[cfg(target_os = "windows")]
     {
         use tauri::Manager as _;
+        // Engine Pack activation mutates the same managed Runtime as
+        // install/start/repair. Hold their shared local and cross-process lease
+        // for the complete reconciliation so another desktop process or the
+        // updater cannot terminate WSL while a release slot is being switched.
+        let operation = installer.inner().prepare_installer_operation()?;
         tauri::async_runtime::spawn_blocking(move || {
+            let _operation = operation;
             let current = status()?;
             if !current.supported {
                 return Err(current.message.unwrap_or_else(|| {
@@ -540,6 +566,23 @@ mod tests {
         let reconciler = std::str::from_utf8(EMBEDDED_RECONCILER).expect("UTF-8 reconciler");
         assert!(reconciler.contains("_LEGACY_ROOT = \"/opt/dronedream/source\""));
         assert!(reconciler.contains("_ENGINE_ROOT = \"/opt/dronedream/engine/current\""));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn wsl_failures_always_preserve_an_actionable_message() {
+        assert_eq!(
+            command_failure_message("Engine Pack activation", Some(7), b"\r\n"),
+            "Engine Pack activation failed (7)."
+        );
+        assert_eq!(
+            command_failure_message(
+                "Engine Pack activation",
+                None,
+                b"  manager rejected the archive  ",
+            ),
+            "Engine Pack activation failed (terminated without an exit code): manager rejected the archive"
+        );
     }
 
     #[cfg(target_os = "windows")]
