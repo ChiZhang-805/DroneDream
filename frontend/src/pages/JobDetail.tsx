@@ -163,6 +163,8 @@ export function JobDetail() {
   const safeId = jobId ?? "";
   const [pdfDownloadError, setPdfDownloadError] = useState(false);
   const terminalReconciledJobRef = useRef<string | null>(null);
+  const rerunInFlightRef = useRef(false);
+  const cancelInFlightRef = useRef(false);
 
   const rerunMutation = useMutation({
     mutationFn: ({
@@ -338,12 +340,42 @@ export function JobDetail() {
     job.status === "FAILED" ||
     job.status === "CANCELLED";
 
+  const submitRerun = (args: {
+    id: string;
+    request?: JobRerunRequest;
+    managedAccess?: boolean;
+  }) => {
+    if (rerunInFlightRef.current) return;
+    rerunInFlightRef.current = true;
+    rerunMutation.mutate(args, {
+      onSettled: () => {
+        rerunInFlightRef.current = false;
+      },
+    });
+  };
+
+  const submitCancel = () => {
+    if (cancelInFlightRef.current) return;
+    cancelInFlightRef.current = true;
+    cancelMutation.mutate(
+      {
+        id: job.id,
+        controlVersion: job.control_version,
+      },
+      {
+        onSettled: () => {
+          cancelInFlightRef.current = false;
+        },
+      },
+    );
+  };
+
   const handleRerun = () => {
     if (optimizerUsesModelAccess(job.optimizer_strategy)) {
       const accessMode = job.llm_access_mode
         ?? (job.llm_provider === "dronedream" ? "platform" : "byok");
       if (accessMode === "platform") {
-        rerunMutation.mutate({ id: job.id, managedAccess: true });
+        submitRerun({ id: job.id, managedAccess: true });
         return;
       }
       const provider = job.llm_provider?.trim() || "openai";
@@ -351,7 +383,7 @@ export function JobDetail() {
         t("jobDetail.apiKeyPrompt", { provider }),
       );
       if (!freshKey || freshKey.trim() === "") return;
-      rerunMutation.mutate({
+      submitRerun({
         id: job.id,
         request: {
           llm: {
@@ -366,7 +398,7 @@ export function JobDetail() {
       });
       return;
     }
-    rerunMutation.mutate({ id: job.id });
+    submitRerun({ id: job.id });
   };
 
   return (
@@ -374,10 +406,7 @@ export function JobDetail() {
       <JobHeader
         job={job}
         onRerun={handleRerun}
-        onCancel={() => cancelMutation.mutate({
-          id: job.id,
-          controlVersion: job.control_version,
-        })}
+        onCancel={submitCancel}
         rerunPending={rerunMutation.isPending}
         cancelPending={cancelMutation.isPending}
         canCancel={!isTerminal}
