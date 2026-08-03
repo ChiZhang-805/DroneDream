@@ -124,6 +124,10 @@ def build_test_run_receipt(
 
     source_commit = _commit(source_commit, field="source_commit")
     base_commit = _commit(base_commit, field="base_commit")
+    if exact_final_commit_run and source_commit != base_commit:
+        raise ValueError(
+            "source_commit must equal base_commit for an exact final commit run"
+        )
     generated_at = _utc_timestamp(generated_at, field="generated_at")
     full_suite_started_at = _utc_timestamp(
         full_suite_started_at,

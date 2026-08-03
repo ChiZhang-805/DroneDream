@@ -19,6 +19,8 @@ _LOG = Path(__file__).resolve().parent / "fixtures" / "test_run_receipt_v1.log"
 
 def _build_receipt(
     *,
+    source_commit: str = _SOURCE_COMMIT,
+    base_commit: str = _BASE_COMMIT,
     exact_final_commit_run: bool = False,
     full_suite_started_at: str = _TIMESTAMP,
     full_suite_finished_at: str = "2026-07-28T00:12:39Z",
@@ -28,8 +30,8 @@ def _build_receipt(
     focused_duration_seconds: float = 1.0,
 ) -> dict[str, object]:
     return build_test_run_receipt(
-        source_commit=_SOURCE_COMMIT,
-        base_commit=_BASE_COMMIT,
+        source_commit=source_commit,
+        base_commit=base_commit,
         generated_at=_TIMESTAMP,
         platform="test-platform",
         python_version="3.13.0",
@@ -83,11 +85,14 @@ def test_test_run_receipt_is_deterministic_and_content_addressed() -> None:
 
 
 def test_test_run_receipt_marks_an_exact_commit_run_without_a_bridge_claim() -> None:
-    receipt = _build_receipt(exact_final_commit_run=True)
+    receipt = _build_receipt(
+        base_commit=_SOURCE_COMMIT,
+        exact_final_commit_run=True,
+    )
 
     assert receipt["full_suite"]["tested_state"] == {
         "kind": "commit",
-        "base_commit": _BASE_COMMIT,
+        "base_commit": _SOURCE_COMMIT,
         "exact_final_commit_run": True,
     }
     assert receipt["validation_bridge"] == {
@@ -96,6 +101,11 @@ def test_test_run_receipt_marks_an_exact_commit_run_without_a_bridge_claim() -> 
         "focused_rerun_performed": True,
         "reason": "Fixture verifies deterministic receipt binding.",
     }
+
+
+def test_test_run_receipt_rejects_false_exact_commit_claim() -> None:
+    with pytest.raises(ValueError, match="source_commit must equal base_commit"):
+        _build_receipt(exact_final_commit_run=True)
 
 
 def test_test_run_receipt_rejects_noncanonical_commit() -> None:
