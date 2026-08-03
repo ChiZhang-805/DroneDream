@@ -1,0 +1,200 @@
+{
+  "schemaVersion": "dronedream.website-admin-shared-results-validation.v1",
+  "generatedAt": "2026-08-03T04:22:29.9552307Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "eb08ea2ab2688d27bb704f0415695765a5e3171f",
+    "subjectTree": "cf9f07ce9cb20f5d040310893417ef8234bf43e1",
+    "frontendIntegrationCommit": "13da20122f87c9f7e69216ebbcfc44ca01908b48",
+    "frontendIntegrationTree": "4df475344d70b67142e671d1aa369b1c4a9ca6b5",
+    "adminServerSourceCommit": "e1c3d859d4bad906423ac0db6b6014cba19e8bbb",
+    "deploymentPerformed": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "paymentMutationPerformed": false,
+    "technicalReportModified": false
+  },
+  "frontendDonors": [
+    {
+      "parent": "5cb1fa6b908fe4c13be53021a70ff1c580db3922",
+      "source": "3bd83fef599d72122488d1b841e1bd70919b7ae3",
+      "scope": "frontend/** only"
+    },
+    {
+      "parent": "25a4a120e10fec303e6605b6ef73ffb6fc11d67b",
+      "source": "671a6cdb5d287de3e369e10476d52a0708f65e15",
+      "scope": "frontend/** only"
+    },
+    {
+      "parent": "671a6cdb5d287de3e369e10476d52a0708f65e15",
+      "source": "1fd026ea2170054caf55af71f5b18059554d563d",
+      "scope": "frontend/** only"
+    },
+    {
+      "parent": "1fd026ea2170054caf55af71f5b18059554d563d",
+      "source": "ce3d515dcce2388a0c27e0690b41d734ef80ad8e",
+      "scope": "frontend/** only"
+    },
+    {
+      "parent": "ce3d515dcce2388a0c27e0690b41d734ef80ad8e",
+      "source": "0c2ca917506866635d89405db5aedb8b646465af",
+      "scope": "frontend/** only"
+    },
+    {
+      "parent": "e9febbd9a33ef88ec96dc9e06085f0efdb98af71",
+      "source": "d07aaa54764733f14856efa482f276f353e991d8",
+      "scope": "frontend/** only"
+    },
+    {
+      "parent": "854b27b8eb1053224fb1f9f12ca6610c045c6bb1",
+      "source": "5146b477f724cac4ac5b236b70d67197a606ea1a",
+      "scope": "frontend/** only"
+    },
+    {
+      "parent": "5146b477f724cac4ac5b236b70d67197a606ea1a",
+      "source": "7d301b9cb93a5011f462bc5aee7c714ebc349674",
+      "scope": "frontend/** only"
+    }
+  ],
+  "integrationBoundaries": {
+    "websiteSiteAuthority": "frontend/src/site/** remained the website branch authority and was not replaced by an older software snapshot",
+    "pricingAvailability": "website getBillingAvailability and billing-checkout availability behavior retained",
+    "resultHonesty": "JobDetail and JobCompare require authoritative winner fields and never infer a winner from baseline diagnostics",
+    "adminAuthorization": "production admin UI remains dependent on server-authorized /admin-console/access; development preview is not a production bypass",
+    "manualDraftsExcluded": true,
+    "manualDraftPaths": [
+      "frontend/public/docs/downloads/DroneDream-Manual-en.md",
+      "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.md",
+      "website/manual-pdf/**",
+      "website/scripts/build_manual_pdf.py",
+      "website/scripts/audit_manual_pdf_layout.py",
+      "work/**"
+    ]
+  },
+  "validation": {
+    "completeFrontendSuite": {
+      "command": "npm.cmd --prefix frontend test -- --maxWorkers=1",
+      "files": 59,
+      "tests": 394,
+      "passed": 394,
+      "failed": 0
+    },
+    "publicSiteFocused": {
+      "command": "npm.cmd --prefix frontend test -- src/__tests__/PublicSite.test.tsx --maxWorkers=1",
+      "files": 1,
+      "tests": 19,
+      "passed": 19,
+      "failed": 0,
+      "pricingAvailabilityContract": "passed"
+    },
+    "resultHonestyFocused": {
+      "command": "npm.cmd --prefix frontend test -- src/__tests__/JobDetail.test.tsx src/__tests__/JobCompare.test.tsx --maxWorkers=1",
+      "files": 2,
+      "tests": 15,
+      "passed": 15,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appBuild": "passed with the existing non-failing Vite chunk-size advisory",
+    "sharedSiteBuild": "passed with local non-secret placeholder Supabase values",
+    "sharedConsoleBuild": "passed with local non-secret placeholder Supabase values",
+    "deploymentContract": {
+      "tests": 11,
+      "subtests": 23,
+      "passed": true
+    },
+    "adminServerSource": {
+      "sourceCommit": "e1c3d859d4bad906423ac0db6b6014cba19e8bbb",
+      "denoTests": 48,
+      "passed": 48,
+      "fmt": "passed",
+      "lint": "passed",
+      "check": "passed",
+      "rerunAfterFrontendIntegration": false,
+      "reason": "Deno was not present on PATH in the final frontend validation shell; git diff confirms supabase/** is unchanged from the exact server source through the subject commit."
+    },
+    "historyLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "languages": ["en", "zh-CN"],
+      "viewports": ["1440x1000", "390x844"],
+      "documentWidthParity": true,
+      "mobileTableLocalScroll": true,
+      "receiptPath": "artifacts/test-runs/history-responsive-overflow/website-source-13da201/measurements.json",
+      "receiptSha256": "6ebcd059216cbdfd50c51ce80c4c0b1e0d5951c123ed0737e4d66805e446db49"
+    },
+    "resultHonestyLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "receiptSha256": "ca56352be15fc48b3548121836a87d11eaf0b2bcd5867e299d745dc814116caf"
+    },
+    "adminConsoleLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "receiptSha256": "5a86166af513a6c4920d3c5a15fc2ac823ce760d9e61eed4e25c3bad6205d720"
+    },
+    "softwareUiLayout": {
+      "cases": 5,
+      "passed": 5,
+      "failed": 0,
+      "receiptSha256": "359963a45ffa372c3b07247fa6a841809287ee8a223bff29d43f06fe231c4f21"
+    },
+    "publicBrowserMatrix": {
+      "subjectCommit": "eb08ea2ab2688d27bb704f0415695765a5e3171f",
+      "browsers": ["edge", "chrome", "lenovo", "firefox"],
+      "checks": 120,
+      "passed": 120,
+      "failed": 0,
+      "externalWarnings": 22,
+      "receiptSha256": "3e8dc217f1fbfaa328c8aa71968da8dde01c33be25cb455945f37818d84b10d0"
+    },
+    "publicTypography": {
+      "desktop1440": {
+        "languages": ["en", "zh-CN"],
+        "strictFinalLineThreshold": "80%",
+        "passed": true,
+        "receiptSha256": "36b951dad624853b40503039b434ce529b707cfd5f053d24a6ae35e7fd1eb1eb"
+      },
+      "wide2048": {
+        "languages": ["en", "zh-CN"],
+        "strictFinalLineThreshold": "80%",
+        "passed": true,
+        "receiptSha256": "f4f2f706df4b87fd06b7bb62057ca6b1964061c85a5fc7e3ab6de2dea06b8042"
+      },
+      "mobile390": {
+        "languages": ["en", "zh-CN"],
+        "layoutOnly": true,
+        "horizontalOverflow": false,
+        "clipping": false,
+        "passed": true,
+        "receiptSha256": "0a6123e5bc11b5e64b537c4a4e66ea7fd51b409f27c73ca97779faf0320592ae"
+      }
+    },
+    "credentialScan": {
+      "productionSourcePatterns": "passed",
+      "matches": 0,
+      "testFixtureClassification": "A fake secret-shaped value remains only in a product-events rejection test and is not a credential."
+    },
+    "diffCheck": "passed"
+  },
+  "validationNotes": {
+    "wrapperInvocationErrors": [
+      "Two initial focused-test wrapper commands were launched from the repository root without the frontend Vitest configuration. They were command invocation errors, not product failures; the corrected frontend-prefixed commands passed 19/19 and 15/15."
+    ],
+    "softwareBranchPublicSiteFailure": "The software branch 415/416 result used a protected older site snapshot. The website-authoritative PublicSite contract passes 19/19 in this source.",
+    "finalSourceDelta": "The subject commit differs from frontendIntegrationCommit only by website/scripts/audit-browser-matrix.mjs, replacing nondeterministic browser back navigation with explicit same-route navigation. The browser matrix was rerun at the exact subject commit and passed 120/120."
+  },
+  "remainingProductionGates": [
+    "admin-console and product-events migrations and Edge Functions have not been deployed",
+    "ADMIN_OWNER_EMAIL and provider secrets have not been configured or read",
+    "Docker, Supabase CLI, and psql production-equivalent integration validation remain unavailable locally",
+    "getdronedream.com TLS still has a certificate principal/SNI mismatch and must not be treated as trusted by bypassing certificate validation",
+    "no password, account, payment, DNS, TLS, or production configuration mutation was performed"
+  ]
+}
