@@ -130,6 +130,46 @@ _PROJECTION_LOCAL_ERROR_FALLBACK_M = 5.0
 _MAX_PROJECTION_SEGMENT_COMPARISONS = 10_000_000
 _MAX_COVERAGE_PROGRESS_STEP_FRACTION = 0.2
 
+_RUN_OUTPUT_NAMES = (
+    "runner.log",
+    "stdout.log",
+    "stderr.log",
+    "telemetry.json",
+    "telemetry.csv",
+    "trajectory.json",
+    "controller_params.json",
+    "px4_parameters.input.json",
+    "reference_track.json",
+    "scenario_config.json",
+    REQUEST_ARTIFACT_NAME,
+    EVIDENCE_ARTIFACT_NAME,
+    "launch_config.json",
+    "simulator_runtime_manifest.json",
+    "px4_source.ulg",
+    "offboard_executor.log",
+    "offboard_timing.json",
+    "launcher_failure.json",
+    ACTUATOR_LINK_HEALTH_NAME,
+    TRANSIENT_RETRY_RECEIPT_NAME,
+    "actuator_link_transient_attempt_1.ulg",
+    "actuator_link_transient_attempt_1.health.json",
+    "actuator_link_transient_attempt_1.offboard_timing.json",
+    "actuator_link_transient_attempt_1.offboard_executor.log",
+    "actuator_link_transient_attempt_1.launcher_failure.json",
+    "actuator_link_transient_attempt_1.stdout.log",
+    "actuator_link_transient_attempt_1.stderr.log",
+    "actuator_link_transient_attempt_1.telemetry.json",
+    "actuator_link_transient_attempt_1.px4_parameters.applied.json",
+    "actuator_link_transient_attempt_1.scenario_effects.applied.json",
+    "gui_stdout.log",
+    "gui_stderr.log",
+    "track_marker_stdout.log",
+    "track_marker_stderr.log",
+    REQUESTED_EVIDENCE_NAME,
+    BEFORE_EVIDENCE_NAME,
+    APPLIED_EVIDENCE_NAME,
+)
+
 _REQUIRED_PARAM_KEYS = (
     "kp_xy",
     "kd_xy",
@@ -995,6 +1035,17 @@ def _require_effect_evidence_file(path: Path) -> None:
         raise ScenarioEffectContractError("scenario effect evidence file is missing or too large")
 
 
+def _numeric_float(value: Any, *, label: str) -> float:
+    """Normalize a JSON numeric field without treating booleans as 0/1."""
+
+    if isinstance(value, bool):
+        raise RunnerError(f"{label} must be numeric")
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise RunnerError(f"{label} must be numeric") from None
+
+
 def _validate_trial_input(
     payload: dict[str, Any],
     *,
@@ -1089,12 +1140,9 @@ def _validate_trial_input(
 
     start_x_raw: Any = start_point.get("x")
     start_y_raw: Any = start_point.get("y")
-    try:
-        start_x = float(start_x_raw)
-        start_y = float(start_y_raw)
-        altitude = float(altitude_m)
-    except (TypeError, ValueError):
-        raise RunnerError("start_point.x/y and altitude_m must be numeric") from None
+    start_x = _numeric_float(start_x_raw, label="start_point.x/y and altitude_m")
+    start_y = _numeric_float(start_y_raw, label="start_point.x/y and altitude_m")
+    altitude = _numeric_float(altitude_m, label="start_point.x/y and altitude_m")
     if not all(math.isfinite(value) for value in (start_x, start_y, altitude)):
         raise RunnerError("start_point.x/y and altitude_m must be finite")
     if not 1.0 <= altitude <= 20.0:
@@ -1106,13 +1154,13 @@ def _validate_trial_input(
         raise RunnerError("wind must be an object when provided")
     if wind is None:
         wind = {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0}
-    try:
-        normalized_wind = {
-            direction: float(wind.get(direction, 0.0))
-            for direction in ("north", "east", "south", "west")
-        }
-    except (TypeError, ValueError):
-        raise RunnerError("wind components must be numeric") from None
+    normalized_wind = {
+        direction: _numeric_float(
+            wind.get(direction, 0.0),
+            label="wind components",
+        )
+        for direction in ("north", "east", "south", "west")
+    }
     if not all(math.isfinite(value) for value in normalized_wind.values()):
         raise RunnerError("wind components must be finite")
     if any(not -10.0 <= value <= 10.0 for value in normalized_wind.values()):
@@ -1146,18 +1194,13 @@ def _validate_trial_input(
                 raise RunnerError(f"reference_track[{idx}] must be an object with x/y")
             x_raw: Any = point.get("x")
             y_raw: Any = point.get("y")
-            try:
-                x = float(x_raw)
-                y = float(y_raw)
-            except (TypeError, ValueError):
-                raise RunnerError(f"reference_track[{idx}].x/y must be numeric") from None
+            x = _numeric_float(x_raw, label=f"reference_track[{idx}].x/y")
+            y = _numeric_float(y_raw, label=f"reference_track[{idx}].x/y")
             z_raw = point.get("z")
-            try:
-                z = float(altitude if z_raw is None else z_raw)
-            except (TypeError, ValueError):
-                raise RunnerError(
-                    f"reference_track[{idx}].z must be numeric when provided"
-                ) from None
+            z = _numeric_float(
+                altitude if z_raw is None else z_raw,
+                label=f"reference_track[{idx}].z",
+            )
             if not all(math.isfinite(value) for value in (x, y, z)):
                 raise RunnerError(f"reference_track[{idx}] coordinates must be finite")
             normalized_points.append({"x": x, "y": y, "z": z})
@@ -1189,10 +1232,7 @@ def _validate_trial_input(
     }
     for key in _REQUIRED_PARAM_KEYS:
         value = params_raw.get(key, defaults[key])
-        try:
-            params[key] = float(value)
-        except (TypeError, ValueError):
-            raise RunnerError(f"parameters.{key} must be numeric") from None
+        params[key] = _numeric_float(value, label=f"parameters.{key}")
         if not math.isfinite(params[key]):
             raise RunnerError(f"parameters.{key} must be finite")
     if min(params["kp_xy"], params["kd_xy"], params["ki_xy"]) < 0:
@@ -1535,14 +1575,22 @@ def _normalize_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for idx, raw in enumerate(samples):
         try:
             s: dict[str, Any] = {
-                "t": float(raw["t"]),
-                "x": float(raw["x"]),
-                "y": float(raw["y"]),
-                "z": float(raw["z"]),
-                "vx": float(raw.get("vx", 0.0)),
-                "vy": float(raw.get("vy", 0.0)),
-                "vz": float(raw.get("vz", 0.0)),
-                "yaw": float(raw.get("yaw", 0.0)),
+                "t": _numeric_float(raw["t"], label=f"telemetry sample {idx} field 't'"),
+                "x": _numeric_float(raw["x"], label=f"telemetry sample {idx} field 'x'"),
+                "y": _numeric_float(raw["y"], label=f"telemetry sample {idx} field 'y'"),
+                "z": _numeric_float(raw["z"], label=f"telemetry sample {idx} field 'z'"),
+                "vx": _numeric_float(
+                    raw.get("vx", 0.0), label=f"telemetry sample {idx} field 'vx'"
+                ),
+                "vy": _numeric_float(
+                    raw.get("vy", 0.0), label=f"telemetry sample {idx} field 'vy'"
+                ),
+                "vz": _numeric_float(
+                    raw.get("vz", 0.0), label=f"telemetry sample {idx} field 'vz'"
+                ),
+                "yaw": _numeric_float(
+                    raw.get("yaw", 0.0), label=f"telemetry sample {idx} field 'yaw'"
+                ),
                 "armed": _telemetry_bool(raw.get("armed", True), field="armed", sample_index=idx),
                 "mode": str(raw.get("mode", "unknown")),
                 "crashed": _telemetry_bool(
@@ -3133,6 +3181,21 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
     return [r for r in records if r]
 
 
+def _require_fresh_run_directory(run_dir: Path) -> None:
+    """Fail closed instead of consuming output left by an earlier invocation."""
+
+    stale = sorted(
+        name
+        for name in _RUN_OUTPUT_NAMES
+        if (run_dir / name).exists() or (run_dir / name).is_symlink()
+    )
+    if stale:
+        raise RunnerError(
+            "runner output directory contains stale files from an earlier invocation; "
+            "start a new Trial attempt instead of reusing it: " + ", ".join(stale)
+        )
+
+
 def _execution_identity_from_meta(meta: dict[str, Any]) -> dict[str, object]:
     return {
         "trial_id": meta["trial_id"],
@@ -3338,6 +3401,20 @@ def run_once(input_path: Path, output_path: Path) -> int:
     scenario_effect_request_json = run_dir / REQUEST_ARTIFACT_NAME
     scenario_effect_evidence_json = run_dir / EVIDENCE_ARTIFACT_NAME
     meta: dict[str, Any] | None = None
+
+    try:
+        _require_fresh_run_directory(run_dir)
+    except RunnerError as exc:
+        _json_dump(
+            output_path,
+            _failure_result(
+                str(exc),
+                FAILURE_SIMULATION,
+                [],
+                f"px4_gazebo_runner stale run directory: {exc}",
+            ),
+        )
+        return 0
 
     def log(msg: str) -> None:
         with runner_log.open("a", encoding="utf-8") as f:

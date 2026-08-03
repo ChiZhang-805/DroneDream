@@ -399,6 +399,31 @@ def test_runner_rejects_oversized_trial_input_before_json_decode(tmp_path: Path)
         runner_module._load_trial_payload(input_path)
 
 
+def test_runner_rejects_stale_output_without_starting_launcher(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input_path = _trial_input(tmp_path)
+    output_path = tmp_path / "trial_result.json"
+    (tmp_path / "telemetry.json").write_text('{"samples": []}', encoding="utf-8")
+    monkeypatch.setenv("PX4_GAZEBO_DRY_RUN", "false")
+    monkeypatch.setenv("PX4_GAZEBO_LAUNCH_COMMAND", sys.executable)
+
+    def fail_if_launched(**_kwargs: object) -> int:
+        raise AssertionError("stale run output must be rejected before process launch")
+
+    monkeypatch.setattr(runner_module, "_run_lower_level_launcher", fail_if_launched)
+
+    assert runner_module.run_once(input_path, output_path) == 0
+
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert result["failure"]["code"] == runner_module.FAILURE_SIMULATION
+    assert "stale files" in result["failure"]["reason"]
+    assert "telemetry.json" in result["failure"]["reason"]
+    assert result["artifacts"] == []
+
+
 def _trial_input(
     tmp_path: Path,
     *,
@@ -467,6 +492,49 @@ def test_runner_independently_enforces_job_environment_bounds(
 
     with pytest.raises(runner_module.RunnerError, match=expected):
         runner_module._validate_trial_input(payload)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda payload: payload["job_config"].__setitem__("altitude_m", True),
+        lambda payload: payload["job_config"]["start_point"].__setitem__("x", False),
+        lambda payload: payload["job_config"]["wind"].__setitem__("north", True),
+        lambda payload: payload["job_config"].__setitem__(
+            "reference_track",
+            [{"x": False, "y": 0.0, "z": 3.0}, {"x": 1.0, "y": 0.0, "z": 3.0}],
+        ),
+        lambda payload: payload["parameters"].__setitem__("kp_xy", True),
+    ],
+)
+def test_runner_rejects_booleans_in_numeric_trial_fields(
+    tmp_path: Path,
+    mutate: object,
+) -> None:
+    payload = json.loads(_trial_input(tmp_path).read_text(encoding="utf-8"))
+    assert callable(mutate)
+    mutate(payload)
+
+    with pytest.raises(runner_module.RunnerError, match="must be numeric"):
+        runner_module._validate_trial_input(payload)
+
+
+@pytest.mark.parametrize("field", ["t", "x", "y", "z", "vx", "vy", "vz", "yaw"])
+def test_runner_rejects_booleans_in_numeric_telemetry_fields(field: str) -> None:
+    sample: dict[str, object] = {
+        "t": 0.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 3.0,
+        "vx": 0.0,
+        "vy": 0.0,
+        "vz": 0.0,
+        "yaw": 0.0,
+    }
+    sample[field] = True
+
+    with pytest.raises(runner_module.RunnerError, match="must be numeric"):
+        runner_module._normalize_samples([sample])
 
 
 def test_runner_rejects_control_characters_in_execution_identity(tmp_path: Path) -> None:
