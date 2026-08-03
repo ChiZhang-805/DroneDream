@@ -383,6 +383,63 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        if "first_qualified_freeze_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    first_qualified_freeze_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES first_qualified_freeze_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_first_qualified_freeze_receipts_no_update
+                    BEFORE UPDATE ON first_qualified_freeze_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'first-qualified freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    "DROP TRIGGER IF EXISTS "
+                    "trg_first_qualified_freeze_receipts_no_delete"
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER
+                    trg_first_qualified_freeze_receipts_no_delete
+                    BEFORE DELETE ON first_qualified_freeze_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM first_qualified_freeze_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'first-qualified freeze receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
         if "artifacts" in table_names:
             artifact_columns = {
                 row[1] for row in conn.execute(text("PRAGMA table_info('artifacts')")).fetchall()

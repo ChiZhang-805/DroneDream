@@ -1448,6 +1448,24 @@ def delete_job(
                     "Winner freeze deletion has a conflicting authorization.",
                     http_status=500,
                 )
+        if job.first_qualified_freeze is not None:
+            first_qualified_authorization = db.get(
+                models.FirstQualifiedFreezeDeleteAuthorization,
+                job.first_qualified_freeze.id,
+            )
+            if first_qualified_authorization is None:
+                db.add(
+                    models.FirstQualifiedFreezeDeleteAuthorization(
+                        receipt_id=job.first_qualified_freeze.id,
+                        reason="job_delete",
+                    )
+                )
+            elif first_qualified_authorization.reason != "job_delete":
+                raise JobServiceError(
+                    "FIRST_QUALIFIED_FREEZE_DELETE_NOT_AUTHORIZED",
+                    "First-qualified freeze deletion has a conflicting authorization.",
+                    http_status=500,
+                )
         for child in db.scalars(select(models.Job).where(models.Job.source_job_id == job.id)):
             child.source_job_id = None
         for artifact in artifact_rows:

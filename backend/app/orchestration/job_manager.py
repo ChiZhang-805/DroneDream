@@ -119,6 +119,45 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class CandidateDispatchStopped(RuntimeError):
+    """Raised when a frozen first-qualified Job rejects new candidate work."""
+
+
+def _claim_candidate_dispatch_ordinal(db: Session, job: models.Job) -> int:
+    """Atomically reserve the next server-authoritative candidate ordinal.
+
+    The conditional Job-row update is part of the caller's transaction.  A
+    concurrent first-qualified freeze therefore either wins before this claim
+    (and rejects it) or waits for the candidate transaction to finish.  UUIDs
+    and client arrival order never define candidate ordering.
+    """
+
+    with db.no_autoflush:
+        next_value = db.scalar(
+            update(models.Job)
+            .where(
+                models.Job.id == job.id,
+                models.Job.first_qualified_candidate_id.is_(None),
+            )
+            .values(
+                next_candidate_dispatch_ordinal=(
+                    models.Job.next_candidate_dispatch_ordinal + 1
+                )
+            )
+            .returning(models.Job.next_candidate_dispatch_ordinal)
+            .execution_options(synchronize_session=False)
+        )
+    if next_value is None:
+        raise CandidateDispatchStopped(
+            f"Job {job.id} already froze a first-qualified candidate"
+        )
+    db.expire(
+        job,
+        ["next_candidate_dispatch_ordinal", "first_qualified_candidate_id"],
+    )
+    return int(next_value) - 1
+
+
 def _configured_scenario_runs(
     job: models.Job,
     *,
@@ -405,6 +444,7 @@ def _create_baseline_candidate(db: Session, job: models.Job) -> models.Candidate
     candidate = models.CandidateParameterSet(
         job_id=job.id,
         generation_index=0,
+        dispatch_ordinal=_claim_candidate_dispatch_ordinal(db, job),
         source_type="baseline",
         label="baseline",
         parameter_json=_baseline_parameters_for_job(job),
@@ -435,6 +475,7 @@ def _create_llm_candidate(
     candidate = models.CandidateParameterSet(
         job_id=job.id,
         generation_index=generation_index,
+        dispatch_ordinal=_claim_candidate_dispatch_ordinal(db, job),
         source_type="llm_optimizer",
         label=proposal.label,
         parameter_json=_complete_candidate_parameters(job, proposal.parameters),
@@ -625,6 +666,7 @@ def _create_optimizer_candidate(
     candidate = models.CandidateParameterSet(
         job_id=job.id,
         generation_index=proposal.generation_index,
+        dispatch_ordinal=_claim_candidate_dispatch_ordinal(db, job),
         source_type="optimizer",
         label=proposal.label,
         parameter_json=_complete_candidate_parameters(job, proposal.parameters),
@@ -967,6 +1009,13 @@ def _require_current_outcome_contract(
         )
 
 
+def _first_qualified_dispatch_stopped(job: models.Job) -> bool:
+    return (
+        job.completion_policy == "first_qualified_stop"
+        and job.first_qualified_candidate_id is not None
+    )
+
+
 def dispatch_next_llm_generation(
     db: Session,
     job: models.Job,
@@ -982,6 +1031,8 @@ def dispatch_next_llm_generation(
 
     from app.orchestration.acceptance import criteria_for_job
 
+    if _first_qualified_dispatch_stopped(job):
+        return LlmDispatchResult(status="first_qualified_stop")
     _require_current_outcome_contract(db, job)
     generation_index = job.current_generation + 1
     configured_runs = _configured_scenario_runs(job, generation_index=generation_index)
@@ -1046,6 +1097,8 @@ def dispatch_next_cma_es_generation(
 ) -> AdaptiveDispatchResult:
     """Generate and dispatch the next dependency-free CMA-ES-style candidate."""
 
+    if _first_qualified_dispatch_stopped(job):
+        return AdaptiveDispatchResult(status="first_qualified_stop")
     _require_current_outcome_contract(db, job)
     generation_index = job.current_generation + 1
     configured_runs = _configured_scenario_runs(job, generation_index=generation_index)
@@ -1217,6 +1270,8 @@ def dispatch_next_experimental_generation(
 ) -> AdaptiveDispatchResult:
     """Generate and dispatch one batch from an accuracy-first optimizer."""
 
+    if _first_qualified_dispatch_stopped(job):
+        return AdaptiveDispatchResult(status="first_qualified_stop")
     _require_current_outcome_contract(db, job)
     strategy_value = strategy_override or job.optimizer_strategy
     if not is_experimental_strategy(strategy_value):
@@ -1718,6 +1773,8 @@ def dispatch_next_harness_generation(
 ) -> AdaptiveDispatchResult:
     """Plan, execute, revise, and dispatch one bounded multi-tool generation."""
 
+    if _first_qualified_dispatch_stopped(job):
+        return AdaptiveDispatchResult(status="first_qualified_stop")
     _require_current_outcome_contract(db, job)
     generation_index = job.current_generation + 1
     if generation_index > job.max_iterations:

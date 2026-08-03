@@ -601,9 +601,8 @@ class WinnerFreezeReceipt(Base):
 class FirstQualifiedFreezeReceipt(Base):
     """Insert-once receipt for the first fully-qualified candidate.
 
-    Immutability guards and atomic freeze semantics are installed by the next
-    architecture layer; this model establishes the versioned persistence
-    contract without overloading the final winner receipt.
+    Database guards reject mutation, while orchestration freezes the row under
+    the Job finalization fence without overloading the final winner receipt.
     """
 
     __tablename__ = "first_qualified_freeze_receipts"
@@ -799,6 +798,22 @@ class WinnerFreezeDeleteAuthorization(Base):
     receipt_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("winner_freeze_receipts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+
+class FirstQualifiedFreezeDeleteAuthorization(Base):
+    """Transaction-scoped authorization for first-qualified lifecycle deletion."""
+
+    __tablename__ = "first_qualified_freeze_delete_authorizations"
+
+    receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("first_qualified_freeze_receipts.id", ondelete="CASCADE"),
         primary_key=True,
     )
     reason: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -1212,6 +1227,7 @@ __all__ = [
     "CandidateEvidenceDeleteAuthorization",
     "CandidateEvidenceReceipt",
     "CandidateParameterSet",
+    "FirstQualifiedFreezeDeleteAuthorization",
     "FirstQualifiedFreezeReceipt",
     "HarnessCognitiveTurnOutcome",
     "HarnessCognitiveTurnReceipt",

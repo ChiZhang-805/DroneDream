@@ -101,6 +101,18 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         conn.execute(
             text(
                 """
+                CREATE TABLE first_qualified_freeze_receipts (
+                    id VARCHAR(64) PRIMARY KEY,
+                    job_id VARCHAR(64) NOT NULL,
+                    candidate_id VARCHAR(64) NOT NULL,
+                    evidence_id VARCHAR(71) NOT NULL
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
                 CREATE TABLE artifacts (
                     id VARCHAR(64) PRIMARY KEY,
                     owner_type VARCHAR(32) NOT NULL,
@@ -221,6 +233,25 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
                 text("PRAGMA table_info('winner_freeze_delete_authorizations')")
             ).fetchall()
         }
+        first_qualified_freeze_triggers = {
+            row[0]
+            for row in conn.execute(
+                text(
+                    "SELECT name FROM sqlite_master "
+                    "WHERE type='trigger' "
+                    "AND tbl_name='first_qualified_freeze_receipts'"
+                )
+            ).fetchall()
+        }
+        first_qualified_delete_authorization_columns = {
+            row[1]
+            for row in conn.execute(
+                text(
+                    "PRAGMA table_info("
+                    "'first_qualified_freeze_delete_authorizations')"
+                )
+            ).fetchall()
+        }
         artifact_columns = {
             row[1] for row in conn.execute(text("PRAGMA table_info('artifacts')")).fetchall()
         }
@@ -290,6 +321,15 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         "trg_winner_freeze_receipts_no_delete",
     }
     assert winner_freeze_delete_authorization_columns == {
+        "receipt_id",
+        "reason",
+        "created_at",
+    }
+    assert first_qualified_freeze_triggers == {
+        "trg_first_qualified_freeze_receipts_no_update",
+        "trg_first_qualified_freeze_receipts_no_delete",
+    }
+    assert first_qualified_delete_authorization_columns == {
         "receipt_id",
         "reason",
         "created_at",
@@ -668,7 +708,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260803_0019 (head)"]
+    assert heads == ["20260804_0020 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -719,8 +759,24 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "WHERE type='trigger' AND tbl_name='candidate_parameter_sets'"
             ).fetchall()
         }
+        first_qualified_triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='trigger' "
+                "AND tbl_name='first_qualified_freeze_receipts'"
+            ).fetchall()
+        }
+        first_qualified_authorization_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name="
+                "'first_qualified_freeze_delete_authorizations'"
+            ).fetchall()
+        }
 
-    assert version == ("20260803_0019",)
+    assert version == ("20260804_0020",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
@@ -730,6 +786,51 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
         "trg_candidate_evidence_required_no_downgrade",
         "trg_candidate_provenance_no_mutation",
     }.issubset(candidate_triggers)
+    assert first_qualified_triggers == {
+        "trg_first_qualified_freeze_receipts_no_update",
+        "trg_first_qualified_freeze_receipts_no_delete",
+    }
+    assert first_qualified_authorization_tables == {
+        "first_qualified_freeze_delete_authorizations"
+    }
+
+
+def test_postgresql_first_qualified_migration_emits_immutable_guard(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260804_0020_first_qualified_guards.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "first_qualified_guards_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _PostgresOp:
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration._install_postgres_guards()
+
+    sql = "\n".join(emitted)
+    assert (
+        "CREATE FUNCTION dronedream_reject_first_qualified_freeze_mutation()"
+        in sql
+    )
+    assert "BEFORE UPDATE OR DELETE ON first_qualified_freeze_receipts" in sql
+    assert "first_qualified_freeze_delete_authorizations" in sql
+    assert "first-qualified freeze receipts are append-only" in sql
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

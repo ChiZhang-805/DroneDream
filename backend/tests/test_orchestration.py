@@ -144,15 +144,22 @@ def test_attempt_evidence_rejects_contradictory_terminal_outcomes() -> None:
         )
 
 
-def _create_queued_job(ctx: dict[str, object]) -> str:
+def _create_queued_job(
+    ctx: dict[str, object],
+    *,
+    acceptance_criteria: object | None = None,
+) -> str:
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
     db_module = ctx["db_module"]
 
-    req = schemas.JobCreateRequest(
-        simulator_backend="mock",
-        optimizer_strategy="heuristic",
-    )
+    request_kwargs: dict[str, object] = {
+        "simulator_backend": "mock",
+        "optimizer_strategy": "heuristic",
+    }
+    if acceptance_criteria is not None:
+        request_kwargs["acceptance_criteria"] = acceptance_criteria
+    req = schemas.JobCreateRequest(**request_kwargs)
     with db_module.SessionLocal() as db:
         job = jobs_service.create_job(db, req)
         return job.id
@@ -184,6 +191,8 @@ def test_start_queued_jobs_creates_baseline_and_trials(orchestration_ctx):
         candidates = list(job.candidates)
         # Phase 5: one baseline plus the optimizer proposals.
         assert len(candidates) == 1 + 3
+        assert sorted(c.dispatch_ordinal for c in candidates) == [1, 2, 3, 4]
+        assert job.next_candidate_dispatch_ordinal == 5
         baseline = next(c for c in candidates if c.is_baseline)
         assert baseline.source_type == "baseline"
         assert baseline.is_baseline is True
@@ -2938,7 +2947,17 @@ def test_finalization_failure_isolated_to_one_ready_job(orchestration_ctx, monke
 
 def test_runner_drives_job_to_completed(orchestration_ctx):
     ctx = orchestration_ctx
-    job_id = _create_queued_job(ctx)
+    # This remains the full-matrix aggregation regression.  Disable every
+    # numeric stopping criterion explicitly so the default first-qualified
+    # policy does not intentionally stop after a passing baseline.
+    job_id = _create_queued_job(
+        ctx,
+        acceptance_criteria=ctx["schemas"].AcceptanceCriteria(
+            target_rmse=None,
+            target_max_error=None,
+            min_pass_rate=0.0,
+        ),
+    )
 
     # Drive the runner synchronously until the job is terminal. Phase 5
     # dispatches 13 trials per job (4 baseline + 3×3 optimizer), so the
@@ -3007,6 +3026,49 @@ def test_runner_drives_job_to_completed(orchestration_ctx):
         assert "aggregation_started" in event_types
         assert "best_candidate_selected" in event_types
         assert "job_completed" in event_types
+
+
+def test_runner_default_policy_stops_after_first_qualified_baseline(orchestration_ctx):
+    ctx = orchestration_ctx
+    job_id = _create_queued_job(ctx)
+    for _ in range(30):
+        ctx["runner"].tick("first-qualified-default-worker")
+        with ctx["db_module"].SessionLocal() as db:
+            job = db.get(ctx["models"].Job, job_id)
+            assert job is not None
+            if job.status in {"COMPLETED", "FAILED", "CANCELLED"}:
+                break
+    else:  # pragma: no cover
+        pytest.fail("first-qualified Job did not finalize within the tick budget")
+
+    with ctx["db_module"].SessionLocal() as db:
+        models = ctx["models"]
+        job = db.get(models.Job, job_id)
+        assert job is not None
+        baseline = db.get(models.CandidateParameterSet, job.baseline_candidate_id)
+        assert baseline is not None
+        assert job.status == "COMPLETED"
+        assert job.first_qualified_candidate_id == baseline.id
+        assert job.first_qualified_freeze is not None
+        assert baseline.completed_trial_count == baseline.trial_count == 4
+        optimizer_candidates = [
+            candidate for candidate in job.candidates if not candidate.is_baseline
+        ]
+        assert optimizer_candidates
+        assert all(
+            candidate.aggregated_metric_json is None
+            for candidate in optimizer_candidates
+        )
+        assert all(
+            candidate.failed_trial_count == candidate.trial_count
+            for candidate in optimizer_candidates
+        )
+        optimizer_trials = [
+            trial for trial in job.trials if trial.candidate_id != baseline.id
+        ]
+        assert optimizer_trials
+        assert all(trial.status == "CANCELLED" for trial in optimizer_trials)
+        assert job.progress_completed_trials == job.progress_total_trials
 
 
 def test_api_report_endpoint_returns_ready_after_worker_runs(

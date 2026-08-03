@@ -960,6 +960,7 @@ def claim_and_run_one_pending_trial(
             select(models.Job.id)
             .where(
                 models.Job.status == "RUNNING",
+                models.Job.first_qualified_candidate_id.is_(None),
                 exists(
                     select(eligible_trial.id).where(
                         eligible_trial.job_id == models.Job.id,
