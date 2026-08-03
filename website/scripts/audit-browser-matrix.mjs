@@ -399,6 +399,7 @@ const collectAccessibility = async (page) => page.evaluate(() => {
 });
 
 const checkWebsiteAccountNavigation = async (page, originalRoot) => {
+  const originalUrl = page.url();
   const button = page.locator(".site-account-button").first();
   if (await button.count() === 0 || !await button.isVisible()) return [];
   await button.click();
@@ -426,7 +427,11 @@ const checkWebsiteAccountNavigation = async (page, originalRoot) => {
     }
     return output;
   });
-  await page.goBack();
+  // A production navigation can replace the document, and Chromium's
+  // back-forward cache is not deterministic across all four audited browser
+  // channels. Return to the exact route explicitly so this audit measures the
+  // rendered product rather than BFCache eligibility.
+  await page.goto(originalUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
   await page.waitForSelector(originalRoot, { state: "visible", timeout: 10_000 });
   return issues;
 };
