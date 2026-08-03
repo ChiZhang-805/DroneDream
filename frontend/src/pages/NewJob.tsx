@@ -14,6 +14,7 @@ import { TrackEditor2D } from "../components/TrackEditor2D";
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { publicDemoConsole } from "../features/demo/publicDemo";
+import { recordProductEvent } from "../features/analytics/productEvents";
 import {
   EXPERIMENTAL_OPTIMIZER_STRATEGIES,
   HARNESS_OPTIMIZER_STRATEGIES,
@@ -44,6 +45,7 @@ import type {
   TrackPoint,
   TrackType,
   TuningMode,
+  UserExperiencePreferences,
 } from "../types/api";
 import {
   BUILTIN_PARAMETER_CATALOG,
@@ -78,6 +80,15 @@ import {
   type ExperimentFormState,
   type ScenarioPreset,
 } from "../features/experiment/formState";
+import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
+import {
+  applyStarterExperienceTemplate,
+  findStarterExperienceTemplate,
+  STARTER_EXPERIENCE_CATALOG_VERSION,
+  STARTER_EXPERIENCE_TEMPLATES,
+  type StarterExperienceId,
+  type StarterExperienceTemplate,
+} from "../features/experiment/experienceTemplates";
 import {
   createExperimentWorkspaceId,
   isExperimentWorkspaceNameAvailable,
@@ -117,6 +128,28 @@ const WIZARD_STEPS: Array<{ key: TranslationKey }> = [
   { key: "wizard.step.constraints" },
   { key: "wizard.step.review" },
 ];
+
+const STARTER_EXPERIENCE_I18N: Record<
+  StarterExperienceId,
+  { title: TranslationKey; description: TranslationKey }
+> = {
+  "hover-basics": {
+    title: "wizard.starter.hover.title",
+    description: "wizard.starter.hover.description",
+  },
+  "first-circle": {
+    title: "wizard.starter.circle.title",
+    description: "wizard.starter.circle.description",
+  },
+  "light-wind-circle": {
+    title: "wizard.starter.wind.title",
+    description: "wizard.starter.wind.description",
+  },
+  "wind-sensor-circle": {
+    title: "wizard.starter.combined.title",
+    description: "wizard.starter.combined.description",
+  },
+};
 
 const OBJECTIVE_WEIGHT_PRESETS: Record<
   Exclude<ObjectiveProfile, "custom">,
@@ -292,6 +325,7 @@ const AGGREGATION_HINT_KEYS: Record<RobustAggregation, TranslationKey> = {
 };
 
 const TRACK_HINT_KEYS: Record<TrackType, TranslationKey> = {
+  hover: "wizard.hint.track.hover",
   circle: "wizard.hint.track.circle",
   u_turn: "wizard.hint.track.uTurn",
   lemniscate: "wizard.hint.track.lemniscate",
@@ -698,8 +732,14 @@ function validate(
     const value = parseNumber(form.lemniscate_scale_m);
     if (value === null || value <= 0 || value > 100) errors.lemniscate_scale_m = t("wizard.validation.positiveAtMost", { max: 100 });
   }
-  if (parseNumber(form.start_x) === null) errors.start_x = t("wizard.validation.requiredNumber");
-  if (parseNumber(form.start_y) === null) errors.start_y = t("wizard.validation.requiredNumber");
+  const startX = parseNumber(form.start_x);
+  const startY = parseNumber(form.start_y);
+  if (startX === null) errors.start_x = t("wizard.validation.requiredNumber");
+  if (startY === null) errors.start_y = t("wizard.validation.requiredNumber");
+  if (form.track_type === "hover" && (startX !== 0 || startY !== 0)) {
+    errors.start_x = t("wizard.validation.hoverOrigin");
+    errors.start_y = t("wizard.validation.hoverOrigin");
+  }
   const altitude = parseNumber(form.altitude_m);
   if (altitude === null) errors.altitude_m = t("wizard.validation.requiredNumber");
   else if (altitude < 1 || altitude > 20) errors.altitude_m = t("wizard.validation.between", { min: 1, max: 20 });
@@ -1207,9 +1247,19 @@ export function NewJob() {
       ? loadExperimentDraft(EXPERIMENT_DRAFT_SCHEMA, initialWorkspaceId)
       : null,
   ).current;
+  const initialTemplate = useRef(
+    initialWorkspaceId
+      ? null
+      : findStarterExperienceTemplate(searchParams.get("scenario")),
+  ).current;
+  const initialBaseForm = useRef<FormState>(
+    initialDraft?.form
+      ?? (initialTemplate
+        ? applyStarterExperienceTemplate(DEFAULTS, initialTemplate)
+        : DEFAULTS),
+  ).current;
   const [form, setForm] = useState<FormState>(() => ({
-    ...DEFAULTS,
-    ...(initialDraft?.form ?? {}),
+    ...initialBaseForm,
     llm_provider: modelAccess.provider,
     llm_access_mode: modelAccess.accessMode,
     llm_api_key: modelAccess.apiKey,
@@ -1219,19 +1269,19 @@ export function NewJob() {
   const [catalog, setCatalog] = useState<ParameterCatalogResponse>(BUILTIN_PARAMETER_CATALOG);
   const [selections, setSelections] = useState<ParameterSelectionMap>(() =>
     mergeSelections(
-      createParameterSelections(BUILTIN_PARAMETER_CATALOG.parameters, initialDraft?.form.tuning_mode ?? "basic"),
+      createParameterSelections(BUILTIN_PARAMETER_CATALOG.parameters, initialBaseForm.tuning_mode),
       initialDraft?.selections,
     ),
   );
   const manualEditOriginForm = useRef<FormState>(
-    initialDraft?.conversation ? initialDraft.form : DEFAULTS,
+    initialDraft?.conversation ? initialDraft.form : initialBaseForm,
   ).current;
   const manualEditOriginSelections = useRef<ParameterSelectionMap>(
     initialDraft?.conversation
       ? initialDraft.selections
       : createParameterSelections(
         BUILTIN_PARAMETER_CATALOG.parameters,
-        initialDraft?.form.tuning_mode ?? "basic",
+        initialBaseForm.tuning_mode,
       ),
   ).current;
   const conversationRef = useRef(initialDraft?.conversation ?? null);
@@ -1253,6 +1303,11 @@ export function NewJob() {
   const [showTrackEditor, setShowTrackEditor] = useState(false);
   const [showTrackJson, setShowTrackJson] = useState(false);
   const [showParameterReview, setShowParameterReview] = useState(false);
+  const [lastAppliedTemplateKey, setLastAppliedTemplateKey] = useState<string | null>(
+    initialTemplate?.key ?? null,
+  );
+  const [savedDefaultsState, setSavedDefaultsState] =
+    useState<"idle" | "loading" | "applied" | "empty" | "error">("idle");
   const [capabilities, setCapabilities] = useState<BackendCapabilitiesResponse | null>(null);
   const [capabilitiesUnavailable, setCapabilitiesUnavailable] = useState(false);
   const submittingRef = useRef(false);
@@ -1270,6 +1325,7 @@ export function NewJob() {
   ).length;
   const trialPlan = calculateTrialPlan(form, selectedCount);
   const estimatedTrials = trialPlan.scheduledTrials;
+  const localPreviewPoints = referenceTrack(form) ?? [];
 
   useEffect(() => {
     if (!workspaceId || !initialDraft?.form.display_name.trim()) return;
@@ -1489,6 +1545,74 @@ export function NewJob() {
       delete next.percentile;
       return next;
     });
+  }
+
+  function applyStarterTemplate(template: StarterExperienceTemplate): void {
+    setForm((previous) => applyStarterExperienceTemplate(previous, template));
+    applyModePreset(template.patch.tuning_mode);
+    setLastAppliedTemplateKey(template.key);
+    setErrors((previous) => {
+      const next = { ...previous };
+      for (const key of Object.keys(template.patch)) {
+        delete next[key];
+      }
+      return next;
+    });
+  }
+
+  function applySavedDefaults(preferences: UserExperiencePreferences): void {
+    const template = STARTER_EXPERIENCE_TEMPLATES.find(
+      (candidate) => candidate.key === preferences.default_template_key,
+    );
+    setForm((previous) => {
+      const templated = template
+        ? applyStarterExperienceTemplate(previous, template)
+        : previous;
+      const trackType = preferences.default_track_type ?? templated.track_type;
+      return {
+        ...templated,
+        track_type: trackType,
+        start_x: trackType === "hover" ? "0" : templated.start_x,
+        start_y: trackType === "hover" ? "0" : templated.start_y,
+        altitude_m: preferences.default_altitude_m === null
+          ? templated.altitude_m
+          : String(preferences.default_altitude_m),
+      };
+    });
+    if (template) {
+      applyModePreset(template.patch.tuning_mode);
+      setLastAppliedTemplateKey(template.key);
+    }
+    setErrors((previous) => {
+      const next = { ...previous };
+      for (const key of ["track_type", "start_x", "start_y", "altitude_m"]) {
+        delete next[key];
+      }
+      if (template) {
+        for (const key of Object.keys(template.patch)) {
+          delete next[key];
+        }
+      }
+      return next;
+    });
+  }
+
+  async function loadSavedDefaults(): Promise<void> {
+    setSavedDefaultsState("loading");
+    try {
+      const preferences = await apiClient.getUserExperiencePreferences();
+      const hasDefaults = preferences.default_template_key !== null
+        || preferences.default_track_type !== null
+        || preferences.default_altitude_m !== null;
+      if (!preferences.saved || !hasDefaults) {
+        setSavedDefaultsState("empty");
+        return;
+      }
+      applySavedDefaults(preferences);
+      setSavedDefaultsState("applied");
+    } catch {
+      setSavedDefaultsState("error");
+    }
   }
 
   function handleObjectiveWeightChange(
@@ -1809,6 +1933,11 @@ export function NewJob() {
         });
       }
       clearExperimentDraft(workspaceId);
+      void recordProductEvent("job_created", {
+        source: lastAppliedTemplateKey ? "fixed_scenario" : "manual_or_assistant",
+        template_key: lastAppliedTemplateKey,
+        used_legacy_api: usedLegacyApi,
+      });
       navigate(`/jobs/${created.id}`, { replace: false });
     } catch (error) {
       setSubmitError(
@@ -1979,6 +2108,91 @@ export function NewJob() {
                 ))}
               </select>
             </div>
+            <section
+              className="stack-sm wizard-subsection starter-experience-section"
+              aria-labelledby="starter-experience-title"
+            >
+              <div className="starter-experience-heading">
+                <div>
+                  <h3 id="starter-experience-title">{t("wizard.starter.title")}</h3>
+                  <p>{t("wizard.starter.description")}</p>
+                </div>
+                <div className="starter-experience-heading-actions">
+                  <span className="starter-experience-version">
+                    {t("wizard.starter.catalogVersion", {
+                      version: STARTER_EXPERIENCE_CATALOG_VERSION,
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-small"
+                    disabled={savedDefaultsState === "loading"}
+                    onClick={() => void loadSavedDefaults()}
+                  >
+                    {savedDefaultsState === "loading"
+                      ? t("wizard.starter.loadingSaved")
+                      : t("wizard.starter.loadSaved")}
+                  </button>
+                </div>
+              </div>
+              <div className="starter-experience-layout">
+                <div className="starter-experience-grid">
+                  {STARTER_EXPERIENCE_TEMPLATES.map((template) => {
+                    const copy = STARTER_EXPERIENCE_I18N[template.id];
+                    const title = t(copy.title);
+                    return (
+                      <article className="starter-experience-card" key={template.key}>
+                        <div>
+                          <strong>{title}</strong>
+                          <span>v{template.version}</span>
+                        </div>
+                        <p>{t(copy.description)}</p>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-small"
+                          aria-label={`${t("wizard.starter.apply")}: ${title}`}
+                          onClick={() => applyStarterTemplate(template)}
+                        >
+                          {t("wizard.starter.apply")}
+                        </button>
+                      </article>
+                    );
+                  })}
+                </div>
+                <ExperienceTrackPreview
+                  trackType={form.track_type}
+                  points={localPreviewPoints}
+                  altitudeM={Number(form.altitude_m)}
+                  title={t("wizard.preview.title")}
+                  hoverLabel={t("wizard.preview.hover")}
+                  routeLabel={t("wizard.preview.route")}
+                  pointCountLabel={t("wizard.preview.pointCount", {
+                    count: localPreviewPoints.length,
+                  })}
+                  localOnlyLabel={t("wizard.preview.localOnly")}
+                />
+              </div>
+              {lastAppliedTemplateKey ? (
+                <p className="starter-experience-status" role="status">
+                  {t("wizard.starter.applied", { key: lastAppliedTemplateKey })}
+                </p>
+              ) : null}
+              {savedDefaultsState === "applied" ? (
+                <p className="starter-experience-status" role="status">
+                  {t("wizard.starter.savedApplied")}
+                </p>
+              ) : null}
+              {savedDefaultsState === "empty" ? (
+                <p className="starter-experience-note" role="status">
+                  {t("wizard.starter.noSaved")}
+                </p>
+              ) : null}
+              {savedDefaultsState === "error" ? (
+                <p className="starter-experience-note" role="alert">
+                  {t("wizard.starter.loadFailed")}
+                </p>
+              ) : null}
+            </section>
             <section className="stack-sm wizard-subsection" aria-labelledby="flight-setup-vehicle-title">
               <h3 id="flight-setup-vehicle-title">{t("wizard.section.vehicle")}</h3>
               <div className="form-grid">
@@ -2121,6 +2335,9 @@ export function NewJob() {
                 <Field label={t("wizard.field.startY")} required htmlFor="start_y" error={errors.start_y} hint={t("wizard.hint.startY")}><input id="start_y" type="number" step="0.1" value={form.start_y} onChange={handleTextChange("start_y")} /></Field>
                 <Field label={t("wizard.field.altitude")} required htmlFor="altitude_m" error={errors.altitude_m} hint={t("wizard.field.altitudeHint")}><input id="altitude_m" type="number" min="1" max="20" step="0.1" placeholder="1–20" value={form.altitude_m} onChange={handleTextChange("altitude_m")} /></Field>
               </div>
+              {form.track_type === "hover" ? (
+                <p className="form-hint wizard-full-row">{t(TRACK_HINT_KEYS.hover)}</p>
+              ) : null}
               {form.track_type === "custom" ? (
                 <>
                   <div className="generated-track-callout">

@@ -1,5 +1,11 @@
 import { getAuthAccessToken } from "../auth/authTokenStore";
 import { sensitiveCloudActionsAllowed } from "../../security/sensitiveOrigin";
+import {
+  FetchDeadlineError,
+  FetchResponseSizeError,
+  fetchWithDeadline,
+} from "../../api/fetchWithDeadline";
+import type { ManagedModelProvider } from "./ModelAccessContext";
 
 export type ManagedModelPlanId = "free" | "plus" | "pro";
 export type ManagedModelGrantScope = "assistant" | "job";
@@ -62,6 +68,21 @@ export interface ManagedModelGrant {
   usage: ManagedModelUsageSnapshot;
 }
 
+export interface ManagedModelCatalogEntry {
+  provider: ManagedModelProvider;
+  display_name: string;
+  model: string;
+  enabled: boolean;
+  assistant_enabled: boolean;
+  job_enabled: boolean;
+  policy_version: number;
+}
+
+export interface ManagedModelCatalog {
+  generated_at: string;
+  models: ManagedModelCatalogEntry[];
+}
+
 export interface BillingAvailability {
   enabled: boolean;
   billing_mode: "manual_monthly_renewal";
@@ -95,6 +116,9 @@ export class CloudModelAccessError extends Error {
     this.status = status;
   }
 }
+
+const CLOUD_REQUEST_TIMEOUT_MS = 30_000;
+const CLOUD_RESPONSE_MAX_BYTES = 1024 * 1024;
 
 function deriveFunctionUrl(functionName: string, explicitUrl: string | undefined): string {
   const explicit = explicitUrl?.trim().replace(/\/+$/u, "");
@@ -158,14 +182,26 @@ async function cloudRequest<T>(
       };
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers: {
-        ...requestHeaders,
-        ...(init?.headers ?? {}),
+    response = await fetchWithDeadline(
+      `${baseUrl}${path}`,
+      {
+        ...init,
+        headers: {
+          ...requestHeaders,
+          ...(init?.headers ?? {}),
+        },
       },
-    });
+      CLOUD_REQUEST_TIMEOUT_MS,
+      CLOUD_RESPONSE_MAX_BYTES,
+    );
   } catch (error) {
+    if (error instanceof FetchResponseSizeError) {
+      throw new CloudModelAccessError(
+        "RESPONSE_TOO_LARGE",
+        error.message,
+        error.httpStatus,
+      );
+    }
     throw new CloudModelAccessError(
       "NETWORK_ERROR",
       error instanceof Error ? error.message : "The cloud service could not be reached.",
@@ -175,7 +211,17 @@ async function cloudRequest<T>(
   let parsed: unknown;
   try {
     parsed = await response.json();
-  } catch {
+  } catch (error) {
+    if (error instanceof FetchDeadlineError) {
+      throw new CloudModelAccessError("NETWORK_ERROR", error.message, 0);
+    }
+    if (error instanceof FetchResponseSizeError) {
+      throw new CloudModelAccessError(
+        "RESPONSE_TOO_LARGE",
+        error.message,
+        response.status,
+      );
+    }
     throw new CloudModelAccessError(
       "INVALID_RESPONSE",
       `The cloud service returned HTTP ${response.status} without JSON.`,
@@ -198,15 +244,21 @@ export function getManagedModelUsage(): Promise<ManagedModelUsageSnapshot> {
   return cloudRequest<ManagedModelUsageSnapshot>(modelGatewayUrl, "/usage");
 }
 
+export function getManagedModelCatalog(): Promise<ManagedModelCatalog> {
+  return cloudRequest<ManagedModelCatalog>(modelGatewayUrl, "/models");
+}
+
 export function issueManagedModelGrant(
   scope: ManagedModelGrantScope,
   scopeReference?: string | null,
+  provider?: ManagedModelProvider,
 ): Promise<ManagedModelGrant> {
   return cloudRequest<ManagedModelGrant>(modelGatewayUrl, "/grants", {
     method: "POST",
     body: JSON.stringify({
       scope,
       scope_reference: scopeReference || null,
+      ...(provider ? { provider } : {}),
     }),
   });
 }

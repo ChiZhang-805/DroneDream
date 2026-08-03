@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
@@ -17,9 +18,12 @@ import {
   LayoutDashboard,
   LogIn,
   MailCheck,
+  MapPinned,
+  Menu,
   MoreHorizontal,
   Save,
   Settings,
+  ShieldCheck,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -61,6 +65,10 @@ import { AuthProvider, useAuth } from "./features/auth/AuthContext";
 import { accountCommunityActionsAllowed } from "./security/sensitiveOrigin";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import {
+  useAdminAccess,
+} from "./features/admin/AdminAccessContext";
+import { AdminAccessProvider } from "./features/admin/AdminAccessProvider";
+import {
   captchaProtectionConfigured,
   turnstileSiteKey,
 } from "./features/auth/supabaseClient";
@@ -72,7 +80,9 @@ import {
 import { ModelAccessProvider } from "./features/settings/ModelAccessProvider";
 import {
   CloudModelAccessError,
+  getManagedModelCatalog,
   getManagedModelUsage,
+  type ManagedModelCatalogEntry,
   type ManagedModelUsageSnapshot,
 } from "./features/settings/cloudModelAccess";
 import {
@@ -81,7 +91,14 @@ import {
 } from "./features/experiment/draftStorage";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
-import type { Job, JobStatus } from "./types/api";
+import type {
+  Job,
+  JobStatus,
+  StarterExperienceTemplateKey,
+  UserDefaultTrackType,
+  UserExperiencePreferences,
+} from "./types/api";
+import { ECE498BH_COURSE_URL } from "./externalLinks";
 
 const NAV_ITEMS: {
   to: string;
@@ -90,6 +107,7 @@ const NAV_ITEMS: {
   end?: boolean;
   desktopTo?: string;
   requiresRuntime?: boolean;
+  externalUrl?: string;
   icon: LucideIcon;
 }[] = [
   {
@@ -106,7 +124,17 @@ const NAV_ITEMS: {
     icon: LayoutDashboard,
   },
   { to: "/history", labelKey: "app.history", icon: History },
-  { to: "/ece498", label: "ECE498BH", icon: GraduationCap },
+  {
+    to: "/scenarios",
+    labelKey: "app.fixedScenarios",
+    icon: MapPinned,
+  },
+  {
+    to: ECE498BH_COURSE_URL,
+    label: "ECE498BH",
+    externalUrl: ECE498BH_COURSE_URL,
+    icon: GraduationCap,
+  },
 ];
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
@@ -142,11 +170,46 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
   },
   recent_requests: [],
 };
+
+const DOCS_PREVIEW_MANAGED_MODELS: ManagedModelCatalogEntry[] = [
+  { provider: "openai", display_name: "GPT", model: "gpt-4.1", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "deepseek", display_name: "DeepSeek", model: "deepseek-chat", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+  { provider: "qwen", display_name: "Qwen", model: "qwen-plus", enabled: true, assistant_enabled: true, job_enabled: true, policy_version: 1 },
+];
 const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
 const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
 const ACTIVE_JOB_PAGE_SIZE = 100;
+const MOBILE_NAVIGATION_QUERY = "(max-width: 520px)";
+
+function subscribeToMobileNavigation(onChange: () => void): () => void {
+  if (typeof window === "undefined" || !window.matchMedia) return () => undefined;
+  const query = window.matchMedia(MOBILE_NAVIGATION_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function mobileNavigationSnapshot(): boolean {
+  return typeof window !== "undefined"
+    && Boolean(window.matchMedia?.(MOBILE_NAVIGATION_QUERY).matches);
+}
+
 const MAX_ACTIVE_JOB_PAGES_PER_STATUS = 10;
+
+interface ExperiencePreferenceDraft {
+  memory_enabled: boolean;
+  default_template_key: StarterExperienceTemplateKey | null;
+  default_track_type: UserDefaultTrackType | null;
+  default_altitude_m: number | null;
+}
+
+const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
+  memory_enabled: false,
+  default_template_key: null,
+  default_track_type: null,
+  default_altitude_m: null,
+};
+const EXPERIENCE_PREFERENCE_LOAD_FAILED = "experience-preference-load-failed";
 
 interface ExitPromptState {
   hasDraft: boolean;
@@ -274,13 +337,15 @@ export function AppShell() {
   }
   return (
     <AuthProvider>
-      <DesktopRuntimeAccessProvider>
-        <AppUpdaterProvider>
-          <ModelAccessProvider>
-            <AppShellContent />
-          </ModelAccessProvider>
-        </AppUpdaterProvider>
-      </DesktopRuntimeAccessProvider>
+      <AdminAccessProvider>
+        <DesktopRuntimeAccessProvider>
+          <AppUpdaterProvider>
+            <ModelAccessProvider>
+              <AppShellContent />
+            </ModelAccessProvider>
+          </AppUpdaterProvider>
+        </DesktopRuntimeAccessProvider>
+      </AdminAccessProvider>
     </AuthProvider>
   );
 }
@@ -339,6 +404,7 @@ function SettingsDialog({
     addProfile,
     removeActiveProfile,
     selectAccessMode,
+    selectManagedProvider,
     selectProvider,
     updateSettings,
   } = useModelAccess();
@@ -353,8 +419,24 @@ function SettingsDialog({
       docsPreview ? "ready" : "idle",
     );
   const [managedUsageError, setManagedUsageError] = useState<string | null>(null);
+  const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
+    docsPreview ? DOCS_PREVIEW_MANAGED_MODELS : [],
+  );
+  const [managedModelsError, setManagedModelsError] = useState<string | null>(null);
   const [subscriptionOpenError, setSubscriptionOpenError] =
     useState<string | null>(null);
+  const [experiencePreferences, setExperiencePreferences] =
+    useState<UserExperiencePreferences | null>(null);
+  const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
+    useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
+  const [experiencePreferenceState, setExperiencePreferenceState] =
+    useState<"blocked" | "loading" | "ready" | "saving" | "saved" | "error">(
+      access.canUseRuntime ? "loading" : "blocked",
+    );
+  const [experiencePreferenceMessage, setExperiencePreferenceMessage] =
+    useState<string | null>(null);
+  const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
+    useState(false);
   const openSubscriptionPage = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
   ) => {
@@ -395,7 +477,131 @@ function SettingsDialog({
   useEffect(() => {
     void refreshManagedUsage();
   }, [refreshManagedUsage]);
+  useEffect(() => {
+    if (modelAccess.accessMode !== "platform") return;
+    if (docsPreview) {
+      setManagedModels(DOCS_PREVIEW_MANAGED_MODELS);
+      setManagedModelsError(null);
+      return;
+    }
+    if (!auth.account) return;
+    let active = true;
+    void getManagedModelCatalog()
+      .then((catalog) => {
+        if (!active) return;
+        setManagedModels(catalog.models.filter((model) =>
+          model.enabled && model.assistant_enabled
+        ));
+        setManagedModelsError(null);
+      })
+      .catch((error) => {
+        if (!active) return;
+        setManagedModels([]);
+        setManagedModelsError(error instanceof Error ? error.message : t("settings.model.usageUnavailable"));
+      });
+    return () => {
+      active = false;
+    };
+  }, [auth.account, docsPreview, modelAccess.accessMode, t]);
+  useEffect(() => {
+    if (managedModels.length === 0) return;
+    if (!managedModels.some((model) => model.provider === modelAccess.managedProvider)) {
+      selectManagedProvider(managedModels[0].provider);
+    }
+  }, [managedModels, modelAccess.managedProvider, selectManagedProvider]);
+  useEffect(() => {
+    if (!access.canUseRuntime) {
+      setExperiencePreferenceState("blocked");
+      setExperiencePreferenceMessage(null);
+      setConfirmExperiencePreferenceDelete(false);
+      return undefined;
+    }
+    let active = true;
+    setExperiencePreferenceState("loading");
+    setExperiencePreferenceMessage(null);
+    void apiClient.getUserExperiencePreferences()
+      .then((preferences) => {
+        if (!active) return;
+        setExperiencePreferences(preferences);
+        setExperiencePreferenceDraft({
+          memory_enabled: preferences.memory_enabled,
+          default_template_key: preferences.default_template_key,
+          default_track_type: preferences.default_track_type,
+          default_altitude_m: preferences.default_altitude_m,
+        });
+        setExperiencePreferenceState("ready");
+      })
+      .catch(() => {
+        if (!active) return;
+        setExperiencePreferenceState("error");
+        setExperiencePreferenceMessage(EXPERIENCE_PREFERENCE_LOAD_FAILED);
+      });
+    return () => {
+      active = false;
+    };
+  }, [access.canUseRuntime]);
+  const saveExperiencePreferences = async () => {
+    if (
+      !access.canUseRuntime ||
+      experiencePreferenceState === "blocked" ||
+      experiencePreferenceState === "loading" ||
+      experiencePreferenceState === "saving"
+    ) {
+      return;
+    }
+    setExperiencePreferenceState("saving");
+    setExperiencePreferenceMessage(null);
+    try {
+      const saved = await apiClient.updateUserExperiencePreferences({
+        ...experiencePreferenceDraft,
+        locale,
+      });
+      setExperiencePreferences(saved);
+      setExperiencePreferenceState("saved");
+      setExperiencePreferenceMessage(
+        saved.deleted_memory_count > 0
+          ? t("settings.memory.savedAndDeleted", {
+              count: saved.deleted_memory_count,
+            })
+          : t("settings.memory.saved"),
+      );
+    } catch {
+      setExperiencePreferenceState("error");
+      setExperiencePreferenceMessage(t("settings.memory.saveFailed"));
+    }
+  };
+  const deleteExperiencePreferences = async () => {
+    if (
+      !access.canUseRuntime ||
+      experiencePreferenceState === "blocked" ||
+      experiencePreferenceState === "loading" ||
+      experiencePreferenceState === "saving"
+    ) {
+      return;
+    }
+    setExperiencePreferenceState("saving");
+    setExperiencePreferenceMessage(null);
+    try {
+      const deleted = await apiClient.deleteUserExperiencePreferences();
+      setExperiencePreferences(null);
+      setExperiencePreferenceDraft(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
+      setConfirmExperiencePreferenceDelete(false);
+      setExperiencePreferenceState("ready");
+      setExperiencePreferenceMessage(
+        t("settings.memory.deleted", {
+          count: deleted.deleted_memory_count,
+        }),
+      );
+    } catch {
+      setExperiencePreferenceState("error");
+      setExperiencePreferenceMessage(t("settings.memory.deleteFailed"));
+    }
+  };
   const numberFormatter = new Intl.NumberFormat(locale === "zh-CN" ? "zh-CN" : "en");
+  const experiencePreferenceControlsDisabled =
+    experiencePreferenceState === "blocked" ||
+    experiencePreferenceState === "loading" ||
+    experiencePreferenceState === "saving";
   const creditRatio = managedUsage
     ? Math.min(
         100,
@@ -503,6 +709,156 @@ function SettingsDialog({
           <i aria-hidden="true">✓</i>
         </button>
       </fieldset>
+      <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
+        <div className="settings-memory-heading">
+          <div>
+            <h3 id="settings-memory-title">{t("settings.memory.title")}</h3>
+            <p>{t("settings.memory.description")}</p>
+          </div>
+          <span className={experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
+            {t(
+              experiencePreferenceDraft.memory_enabled
+                ? "settings.memory.enabled"
+                : "settings.memory.disabled",
+            )}
+          </span>
+        </div>
+        <label className="settings-memory-consent" htmlFor="settings_memory_enabled">
+          <input
+            id="settings_memory_enabled"
+            type="checkbox"
+            checked={experiencePreferenceDraft.memory_enabled}
+            disabled={experiencePreferenceControlsDisabled}
+            onChange={(event) => setExperiencePreferenceDraft((current) => ({
+              ...current,
+              memory_enabled: event.target.checked,
+            }))}
+          />
+          <span>
+            <strong>{t("settings.memory.consent")}</strong>
+            <small>{t("settings.memory.consentDetail")}</small>
+          </span>
+        </label>
+        <div className="settings-memory-grid">
+          <label htmlFor="settings_default_template">
+            <span>{t("settings.memory.defaultTemplate")}</span>
+            <select
+              id="settings_default_template"
+              value={experiencePreferenceDraft.default_template_key ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_template_key: (
+                  event.target.value || null
+                ) as StarterExperienceTemplateKey | null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="hover-basics@1">{t("wizard.starter.hover.title")} · v1</option>
+              <option value="first-circle@1">{t("wizard.starter.circle.title")} · v1</option>
+              <option value="light-wind-circle@1">{t("wizard.starter.wind.title")} · v1</option>
+            </select>
+          </label>
+          <label htmlFor="settings_default_track">
+            <span>{t("settings.memory.defaultTrack")}</span>
+            <select
+              id="settings_default_track"
+              value={experiencePreferenceDraft.default_track_type ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_track_type: (
+                  event.target.value || null
+                ) as UserDefaultTrackType | null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              <option value="hover">{t("wizard.track.hover")}</option>
+              <option value="circle">{t("wizard.track.circle")}</option>
+              <option value="u_turn">{t("wizard.track.uTurn")}</option>
+              <option value="lemniscate">{t("wizard.track.lemniscate")}</option>
+            </select>
+          </label>
+          <label htmlFor="settings_default_altitude">
+            <span>{t("settings.memory.defaultAltitude")}</span>
+            <input
+              id="settings_default_altitude"
+              type="number"
+              min="1"
+              max="20"
+              step="0.1"
+              value={experiencePreferenceDraft.default_altitude_m ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_altitude_m: event.target.value === ""
+                  ? null
+                  : Number(event.target.value),
+              }))}
+            />
+          </label>
+        </div>
+        <p className="settings-memory-policy">
+          {t("settings.memory.policy", {
+            days: experiencePreferences?.retention_days ?? 90,
+          })}
+        </p>
+        <div className="settings-memory-actions">
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={experiencePreferenceControlsDisabled}
+            onClick={() => void saveExperiencePreferences()}
+          >
+            {experiencePreferenceState === "saving"
+              ? t("settings.memory.saving")
+              : t("settings.memory.save")}
+          </button>
+          {!confirmExperiencePreferenceDelete ? (
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={experiencePreferenceControlsDisabled}
+              onClick={() => setConfirmExperiencePreferenceDelete(true)}
+            >
+              {t("settings.memory.delete")}
+            </button>
+          ) : (
+            <div className="settings-memory-delete-confirm" role="group" aria-label={t("settings.memory.confirmDelete")}>
+              <span>{t("settings.memory.confirmDelete")}</span>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => void deleteExperiencePreferences()}
+              >
+                {t("settings.memory.confirm")}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setConfirmExperiencePreferenceDelete(false)}
+              >
+                {t("settings.memory.cancel")}
+              </button>
+            </div>
+          )}
+        </div>
+        {experiencePreferenceState === "blocked" ? (
+          <p className="settings-memory-message" role="status">
+            {t("settings.memory.runtimeRequired")}
+          </p>
+        ) : null}
+        {experiencePreferenceMessage ? (
+          <p
+            className="settings-memory-message"
+            role={experiencePreferenceState === "error" ? "alert" : "status"}
+          >
+            {experiencePreferenceMessage === EXPERIENCE_PREFERENCE_LOAD_FAILED
+              ? t("settings.memory.loadFailed")
+              : experiencePreferenceMessage}
+          </p>
+        ) : null}
+      </section>
       <section className="settings-model-panel" aria-labelledby="settings-model-title">
         <div className="settings-model-heading">
           <h3 id="settings-model-title">{t("settings.model.title")}</h3>
@@ -543,6 +899,28 @@ function SettingsDialog({
         </div>
         {modelAccess.accessMode === "platform" ? (
           <div className="settings-model-usage">
+            <div className="settings-managed-model-row">
+              <label htmlFor="settings_managed_model_provider">
+                <span>{locale === "zh-CN" ? "平台托管模型" : "Included model"}</span>
+                <select
+                  id="settings_managed_model_provider"
+                  value={modelAccess.managedProvider}
+                  disabled={managedModels.length === 0}
+                  onChange={(event) => selectManagedProvider(
+                    event.target.value as ManagedModelCatalogEntry["provider"],
+                  )}
+                >
+                  {managedModels.map((model) => (
+                    <option key={model.provider} value={model.provider}>
+                      {model.display_name} · {model.model}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {managedModelsError ? (
+                <p role="status">{managedModelsError}</p>
+              ) : null}
+            </div>
             <div className="settings-model-plan-row">
               <div>
                 <span>{t("settings.model.currentPlan")}</span>
@@ -1633,16 +2011,26 @@ function AppShellContent() {
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuth();
+  const adminAccess = useAdminAccess();
   const updater = useAppUpdaterState();
   const { locale, t } = useI18n();
   const accountCopy = ACCOUNT_COPY[locale];
+  const mobileNavigationEnabled = useSyncExternalStore(
+    subscribeToMobileNavigation,
+    mobileNavigationSnapshot,
+    () => false,
+  );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
   const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
   const accountCloseRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuPanelRef = useRef<HTMLDivElement>(null);
   const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
   const currentPathRef = useRef(location.pathname);
   const exitPromptRef = useRef<ExitPromptState | null>(null);
@@ -1670,6 +2058,18 @@ function AppShellContent() {
     && !auth.account;
   const accountDialogRequired = accountRequired && !launcherMode;
   const accountDialogOpen = accountOpen || accountDialogRequired;
+  const mobileMenuExpanded = mobileNavigationEnabled && mobileMenuOpen;
+  const openExternalNavigation = useCallback((
+    event: MouseEvent<HTMLAnchorElement>,
+    url: string,
+  ) => {
+    if (!desktopRuntime) return;
+    event.preventDefault();
+    setExternalNavigationError(null);
+    void import("@tauri-apps/plugin-opener")
+      .then(({ openUrl }) => openUrl(url))
+      .catch(() => setExternalNavigationError(t("app.externalOpenFailed")));
+  }, [desktopRuntime, t]);
 
   useEffect(() => {
     // The launcher owns a strict two-stage flow: environment first, browser
@@ -1750,14 +2150,50 @@ function AppShellContent() {
     setLauncherSettingsOpen(false);
     // The trigger is inert while the modal is open. Restore focus on the next
     // frame, after the dialog effect has removed inert from the app shell.
-    requestAnimationFrame(() => launcherSettingsButtonRef.current?.focus());
-  }, []);
+    requestAnimationFrame(() => {
+      if (mobileNavigationEnabled) mobileMenuButtonRef.current?.focus();
+      else launcherSettingsButtonRef.current?.focus();
+    });
+  }, [mobileNavigationEnabled]);
 
   const closeAccount = useCallback(() => {
     if (accountRequired) return;
     setAccountOpen(false);
-    requestAnimationFrame(() => accountButtonRef.current?.focus());
-  }, [accountRequired]);
+    requestAnimationFrame(() => {
+      if (mobileNavigationEnabled) mobileMenuButtonRef.current?.focus();
+      else accountButtonRef.current?.focus();
+    });
+  }, [accountRequired, mobileNavigationEnabled]);
+
+  useEffect(() => {
+    if (!mobileMenuExpanded) return;
+    const closeMobileMenu = (restoreFocus: boolean) => {
+      setMobileMenuOpen(false);
+      if (restoreFocus) {
+        requestAnimationFrame(() => mobileMenuButtonRef.current?.focus());
+      }
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        mobileMenuPanelRef.current?.contains(target)
+        || mobileMenuButtonRef.current?.contains(target)
+      ) return;
+      closeMobileMenu(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeMobileMenu(true);
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuExpanded]);
 
   useEffect(() => {
     if (launcherMode) return;
@@ -2096,7 +2532,26 @@ function AppShellContent() {
             <BrandLockup variant="compact" />
           </a>
         )}
-        <nav className="app-nav" aria-label={t("app.primaryNav")}>
+        {mobileNavigationEnabled ? (
+          <button
+            ref={mobileMenuButtonRef}
+            type="button"
+            className="app-mobile-menu-button"
+            aria-label={t(mobileMenuExpanded ? "app.closeMenu" : "app.openMenu")}
+            aria-controls="app-mobile-navigation"
+            aria-expanded={mobileMenuExpanded}
+            onClick={() => setMobileMenuOpen((current) => !current)}
+          >
+            <Menu aria-hidden="true" strokeWidth={1.9} />
+          </button>
+        ) : null}
+        <div
+          ref={mobileMenuPanelRef}
+          id="app-mobile-navigation"
+          className={`app-mobile-menu-panel${mobileMenuExpanded ? " is-open" : ""}`}
+          hidden={mobileNavigationEnabled && !mobileMenuExpanded}
+        >
+          <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">
             {runtimeNavDescription}
           </span>
@@ -2110,20 +2565,8 @@ function AppShellContent() {
               item.requiresRuntime &&
               !runtimeAccess.canUseRuntime,
             );
-
-            return (
-              <NavLink
-                key={item.to}
-                to={destination}
-                end={item.end}
-                title={runtimeLocked ? runtimeNavDescription : undefined}
-                aria-describedby={runtimeLocked ? "runtime-nav-description" : undefined}
-                className={({ isActive }) => {
-                  const classes = runtimeLocked ? ["runtime-locked"] : [];
-                  if (isActive) classes.push("active");
-                  return classes.length > 0 ? classes.join(" ") : undefined;
-                }}
-              >
+            const itemContent = (
+              <>
                 <span className="app-nav-entry">
                   <ItemIcon aria-hidden="true" strokeWidth={1.75} />
                   <span>{item.labelKey ? t(item.labelKey) : item.label}</span>
@@ -2137,15 +2580,62 @@ function AppShellContent() {
                       : `🔒 ${t("runtimeGate.requiredShort")}`}
                   </span>
                 ) : null}
+              </>
+            );
+
+            if (item.externalUrl) {
+              return (
+                <a
+                  key={item.to}
+                  href={item.externalUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => {
+                    setMobileMenuOpen(false);
+                    openExternalNavigation(event, item.externalUrl!);
+                  }}
+                >
+                  {itemContent}
+                </a>
+              );
+            }
+
+            return (
+              <NavLink
+                key={item.to}
+                to={destination}
+                end={item.end}
+                title={runtimeLocked ? runtimeNavDescription : undefined}
+                aria-describedby={runtimeLocked ? "runtime-nav-description" : undefined}
+                onClick={() => setMobileMenuOpen(false)}
+                className={({ isActive }) => {
+                  const classes = runtimeLocked ? ["runtime-locked"] : [];
+                  if (isActive) classes.push("active");
+                  return classes.length > 0 ? classes.join(" ") : undefined;
+                }}
+              >
+                {itemContent}
               </NavLink>
             );
           })}
-        </nav>
-        <ExperimentWorkspaceSidebar
-          ownerId={auth.account?.id ?? "local"}
-          locale={locale}
-        />
-        <div className="app-sidebar-footer">
+          {!desktopRuntime && adminAccess.status === "allowed" ? (
+            <NavLink
+              to="/admin"
+              onClick={() => setMobileMenuOpen(false)}
+              className={({ isActive }) => isActive ? "active" : undefined}
+            >
+              <span className="app-nav-entry">
+                <ShieldCheck aria-hidden="true" strokeWidth={1.75} />
+                <span>{locale === "zh-CN" ? "管理端" : "Admin"}</span>
+              </span>
+            </NavLink>
+          ) : null}
+          </nav>
+          <ExperimentWorkspaceSidebar
+            ownerId={auth.account?.id ?? "local"}
+            locale={locale}
+          />
+          <div className="app-sidebar-footer">
           <button
             ref={accountButtonRef}
             type="button"
@@ -2154,6 +2644,7 @@ function AppShellContent() {
             aria-haspopup="dialog"
             aria-expanded={accountDialogOpen}
             onClick={() => {
+              setMobileMenuOpen(false);
               setLauncherSettingsOpen(false);
               setAccountOpen(true);
             }}
@@ -2174,12 +2665,31 @@ function AppShellContent() {
             </span>
             <MoreHorizontal aria-hidden="true" strokeWidth={1.8} />
           </button>
+          </div>
+          {mobileNavigationEnabled ? (
+            <button
+              ref={launcherSettingsButtonRef}
+              type="button"
+              className="app-mobile-settings-entry"
+              aria-label={t("app.settings")}
+              aria-haspopup="dialog"
+              aria-expanded={launcherSettingsOpen}
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setLauncherSettingsOpen(true);
+              }}
+            >
+              <Settings aria-hidden="true" strokeWidth={1.75} />
+              <span>{t("app.settings")}</span>
+            </button>
+          ) : null}
         </div>
       </aside>
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">DroneDream — {t("app.platform")}</div>
-          <div className="app-header-meta">
+          {!mobileNavigationEnabled ? (
+            <div className="app-header-meta">
             <button
               ref={launcherSettingsButtonRef}
               type="button"
@@ -2191,7 +2701,8 @@ function AppShellContent() {
             >
               <Settings aria-hidden="true" strokeWidth={1.85} />
             </button>
-          </div>
+            </div>
+          ) : null}
         </header>
         {launcherSettingsOpen ? (
           <div
@@ -2211,6 +2722,18 @@ function AppShellContent() {
         ) : null}
         {accountDialog}
         {exitGuard}
+        {externalNavigationError ? (
+          <div className="app-external-navigation-error" role="alert">
+            <span>{externalNavigationError}</span>
+            <button
+              type="button"
+              aria-label={t("app.dismiss")}
+              onClick={() => setExternalNavigationError(null)}
+            >
+              <X aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
         <main id="main-content" className={`app-main${experimentWizardMode ? " app-main-wizard" : ""}`} tabIndex={-1}>
           <Outlet />
         </main>

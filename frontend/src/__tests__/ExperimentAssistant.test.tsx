@@ -94,6 +94,7 @@ describe("conversational experiment drafting", () => {
   });
 
   afterEach(() => {
+    window.history.replaceState({}, "", "/");
     vi.restoreAllMocks();
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
@@ -224,7 +225,8 @@ describe("conversational experiment drafting", () => {
       .toHaveValue("default");
   });
 
-  it("shows the included managed model by default without exposing a key", () => {
+  it("shows only centrally available managed models without exposing a key", () => {
+    window.history.replaceState({}, "", "/?docsPreview=1");
     render(
       <I18nProvider>
         <MemoryRouter>
@@ -236,10 +238,33 @@ describe("conversational experiment drafting", () => {
     );
 
     const selector = screen.getByRole("combobox", { name: "Model" });
-    expect(selector).toHaveValue("managed");
-    expect(selector).toHaveTextContent("DroneDream Managed");
-    expect(selector).not.toHaveTextContent("OpenAI");
+    expect(selector).toHaveValue("managed:openai");
+    expect(selector).toHaveTextContent("GPT · gpt-4.1");
+    expect(selector).toHaveTextContent("DeepSeek · deepseek-chat");
+    expect(selector).toHaveTextContent("Qwen · qwen-plus");
     expect(selector).not.toHaveTextContent("key required");
+
+    fireEvent.change(selector, { target: { value: "managed:deepseek" } });
+    expect(selector).toHaveValue("managed:deepseek");
+  });
+
+  it("fails closed when a signed-out build has no managed model policy", () => {
+    render(
+      <I18nProvider>
+        <MemoryRouter>
+          <ModelAccessProvider>
+            <ExperimentAssistant />
+          </ModelAccessProvider>
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+
+    const selector = screen.getByRole("combobox", { name: "Model" });
+    expect(selector).toBeDisabled();
+    expect(selector).toHaveValue("none");
+    expect(selector).toHaveTextContent(
+      "No managed conversation model is currently available.",
+    );
   });
 
   it("inserts only a template body and keeps its heading out of the prompt", () => {

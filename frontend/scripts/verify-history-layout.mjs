@@ -232,6 +232,37 @@ async function measure(page) {
   });
 }
 
+async function measureActions(page, definitions) {
+  return page.evaluate((entries) => {
+    const action = ({ name, selector }) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) {
+        return { name, selector, exists: false, horizontallyReachable: false };
+      }
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return {
+        name,
+        selector,
+        exists: true,
+        disabled: element instanceof HTMLButtonElement ? element.disabled : false,
+        display: style.display,
+        visibility: style.visibility,
+        left: Number(rect.left.toFixed(2)),
+        right: Number(rect.right.toFixed(2)),
+        width: Number(rect.width.toFixed(2)),
+        horizontallyReachable:
+          rect.width > 0
+          && rect.right > 0
+          && rect.left < document.documentElement.clientWidth
+          && rect.left >= -1
+          && rect.right <= document.documentElement.clientWidth + 1,
+      };
+    };
+    return entries.map(action);
+  }, definitions);
+}
+
 function containmentViolations(metrics) {
   const violations = [];
   const exceeds = (entry) =>
@@ -330,6 +361,24 @@ try {
       window.scrollTo(0, 0);
     });
     const initial = await measure(page);
+    if (testCase.viewport.width <= 520) {
+      const menuButton = page.locator(".app-mobile-menu-button");
+      await menuButton.click();
+      await page.locator("#app-mobile-navigation").waitFor();
+      const mobileActions = await measureActions(page, [
+        {
+          name: "history navigation",
+          selector: '#app-mobile-navigation .app-nav a[href$="/history"]',
+        },
+        {
+          name: "application settings",
+          selector: "#app-mobile-navigation .app-mobile-settings-entry",
+        },
+      ]);
+      initial.actions = [...mobileActions, ...initial.actions.slice(2)];
+      await menuButton.click();
+      await page.locator("#app-mobile-navigation").waitFor({ state: "hidden" });
+    }
     const violations = containmentViolations(initial);
     await page.screenshot({
       path: path.join(outputRoot, `${testCase.id}-initial.png`),

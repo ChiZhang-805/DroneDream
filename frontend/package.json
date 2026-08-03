@@ -15,7 +15,9 @@
     "console:build": "vite build --config vite.console.config.ts",
     "site:preview": "vite preview --config vite.site.config.ts",
     "test:history-layout": "node scripts/verify-history-layout.mjs",
+    "test:result-honesty-layout": "node scripts/verify-result-honesty-layout.mjs",
     "test:desktop-browser-auth": "node scripts/verify-desktop-browser-auth.mjs",
+    "test:admin-layout": "node scripts/verify-admin-console-layout.mjs",
     "test:software-ui-layout": "node scripts/verify-software-ui-layout.mjs",
     "test": "vitest run",
     "test:watch": "vitest"

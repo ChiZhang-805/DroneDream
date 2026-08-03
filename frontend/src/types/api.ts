@@ -36,13 +36,58 @@ export type TrialStatus =
   | "FAILED"
   | "CANCELLED";
 
-export type TrackType = "circle" | "u_turn" | "lemniscate" | "custom";
+export type TrackType = "hover" | "circle" | "u_turn" | "lemniscate" | "custom";
 export const TRACK_TYPES: readonly TrackType[] = [
+  "hover",
   "circle",
   "u_turn",
   "lemniscate",
   "custom",
 ];
+
+export type StarterExperienceTemplateKey =
+  | "hover-basics@1"
+  | "first-circle@1"
+  | "light-wind-circle@1"
+  | "wind-sensor-circle@1";
+export type UserDefaultTrackType =
+  | "hover"
+  | "circle"
+  | "u_turn"
+  | "lemniscate";
+
+export interface UserExperiencePreferences {
+  schema_version: "1.0";
+  saved: boolean;
+  memory_enabled: boolean;
+  locale: "en" | "zh-CN" | null;
+  default_template_key: StarterExperienceTemplateKey | null;
+  default_track_type: UserDefaultTrackType | null;
+  default_altitude_m: number | null;
+  retention_days: number;
+  stored_content:
+    "allowlisted_preferences_and_verified_structured_job_outcomes_only";
+  updated_at: string | null;
+}
+
+export interface UserExperiencePreferencesUpdate {
+  memory_enabled?: boolean;
+  locale?: "en" | "zh-CN" | null;
+  default_template_key?: StarterExperienceTemplateKey | null;
+  default_track_type?: UserDefaultTrackType | null;
+  default_altitude_m?: number | null;
+}
+
+export interface UserExperiencePreferencesMutation
+  extends UserExperiencePreferences {
+  deleted_memory_count: number;
+}
+
+export interface DeleteUserExperiencePreferencesResponse {
+  deleted_preferences: boolean;
+  deleted_memory_count: number;
+  memory_enabled: false;
+}
 
 export type SensorNoiseLevel = "low" | "medium" | "high";
 export const SENSOR_NOISE_LEVELS: readonly SensorNoiseLevel[] = [
@@ -823,6 +868,8 @@ export interface JobReport {
   optimized_metrics: AggregatedMetrics;
   comparison: ComparisonPoint[];
   best_parameters: BestParameters;
+  winner_evidence_id?: string | null;
+  winner_freeze_receipt_id?: string | null;
   report_status: "PENDING" | "READY" | "FAILED";
   created_at: string;
   updated_at: string;

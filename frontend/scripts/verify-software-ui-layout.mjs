@@ -39,6 +39,13 @@ const cases = [
   { id: "mobile-en", locale: "en", viewport: { width: 390, height: 844 } },
   { id: "mobile-zh", locale: "zh-CN", viewport: { width: 390, height: 844 } },
 ];
+const fixedScenarioOnlyCases = [
+  {
+    id: "tablet-fixed-scenarios-en",
+    locale: "en",
+    viewport: { width: 760, height: 900 },
+  },
+];
 
 function git(...gitArgs) {
   return execFileSync("git", gitArgs, {
@@ -114,7 +121,11 @@ async function screenshot(page, id, surface) {
 async function openAccountCropper(page, avatarBytes) {
   const account = page.locator(".account-dialog");
   if (!(await account.isVisible())) {
-    await page.locator(".app-account-button").click();
+    const accountButton = page.locator(".app-account-button");
+    if (!(await accountButton.isVisible())) {
+      await page.locator(".app-mobile-menu-button").click();
+    }
+    await accountButton.click();
   }
   await account.waitFor();
   await account.locator('input[type="file"]').setInputFiles({
@@ -139,7 +150,21 @@ async function openAccountCropper(page, avatarBytes) {
 
 async function verifySettings(page, testCase) {
   await page.goto(`${origin}/assistant?docsPreview=1`, { waitUntil: "networkidle" });
-  await page.locator(".launcher-settings-button").click();
+  const assistantModel = page.locator(".assistant-model-button");
+  await assistantModel.waitFor();
+  assert.equal(await assistantModel.locator("option").count(), 3);
+  assert.equal(
+    await assistantModel.getAttribute("aria-label"),
+    testCase.locale === "en" ? "Model" : "模型",
+  );
+  await assistantModel.scrollIntoViewIfNeeded();
+  const assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
+  if (testCase.viewport.width <= 520) {
+    await page.locator(".app-mobile-menu-button").click();
+    await page.locator(".app-mobile-settings-entry").click();
+  } else {
+    await page.locator(".launcher-settings-button").click();
+  }
   const dialog = page.locator(".launcher-settings-dialog");
   await dialog.waitFor();
   const usage = dialog.locator(".settings-model-usage");
@@ -172,6 +197,12 @@ async function verifySettings(page, testCase) {
       },
       documentWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
+      managedModelOptions: element.querySelectorAll(
+        ".settings-managed-model-row select option",
+      ).length,
+      usageValuesFit: Array.from(
+        element.querySelectorAll(".settings-model-usage-grid strong"),
+      ).every((value) => value.scrollWidth <= value.clientWidth + 1),
     };
   });
   assert(metrics.manage && metrics.refresh && metrics.period && metrics.usage);
@@ -188,6 +219,8 @@ async function verifySettings(page, testCase) {
     metrics.documentWidth,
     `${testCase.id}: Settings caused horizontal document overflow`,
   );
+  assert.equal(metrics.managedModelOptions, 3);
+  assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
   const manage = usage.locator(".settings-model-plan-row .btn");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
@@ -195,7 +228,12 @@ async function verifySettings(page, testCase) {
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
   await dialog.locator(".launcher-settings-close").click();
-  return { ...metrics, keyboardFocusOrder: "manage-subscription -> refresh-usage", image };
+  return {
+    ...metrics,
+    keyboardFocusOrder: "manage-subscription -> refresh-usage",
+    assistantModelImage,
+    image,
+  };
 }
 
 async function verifyAvatar(page, testCase, avatarBytes) {
@@ -253,59 +291,242 @@ async function verifyAvatar(page, testCase, avatarBytes) {
   };
 }
 
-async function verifyEce498(page, testCase) {
-  await page.goto(`${origin}/ece498?docsPreview=1`, { waitUntil: "networkidle" });
-  const stageResults = [];
-  const tabs = page.getByRole("tab");
-  assert.equal(await tabs.count(), 7);
-  for (let index = 0; index < 7; index += 1) {
-    await tabs.nth(index).click();
-    await page.waitForFunction(() => {
-      const bodies = Array.from(document.querySelectorAll(".ece498-stage-body"));
-      return bodies.length === 4
-        && bodies.every((body) => body.dataset.lineContract !== "pending");
-    });
-    const stage = await page.locator(".ece498-stage-detail").evaluate((element) => {
-      const titleLines = Array.from(
-        element.querySelectorAll(".ece498-stage-copy-section > span"),
-      ).map((title) => {
-        const bounds = title.getBoundingClientRect();
-        const lineHeight = Number.parseFloat(getComputedStyle(title).lineHeight);
-        return Math.round(bounds.height / lineHeight);
-      });
-      const bodies = Array.from(
-        element.querySelectorAll(".ece498-stage-body"),
-      ).map((body) => ({
-        lines: Number(body.dataset.renderedLines || 0),
-        contract: body.dataset.lineContract,
-        clientHeight: body.clientHeight,
-        scrollHeight: body.scrollHeight,
-      }));
+async function verifyEce498ExternalEntry(page, testCase) {
+  const courseUrl =
+    "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html";
+  await page.goto(`${origin}/dashboard?docsPreview=1`, { waitUntil: "networkidle" });
+  if (testCase.viewport.width <= 520) {
+    await page.locator(".app-mobile-menu-button").click();
+  }
+  const courseLink = page.getByRole("link", { name: "ECE498BH" });
+  await courseLink.waitFor();
+  assert.equal(await courseLink.getAttribute("href"), courseUrl);
+  assert.equal(await courseLink.getAttribute("target"), "_blank");
+  assert.equal(await courseLink.getAttribute("rel"), "noreferrer");
+  assert.equal(await page.getByRole("tab").count(), 0);
+  assert.equal(await page.locator(".ece498-stage-detail").count(), 0);
+
+  await page.context().route(courseUrl, (route) => route.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: "<!doctype html><title>ECE498BH course fixture</title>",
+  }));
+      const popupPromise = page.waitForEvent("popup");
+      await courseLink.click();
+      const popup = await popupPromise;
+      await popup.waitForURL(courseUrl, { waitUntil: "domcontentloaded" });
+      assert.equal(popup.url(), courseUrl);
+  await popup.close();
+  await page.context().unroute(courseUrl);
+
+  const dimensions = await page.evaluate(() => ({
+    documentWidth: document.documentElement.clientWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+  }));
+  assert.equal(dimensions.documentScrollWidth, dimensions.documentWidth);
+  const image = await screenshot(page, testCase.id, "ece498-external-entry");
+  return {
+    courseUrl,
+    target: "_blank",
+    internalCoursePageRemoved: true,
+    popupReachedExactUrl: true,
+    ...dimensions,
+    image,
+  };
+}
+
+async function verifyFixedScenarios(page, testCase) {
+  await page.goto(`${origin}/scenarios?docsPreview=1`, { waitUntil: "networkidle" });
+  const nav = page.locator(".app-nav");
+  const navEntries = nav.locator(":scope > a");
+  const activeEntry = nav.locator('a[href="/scenarios"]');
+  const cards = page.locator(".fixed-scenario-card");
+  let mobileMenuImage = null;
+  if (testCase.viewport.width <= 520) {
+    const menuButton = page.locator(".app-mobile-menu-button");
+    assert(await menuButton.isVisible(), `${testCase.id}: mobile menu trigger is missing`);
+    assert.equal(await page.locator(".app-header").isVisible(), false);
+    await menuButton.click();
+    const panel = page.locator(".app-mobile-menu-panel");
+    await panel.waitFor();
+    const mobileMenu = await panel.evaluate((element) => {
+      const bounds = (target) => {
+        const rect = target.getBoundingClientRect();
+        return {
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          width: rect.width,
+        };
+      };
+      const account = element.querySelector(".app-sidebar-footer");
+      const settings = element.querySelector(".app-mobile-settings-entry");
+      const links = Array.from(element.querySelectorAll(".app-nav > a"));
+      if (!(account instanceof HTMLElement) || !(settings instanceof HTMLElement)) {
+        throw new Error("Mobile navigation is missing its account or settings row");
+      }
       return {
-        title: element.querySelector(".ece498-stage-heading h3")?.textContent,
-        titleLines,
-        bodies,
+        panel: bounds(element),
+        account: bounds(account),
+        settings: bounds(settings),
+        links: links.map(bounds),
         documentWidth: document.documentElement.clientWidth,
         documentScrollWidth: document.documentElement.scrollWidth,
       };
     });
-    assert(stage.titleLines.every((lines) => lines === 1));
-    assert(stage.bodies.every((body) => body.scrollHeight <= body.clientHeight + 1));
-    if (testCase.viewport.width >= 1000) {
-      assert(
-        stage.bodies.every((body) => body.lines === 9 && body.contract === "pass"),
-        `${testCase.id}: ${stage.title} did not render four nine-line bodies: ${
-          JSON.stringify(stage.bodies)
-        }`,
-      );
-    }
-    assert.equal(stage.documentScrollWidth, stage.documentWidth);
-    stageResults.push(stage);
+    assert.equal(mobileMenu.links.length, 5);
+    assert(mobileMenu.account.bottom <= mobileMenu.links[0].top + 1);
+    assert(mobileMenu.links.at(-1).bottom <= mobileMenu.settings.top + 1);
+    assert(mobileMenu.links.every((entry) => closeEnough(
+      entry.width,
+      mobileMenu.panel.width,
+      2,
+    )));
+    assert.equal(mobileMenu.documentScrollWidth, mobileMenu.documentWidth);
+    mobileMenuImage = await screenshot(page, testCase.id, "mobile-navigation");
   }
-  const image = await screenshot(page, testCase.id, "ece498");
+  await activeEntry.waitFor();
+  assert.equal(await navEntries.count(), 5);
+  assert.equal(await cards.count(), 4);
+  assert(await activeEntry.evaluate((element) => element.classList.contains("active")));
+
+  const metrics = await page.evaluate(() => {
+    const bounds = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      };
+    };
+    const navElement = document.querySelector(".app-nav");
+    const pageElement = document.querySelector(".fixed-scenarios-page");
+    const version = document.querySelector(".fixed-scenarios-version");
+    const navLinks = Array.from(document.querySelectorAll(".app-nav > a"));
+    const scenarioCards = Array.from(document.querySelectorAll(".fixed-scenario-card"));
+    if (!(navElement instanceof HTMLElement) || !(pageElement instanceof HTMLElement)) {
+      throw new Error("Fixed-scenario layout is missing its navigation or page root");
+    }
+    return {
+      nav: bounds(navElement),
+      page: bounds(pageElement),
+      version: version instanceof HTMLElement ? bounds(version) : null,
+      navEntries: navLinks.map((link) => {
+        const label = link.querySelector(".app-nav-entry > span");
+        return {
+          ...bounds(link),
+          href: link.getAttribute("href"),
+          active: link.classList.contains("active"),
+          labelFits: label instanceof HTMLElement
+            ? label.scrollWidth <= label.clientWidth + 1
+            : false,
+        };
+      }),
+      cards: scenarioCards.map(bounds),
+      documentWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+    };
+  });
+
+  assert(metrics.version, `${testCase.id}: scenario catalog version badge is missing`);
+  assert.equal(metrics.navEntries.filter((entry) => entry.active).length, 1);
+  assert.equal(
+    metrics.navEntries.find((entry) => entry.active)?.href,
+    "/scenarios",
+  );
+  assert(
+    metrics.navEntries.every((entry) => entry.labelFits),
+    `${testCase.id}: a primary-navigation label is clipped`,
+  );
+  assert.equal(
+    metrics.documentScrollWidth,
+    metrics.documentWidth,
+    `${testCase.id}: fixed scenarios caused horizontal document overflow`,
+  );
+  assert(
+    metrics.version.left >= metrics.page.left - 1
+      && metrics.version.right <= metrics.page.right + 1,
+    `${testCase.id}: catalog version badge escaped the page bounds`,
+  );
+
+  if (testCase.viewport.width >= 1000) {
+    assert(closeEnough(metrics.cards[0].top, metrics.cards[1].top, 1));
+    assert(closeEnough(metrics.cards[2].top, metrics.cards[3].top, 1));
+    assert(closeEnough(metrics.cards[0].width, metrics.cards[1].width, 1));
+    assert(closeEnough(metrics.cards[2].width, metrics.cards[3].width, 1));
+    assert(
+      metrics.navEntries.every((entry, index, entries) => (
+        index === 0 || entry.top > entries[index - 1].top
+      )),
+      `${testCase.id}: desktop navigation entries are not vertically ordered`,
+    );
+  } else {
+    assert(
+      metrics.cards.every((card) => (
+        closeEnough(card.left, metrics.cards[0].left, 1)
+        && closeEnough(card.right, metrics.cards[0].right, 1)
+      )),
+      `${testCase.id}: mobile scenario cards do not share one column`,
+    );
+    const trailingEntry = metrics.navEntries.at(-1);
+    assert(trailingEntry);
+    if (testCase.viewport.width <= 520) {
+      assert(closeEnough(trailingEntry.left, metrics.nav.left, 1));
+      assert(closeEnough(trailingEntry.right, metrics.nav.right, 1));
+      assert(
+        trailingEntry.top > metrics.navEntries.at(-2).top,
+        `${testCase.id}: trailing navigation entry did not receive its full-width row`,
+      );
+    } else {
+      const penultimateEntry = metrics.navEntries.at(-2);
+      assert(penultimateEntry);
+      assert(closeEnough(penultimateEntry.top, trailingEntry.top, 1));
+      assert(penultimateEntry.top > metrics.navEntries.at(-3).top);
+      assert(penultimateEntry.left > metrics.nav.left);
+      assert(trailingEntry.right < metrics.nav.right);
+      assert(closeEnough(
+        (penultimateEntry.left + trailingEntry.right) / 2,
+        (metrics.nav.left + metrics.nav.right) / 2,
+        2,
+      ));
+    }
+  }
+
+  if (testCase.viewport.width <= 520) {
+    await page.locator(".app-mobile-menu-button").click();
+  }
+  const image = await screenshot(page, testCase.id, "fixed-scenarios");
+  let createRequests = 0;
+  const countCreateRequest = (request) => {
+    if (request.method() === "POST" && /\/api\/v1\/jobs(?:\?|$)/u.test(request.url())) {
+      createRequests += 1;
+    }
+  };
+  page.on("request", countCreateRequest);
+  const combinedScenario = page.locator(
+    '.fixed-scenario-card[data-template-key="wind-sensor-circle@1"] .fixed-scenario-use',
+  );
+  await combinedScenario.focus();
+  assert(await combinedScenario.evaluate((element) => element === document.activeElement));
+  await page.keyboard.press("Enter");
+  await page.locator(".wizard-name-modal").waitFor();
+  assert.equal(new URL(page.url()).searchParams.get("scenario"), "wind-sensor-circle@1");
+  assert.equal(await page.locator(".wizard-name-modal input").inputValue(), "");
+  assert.equal(await page.locator(".wizard-stepper").count(), 0);
+  assert.equal(createRequests, 0);
+  page.off("request", countCreateRequest);
+
   return {
-    stages: stageResults,
-    desktopLineContract: testCase.viewport.width >= 1000 ? "4 cards x (1 + 9 lines)" : "responsive unclipped",
+    ...metrics,
+    balancedNavigation: true,
+    keyboardScenarioSelection: true,
+    freshNameRequired: true,
+    createRequests,
+    mobileMenuImage,
     image,
   };
 }
@@ -645,7 +866,8 @@ try {
     try {
       entry.settings = await verifySettings(page, testCase);
       entry.avatar = await verifyAvatar(page, testCase, avatarBytes);
-      entry.ece498 = await verifyEce498(page, testCase);
+      entry.fixedScenarios = await verifyFixedScenarios(page, testCase);
+      entry.ece498 = await verifyEce498ExternalEntry(page, testCase);
       entry.wizard = await verifyTrackAndScenario(page, testCase);
       entry.workspace = await verifyWorkspaceLifecycle(page, testCase);
       entry.pageErrors = pageErrors;
@@ -659,6 +881,36 @@ try {
     results.push(entry);
     await context.close();
     if (failure) break;
+  }
+  if (!failure) {
+    for (const testCase of fixedScenarioOnlyCases) {
+      const context = await browser.newContext({ viewport: testCase.viewport });
+      await context.addInitScript((locale) => {
+        window.localStorage.setItem("drone-dream:locale", locale);
+      }, testCase.locale);
+      await context.route("**/api/v1/**", (route) => route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Offline visual-validation fixture" }),
+      }));
+      const page = await context.newPage();
+      const pageErrors = [];
+      page.on("pageerror", (error) => pageErrors.push(error.message));
+      const entry = { case: testCase, scope: "fixed-scenarios-only" };
+      try {
+        entry.fixedScenarios = await verifyFixedScenarios(page, testCase);
+        entry.pageErrors = pageErrors;
+        assert.deepEqual(pageErrors, [], `${testCase.id}: page errors`);
+        entry.status = "pass";
+      } catch (error) {
+        entry.status = "fail";
+        entry.error = error instanceof Error ? error.stack : String(error);
+        failure = error;
+      }
+      results.push(entry);
+      await context.close();
+      if (failure) break;
+    }
   }
 } finally {
   await browser.close();

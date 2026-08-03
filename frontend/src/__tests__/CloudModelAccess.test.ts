@@ -110,6 +110,55 @@ describe("cloud model access client", () => {
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("PLATFORM_LLM_API_KEY");
   });
 
+  it("loads the centrally filtered model catalog and requests one provider", async () => {
+    const { cloud, auth } = await loadCloudAccess();
+    auth.setAuthAccessToken("signed-user-token");
+    const catalog = {
+      policy_version: 8,
+      models: [
+        {
+          provider: "deepseek",
+          display_name: "DeepSeek",
+          model: "deepseek-chat",
+          enabled: true,
+          assistant_enabled: true,
+          job_enabled: false,
+          policy_version: 8,
+        },
+      ],
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ data: catalog }))
+      .mockResolvedValueOnce(jsonResponse({
+        data: {
+          access_mode: "platform",
+          grant: "ddg_one_time_scoped_test_grant_1234567890",
+          scope: "assistant",
+          expires_at: "2026-08-03T00:00:00Z",
+          max_calls: 1,
+          gateway_base_url: "https://cloud.example.test/functions/v1/model-gateway",
+          managed_model: "deepseek-chat",
+          usage: {},
+        },
+      }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(cloud.getManagedModelCatalog()).resolves.toEqual(catalog);
+    await cloud.issueManagedModelGrant("assistant", "draft-84", "deepseek");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://cloud.example.test/functions/v1/model-gateway/models",
+    );
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(expect.objectContaining({
+      body: JSON.stringify({
+        scope: "assistant",
+        scope_reference: "draft-84",
+        provider: "deepseek",
+      }),
+    }));
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toMatch(/api[_-]?key/iu);
+  });
+
   it("maps an exhausted managed allowance to the typed BYOK boundary", async () => {
     const { cloud, auth } = await loadCloudAccess();
     auth.setAuthAccessToken("signed-user-token");

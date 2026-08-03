@@ -22,6 +22,7 @@ import type {
   DeleteJobResponse,
   ExperimentAssistantTurnRequest,
   ExperimentAssistantTurnResponse,
+  DeleteUserExperiencePreferencesResponse,
   JobUpdateRequest,
   JobRerunRequest,
   JobReport,
@@ -32,6 +33,9 @@ import type {
   OptimizationHistory,
   Trial,
   TrialSummary,
+  UserExperiencePreferences,
+  UserExperiencePreferencesMutation,
+  UserExperiencePreferencesUpdate,
 } from "../types/api";
 
 export class ApiClientError extends Error {
@@ -399,6 +403,25 @@ export const apiClient = {
   async getParameterCatalog(px4Version: string): Promise<ParameterCatalogApiResponse> {
     const qs = buildQuery({ px4_version: px4Version });
     return request<ParameterCatalogApiResponse>(`/parameter-catalog${qs}`);
+  },
+
+  async getUserExperiencePreferences(): Promise<UserExperiencePreferences> {
+    return request<UserExperiencePreferences>("/preferences/experience");
+  },
+
+  async updateUserExperiencePreferences(
+    req: UserExperiencePreferencesUpdate,
+  ): Promise<UserExperiencePreferencesMutation> {
+    return request<UserExperiencePreferencesMutation>("/preferences/experience", {
+      method: "PUT",
+      body: JSON.stringify(req),
+    }, { idempotentMutation: true });
+  },
+
+  async deleteUserExperiencePreferences(): Promise<DeleteUserExperiencePreferencesResponse> {
+    return request<DeleteUserExperiencePreferencesResponse>("/preferences/experience", {
+      method: "DELETE",
+    }, { idempotentMutation: true });
   },
 
   async createJob(req: JobCreateRequest): Promise<Job> {
