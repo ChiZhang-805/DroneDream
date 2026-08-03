@@ -339,6 +339,16 @@ def _validate_execution_window(
     )
     if ended_at <= started_at:
         raise ValueError(f"{spec.directory} execution window is not chronological")
+    elapsed_seconds = int(
+        (
+            datetime.fromisoformat(ended_at.replace("Z", "+00:00"))
+            - datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+        ).total_seconds()
+    )
+    if int(window["duration_seconds"]) != elapsed_seconds:
+        raise ValueError(
+            f"{spec.directory} execution window duration does not match timestamps"
+        )
     return {
         "present": True,
         "started_at": started_at,

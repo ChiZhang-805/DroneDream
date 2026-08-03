@@ -224,6 +224,19 @@ def _same_identity(left: object, right: object, *, field: str) -> dict[str, Any]
     required = {"trial_id", "job_id", "candidate_id", "seed", "attempt_count"}
     if set(left) != required:
         raise ValueError(f"{field} execution identity keys are incomplete")
+    if (
+        any(
+            not isinstance(left[key], str) or not left[key]
+            for key in ("trial_id", "job_id", "candidate_id")
+        )
+        or isinstance(left["seed"], bool)
+        or not isinstance(left["seed"], int)
+        or left["seed"] < 0
+        or isinstance(left["attempt_count"], bool)
+        or not isinstance(left["attempt_count"], int)
+        or left["attempt_count"] < 1
+    ):
+        raise ValueError(f"{field} execution identity values are invalid")
     return left
 
 

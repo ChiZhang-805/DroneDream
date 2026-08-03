@@ -209,6 +209,43 @@ def test_later_failure_may_not_omit_result_identity(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    "identity",
+    [
+        {
+            "trial_id": "",
+            "job_id": "job-1",
+            "candidate_id": "cand-1",
+            "seed": 7,
+            "attempt_count": 1,
+        },
+        {
+            "trial_id": "trial-1",
+            "job_id": "job-1",
+            "candidate_id": "cand-1",
+            "seed": True,
+            "attempt_count": 1,
+        },
+        {
+            "trial_id": "trial-1",
+            "job_id": "job-1",
+            "candidate_id": "cand-1",
+            "seed": 7,
+            "attempt_count": 0,
+        },
+    ],
+)
+def test_physical_campaign_identity_rejects_malformed_values(
+    identity: dict[str, object],
+) -> None:
+    with pytest.raises(ValueError, match="execution identity values are invalid"):
+        physical_campaign_evidence._same_identity(
+            identity,
+            dict(identity),
+            field="trial",
+        )
+
+
 def test_inventory_uses_posix_sort_order_and_deterministic_ulog_gzip(
     tmp_path: Path,
 ) -> None:

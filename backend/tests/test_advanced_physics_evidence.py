@@ -371,6 +371,21 @@ def test_export_rejects_unverified_effect(tmp_path: Path) -> None:
         _export(source, tmp_path / "bundle")
 
 
+def test_export_rejects_execution_window_duration_mismatch(tmp_path: Path) -> None:
+    source = _build_source(tmp_path / "source")
+    window_path = (
+        source
+        / "success-five-effects-attempt-4"
+        / "execution-window.json"
+    )
+    window = json.loads(window_path.read_text(encoding="utf-8"))
+    window["duration_seconds"] = 1
+    _write_json(window_path, window)
+
+    with pytest.raises(ValueError, match="duration does not match"):
+        _export(source, tmp_path / "bundle")
+
+
 def test_export_rejects_request_hash_that_only_matches_cross_file_references(
     tmp_path: Path,
 ) -> None:
