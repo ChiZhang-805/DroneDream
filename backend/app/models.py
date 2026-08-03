@@ -754,6 +754,22 @@ class HarnessCognitiveTurnOutcome(Base):
     )
 
 
+class HarnessCognitiveTurnDeleteAuthorization(Base):
+    """Transaction-scoped authorization for cognitive receipt Job deletion."""
+
+    __tablename__ = "harness_cognitive_turn_delete_authorizations"
+
+    receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("harness_cognitive_turn_receipts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+
 class JobReport(Base):
     __tablename__ = "job_reports"
 
@@ -1229,6 +1245,7 @@ __all__ = [
     "CandidateParameterSet",
     "FirstQualifiedFreezeDeleteAuthorization",
     "FirstQualifiedFreezeReceipt",
+    "HarnessCognitiveTurnDeleteAuthorization",
     "HarnessCognitiveTurnOutcome",
     "HarnessCognitiveTurnReceipt",
     "HarnessExperienceMemory",

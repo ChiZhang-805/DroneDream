@@ -402,6 +402,8 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "'trial_execution_attempt_outcomes', "
                 "'candidate_evidence_receipts', "
                 "'candidate_parameter_sets', "
+                "'harness_cognitive_turn_receipts', "
+                "'harness_cognitive_turn_outcomes', "
                 "'trials'"
                 ")"
             ).fetchall()
@@ -473,6 +475,14 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 ")"
             ).fetchall()
         }
+        cognitive_authorization_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' "
+                "AND name='harness_cognitive_turn_delete_authorizations'"
+            ).fetchall()
+        }
     assert trigger_names == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
@@ -487,6 +497,10 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "trg_candidate_evidence_receipts_no_delete",
         "trg_candidate_evidence_required_no_downgrade",
         "trg_candidate_provenance_no_mutation",
+        "trg_harness_cognitive_turn_receipts_no_update",
+        "trg_harness_cognitive_turn_receipts_no_delete",
+        "trg_harness_cognitive_turn_outcomes_no_update",
+        "trg_harness_cognitive_turn_outcomes_no_delete",
     }
     assert attempt_tables == {
         "trial_execution_attempts",
@@ -505,6 +519,9 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
         "harness_cognitive_turn_outcomes",
+    }
+    assert cognitive_authorization_tables == {
+        "harness_cognitive_turn_delete_authorizations"
     }
     assert {
         "user_id",
@@ -708,7 +725,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0020 (head)"]
+    assert heads == ["20260804_0021 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -775,8 +792,26 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "'first_qualified_freeze_delete_authorizations'"
             ).fetchall()
         }
+        cognitive_triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='trigger' AND tbl_name IN ("
+                "'harness_cognitive_turn_receipts', "
+                "'harness_cognitive_turn_outcomes'"
+                ")"
+            ).fetchall()
+        }
+        cognitive_authorization_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name="
+                "'harness_cognitive_turn_delete_authorizations'"
+            ).fetchall()
+        }
 
-    assert version == ("20260804_0020",)
+    assert version == ("20260804_0021",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
@@ -792,6 +827,15 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
     }
     assert first_qualified_authorization_tables == {
         "first_qualified_freeze_delete_authorizations"
+    }
+    assert cognitive_triggers == {
+        "trg_harness_cognitive_turn_receipts_no_update",
+        "trg_harness_cognitive_turn_receipts_no_delete",
+        "trg_harness_cognitive_turn_outcomes_no_update",
+        "trg_harness_cognitive_turn_outcomes_no_delete",
+    }
+    assert cognitive_authorization_tables == {
+        "harness_cognitive_turn_delete_authorizations"
     }
 
 
@@ -831,6 +875,42 @@ def test_postgresql_first_qualified_migration_emits_immutable_guard(
     assert "BEFORE UPDATE OR DELETE ON first_qualified_freeze_receipts" in sql
     assert "first_qualified_freeze_delete_authorizations" in sql
     assert "first-qualified freeze receipts are append-only" in sql
+
+
+def test_postgresql_cognitive_turn_migration_emits_immutable_guards(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260804_0021_cognitive_turn_guards.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "cognitive_turn_guards_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _PostgresOp:
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration._install_postgres_guards()
+
+    sql = "\n".join(emitted)
+    assert "CREATE FUNCTION dronedream_reject_cognitive_turn_mutation()" in sql
+    assert "BEFORE UPDATE OR DELETE ON harness_cognitive_turn_receipts" in sql
+    assert "BEFORE UPDATE OR DELETE ON harness_cognitive_turn_outcomes" in sql
+    assert "harness_cognitive_turn_delete_authorizations" in sql
+    assert "cognitive turn records are append-only" in sql
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

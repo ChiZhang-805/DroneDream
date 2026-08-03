@@ -30,7 +30,7 @@ class FakeOpenAIClient:
 
 
 class SequenceOpenAIClient:
-    """Provider double for workflows that intentionally use two bounded turns."""
+    """Provider double for workflows that intentionally use bounded turns."""
 
     def __init__(self, responses: list[dict[str, Any] | Exception]) -> None:
         self._responses = list(responses)
@@ -2895,6 +2895,7 @@ def test_harness_dispatches_revised_budget_plan_without_mutating_job_mode(
             "harness_budget_plan_accepted": "evt_eeeeeeeeeeee",
             "harness_plan_revision_started": "evt_dddddddddddd",
             "harness_plan_revision_accepted": "evt_cccccccccccc",
+            "harness_cognitive_review_result": "evt_bbbbbbbbbbbb",
             "harness_multi_tool_execution_result": "evt_aaaaaaaaaaaa",
         }
         for event_type, event_id in tied_ids.items():
@@ -3040,6 +3041,143 @@ def test_harness_dispatches_revised_budget_plan_without_mutating_job_mode(
         result_event_payload["selected_proposal_refs"][0],
     ):
         assert opaque_id not in serialized_history
+
+
+def test_harness_dispatches_through_bounded_four_turn_review(
+    llm_ctx,
+    monkeypatch,
+):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    from app.orchestration import cognitive_budget
+
+    monkeypatch.setattr(
+        cognitive_budget,
+        "evaluate_adaptive_triggers",
+        lambda *_args, **_kwargs: cognitive_budget.CognitiveTriggerEvaluation(
+            policy_version=cognitive_budget.COGNITIVE_TRIGGER_POLICY_VERSION,
+            diagnosis_reasons=("tool_direction_conflict",),
+            critic_reasons=("hard_boundary_candidate",),
+            suppressed_by_cooldown=(),
+            evidence={"holdout_outcomes_visible": False},
+        ),
+    )
+    plan = {
+        "schema_version": "1.0",
+        "decision": "continue",
+        "generation_goal": "Generate one deterministic portfolio proposal.",
+        "tool_calls": [
+            {
+                "tool_id": "optimizer_portfolio",
+                "allocation": 1,
+                "fidelity_mode": "force_full",
+                "focus": ["diversity", "verification"],
+            }
+        ],
+        "stop": {"recommended": False, "reason_code": None},
+        "uncertainty": {
+            "level": "medium",
+            "missing_evidence": ["tool_cost_history"],
+        },
+    }
+    client = SequenceOpenAIClient(
+        [
+            plan,
+            {
+                "schema_version": "1.0",
+                "decision": "dispatch",
+                "selected_proposal_refs": ["proposal_0"],
+                "rationale": "Dispatch one bounded proposal.",
+            },
+            {
+                "schema_version": "1.0",
+                "decision": "keep",
+                "selected_proposal_refs": ["proposal_0"],
+                "diagnosis_codes": ["tool_direction_conflict"],
+            },
+            {
+                "schema_version": "1.0",
+                "decision": "approve",
+                "approved_proposal_refs": ["proposal_0"],
+                "risk_codes": ["hard_boundary_candidate"],
+            },
+        ]
+    )
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        result = ctx["job_manager"].dispatch_next_harness_generation(
+            db,
+            job,
+            client=client,
+        )
+        db.flush()
+        assert len(client.calls) == 4, {
+            "result": result,
+            "events": [event.event_type for event in job.events],
+        }
+        events = ctx["decision_harness"]._recent_harness_multi_tool_events(db, job)
+        history = ctx["decision_harness"]._generation_plan_history(
+            events,
+            current_generation=job.current_generation,
+        )
+        review = next(
+            event for event in events if event.event_type == "harness_cognitive_review_result"
+        )
+        result_event = next(
+            event for event in events if event.event_type == "harness_multi_tool_execution_result"
+        )
+
+        assert result.status == "dispatched"
+        assert len(client.calls) == 4
+        assert job.provider_turns_attempted == 4
+        assert job.provider_turns_succeeded == 4
+        assert review.payload_json["holdout_outcomes_visible"] is False
+        assert review.payload_json["diagnosis_decision"] == "keep"
+        assert review.payload_json["critic_decision"] == "approve"
+        assert result_event.payload_json["provider_call_count"] == 4
+        assert result_event.payload_json["provider_success_count"] == 4
+        assert len(history) == 1
+        assert history[0].provider_call_count == 4
+
+        original_result_payload = dict(result_event.payload_json)
+        result_event.payload_json = {
+            **original_result_payload,
+            "provider_success_count": 5,
+        }
+        assert (
+            ctx["decision_harness"]._generation_plan_history(
+                events,
+                current_generation=job.current_generation,
+            )
+            == ()
+        )
+        result_event.payload_json = original_result_payload
+
+
+def test_harness_first_qualified_stop_uses_zero_provider_turns(llm_ctx):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    client = SequenceOpenAIClient([])
+
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        job.first_qualified_candidate_id = "frozen-qualified-candidate"
+        db.commit()
+        db.refresh(job)
+
+        result = ctx["job_manager"].dispatch_next_harness_generation(
+            db,
+            job,
+            client=client,
+        )
+
+        assert result.status == "first_qualified_stop"
+        assert client.calls == []
+        assert job.provider_turns_attempted == 0
+        assert job.provider_turns_succeeded == 0
+        assert job.cognitive_turn_receipts == []
 
 
 def test_harness_plan_history_accepts_verified_deterministic_plan_fallback(

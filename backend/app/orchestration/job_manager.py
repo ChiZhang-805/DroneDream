@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import math
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -1764,6 +1764,91 @@ def _harness_candidate_proposal(
     )
 
 
+def _cognitive_review_inputs(
+    job: models.Job,
+    *,
+    summaries: tuple[HarnessProposalSummary, ...],
+    proposal_by_ref: Mapping[
+        str,
+        tuple[CandidateProposal, _HarnessToolCallResult],
+    ],
+    selected_refs: tuple[str, ...],
+) -> tuple[
+    dict[str, dict[str, object]],
+    list[dict[str, object]],
+    bool,
+    bool,
+]:
+    """Build bounded proposal/boundary evidence and deterministic risk flags."""
+
+    search_space = search_space_for_job(
+        job,
+        baseline_parameters=_baseline_parameters_for_job(job),
+    )
+    incumbent = _harness_incumbent_parameters(job)
+    summary_by_ref = {item.proposal_ref: item for item in summaries}
+    proposal_details: dict[str, dict[str, object]] = {}
+    tool_directions: dict[str, dict[str, list[float]]] = {}
+    hard_boundary_candidate = False
+    selected_set = frozenset(selected_refs)
+    for ref in sorted(proposal_by_ref):
+        proposal, tool_result = proposal_by_ref[ref]
+        summary = summary_by_ref[ref]
+        normalized_parameters: dict[str, float] = {}
+        boundary_parameters: list[str] = []
+        for domain in search_space.tunable:
+            value = float(proposal.parameters.get(domain.name, domain.baseline))
+            span = domain.maximum - domain.minimum
+            unit = 0.0 if span <= 0 else (value - domain.minimum) / span
+            normalized_parameters[domain.name] = round(max(0.0, min(1.0, unit)), 6)
+            if ref in selected_set and span > 0 and (unit <= 0.02 or unit >= 0.98):
+                boundary_parameters.append(domain.name)
+            if ref in selected_set and span > 0:
+                delta = (value - float(incumbent.get(domain.name, domain.baseline))) / span
+                if abs(delta) >= 0.02:
+                    tool_directions.setdefault(domain.name, {}).setdefault(
+                        tool_result.call.tool_id,
+                        [],
+                    ).append(delta)
+        if boundary_parameters:
+            hard_boundary_candidate = True
+        proposal_details[ref] = {
+            "proposal_ref": ref,
+            "tool_id": summary.tool_id,
+            "tool_candidate_ordinal": summary.tool_candidate_ordinal,
+            "requested_fidelity": summary.requested_fidelity,
+            "effective_fidelity": summary.effective_fidelity,
+            "normalized_distance_from_incumbent": (summary.normalized_distance_from_incumbent),
+            "normalized_parameters": normalized_parameters,
+            "near_hard_bound_parameters": sorted(boundary_parameters),
+        }
+    tool_direction_conflict = False
+    for directions_by_tool in tool_directions.values():
+        if len(directions_by_tool) < 2:
+            continue
+        tool_means = [sum(values) / len(values) for values in directions_by_tool.values() if values]
+        if tool_means and min(tool_means) < -0.02 and max(tool_means) > 0.02:
+            tool_direction_conflict = True
+            break
+    hard_bounds = [
+        {
+            "parameter": domain.name,
+            "minimum": domain.minimum,
+            "maximum": domain.maximum,
+            "baseline": domain.baseline,
+            "scale": domain.scale,
+            "value_type": domain.value_type,
+        }
+        for domain in search_space.tunable
+    ]
+    return (
+        proposal_details,
+        hard_bounds,
+        tool_direction_conflict,
+        hard_boundary_candidate,
+    )
+
+
 def dispatch_next_harness_generation(
     db: Session,
     job: models.Job,
@@ -1818,7 +1903,10 @@ def dispatch_next_harness_generation(
         )
         return AdaptiveDispatchResult(status="budget_exhausted")
 
+    from app.orchestration.cognitive_budget import cognitive_turn_counts, evaluate_adaptive_triggers
+    from app.orchestration.cognitive_review import run_adaptive_cognitive_review
     from app.orchestration.decision_harness import (
+        current_harness_evidence_snapshot,
         select_optimizer_budget_plan,
         select_plan_revision,
     )
@@ -1840,6 +1928,11 @@ def dispatch_next_harness_generation(
     if decision.generation != generation_index:
         raise RuntimeError("Harness budget decision generation drifted")
     if decision.compiled_plan is None:
+        provider_call_count, provider_success_count = cognitive_turn_counts(
+            db,
+            job,
+            generation_index=generation_index,
+        )
         record_event(
             db,
             job.id,
@@ -1851,7 +1944,8 @@ def dispatch_next_harness_generation(
                 "stop_reason": decision.stop_reason,
                 "decision_source": decision.source,
                 "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
-                "provider_call_count": 1,
+                "provider_call_count": provider_call_count,
+                "provider_success_count": provider_success_count,
                 "evidence_sha256": decision.evidence_sha256,
                 "prompt_sha256": decision.prompt_sha256,
                 "evidence_schema_version": decision.evidence_schema_version,
@@ -1899,18 +1993,73 @@ def dispatch_next_harness_generation(
     )
     revision_wall_ms = (time.perf_counter_ns() - revision_started) / 1_000_000
     selected_refs = revision.selected_proposal_refs
-    provider_call_count = int(
-        decision.source == "model" or decision.fallback_reason in {"client_error", "invalid_plan"}
-    ) + int(
-        revision.source == "model"
-        or revision.fallback_reason
-        in {
-            "client_error",
-            "invalid_schema",
-            "unknown_proposal_reference",
-            "dispatch_capacity_exceeded",
-            "abandon_not_authorized",
-        }
+    revision_selected_refs = selected_refs
+    cognitive_review = None
+    if (
+        summaries
+        and selected_refs
+        and not revision.abandoned
+        and decision.source == "model"
+        and revision.source == "model"
+    ):
+        (
+            proposal_details,
+            hard_bounds,
+            tool_direction_conflict,
+            hard_boundary_candidate,
+        ) = _cognitive_review_inputs(
+            job,
+            summaries=summaries,
+            proposal_by_ref=proposal_by_ref,
+            selected_refs=selected_refs,
+        )
+        trigger_snapshot, _ = current_harness_evidence_snapshot(db, job)
+        trigger = evaluate_adaptive_triggers(
+            job,
+            generation_index=generation_index,
+            snapshot=trigger_snapshot,
+            proposal_tools={item.proposal_ref: item.tool_id for item in summaries},
+            selected_proposal_refs=selected_refs,
+            tool_direction_conflict=tool_direction_conflict,
+            hard_boundary_candidate=hard_boundary_candidate,
+        )
+        cognitive_review = run_adaptive_cognitive_review(
+            db,
+            job,
+            generation_index=generation_index,
+            trigger=trigger,
+            proposals=summaries,
+            selected_proposal_refs=selected_refs,
+            proposal_details=proposal_details,
+            hard_bounds=hard_bounds,
+            client=client,
+        )
+        selected_refs = cognitive_review.selected_proposal_refs
+        record_event(
+            db,
+            job.id,
+            "harness_cognitive_review_result",
+            {
+                "decision_id": decision.decision_id,
+                "revision_id": revision.revision_id,
+                "generation": generation_index,
+                "trigger_policy_version": trigger.policy_version,
+                "diagnosis_trigger_reasons": list(trigger.diagnosis_reasons),
+                "critic_trigger_reasons": list(trigger.critic_reasons),
+                "suppressed_by_cooldown": list(trigger.suppressed_by_cooldown),
+                "available_proposal_refs": [item.proposal_ref for item in summaries],
+                "input_selected_proposal_refs": list(revision_selected_refs),
+                "diagnosis_decision": cognitive_review.diagnosis_decision,
+                "critic_decision": cognitive_review.critic_decision,
+                "fail_closed_reason": cognitive_review.fail_closed_reason,
+                "selected_proposal_refs": list(selected_refs),
+                "holdout_outcomes_visible": False,
+            },
+        )
+    provider_call_count, provider_success_count = cognitive_turn_counts(
+        db,
+        job,
+        generation_index=generation_index,
     )
     actual_tool_cpu_ms = round(
         sum(result.cpu_ms for result in tool_results),
@@ -1949,6 +2098,7 @@ def dispatch_next_harness_generation(
                 "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
                 "revision_wall_ms": round(revision_wall_ms, 3),
                 "provider_call_count": provider_call_count,
+                "provider_success_count": provider_success_count,
                 "selected_proposal_refs": list(selected_refs),
                 "dispatched_candidates": 0,
                 "dispatched_trials": 0,
@@ -1966,6 +2116,9 @@ def dispatch_next_harness_generation(
                 "prompt_sha256": decision.prompt_sha256,
                 "fallback_reason": decision.fallback_reason,
                 "revision_fallback_reason": revision.fallback_reason,
+                "cognitive_review_fail_closed_reason": (
+                    cognitive_review.fail_closed_reason if cognitive_review else None
+                ),
                 "evidence_schema_version": decision.evidence_schema_version,
                 "tool_registry_version": decision.tool_registry_version,
                 "budget_policy_version": decision.budget_policy_version,
@@ -2040,6 +2193,7 @@ def dispatch_next_harness_generation(
             "plan_decision_wall_ms": round(plan_decision_wall_ms, 3),
             "revision_wall_ms": round(revision_wall_ms, 3),
             "provider_call_count": provider_call_count,
+            "provider_success_count": provider_success_count,
             "selected_proposal_refs": list(selected_refs),
             "dispatched_candidates": dispatched_candidates,
             "dispatched_trials": dispatched_trials,
@@ -2057,6 +2211,9 @@ def dispatch_next_harness_generation(
             "prompt_sha256": decision.prompt_sha256,
             "fallback_reason": decision.fallback_reason,
             "revision_fallback_reason": revision.fallback_reason,
+            "cognitive_review_fail_closed_reason": (
+                cognitive_review.fail_closed_reason if cognitive_review else None
+            ),
             "evidence_schema_version": decision.evidence_schema_version,
             "tool_registry_version": decision.tool_registry_version,
             "budget_policy_version": decision.budget_policy_version,

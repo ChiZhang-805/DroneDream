@@ -726,7 +726,7 @@ class HarnessGenerationPlanMemory(_ClosedModel):
     revision_wall_ms: float = Field(ge=0.0, le=600_000.0)
     tool_execution_wall_ms: float = Field(ge=0.0, le=600_000.0)
     actual_tool_cpu_ms: float = Field(ge=0.0, le=600_000.0)
-    provider_call_count: int = Field(ge=0, le=2)
+    provider_call_count: int = Field(ge=0, le=4)
     tool_calls: tuple[HarnessToolCallExecutionMemory, ...] = Field(
         default=(),
         max_length=4,

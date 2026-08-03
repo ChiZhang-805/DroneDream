@@ -24,6 +24,13 @@ from sqlalchemy.orm import Session
 from app import models
 from app.config import get_settings
 from app.optimization.experimental_types import ExperimentalOptimizerStrategy
+from app.orchestration.cognitive_budget import (
+    CognitiveTurnBlocked,
+    begin_cognitive_turn,
+    empty_tool_outputs_sha256,
+    finish_cognitive_turn,
+    sha256_json,
+)
 from app.orchestration.events import record_event
 from app.orchestration.experience_memory import (
     materialize_verified_terminal_job_experiences,
@@ -587,6 +594,7 @@ def _recent_harness_multi_tool_events(
                         "harness_plan_revision_started",
                         "harness_plan_revision_accepted",
                         "harness_plan_revision_fallback",
+                        "harness_cognitive_review_result",
                         "harness_multi_tool_execution_result",
                     )
                 ),
@@ -970,7 +978,37 @@ def _generation_plan_history(
             continue
         revision_refs = _selected_refs(revision_payload)
         result_refs = _selected_refs(result_payload)
-        if revision_refs is None or result_refs is None or revision_refs != result_refs:
+        if revision_refs is None or result_refs is None:
+            continue
+        review_events = by_type.get("harness_cognitive_review_result", [])
+        if review_events:
+            if len(review_events) != 1:
+                continue
+            review_event = review_events[0]
+            review_payload_json = review_event.payload_json
+            if not isinstance(review_payload_json, dict):
+                continue
+            review_payload = dict(review_payload_json)
+            review_input_refs = review_payload.get("input_selected_proposal_refs")
+            review_available_refs = review_payload.get("available_proposal_refs")
+            review_result_refs = _selected_refs(review_payload)
+            if (
+                review_payload.get("decision_id") != decision_id
+                or review_payload.get("revision_id") != revision_id
+                or review_payload.get("generation") != generation
+                or not isinstance(review_input_refs, list)
+                or tuple(review_input_refs) != revision_refs
+                or not isinstance(review_available_refs, list)
+                or len(set(review_available_refs)) != len(review_available_refs)
+                or any(not isinstance(ref, str) for ref in review_available_refs)
+                or review_result_refs != result_refs
+                or not set(result_refs).issubset(review_available_refs)
+                or review_payload.get("holdout_outcomes_visible") is not False
+                or _event_happened_after(revision_event, review_event)
+                or _event_happened_after(review_event, result_event)
+            ):
+                continue
+        elif revision_refs != result_refs:
             continue
         revision_source = result_payload.get("revision_source")
         if revision_event.event_type == "harness_plan_revision_accepted":
@@ -1076,6 +1114,7 @@ def _generation_plan_history(
         tool_wall = _bounded_number(result_payload.get("tool_execution_wall_ms"))
         actual_cpu = _bounded_number(result_payload.get("actual_tool_cpu_ms"))
         provider_calls = result_payload.get("provider_call_count")
+        provider_successes = result_payload.get("provider_success_count")
         usable = result_payload.get("usable_proposal_count")
         dispatched_candidates = result_payload.get("dispatched_candidates")
         dispatched_trials = result_payload.get("dispatched_trials")
@@ -1086,7 +1125,15 @@ def _generation_plan_history(
             or actual_cpu is None
             or isinstance(provider_calls, bool)
             or not isinstance(provider_calls, int)
-            or not 0 <= provider_calls <= 2
+            or not 0 <= provider_calls <= 4
+            or (
+                provider_successes is not None
+                and (
+                    isinstance(provider_successes, bool)
+                    or not isinstance(provider_successes, int)
+                    or not 0 <= provider_successes <= provider_calls
+                )
+            )
             or isinstance(usable, bool)
             or not isinstance(usable, int)
             or usable < 0
@@ -1331,26 +1378,9 @@ def select_optimizer_budget_plan(
     generation = job.current_generation + 1
     if opportunity.generation != generation:
         raise ValueError("budget opportunity generation does not match the Job")
-    recent_decision_events = _recent_harness_decision_events(db, job)
-    recent_multi_tool_events = _recent_harness_multi_tool_events(db, job)
-    verified_started_decision_ids = frozenset(
-        verified_id
-        for event in recent_decision_events
-        if (verified_id := _verified_started_decision_id(event)) is not None
-    )
-    evidence_snapshot, has_scored_evidence = build_harness_evidence(
-        job,
-        execution_events=recent_decision_events,
-        verified_started_decision_ids=verified_started_decision_ids,
-        generation_plan_history=_generation_plan_history(
-            recent_multi_tool_events,
-            current_generation=max(0, int(job.current_generation or 0)),
-        ),
-    )
-    evidence_snapshot = _compile_cross_job_memory(
+    evidence_snapshot, has_scored_evidence = current_harness_evidence_snapshot(
         db,
-        current_job=job,
-        current_snapshot=evidence_snapshot,
+        job,
     )
     evidence = evidence_snapshot.model_dump(mode="json", exclude_none=True)
     evidence_sha256 = _sha256_text(_canonical_json(evidence))
@@ -1412,6 +1442,7 @@ def select_optimizer_budget_plan(
             model=chosen_model,
         )
     prompt_sha256 = _sha256_text(f"{system}\n{user}")
+    plan_schema = generation_plan_schema(opportunity)
     effective_client = client
     if effective_client is None:
         api_key = load_job_api_key(db, job)
@@ -1429,7 +1460,7 @@ def select_optimizer_budget_plan(
             )
         effective_client = OpenAIJsonClient(
             api_key,
-            proposal_schema=generation_plan_schema(opportunity),
+            proposal_schema=plan_schema,
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
             max_retries=settings.llm_max_retries,
@@ -1454,6 +1485,19 @@ def select_optimizer_budget_plan(
             "tool_registry_version": HARNESS_TOOL_REGISTRY_VERSION,
         },
     )
+    attempt = begin_cognitive_turn(
+        db,
+        job,
+        generation_index=generation,
+        turn_index=1,
+        turn_role="plan",
+        trigger_reasons=("default_plan",),
+        model_snapshot=chosen_model,
+        prompt_sha256=prompt_sha256,
+        evidence_sha256=evidence_sha256,
+        schema_sha256=sha256_json(plan_schema),
+        tool_outputs_sha256=empty_tool_outputs_sha256(),
+    )
     try:
         raw = effective_client.generate(
             model=chosen_model,
@@ -1461,6 +1505,13 @@ def select_optimizer_budget_plan(
             user=user,
         )
     except Exception as exc:
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="provider_failed",
+            error_code="client_error",
+        )
         logger.warning(
             "harness budget plan call failed for job %s (error_type=%s)",
             job.id,
@@ -1481,6 +1532,18 @@ def select_optimizer_budget_plan(
 
     plan, validation = validate_generation_plan(raw, opportunity)
     if plan is None:
+        rejection_code = next(
+            (rule.code for rule in validation.rule_results if not rule.passed),
+            "invalid_plan",
+        )
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="invalid_schema",
+            response=raw,
+            error_code=rejection_code,
+        )
         return _budget_plan_fallback(
             db,
             job,
@@ -1492,6 +1555,20 @@ def select_optimizer_budget_plan(
             prompt_sha256=prompt_sha256,
             model=chosen_model,
             validation=validation,
+        )
+    if (
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="succeeded",
+            response=raw,
+        )
+        == "source_drift"
+    ):
+        raise CognitiveTurnBlocked(
+            "source_drift",
+            "Software source changed while the provider turn was in flight.",
         )
     if plan.decision == "stop":
         stop_reason = plan.stop.reason_code
@@ -1558,6 +1635,38 @@ def select_optimizer_budget_plan(
         evidence_sha256=evidence_sha256,
         prompt_sha256=prompt_sha256,
         validation=validation,
+    )
+
+
+def current_harness_evidence_snapshot(
+    db: Session,
+    job: models.Job,
+) -> tuple[HarnessEvidenceSnapshot, bool]:
+    """Build the current provider-safe snapshot without holdout outcomes."""
+
+    recent_decision_events = _recent_harness_decision_events(db, job)
+    recent_multi_tool_events = _recent_harness_multi_tool_events(db, job)
+    verified_started_decision_ids = frozenset(
+        verified_id
+        for event in recent_decision_events
+        if (verified_id := _verified_started_decision_id(event)) is not None
+    )
+    snapshot, has_scored_evidence = build_harness_evidence(
+        job,
+        execution_events=recent_decision_events,
+        verified_started_decision_ids=verified_started_decision_ids,
+        generation_plan_history=_generation_plan_history(
+            recent_multi_tool_events,
+            current_generation=max(0, int(job.current_generation or 0)),
+        ),
+    )
+    return (
+        _compile_cross_job_memory(
+            db,
+            current_job=job,
+            current_snapshot=snapshot,
+        ),
+        has_scored_evidence,
     )
 
 
@@ -1661,6 +1770,10 @@ def select_plan_revision(
             model=plan_decision.model,
         )
     prompt_sha256 = _sha256_text(f"{system}\n{user}")
+    revision_schema = plan_revision_schema(
+        proposals,
+        maximum_dispatch_candidates=maximum_dispatch_candidates,
+    )
     effective_client = client
     if effective_client is None:
         api_key = load_job_api_key(db, job)
@@ -1680,10 +1793,7 @@ def select_plan_revision(
             )
         effective_client = OpenAIJsonClient(
             api_key,
-            proposal_schema=plan_revision_schema(
-                proposals,
-                maximum_dispatch_candidates=maximum_dispatch_candidates,
-            ),
+            proposal_schema=revision_schema,
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
             max_retries=settings.llm_max_retries,
@@ -1705,6 +1815,26 @@ def select_plan_revision(
             "revision_prompt_version": HARNESS_PLAN_REVISION_PROMPT_VERSION,
         },
     )
+    revision_evidence = {
+        "compiled_plan": compiled.model_dump(mode="json"),
+        "proposals": [proposal.model_dump(mode="json") for proposal in proposals],
+        "maximum_dispatch_candidates": maximum_dispatch_candidates,
+    }
+    attempt = begin_cognitive_turn(
+        db,
+        job,
+        generation_index=compiled.generation,
+        turn_index=2,
+        turn_role="revision",
+        trigger_reasons=("post_tool_revision",),
+        model_snapshot=plan_decision.model or _DEFAULT_MODEL,
+        prompt_sha256=prompt_sha256,
+        evidence_sha256=sha256_json(revision_evidence),
+        schema_sha256=sha256_json(revision_schema),
+        tool_outputs_sha256=sha256_json(
+            [proposal.model_dump(mode="json") for proposal in proposals]
+        ),
+    )
     try:
         raw = effective_client.generate(
             model=plan_decision.model or _DEFAULT_MODEL,
@@ -1712,6 +1842,13 @@ def select_plan_revision(
             user=user,
         )
     except Exception as exc:
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="provider_failed",
+            error_code="client_error",
+        )
         logger.warning(
             "harness plan revision call failed for job %s (error_type=%s)",
             job.id,
@@ -1738,6 +1875,14 @@ def select_plan_revision(
         allow_abandon=allow_abandon,
     )
     if revision is None:
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="invalid_schema",
+            response=raw,
+            error_code=validation.rejection_code or "invalid_revision",
+        )
         return _revision_fallback(
             db,
             job,
@@ -1750,6 +1895,20 @@ def select_plan_revision(
             reason=validation.rejection_code or "invalid_revision",
             prompt_sha256=prompt_sha256,
             model=plan_decision.model,
+        )
+    if (
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="succeeded",
+            response=raw,
+        )
+        == "source_drift"
+    ):
+        raise CognitiveTurnBlocked(
+            "source_drift",
+            "Software source changed while the provider turn was in flight.",
         )
     record_event(
         db,

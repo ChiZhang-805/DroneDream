@@ -440,6 +440,93 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        if "harness_cognitive_turn_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS
+                    harness_cognitive_turn_delete_authorizations (
+                        receipt_id VARCHAR(64) PRIMARY KEY,
+                        reason VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL,
+                        FOREIGN KEY(receipt_id)
+                            REFERENCES harness_cognitive_turn_receipts(id)
+                            ON DELETE CASCADE
+                    )
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_receipts_no_update
+                    BEFORE UPDATE ON harness_cognitive_turn_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_receipts_no_delete
+                    BEFORE DELETE ON harness_cognitive_turn_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "harness_cognitive_turn_outcomes" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_outcomes_no_update
+                    BEFORE UPDATE ON harness_cognitive_turn_outcomes
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_harness_cognitive_turn_outcomes_no_delete
+                    BEFORE DELETE ON harness_cognitive_turn_outcomes
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.turn_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'cognitive turn outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
         if "artifacts" in table_names:
             artifact_columns = {
                 row[1] for row in conn.execute(text("PRAGMA table_info('artifacts')")).fetchall()

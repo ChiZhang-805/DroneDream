@@ -1430,6 +1430,24 @@ def delete_job(
                 receipt=receipt,
                 reason="job_delete",
             )
+        for receipt in job.cognitive_turn_receipts:
+            cognitive_authorization = db.get(
+                models.HarnessCognitiveTurnDeleteAuthorization,
+                receipt.id,
+            )
+            if cognitive_authorization is None:
+                db.add(
+                    models.HarnessCognitiveTurnDeleteAuthorization(
+                        receipt_id=receipt.id,
+                        reason="job_delete",
+                    )
+                )
+            elif cognitive_authorization.reason != "job_delete":
+                raise JobServiceError(
+                    "COGNITIVE_TURN_DELETE_NOT_AUTHORIZED",
+                    "Cognitive turn deletion has a conflicting authorization.",
+                    http_status=500,
+                )
         if job.winner_freeze is not None:
             winner_authorization = db.get(
                 models.WinnerFreezeDeleteAuthorization,
