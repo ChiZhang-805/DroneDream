@@ -431,7 +431,11 @@ export function JobDetail() {
             title={t("jobDetail.summary")}
             description={t("jobDetail.summaryDescription")}
           >
-            <p style={{ margin: 0 }}>{report.summary_text}</p>
+            <p style={{ margin: 0 }}>
+              {reportHasValidatedRecommendation(job, report)
+                ? report.summary_text
+                : t("jobDetail.noValidatedSummary")}
+            </p>
           </SectionCard>
         </>
       ) : null}
@@ -1009,11 +1013,17 @@ function BestParametersSection({
 }) {
   const { t } = useI18n();
   const baselineWon = report.best_candidate_id === job.baseline_candidate_id;
+  const recommendationValidated = reportHasValidatedRecommendation(job, report);
+  const diagnosticFallback = !recommendationValidated;
   return (
     <SectionCard
-      title={t("jobDetail.bestParameters")}
+      title={diagnosticFallback
+        ? t("jobDetail.diagnosticParameters")
+        : t("jobDetail.bestParameters")}
       description={
-        baselineWon
+        diagnosticFallback
+          ? t("jobDetail.diagnosticParametersDescription")
+          : baselineWon
           ? t("jobDetail.baselineWinnerDescription")
           : t("jobDetail.optimizerWinnerDescription")
       }
@@ -1021,10 +1031,16 @@ function BestParametersSection({
       <div className="best-parameters-head">
         <span
           className={`candidate-tag ${
-            baselineWon ? "candidate-tag-baseline" : "candidate-tag-optimizer"
+            diagnosticFallback || baselineWon
+              ? "candidate-tag-baseline"
+              : "candidate-tag-optimizer"
           }`}
         >
-          {baselineWon ? t("jobDetail.baselineWinner") : t("jobDetail.optimizerWinner")}
+          {diagnosticFallback
+            ? t("jobDetail.noValidatedWinner")
+            : baselineWon
+              ? t("jobDetail.baselineWinner")
+              : t("jobDetail.optimizerWinner")}
         </span>
         <code className="candidate-id">{report.best_candidate_id}</code>
       </div>
@@ -1037,6 +1053,14 @@ function BestParametersSection({
         ))}
       </ul>
     </SectionCard>
+  );
+}
+
+function reportHasValidatedRecommendation(job: Job, report: JobReport): boolean {
+  return Boolean(
+    report.winner_freeze_receipt_id
+    && job.best_candidate_id
+    && report.best_candidate_id === job.best_candidate_id,
   );
 }
 

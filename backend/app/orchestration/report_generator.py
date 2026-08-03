@@ -196,11 +196,7 @@ def _instability_rate(trials: list[models.Trial]) -> float:
 
     if not trials:
         return 0.0
-    unstable = sum(
-        1
-        for t in trials
-        if t.metric is not None and t.metric.instability_flag
-    )
+    unstable = sum(1 for t in trials if t.metric is not None and t.metric.instability_flag)
     return unstable / len(trials)
 
 
@@ -241,12 +237,20 @@ def generate_summary_text(
         f"over {len(baseline_trials)} trials."
     )
 
-    # (2) Optimized — when the baseline wins, make that explicit.
+    # (2) Optimized — distinguish a validated baseline winner from the
+    # diagnostic baseline projection emitted when no candidate is publishable.
     if best.is_baseline:
-        lines.append(
-            "No optimizer candidate beat the baseline on aggregated score; "
-            "baseline parameters are therefore the recommended result."
-        )
+        if best.is_best:
+            lines.append(
+                "No publishable optimizer candidate ranked ahead of the baseline; "
+                "baseline parameters remain the validated recommendation."
+            )
+        else:
+            lines.append(
+                "No candidate satisfied the publication and evidence gates; "
+                "baseline parameters are shown only as a diagnostic comparison "
+                "fallback and are not a validated recommendation."
+            )
     else:
         lines.append(
             f"Optimizer candidate '{best.label}' (generation "
@@ -300,23 +304,16 @@ def generate_summary_text(
     if not best_trials:
         notes.append("no best-candidate trial rows were available")
     elif best_failed > 0:
-        notes.append(
-            f"{best_failed} of {len(best_trials)} best-candidate trials failed"
-        )
+        notes.append(f"{best_failed} of {len(best_trials)} best-candidate trials failed")
     if best_instability >= 0.25:
-        notes.append(
-            f"{best_instability * 100:.0f}% of best-candidate trials "
-            f"flagged instability"
-        )
+        notes.append(f"{best_instability * 100:.0f}% of best-candidate trials flagged instability")
     if best_pass is not None and best_pass < 0.75:
         notes.append(f"pass rate only {best_pass * 100:.0f}%")
 
     if notes:
         lines.append("Watch-outs: " + "; ".join(notes) + ".")
     else:
-        lines.append(
-            "No failure or instability flags on best-candidate trials."
-        )
+        lines.append("No failure or instability flags on best-candidate trials.")
 
     return " ".join(lines)
 
@@ -365,9 +362,7 @@ def persist_report(
 ) -> models.JobReport:
     """Upsert the JobReport row for ``job`` and mark it READY."""
 
-    existing = db.scalars(
-        select(models.JobReport).where(models.JobReport.job_id == job.id)
-    ).first()
+    existing = db.scalars(select(models.JobReport).where(models.JobReport.job_id == job.id)).first()
     if existing is None:
         existing = models.JobReport(job_id=job.id)
         db.add(existing)
@@ -381,9 +376,7 @@ def persist_report(
     existing.winner_evidence_json = winner_evidence
     existing.winner_freeze_receipt = winner_freeze_receipt
     existing.winner_freeze_receipt_id = (
-        winner_freeze_receipt.id
-        if winner_freeze_receipt is not None
-        else None
+        winner_freeze_receipt.id if winner_freeze_receipt is not None else None
     )
     existing.report_status = "READY"
     return existing
@@ -460,9 +453,7 @@ def ensure_mock_job_artifacts(db: Session, job: models.Job) -> list[models.Artif
 def _real_artifact_root() -> Path:
     settings = get_settings()
     return Path(
-        os.environ.get(
-            "REAL_SIMULATOR_ARTIFACT_ROOT", str(settings.real_artifact_root_path)
-        )
+        os.environ.get("REAL_SIMULATOR_ARTIFACT_ROOT", str(settings.real_artifact_root_path))
     ).resolve()
 
 
@@ -486,15 +477,11 @@ def _require_existing_artifact_bytes(path: Path, content: bytes) -> None:
     except FileNotFoundError:
         raise
     if not stat.S_ISREG(expected.st_mode):
-        raise ArtifactIntegrityError(
-            "immutable artifact destination is not a regular file"
-        )
+        raise ArtifactIntegrityError("immutable artifact destination is not a regular file")
     with path.open("rb") as stream:
         opened = os.fstat(stream.fileno())
         if (opened.st_dev, opened.st_ino) != (expected.st_dev, expected.st_ino):
-            raise ArtifactIntegrityError(
-                "immutable artifact destination changed while opening"
-            )
+            raise ArtifactIntegrityError("immutable artifact destination changed while opening")
         stored = stream.read(len(content) + 1)
         finished = os.fstat(stream.fileno())
     if (
@@ -502,9 +489,7 @@ def _require_existing_artifact_bytes(path: Path, content: bytes) -> None:
         or finished.st_size != opened.st_size
         or finished.st_mtime_ns != opened.st_mtime_ns
     ):
-        raise ArtifactIntegrityError(
-            "immutable artifact destination changed while reading"
-        )
+        raise ArtifactIntegrityError("immutable artifact destination changed while reading")
     if stored != content:
         raise ArtifactIntegrityError(
             "unregistered immutable artifact bytes differ from regeneration"
@@ -515,12 +500,9 @@ def _publish_immutable_artifact(path: Path, content: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     resolved_parent = path.parent.resolve()
     if not any(
-        resolved_parent.is_relative_to(root)
-        for root in get_settings().allowed_artifact_roots
+        resolved_parent.is_relative_to(root) for root in get_settings().allowed_artifact_roots
     ):
-        raise ArtifactIntegrityError(
-            "immutable artifact destination is outside allowed roots"
-        )
+        raise ArtifactIntegrityError("immutable artifact destination is outside allowed roots")
     descriptor: int | None = None
     try:
         descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
@@ -592,9 +574,7 @@ def _ensure_immutable_file_artifact(
     storage_path = storage.put_file(path, storage_key, mime_type)
     stored_digest = storage.content_digest(storage_path)
     if stored_digest != artifact_content_digest(content):
-        raise ArtifactIntegrityError(
-            "artifact storage did not preserve the generated bytes"
-        )
+        raise ArtifactIntegrityError("artifact storage did not preserve the generated bytes")
     artifact = models.Artifact(
         owner_type=owner_type,
         owner_id=owner_id,
@@ -630,11 +610,7 @@ def ensure_real_job_artifacts(
         require_winner_freeze_receipt(
             winner_freeze,
             job=job,
-            evidence=(
-                job.report.winner_evidence_json
-                if job.report is not None
-                else None
-            ),
+            evidence=(job.report.winner_evidence_json if job.report is not None else None),
         )
         if winner_freeze is not None
         else None
@@ -643,9 +619,7 @@ def ensure_real_job_artifacts(
         "job_id": job.id,
         "best_candidate_id": best.id,
         "winner_selection_evidence": sanitize_payload(
-            verified_winner.model_dump(mode="json")
-            if verified_winner is not None
-            else None
+            verified_winner.model_dump(mode="json") if verified_winner is not None else None
         ),
         "winner_freeze_receipt": sanitize_payload(
             {
@@ -654,8 +628,7 @@ def ensure_real_job_artifacts(
                 "evidence_id": winner_freeze.evidence_id,
                 "frozen_at": canonical_utc_iso(winner_freeze.frozen_at),
             }
-            if verified_winner is not None
-            and winner_freeze is not None
+            if verified_winner is not None and winner_freeze is not None
             else None
         ),
         "summary_text": report_body["summary_text"],
@@ -696,16 +669,11 @@ def ensure_real_job_artifacts(
                 "aggregated_metrics": sanitize_payload(aggregate),
                 "trial_count": len(candidate_trials),
                 "completed_trial_count": sum(
-                    trial.status == "COMPLETED"
-                    for trial in candidate_trials
+                    trial.status == "COMPLETED" for trial in candidate_trials
                 ),
-                "failed_trial_count": sum(
-                    trial.status == "FAILED" for trial in candidate_trials
-                ),
+                "failed_trial_count": sum(trial.status == "FAILED" for trial in candidate_trials),
                 "rank_in_job": candidate.rank_in_job,
-                "parameter_json": sanitize_payload(
-                    dict(candidate.parameter_json or {})
-                ),
+                "parameter_json": sanitize_payload(dict(candidate.parameter_json or {})),
             }
         )
     trial_ids = [t.id for t in job.trials]
@@ -734,8 +702,7 @@ def ensure_real_job_artifacts(
             "max_error": t.metric.max_error if t.metric is not None else None,
             "score": t.metric.score if t.metric is not None else None,
             "completion_time": t.metric.completion_time if t.metric is not None else None,
-            "has_telemetry_json": "telemetry_json"
-            in trial_artifact_types.get(t.id, set()),
+            "has_telemetry_json": "telemetry_json" in trial_artifact_types.get(t.id, set()),
             "has_reference_track_json": "reference_track_json"
             in trial_artifact_types.get(t.id, set()),
         }
@@ -845,11 +812,7 @@ def ensure_real_job_artifacts(
 
     created: list[models.Artifact] = []
     for artifact_type, display_name, mime_type, path, payload in file_specs:
-        content = (
-            _text_bytes(payload)
-            if isinstance(payload, str)
-            else _json_bytes(payload)
-        )
+        content = _text_bytes(payload) if isinstance(payload, str) else _json_bytes(payload)
         storage_key = f"jobs/{job.id}/job_artifacts/{path.name}"
         artifact, was_created = _ensure_immutable_file_artifact(
             db,
@@ -881,8 +844,6 @@ def ensure_job_artifacts(
     return ensure_mock_job_artifacts(db, job)
 
 
-
-
 def ensure_repro_manifest_artifact(
     db: Session,
     *,
@@ -904,9 +865,7 @@ def ensure_repro_manifest_artifact(
         .where(models.Artifact.artifact_type == "repro_manifest_json")
     ).all()
     if len(existing_rows) > 1:
-        raise ArtifactIntegrityError(
-            "job contains multiple reproducibility manifest artifacts"
-        )
+        raise ArtifactIntegrityError("job contains multiple reproducibility manifest artifacts")
     artifact, _ = _ensure_immutable_file_artifact(
         db,
         existing=existing_rows[0] if existing_rows else None,
@@ -984,9 +943,7 @@ def generate_and_persist_report(
     if baseline is None:
         raise ReportEvidenceError("baseline Candidate is missing")
     aggregated_candidates = [
-        candidate
-        for candidate in job.candidates
-        if candidate.aggregated_metric_json is not None
+        candidate for candidate in job.candidates if candidate.aggregated_metric_json is not None
     ]
     verified_aggregates = {
         candidate.id: _authoritative_report_aggregate(
@@ -1002,20 +959,11 @@ def generate_and_persist_report(
             candidate_id=candidate.id,
             generation_index=candidate.generation_index,
             parameter_snapshot=candidate.parameter_json,
-            trial_evidence_rows=candidate_training_trial_evidence_rows(
-                candidate
-            ),
+            trial_evidence_rows=candidate_training_trial_evidence_rows(candidate),
             aggregate=candidate.aggregated_metric_json,
         )
-        if (
-            candidate_report_evidence_required(
-                candidate.aggregated_metric_json
-            )
-            and not projection
-        ):
-            raise ReportEvidenceError(
-                "Candidate outcome evidence is invalid at report boundary"
-            )
+        if candidate_report_evidence_required(candidate.aggregated_metric_json) and not projection:
+            raise ReportEvidenceError("Candidate outcome evidence is invalid at report boundary")
         outcome_projections[candidate.id] = projection
     winner_payload = (
         winner_evidence.model_dump(mode="json")
@@ -1023,31 +971,20 @@ def generate_and_persist_report(
         else winner_evidence
     )
     verified_winner = verify_winner_selection_evidence(winner_payload)
-    winner_required = (
-        job.best_candidate_id is not None
-        and any(
-            candidate_report_evidence_required(
-                candidate.aggregated_metric_json
-            )
-            for candidate in aggregated_candidates
-        )
+    winner_required = job.best_candidate_id is not None and any(
+        candidate_report_evidence_required(candidate.aggregated_metric_json)
+        for candidate in aggregated_candidates
     )
     if winner_payload is not None and verified_winner is None:
-        raise ReportEvidenceError(
-            "winner-selection evidence content hash is invalid"
-        )
+        raise ReportEvidenceError("winner-selection evidence content hash is invalid")
     if winner_required and verified_winner is None:
-        raise ReportEvidenceError(
-            "winner-selection evidence is required for this report"
-        )
+        raise ReportEvidenceError("winner-selection evidence is required for this report")
     if verified_winner is not None and (
         verified_winner.winner_candidate_id != best.id
         or verified_winner.winner_candidate_id != job.best_candidate_id
-        or verified_winner.baseline_candidate_id
-        != job.baseline_candidate_id
+        or verified_winner.baseline_candidate_id != job.baseline_candidate_id
         or any(
-            projection.get("outcome_contract_id")
-            != verified_winner.outcome_contract_id
+            projection.get("outcome_contract_id") != verified_winner.outcome_contract_id
             for projection in outcome_projections.values()
         )
         or not winner_evidence_matches_current_candidates(
@@ -1057,26 +994,19 @@ def generate_and_persist_report(
             report_projections=verified_aggregates,
         )
     ):
-        raise ReportEvidenceError(
-            "winner-selection evidence no longer matches current ranking"
-        )
-    baseline_agg = verified_aggregates.get(
-        baseline.id
-    ) or _authoritative_report_aggregate(baseline, baseline_agg)
-    best_agg = verified_aggregates.get(
-        best.id
-    ) or _authoritative_report_aggregate(best, best_agg)
+        raise ReportEvidenceError("winner-selection evidence no longer matches current ranking")
+    baseline_agg = verified_aggregates.get(baseline.id) or _authoritative_report_aggregate(
+        baseline, baseline_agg
+    )
+    best_agg = verified_aggregates.get(best.id) or _authoritative_report_aggregate(best, best_agg)
     try:
         baseline_trials = [
             t
             for t in job.trials
-            if t.candidate_id == (job.baseline_candidate_id or "")
-            and not trial_is_holdout(t)
+            if t.candidate_id == (job.baseline_candidate_id or "") and not trial_is_holdout(t)
         ]
         best_trials = [
-            t
-            for t in job.trials
-            if t.candidate_id == best.id and not trial_is_holdout(t)
+            t for t in job.trials if t.candidate_id == best.id and not trial_is_holdout(t)
         ]
     except ValueError as exc:
         raise ReportEvidenceError(
@@ -1112,9 +1042,7 @@ def generate_and_persist_report(
         best=best,
         report_body=body,
         winner_evidence=(
-            verified_winner.model_dump(mode="json")
-            if verified_winner is not None
-            else None
+            verified_winner.model_dump(mode="json") if verified_winner is not None else None
         ),
         winner_freeze_receipt=winner_freeze_receipt,
     )

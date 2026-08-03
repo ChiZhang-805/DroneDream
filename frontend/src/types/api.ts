@@ -897,6 +897,8 @@ export interface JobReport {
   optimized_metrics: AggregatedMetrics;
   comparison: ComparisonPoint[];
   best_parameters: BestParameters;
+  winner_evidence_id?: string | null;
+  winner_freeze_receipt_id?: string | null;
   report_status: "PENDING" | "READY" | "FAILED";
   created_at: string;
   updated_at: string;

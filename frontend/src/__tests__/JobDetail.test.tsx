@@ -95,6 +95,8 @@ function makeReport(): JobReport {
       accel_limit: 4.0,
       disturbance_rejection: 0.5,
     },
+    winner_evidence_id: "sha256:winner-evidence",
+    winner_freeze_receipt_id: "wfr_test",
     report_status: "READY",
     created_at: "2026-04-22T09:05:00Z",
     updated_at: "2026-04-22T09:05:00Z",
@@ -175,6 +177,32 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     await waitFor(() =>
       expect(apiClient.getJobReport).toHaveBeenCalledWith(job.id),
     );
+  });
+
+  it("labels a no-usable-candidate report as diagnostic instead of a recommendation", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimization_outcome: "no_usable_candidate",
+      best_candidate_id: null,
+    });
+    const report = makeReport();
+    report.best_candidate_id = "cand_baseline";
+    report.best_parameters = { MPC_XY_P: 0.95 };
+    report.winner_evidence_id = null;
+    report.winner_freeze_receipt_id = null;
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(report);
+
+    renderWithJob(job.id);
+
+    expect(await screen.findByText("Diagnostic parameters")).toBeVisible();
+    expect(screen.getByText("No validated winner")).toBeVisible();
+    expect(screen.getByText(/not a validated recommendation/i)).toBeVisible();
+    expect(screen.getByText(/no candidate passed the acceptance and evidence gates/i)).toBeVisible();
+    expect(screen.queryByText("best-so-far summary text")).toBeNull();
+    expect(screen.queryByText("Baseline winner")).toBeNull();
   });
 
   it("surfaces worst-case max error and incomplete holdout evidence", async () => {

@@ -183,6 +183,38 @@ def test_summary_text_handles_incomplete_diagnostic_metrics(ctx):
     assert "no best-candidate trial rows were available" in text
 
 
+def test_summary_text_does_not_recommend_a_diagnostic_baseline(ctx):
+    models = ctx["models"]
+    report_generator = ctx["report_generator"]
+    baseline = models.CandidateParameterSet(
+        id="cand_unqualified_baseline",
+        job_id="job_unqualified",
+        generation_index=0,
+        source_type="baseline",
+        label="baseline",
+        parameter_json={},
+        is_baseline=True,
+        is_best=False,
+    )
+    aggregate = {
+        "aggregated_score": 3.4332,
+        "rmse": 8.4936,
+        "completion_time": 38.808,
+    }
+
+    text = report_generator.generate_summary_text(
+        best=baseline,
+        baseline_agg=aggregate,
+        best_agg=aggregate,
+        baseline_trials=[],
+        best_trials=[],
+    )
+
+    assert "No candidate satisfied the publication and evidence gates" in text
+    assert "diagnostic comparison fallback" in text
+    assert "not a validated recommendation" in text
+
+
 def test_bound_report_projection_seals_compatibility_and_evidence_fields(
     ctx,
 ):
