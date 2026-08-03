@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import sys
@@ -59,15 +60,28 @@ def _write_audit(
     audit_sha256 = hashlib.sha256(audit_bytes).hexdigest()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     sha256_output_path.parent.mkdir(parents=True, exist_ok=True)
+    created: list[Path] = []
     try:
         with output_path.open("xb") as handle:
+            created.append(output_path)
             handle.write(audit_bytes)
         with sha256_output_path.open("x", encoding="ascii", newline="\n") as handle:
+            created.append(sha256_output_path)
             handle.write(f"{audit_sha256}  {output_path.name}\n")
     except FileExistsError as exc:
+        for path in reversed(created):
+            with contextlib.suppress(FileNotFoundError):
+                path.unlink()
         raise ValueError(
             f"refusing to overwrite frozen installer audit output: {exc.filename}"
         ) from exc
+    except Exception:
+        # Only remove paths that this call opened with exclusive-create mode.
+        # A pre-existing frozen output can therefore never be deleted here.
+        for path in reversed(created):
+            with contextlib.suppress(FileNotFoundError):
+                path.unlink()
+        raise
 
 
 def _verify_sidecar(audit_path: Path, sidecar_path: Path) -> None:

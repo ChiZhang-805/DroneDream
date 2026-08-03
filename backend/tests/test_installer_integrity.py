@@ -278,6 +278,29 @@ def test_public_audit_writer_refuses_colliding_or_frozen_outputs(
     )
 
 
+def test_public_audit_writer_rolls_back_partial_group_on_sidecar_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audit = _build_frozen_audit(monkeypatch)
+    output = tmp_path / "audit.json"
+    sidecar = tmp_path / "audit.json.sha256"
+    original_open = Path.open
+
+    def fail_sidecar_open(path: Path, *args: Any, **kwargs: Any) -> Any:
+        if path == sidecar:
+            raise OSError("simulated sidecar write failure")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", fail_sidecar_open)
+
+    with pytest.raises(OSError, match="simulated sidecar write failure"):
+        _write_audit(audit, output_path=output, sha256_output_path=sidecar)
+
+    assert not output.exists()
+    assert not sidecar.exists()
+
+
 def test_frozen_public_audit_rejects_tampered_authority(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
