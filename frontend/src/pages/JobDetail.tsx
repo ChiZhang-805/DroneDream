@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -162,6 +162,7 @@ export function JobDetail() {
   const queryClient = useQueryClient();
   const safeId = jobId ?? "";
   const [pdfDownloadError, setPdfDownloadError] = useState(false);
+  const terminalReconciledJobRef = useRef<string | null>(null);
 
   const rerunMutation = useMutation({
     mutationFn: ({
@@ -239,6 +240,35 @@ export function JobDetail() {
         : false,
     retry: false,
   });
+
+  useEffect(() => {
+    if (
+      !safeId ||
+      !jobStatus ||
+      isActiveJobStatus(jobStatus) ||
+      !trialsQuery.isFetched ||
+      !candidatesQuery.isFetched ||
+      terminalReconciledJobRef.current === safeId
+    ) {
+      return;
+    }
+
+    terminalReconciledJobRef.current = safeId;
+    void queryClient.invalidateQueries({
+      queryKey: ["job-trials", safeId],
+      exact: true,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["job-candidates", safeId],
+      exact: true,
+    });
+  }, [
+    candidatesQuery.isFetched,
+    jobStatus,
+    queryClient,
+    safeId,
+    trialsQuery.isFetched,
+  ]);
 
   const job = jobQuery.data;
   // Phase 8: FAILED jobs (e.g. MAX_ITERATIONS_REACHED) may still have a

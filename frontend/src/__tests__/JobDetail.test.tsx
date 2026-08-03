@@ -685,4 +685,23 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     await screen.findByText(/Baseline vs Optimized comparison/i);
     expect(screen.queryByRole("button", { name: /download pdf report/i })).toBeNull();
   });
+
+  it("performs one final trials and candidates refresh for a terminal job", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    const trialsSpy = vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    const candidatesSpy = vi.spyOn(apiClient, "listJobCandidates").mockResolvedValue({
+      items: [],
+      pareto_candidate_ids: [],
+      recommendations: {},
+      objective_directions: {},
+    });
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    await waitFor(() => expect(trialsSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(candidatesSpy).toHaveBeenCalledTimes(2));
+  });
 });
