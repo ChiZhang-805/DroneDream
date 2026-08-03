@@ -63,6 +63,7 @@ DEFAULT_OFFBOARD_CONNECTION = "udp://:14540"
 DEFAULT_OFFBOARD_SETPOINT_RATE_HZ = 10.0
 DEFAULT_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS = 30.0
 DEFAULT_OFFBOARD_TRACK_TIMEOUT_SECONDS = 120.0
+DEFAULT_OFFBOARD_LANDING_TIMEOUT_SECONDS = 60.0
 DEFAULT_LAUNCH_GUI_CLIENT = False
 DEFAULT_GUI_COMMAND = (
     f"{shlex.quote(str(Path(__file__).resolve().parent / 'gazebo_gui_client.sh'))}"
@@ -3078,6 +3079,16 @@ def _build_offboard_executor_argv(args: argparse.Namespace) -> list[str]:
             ),
         ),
     )
+    landing_timeout = max(
+        1.0,
+        min(
+            600.0,
+            _parse_float(
+                os.environ.get("PX4_OFFBOARD_LANDING_TIMEOUT_SECONDS"),
+                default=DEFAULT_OFFBOARD_LANDING_TIMEOUT_SECONDS,
+            ),
+        ),
+    )
     connection = (
         os.environ.get("PX4_OFFBOARD_CONNECTION", DEFAULT_OFFBOARD_CONNECTION).strip()
         or DEFAULT_OFFBOARD_CONNECTION
@@ -3105,6 +3116,8 @@ def _build_offboard_executor_argv(args: argparse.Namespace) -> list[str]:
             str(takeoff_timeout),
             "--track-timeout-seconds",
             str(track_timeout),
+            "--landing-timeout-seconds",
+            str(landing_timeout),
             "--log",
             str(offboard_log),
         ]

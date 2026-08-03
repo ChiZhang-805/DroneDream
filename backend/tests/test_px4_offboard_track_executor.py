@@ -819,7 +819,8 @@ def test_executor_waits_for_continuously_stable_hover_before_track_entry(
     assert timing["takeoff_stable_t"] <= timing["track_start_t"]
     assert timing["cleanup"] == {
         "stop_offboard": "completed",
-        "land": "command_sent",
+        "land": "confirmed_on_ground",
+        "landing_observation": {"state": "ON_GROUND", "confirmed": True},
         "close": "completed",
     }
 
@@ -1199,9 +1200,44 @@ def test_executor_fails_closed_when_hover_velocity_never_stabilizes(
     assert timing["takeoff_gate"]["latest_observation"]["horizontal_speed_m_s"] == 1.0
     assert timing["cleanup"] == {
         "stop_offboard": "completed_during_failure_cleanup",
-        "land": "command_sent_during_failure_cleanup",
+        "land": "confirmed_on_ground_during_failure_cleanup",
+        "landing_observation": {"state": "ON_GROUND", "confirmed": True},
         "close": "completed",
     }
+
+
+def test_executor_fails_when_landing_is_not_confirmed_by_telemetry(tmp_path: Path) -> None:
+    class LandingTimeoutClient(executor.FakeOffboardClient):
+        async def wait_until_landed(self, timeout_seconds: float) -> dict[str, object]:
+            raise TimeoutError(
+                f"PX4 landing confirmation timeout after {timeout_seconds:g}s"
+            )
+
+    client = LandingTimeoutClient()
+    timing_path = tmp_path / "offboard_timing.json"
+
+    with pytest.raises(TimeoutError, match="landing confirmation timeout"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -1.0, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                landing_timeout_seconds=0.01,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=timing_path,
+            )
+        )
+
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["status"] == "failed"
+    assert timing["cleanup"]["land"].startswith("failed: TimeoutError:")
+    assert "land_confirmed_t" not in timing
+    assert client.landed is True
+    assert client.closed is True
 
 
 def test_executor_fails_closed_when_px4_rejects_arm_after_preflight_readiness(
@@ -1418,6 +1454,34 @@ def test_mavsdk_readiness_returns_observed_health_state():
         local_position_ok=True,
         armable=True,
     )
+
+
+def test_mavsdk_landing_confirmation_requires_on_ground_state() -> None:
+    class TelemetryStub:
+        async def landed_state(self):
+            yield type("LandedState", (), {"name": "IN_AIR"})()
+            yield type("LandedState", (), {"name": "ON_GROUND"})()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = type("SystemStub", (), {"telemetry": TelemetryStub()})()
+
+    assert asyncio.run(client.wait_until_landed(1.0)) == {
+        "state": "ON_GROUND",
+        "confirmed": True,
+    }
+
+
+def test_mavsdk_landing_confirmation_times_out_without_on_ground_state() -> None:
+    class TelemetryStub:
+        async def landed_state(self):
+            await asyncio.sleep(1.0)
+            yield type("LandedState", (), {"name": "IN_AIR"})()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = type("SystemStub", (), {"telemetry": TelemetryStub()})()
+
+    with pytest.raises(TimeoutError, match="landing confirmation timeout"):
+        asyncio.run(client.wait_until_landed(0.01))
 
 
 def test_mavsdk_readiness_accepts_armable_local_navigation_without_global_position():

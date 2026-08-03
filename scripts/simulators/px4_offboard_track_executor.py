@@ -130,6 +130,11 @@ class OffboardClientProtocol(Protocol):
 
     async def land(self) -> None: ...
 
+    async def wait_until_landed(
+        self,
+        timeout_seconds: float,
+    ) -> dict[str, Any]: ...
+
     async def get_param_int(self, name: str) -> int: ...
 
     async def set_param_int(self, name: str, value: int) -> None: ...
@@ -239,6 +244,29 @@ class MavsdkOffboardClient:
 
     async def land(self) -> None:
         await self._require_system().action.land()
+
+    async def wait_until_landed(self, timeout_seconds: float) -> dict[str, Any]:
+        async def _wait() -> dict[str, Any]:
+            async for landed_state in self._require_system().telemetry.landed_state():
+                raw_name = getattr(landed_state, "name", None)
+                state_name = (
+                    raw_name
+                    if isinstance(raw_name, str) and raw_name
+                    else str(landed_state).rsplit(".", 1)[-1]
+                ).upper()
+                if state_name == "ON_GROUND":
+                    return {
+                        "state": state_name,
+                        "confirmed": True,
+                    }
+            raise RuntimeError("PX4 landed-state stream ended before ON_GROUND")
+
+        try:
+            return await asyncio.wait_for(_wait(), timeout=timeout_seconds)
+        except TimeoutError:
+            raise TimeoutError(
+                f"PX4 landing confirmation timeout after {timeout_seconds:g}s"
+            ) from None
 
     async def get_param_float(self, name: str) -> float:
         return float(await self._require_system().param.get_param_float(name))
@@ -381,6 +409,12 @@ class FakeOffboardClient:
     async def land(self) -> None:
         self.landed = True
 
+    async def wait_until_landed(self, timeout_seconds: float) -> dict[str, Any]:
+        _ = timeout_seconds
+        if not self.landed:
+            raise RuntimeError("fake PX4 has not received a land command")
+        return {"state": "ON_GROUND", "confirmed": True}
+
     async def get_param_float(self, name: str) -> float:
         return self.float_params[name]
 
@@ -481,6 +515,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--track-timeout-seconds",
         type=float,
         default=_parse_float(os.environ.get("PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS"), default=120.0),
+    )
+    parser.add_argument(
+        "--landing-timeout-seconds",
+        type=float,
+        default=_parse_float(
+            os.environ.get("PX4_OFFBOARD_LANDING_TIMEOUT_SECONDS"),
+            default=60.0,
+        ),
     )
     parser.add_argument(
         "--takeoff-horizontal-tolerance-m",
@@ -1593,6 +1635,7 @@ async def run_executor(
     takeoff_timeout_seconds: float,
     takeoff_climb_rate_m_s: float = 1.0,
     track_timeout_seconds: float,
+    landing_timeout_seconds: float = 60.0,
     rate_hz: float,
     land_after: bool,
     log_path: Path,
@@ -1617,6 +1660,7 @@ async def run_executor(
         ("takeoff_timeout_seconds", takeoff_timeout_seconds),
         ("takeoff_climb_rate_m_s", takeoff_climb_rate_m_s),
         ("track_timeout_seconds", track_timeout_seconds),
+        ("landing_timeout_seconds", landing_timeout_seconds),
     ):
         if not math.isfinite(value) or value <= 0:
             raise ValueError(f"{label} must be finite and greater than zero")
@@ -1652,6 +1696,7 @@ async def run_executor(
     offboard_started = False
     offboard_stopped = False
     land_command_sent = False
+    landing_confirmation_attempted = False
     runtime_failure: str | None = None
     runtime_observations: dict[str, dict[str, Any]] = {}
     attempted_effect_sections: set[str] = set()
@@ -1953,6 +1998,18 @@ async def run_executor(
             land_command_sent = True
             cleanup["land"] = "command_sent"
             _log(log_path, "land command sent")
+            landing_confirmation_attempted = True
+            try:
+                landing_observation = await client.wait_until_landed(
+                    landing_timeout_seconds
+                )
+            except Exception as exc:
+                cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
+                raise
+            cleanup["land"] = "confirmed_on_ground"
+            cleanup["landing_observation"] = landing_observation
+            timing["land_confirmed_t"] = time.monotonic() - exec_start
+            _log(log_path, "landing confirmed ON_GROUND by PX4 telemetry")
     except BaseException as exc:
         runtime_failure = f"{type(exc).__name__}: {exc}"
         if takeoff_gate.get("status") not in {"achieved", "failed"}:
@@ -2007,13 +2064,25 @@ async def run_executor(
             except Exception as exc:
                 cleanup["stop_offboard"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not stop offboard: {exc}")
-        if armed and land_after and not land_command_sent:
+        if armed and land_after and not landing_confirmation_attempted:
             try:
                 timing.setdefault("land_start_t", time.monotonic() - exec_start)
-                await client.land()
-                land_command_sent = True
-                cleanup["land"] = "command_sent_during_failure_cleanup"
-                _log(log_path, "land command sent during failure cleanup")
+                if not land_command_sent:
+                    await client.land()
+                    land_command_sent = True
+                    cleanup["land"] = "command_sent_during_failure_cleanup"
+                    _log(log_path, "land command sent during failure cleanup")
+                landing_confirmation_attempted = True
+                landing_observation = await client.wait_until_landed(
+                    landing_timeout_seconds
+                )
+                cleanup["land"] = "confirmed_on_ground_during_failure_cleanup"
+                cleanup["landing_observation"] = landing_observation
+                timing["land_confirmed_t"] = time.monotonic() - exec_start
+                _log(
+                    log_path,
+                    "landing confirmed ON_GROUND during failure cleanup",
+                )
             except Exception as exc:
                 cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not land: {exc}")
@@ -2124,6 +2193,7 @@ def main(argv: list[str] | None = None) -> int:
                 takeoff_timeout_seconds=args.takeoff_timeout_seconds,
                 takeoff_climb_rate_m_s=args.takeoff_climb_rate_m_s,
                 track_timeout_seconds=args.track_timeout_seconds,
+                landing_timeout_seconds=args.landing_timeout_seconds,
                 rate_hz=args.setpoint_rate_hz,
                 land_after=land_after,
                 log_path=args.log,
