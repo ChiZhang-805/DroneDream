@@ -19,7 +19,10 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from app.simulator.scenario_effects import scenario_effect_request_sha256
+from app.simulator.scenario_effects import (
+    scenario_effect_request_sha256,
+    scenario_effect_value_sha256,
+)
 
 MANIFEST_SCHEMA_VERSION = "dronedream.advanced-physics-real-px4-manifest.v1"
 RECEIPT_SCHEMA_VERSION = "dronedream.advanced-physics-real-px4-receipt.v1"
@@ -387,12 +390,28 @@ def _validate_effect_contract(
     evidence_rows = evidence.get("effects")
     if not isinstance(request_rows, list) or not isinstance(evidence_rows, list):
         raise ValueError(f"{spec.directory} effect rows are invalid")
-    request_effects = [
-        str(_mapping(row, field="request effect").get("effect_id")) for row in request_rows
-    ]
-    applied_effects = [
-        str(_mapping(row, field="applied effect").get("effect_id")) for row in evidence_rows
-    ]
+    request_by_id: dict[str, Mapping[str, Any]] = {}
+    request_effects: list[str] = []
+    for row in request_rows:
+        item = _mapping(row, field="request effect")
+        effect_id = item.get("effect_id")
+        if not isinstance(effect_id, str) or not effect_id:
+            raise ValueError(f"{spec.directory} request effect id is invalid")
+        request_effects.append(effect_id)
+        if effect_id in request_by_id:
+            raise ValueError(f"{spec.directory} request repeats an effect")
+        request_by_id[effect_id] = item
+    evidence_by_id: dict[str, Mapping[str, Any]] = {}
+    applied_effects: list[str] = []
+    for row in evidence_rows:
+        item = _mapping(row, field="applied effect")
+        effect_id = item.get("effect_id")
+        if not isinstance(effect_id, str) or not effect_id:
+            raise ValueError(f"{spec.directory} evidence effect id is invalid")
+        applied_effects.append(effect_id)
+        if effect_id in evidence_by_id:
+            raise ValueError(f"{spec.directory} evidence repeats an effect")
+        evidence_by_id[effect_id] = item
     if sorted(request_effects) != list(spec.expected_effects):
         raise ValueError(f"{spec.directory} requested effects drifted")
     if sorted(applied_effects) != list(spec.expected_effects):
@@ -406,8 +425,7 @@ def _validate_effect_contract(
         capability = _mapping(item.get("capability"), field="request capability")
         if capability.get("status") != "available":
             raise ValueError(f"{spec.directory} request capability is unavailable")
-    for row in evidence_rows:
-        item = _mapping(row, field="applied effect")
+    for effect_id, item in evidence_by_id.items():
         capability = _mapping(item.get("capability"), field="evidence capability")
         verification = _mapping(item.get("evidence"), field="effect evidence").get("verification")
         if (
@@ -417,6 +435,11 @@ def _validate_effect_contract(
             or verification.get("status") != "verified"
         ):
             raise ValueError(f"{spec.directory} effect is not verified applied")
+        _validate_effect_proof_envelope(
+            requested=request_by_id[effect_id],
+            observed=item,
+            field=f"{spec.directory}.{effect_id}",
+        )
 
     request_sha = _require_sha256(
         request.get("request_sha256"),
@@ -487,6 +510,61 @@ def _validate_effect_contract(
         "failed_effects": [],
         "pending_effects": [],
     }
+
+
+def _validate_effect_proof_envelope(
+    *,
+    requested: Mapping[str, Any],
+    observed: Mapping[str, Any],
+    field: str,
+) -> None:
+    """Verify the version-stable request/readback envelope for frozen effects.
+
+    The exact compiled SDF profile evolved after this historical campaign, so
+    re-running the newest profile-specific validator would reject honest old
+    evidence.  These invariants are stable across those versions and prevent a
+    bare ``status=verified`` label from becoming exportable evidence.
+    """
+
+    mechanism = requested.get("mechanism")
+    if not isinstance(mechanism, str) or not mechanism or observed.get("mechanism") != mechanism:
+        raise ValueError(f"{field} evidence mechanism does not match the request")
+    if "requested_value" not in requested:
+        raise ValueError(f"{field} requested value is missing")
+    details = _mapping(observed.get("evidence"), field=f"{field}.evidence")
+    expected_value_sha256 = scenario_effect_value_sha256(requested["requested_value"])
+    if details.get("requested_value_sha256") != expected_value_sha256:
+        raise ValueError(f"{field} evidence is not bound to its requested value")
+    verification = _mapping(
+        details.get("verification"),
+        field=f"{field}.verification",
+    )
+    method = verification.get("method")
+    if not isinstance(method, str) or not method or len(method) > 256:
+        raise ValueError(f"{field} verification method is invalid")
+    observations = verification.get("observations")
+    if not isinstance(observations, list) or not 1 <= len(observations) <= 128:
+        raise ValueError(f"{field} requires bounded non-empty observations")
+    for index, raw_observation in enumerate(observations):
+        observation = _mapping(
+            raw_observation,
+            field=f"{field}.observations[{index}]",
+        )
+        source = observation.get("source")
+        if not isinstance(source, str) or not source or len(source) > 1024:
+            raise ValueError(f"{field} observation source is invalid")
+        if observation.get("kind") not in {
+            "readback",
+            "acknowledgement",
+            "sample",
+            "artifact",
+        }:
+            raise ValueError(f"{field} observation kind is invalid")
+        if "value" not in observation:
+            raise ValueError(f"{field} observation value is missing")
+        digest = observation.get("sha256")
+        if digest is not None and digest != scenario_effect_value_sha256(observation["value"]):
+            raise ValueError(f"{field} observation hash does not match")
 
 
 def _validate_attempt(

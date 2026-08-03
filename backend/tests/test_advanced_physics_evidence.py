@@ -13,7 +13,10 @@ from app.simulator.advanced_physics_evidence import (
     export_advanced_physics_evidence,
     verify_advanced_physics_evidence,
 )
-from app.simulator.scenario_effects import scenario_effect_request_sha256
+from app.simulator.scenario_effects import (
+    scenario_effect_request_sha256,
+    scenario_effect_value_sha256,
+)
 
 SUBJECT_COMMIT = "1" * 40
 EXPORTER_COMMIT = "2" * 40
@@ -52,6 +55,7 @@ def _effect_request(
                 "effect_id": effect,
                 "capability": {"status": "available", "reason": "fixture"},
                 "mechanism": "fixture",
+                "requested_value": {"effect_id": effect, "fixture": True},
             }
             for effect in effects
         ],
@@ -76,7 +80,22 @@ def _effect_evidence(
                 "status": "applied",
                 "capability": {"status": "available", "reason": "fixture"},
                 "mechanism": "fixture",
-                "evidence": {"verification": {"status": "verified"}},
+                "evidence": {
+                    "requested_value_sha256": scenario_effect_value_sha256(
+                        {"effect_id": effect, "fixture": True}
+                    ),
+                    "verification": {
+                        "status": "verified",
+                        "method": "fixture-readback",
+                        "observations": [
+                            {
+                                "kind": "readback",
+                                "source": "fixture/runtime",
+                                "value": {"physical_effect_verified": True},
+                            }
+                        ],
+                    },
+                },
             }
             for effect in effects
         ],
@@ -368,6 +387,32 @@ def test_export_rejects_unverified_effect(tmp_path: Path) -> None:
     _write_json(path, evidence)
 
     with pytest.raises(ValueError, match="effect is not verified applied"):
+        _export(source, tmp_path / "bundle")
+
+
+def test_export_rejects_verified_label_without_request_bound_observations(
+    tmp_path: Path,
+) -> None:
+    source = _build_source(tmp_path / "source")
+    path = source / "success-five-effects-attempt-4" / "scenario_effects.applied.json"
+    evidence = json.loads(path.read_text(encoding="utf-8"))
+    evidence["effects"][0]["evidence"] = {
+        "requested_value_sha256": "0" * 64,
+        "verification": {
+            "status": "verified",
+            "method": "fixture-readback",
+            "observations": [
+                {
+                    "kind": "readback",
+                    "source": "fixture/runtime",
+                    "value": {"physical_effect_verified": True},
+                }
+            ],
+        },
+    }
+    _write_json(path, evidence)
+
+    with pytest.raises(ValueError, match="not bound to its requested value"):
         _export(source, tmp_path / "bundle")
 
 
