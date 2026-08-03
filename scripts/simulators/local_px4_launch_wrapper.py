@@ -2878,8 +2878,8 @@ def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, l
     except OSError:
         return
 
-    deadline = time.time() + 2.0
-    while time.time() < deadline:
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
         if proc.poll() is not None:
             return
         time.sleep(0.1)
@@ -3950,11 +3950,11 @@ def main() -> int:
             f"[local_px4_launch_wrapper] Waiting {ready_timeout_seconds}s "
             "for PX4 readiness (simple fixed wait)",
         )
-        ready_deadline = time.time() + float(ready_timeout_seconds)
-        while time.time() < ready_deadline:
+        ready_deadline = time.monotonic() + float(ready_timeout_seconds)
+        while time.monotonic() < ready_deadline:
             if px4_proc.poll() is not None:
                 break
-            time.sleep(min(0.1, max(0.0, ready_deadline - time.time())))
+            time.sleep(min(0.1, max(0.0, ready_deadline - time.monotonic())))
 
         if px4_proc.poll() is not None and px4_proc.returncode != 0:
             raise RuntimeError(
@@ -4149,8 +4149,8 @@ def main() -> int:
                 f"[local_px4_launch_wrapper] GUI client launch command: {gui_command}",
             )
 
-            startup_deadline = time.time() + gui_wait_timeout_seconds
-            while time.time() < startup_deadline:
+            startup_deadline = time.monotonic() + gui_wait_timeout_seconds
+            while time.monotonic() < startup_deadline:
                 if gui_proc.poll() is not None:
                     break
                 time.sleep(0.1)

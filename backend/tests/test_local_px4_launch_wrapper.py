@@ -35,6 +35,12 @@ wrapper = importlib.util.module_from_spec(WRAPPER_SPEC)
 WRAPPER_SPEC.loader.exec_module(wrapper)
 
 
+def test_wrapper_uses_monotonic_clock_for_elapsed_deadlines() -> None:
+    source = WRAPPER.read_text(encoding="utf-8")
+
+    assert "time.time()" not in source
+
+
 def _write_json(path: Path, payload: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")
