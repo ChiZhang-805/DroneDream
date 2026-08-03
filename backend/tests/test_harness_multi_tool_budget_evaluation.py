@@ -24,6 +24,11 @@ from scripts.evaluate_harness_multi_tool_budget import (
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = BACKEND_ROOT.parent
 EVALUATOR = BACKEND_ROOT / "scripts" / "evaluate_harness_multi_tool_budget.py"
+FROZEN_ARTIFACT = (
+    BACKEND_ROOT
+    / "evaluation_artifacts"
+    / "harness-multi-tool-budget-evaluation-v1.json"
+)
 
 
 def _head() -> str:
@@ -140,29 +145,9 @@ def test_semantic_reexecution_ignores_only_validated_clock_observations() -> Non
 
 
 def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> None:
-    source_commit = _head()
-    generated_at = "2026-07-28T18:01:00Z"
-    artifact = {
-        "schema_version": "dronedream.harness-multi-tool-budget-evaluation/v1",
-        "source_commit": source_commit,
-        "generated_at": generated_at,
-        "claim_boundary": HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
-        "seed_blocks": [7100],
-        "configured_budget": {
-            "max_iterations": 2,
-            "max_total_trials": 40,
-        },
-        "contracts": {
-            "evidence_schema_version": "2.9",
-            "tool_registry_version": "2.1",
-        },
-        "physical_fidelity": False,
-        "real_provider_calls": 0,
-        "network_calls": 0,
-        "real_credentials_used": False,
-        "block_rows": [],
-    }
-    artifact["artifact_sha256"] = _sha256(artifact, "artifact_sha256")
+    artifact = json.loads(FROZEN_ARTIFACT.read_text(encoding="utf-8"))
+    source_commit = artifact["source_commit"]
+    generated_at = artifact["generated_at"]
     manifest = build_harness_multi_tool_budget_manifest(
         source_commit=source_commit,
         generated_at=generated_at,
@@ -172,7 +157,7 @@ def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> No
     assert manifest["source_commit"] == source_commit
     assert manifest["generated_at"] == generated_at
     assert manifest["artifact_sha256"] == artifact["artifact_sha256"]
-    assert manifest["seed_blocks"] == [7100]
+    assert manifest["seed_blocks"] == [7100, 8200, 9300]
     assert manifest["runtime"] == {
         "simulator_backend": "mock",
         "real_provider_calls": 0,
@@ -180,8 +165,6 @@ def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> No
         "real_credentials_used": False,
     }
     assert manifest["manifest_sha256"] == _sha256(manifest, "manifest_sha256")
-    # A minimal row-less artifact is sufficient to exercise canonical file
-    # rendering here; semantic run validation belongs to the campaign test.
     rendered = _payloads(artifact, manifest)
     assert set(rendered) == {
         "harness-multi-tool-budget-evaluation-v1.json",
@@ -194,6 +177,60 @@ def test_multi_tool_evaluation_manifest_and_rendered_files_bind_artifact() -> No
         build_harness_multi_tool_budget_manifest(
             source_commit="0" * 40,
             generated_at=generated_at,
+            artifact=artifact,
+        )
+
+
+def test_multi_tool_manifest_rejects_self_hashed_empty_measurement() -> None:
+    source_commit = _head()
+    generated_at = "2026-07-28T18:01:00Z"
+    empty_artifact = {
+        "schema_version": "dronedream.harness-multi-tool-budget-evaluation/v1",
+        "source_commit": source_commit,
+        "generated_at": generated_at,
+        "claim_boundary": HARNESS_MULTI_TOOL_BUDGET_EVAL_CLAIM_BOUNDARY,
+        "evidence_class": "synthetic_mock_equal_budget_dispatcher_evaluation",
+        "seed_blocks": [7100],
+        "configured_budget": {
+            "max_iterations": 2,
+            "max_total_trials": 40,
+        },
+        "contracts": {
+            "evidence_schema_version": "2.9",
+            "tool_registry_version": "2.1",
+        },
+        "physical_fidelity": False,
+        "llm_quality_claim_permitted": False,
+        "optimizer_superiority_claim_permitted": False,
+        "causal_harness_benefit_claim_permitted": False,
+        "real_provider_calls": 0,
+        "network_calls": 0,
+        "real_credentials_used": False,
+        "block_rows": [],
+        "summary": {},
+    }
+    empty_artifact["artifact_sha256"] = _sha256(
+        empty_artifact,
+        "artifact_sha256",
+    )
+
+    with pytest.raises(ValueError, match="block rows"):
+        build_harness_multi_tool_budget_manifest(
+            source_commit=source_commit,
+            generated_at=generated_at,
+            artifact=empty_artifact,
+        )
+
+
+def test_multi_tool_manifest_rejects_self_hashed_trial_accounting_tamper() -> None:
+    artifact = json.loads(FROZEN_ARTIFACT.read_text(encoding="utf-8"))
+    artifact["block_rows"][0]["realized_trial_delta_scripted_minus_direct"] += 1
+    artifact["artifact_sha256"] = _sha256(artifact, "artifact_sha256")
+
+    with pytest.raises(ValueError, match="Trial delta"):
+        build_harness_multi_tool_budget_manifest(
+            source_commit=artifact["source_commit"],
+            generated_at=artifact["generated_at"],
             artifact=artifact,
         )
 

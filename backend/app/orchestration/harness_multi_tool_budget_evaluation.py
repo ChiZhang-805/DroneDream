@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import shutil
 import subprocess
 from collections.abc import Iterable
@@ -34,6 +35,7 @@ from app.orchestration.decision_harness import (
 from app.orchestration.harness_context import (
     HARNESS_EVIDENCE_SCHEMA_VERSION,
     HARNESS_TOOL_REGISTRY_VERSION,
+    HarnessGenerationPlanMemory,
 )
 from app.orchestration.harness_outcome_campaign import (
     HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS,
@@ -450,6 +452,240 @@ def build_harness_multi_tool_budget_evaluation(
     return {**unsigned, "artifact_sha256": _sha256(unsigned)}
 
 
+def _nonnegative_int(value: object, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{field} must be a non-negative integer")
+    return value
+
+
+def _finite_timing(value: object, *, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{field} must be a finite timing number")
+    resolved = float(value)
+    if not math.isfinite(resolved) or not 0.0 <= resolved <= 600_000.0:
+        raise ValueError(f"{field} must be between 0 and 600000 milliseconds")
+    return resolved
+
+
+def _verify_plan_trace(
+    trace: object,
+    *,
+    arm_name: str,
+    block_index: int,
+) -> dict[str, object]:
+    if not isinstance(trace, dict):
+        raise ValueError(f"multi-tool block {block_index} {arm_name} trace is invalid")
+    raw_history = trace.get("provider_visible_history")
+    accounting = trace.get("accounting")
+    if not isinstance(raw_history, list) or not isinstance(accounting, dict):
+        raise ValueError(
+            f"multi-tool block {block_index} {arm_name} trace accounting is invalid"
+        )
+    history = [HarnessGenerationPlanMemory.model_validate(row) for row in raw_history]
+    verified_generation_count = _nonnegative_int(
+        trace.get("verified_generation_count"),
+        field="verified_generation_count",
+    )
+    multi_tool_generation_count = _nonnegative_int(
+        trace.get("multi_tool_generation_count"),
+        field="multi_tool_generation_count",
+    )
+    if verified_generation_count != len(history) or multi_tool_generation_count != sum(
+        len(row.tool_calls) >= 2 for row in history
+    ):
+        raise ValueError("multi-tool plan trace generation counts do not recompute")
+    for name in (
+        "provider_call_count",
+        "planned_candidates",
+        "dispatched_candidates",
+        "dispatched_trials",
+    ):
+        observed = _nonnegative_int(accounting.get(name), field=name)
+        if observed != sum(int(getattr(row, name)) for row in history):
+            raise ValueError(f"multi-tool {name} accounting does not recompute")
+    for name in (
+        "plan_decision_wall_ms",
+        "revision_wall_ms",
+        "tool_execution_wall_ms",
+        "actual_tool_cpu_ms",
+    ):
+        observed = _finite_timing(accounting.get(name), field=name)
+        expected = round(sum(float(getattr(row, name)) for row in history), 3)
+        if not math.isclose(observed, expected, abs_tol=0.001):
+            raise ValueError(f"multi-tool {name} accounting does not recompute")
+    if arm_name == "direct_portfolio" and (
+        history
+        or verified_generation_count != 0
+        or multi_tool_generation_count != 0
+        or any(value != 0 for value in accounting.values())
+    ):
+        raise ValueError("direct portfolio arm contains scripted plan accounting")
+    return trace
+
+
+def _verify_arm_row(
+    arm: object,
+    *,
+    expected_name: str,
+    block_index: int,
+) -> dict[str, Any]:
+    if not isinstance(arm, dict) or arm.get("arm") != expected_name:
+        raise ValueError("multi-tool evaluation arm order or identity drifted")
+    dispatched = _nonnegative_int(
+        arm.get("realized_dispatched_trials"),
+        field="realized_dispatched_trials",
+    )
+    completed = _nonnegative_int(
+        arm.get("realized_completed_trials"),
+        field="realized_completed_trials",
+    )
+    candidates = _nonnegative_int(
+        arm.get("realized_candidate_count"),
+        field="realized_candidate_count",
+    )
+    failure_count = _nonnegative_int(arm.get("failure_count"), field="failure_count")
+    if (
+        arm.get("configured_max_iterations")
+        != HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS
+        or arm.get("configured_max_total_trials")
+        != HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS
+        or dispatched > HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS
+        or completed > dispatched
+        or candidates < 1
+        or failure_count > dispatched
+        or arm.get("terminal_status") not in _TERMINAL_JOBS
+        or arm.get("real_provider_calls") != 0
+        or arm.get("network_calls") != 0
+        or arm.get("real_credentials_used") is not False
+        or not isinstance(arm.get("outcome_sha256"), str)
+        or len(str(arm["outcome_sha256"])) != 64
+        or any(char not in "0123456789abcdef" for char in str(arm["outcome_sha256"]))
+    ):
+        raise ValueError("multi-tool evaluation arm integrity is invalid")
+    trace = _verify_plan_trace(
+        arm.get("plan_trace"),
+        arm_name=expected_name,
+        block_index=block_index,
+    )
+    accounting = trace["accounting"]
+    scripted_calls = _nonnegative_int(
+        arm.get("scripted_decision_calls"),
+        field="scripted_decision_calls",
+    )
+    plan_calls = _nonnegative_int(
+        arm.get("scripted_plan_calls"),
+        field="scripted_plan_calls",
+    )
+    revision_calls = _nonnegative_int(
+        arm.get("scripted_revision_calls"),
+        field="scripted_revision_calls",
+    )
+    if expected_name == "direct_portfolio":
+        if scripted_calls or plan_calls or revision_calls:
+            raise ValueError("direct portfolio arm invoked the scripted planner")
+    elif (
+        scripted_calls != plan_calls + revision_calls
+        or scripted_calls != accounting["provider_call_count"]
+        or plan_calls != trace["verified_generation_count"]
+        or revision_calls != trace["verified_generation_count"]
+        or trace["multi_tool_generation_count"] < 1
+        or accounting["dispatched_candidates"] > candidates
+        or accounting["dispatched_trials"] > dispatched
+    ):
+        raise ValueError("scripted multi-tool call or dispatch accounting drifted")
+    return arm
+
+
+def _verify_multi_tool_artifact_semantics(
+    artifact: dict[str, object],
+) -> None:
+    seed_blocks = artifact.get("seed_blocks")
+    raw_blocks = artifact.get("block_rows")
+    if (
+        not isinstance(seed_blocks, list)
+        or not seed_blocks
+        or not isinstance(raw_blocks, list)
+        or len(raw_blocks) != len(seed_blocks)
+    ):
+        raise ValueError("multi-tool evaluation block rows are incomplete")
+    scripted_rows: list[dict[str, Any]] = []
+    for block_index, (seed_block, block) in enumerate(
+        zip(seed_blocks, raw_blocks, strict=True),
+        start=1,
+    ):
+        if (
+            not isinstance(block, dict)
+            or block.get("block_id") != block_index
+            or block.get("seed_block") != seed_block
+            or block.get("configured_budget_equal") is not True
+        ):
+            raise ValueError("multi-tool evaluation block identity or budget drifted")
+        arms = block.get("arms")
+        if not isinstance(arms, list) or len(arms) != len(
+            HARNESS_MULTI_TOOL_BUDGET_EVAL_ARMS
+        ):
+            raise ValueError("multi-tool evaluation block arms are incomplete")
+        verified_arms = [
+            _verify_arm_row(
+                arm,
+                expected_name=expected_name,
+                block_index=block_index,
+            )
+            for arm, expected_name in zip(
+                arms,
+                HARNESS_MULTI_TOOL_BUDGET_EVAL_ARMS,
+                strict=True,
+            )
+        ]
+        direct, scripted = verified_arms
+        expected_delta = int(scripted["realized_dispatched_trials"]) - int(
+            direct["realized_dispatched_trials"]
+        )
+        if block.get("realized_trial_delta_scripted_minus_direct") != expected_delta:
+            raise ValueError("multi-tool realized Trial delta does not recompute")
+        scripted_rows.append(scripted)
+    summary = artifact.get("summary")
+    if not isinstance(summary, dict):
+        raise ValueError("multi-tool evaluation summary is invalid")
+    traces = [row["plan_trace"] for row in scripted_rows]
+    accountings = [trace["accounting"] for trace in traces]
+    expected_summary = {
+        "block_count": len(raw_blocks),
+        "arm_run_count": len(raw_blocks) * len(HARNESS_MULTI_TOOL_BUDGET_EVAL_ARMS),
+        "configured_budget_parity_count": len(raw_blocks),
+        "scripted_verified_generation_count": sum(
+            int(trace["verified_generation_count"]) for trace in traces
+        ),
+        "scripted_multi_tool_generation_count": sum(
+            int(trace["multi_tool_generation_count"]) for trace in traces
+        ),
+        "scripted_decision_call_count": sum(
+            int(row["scripted_decision_calls"]) for row in scripted_rows
+        ),
+        "scripted_accounted_provider_call_count": sum(
+            int(accounting["provider_call_count"]) for accounting in accountings
+        ),
+        "scripted_plan_decision_wall_ms": round(
+            sum(float(accounting["plan_decision_wall_ms"]) for accounting in accountings),
+            3,
+        ),
+        "scripted_revision_wall_ms": round(
+            sum(float(accounting["revision_wall_ms"]) for accounting in accountings),
+            3,
+        ),
+        "scripted_tool_execution_wall_ms": round(
+            sum(float(accounting["tool_execution_wall_ms"]) for accounting in accountings),
+            3,
+        ),
+        "scripted_actual_tool_cpu_ms": round(
+            sum(float(accounting["actual_tool_cpu_ms"]) for accounting in accountings),
+            3,
+        ),
+    }
+    if summary != expected_summary:
+        raise ValueError("multi-tool evaluation summary does not recompute")
+
+
 def build_harness_multi_tool_budget_manifest(
     *,
     source_commit: str,
@@ -488,8 +724,14 @@ def build_harness_multi_tool_budget_manifest(
         or artifact.get("real_provider_calls") != 0
         or artifact.get("network_calls") != 0
         or artifact.get("real_credentials_used") is not False
+        or artifact.get("evidence_class")
+        != "synthetic_mock_equal_budget_dispatcher_evaluation"
+        or artifact.get("llm_quality_claim_permitted") is not False
+        or artifact.get("optimizer_superiority_claim_permitted") is not False
+        or artifact.get("causal_harness_benefit_claim_permitted") is not False
     ):
         raise ValueError("multi-tool artifact provenance or integrity drifted")
+    _verify_multi_tool_artifact_semantics(artifact)
     unsigned: dict[str, object] = {
         "schema_version": HARNESS_MULTI_TOOL_BUDGET_EVAL_MANIFEST_SCHEMA_VERSION,
         "generated_at": generated_at,
