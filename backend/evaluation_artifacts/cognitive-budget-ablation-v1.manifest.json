@@ -1,0 +1,568 @@
+{
+  "arms": [
+    "one_turn",
+    "fixed_two_turn",
+    "adaptive_two_to_four_turn"
+  ],
+  "case_count": 11,
+  "cases": [
+    {
+      "case_id": "direct_first_turn_stop",
+      "category": "local_progress",
+      "cooldown_reasons": [],
+      "expected_optional_turn": false,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 1,
+        "fixed_two_turn": 1,
+        "one_turn": 1
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 1,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 18,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "steady_progress_no_extra_reasoning",
+      "category": "local_progress",
+      "cooldown_reasons": [],
+      "expected_optional_turn": false,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 2,
+        "fixed_two_turn": 2,
+        "one_turn": 2
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "trailing_stagnation_diagnosis",
+      "category": "stagnation",
+      "cooldown_reasons": [],
+      "expected_optional_turn": true,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 3,
+        "fixed_two_turn": 4,
+        "one_turn": null
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 1.0,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 2,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "conflicting_tool_directions",
+      "category": "mixed_tool_history",
+      "cooldown_reasons": [],
+      "expected_optional_turn": true,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 2,
+        "fixed_two_turn": 3,
+        "one_turn": 4
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": true
+    },
+    {
+      "case_id": "prediction_outcome_mismatch",
+      "category": "failure_recovery",
+      "cooldown_reasons": [],
+      "expected_optional_turn": true,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 3,
+        "fixed_two_turn": 4,
+        "one_turn": null
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "last_execution": {
+          "batch_policy": "balanced",
+          "decision_source": "model",
+          "dispatched_candidates": 2,
+          "generation": 2,
+          "observed_outcome": {
+            "accepted_attempt_count": 4,
+            "cohort_best_score": 1.25,
+            "cohort_candidate_count": 2,
+            "completed_candidate_rate": 1.0,
+            "domain_failure_trial_count": 0,
+            "feasible_candidate_count": 1,
+            "incumbent_score_after": 1.0,
+            "incumbent_score_before": 1.0,
+            "optimizer_learning_trial_count": 4,
+            "schema_id": "dronedream.harness-decision-observed-outcome/v1"
+          },
+          "plan_phase": "balanced",
+          "planned_candidates": 2,
+          "reflection_status": "verified_complete",
+          "status": "dispatched",
+          "tool_id": "optimizer_portfolio"
+        },
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "domain_failure_spike",
+      "category": "failure_recovery",
+      "cooldown_reasons": [],
+      "expected_optional_turn": true,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 2,
+        "fixed_two_turn": 3,
+        "one_turn": null
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "last_execution": {
+          "batch_policy": "balanced",
+          "decision_source": "model",
+          "dispatched_candidates": 2,
+          "generation": 2,
+          "observed_outcome": {
+            "accepted_attempt_count": 4,
+            "cohort_best_score": 1.0,
+            "cohort_candidate_count": 2,
+            "completed_candidate_rate": 1.0,
+            "domain_failure_trial_count": 2,
+            "feasible_candidate_count": 1,
+            "incumbent_score_after": 1.0,
+            "incumbent_score_before": 1.0,
+            "optimizer_learning_trial_count": 4,
+            "schema_id": "dronedream.harness-decision-observed-outcome/v1"
+          },
+          "plan_phase": "balanced",
+          "planned_candidates": 2,
+          "reflection_status": "verified_complete",
+          "status": "dispatched",
+          "tool_id": "optimizer_portfolio"
+        },
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "ood_without_transfer_memory",
+      "category": "cold_start",
+      "cooldown_reasons": [],
+      "expected_optional_turn": true,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 3,
+        "fixed_two_turn": 4,
+        "one_turn": null
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.3,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "hard_boundary_safety_review",
+      "category": "constraint_pressure",
+      "cooldown_reasons": [],
+      "expected_optional_turn": true,
+      "hard_boundary_candidate": true,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 2,
+        "fixed_two_turn": 3,
+        "one_turn": null
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "cooldown_suppresses_duplicate_stagnation",
+      "category": "stagnation",
+      "cooldown_reasons": [
+        "trailing_stagnation"
+      ],
+      "expected_optional_turn": false,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 2,
+        "fixed_two_turn": 2,
+        "one_turn": 3
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 1.0,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 2,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "severity_escalation_over_cooldown",
+      "category": "constraint_pressure",
+      "cooldown_reasons": [
+        "hard_boundary_candidate"
+      ],
+      "expected_optional_turn": true,
+      "hard_boundary_candidate": true,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": 2,
+        "fixed_two_turn": 3,
+        "one_turn": null
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    },
+    {
+      "case_id": "no_validated_winner_under_frozen_budget",
+      "category": "tight_budget",
+      "cooldown_reasons": [],
+      "expected_optional_turn": false,
+      "hard_boundary_candidate": false,
+      "qualification_generation": {
+        "adaptive_two_to_four_turn": null,
+        "fixed_two_turn": null,
+        "one_turn": null
+      },
+      "stimulus": {
+        "baseline_score": 1.0,
+        "best_score": 0.85,
+        "constraint_count": 3,
+        "current_generation": 2,
+        "environment": {
+          "advanced_config_present": false,
+          "baro_noise_m": 0.0,
+          "battery_initial_percent": 100.0,
+          "gps_noise_m": 0.0,
+          "imu_noise_scale": 1.0,
+          "obstacle_count": 0,
+          "sensor_dropout_rate": 0.0,
+          "sensor_noise_level": "medium",
+          "steady_wind_component_l1_mps": 0.0,
+          "voltage_sag": false
+        },
+        "feasible_candidate_count": 2,
+        "max_iterations": 4,
+        "objective_count": 3,
+        "observed_failure_rate": 0.0,
+        "parameter_count": 12,
+        "remaining_trials": 12,
+        "scored_candidate_count": 4,
+        "tool_history": [],
+        "trailing_stagnant_generations": 0,
+        "training_case_count": 3,
+        "training_cases": [],
+        "training_replicate_count": 9,
+        "trials_per_candidate": 3
+      },
+      "tool_direction_conflict": false
+    }
+  ],
+  "cases_sha256": "12d36ee0ca65d45ae0bfd07dba4a668db5d6736b2e28aa11baa20055747fcacd",
+  "claim_boundary": "Deterministic offline state-machine evidence over frozen scripted outcomes. It exercises the production adaptive trigger and equal maximum simulation, trial, scenario, seed, model-fixture and tool-version budgets across arms. It does not call a provider or simulator and cannot establish optimizer quality, model superiority, PX4/Gazebo performance, physical fidelity, transfer to aircraft, flight safety, or a global optimum.",
+  "claim_label": "SYNTHETIC_FIXED_BUDGET",
+  "cognitive_policy_version": "adaptive-2-4-v1",
+  "fixed_budget": {
+    "generation_cap": 4,
+    "provider_retries": 0,
+    "simulation_cap": 24,
+    "trial_cap": 24,
+    "trials_per_generation": 6
+  },
+  "fixtures": {
+    "model": "sequence-provider-fixture-v1",
+    "scenarios": "cognitive-trigger-scenarios-v1",
+    "seeds": [
+      2026080401,
+      2026080402,
+      2026080403
+    ],
+    "tools": "bounded-local-tool-fixture-v1"
+  },
+  "manifest_sha256": "aefd8bdb0d52a1b6bea26c250cf1cc8c7e5c201158e3db16792a151f171ac61a",
+  "schema_version": "dronedream.cognitive-budget-ablation-manifest/v1",
+  "trigger_policy_version": "adaptive-trigger-v1"
+}
