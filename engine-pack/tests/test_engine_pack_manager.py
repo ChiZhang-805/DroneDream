@@ -132,6 +132,26 @@ class EnginePackManagerTests(unittest.TestCase):
         with self.assertRaisesRegex(manager.EnginePackInstallError, "failed verification"):
             self.install()
 
+    def test_existing_release_rejects_unlisted_executable_source(self) -> None:
+        self.install()
+        unlisted = self.root / "engine/current/backend/sitecustomize.py"
+        unlisted.write_text("raise RuntimeError('must never execute')\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(manager.EnginePackInstallError, "unlisted path"):
+            self.install()
+
+    def test_current_ordinary_file_is_rejected_and_preserved(self) -> None:
+        engine_root = self.root / "engine"
+        engine_root.mkdir(parents=True)
+        current = engine_root / "current"
+        current.write_text("preserve-me", encoding="utf-8")
+
+        with self.assertRaisesRegex(manager.EnginePackInstallError, "managed symlink"):
+            self.install()
+
+        self.assertTrue(current.is_file())
+        self.assertEqual(current.read_text(encoding="utf-8"), "preserve-me")
+
     def test_release_target_symlink_is_rejected(self) -> None:
         descriptor = json.loads(
             (self.output / engine_pack.DESCRIPTOR_FILENAME).read_text(encoding="utf-8")

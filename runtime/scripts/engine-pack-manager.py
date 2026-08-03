@@ -155,6 +155,10 @@ def replace_symlink(link: Path, target: Path) -> None:
 
 def current_release(current: Path) -> Path | None:
     if not current.is_symlink():
+        if current.exists():
+            raise EnginePackInstallError(
+                "Engine Pack current release path is not a managed symlink"
+            )
         return None
     try:
         target = current.resolve(strict=True)
@@ -182,6 +186,15 @@ def verify_release_directory(
     try:
         if manifest_path.is_symlink() or manifest_path.read_bytes() != manifest_bytes:
             raise EnginePackInstallError("Engine Pack release manifest was modified")
+        expected_files = {
+            "engine-pack-manifest.json",
+            *(record["path"] for record in manifest["files"]),
+        }
+        expected_directories: set[str] = set()
+        for relative in expected_files:
+            for parent in PurePosixPath(relative).parents:
+                if str(parent) != ".":
+                    expected_directories.add(str(parent))
         for record in manifest["files"]:
             path = release / Path(*PurePosixPath(record["path"]).parts)
             if path.is_symlink() or not path.is_file():
@@ -194,6 +207,22 @@ def verify_release_directory(
             ):
                 raise EnginePackInstallError(
                     f"Engine Pack release file failed verification: {record['path']}"
+                )
+        for path in release.rglob("*"):
+            relative = path.relative_to(release).as_posix()
+            if path.is_symlink():
+                raise EnginePackInstallError(
+                    f"Engine Pack release contains an unsafe symlink: {relative}"
+                )
+            if path.is_dir():
+                allowed = relative in expected_directories
+            elif path.is_file():
+                allowed = relative in expected_files
+            else:
+                allowed = False
+            if not allowed:
+                raise EnginePackInstallError(
+                    f"Engine Pack release contains an unlisted path: {relative}"
                 )
     except OSError as error:
         raise EnginePackInstallError("Engine Pack release directory cannot be verified") from error
