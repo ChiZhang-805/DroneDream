@@ -123,6 +123,23 @@ def test_robust_aggregations_follow_worst_objective_direction() -> None:
     assert aggregate_metric(values, direction="minimize", mode="cvar", cvar_alpha=0.2) == 10.0
 
 
+@pytest.mark.parametrize("invalid", [True, "1.0"])
+def test_robust_aggregation_rejects_non_numeric_metric_samples(invalid: object) -> None:
+    with pytest.raises(ValueError, match="metric samples must be finite numbers"):
+        aggregate_metric([1.0, invalid], direction="minimize", mode="mean")  # type: ignore[list-item]
+
+
+@pytest.mark.parametrize("invalid", [False, "1.0"])
+def test_robust_aggregation_rejects_non_numeric_sample_weights(invalid: object) -> None:
+    with pytest.raises(ValueError, match="sample weights must be finite numbers"):
+        aggregate_metric(
+            [1.0, 2.0],
+            direction="minimize",
+            mode="mean",
+            weights=[1.0, invalid],  # type: ignore[list-item]
+        )
+
+
 def test_candidate_evaluation_enforces_worst_case_hard_constraints() -> None:
     config = ObjectiveConfig(
         objectives=[
@@ -949,6 +966,35 @@ def test_pareto_diagnostics_never_recommend_an_infeasible_parameter_set() -> Non
 
     assert [point.id for point in nondominated_front(unsafe)] == ["less-unsafe"]
     assert representative_points(unsafe) == {}
+
+
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), True, "0.1"])
+def test_pareto_point_rejects_invalid_objective_values(invalid: object) -> None:
+    with pytest.raises(ValueError, match="objective values must be finite numbers"):
+        ParetoPoint(
+            "invalid",
+            {"rmse": invalid},  # type: ignore[dict-item]
+            {"rmse": "minimize"},
+        )
+
+
+def test_pareto_point_requires_exact_valid_objective_directions() -> None:
+    with pytest.raises(ValueError, match="directions must exactly match objectives"):
+        ParetoPoint("missing", {"rmse": 0.2}, {})
+    with pytest.raises(ValueError, match="unsupported direction"):
+        ParetoPoint("invalid", {"rmse": 0.2}, {"rmse": "smaller"})
+
+
+@pytest.mark.parametrize("invalid", [-0.1, float("nan"), float("inf"), True])
+def test_pareto_point_rejects_invalid_constraint_violation(invalid: object) -> None:
+    with pytest.raises(ValueError, match="total_violation must be finite and non-negative"):
+        ParetoPoint(
+            "invalid",
+            {"rmse": 0.2},
+            {"rmse": "minimize"},
+            False,
+            invalid,  # type: ignore[arg-type]
+        )
 
 
 def test_scenario_suite_requires_unique_ids_and_seeds() -> None:

@@ -26,9 +26,14 @@ class CandidateEvaluation:
 def _validated_values(values: Sequence[float]) -> list[float]:
     if not values:
         raise ValueError("at least one sample is required")
+    if any(
+        isinstance(value, bool) or not isinstance(value, int | float)
+        for value in values
+    ):
+        raise ValueError("metric samples must be finite numbers")
     result = [float(value) for value in values]
     if not all(math.isfinite(value) for value in result):
-        raise ValueError("metric samples must be finite")
+        raise ValueError("metric samples must be finite numbers")
     return result
 
 
@@ -37,9 +42,14 @@ def _validated_weights(count: int, weights: Sequence[float] | None) -> list[floa
         return [1.0] * count
     if len(weights) != count:
         raise ValueError("sample weights must match sample count")
+    if any(
+        isinstance(weight, bool) or not isinstance(weight, int | float)
+        for weight in weights
+    ):
+        raise ValueError("sample weights must be finite numbers and > 0")
     result = [float(weight) for weight in weights]
     if not all(math.isfinite(weight) and weight > 0 for weight in result):
-        raise ValueError("sample weights must be finite and > 0")
+        raise ValueError("sample weights must be finite numbers and > 0")
     return result
 
 
