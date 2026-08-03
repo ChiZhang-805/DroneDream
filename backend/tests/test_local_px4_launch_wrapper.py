@@ -319,6 +319,7 @@ def _fake_ulog_with_groundtruth_yaw() -> SimpleNamespace:
             _fake_dataset(
                 "vehicle_attitude_groundtruth",
                 {
+                    "timestamp": [1_000_000, 2_000_000],
                     "q[0]": [1.0, math.cos(math.pi / 4)],
                     "q[1]": [0.0, 0.0],
                     "q[2]": [0.0, 0.0],
@@ -328,6 +329,7 @@ def _fake_ulog_with_groundtruth_yaw() -> SimpleNamespace:
             _fake_dataset(
                 "vehicle_status",
                 {
+                    "timestamp": [1_000_000, 2_000_000],
                     "arming_state": [2, 2],
                     "nav_state": [14, 14],
                 },
@@ -335,6 +337,7 @@ def _fake_ulog_with_groundtruth_yaw() -> SimpleNamespace:
             _fake_dataset(
                 "failure_detector_status",
                 {
+                    "timestamp": [1_000_000, 2_000_000],
                     "fd_motor": [0, 1],
                     "fd_roll": [0, 0],
                 },
@@ -440,7 +443,13 @@ def test_ulog_to_telemetry_json_writes_schema_with_attitude_groundtruth_fallback
     assert len(payload["meta"]["origin_source_sha256"]) == 71
     assert payload["meta"]["origin_source_byte_count"] == len(b"test ULog fixture")
     assert payload["meta"]["origin_coordinate_frame"] == "PX4_LOCAL_NED"
-    assert payload["meta"]["origin_extraction_revision"] == ("pyulog-vehicle-local-position-1.1")
+    assert payload["meta"]["origin_extraction_revision"] == ("pyulog-vehicle-local-position-1.2")
+    assert payload["meta"]["origin_secondary_topic_alignment_policy"] == (
+        "latest_at_or_before_position_timestamp"
+    )
+    assert payload["meta"]["origin_preobservation_state_policy"] == (
+        "armed=false;mode=unknown;crashed=false;yaw=velocity_derived"
+    )
     assert payload["meta"]["origin_timestamp_duplicate_count"] == 0
     assert payload["samples"][0]["t"] == 0.0
     assert payload["samples"][0]["z"] == 5.0
@@ -473,6 +482,30 @@ def test_bool_from_value_rejects_non_boolean_numpy_numbers(value: object) -> Non
         wrapper._bool_from_value(value)
 
 
+@pytest.mark.parametrize("value", [True, 2.9, "2", float("nan")])
+def test_armed_from_px4_state_rejects_non_integral_or_non_numeric_values(
+    value: object,
+) -> None:
+    with pytest.raises(ValueError, match="invalid PX4 arming_state value"):
+        wrapper._armed_from_px4_state(value)
+
+
+def test_extract_yaw_rejects_partial_attitude_quaternion() -> None:
+    datasets = {
+        "vehicle_attitude": SimpleNamespace(
+            data={
+                "timestamp": [1_000_000],
+                "q[0]": [1.0],
+                "q[1]": [0.0],
+                "q[2]": [0.0],
+            }
+        )
+    }
+
+    with pytest.raises(ValueError, match="quaternion is incomplete"):
+        wrapper._extract_yaw_values(datasets, [1.0], [0.0], [1_000_000])
+
+
 def test_ulog_to_telemetry_json_fails_when_vehicle_local_position_missing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
@@ -490,6 +523,117 @@ def test_ulog_to_telemetry_json_fails_when_vehicle_local_position_missing(
             "x500",
             "default",
         )
+
+
+def test_ulog_to_telemetry_json_rejects_missing_position_axis(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    fake_ulog = _fake_ulog_with_groundtruth_yaw()
+    del fake_ulog.data_list[0].data["x"]
+
+    class FakeULog:
+        def __init__(self, _path: str):
+            self.data_list = fake_ulog.data_list
+
+    monkeypatch.setitem(sys.modules, "pyulog", SimpleNamespace(ULog=FakeULog))
+    ulog_path = tmp_path / "sample.ulg"
+    ulog_path.write_bytes(b"test ULog fixture")
+
+    with pytest.raises(ValueError, match="vehicle_local_position.x"):
+        wrapper.ulog_to_telemetry_json(
+            ulog_path,
+            tmp_path / "telemetry.json",
+            "x500",
+            "default",
+        )
+
+
+@pytest.mark.parametrize("field", ["t", "x", "y", "z", "vx", "vy", "vz", "yaw"])
+def test_wrapper_rejects_booleans_in_numeric_json_telemetry(field: str) -> None:
+    sample: dict[str, object] = {
+        "t": 0.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 3.0,
+        "vx": 0.0,
+        "vy": 0.0,
+        "vz": 0.0,
+        "yaw": 0.0,
+        "armed": True,
+        "mode": "offboard",
+        "crashed": False,
+    }
+    sample[field] = True
+
+    with pytest.raises(ValueError, match="must be numeric"):
+        wrapper._normalize_telemetry_payload({"samples": [sample]})
+
+
+def test_ulog_secondary_state_is_aligned_by_timestamp_not_array_index(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    fake_ulog = SimpleNamespace(
+        data_list=[
+            _fake_dataset(
+                "vehicle_local_position",
+                {
+                    "timestamp": [1_000_000, 2_000_000, 3_000_000, 4_000_000],
+                    "x": [0.0, 1.0, 2.0, 3.0],
+                    "y": [0.0] * 4,
+                    "z": [-3.0] * 4,
+                    "vx": [1.0] * 4,
+                    "vy": [0.0] * 4,
+                    "vz": [0.0] * 4,
+                },
+            ),
+            _fake_dataset(
+                "vehicle_attitude",
+                {
+                    "timestamp": [1_500_000, 3_500_000],
+                    "q[0]": [1.0, math.cos(math.pi / 4)],
+                    "q[1]": [0.0, 0.0],
+                    "q[2]": [0.0, 0.0],
+                    "q[3]": [0.0, math.sin(math.pi / 4)],
+                },
+            ),
+            _fake_dataset(
+                "vehicle_status",
+                {
+                    "timestamp": [1_500_000, 3_500_000],
+                    "arming_state": [1, 2],
+                    "nav_state": [3, 14],
+                },
+            ),
+            _fake_dataset(
+                "failure_detector_status",
+                {
+                    "timestamp": [1_500_000, 3_500_000],
+                    "fd_motor": [0, 1],
+                },
+            ),
+        ]
+    )
+
+    class FakeULog:
+        def __init__(self, _path: str):
+            self.data_list = fake_ulog.data_list
+
+    monkeypatch.setitem(sys.modules, "pyulog", SimpleNamespace(ULog=FakeULog))
+    ulog_path = tmp_path / "sample.ulg"
+    ulog_path.write_bytes(b"test ULog fixture")
+    output_path = tmp_path / "telemetry.json"
+
+    wrapper.ulog_to_telemetry_json(ulog_path, output_path, "x500", "default")
+
+    samples = json.loads(output_path.read_text(encoding="utf-8"))["samples"]
+    assert [sample["armed"] for sample in samples] == [False, False, False, True]
+    assert [sample["mode"] for sample in samples] == ["unknown", "3", "3", "14"]
+    assert [sample["crashed"] for sample in samples] == [False, False, False, True]
+    assert [sample["yaw"] for sample in samples] == pytest.approx(
+        [0.0, 0.0, 0.0, math.pi / 2]
+    )
 
 
 def test_ulog_conversion_downsamples_evenly_and_preserves_endpoints(
@@ -1837,6 +1981,46 @@ def test_json_and_normalized_telemetry_limits_fail_before_unbounded_processing(
         wrapper._normalize_telemetry_payload(payload)
 
 
+def test_json_load_rejects_non_standard_nonfinite_constants(tmp_path: Path) -> None:
+    source = tmp_path / "nonfinite.json"
+    source.write_text('{"value": NaN}', encoding="utf-8")
+
+    with pytest.raises(ValueError, match="malformed"):
+        wrapper._json_load(source)
+
+
+def test_json_load_rejects_symlink_source(tmp_path: Path) -> None:
+    target = tmp_path / "target.json"
+    target.write_text('{"value": 1}', encoding="utf-8")
+    source = tmp_path / "source.json"
+    try:
+        source.symlink_to(target)
+    except OSError:
+        pytest.skip("symlink creation is unavailable on this Windows host")
+
+    with pytest.raises(ValueError, match="regular, non-symlink"):
+        wrapper._json_load(source)
+
+
+def test_json_dump_is_atomic_when_replace_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    destination = tmp_path / "evidence.json"
+    destination.write_text("old evidence", encoding="utf-8")
+
+    def fail_replace(_source: Path, _destination: Path) -> None:
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(wrapper.Path, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="replace failed"):
+        wrapper._json_dump(destination, {"value": "new evidence"})
+
+    assert destination.read_text(encoding="utf-8") == "old evidence"
+    assert list(tmp_path.glob(".evidence.json.*.tmp")) == []
+
+
 def test_wrapper_real_mode_ulog_uses_px4_ulog_path(tmp_path: Path):
     launcher = tmp_path / "launcher.py"
     launcher.write_text("print('ok')\n", encoding="utf-8")
@@ -1866,7 +2050,8 @@ def test_wrapper_real_mode_ulog_uses_px4_ulog_path(tmp_path: Path):
         "                'z':[-3.0], 'vx':[0.0], 'vy':[0.0], 'vz':[0.0]\n"
         "            }),\n"
         "            DS('vehicle_attitude_groundtruth', {\n"
-        "                'q[0]':[1.0], 'q[1]':[0.0], 'q[2]':[0.0], 'q[3]':[0.0]\n"
+        "                'timestamp':[1000000], 'q[0]':[1.0], 'q[1]':[0.0],\n"
+        "                'q[2]':[0.0], 'q[3]':[0.0]\n"
         "            })\n"
         "        ]\n",
         encoding="utf-8",
@@ -2201,6 +2386,58 @@ def test_wrapper_windows_cleanup_timeout_is_best_effort(
 
     assert state["killed"] is True
     assert "Timed out terminating PX4 process tree" in stderr_log.read_text(encoding="utf-8")
+
+
+def test_wrapper_posix_cleanup_terminates_group_after_launcher_exits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent_signals: list[int] = []
+
+    def fake_killpg(_pid: int, requested_signal: int) -> None:
+        sent_signals.append(requested_signal)
+        if requested_signal == 0:
+            raise ProcessLookupError
+
+    fake_proc = SimpleNamespace(pid=12345, poll=lambda: 0)
+    monkeypatch.setattr(wrapper.os, "name", "posix")
+    monkeypatch.setattr(wrapper.os, "killpg", fake_killpg, raising=False)
+
+    wrapper._terminate_process_group(
+        fake_proc,
+        tmp_path / "stderr.log",
+        label="PX4",
+    )
+
+    assert sent_signals == [wrapper.signal.SIGTERM, 0]
+
+
+def test_launch_process_closes_log_handles_when_spawn_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    handles = [SimpleNamespace(closed=False), SimpleNamespace(closed=False)]
+    for handle in handles:
+        handle.close = lambda current=handle: setattr(current, "closed", True)
+
+    monkeypatch.setattr(wrapper.Path, "open", lambda *_args, **_kwargs: handles.pop(0))
+    monkeypatch.setattr(
+        wrapper.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("spawn failed")),
+    )
+
+    first_handle = handles[0]
+    second_handle = handles[1]
+    with pytest.raises(OSError, match="spawn failed"):
+        wrapper._launch_process(
+            "ignored",
+            stdout_log=tmp_path / "stdout.log",
+            stderr_log=tmp_path / "stderr.log",
+        )
+
+    assert first_handle.closed is True
+    assert second_handle.closed is True
 
 
 def test_wrapper_offboard_executor_failure_exits_non_zero(tmp_path: Path):

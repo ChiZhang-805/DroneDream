@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import ast
 import asyncio
+import bisect
 import contextlib
 import copy
 import hashlib
@@ -211,6 +212,18 @@ def _parse_float(raw: str | None, *, default: float) -> float:
     return value
 
 
+def _numeric_float(value: Any, *, label: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be numeric")
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(f"{label} must be numeric") from None
+    if not math.isfinite(normalized):
+        raise ValueError(f"{label} must be finite")
+    return normalized
+
+
 def _subprocess_text(value: str | bytes | None) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
@@ -251,26 +264,72 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _json_load(path: Path) -> Any:
+def _read_bounded_regular_bytes(path: Path, *, byte_limit: int) -> bytes:
     try:
-        size = path.stat().st_size
+        path_info = path.lstat()
     except OSError as exc:
         raise ValueError(f"could not inspect JSON file {path}: {exc}") from exc
-    if size > MAX_JSON_BYTES:
-        raise ValueError(f"JSON file exceeds {MAX_JSON_BYTES} bytes: {path}")
-    with path.open("rb") as stream:
-        content = stream.read(MAX_JSON_BYTES + 1)
-    if len(content) > MAX_JSON_BYTES:
-        raise ValueError(f"JSON file exceeds {MAX_JSON_BYTES} bytes: {path}")
+    if stat.S_ISLNK(path_info.st_mode) or not stat.S_ISREG(path_info.st_mode):
+        raise ValueError(f"JSON source must be a regular, non-symlink file: {path}")
+    if path_info.st_size > byte_limit:
+        raise ValueError(f"JSON file exceeds {byte_limit} bytes: {path}")
     try:
-        return json.loads(content.decode("utf-8"))
-    except (UnicodeError, json.JSONDecodeError) as exc:
+        with path.open("rb") as stream:
+            opened_info = os.fstat(stream.fileno())
+            if (
+                not stat.S_ISREG(opened_info.st_mode)
+                or opened_info.st_dev != path_info.st_dev
+                or opened_info.st_ino != path_info.st_ino
+            ):
+                raise ValueError(f"JSON source changed before it was opened: {path}")
+            content = stream.read(byte_limit + 1)
+            final_info = os.fstat(stream.fileno())
+    except OSError as exc:
+        raise ValueError(f"could not read JSON file {path}: {exc}") from exc
+    if len(content) > byte_limit:
+        raise ValueError(f"JSON file exceeds {byte_limit} bytes: {path}")
+    if (
+        final_info.st_size != opened_info.st_size
+        or final_info.st_mtime_ns != opened_info.st_mtime_ns
+        or len(content) != opened_info.st_size
+    ):
+        raise ValueError(f"JSON source changed while it was being read: {path}")
+    return content
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant: {value}")
+
+
+def _json_load(path: Path, *, byte_limit: int | None = None) -> Any:
+    effective_limit = MAX_JSON_BYTES if byte_limit is None else byte_limit
+    content = _read_bounded_regular_bytes(path, byte_limit=effective_limit)
+    try:
+        return json.loads(content.decode("utf-8"), parse_constant=_reject_json_constant)
+    except (UnicodeError, json.JSONDecodeError, ValueError) as exc:
         raise ValueError(f"JSON file is malformed: {path}: {exc}") from exc
 
 
 def _json_dump(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    encoded = json.dumps(
+        payload,
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
+    ).encode("utf-8")
+    if len(encoded) > MAX_JSON_BYTES:
+        raise ValueError(f"JSON output exceeds {MAX_JSON_BYTES} bytes: {path}")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
+    try:
+        with temporary.open("xb") as stream:
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+    finally:
+        with contextlib.suppress(OSError):
+            temporary.unlink()
 
 
 def _write_launcher_failure(run_dir: Path, *, stage: str, exc: BaseException) -> None:
@@ -417,11 +476,9 @@ def _load_runtime_effect_records(
     if profile is None:
         return {}
     path = run_dir / engine.RUNTIME_EVIDENCE_ARTIFACT_NAME
-    if not path.is_file() or path.stat().st_size > engine.MAX_EFFECT_CONTRACT_BYTES:
-        raise RuntimeError("flight-timed scenario-effect evidence is missing or too large")
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        payload = _json_load(path, byte_limit=engine.MAX_EFFECT_CONTRACT_BYTES)
+    except ValueError as exc:
         raise RuntimeError(f"could not read flight-timed scenario-effect evidence: {exc}") from exc
     if not isinstance(payload, dict):
         raise RuntimeError("flight-timed scenario-effect evidence must be an object")
@@ -2357,26 +2414,18 @@ def _normalize_telemetry_payload(payload: Any) -> dict[str, Any]:
             if key not in sample:
                 raise ValueError(f"telemetry sample {idx} missing required key: {key}")
         cleaned = {
-            "t": float(sample["t"]),
-            "x": float(sample["x"]),
-            "y": float(sample["y"]),
-            "z": float(sample["z"]),
-            "vx": float(sample["vx"]),
-            "vy": float(sample["vy"]),
-            "vz": float(sample["vz"]),
-            "yaw": float(sample["yaw"]),
+            "t": _numeric_float(sample["t"], label=f"telemetry sample {idx} field t"),
+            "x": _numeric_float(sample["x"], label=f"telemetry sample {idx} field x"),
+            "y": _numeric_float(sample["y"], label=f"telemetry sample {idx} field y"),
+            "z": _numeric_float(sample["z"], label=f"telemetry sample {idx} field z"),
+            "vx": _numeric_float(sample["vx"], label=f"telemetry sample {idx} field vx"),
+            "vy": _numeric_float(sample["vy"], label=f"telemetry sample {idx} field vy"),
+            "vz": _numeric_float(sample["vz"], label=f"telemetry sample {idx} field vz"),
+            "yaw": _numeric_float(sample["yaw"], label=f"telemetry sample {idx} field yaw"),
             "armed": _bool_from_value(sample["armed"]),
             "mode": str(sample["mode"]),
             "crashed": _bool_from_value(sample["crashed"]),
         }
-        for numeric_key in ("t", "x", "y", "z", "vx", "vy", "vz", "yaw"):
-            numeric_value = cleaned[numeric_key]
-            if (
-                isinstance(numeric_value, bool)
-                or not isinstance(numeric_value, (int, float))
-                or not math.isfinite(numeric_value)
-            ):
-                raise ValueError(f"telemetry sample {idx} contains non-finite {numeric_key}")
         normalized.append(cleaned)
     for idx in range(1, len(normalized)):
         if normalized[idx]["t"] <= normalized[idx - 1]["t"]:
@@ -2481,7 +2530,11 @@ def _sample_indices(length: int, maximum: int | None = None) -> list[int]:
     return [index * (length - 1) // (maximum - 1) for index in range(maximum)]
 
 
-def _strict_ulog_timestamp_source_indices(values: Any) -> tuple[list[int], int]:
+def _strict_ulog_timestamp_source_indices(
+    values: Any,
+    *,
+    dataset_name: str = "vehicle_local_position",
+) -> tuple[list[int], int]:
     """Collapse exact PX4 ULog timestamp repeats while rejecting time reversal."""
 
     source_indices: list[int] = []
@@ -2490,18 +2543,18 @@ def _strict_ulog_timestamp_source_indices(values: Any) -> tuple[list[int], int]:
     for source_index, value in enumerate(values):
         if isinstance(value, bool) or not isinstance(value, numbers.Real):
             raise ValueError(
-                f"vehicle_local_position.timestamp sample {source_index} is not numeric"
+                f"{dataset_name}.timestamp sample {source_index} is not numeric"
             )
         numeric = float(value)
         if not math.isfinite(numeric) or not numeric.is_integer() or numeric < 0:
             raise ValueError(
-                f"vehicle_local_position.timestamp sample {source_index} is not a "
+                f"{dataset_name}.timestamp sample {source_index} is not a "
                 "finite non-negative integer"
             )
         timestamp = int(numeric)
         if previous_timestamp is not None and timestamp < previous_timestamp:
             raise ValueError(
-                "vehicle_local_position.timestamp moved backwards at sample "
+                f"{dataset_name}.timestamp moved backwards at sample "
                 f"{source_index}: {timestamp} < {previous_timestamp}"
             )
         if previous_timestamp == timestamp:
@@ -2516,10 +2569,43 @@ def _strict_ulog_timestamp_source_indices(values: Any) -> tuple[list[int], int]:
     return source_indices, duplicate_count
 
 
-def _to_float_list(values: Any, indices: list[int], *, default: float = 0.0) -> list[float]:
+def _to_float_list(
+    values: Any,
+    indices: list[int],
+    *,
+    label: str,
+    required: bool,
+    default: float = 0.0,
+) -> list[float]:
     if values is None:
+        if required:
+            raise ValueError(f"{label} is required and cannot be empty")
         return [default] * len(indices)
-    return [float(values[idx]) for idx in indices]
+    if indices and len(values) <= max(indices):
+        raise ValueError(f"{label} does not cover every selected position timestamp")
+    return [_numeric_float(values[idx], label=f"{label} sample {idx}") for idx in indices]
+
+
+def _asof_source_indices(
+    dataset: Any,
+    target_timestamps: list[int],
+    *,
+    dataset_name: str,
+) -> list[int | None]:
+    data = dataset.data
+    timestamps = data.get("timestamp")
+    if timestamps is None or len(timestamps) == 0:
+        raise ValueError(f"{dataset_name}.timestamp is required and cannot be empty")
+    source_indices, _ = _strict_ulog_timestamp_source_indices(
+        timestamps,
+        dataset_name=dataset_name,
+    )
+    ordered_timestamps = [int(float(timestamps[index])) for index in source_indices]
+    aligned: list[int | None] = []
+    for target in target_timestamps:
+        position = bisect.bisect_right(ordered_timestamps, target) - 1
+        aligned.append(source_indices[position] if position >= 0 else None)
+    return aligned
 
 
 def _bool_from_value(value: Any) -> bool:
@@ -2545,53 +2631,70 @@ def _bool_from_value(value: Any) -> bool:
 def _armed_from_px4_state(value: Any) -> bool:
     """PX4 vehicle_status.arming_state uses enum value 2 for ARMED."""
 
-    try:
-        numeric = int(value)
-    except (TypeError, ValueError, OverflowError):
-        raise ValueError(f"invalid PX4 arming_state value: {value!r}") from None
-    return numeric == 2
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise ValueError(f"invalid PX4 arming_state value: {value!r}")
+    numeric = float(value)
+    if not math.isfinite(numeric) or not numeric.is_integer():
+        raise ValueError(f"invalid PX4 arming_state value: {value!r}")
+    return int(numeric) == 2
 
 
 def _extract_vehicle_status(
-    dataset_map: dict[str, Any], indices: list[int]
+    dataset_map: dict[str, Any], target_timestamps: list[int]
 ) -> tuple[list[bool], list[str]]:
-    sample_count = len(indices)
+    sample_count = len(target_timestamps)
     status = dataset_map.get("vehicle_status")
     if status is None:
-        return [True] * sample_count, ["unknown"] * sample_count
+        return [False] * sample_count, ["unknown"] * sample_count
 
     data = status.data
+    aligned_indices = _asof_source_indices(
+        status,
+        target_timestamps,
+        dataset_name="vehicle_status",
+    )
     arming_state_values = data.get("arming_state")
     armed_values = data.get("armed")
     if arming_state_values is not None:
-        if len(arming_state_values) == 0:
-            armed = [True] * sample_count
-        else:
-            armed = [
-                _armed_from_px4_state(arming_state_values[min(index, len(arming_state_values) - 1)])
-                for index in indices
-            ]
+        armed = []
+        for index in aligned_indices:
+            if index is None:
+                armed.append(False)
+            elif index >= len(arming_state_values):
+                raise ValueError("vehicle_status.arming_state does not cover its timestamps")
+            else:
+                armed.append(_armed_from_px4_state(arming_state_values[index]))
     elif armed_values is not None:
-        if len(armed_values) == 0:
-            armed = [True] * sample_count
-        else:
-            armed = [
-                _bool_from_value(armed_values[min(index, len(armed_values) - 1)])
-                for index in indices
-            ]
+        armed = []
+        for index in aligned_indices:
+            if index is None:
+                armed.append(False)
+            elif index >= len(armed_values):
+                raise ValueError("vehicle_status.armed does not cover its timestamps")
+            else:
+                armed.append(_bool_from_value(armed_values[index]))
     else:
-        armed = [True] * sample_count
+        armed = [False] * sample_count
 
     nav_state_values = data.get("nav_state")
     if nav_state_values is None or len(nav_state_values) == 0:
         mode = ["unknown"] * sample_count
     else:
-        mode = [str(nav_state_values[min(index, len(nav_state_values) - 1)]) for index in indices]
+        mode = []
+        for index in aligned_indices:
+            if index is None:
+                mode.append("unknown")
+            elif index >= len(nav_state_values):
+                raise ValueError("vehicle_status.nav_state does not cover its timestamps")
+            else:
+                mode.append(str(nav_state_values[index]))
     return armed, mode
 
 
-def _extract_crash_flags(dataset_map: dict[str, Any], indices: list[int]) -> list[bool]:
-    sample_count = len(indices)
+def _extract_crash_flags(
+    dataset_map: dict[str, Any], target_timestamps: list[int]
+) -> list[bool]:
+    sample_count = len(target_timestamps)
     failure = dataset_map.get("failure_detector_status")
     if failure is None:
         return [False] * sample_count
@@ -2612,14 +2715,20 @@ def _extract_crash_flags(dataset_map: dict[str, Any], indices: list[int]) -> lis
     if not flags_by_field:
         return [False] * sample_count
 
+    aligned_indices = _asof_source_indices(
+        failure,
+        target_timestamps,
+        dataset_name="failure_detector_status",
+    )
     crashed: list[bool] = []
-    for index in indices:
+    for index in aligned_indices:
+        if index is None:
+            crashed.append(False)
+            continue
+        if any(index >= len(field_values) for field_values in flags_by_field):
+            raise ValueError("failure_detector_status fields do not cover their timestamps")
         crashed.append(
-            any(
-                _bool_from_value(field_values[index])
-                for field_values in flags_by_field
-                if index < len(field_values)
-            )
+            any(_bool_from_value(field_values[index]) for field_values in flags_by_field)
         )
     return crashed
 
@@ -2634,9 +2743,15 @@ def _extract_yaw_values(
     dataset_map: dict[str, Any],
     vx_values: list[float],
     vy_values: list[float],
-    indices: list[int],
+    target_timestamps: list[int],
 ) -> list[float]:
-    sample_count = len(indices)
+    sample_count = len(target_timestamps)
+    velocity_yaw = [
+        math.atan2(vy_values[index], vx_values[index])
+        if abs(vx_values[index]) > 1e-6 or abs(vy_values[index]) > 1e-6
+        else 0.0
+        for index in range(sample_count)
+    ]
     for attitude_name in (
         "vehicle_attitude",
         "vehicle_attitude_groundtruth",
@@ -2649,31 +2764,35 @@ def _extract_yaw_values(
         q1 = attitude_dataset.data.get("q[1]")
         q2 = attitude_dataset.data.get("q[2]")
         q3 = attitude_dataset.data.get("q[3]")
-        if any(component is None for component in (q0, q1, q2, q3)):
+        components = (q0, q1, q2, q3)
+        if all(component is None for component in components):
             continue
-        size = min(len(q0), len(q1), len(q2), len(q3))
-        if size <= 0:
-            continue
-        attitude_yaw_values = [
-            _quat_to_yaw(
-                float(q0[min(index, size - 1)]),
-                float(q1[min(index, size - 1)]),
-                float(q2[min(index, size - 1)]),
-                float(q3[min(index, size - 1)]),
+        if any(component is None for component in components):
+            raise ValueError(f"{attitude_name} quaternion is incomplete")
+        if any(len(component) == 0 for component in components):
+            raise ValueError(f"{attitude_name} quaternion is empty")
+        aligned_indices = _asof_source_indices(
+            attitude_dataset,
+            target_timestamps,
+            dataset_name=attitude_name,
+        )
+        attitude_yaw_values: list[float] = []
+        for output_index, source_index in enumerate(aligned_indices):
+            if source_index is None:
+                attitude_yaw_values.append(velocity_yaw[output_index])
+                continue
+            if any(source_index >= len(component) for component in components):
+                raise ValueError(f"{attitude_name} quaternion does not cover its timestamps")
+            attitude_yaw_values.append(
+                _quat_to_yaw(
+                    _numeric_float(q0[source_index], label=f"{attitude_name}.q[0]"),
+                    _numeric_float(q1[source_index], label=f"{attitude_name}.q[1]"),
+                    _numeric_float(q2[source_index], label=f"{attitude_name}.q[2]"),
+                    _numeric_float(q3[source_index], label=f"{attitude_name}.q[3]"),
+                )
             )
-            for index in indices
-        ]
         return attitude_yaw_values
-
-    yaw_values: list[float] = []
-    for idx in range(sample_count):
-        vx = vx_values[idx]
-        vy = vy_values[idx]
-        if abs(vx) > 1e-6 or abs(vy) > 1e-6:
-            yaw_values.append(math.atan2(vy, vx))
-        else:
-            yaw_values.append(0.0)
-    return yaw_values
+    return velocity_yaw
 
 
 def _sha256_file(path: Path) -> str:
@@ -2758,15 +2877,46 @@ def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, wor
     sampled_unique_positions = _sample_indices(len(unique_source_indices))
     indices = [unique_source_indices[index] for index in sampled_unique_positions]
     t0 = float(timestamps[unique_source_indices[0]])
-    x_values = _to_float_list(data.get("x"), indices)
-    y_values = _to_float_list(data.get("y"), indices)
-    z_values = _to_float_list(data.get("z"), indices)
-    vx_values = _to_float_list(data.get("vx"), indices)
-    vy_values = _to_float_list(data.get("vy"), indices)
-    vz_values = _to_float_list(data.get("vz"), indices)
-    yaw_values = _extract_yaw_values(datasets, vx_values, vy_values, indices)
-    armed_values, mode_values = _extract_vehicle_status(datasets, indices)
-    crashed_values = _extract_crash_flags(datasets, indices)
+    target_timestamps = [int(float(timestamps[index])) for index in indices]
+    x_values = _to_float_list(
+        data.get("x"),
+        indices,
+        label="vehicle_local_position.x",
+        required=True,
+    )
+    y_values = _to_float_list(
+        data.get("y"),
+        indices,
+        label="vehicle_local_position.y",
+        required=True,
+    )
+    z_values = _to_float_list(
+        data.get("z"),
+        indices,
+        label="vehicle_local_position.z",
+        required=True,
+    )
+    vx_values = _to_float_list(
+        data.get("vx"),
+        indices,
+        label="vehicle_local_position.vx",
+        required=False,
+    )
+    vy_values = _to_float_list(
+        data.get("vy"),
+        indices,
+        label="vehicle_local_position.vy",
+        required=False,
+    )
+    vz_values = _to_float_list(
+        data.get("vz"),
+        indices,
+        label="vehicle_local_position.vz",
+        required=False,
+    )
+    yaw_values = _extract_yaw_values(datasets, vx_values, vy_values, target_timestamps)
+    armed_values, mode_values = _extract_vehicle_status(datasets, target_timestamps)
+    crashed_values = _extract_crash_flags(datasets, target_timestamps)
 
     samples = []
     for output_index, source_index in enumerate(indices):
@@ -2797,9 +2947,15 @@ def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, wor
             "ulog_path": str(ulog_path),
             "origin_source_sha256": _sha256_file(ulog_path),
             "origin_source_byte_count": ulog_size,
-            "origin_extraction_revision": "pyulog-vehicle-local-position-1.1",
+            "origin_extraction_revision": "pyulog-vehicle-local-position-1.2",
             "origin_timestamp_duplicate_count": duplicate_timestamp_count,
             "origin_timestamp_duplicate_policy": "retain_last_exact_microsecond_sample",
+            "origin_secondary_topic_alignment_policy": (
+                "latest_at_or_before_position_timestamp"
+            ),
+            "origin_preobservation_state_policy": (
+                "armed=false;mode=unknown;crashed=false;yaw=velocity_derived"
+            ),
             "origin_coordinate_frame": "PX4_LOCAL_NED",
             "coordinate_transform": (
                 "x=north_m;y=east_m;z=-down_m;vx=north_mps;vy=east_mps;vz=-down_mps;yaw=px4_ned_rad"
@@ -2831,9 +2987,9 @@ def _split_command(command: str) -> list[str]:
 
 
 def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, label: str) -> None:
-    if proc.poll() is not None:
-        return
     if os.name == "nt":
+        if proc.poll() is not None:
+            return
         try:
             subprocess.run(  # noqa: S603, S607
                 ["taskkill", "/PID", str(proc.pid), "/T", "/F"],  # noqa: S607
@@ -2880,8 +3036,19 @@ def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, l
 
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline:
-        if proc.poll() is not None:
+        try:
+            kill_process_group(proc.pid, 0)
+        except ProcessLookupError:
             return
+        except PermissionError:
+            # The group still exists even if the current process cannot signal it.
+            pass
+        except OSError as exc:
+            _append_log(
+                stderr_log,
+                f"[local_px4_launch_wrapper] Could not probe {label} process group: {exc}",
+            )
+            break
         time.sleep(0.1)
 
     try:
@@ -2901,46 +3068,55 @@ def _launch_process(
     stderr_log: Path,
     launch_env: dict[str, str] | None = None,
 ) -> subprocess.Popen[str]:
-    out_handle = stdout_log.open("a", encoding="utf-8")
-    err_handle = stderr_log.open("a", encoding="utf-8")
-    start_new_session = os.name != "nt"
-    creationflags = 0
-    if os.name == "nt":
-        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
-            subprocess, "CREATE_NO_WINDOW", 0
-        )
-        shell_preference = os.environ.get("PX4_WINDOWS_COMMAND_SHELL", "powershell").lower()
-        if shell_preference == "direct":
-            shell_argv = _split_command(command)
-        elif shell_preference == "wsl":
-            wsl = shutil.which("wsl")
-            if not wsl:
-                raise RuntimeError("PX4_WINDOWS_COMMAND_SHELL=wsl but wsl.exe was not found")
-            shell_argv = [wsl, "bash", "-lc", command]
-        elif shell_preference == "bash":
-            bash = shutil.which("bash")
-            if not bash:
-                raise RuntimeError("PX4_WINDOWS_COMMAND_SHELL=bash but bash was not found")
-            shell_argv = [bash, "-lc", command]
+    out_handle = None
+    err_handle = None
+    try:
+        out_handle = stdout_log.open("a", encoding="utf-8")
+        err_handle = stderr_log.open("a", encoding="utf-8")
+        start_new_session = os.name != "nt"
+        creationflags = 0
+        if os.name == "nt":
+            creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(
+                subprocess, "CREATE_NO_WINDOW", 0
+            )
+            shell_preference = os.environ.get("PX4_WINDOWS_COMMAND_SHELL", "powershell").lower()
+            if shell_preference == "direct":
+                shell_argv = _split_command(command)
+            elif shell_preference == "wsl":
+                wsl = shutil.which("wsl")
+                if not wsl:
+                    raise RuntimeError("PX4_WINDOWS_COMMAND_SHELL=wsl but wsl.exe was not found")
+                shell_argv = [wsl, "bash", "-lc", command]
+            elif shell_preference == "bash":
+                bash = shutil.which("bash")
+                if not bash:
+                    raise RuntimeError("PX4_WINDOWS_COMMAND_SHELL=bash but bash was not found")
+                shell_argv = [bash, "-lc", command]
+            else:
+                shell_argv = [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    command,
+                ]
         else:
-            shell_argv = [
-                "powershell.exe",
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                command,
-            ]
-    else:
-        shell_argv = ["bash", "-lc", command]
-    proc = subprocess.Popen(  # noqa: S603
-        shell_argv,
-        stdout=out_handle,
-        stderr=err_handle,
-        text=True,
-        start_new_session=start_new_session,
-        creationflags=creationflags,
-        env=launch_env,
-    )
+            shell_argv = ["bash", "-lc", command]
+        proc = subprocess.Popen(  # noqa: S603
+            shell_argv,
+            stdout=out_handle,
+            stderr=err_handle,
+            text=True,
+            start_new_session=start_new_session,
+            creationflags=creationflags,
+            env=launch_env,
+        )
+    except Exception:
+        if out_handle is not None:
+            out_handle.close()
+        if err_handle is not None:
+            err_handle.close()
+        raise
     proc._stdout_handle = out_handle  # type: ignore[attr-defined]
     proc._stderr_handle = err_handle  # type: ignore[attr-defined]
     return proc
