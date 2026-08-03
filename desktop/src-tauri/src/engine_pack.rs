@@ -20,6 +20,8 @@ const MANIFEST_FILENAME: &str = "engine-pack-manifest.json";
 const RECONCILER_FILENAME: &str = "reconcile_engine_pack_runtime_env.py";
 const RUNTIME_ENVIRONMENT_PATH: &str = "/etc/dronedream/runtime.env";
 const ENGINE_PACK_ACTIVE_ROOT: &str = "/opt/dronedream/engine/current";
+const ENGINE_PACK_ACTIVE_MANIFEST: &str =
+    "/opt/dronedream/engine/current/engine-pack-manifest.json";
 const EXPECTED_RUNTIME_EXECUTION_LINES: &[&str] = &[
     "REAL_SIMULATOR_COMMAND=\"/opt/dronedream/venv/bin/python /opt/dronedream/engine/current/scripts/simulators/px4_gazebo_runner.py\"",
     "PX4_GAZEBO_WORKDIR=/opt/dronedream/engine/current",
@@ -71,6 +73,22 @@ struct InstalledReceipt {
     activated_at: String,
     runtime_id: String,
     runtime_version: String,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct EnginePackManifestIdentity {
+    schema_version: u32,
+    kind: String,
+    pack_id: String,
+    source: EnginePackManifestSource,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct EnginePackManifestSource {
+    git_commit: String,
+    source_date_epoch: u64,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -125,6 +143,57 @@ fn embedded_descriptor() -> Result<EmbeddedDescriptor, String> {
         );
     }
     Ok(descriptor)
+}
+
+fn parse_manifest_identity(
+    bytes: &[u8],
+    expected_pack_id: &str,
+    expected_source_commit: &str,
+    label: &str,
+) -> Result<EnginePackManifestIdentity, String> {
+    let identity: EnginePackManifestIdentity =
+        serde_json::from_slice(bytes).map_err(|error| format!("{label} is invalid: {error}"))?;
+    if identity.schema_version != 1
+        || identity.kind != "dronedream-engine-pack"
+        || identity.pack_id != expected_pack_id
+        || identity.source.git_commit != expected_source_commit
+        || identity.source.source_date_epoch == 0
+    {
+        return Err(format!("{label} has an untrusted release identity."));
+    }
+    Ok(identity)
+}
+
+fn embedded_manifest_identity(
+    descriptor: &EmbeddedDescriptor,
+) -> Result<EnginePackManifestIdentity, String> {
+    parse_manifest_identity(
+        EMBEDDED_MANIFEST,
+        &descriptor.pack_id,
+        &descriptor.source_commit,
+        "Embedded Engine Pack manifest",
+    )
+}
+
+fn embedded_update_required(
+    embedded: &EnginePackManifestIdentity,
+    installed: &EnginePackManifestIdentity,
+) -> Result<bool, String> {
+    if embedded.pack_id == installed.pack_id {
+        if embedded.source != installed.source {
+            return Err(
+                "Matching Engine Pack IDs contain conflicting source provenance.".to_string(),
+            );
+        }
+        return Ok(false);
+    }
+    if embedded.source.source_date_epoch == installed.source.source_date_epoch {
+        return Err(
+            "Different Engine Packs share the same source timestamp; refusing an ambiguous update."
+                .to_string(),
+        );
+    }
+    Ok(embedded.source.source_date_epoch > installed.source.source_date_epoch)
 }
 
 #[cfg(target_os = "windows")]
@@ -246,8 +315,27 @@ fn installed_receipt() -> Result<Option<InstalledReceipt>, String> {
 }
 
 #[cfg(target_os = "windows")]
+fn installed_manifest_identity(
+    receipt: &InstalledReceipt,
+) -> Result<EnginePackManifestIdentity, String> {
+    let output = wsl_output(
+        "/usr/bin/cat",
+        &[ENGINE_PACK_ACTIVE_MANIFEST],
+        Duration::from_secs(8),
+        "Installed Engine Pack manifest probe",
+    )?;
+    parse_manifest_identity(
+        &output,
+        &receipt.current_pack_id,
+        &receipt.source_commit,
+        "Installed Engine Pack manifest",
+    )
+}
+
+#[cfg(target_os = "windows")]
 fn status() -> Result<EnginePackStatus, String> {
     let embedded = embedded_descriptor()?;
+    let embedded_identity = embedded_manifest_identity(&embedded)?;
     if !crate::runtime::runtime_is_registered()? {
         return Ok(EnginePackStatus {
             supported: true,
@@ -281,15 +369,35 @@ fn status() -> Result<EnginePackStatus, String> {
     let installed_pack_id = receipt.as_ref().map(|value| value.current_pack_id.clone());
     let installed_source_commit = receipt.as_ref().map(|value| value.source_commit.clone());
     let execution_paths_current = runtime_execution_paths_current();
+    let mut installed_is_newer = false;
+    let pack_update_required = match receipt.as_ref() {
+        Some(receipt) => {
+            let installed_identity = installed_manifest_identity(receipt)?;
+            let update_required =
+                embedded_update_required(&embedded_identity, &installed_identity)?;
+            installed_is_newer =
+                !update_required && installed_identity.pack_id != embedded_identity.pack_id;
+            update_required
+        }
+        None => true,
+    };
+    if installed_is_newer && !execution_paths_current {
+        return Err(
+            "The installed Engine Pack is newer than this application, but its Runtime execution paths need repair; refusing to downgrade it."
+                .to_string(),
+        );
+    }
     Ok(EnginePackStatus {
         supported: true,
-        update_required: installed_pack_id.as_deref() != Some(embedded.pack_id.as_str())
-            || !execution_paths_current,
+        update_required: pack_update_required || !execution_paths_current,
         embedded_pack_id: embedded.pack_id,
         embedded_source_commit: embedded.source_commit,
         installed_pack_id,
         installed_source_commit,
-        message: None,
+        message: installed_is_newer.then(|| {
+            "The installed Engine Pack is newer than this application; it was preserved."
+                .to_string()
+        }),
     })
 }
 
@@ -541,10 +649,50 @@ mod tests {
     #[test]
     fn embedded_bundle_matches_build_provenance() {
         let descriptor = embedded_descriptor().expect("embedded descriptor");
+        let manifest = embedded_manifest_identity(&descriptor).expect("embedded manifest");
         assert_eq!(descriptor.pack_id, env!("DRONEDREAM_ENGINE_PACK_ID"));
         assert_eq!(descriptor.source_commit, env!("DRONEDREAM_SOURCE_COMMIT"));
         assert_eq!(descriptor.archive.sha256, sha256(EMBEDDED_ARCHIVE));
         assert_eq!(descriptor.manifest.sha256, sha256(EMBEDDED_MANIFEST));
+        assert_eq!(manifest.pack_id, descriptor.pack_id);
+        assert_eq!(manifest.source.git_commit, descriptor.source_commit);
+    }
+
+    fn release_identity(
+        pack_id: &str,
+        source_commit: &str,
+        source_date_epoch: u64,
+    ) -> EnginePackManifestIdentity {
+        EnginePackManifestIdentity {
+            schema_version: 1,
+            kind: "dronedream-engine-pack".to_string(),
+            pack_id: pack_id.to_string(),
+            source: EnginePackManifestSource {
+                git_commit: source_commit.to_string(),
+                source_date_epoch,
+            },
+        }
+    }
+
+    #[test]
+    fn engine_pack_updates_are_monotonic_and_never_downgrade() {
+        let old = release_identity(&format!("sha256:{}", "1".repeat(64)), &"a".repeat(40), 100);
+        let new = release_identity(&format!("sha256:{}", "2".repeat(64)), &"b".repeat(40), 200);
+
+        assert!(embedded_update_required(&new, &old).unwrap());
+        assert!(!embedded_update_required(&old, &new).unwrap());
+        assert!(!embedded_update_required(&new, &new).unwrap());
+    }
+
+    #[test]
+    fn engine_pack_updates_fail_closed_on_ambiguous_or_conflicting_identity() {
+        let first = release_identity(&format!("sha256:{}", "1".repeat(64)), &"a".repeat(40), 100);
+        let same_time =
+            release_identity(&format!("sha256:{}", "2".repeat(64)), &"b".repeat(40), 100);
+        let conflicting_source = release_identity(&first.pack_id, &"c".repeat(40), 100);
+
+        assert!(embedded_update_required(&first, &same_time).is_err());
+        assert!(embedded_update_required(&first, &conflicting_source).is_err());
     }
 
     #[test]
