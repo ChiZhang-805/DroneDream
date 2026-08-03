@@ -1298,16 +1298,31 @@ def build_scenario_effect_request(
         "battery_degraded": {"battery.initial_percent", "battery.voltage_sag"},
     }
     requested_ids = {item["effect_id"] for item in effects}
-    # ``combined_perturbed`` is only a label.  Keep the explicit unsupported
-    # marker as a guard when the caller supplied no physical perturbation at
-    # all, but do not poison a fully specified combined scenario with an
-    # additional non-physical effect that no launcher could ever apply.
-    if scenario_type == "combined_perturbed" and not requested_ids:
-        add(
-            "scenario_type.combined_perturbed",
-            "scenario_type",
-            {"scenario_type": scenario_type, "config": scenario},
-        )
+    # A combined scenario must represent at least two independently applied
+    # physical effect families.  The API's default combined holdout does not
+    # carry explicit effect values, so compile deterministic launcher-supported
+    # defaults instead of emitting the non-physical combined label that a real
+    # PX4/Gazebo runner must reject.  When the caller supplied one family, keep
+    # it unchanged and add only the missing default family.
+    if scenario_type == "combined_perturbed":
+        physical_families = {
+            str(item["mechanism"])
+            for item in effects
+            if item["capability"]["status"] == "available"
+        }
+        if len(physical_families) < 2 and "gazebo_wind_effects" not in physical_families:
+            add(
+                "scenario_type.wind_perturbed",
+                "scenario_type.combined_perturbed.default_wind",
+                {"scenario_type": "wind_perturbed", "config": {}},
+            )
+            physical_families.add("gazebo_wind_effects")
+        if len(physical_families) < 2 and "sdformat_sensor_noise" not in physical_families:
+            add(
+                "scenario_type.noise_perturbed",
+                "scenario_type.combined_perturbed.default_sensor_noise",
+                {"scenario_type": "noise_perturbed", "config": {}},
+            )
     elif scenario_type in concrete_by_scenario and not (
         concrete_by_scenario[scenario_type] & requested_ids
     ):

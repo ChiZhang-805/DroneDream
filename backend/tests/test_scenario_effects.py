@@ -930,7 +930,7 @@ def test_combined_scenario_uses_explicit_effects_without_unappliable_label() -> 
     assert "scenario_type.combined_perturbed" not in effect_ids
 
 
-def test_combined_scenario_without_explicit_effects_keeps_guard_marker() -> None:
+def test_combined_scenario_without_explicit_effects_gets_two_physical_defaults() -> None:
     request = build_scenario_effect_request(
         execution_identity=_identity(),
         scenario_type="combined_perturbed",
@@ -942,9 +942,32 @@ def test_combined_scenario_without_explicit_effects_keeps_guard_marker() -> None
         advanced_config={},
     )
 
-    assert [item["effect_id"] for item in request["effects"]] == [
-        "scenario_type.combined_perturbed"
-    ]
+    assert {item["effect_id"] for item in request["effects"]} == {
+        "scenario_type.wind_perturbed",
+        "scenario_type.noise_perturbed",
+    }
+    assert compile_bundled_steady_wind(request) is not None
+    sdf_profile = compile_bundled_sdf_profile(request)
+    assert sdf_profile is not None
+    assert sdf_profile["sensor_noise"]["preset"] == "high"
+
+
+def test_combined_scenario_with_only_one_effect_adds_a_second_effect_family() -> None:
+    request = build_scenario_effect_request(
+        execution_identity=_identity(),
+        scenario_type="combined_perturbed",
+        scenario_config={"wind_mps": 4.0},
+        job_config={
+            "wind": {"north": 0.0, "east": 0.0, "south": 0.0, "west": 0.0},
+            "sensor_noise_level": "medium",
+        },
+        advanced_config={},
+    )
+
+    assert {item["effect_id"] for item in request["effects"]} == {
+        "scenario_config.wind_mps",
+        "scenario_type.noise_perturbed",
+    }
 
 
 def test_request_builder_rejects_pathologically_deep_custom_config() -> None:
