@@ -3796,12 +3796,14 @@ def run_once(input_path: Path, output_path: Path) -> int:
             _merge_json_object(run_dir / "launch_config.json", runner_launch_config)
             log(f"launcher exit code: {exit_code}")
             if scenario_effect_request["effects"]:
+                effect_evidence_verified = False
                 try:
                     _require_effect_evidence_file(scenario_effect_evidence_json)
                     verified_effects = load_scenario_effect_evidence(
                         scenario_effect_evidence_json,
                         scenario_effect_request,
                     )
+                    effect_evidence_verified = True
                 except ScenarioEffectContractError as exc:
                     requested_effect_ids = list(scenario_effect_contract["requested_effects"])
                     verified_effects = {
@@ -3845,12 +3847,22 @@ def run_once(input_path: Path, output_path: Path) -> int:
                         "scenario_effect_evidence": evidence_manifest,
                     },
                 )
-                if scenario_effect_contract.get("failed_effects"):
+                if scenario_effect_contract.get("failed_effects") and (
+                    exit_code == 0 or effect_evidence_verified
+                ):
                     raise RunnerError(
                         "launcher failed to apply scenario effects: "
                         + ", ".join(scenario_effect_contract["failed_effects"])
                     )
-                _enforce_scenario_effect_contract(scenario_effect_contract)
+                # A launcher that exits successfully without the required
+                # evidence has violated the scenario contract. A launcher that
+                # explicitly and validly reports an unsupported effect should
+                # also retain that classification. Missing/invalid evidence
+                # after a non-zero launcher exit, however, is downstream of the
+                # launch failure and must not conceal the primary PX4/Gazebo
+                # connection or startup diagnostic.
+                if exit_code == 0 or effect_evidence_verified:
+                    _enforce_scenario_effect_contract(scenario_effect_contract)
             if exit_code != 0:
                 failure_reason = _lower_level_failure_reason(run_dir, exit_code)
                 final_actuator_link_health = _verified_actuator_link_stall(

@@ -1895,6 +1895,44 @@ def test_px4_runner_treats_nonzero_launcher_exit_as_failure(tmp_path: Path):
     assert "exited with code 7" in result["failure"]["reason"]
 
 
+def test_nonzero_launcher_exit_is_not_misclassified_as_unsupported_scenario(
+    tmp_path: Path,
+) -> None:
+    input_path = _trial_input(tmp_path)
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    payload["scenario_type"] = "wind_perturbed"
+    payload["scenario_config"] = {"wind_mps": 4.0}
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+    launcher = tmp_path / "failed_before_effect_evidence.py"
+    launcher.write_text("raise SystemExit(7)\n", encoding="utf-8")
+    output_path = tmp_path / "trial_result.json"
+    env = os.environ.copy()
+    env.update(
+        {
+            "PX4_GAZEBO_DRY_RUN": "false",
+            "PX4_GAZEBO_LAUNCH_COMMAND": f'"{sys.executable}" "{launcher}"',
+        }
+    )
+
+    proc = subprocess.run(
+        [sys.executable, str(RUNNER), "--input", str(input_path), "--output", str(output_path)],
+        text=True,
+        capture_output=True,
+        check=False,
+        env=env,
+    )
+
+    assert proc.returncode == 0
+    result = json.loads(output_path.read_text(encoding="utf-8"))
+    assert result["success"] is False
+    assert result["failure"]["code"] == "SIMULATION_FAILED"
+    assert result["failure"]["reason"] == "lower-level launcher exited with code 7"
+    launch_config = json.loads((tmp_path / "launch_config.json").read_text(encoding="utf-8"))
+    contract = launch_config["scenario_effect_contract"]
+    assert contract["verification_status"] == "invalid_launcher_evidence"
+    assert contract["unsupported_effects"] == ["scenario_config.wind_mps"]
+
+
 def test_px4_runner_retries_one_verified_actuator_link_stall_end_to_end(
     tmp_path: Path,
 ) -> None:
