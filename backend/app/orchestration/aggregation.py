@@ -367,7 +367,12 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     except Exception:  # pragma: no cover - detached ORM state is not publishable
         return False
     if has_trial_relationship and (
-        len(trials) != trial_count or any(not _trial_has_usable_metric(trial) for trial in trials)
+        len(trials) != trial_count
+        or any(
+            not _trial_has_usable_metric(trial)
+            or not _trial_metric_provenance_is_publishable(trial)
+            for trial in trials
+        )
     ):
         return False
 
@@ -486,6 +491,38 @@ def _required_overshoot_count(value: object) -> int:
 def _trial_has_usable_metric(trial: models.Trial) -> bool:
     return getattr(trial, "status", None) == "COMPLETED" and _metric_is_usable(
         getattr(trial, "metric", None)
+    )
+
+
+def _trial_metric_provenance_is_publishable(trial: models.Trial) -> bool:
+    """Keep synthetic PX4 plumbing checks out of published recommendations.
+
+    The PX4/Gazebo runner deliberately returns a successful TrialResult in
+    ``dry_run`` and ``site_dry_run`` modes so the adapter, storage, and evidence
+    plumbing can be exercised without launching a simulator.  Those metrics are
+    useful diagnostics, but they are not observations of a physical simulation
+    and must never rank a Candidate or become a frozen winner.
+
+    Generic/mock simulators do not emit PX4 outcome evidence and retain their
+    existing behaviour.  Once a metric claims the PX4 evidence schema, however,
+    provenance is fail-closed: only an explicit, boolean ``synthetic: false``
+    may be published.  For accepted physical attempts the complete raw metric
+    object is already content-bound by ``metric_sha256``.
+    """
+
+    metric = getattr(trial, "metric", None)
+    raw_metric = getattr(metric, "raw_metric_json", None)
+    if not isinstance(raw_metric, dict):
+        return True
+    if raw_metric.get("mode") in {"dry_run", "site_dry_run"}:
+        return False
+    px4_evidence = raw_metric.get("px4_outcome_evidence")
+    if px4_evidence is None:
+        return True
+    return (
+        isinstance(px4_evidence, dict)
+        and px4_evidence.get("schema_id") == "dronedream.px4-outcome-evidence/v1"
+        and px4_evidence.get("synthetic") is False
     )
 
 

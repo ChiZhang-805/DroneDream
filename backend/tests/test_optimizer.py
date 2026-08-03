@@ -1406,6 +1406,106 @@ def test_rank_and_select_best_does_not_publish_partial_baseline() -> None:
     assert baseline.is_best is False
 
 
+@pytest.mark.parametrize(
+    "raw_metric_json",
+    [
+        {
+            "mode": "dry_run",
+            "px4_outcome_evidence": {
+                "schema_id": "dronedream.px4-outcome-evidence/v1",
+                "synthetic": False,
+            },
+        },
+        {
+            "mode": "site_dry_run",
+            "px4_outcome_evidence": {
+                "schema_id": "dronedream.px4-outcome-evidence/v1",
+                "synthetic": False,
+            },
+        },
+        {
+            "mode": "live",
+            "px4_outcome_evidence": {
+                "schema_id": "dronedream.px4-outcome-evidence/v1",
+                "synthetic": True,
+            },
+        },
+        {
+            "mode": "live",
+            "px4_outcome_evidence": {
+                "schema_id": "dronedream.px4-outcome-evidence/v1",
+            },
+        },
+    ],
+    ids=["dry-run-mode", "site-dry-run-mode", "synthetic-evidence", "missing-provenance"],
+)
+def test_publishable_gate_rejects_synthetic_px4_runner_metrics(
+    raw_metric_json: dict[str, object],
+) -> None:
+    candidate = _FakeCandidate(
+        candidate_id="synthetic-px4",
+        score=0.1,
+        trial_count=1,
+        completed=1,
+    )
+    candidate.trials = [
+        SimpleNamespace(
+            status="COMPLETED",
+            metric=SimpleNamespace(
+                rmse=0.1,
+                max_error=0.2,
+                overshoot_count=0,
+                completion_time=1.0,
+                crash_flag=False,
+                timeout_flag=False,
+                score=0.1,
+                final_error=0.05,
+                pass_flag=True,
+                instability_flag=False,
+                raw_metric_json=raw_metric_json,
+            ),
+        )
+    ]
+
+    assert aggregation.candidate_is_publishable(candidate) is False
+    assert aggregation._rank_and_select_best([candidate]) is None
+
+
+def test_publishable_gate_accepts_explicitly_nonsynthetic_px4_metrics() -> None:
+    candidate = _FakeCandidate(
+        candidate_id="physical-px4",
+        score=0.1,
+        trial_count=1,
+        completed=1,
+    )
+    candidate.trials = [
+        SimpleNamespace(
+            status="COMPLETED",
+            metric=SimpleNamespace(
+                rmse=0.1,
+                max_error=0.2,
+                overshoot_count=0,
+                completion_time=1.0,
+                crash_flag=False,
+                timeout_flag=False,
+                score=0.1,
+                final_error=0.05,
+                pass_flag=True,
+                instability_flag=False,
+                raw_metric_json={
+                    "mode": "live",
+                    "px4_outcome_evidence": {
+                        "schema_id": "dronedream.px4-outcome-evidence/v1",
+                        "synthetic": False,
+                    },
+                },
+            ),
+        )
+    ]
+
+    assert aggregation.candidate_is_publishable(candidate) is True
+
+
 def test_rank_and_select_best_rejects_failed_holdout_verification() -> None:
     baseline = _FakeCandidate(
         candidate_id="baseline",
