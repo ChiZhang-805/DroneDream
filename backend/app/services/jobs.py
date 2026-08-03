@@ -122,10 +122,7 @@ def _expected_control_version(
         if get_settings().app_env.strip().lower() in {"desktop", "prod", "production"}:
             raise JobServiceError(
                 "CONTROL_VERSION_REQUIRED",
-                (
-                    f"A current control_version is required to modify "
-                    f"{resource_kind} {resource_id}."
-                ),
+                (f"A current control_version is required to modify {resource_kind} {resource_id}."),
                 http_status=428,
             )
         # Preserve source/API compatibility for non-packaged development while
@@ -1250,11 +1247,7 @@ def cancel_job(
                 current_version=job.control_version,
             )
         if job.status in schemas.JOB_TERMINAL_STATUSES:
-            code = (
-                "JOB_ALREADY_CANCELLED"
-                if job.status == "CANCELLED"
-                else "JOB_ALREADY_COMPLETED"
-            )
+            code = "JOB_ALREADY_CANCELLED" if job.status == "CANCELLED" else "JOB_ALREADY_COMPLETED"
             raise JobServiceError(
                 code,
                 f"Job {job.id} is already in terminal state {job.status}.",
@@ -1718,8 +1711,20 @@ def compare_jobs(
         optimized_metrics = (
             dict(job.report.optimized_metric_json or {}) if job.report is not None else None
         )
+        validated_best = bool(
+            job.best_candidate_id
+            and (
+                job.simulator_backend_requested != "real_cli"
+                or (job.report is not None and job.report.winner_freeze_receipt_id)
+            )
+        )
         if job.status != "COMPLETED":
             baseline_metrics = None
+            optimized_metrics = None
+        elif not validated_best:
+            # A completed no-winner run can still carry a diagnostic baseline
+            # projection in its report. Never rank that projection as an
+            # optimized result in cross-job comparisons.
             optimized_metrics = None
         best_candidate = next((c for c in job.candidates if c.id == job.best_candidate_id), None)
         items.append(
@@ -1734,9 +1739,9 @@ def compare_jobs(
                 optimization_outcome=job.optimization_outcome,  # type: ignore[arg-type]
                 baseline_metrics=baseline_metrics,
                 optimized_metrics=optimized_metrics,
-                best_candidate_id=job.best_candidate_id,
+                best_candidate_id=job.best_candidate_id if validated_best else None,
                 best_parameters=dict(best_candidate.parameter_json or {})
-                if best_candidate is not None
+                if validated_best and best_candidate is not None
                 else {},
                 trial_count=len(job.trials),
                 completed_trial_count=sum(1 for t in job.trials if t.status == "COMPLETED"),
@@ -1879,11 +1884,7 @@ def _candidate_evaluation(
             raise RuntimeError("validated scenario resolution unexpectedly has no case")
         return scenario_case
 
-    training_trials = [
-        trial
-        for trial in candidate.trials
-        if not _matched_case(trial).holdout
-    ]
+    training_trials = [trial for trial in candidate.trials if not _matched_case(trial).holdout]
 
     def _resolved_case(
         trial: models.Trial,

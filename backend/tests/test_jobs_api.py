@@ -86,9 +86,7 @@ def test_create_job_exposes_job_id_alias(client: TestClient) -> None:
     assert job["status"] == "QUEUED"
 
 
-def test_cancelling_gpt_job_purges_encrypted_api_key(
-    client: TestClient, monkeypatch
-) -> None:
+def test_cancelling_gpt_job_purges_encrypted_api_key(client: TestClient, monkeypatch) -> None:
     monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
     created = client.post(
         "/api/v1/jobs",
@@ -112,16 +110,12 @@ def test_cancelling_gpt_job_purges_encrypted_api_key(
     from app.db import SessionLocal
 
     with SessionLocal() as db:
-        secret = db.scalars(
-            select(models.JobSecret).where(models.JobSecret.job_id == job_id)
-        ).one()
+        secret = db.scalars(select(models.JobSecret).where(models.JobSecret.job_id == job_id)).one()
         assert secret.deleted_at is not None
         assert secret.encrypted_api_key == ""
         events = {
             event.event_type
-            for event in db.scalars(
-                select(models.JobEvent).where(models.JobEvent.job_id == job_id)
-            )
+            for event in db.scalars(select(models.JobEvent).where(models.JobEvent.job_id == job_id))
         }
         assert "job_secrets_purged" in events
 
@@ -151,9 +145,7 @@ def test_gpt_job_secret_has_bounded_lifetime(client: TestClient, monkeypatch) ->
 
     with SessionLocal() as db:
         secret = db.scalars(
-            select(models.JobSecret).where(
-                models.JobSecret.job_id == created.json()["data"]["id"]
-            )
+            select(models.JobSecret).where(models.JobSecret.job_id == created.json()["data"]["id"])
         ).one()
         assert secret.expires_at is not None
         expires_at = secret.expires_at
@@ -180,9 +172,7 @@ def test_gpt_job_rejects_blank_server_secret(client: TestClient, monkeypatch) ->
     assert response.json()["error"]["code"] == "CONFIGURATION_ERROR"
 
 
-def test_housekeeping_wipes_expired_secret_without_worker(
-    client: TestClient, monkeypatch
-) -> None:
+def test_housekeeping_wipes_expired_secret_without_worker(client: TestClient, monkeypatch) -> None:
     monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
     created = client.post(
         "/api/v1/jobs",
@@ -205,9 +195,7 @@ def test_housekeeping_wipes_expired_secret_without_worker(
 
     with SessionLocal() as db:
         secret = db.scalars(
-            select(models.JobSecret).where(
-                models.JobSecret.job_id == created.json()["data"]["id"]
-            )
+            select(models.JobSecret).where(models.JobSecret.job_id == created.json()["data"]["id"])
         ).one()
         secret.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
         db.commit()
@@ -574,9 +562,9 @@ def test_list_trials_keeps_array_contract_and_exposes_page_metadata(
     second = client.get(f"/api/v1/jobs/{job['id']}/trials?page=2&page_size=2")
     assert second.status_code == 200, second.text
     assert len(second.json()["data"]) == 1
-    assert {
-        item["id"] for item in first.json()["data"]
-    }.isdisjoint({item["id"] for item in second.json()["data"]})
+    assert {item["id"] for item in first.json()["data"]}.isdisjoint(
+        {item["id"] for item in second.json()["data"]}
+    )
 
 
 def test_trial_not_found(client: TestClient) -> None:
@@ -657,6 +645,16 @@ def test_compare_jobs_returns_completed_metrics(client: TestClient) -> None:
             job = db.get(models.Job, job_id)
             assert job is not None
             job.status = "COMPLETED"
+            candidate = models.CandidateParameterSet(
+                id=f"cand_{job_id.removeprefix('job_')}",
+                job_id=job.id,
+                parameter_json={"MPC_XY_P": 0.9},
+                is_baseline=True,
+                is_best=True,
+            )
+            db.add(candidate)
+            job.baseline_candidate_id = candidate.id
+            job.best_candidate_id = candidate.id
             job.report = models.JobReport(
                 job_id=job.id,
                 report_status="READY",
@@ -669,6 +667,41 @@ def test_compare_jobs_returns_completed_metrics(client: TestClient) -> None:
     items = resp.json()["data"]["items"]
     assert len(items) == 2
     assert items[0]["optimized_metrics"]["rmse"] == 0.8
+
+
+def test_compare_jobs_keeps_no_winner_report_metrics_diagnostic(client: TestClient) -> None:
+    from app import models
+    from app.db import SessionLocal
+
+    job_ids = [
+        client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+        for _ in range(2)
+    ]
+    with SessionLocal() as db:
+        for job_id in job_ids:
+            job = db.get(models.Job, job_id)
+            assert job is not None
+            job.status = "COMPLETED"
+            job.optimization_outcome = "no_usable_candidate"
+            job.best_candidate_id = None
+            job.report = models.JobReport(
+                job_id=job.id,
+                report_status="READY",
+                baseline_metric_json={"rmse": 8.4},
+                optimized_metric_json={"rmse": 8.4},
+                best_candidate_id=job.baseline_candidate_id,
+                best_parameter_json={"MPC_XY_P": 0.95},
+            )
+        db.commit()
+
+    response = client.post("/api/v1/jobs/compare", json={"job_ids": job_ids})
+
+    assert response.status_code == 200, response.text
+    for item in response.json()["data"]["items"]:
+        assert item["baseline_metrics"] == {"rmse": 8.4}
+        assert item["optimized_metrics"] is None
+        assert item["best_candidate_id"] is None
+        assert item["best_parameters"] == {}
 
 
 def test_compare_jobs_active_job_metrics_are_null(client: TestClient) -> None:
@@ -862,20 +895,36 @@ def _seed_job_with_report(
     from app import models
 
     baseline = {
-        "rmse": 1.2, "max_error": 2.0, "overshoot_count": 3,
-        "completion_time": 9.0, "score": 4.2,
+        "rmse": 1.2,
+        "max_error": 2.0,
+        "overshoot_count": 3,
+        "completion_time": 9.0,
+        "score": 4.2,
     }
     optimized = {
-        "rmse": 0.9, "max_error": 1.5, "overshoot_count": 2,
-        "completion_time": 8.0, "score": 3.0,
+        "rmse": 0.9,
+        "max_error": 1.5,
+        "overshoot_count": 2,
+        "completion_time": 8.0,
+        "score": 3.0,
     }
     comparison = [
-        {"metric": "rmse", "label": "RMSE", "baseline": 1.2,
-         "optimized": 0.9, "lower_is_better": True, "unit": "m"}
+        {
+            "metric": "rmse",
+            "label": "RMSE",
+            "baseline": 1.2,
+            "optimized": 0.9,
+            "lower_is_better": True,
+            "unit": "m",
+        }
     ]
     best_params = {
-        "kp_xy": 1.1, "kd_xy": 0.21, "ki_xy": 0.05,
-        "vel_limit": 5.0, "accel_limit": 4.0, "disturbance_rejection": 0.5,
+        "kp_xy": 1.1,
+        "kd_xy": 0.21,
+        "ki_xy": 0.05,
+        "vel_limit": 5.0,
+        "accel_limit": 4.0,
+        "disturbance_rejection": 0.5,
     }
 
     with db_module.SessionLocal() as db:
@@ -885,7 +934,10 @@ def _seed_job_with_report(
             start_point_x=0.0,
             start_point_y=0.0,
             altitude_m=3.0,
-            wind_north=0.0, wind_east=0.0, wind_south=0.0, wind_west=0.0,
+            wind_north=0.0,
+            wind_east=0.0,
+            wind_south=0.0,
+            wind_west=0.0,
             sensor_noise_level="medium",
             objective_profile="robust",
             status=status,
@@ -1017,6 +1069,7 @@ def test_artifacts_includes_trial_scoped_artifacts(client: TestClient) -> None:
     assert "trial" in owner_types and "job" in owner_types
     assert "trajectory_plot" in kinds and "report_summary" in kinds
 
+
 def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) -> None:
     from app import models
     from app.db import SessionLocal
@@ -1081,21 +1134,16 @@ def test_delete_completed_job_and_artifacts(client: TestClient, tmp_path: Path) 
     assert resp.status_code == 200
     assert resp.json()["data"] == {"id": job["id"], "deleted": True}
     assert client.get(f"/api/v1/jobs/{job['id']}").status_code == 404
-    ids = [x['id'] for x in client.get('/api/v1/jobs').json()['data']['items']]
-    assert job['id'] not in ids and other['id'] in ids
+    ids = [x["id"] for x in client.get("/api/v1/jobs").json()["data"]["items"]]
+    assert job["id"] not in ids and other["id"] in ids
     with SessionLocal() as db:
         remaining = list(db.query(models.Artifact).all())
-        assert all(a.owner_id != job['id'] for a in remaining)
-        assert any(a.owner_id == other['id'] for a in remaining)
+        assert all(a.owner_id != job["id"] for a in remaining)
+        assert any(a.owner_id == other["id"] for a in remaining)
         assert not art_file.exists()
         assert not sealed_file.exists()
-        assert (
-            db.query(models.ArtifactDigestReceipt).count() == 0
-        )
-        assert (
-            db.query(models.ArtifactDigestDeleteAuthorization).count()
-            == 0
-        )
+        assert db.query(models.ArtifactDigestReceipt).count() == 0
+        assert db.query(models.ArtifactDigestDeleteAuthorization).count() == 0
 
 
 def test_delete_job_commit_failure_preserves_artifact_payload(
@@ -1190,38 +1238,39 @@ def test_delete_job_keeps_committed_deletion_when_payload_cleanup_fails(
 
 
 def test_delete_active_job_conflict(client: TestClient) -> None:
-    job = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
     resp = client.delete(f"/api/v1/jobs/{job['id']}")
     assert resp.status_code == 409
-    assert resp.json()['error']['code'] == 'JOB_NOT_DELETABLE'
+    assert resp.json()["error"]["code"] == "JOB_NOT_DELETABLE"
 
 
 def test_delete_source_job_nulls_child_source_id(client: TestClient) -> None:
     from app import models
     from app.db import SessionLocal
-    parent = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
-    child = client.post(f"/api/v1/jobs/{parent['id']}/rerun").json()['data']
+
+    parent = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    child = client.post(f"/api/v1/jobs/{parent['id']}/rerun").json()["data"]
     with SessionLocal() as db:
-        p = db.get(models.Job, parent['id'])
+        p = db.get(models.Job, parent["id"])
         assert p is not None
-        p.status = 'COMPLETED'
+        p.status = "COMPLETED"
         db.commit()
     assert client.delete(f"/api/v1/jobs/{parent['id']}").status_code == 200
     child_detail = client.get(f"/api/v1/jobs/{child['id']}")
     assert child_detail.status_code == 200
-    assert child_detail.json()['data']['source_job_id'] is None
+    assert child_detail.json()["data"]["source_job_id"] is None
 
 
 def test_delete_job_ignores_missing_artifact_file(client: TestClient, tmp_path: Path) -> None:
     from app import models
     from app.db import SessionLocal
 
-    job = client.post('/api/v1/jobs', json=HEURISTIC_JOB_PAYLOAD).json()['data']
-    missing_path = tmp_path / 'artifacts' / 'missing.bin'
+    job = client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]
+    missing_path = tmp_path / "artifacts" / "missing.bin"
     with SessionLocal() as db:
-        j = db.get(models.Job, job['id'])
+        j = db.get(models.Job, job["id"])
         assert j is not None
-        j.status = 'COMPLETED'
+        j.status = "COMPLETED"
         db.add(
             models.Artifact(
                 owner_type="job",
@@ -1263,5 +1312,5 @@ def test_delete_job_never_deletes_artifact_outside_allowed_roots(
     assert response.status_code == 200, response.text
     assert outside_path.read_bytes() == b"must remain"
     with SessionLocal() as db:
-        assert db.get(models.Job, job['id']) is None
-        assert db.query(models.Artifact).filter(models.Artifact.owner_id == job['id']).count() == 0
+        assert db.get(models.Job, job["id"]) is None
+        assert db.query(models.Artifact).filter(models.Artifact.owner_id == job["id"]).count() == 0

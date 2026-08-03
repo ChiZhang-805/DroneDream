@@ -1057,11 +1057,12 @@ function BestParametersSection({
 }
 
 function reportHasValidatedRecommendation(job: Job, report: JobReport): boolean {
-  return Boolean(
-    report.winner_freeze_receipt_id
-    && job.best_candidate_id
-    && report.best_candidate_id === job.best_candidate_id,
+  const selectedCandidateMatches = Boolean(
+    job.best_candidate_id && report.best_candidate_id === job.best_candidate_id,
   );
+  if (!selectedCandidateMatches) return false;
+  return job.simulator_backend_requested !== "real_cli"
+    || Boolean(report.winner_freeze_receipt_id);
 }
 
 /** Build the fallback diagnostic lines from the job's timestamp columns. Used

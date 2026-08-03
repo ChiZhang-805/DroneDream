@@ -35,6 +35,20 @@ function metricDirection(metric: string): "lower" | "higher" | null {
   return null;
 }
 
+function outcomeLabel(
+  outcome: JobCompareItem["optimization_outcome"],
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  switch (outcome) {
+    case "success": return t("jobCompare.outcomeSuccess");
+    case "max_iterations_reached": return t("jobCompare.outcomeMaxIterations");
+    case "no_usable_candidate": return t("jobCompare.outcomeNoWinner");
+    case "llm_failed": return t("jobCompare.outcomeModelFailed");
+    case "simulator_unavailable": return t("jobCompare.outcomeSimulatorFailed");
+    default: return t("jobCompare.outcomePending");
+  }
+}
+
 function useJobIds(): string[] {
   const location = useLocation();
   return useMemo(() => {
@@ -105,39 +119,42 @@ export function JobCompare() {
       </header>
       {downloadError ? <p className="form-error" role="alert">{t("jobCompare.downloadFailed")}</p> : null}
       <SectionCard title={t("jobCompare.tableTitle")}>
-        <table className="data-table">
-          <thead><tr><th>{t("jobCompare.job")}</th><th>{t("jobCompare.status")}</th><th>{t("jobCompare.backend")}</th><th>{t("jobCompare.strategy")}</th>{metricKeys.map((key) => <th key={key}>{t("jobCompare.bestMetric", { metric: key })}</th>)}<th>{t("jobCompare.trials")}</th></tr></thead>
-          <tbody>
-            {items.map((item) => {
-              return (
-                <tr key={item.job_id}>
-                  <td><code>{item.job_id}</code></td>
-                  <td><StatusBadge status={item.status} /></td>
-                  <td>{t(
-                    item.simulator_backend === "real_cli"
-                      ? "wizard.simulator.realCli"
-                      : "wizard.simulator.mock",
-                  )}</td>
-                  <td>{optimizerStrategyLabel(item.optimizer_strategy, t)}</td>
-                  {metricKeys.map((metric) => {
-                    const value = getNumericMetric(item, "optimized_metrics", metric);
-                    const isBest = (
-                      metricDirection(metric) !== null
-                      && value !== null
-                      && value === bestByMetric[metric]
-                    );
-                    return (
-                      <td key={metric} style={{ fontWeight: isBest ? 700 : 400 }}>
-                        {value ?? "—"}
-                      </td>
-                    );
-                  })}
-                  <td>{item.completed_trial_count}/{item.trial_count}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="data-table-wrapper">
+          <table className="data-table">
+            <thead><tr><th>{t("jobCompare.job")}</th><th>{t("jobCompare.status")}</th><th>{t("jobCompare.outcome")}</th><th>{t("jobCompare.backend")}</th><th>{t("jobCompare.strategy")}</th>{metricKeys.map((key) => <th key={key}>{t("jobCompare.bestMetric", { metric: key })}</th>)}<th>{t("jobCompare.trials")}</th></tr></thead>
+            <tbody>
+              {items.map((item) => {
+                return (
+                  <tr key={item.job_id}>
+                    <td><code>{item.job_id}</code></td>
+                    <td><StatusBadge status={item.status} /></td>
+                    <td>{outcomeLabel(item.optimization_outcome, t)}</td>
+                    <td>{t(
+                      item.simulator_backend === "real_cli"
+                        ? "wizard.simulator.realCli"
+                        : "wizard.simulator.mock",
+                    )}</td>
+                    <td>{optimizerStrategyLabel(item.optimizer_strategy, t)}</td>
+                    {metricKeys.map((metric) => {
+                      const value = getNumericMetric(item, "optimized_metrics", metric);
+                      const isBest = (
+                        metricDirection(metric) !== null
+                        && value !== null
+                        && value === bestByMetric[metric]
+                      );
+                      return (
+                        <td key={metric} style={{ fontWeight: isBest ? 700 : 400 }}>
+                          {value ?? "—"}
+                        </td>
+                      );
+                    })}
+                    <td>{item.completed_trial_count}/{item.trial_count}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </SectionCard>
     </section>
   );
