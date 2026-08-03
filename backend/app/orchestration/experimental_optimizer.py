@@ -144,7 +144,7 @@ def _trial_metric_payload_is_usable(metric: object) -> bool:
         finite_number("rmse")
         and finite_number("max_error")
         and finite_number("completion_time")
-        and finite_number("score", nonnegative=False)
+        and finite_number("score")
         and finite_number("final_error")
         and isinstance(overshoot, int)
         and not isinstance(overshoot, bool)
@@ -156,6 +156,13 @@ def _trial_metric_payload_is_usable(metric: object) -> bool:
                 "timeout_flag",
                 "pass_flag",
                 "instability_flag",
+            )
+        )
+        and not (
+            metric.get("pass_flag") is True
+            and any(
+                metric.get(name) is True
+                for name in ("crash_flag", "timeout_flag", "instability_flag")
             )
         )
     )

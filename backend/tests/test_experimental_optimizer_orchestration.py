@@ -163,6 +163,53 @@ def test_source_evidence_schema_upgrade_preserves_numerical_seed_projection() ->
     assert _optimizer_seed_metadata(modern) == legacy
 
 
+@pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    (
+        ("score", -0.1),
+        ("crash_flag", True),
+        ("timeout_flag", True),
+        ("instability_flag", True),
+    ),
+)
+def test_experimental_history_rejects_invalid_or_contradictory_trial_metric(
+    field_name: str,
+    invalid_value: float | bool,
+) -> None:
+    from app.orchestration.experimental_optimizer import (
+        _authoritative_training_outcome_counts,
+    )
+
+    metric: dict[str, float | int | bool] = {
+        "rmse": 0.5,
+        "max_error": 0.75,
+        "completion_time": 8.0,
+        "score": 0.5,
+        "final_error": 0.1,
+        "overshoot_count": 0,
+        "crash_flag": False,
+        "timeout_flag": False,
+        "pass_flag": True,
+        "instability_flag": False,
+    }
+    metric[field_name] = invalid_value
+
+    counts = _authoritative_training_outcome_counts(
+        trial_evidence_rows=(
+            {
+                "status": "COMPLETED",
+                "failure_code": None,
+                "metric": metric,
+            },
+        ),
+        aggregate={},
+    )
+
+    assert counts is not None
+    assert counts["success"] == 0
+    assert counts["invalid_evidence"] == 1
+
+
 @pytest.mark.parametrize("strategy", STRATEGIES)
 def test_experimental_strategy_dispatches_candidates_with_budgeted_metadata(
     experimental_ctx: dict[str, Any], strategy: str
