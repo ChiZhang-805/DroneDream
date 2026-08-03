@@ -63,11 +63,54 @@ def test_executor_boolean_environment_parser_rejects_typos():
         executor._parse_bool("tru", default=False)
 
 
+@pytest.mark.parametrize("raw", ["nan", "inf", "-inf"])
+def test_executor_float_environment_parser_rejects_nonfinite_values(raw: str):
+    with pytest.raises(ValueError, match="must be a finite number"):
+        executor._parse_float(raw, default=1.0)
+
+
 def test_executor_rejects_nonfinite_track_coordinates(tmp_path: Path):
     track = tmp_path / "reference_track.json"
     track.write_text('{"points":[{"x":NaN,"y":0,"z":3}]}', encoding="utf-8")
     with pytest.raises(ValueError, match="non-standard JSON numeric constant"):
         executor.load_reference_track(track)
+
+
+def test_executor_rejects_oversized_reference_track_before_json_decode(tmp_path: Path):
+    track = tmp_path / "reference_track.json"
+    track.write_bytes(b" " * (executor.MAX_INPUT_JSON_BYTES + 1))
+
+    with pytest.raises(ValueError, match="exceeds the .* byte limit"):
+        executor.load_reference_track(track)
+
+
+def test_offboard_timing_write_is_atomic_and_preserves_previous_receipt_on_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    timing_path = tmp_path / "offboard_timing.json"
+    timing_path.write_text('{"status":"previous"}\n', encoding="utf-8")
+
+    def fail_replace(self: Path, target: Path) -> Path:
+        _ = self, target
+        raise OSError("injected replace failure")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="injected replace failure"):
+        executor._write_offboard_timing(timing_path, {"status": "new"})
+
+    assert timing_path.read_text(encoding="utf-8") == '{"status":"previous"}\n'
+    assert list(tmp_path.glob(".offboard_timing.json.*.tmp")) == []
+
+
+def test_offboard_timing_rejects_nonfinite_json(tmp_path: Path):
+    timing_path = tmp_path / "offboard_timing.json"
+
+    with pytest.raises(ValueError, match="Out of range float values"):
+        executor._write_offboard_timing(timing_path, {"elapsed": math.nan})
+
+    assert not timing_path.exists()
 
 
 @pytest.mark.parametrize(
@@ -149,13 +192,16 @@ def test_build_setpoint_schedule_respects_low_velocity_limits() -> None:
     schedule = executor.build_setpoint_schedule(points, params, rate_hz)
 
     max_step = params.vel_limit / rate_hz
-    assert max(
-        math.dist(
-            (first.north_m, first.east_m, first.down_m),
-            (second.north_m, second.east_m, second.down_m),
+    assert (
+        max(
+            math.dist(
+                (first.north_m, first.east_m, first.down_m),
+                (second.north_m, second.east_m, second.down_m),
+            )
+            for first, second in zip(schedule, schedule[1:], strict=False)
         )
-        for first, second in zip(schedule, schedule[1:], strict=False)
-    ) <= max_step + 1e-9
+        <= max_step + 1e-9
+    )
 
 
 def test_track_start_follows_safe_ingress_to_the_first_reference_point() -> None:
@@ -189,10 +235,10 @@ def test_straight_track_schedule_respects_scalar_acceleration_limit() -> None:
     ]
 
     assert max(speeds) <= params.vel_limit + 1e-9
-    assert max(
-        abs(first - second)
-        for first, second in zip([0.0, *speeds], speeds, strict=False)
-    ) <= params.accel_limit / rate_hz + 1e-9
+    assert (
+        max(abs(first - second) for first, second in zip([0.0, *speeds], speeds, strict=False))
+        <= params.accel_limit / rate_hz + 1e-9
+    )
 
 
 def test_track_schedule_is_invariant_to_collinear_waypoint_density() -> None:
@@ -476,6 +522,7 @@ def test_runtime_effects_write_request_bound_gps_and_battery_evidence(
     )
     profile = scenario_effects.compile_bundled_runtime_profile(request)
     assert profile is not None
+
     class KeepaliveDemandingClient(executor.FakeOffboardClient):
         gps_parameter_keepalive_observed = False
 
@@ -841,6 +888,82 @@ def test_fake_offboard_client_receives_setpoints_in_order(tmp_path: Path):
     timing = json.loads(timing_path.read_text(encoding="utf-8"))
     assert timing["time_base"] == "executor_relative_seconds"
     assert timing["track_start_t"] <= timing["track_end_t"]
+
+
+@pytest.mark.parametrize(
+    "track_start_index, track_end_index",
+    [
+        (-1, None),
+        (2, None),
+        (1, 0),
+        (0, 2),
+        (True, None),
+        (0, True),
+    ],
+)
+def test_executor_rejects_invalid_track_bounds_before_connecting(
+    tmp_path: Path,
+    track_start_index: int,
+    track_end_index: int | None,
+) -> None:
+    client = executor.FakeOffboardClient()
+    schedule = [
+        executor.Setpoint(0.0, 0.0, -3.0, 0.0),
+        executor.Setpoint(1.0, 0.0, -3.0, 0.0),
+    ]
+
+    with pytest.raises(ValueError, match="track .* index"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                schedule,
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                track_start_index=track_start_index,
+                track_end_index=track_end_index,
+            )
+        )
+
+    assert client.connected is False
+    assert client.armed is False
+
+
+def test_executor_track_timeout_interrupts_a_hung_setpoint_call(tmp_path: Path) -> None:
+    class HangingClient(executor.FakeOffboardClient):
+        async def set_position_ned(self, setpoint: executor.Setpoint) -> None:
+            if self.offboard_started and setpoint.north_m == 1.0:
+                await asyncio.Event().wait()
+            await super().set_position_ned(setpoint)
+
+    client = HangingClient()
+    schedule = [
+        executor.Setpoint(0.0, 0.0, -0.01, 0.0),
+        executor.Setpoint(1.0, 0.0, -0.01, 0.0),
+    ]
+
+    with pytest.raises(TimeoutError, match="track timeout after 0.05s"):
+        asyncio.run(
+            asyncio.wait_for(
+                executor.run_executor(
+                    client,
+                    schedule,
+                    connection="udp://:14540",
+                    takeoff_timeout_seconds=1.0,
+                    track_timeout_seconds=0.05,
+                    rate_hz=100.0,
+                    land_after=True,
+                    log_path=tmp_path / "offboard.log",
+                ),
+                timeout=0.5,
+            )
+        )
+
+    assert client.landed is True
+    assert client.closed is True
 
 
 def test_executor_streams_prearm_hold_and_bounded_vertical_takeoff_ramp(
@@ -1370,9 +1493,7 @@ def test_executor_fails_closed_when_hover_velocity_never_stabilizes(
 def test_executor_fails_when_landing_is_not_confirmed_by_telemetry(tmp_path: Path) -> None:
     class LandingTimeoutClient(executor.FakeOffboardClient):
         async def wait_until_landed(self, timeout_seconds: float) -> dict[str, object]:
-            raise TimeoutError(
-                f"PX4 landing confirmation timeout after {timeout_seconds:g}s"
-            )
+            raise TimeoutError(f"PX4 landing confirmation timeout after {timeout_seconds:g}s")
 
     client = LandingTimeoutClient()
     timing_path = tmp_path / "offboard_timing.json"
@@ -1540,6 +1661,73 @@ def test_executor_stops_offboard_and_lands_after_streaming_failure(tmp_path: Pat
     assert client.closed is True
     assert "offboard stopped during failure cleanup" in log_path.read_text(encoding="utf-8")
     assert "land command sent during failure cleanup" in log_path.read_text(encoding="utf-8")
+
+
+def test_executor_preserves_primary_failure_when_timing_write_also_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FailingClient(executor.FakeOffboardClient):
+        async def set_position_ned(self, setpoint: executor.Setpoint) -> None:
+            await super().set_position_ned(setpoint)
+            if self.offboard_started:
+                raise RuntimeError("primary setpoint failure")
+
+    def fail_timing_write(path: Path, payload: dict) -> None:
+        _ = path, payload
+        raise OSError("secondary timing write failure")
+
+    monkeypatch.setattr(executor, "_write_offboard_timing", fail_timing_write)
+    client = FailingClient()
+
+    with pytest.raises(RuntimeError, match="primary setpoint failure"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -0.01, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=tmp_path / "offboard_timing.json",
+            )
+        )
+
+    assert "secondary timing write failure" in (tmp_path / "offboard.log").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_executor_fails_closed_when_client_close_fails_after_flight(
+    tmp_path: Path,
+) -> None:
+    class CloseFailingClient(executor.FakeOffboardClient):
+        async def close(self) -> None:
+            raise OSError("injected client close failure")
+
+    client = CloseFailingClient()
+    timing_path = tmp_path / "offboard_timing.json"
+
+    with pytest.raises(RuntimeError, match="offboard client cleanup failed"):
+        asyncio.run(
+            executor.run_executor(
+                client,
+                [executor.Setpoint(0.0, 0.0, -0.01, 0.0)],
+                connection="udp://:14540",
+                takeoff_timeout_seconds=1.0,
+                track_timeout_seconds=1.0,
+                rate_hz=100.0,
+                land_after=True,
+                log_path=tmp_path / "offboard.log",
+                timing_path=timing_path,
+            )
+        )
+
+    timing = json.loads(timing_path.read_text(encoding="utf-8"))
+    assert timing["status"] == "failed"
+    assert timing["cleanup"]["close"].startswith("failed: OSError:")
 
 
 def test_executor_rejects_empty_schedule_before_arming(tmp_path: Path):
@@ -1801,6 +1989,29 @@ def test_mavsdk_battery_remaining_percent_keeps_documented_zero_to_100_units():
     assert sample == {"remaining_percent": 91.0, "voltage_v": 15.7}
 
 
+@pytest.mark.parametrize(
+    "remaining_percent, voltage_v",
+    [(math.nan, 15.7), (91.0, math.inf), (True, 15.7)],
+)
+def test_mavsdk_battery_rejects_invalid_numeric_telemetry(
+    remaining_percent: float,
+    voltage_v: float,
+) -> None:
+    class TelemetryStub:
+        async def battery(self):
+            yield type(
+                "Battery",
+                (),
+                {"remaining_percent": remaining_percent, "voltage_v": voltage_v},
+            )()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = type("SystemStub", (), {"telemetry": TelemetryStub()})()
+
+    with pytest.raises(ValueError, match="must be a finite number"):
+        asyncio.run(client.sample_battery(1.0))
+
+
 def test_mavsdk_integer_parameter_bridge_uses_exact_int_api():
     class ParamStub:
         def __init__(self) -> None:
@@ -1844,6 +2055,29 @@ def test_mavsdk_gps_info_preserves_fix_type_and_satellite_count():
         "fix_type": 3,
         "fix_type_name": "FIX_3D",
     }
+
+
+@pytest.mark.parametrize(
+    "num_satellites, fix_type",
+    [(True, 3), (10.5, 3), (10, False), (10, 3.5)],
+)
+def test_mavsdk_gps_info_rejects_non_integer_telemetry(
+    num_satellites: int | float | bool,
+    fix_type: int | float | bool,
+) -> None:
+    class TelemetryStub:
+        async def gps_info(self):
+            yield type(
+                "GpsInfo",
+                (),
+                {"num_satellites": num_satellites, "fix_type": fix_type},
+            )()
+
+    client = executor.MavsdkOffboardClient.__new__(executor.MavsdkOffboardClient)
+    client._system = type("SystemStub", (), {"telemetry": TelemetryStub()})()
+
+    with pytest.raises(ValueError, match="must be an integer"):
+        asyncio.run(client.sample_gps_info(1.0))
 
 
 def test_mavsdk_actions_fail_cleanly_before_connect():

@@ -10,8 +10,10 @@ Coordinate mapping assumption (first implementation):
 - PX4 offboard local frame uses NED north/east/down.
 - Mapping: north=x, east=y, down=-z.
 
-Controller parameters are applied by this executor's scheduling logic
-(vel/accel-limited interpolation and progression), not PX4 internal parameters.
+The executor applies only ``vel_limit`` and ``accel_limit`` to its setpoint
+schedule. Selected PX4 parameters are applied and verified separately by the
+launch wrapper; the remaining legacy controller fields are compatibility
+metadata and must not be represented as physical flight controls.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ import math
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -37,6 +40,7 @@ MAX_REFERENCE_TRACK_POINTS = 10_000
 MAX_SETPOINT_RATE_HZ = 100.0
 MAX_TAKEOFF_CLIMB_RATE_M_S = 5.0
 MAX_SETPOINTS = 1_000_000
+MAX_INPUT_JSON_BYTES = 16 * 1024 * 1024
 DEFAULT_HOVER_DURATION_SECONDS = 10.0
 MIN_HOVER_DURATION_SECONDS = 1.0
 MAX_HOVER_DURATION_SECONDS = 300.0
@@ -285,10 +289,13 @@ class MavsdkOffboardClient:
     async def sample_battery(self, timeout_seconds: float) -> dict[str, float]:
         async def _sample() -> dict[str, float]:
             async for battery in self._require_system().telemetry.battery():
-                return {
-                    "remaining_percent": float(battery.remaining_percent),
-                    "voltage_v": float(battery.voltage_v),
-                }
+                return _validated_battery_telemetry(
+                    {
+                        "remaining_percent": battery.remaining_percent,
+                        "voltage_v": battery.voltage_v,
+                    },
+                    label="PX4 battery telemetry",
+                )
             raise RuntimeError("PX4 battery telemetry stream ended without a sample")
 
         try:
@@ -302,13 +309,16 @@ class MavsdkOffboardClient:
         async def _sample() -> dict[str, int | str]:
             async for gps_info in self._require_system().telemetry.gps_info():
                 fix_type = gps_info.fix_type
-                fix_value = int(getattr(fix_type, "value", fix_type))
+                fix_value = getattr(fix_type, "value", fix_type)
                 fix_name = str(getattr(fix_type, "name", fix_type))
-                return {
-                    "num_satellites": int(gps_info.num_satellites),
-                    "fix_type": fix_value,
-                    "fix_type_name": fix_name,
-                }
+                return _validated_gps_telemetry(
+                    {
+                        "num_satellites": gps_info.num_satellites,
+                        "fix_type": fix_value,
+                        "fix_type_name": fix_name,
+                    },
+                    label="PX4 GPS telemetry",
+                )
             raise RuntimeError("PX4 GPS info telemetry stream ended without a sample")
 
         try:
@@ -481,7 +491,7 @@ def _parse_bool(raw: str | None, *, default: bool) -> bool:
 def _parse_float(raw: str | None, *, default: float) -> float:
     if raw is None or not raw.strip():
         return default
-    return float(raw)
+    return _finite_float(raw, "environment float")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -577,8 +587,7 @@ def _log(path: Path, message: str) -> None:
 
 
 def _write_offboard_timing(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+    _write_json_atomic(path, payload)
 
 
 def _reject_nonfinite_json(value: str) -> None:
@@ -825,13 +834,27 @@ def compile_fixed_duty_schedule(
 
 
 def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    temp.write_text(
-        json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True) + "\n",
-        encoding="utf-8",
+    serialized = (
+        json.dumps(
+            payload,
+            indent=2,
+            sort_keys=True,
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+        + "\n"
     )
-    temp.replace(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.tmp")
+    try:
+        with temp.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+        temp.replace(path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            temp.unlink()
 
 
 def _runtime_effect_records(
@@ -966,11 +989,79 @@ def _finite_float(value: Any, label: str) -> float:
     return parsed
 
 
-def load_reference_track_plan(path: Path) -> ReferenceTrackPlan:
-    payload = json.loads(
-        path.read_text(encoding="utf-8"),
-        parse_constant=_reject_nonfinite_json,
+def _finite_integer(value: Any, label: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be an integer")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+        return int(value)
+    raise ValueError(f"{label} must be an integer")
+
+
+def _validated_battery_telemetry(value: Any, *, label: str) -> dict[str, float]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be an object")
+    remaining_percent = _finite_float(
+        value.get("remaining_percent"),
+        f"{label} remaining_percent",
     )
+    voltage_v = _finite_float(value.get("voltage_v"), f"{label} voltage_v")
+    if not 0.0 <= remaining_percent <= 100.0:
+        raise ValueError(f"{label} remaining_percent must be between 0 and 100")
+    if voltage_v < 0.0:
+        raise ValueError(f"{label} voltage_v must be non-negative")
+    return {"remaining_percent": remaining_percent, "voltage_v": voltage_v}
+
+
+def _validated_gps_telemetry(value: Any, *, label: str) -> dict[str, int | str]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be an object")
+    num_satellites = _finite_integer(
+        value.get("num_satellites"),
+        f"{label} num_satellites",
+    )
+    fix_type = _finite_integer(value.get("fix_type"), f"{label} fix_type")
+    if num_satellites < 0:
+        raise ValueError(f"{label} num_satellites must be non-negative")
+    if fix_type < 0:
+        raise ValueError(f"{label} fix_type must be non-negative")
+    fix_type_name = value.get("fix_type_name", str(fix_type))
+    if not isinstance(fix_type_name, str) or not fix_type_name.strip():
+        raise ValueError(f"{label} fix_type_name must be a non-empty string")
+    return {
+        "num_satellites": num_satellites,
+        "fix_type": fix_type,
+        "fix_type_name": fix_type_name,
+    }
+
+
+def _load_bounded_json(path: Path, *, label: str) -> Any:
+    try:
+        status = path.lstat()
+    except OSError as exc:
+        raise ValueError(f"{label} cannot be inspected: {exc}") from exc
+    if stat.S_ISLNK(status.st_mode):
+        raise ValueError(f"{label} must not be a symbolic link")
+    if not stat.S_ISREG(status.st_mode):
+        raise ValueError(f"{label} must be a regular file")
+    if status.st_size > MAX_INPUT_JSON_BYTES:
+        raise ValueError(f"{label} exceeds the {MAX_INPUT_JSON_BYTES} byte limit")
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise ValueError(f"{label} cannot be read: {exc}") from exc
+    if len(raw) > MAX_INPUT_JSON_BYTES:
+        raise ValueError(f"{label} exceeds the {MAX_INPUT_JSON_BYTES} byte limit")
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{label} must be UTF-8 JSON") from exc
+    return json.loads(text, parse_constant=_reject_nonfinite_json)
+
+
+def load_reference_track_plan(path: Path) -> ReferenceTrackPlan:
+    payload = _load_bounded_json(path, label="reference_track.json")
     if not isinstance(payload, dict) or not isinstance(payload.get("points"), list):
         raise ValueError("reference_track.json must be an object with points[]")
     if len(payload["points"]) > MAX_REFERENCE_TRACK_POINTS:
@@ -1017,10 +1108,7 @@ def load_reference_track(path: Path) -> list[TrackPoint]:
 
 
 def load_controller_params(path: Path) -> ControllerParams:
-    payload = json.loads(
-        path.read_text(encoding="utf-8"),
-        parse_constant=_reject_nonfinite_json,
-    )
+    payload = _load_bounded_json(path, label="controller_params.json")
     if not isinstance(payload, dict):
         raise ValueError("controller_params.json must be an object")
     params = ControllerParams(
@@ -1097,9 +1185,7 @@ def _build_motion_setpoints(
         cruise_seconds = 0.0
     else:
         peak_speed = params.vel_limit
-        cruise_seconds = (
-            cumulative_distance - 2.0 * acceleration_distance
-        ) / peak_speed
+        cruise_seconds = (cumulative_distance - 2.0 * acceleration_distance) / peak_speed
     total_seconds = 2.0 * acceleration_seconds + cruise_seconds
     sample_count = max(1, int(math.ceil(total_seconds * rate_hz)))
     if sample_count > max_samples:
@@ -1113,9 +1199,7 @@ def _build_motion_setpoints(
         if sample_time <= acceleration_seconds:
             progress = 0.5 * params.accel_limit * sample_time**2
         elif sample_time <= acceleration_seconds + cruise_seconds:
-            progress = acceleration_distance + peak_speed * (
-                sample_time - acceleration_seconds
-            )
+            progress = acceleration_distance + peak_speed * (sample_time - acceleration_seconds)
         else:
             deceleration_time = sample_time - acceleration_seconds - cruise_seconds
             progress = (
@@ -1125,14 +1209,9 @@ def _build_motion_setpoints(
                 - 0.5 * params.accel_limit * deceleration_time**2
             )
         progress = min(cumulative_distance, max(0.0, progress))
-        while (
-            segment_index < len(segments) - 1
-            and progress >= segments[segment_index][4] - 1e-12
-        ):
+        while segment_index < len(segments) - 1 and progress >= segments[segment_index][4] - 1e-12:
             segment_index += 1
-        segment_start, segment_end, segment_length, segment_offset, _ = segments[
-            segment_index
-        ]
+        segment_start, segment_end, segment_length, segment_offset, _ = segments[segment_index]
         ratio = min(1.0, max(0.0, (progress - segment_offset) / segment_length))
         point = TrackPoint(
             x=segment_start.x + (segment_end.x - segment_start.x) * ratio,
@@ -1233,11 +1312,7 @@ def build_setpoint_schedule_plan(
     if final_hold_samples > MAX_SETPOINTS - len(schedule):
         raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
     final_yaw = (
-        track_motion[-1].yaw_deg
-        if track_motion
-        else ingress[-1].yaw_deg
-        if ingress
-        else 0.0
+        track_motion[-1].yaw_deg if track_motion else ingress[-1].yaw_deg if ingress else 0.0
     )
     final_setpoint = enu_point_to_ned_setpoint(points[-1], yaw_deg=final_yaw)
     schedule.extend(final_setpoint for _ in range(final_hold_samples))
@@ -1442,9 +1517,7 @@ async def _wait_for_takeoff_stability(
         try:
             sample = await _await_with_setpoint_keepalive(
                 client,
-                client.sample_position_velocity_ned(
-                    min(telemetry_timeout_seconds, remaining)
-                ),
+                client.sample_position_velocity_ned(min(telemetry_timeout_seconds, remaining)),
                 hold_setpoint=commanded,
                 rate_hz=sample_rate_hz,
             )
@@ -1561,10 +1634,15 @@ async def _set_gps_availability_verified(
     samples: list[dict[str, int | str]] = []
     deadline = time.monotonic() + 5.0
     while time.monotonic() < deadline:
-        sample = await client.sample_gps_info(min(1.0, max(0.01, deadline - time.monotonic())))
+        sample = _validated_gps_telemetry(
+            await client.sample_gps_info(min(1.0, max(0.01, deadline - time.monotonic()))),
+            label="PX4 GPS availability telemetry",
+        )
         samples.append(sample)
-        num_satellites = int(sample["num_satellites"])
-        fix_type = int(sample["fix_type"])
+        num_satellites = sample["num_satellites"]
+        fix_type = sample["fix_type"]
+        assert isinstance(num_satellites, int)
+        assert isinstance(fix_type, int)
         observed = (
             num_satellites < 4 and fix_type <= 1
             if unavailable
@@ -1693,8 +1771,12 @@ async def _transition_battery_at_track_start(
             continue
         if sample is None:
             break
+        sample = _validated_battery_telemetry(
+            sample,
+            label="PX4 battery conditioning telemetry",
+        )
         conditioning_samples.append(sample)
-        sample_percent = float(sample["remaining_percent"])
+        sample_percent = sample["remaining_percent"]
         if abs(sample_percent - target) <= tolerance:
             track_start_sample = sample
             break
@@ -1786,6 +1868,23 @@ async def run_executor(
         )
     if not schedule:
         raise ValueError("setpoint schedule is empty")
+    for index, setpoint in enumerate(schedule):
+        for field_name in ("north_m", "east_m", "down_m", "yaw_deg"):
+            _finite_float(
+                getattr(setpoint, field_name),
+                f"setpoint schedule index {index}.{field_name}",
+            )
+    if isinstance(track_start_index, bool) or not isinstance(track_start_index, int):
+        raise ValueError("track start index must be an integer")
+    if track_start_index < 0 or track_start_index >= len(schedule):
+        raise ValueError("track start index is outside the setpoint schedule")
+    if track_end_index is not None:
+        if isinstance(track_end_index, bool) or not isinstance(track_end_index, int):
+            raise ValueError("track end index must be an integer")
+        if track_end_index < 0 or track_end_index >= len(schedule):
+            raise ValueError("track end index is outside the setpoint schedule")
+        if track_end_index < track_start_index:
+            raise ValueError("track end index must not precede the track start index")
     exec_start = time.monotonic()
     timing: dict[str, Any] = {
         "time_base": "executor_relative_seconds",
@@ -1802,12 +1901,8 @@ async def run_executor(
     }
     takeoff_gate = timing["takeoff_gate"]
     cleanup = timing["cleanup"]
-    track_end = (
-        len(schedule) - 1
-        if track_end_index is None
-        else min(max(0, track_end_index), len(schedule) - 1)
-    )
-    track_start = min(max(0, track_start_index), track_end) if schedule else 0
+    track_end = len(schedule) - 1 if track_end_index is None else track_end_index
+    track_start = track_start_index
     armed = False
     offboard_started = False
     offboard_stopped = False
@@ -1989,12 +2084,12 @@ async def run_executor(
             )
 
         dt = 1.0 / rate_hz
-        start = time.monotonic()
+        event_loop = asyncio.get_running_loop()
+        start = event_loop.time()
+        track_deadline = start + track_timeout_seconds
         for idx, setpoint in enumerate(schedule):
-            if (time.monotonic() - start) > track_timeout_seconds:
-                raise TimeoutError(f"track timeout after {track_timeout_seconds}s")
             if idx == track_start and isinstance(battery_profile, dict):
-                conditioning_started = time.monotonic()
+                conditioning_started = event_loop.time()
                 battery_details = await _transition_battery_at_track_start(
                     client,
                     battery_profile,
@@ -2007,80 +2102,99 @@ async def run_executor(
                 )
                 # Battery conditioning is a bounded pre-track safety gate, not
                 # part of the trajectory execution timeout budget.
-                start += time.monotonic() - conditioning_started
-            if idx >= track_start and isinstance(gps_profile, dict):
-                elapsed_track_seconds = (idx - track_start) / rate_hz
-                tick_index = min(
-                    len(gps_schedule) - 1,
-                    int(elapsed_track_seconds / float(gps_profile["tick_period_s"])),
-                )
-                if tick_index != gps_last_tick:
-                    gps_last_tick = tick_index
-                    desired_off = gps_schedule[tick_index]
-                    if desired_off != gps_off:
-                        attempted_effect_sections.add("gps_dropout")
-                        gps_control = _require_runtime_details(
-                            gps_control_details,
-                            label="GPS control details",
+                conditioning_elapsed = event_loop.time() - conditioning_started
+                start += conditioning_elapsed
+                track_deadline += conditioning_elapsed
+            if event_loop.time() >= track_deadline:
+                raise TimeoutError(f"track timeout after {track_timeout_seconds:g}s")
+            timeout_scope = asyncio.timeout_at(track_deadline)
+            try:
+                async with timeout_scope:
+                    if idx >= track_start and isinstance(gps_profile, dict):
+                        elapsed_track_seconds = (idx - track_start) / rate_hz
+                        tick_index = min(
+                            len(gps_schedule) - 1,
+                            int(elapsed_track_seconds / float(gps_profile["tick_period_s"])),
                         )
-                        failure_type = "off" if desired_off else "ok"
-                        target_satellites = (
-                            int(gps_control["dropout_value"])
-                            if desired_off
-                            else int(gps_control["recovery_value"])
-                        )
-                        verification = await _await_with_setpoint_keepalive(
-                            client,
-                            _set_gps_availability_verified(
-                                client,
-                                satellites_used=target_satellites,
-                                unavailable=desired_off,
-                            ),
-                            hold_setpoint=last_commanded_setpoint or schedule[0],
-                            rate_hz=rate_hz,
-                        )
-                        gps_off = desired_off
-                        gps_transitions.append(
-                            {
-                                "tick_index": tick_index,
-                                "track_time_s": elapsed_track_seconds,
-                                "failure_type": failure_type,
-                                "physical_effect_verified": True,
-                                "verification": verification,
-                            }
-                        )
-            await client.set_position_ned(setpoint)
-            last_commanded_setpoint = setpoint
-            now_t = time.monotonic() - exec_start
-            if idx == track_start:
-                timing["track_start_t"] = now_t
-            if idx == track_end:
-                timing["track_end_t"] = now_t
-                if isinstance(battery_profile, dict):
-                    current_battery_details = _require_runtime_details(
-                        battery_details,
-                        label="battery control details",
-                    )
-                    track_end_sample = await _await_with_setpoint_keepalive(
-                        client,
-                        client.sample_battery(5.0),
-                        hold_setpoint=setpoint,
-                        rate_hz=rate_hz,
-                    )
-                    start_percent = float(
-                        current_battery_details["track_start_sample"]["remaining_percent"]
-                    )
-                    end_percent = float(track_end_sample["remaining_percent"])
-                    if bool(battery_profile["voltage_sag"]) and end_percent > start_percent + 0.5:
-                        raise RuntimeError(
-                            "PX4 battery telemetry increased during requested voltage sag: "
-                            f"start={start_percent:g}%, end={end_percent:g}%"
-                        )
-                    current_battery_details["track_end_sample"] = track_end_sample
-                    current_battery_details["observed_nonincrease"] = (
-                        end_percent <= start_percent + 0.5
-                    )
-            await asyncio.sleep(dt)
+                        if tick_index != gps_last_tick:
+                            gps_last_tick = tick_index
+                            desired_off = gps_schedule[tick_index]
+                            if desired_off != gps_off:
+                                attempted_effect_sections.add("gps_dropout")
+                                gps_control = _require_runtime_details(
+                                    gps_control_details,
+                                    label="GPS control details",
+                                )
+                                failure_type = "off" if desired_off else "ok"
+                                target_satellites = (
+                                    int(gps_control["dropout_value"])
+                                    if desired_off
+                                    else int(gps_control["recovery_value"])
+                                )
+                                verification = await _await_with_setpoint_keepalive(
+                                    client,
+                                    _set_gps_availability_verified(
+                                        client,
+                                        satellites_used=target_satellites,
+                                        unavailable=desired_off,
+                                    ),
+                                    hold_setpoint=last_commanded_setpoint or schedule[0],
+                                    rate_hz=rate_hz,
+                                )
+                                gps_off = desired_off
+                                gps_transitions.append(
+                                    {
+                                        "tick_index": tick_index,
+                                        "track_time_s": elapsed_track_seconds,
+                                        "failure_type": failure_type,
+                                        "physical_effect_verified": True,
+                                        "verification": verification,
+                                    }
+                                )
+                    await client.set_position_ned(setpoint)
+                    last_commanded_setpoint = setpoint
+                    now_t = time.monotonic() - exec_start
+                    if idx == track_start:
+                        timing["track_start_t"] = now_t
+                    if idx == track_end:
+                        timing["track_end_t"] = now_t
+                        if isinstance(battery_profile, dict):
+                            current_battery_details = _require_runtime_details(
+                                battery_details,
+                                label="battery control details",
+                            )
+                            track_end_sample = _validated_battery_telemetry(
+                                await _await_with_setpoint_keepalive(
+                                    client,
+                                    client.sample_battery(5.0),
+                                    hold_setpoint=setpoint,
+                                    rate_hz=rate_hz,
+                                ),
+                                label="PX4 track-end battery telemetry",
+                            )
+                            start_percent = _finite_float(
+                                current_battery_details["track_start_sample"]["remaining_percent"],
+                                "PX4 track-start battery remaining_percent",
+                            )
+                            end_percent = track_end_sample["remaining_percent"]
+                            if (
+                                bool(battery_profile["voltage_sag"])
+                                and end_percent > start_percent + 0.5
+                            ):
+                                raise RuntimeError(
+                                    "PX4 battery telemetry increased during requested voltage "
+                                    f"sag: start={start_percent:g}%, end={end_percent:g}%"
+                                )
+                            current_battery_details["track_end_sample"] = track_end_sample
+                            current_battery_details["observed_nonincrease"] = (
+                                end_percent <= start_percent + 0.5
+                            )
+                    next_tick_at = start + (idx + 1) * dt
+                    await asyncio.sleep(max(0.0, next_tick_at - event_loop.time()))
+            except TimeoutError:
+                if timeout_scope.expired():
+                    raise TimeoutError(f"track timeout after {track_timeout_seconds:g}s") from None
+                raise
 
         if isinstance(gps_profile, dict):
             gps_control = _require_runtime_details(
@@ -2145,9 +2259,7 @@ async def run_executor(
             _log(log_path, "land command sent")
             landing_confirmation_attempted = True
             try:
-                landing_observation = await client.wait_until_landed(
-                    landing_timeout_seconds
-                )
+                landing_observation = await client.wait_until_landed(landing_timeout_seconds)
             except Exception as exc:
                 cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
                 raise
@@ -2166,6 +2278,7 @@ async def run_executor(
         raise
     finally:
         reset_error: Exception | None = None
+        deferred_cleanup_error: RuntimeError | None = None
         if (
             isinstance(gps_profile, dict)
             and gps_control_details is not None
@@ -2198,6 +2311,8 @@ async def run_executor(
                 _log(log_path, f"GPS availability cleanup reset failed: {exc}")
                 if runtime_failure is None:
                     runtime_failure = f"{type(exc).__name__}: {exc}"
+                    timing["status"] = "failed"
+                    timing["failure"] = runtime_failure
         if (
             gps_value is not None
             and gps_control_details is not None
@@ -2227,9 +2342,7 @@ async def run_executor(
                     cleanup["land"] = "command_sent_during_failure_cleanup"
                     _log(log_path, "land command sent during failure cleanup")
                 landing_confirmation_attempted = True
-                landing_observation = await client.wait_until_landed(
-                    landing_timeout_seconds
-                )
+                landing_observation = await client.wait_until_landed(landing_timeout_seconds)
                 cleanup["land"] = "confirmed_on_ground_during_failure_cleanup"
                 cleanup["landing_observation"] = landing_observation
                 timing["land_confirmed_t"] = time.monotonic() - exec_start
@@ -2240,13 +2353,13 @@ async def run_executor(
             except Exception as exc:
                 cleanup["land"] = f"failed: {type(exc).__name__}: {exc}"
                 _log(log_path, f"offboard failure cleanup could not land: {exc}")
-        try:
-            if (
-                runtime_profile is not None
-                and scenario_engine is not None
-                and scenario_request is not None
-                and runtime_evidence_path is not None
-            ):
+        if (
+            runtime_profile is not None
+            and scenario_engine is not None
+            and scenario_request is not None
+            and runtime_evidence_path is not None
+        ):
+            try:
                 _write_runtime_effect_artifact(
                     scenario_engine,
                     scenario_request,
@@ -2257,18 +2370,41 @@ async def run_executor(
                     status="complete" if runtime_failure is None else "failed",
                     error=runtime_failure,
                 )
-            if runtime_failure is None:
-                timing["status"] = "complete"
-        finally:
-            try:
-                await client.close()
-                cleanup["close"] = "completed"
-                _log(log_path, "offboard client closed")
             except Exception as exc:
-                cleanup["close"] = f"failed: {type(exc).__name__}: {exc}"
-                _log(log_path, f"offboard client cleanup failed: {exc}")
-            if timing_path is not None:
+                evidence_error = f"{type(exc).__name__}: {exc}"
+                timing["runtime_evidence_write_error"] = evidence_error
+                _log(log_path, f"runtime effect evidence write failed: {exc}")
+                if runtime_failure is None:
+                    runtime_failure = evidence_error
+                    timing["status"] = "failed"
+                    timing["failure"] = evidence_error
+                    deferred_cleanup_error = RuntimeError(
+                        f"runtime effect evidence write failed: {exc}"
+                    )
+        if runtime_failure is None:
+            timing["status"] = "complete"
+        try:
+            await client.close()
+            cleanup["close"] = "completed"
+            _log(log_path, "offboard client closed")
+        except Exception as exc:
+            cleanup_error = f"{type(exc).__name__}: {exc}"
+            cleanup["close"] = f"failed: {cleanup_error}"
+            _log(log_path, f"offboard client cleanup failed: {exc}")
+            if runtime_failure is None:
+                runtime_failure = cleanup_error
+                timing["status"] = "failed"
+                timing["failure"] = cleanup_error
+                deferred_cleanup_error = RuntimeError(f"offboard client cleanup failed: {exc}")
+        if timing_path is not None:
+            try:
                 _write_offboard_timing(timing_path, timing)
+            except Exception as exc:
+                _log(log_path, f"offboard timing evidence write failed: {exc}")
+                if runtime_failure is None:
+                    deferred_cleanup_error = RuntimeError(
+                        f"offboard timing evidence write failed: {exc}"
+                    )
         reset_failure_text = (
             f"{type(reset_error).__name__}: {reset_error}" if reset_error is not None else None
         )
@@ -2276,6 +2412,8 @@ async def run_executor(
             raise RuntimeError(
                 f"GPS availability cleanup reset failed: {reset_error}"
             ) from reset_error
+        if deferred_cleanup_error is not None:
+            raise deferred_cleanup_error
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -2306,7 +2444,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         _log(
             args.log,
-            "controller_params are applied by the offboard executor, not PX4 internal parameters",
+            "offboard schedule applies vel_limit and accel_limit only; selected PX4 parameters "
+            "are applied and verified by the launch wrapper; legacy gain fields are "
+            "compatibility metadata",
         )
 
         if dry_run:
