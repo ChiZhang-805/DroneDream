@@ -906,21 +906,21 @@ def claim_and_run_one_pending_trial(
     """
 
     worker_id = _validated_worker_id(worker_id)
-    now = _now()
     lease_seconds = get_settings().worker_lease_seconds
-    lease_until = now + timedelta(seconds=lease_seconds)
     reclaim_enabled = get_settings().worker_stale_running_reclaim_enabled
-    claimable = (models.Trial.status == "PENDING") & (
-        models.Trial.lease_expires_at.is_(None) | (models.Trial.lease_expires_at <= now)
-    )
-    stale_running = (
-        (models.Trial.status == "RUNNING")
-        & (models.Trial.lease_expires_at.is_not(None))
-        & (models.Trial.lease_expires_at <= now)
-    )
-    claim_pool = or_(claimable, stale_running) if reclaim_enabled else claimable
     claim_collisions = 0
     while True:
+        eligibility_now = _now()
+        claimable = (models.Trial.status == "PENDING") & (
+            models.Trial.lease_expires_at.is_(None)
+            | (models.Trial.lease_expires_at <= eligibility_now)
+        )
+        stale_running = (
+            (models.Trial.status == "RUNNING")
+            & (models.Trial.lease_expires_at.is_not(None))
+            & (models.Trial.lease_expires_at <= eligibility_now)
+        )
+        claim_pool = or_(claimable, stale_running) if reclaim_enabled else claimable
         # Schedule the least-served eligible Job first, then its oldest Trial.
         # The Job row is the short-lived scheduling mutex on PostgreSQL:
         # concurrent workers skip a locked Job and spread across other runnable
@@ -930,12 +930,13 @@ def claim_and_run_one_pending_trial(
         # the FIFO order inside any one Job.
         eligible_trial = aliased(models.Trial)
         eligible_claimable = (eligible_trial.status == "PENDING") & (
-            eligible_trial.lease_expires_at.is_(None) | (eligible_trial.lease_expires_at <= now)
+            eligible_trial.lease_expires_at.is_(None)
+            | (eligible_trial.lease_expires_at <= eligibility_now)
         )
         eligible_stale_running = (
             (eligible_trial.status == "RUNNING")
             & (eligible_trial.lease_expires_at.is_not(None))
-            & (eligible_trial.lease_expires_at <= now)
+            & (eligible_trial.lease_expires_at <= eligibility_now)
         )
         eligible_pool = (
             or_(eligible_claimable, eligible_stale_running)
@@ -958,7 +959,7 @@ def claim_and_run_one_pending_trial(
                         eligible_trial.job_id == models.Job.id,
                         eligible_pool,
                     )
-                )
+                ),
             )
             .order_by(
                 served_attempts.asc(),
@@ -995,6 +996,8 @@ def claim_and_run_one_pending_trial(
         trial_id = str(selected_trial.id)
         job_id = str(selected_trial.job_id)
         was_pending = selected_trial.status == "PENDING"
+        claim_time = _now()
+        lease_until = claim_time + timedelta(seconds=lease_seconds)
 
         # --- Claim ------------------------------------------------------
         update_stmt = (
@@ -1006,7 +1009,7 @@ def claim_and_run_one_pending_trial(
                 worker_id=worker_id,
                 lease_owner=worker_id,
                 lease_expires_at=lease_until,
-                claimed_at=now,
+                claimed_at=claim_time,
                 finished_at=None,
                 failure_code=None,
                 failure_reason=None,
@@ -1015,7 +1018,7 @@ def claim_and_run_one_pending_trial(
             .values(attempt_count=(models.Trial.attempt_count + 1))
             .values(
                 started_at=case(
-                    (models.Trial.started_at.is_(None), now),
+                    (models.Trial.started_at.is_(None), claim_time),
                     else_=models.Trial.started_at,
                 )
             )
@@ -1098,7 +1101,7 @@ def claim_and_run_one_pending_trial(
                     db,
                     attempt=previous,
                     superseded_by_attempt_count=trial.attempt_count,
-                    finished_at=now,
+                    finished_at=claim_time,
                 )
         attempt = record_trial_attempt_claim(
             db,
@@ -1108,7 +1111,7 @@ def claim_and_run_one_pending_trial(
             worker_id=worker_id,
             simulator_backend=sim.backend_name,
             claim_kind=("initial" if was_pending else "stale-reclaim"),
-            claimed_at=now,
+            claimed_at=claim_time,
             input_snapshot=input_snapshot,
         )
         attempt_id = attempt.id

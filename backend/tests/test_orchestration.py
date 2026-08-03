@@ -1532,6 +1532,62 @@ def test_pending_trial_claim_is_single_winner(orchestration_ctx):
         assert "trial_claimed" in event_types
 
 
+def test_pending_trial_lease_starts_when_claim_is_written(
+    orchestration_ctx,
+    monkeypatch,
+) -> None:
+    """Scheduling delay must not consume the newly claimed execution lease."""
+
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    selection_time = datetime(2026, 8, 3, 0, 0, tzinfo=timezone.utc)
+    claim_time = selection_time + timedelta(minutes=10)
+    terminal_time = claim_time + timedelta(seconds=1)
+    now_calls = 0
+
+    def advancing_now() -> datetime:
+        nonlocal now_calls
+        now_calls += 1
+        if now_calls == 1:
+            return selection_time
+        if now_calls == 2:
+            return claim_time
+        return terminal_time
+
+    monkeypatch.setattr(ctx["trial_executor"], "_now", advancing_now)
+    observed: dict[str, datetime] = {}
+
+    class ClaimTimestampAdapter(MockSimulatorAdapter):
+        backend_name = "claim-timestamp-mock"
+
+        def prepare(self, trial_ctx: TrialContext) -> None:
+            with ctx["db_module"].SessionLocal() as inspect_db:
+                row = inspect_db.get(ctx["models"].Trial, trial_ctx.trial_id)
+                assert row is not None
+                assert row.claimed_at is not None
+                assert row.lease_expires_at is not None
+                observed["claimed_at"] = row.claimed_at
+                observed["lease_expires_at"] = row.lease_expires_at
+
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-delayed-claim",
+            adapter=ClaimTimestampAdapter(),
+        )
+    assert claimed == trial_id
+
+    def as_utc(value: datetime) -> datetime:
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+    from app.config import get_settings
+
+    assert as_utc(observed["claimed_at"]) == claim_time
+    assert as_utc(observed["lease_expires_at"]) == claim_time + timedelta(
+        seconds=get_settings().worker_lease_seconds
+    )
+
+
 def test_pending_trial_claims_are_fair_across_jobs(orchestration_ctx):
     """A large experiment must not monopolize a sequential worker queue."""
 
