@@ -399,6 +399,43 @@ def test_aggregation_rejects_completed_trial_with_missing_required_metric() -> N
 
 
 @pytest.mark.parametrize(
+    ("field_name", "invalid_value"),
+    [
+        ("score", -0.1),
+        ("crash_flag", True),
+        ("timeout_flag", True),
+        ("instability_flag", True),
+    ],
+)
+def test_aggregation_rejects_invalid_or_contradictory_completed_metric(
+    field_name: str,
+    invalid_value: float | bool,
+) -> None:
+    candidate = models.CandidateParameterSet(
+        id=f"candidate_invalid_{field_name}",
+        job_id=f"job_invalid_{field_name}",
+        generation_index=1,
+        source_type="optimizer",
+        parameter_json={"MPC_XY_P": 1.0},
+    )
+    trial = _aggregation_trial(
+        candidate=candidate,
+        trial_id=f"trial_invalid_{field_name}",
+        case_id="nominal",
+        seed=101,
+    )
+    assert trial.metric is not None
+    setattr(trial.metric, field_name, invalid_value)
+
+    result = aggregation._aggregate_candidate(candidate, [trial])
+
+    assert result is None
+    assert candidate.completed_trial_count == 0
+    assert candidate.failed_trial_count == 1
+    assert candidate.aggregated_score is None
+
+
+@pytest.mark.parametrize(
     ("case_id", "scenario_type", "holdout"),
     [
         ("unknown", "nominal", False),
@@ -1551,6 +1588,8 @@ def test_publishable_gate_accepts_explicitly_nonsynthetic_px4_metrics() -> None:
     ]
 
     assert aggregation.candidate_is_publishable(candidate) is True
+    candidate.aggregated_score = -0.1
+    assert aggregation.candidate_is_publishable(candidate) is False
 
 
 def test_rank_and_select_best_rejects_failed_holdout_verification() -> None:

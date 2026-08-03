@@ -333,6 +333,7 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
         isinstance(score, bool)
         or not isinstance(score, int | float)
         or not math.isfinite(float(score))
+        or float(score) < 0.0
     ):
         return False
     aggregate = candidate.aggregated_metric_json
@@ -455,7 +456,7 @@ def _metric_is_usable(metric: models.TrialMetric | None) -> bool:
         _finite_metric_number(metric.rmse) is not None
         and _finite_metric_number(metric.max_error) is not None
         and _finite_metric_number(metric.completion_time) is not None
-        and _finite_metric_number(metric.score, nonnegative=False) is not None
+        and _finite_metric_number(metric.score) is not None
         and _finite_metric_number(metric.final_error) is not None
         and isinstance(overshoot, int)
         and not isinstance(overshoot, bool)
@@ -469,14 +470,15 @@ def _metric_is_usable(metric: models.TrialMetric | None) -> bool:
                 metric.instability_flag,
             )
         )
+        and not (
+            metric.pass_flag
+            and (metric.crash_flag or metric.timeout_flag or metric.instability_flag)
+        )
     )
 
 
 def _required_metric_number(value: object, *, field_name: str) -> float:
-    numeric = _finite_metric_number(
-        value,
-        nonnegative=field_name != "score",
-    )
+    numeric = _finite_metric_number(value)
     if numeric is None:
         raise ValueError(f"trial metric {field_name} is missing or invalid")
     return numeric
