@@ -1,0 +1,452 @@
+{
+  "schemaVersion": "dronedream.prefinal-runtime-smoke.v1",
+  "executionSubject": "06fc17fc0e42e9521f6cc85aa4435e39944d001d",
+  "enginePackId": "sha256:3306e99bd31907a4efaed05988d766b55629ab7c9e35eb1df0906a522d70d25f",
+  "enginePackArchiveSha256": "ca7e371019deb875b5c7700ca268971700c69a5123e01c3f7d4cb9d00f107535",
+  "startedAt": "2026-08-02T23:54:42.269Z",
+  "completedAt": "2026-08-02T23:57:19.566Z",
+  "modelProviderCalls": 0,
+  "payloadIndex": 6,
+  "scenarioVariant": "flyable-non-gps",
+  "campaignAdjustment": {
+    "id": "flyable_non_gps_v1",
+    "requestedGpsNoiseM": 0.2,
+    "appliedGpsNoiseM": 0,
+    "sensorNoisePreset": "medium",
+    "reason": "Continuous pre-arm GPS noise triggered the normal PX4 horizontal-position-drift gate; this variant retains explicit barometer, IMU, dropout, wind, battery, and payload effects while keeping GNSS nominal."
+  },
+  "displayName": "Pre-final matrix - Live 07 - Figure eight with light gusts",
+  "jobId": "job_c987378975c2",
+  "status": "COMPLETED",
+  "progress": {
+    "completed_trials": 2,
+    "total_trials": 2,
+    "current_phase": "completed"
+  },
+  "latestError": null,
+  "harnessEvents": 0,
+  "trials": [
+    {
+      "id": "tri_78f86fef087f",
+      "candidateId": "cand_c304c9da02cf",
+      "candidateLabel": "baseline",
+      "candidateSourceType": "baseline",
+      "candidateIsBaseline": true,
+      "candidateIsBest": false,
+      "candidateGenerationIndex": 0,
+      "status": "COMPLETED",
+      "failureCode": null,
+      "failureReason": null,
+      "simulatorBackend": "real_cli",
+      "attempts": 1,
+      "metrics": {
+        "rmse": 0.765126,
+        "max_error": 2.089354,
+        "overshoot_count": 0,
+        "completion_time": 28.192,
+        "crash_flag": false,
+        "timeout_flag": false,
+        "score": 23.219403,
+        "final_error": 0.932433,
+        "pass_flag": false,
+        "instability_flag": false
+      }
+    },
+    {
+      "id": "tri_7fa0b4089357",
+      "candidateId": "cand_33e9c5d4aa50",
+      "candidateLabel": "space_filling_1",
+      "candidateSourceType": "optimizer",
+      "candidateIsBaseline": false,
+      "candidateIsBest": false,
+      "candidateGenerationIndex": 1,
+      "status": "COMPLETED",
+      "failureCode": null,
+      "failureReason": null,
+      "simulatorBackend": "real_cli",
+      "attempts": 1,
+      "metrics": {
+        "rmse": 0.967626,
+        "max_error": 2.462912,
+        "overshoot_count": 0,
+        "completion_time": 30.976,
+        "crash_flag": false,
+        "timeout_flag": false,
+        "score": 23.747882,
+        "final_error": 1.88255,
+        "pass_flag": false,
+        "instability_flag": false
+      }
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "art_9b7d162d3ba9",
+      "ownerType": "job",
+      "ownerId": "job_c987378975c2",
+      "artifactType": "repro_manifest_json",
+      "displayName": "Reproducibility manifest",
+      "fileSizeBytes": 28994
+    },
+    {
+      "id": "art_756efeef37c3",
+      "ownerType": "job",
+      "ownerId": "job_c987378975c2",
+      "artifactType": "pdf_report",
+      "displayName": "job_c987378975c2 report.pdf",
+      "fileSizeBytes": 23272
+    },
+    {
+      "id": "art_f3c55b089bb2",
+      "ownerType": "job",
+      "ownerId": "job_c987378975c2",
+      "artifactType": "candidate_summary_json",
+      "displayName": "Candidate summary",
+      "fileSizeBytes": 3480
+    },
+    {
+      "id": "art_8edb44ab287b",
+      "ownerType": "job",
+      "ownerId": "job_c987378975c2",
+      "artifactType": "trial_summary_json",
+      "displayName": "Trial summary",
+      "fileSizeBytes": 717
+    },
+    {
+      "id": "art_66bee99e2066",
+      "ownerType": "job",
+      "ownerId": "job_c987378975c2",
+      "artifactType": "comparison_json",
+      "displayName": "Comparison summary",
+      "fileSizeBytes": 1551
+    },
+    {
+      "id": "art_ea9a70514dd8",
+      "ownerType": "job",
+      "ownerId": "job_c987378975c2",
+      "artifactType": "job_events_log",
+      "displayName": "Job event log",
+      "fileSizeBytes": 12469
+    },
+    {
+      "id": "art_4aa62db2e33e",
+      "ownerType": "job",
+      "ownerId": "job_c987378975c2",
+      "artifactType": "report_json",
+      "displayName": "Job report",
+      "fileSizeBytes": 2674
+    },
+    {
+      "id": "art_1f83ed64bd9e",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "px4_parameter_evidence_json",
+      "displayName": "PX4 Parameters Before",
+      "fileSizeBytes": 636
+    },
+    {
+      "id": "art_586f3a9d8696",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "px4_parameter_evidence_json",
+      "displayName": "PX4 Parameters Applied",
+      "fileSizeBytes": 1135
+    },
+    {
+      "id": "art_12af777ca715",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "simulator_stderr",
+      "displayName": "Simulator stderr",
+      "fileSizeBytes": 417
+    },
+    {
+      "id": "art_a707dcfd4b8b",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "offboard_executor_log",
+      "displayName": "Offboard Executor Log",
+      "fileSizeBytes": 455
+    },
+    {
+      "id": "art_c670034d2296",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "offboard_timing_json",
+      "displayName": "Offboard Timing",
+      "fileSizeBytes": 57122
+    },
+    {
+      "id": "art_08c1ee5e2511",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "px4_parameter_evidence_json",
+      "displayName": "PX4 Parameters Requested",
+      "fileSizeBytes": 613
+    },
+    {
+      "id": "art_d51013b9c227",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "simulator_runtime_manifest_json",
+      "displayName": "Simulator Runtime Manifest",
+      "fileSizeBytes": 63087
+    },
+    {
+      "id": "art_cdaf521ee36a",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "trajectory_json",
+      "displayName": "Trajectory Samples",
+      "fileSizeBytes": 1046872
+    },
+    {
+      "id": "art_a16bfaad9ae0",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "px4_ulog",
+      "displayName": "Retained PX4 ULog",
+      "fileSizeBytes": 19561983
+    },
+    {
+      "id": "art_dd4e797c0b2d",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "worker_log",
+      "displayName": "Runner Log",
+      "fileSizeBytes": 253
+    },
+    {
+      "id": "art_c776c57361b6",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "simulator_stdout",
+      "displayName": "Simulator stdout",
+      "fileSizeBytes": 5811
+    },
+    {
+      "id": "art_70ca69c0ea0b",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "controller_parameters_json",
+      "displayName": "Controller Parameters",
+      "fileSizeBytes": 125
+    },
+    {
+      "id": "art_0df724e0a73c",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "px4_parameters_input_json",
+      "displayName": "PX4 Parameter Input",
+      "fileSizeBytes": 179
+    },
+    {
+      "id": "art_a3c80bad0963",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "simulator_launch_config_json",
+      "displayName": "Simulator Launch Configuration",
+      "fileSizeBytes": 66711
+    },
+    {
+      "id": "art_6cb512275162",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "scenario_config_json",
+      "displayName": "Scenario Configuration",
+      "fileSizeBytes": 1565
+    },
+    {
+      "id": "art_a649c204d53e",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "scenario_effect_request_json",
+      "displayName": "Scenario Effect Request",
+      "fileSizeBytes": 3627
+    },
+    {
+      "id": "art_614d5fd7654d",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "scenario_effect_evidence_json",
+      "displayName": "Scenario Effect Evidence",
+      "fileSizeBytes": 53962
+    },
+    {
+      "id": "art_176544d455c0",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "reference_track_json",
+      "displayName": "Reference Track",
+      "fileSizeBytes": 1244
+    },
+    {
+      "id": "art_32d110640794",
+      "ownerType": "trial",
+      "ownerId": "tri_7fa0b4089357",
+      "artifactType": "telemetry_json",
+      "displayName": "Telemetry",
+      "fileSizeBytes": 2694571
+    },
+    {
+      "id": "art_22a0df904c2b",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "px4_parameter_evidence_json",
+      "displayName": "PX4 Parameters Applied",
+      "fileSizeBytes": 1137
+    },
+    {
+      "id": "art_240a7eb33c0d",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "offboard_executor_log",
+      "displayName": "Offboard Executor Log",
+      "fileSizeBytes": 455
+    },
+    {
+      "id": "art_4df726b64543",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "offboard_timing_json",
+      "displayName": "Offboard Timing",
+      "fileSizeBytes": 57903
+    },
+    {
+      "id": "art_e7c905c08013",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "px4_parameter_evidence_json",
+      "displayName": "PX4 Parameters Requested",
+      "fileSizeBytes": 613
+    },
+    {
+      "id": "art_c38b6df5c421",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "px4_parameter_evidence_json",
+      "displayName": "PX4 Parameters Before",
+      "fileSizeBytes": 636
+    },
+    {
+      "id": "art_188336bebde8",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "px4_ulog",
+      "displayName": "Retained PX4 ULog",
+      "fileSizeBytes": 18495949
+    },
+    {
+      "id": "art_56310cca1adb",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "worker_log",
+      "displayName": "Runner Log",
+      "fileSizeBytes": 253
+    },
+    {
+      "id": "art_0381b71f5fc2",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "simulator_stdout",
+      "displayName": "Simulator stdout",
+      "fileSizeBytes": 5319
+    },
+    {
+      "id": "art_75c84f94b094",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "simulator_stderr",
+      "displayName": "Simulator stderr",
+      "fileSizeBytes": 417
+    },
+    {
+      "id": "art_842cb24a109c",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "px4_parameters_input_json",
+      "displayName": "PX4 Parameter Input",
+      "fileSizeBytes": 179
+    },
+    {
+      "id": "art_1c1e9b825017",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "simulator_launch_config_json",
+      "displayName": "Simulator Launch Configuration",
+      "fileSizeBytes": 66711
+    },
+    {
+      "id": "art_5ad578fc703e",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "simulator_runtime_manifest_json",
+      "displayName": "Simulator Runtime Manifest",
+      "fileSizeBytes": 63087
+    },
+    {
+      "id": "art_836ab558d62d",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "trajectory_json",
+      "displayName": "Trajectory Samples",
+      "fileSizeBytes": 989208
+    },
+    {
+      "id": "art_b23994acc76f",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "scenario_effect_evidence_json",
+      "displayName": "Scenario Effect Evidence",
+      "fileSizeBytes": 53962
+    },
+    {
+      "id": "art_0df8a69a00cd",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "controller_parameters_json",
+      "displayName": "Controller Parameters",
+      "fileSizeBytes": 125
+    },
+    {
+      "id": "art_32bfaed7bfdc",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "reference_track_json",
+      "displayName": "Reference Track",
+      "fileSizeBytes": 1244
+    },
+    {
+      "id": "art_0bb4ea07cc06",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "scenario_config_json",
+      "displayName": "Scenario Configuration",
+      "fileSizeBytes": 1492
+    },
+    {
+      "id": "art_4b84197fbfdd",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "scenario_effect_request_json",
+      "displayName": "Scenario Effect Request",
+      "fileSizeBytes": 3627
+    },
+    {
+      "id": "art_b851f27b7c2d",
+      "ownerType": "trial",
+      "ownerId": "tri_78f86fef087f",
+      "artifactType": "telemetry_json",
+      "displayName": "Telemetry",
+      "fileSizeBytes": 2540087
+    }
+  ],
+  "bestCandidateId": null,
+  "optimizationOutcome": "no_usable_candidate",
+  "report": {
+    "status": "READY",
+    "bestCandidateId": "cand_c304c9da02cf",
+    "winnerEvidenceId": null,
+    "winnerFreezeReceiptId": null
+  }
+}
