@@ -36,7 +36,12 @@ function aggregateCandidates(trials: TrialSummary[]): CandidateAggregate[] {
         trial.status === "COMPLETED" && trial.score !== null && Number.isFinite(trial.score),
     );
     if (scored.length === 0) return [];
-    const passKnown = scored.filter((trial) => trial.pass_flag !== null);
+    const completedTrials = candidateTrials.filter((trial) => trial.status === "COMPLETED");
+    const hasTerminalEvidence = candidateTrials.some((trial) =>
+      trial.status === "COMPLETED"
+      || trial.status === "FAILED"
+      || trial.status === "CANCELLED"
+    );
     const first = candidateTrials[0];
     return [{
       id,
@@ -47,10 +52,11 @@ function aggregateCandidates(trials: TrialSummary[]): CandidateAggregate[] {
       meanScore: scored.reduce((total, trial) => total + trial.score, 0) / scored.length,
       bestScore: Math.min(...scored.map((trial) => trial.score)),
       passRate:
-        passKnown.length === 0
+        !hasTerminalEvidence
           ? null
-          : passKnown.filter((trial) => trial.pass_flag).length / passKnown.length,
-      completed: scored.length,
+          : candidateTrials.filter((trial) => trial.pass_flag === true).length
+            / candidateTrials.length,
+      completed: completedTrials.length,
       total: candidateTrials.length,
       scenarios: new Set(candidateTrials.map((trial) => `${trial.scenario_type}:${trial.seed}`)).size,
       frontier: false,
