@@ -1504,6 +1504,55 @@ def test_pending_candidate_is_visible_but_excluded_from_bayesian_training(
         assert proposals[0].parameters != pending.parameter_json
 
 
+def test_optimizer_history_rejects_candidate_missing_a_selected_parameter(
+    experimental_ctx: dict[str, Any],
+) -> None:
+    ctx = experimental_ctx
+    job_id = _create_job(ctx, "turbo")
+    from app.orchestration.experimental_optimizer import (
+        observations_for_job,
+        search_space_for_job,
+    )
+
+    with ctx["db"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        assert job is not None
+        incomplete = ctx["models"].CandidateParameterSet(
+            job_id=job.id,
+            generation_index=1,
+            source_type="optimizer",
+            label="incomplete-history",
+            # This invariant controller value is valid extra context, but the
+            # selected MPC_XY_P coordinate is absent and must not be invented
+            # from the current baseline by the history adapter.
+            parameter_json={"MC_PITCHRATE_P": 0.15},
+            aggregated_score=0.2,
+            aggregated_metric_json={
+                "objective_values": {"rmse": 0.2},
+                "constraint_violations": {},
+                "scalar_loss": 0.2,
+                "feasible": True,
+            },
+            optimizer_metadata_json={"strategy": "turbo", "fidelity": 1.0},
+            trial_count=1,
+            completed_trial_count=1,
+            failed_trial_count=0,
+        )
+        search_space = search_space_for_job(
+            job,
+            baseline_parameters={"MPC_XY_P": 0.95},
+        )
+
+        assert (
+            observations_for_job(
+                job,
+                search_space=search_space,
+                candidates=[incomplete],
+            )
+            == ()
+        )
+
+
 def test_job_objective_preferences_reach_bayesian_vector_acquisition(
     experimental_ctx: dict[str, Any],
 ) -> None:

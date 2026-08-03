@@ -380,6 +380,12 @@ def observations_for_job(
             and isinstance(value, int | float)
             and math.isfinite(float(value))
         }
+        if set(raw_parameters) != domain_names:
+            # Candidate rows may carry invariant controller inputs outside the
+            # tuned search space, but every selected coordinate must have been
+            # measured explicitly. Filling a missing or invalid coordinate from
+            # today's baseline would fabricate optimizer history.
+            continue
         try:
             parameters = search_space.project(raw_parameters)
         except ValueError:
