@@ -497,6 +497,40 @@ export function AdminPage() {
   const moderationDialogRef = useRef<HTMLElement | null>(null);
   const moderationReasonRef = useRef<HTMLTextAreaElement | null>(null);
   const moderationTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const permissions = useMemo(
+    () => new Set(access.access?.permissions ?? []),
+    [access.access?.permissions],
+  );
+  const canViewMetrics = permissions.has("metrics.read");
+  const canManageModels = permissions.has("models.write");
+  const canReadUsers = permissions.has("users.read");
+  const canExportUsers = permissions.has("users.export");
+  const canModerateCommunity = permissions.has("community.moderate");
+  const canReadAudit = permissions.has("audit.read");
+  const availableTabs = useMemo(() => ([
+    ...(canViewMetrics ? [["overview", copy.overview] as const] : []),
+    ...(canManageModels ? [["models", copy.models] as const] : []),
+    ...(canReadUsers ? [["users", copy.users] as const] : []),
+    ...(canModerateCommunity || canReadAudit
+      ? [["community", copy.community] as const]
+      : []),
+  ]), [
+    canManageModels,
+    canModerateCommunity,
+    canReadAudit,
+    canReadUsers,
+    canViewMetrics,
+    copy.community,
+    copy.models,
+    copy.overview,
+    copy.users,
+  ]);
+
+  useEffect(() => {
+    if (availableTabs.some(([key]) => key === tab)) return;
+    const firstAvailable = availableTabs[0]?.[0];
+    if (firstAvailable) setTab(firstAvailable);
+  }, [availableTabs, tab]);
 
   const loadAll = useCallback(async () => {
     if (access.status !== "allowed") return;
@@ -505,11 +539,17 @@ export function AdminPage() {
     setError(null);
     try {
       const [nextDashboard, nextModels, nextUsers, nextTopics, nextAudit] = await Promise.all([
-        getAdminDashboard(range),
-        listAdminModels(),
-        listAdminUsers(userPage, submittedUserSearch),
-        listAdminTopics(topicPage),
-        listAdminAudit(1),
+        canViewMetrics ? getAdminDashboard(range) : Promise.resolve(null),
+        canManageModels ? listAdminModels() : Promise.resolve([]),
+        canReadUsers
+          ? listAdminUsers(userPage, submittedUserSearch)
+          : Promise.resolve({ items: [], page: 1, page_size: 25, total: 0 }),
+        canModerateCommunity
+          ? listAdminTopics(topicPage)
+          : Promise.resolve({ items: [], page: 1, page_size: 25, total: 0 }),
+        canReadAudit
+          ? listAdminAudit(1)
+          : Promise.resolve({ items: [], page: 1, page_size: 25, total: 0 }),
       ]);
       if (sequence !== loadSequenceRef.current) return;
       setDashboard(nextDashboard);
@@ -525,7 +565,19 @@ export function AdminPage() {
     } finally {
       if (sequence === loadSequenceRef.current) setLoading(false);
     }
-  }, [access.status, copy.unavailableTitle, range, submittedUserSearch, topicPage, userPage]);
+  }, [
+    access.status,
+    canManageModels,
+    canModerateCommunity,
+    canReadAudit,
+    canReadUsers,
+    canViewMetrics,
+    copy.unavailableTitle,
+    range,
+    submittedUserSearch,
+    topicPage,
+    userPage,
+  ]);
 
   useEffect(() => {
     void loadAll();
@@ -635,6 +687,7 @@ export function AdminPage() {
     item: AdminManagedModel,
     key: "enabled" | "assistant_enabled" | "job_enabled",
   ) => {
+    if (!canManageModels) return;
     setSavingProvider(item.provider);
     setError(null);
     try {
@@ -661,6 +714,7 @@ export function AdminPage() {
   };
 
   const startUserExport = async () => {
+    if (!canExportUsers) return;
     const sequence = ++exportSequenceRef.current;
     setExportingUsers(true);
     setUserExportMessage(null);
@@ -696,7 +750,11 @@ export function AdminPage() {
   };
 
   const confirmModeration = async () => {
-    if (!moderatingTopic || moderationReason.trim().length < 8) return;
+    if (
+      !canModerateCommunity
+      || !moderatingTopic
+      || moderationReason.trim().length < 8
+    ) return;
     setModerating(true);
     setError(null);
     try {
@@ -737,12 +795,7 @@ export function AdminPage() {
         </div>
       </header>
       <nav className="admin-tabs" aria-label={copy.title}>
-        {([
-          ["overview", copy.overview],
-          ["models", copy.models],
-          ["users", copy.users],
-          ["community", copy.community],
-        ] as const).map(([key, label]) => (
+        {availableTabs.map(([key, label]) => (
           <button key={key} type="button" className={tab === key ? "active" : undefined} aria-pressed={tab === key} onClick={() => setTab(key)}>
             {label}
           </button>
@@ -853,8 +906,8 @@ export function AdminPage() {
 
       {tab === "users" ? (
         <section className="admin-panel admin-users-panel">
-          <header><div><h2>{copy.users}</h2><p>{copy.userPrivacy}</p></div><div className="admin-users-toolbar"><form onSubmit={submitSearch}><label><span className="sr-only">{copy.searchEmail}</span><input type="search" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={copy.searchEmail} /></label><button type="submit" className="btn">{copy.search}</button></form><button type="button" className="btn admin-user-export" disabled={exportingUsers} onClick={() => void startUserExport()}>{exportingUsers ? copy.exportingUsers : copy.exportUsers}</button></div></header>
-          <p className="admin-user-export-scope">{copy.exportScope}</p>
+          <header><div><h2>{copy.users}</h2><p>{copy.userPrivacy}</p></div><div className="admin-users-toolbar"><form onSubmit={submitSearch}><label><span className="sr-only">{copy.searchEmail}</span><input type="search" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={copy.searchEmail} /></label><button type="submit" className="btn">{copy.search}</button></form>{canExportUsers ? <button type="button" className="btn admin-user-export" disabled={exportingUsers} onClick={() => void startUserExport()}>{exportingUsers ? copy.exportingUsers : copy.exportUsers}</button> : null}</div></header>
+          {canExportUsers ? <p className="admin-user-export-scope">{copy.exportScope}</p> : null}
           {userExportMessage ? <p className="admin-user-export-status" role="status">{userExportMessage}</p> : null}
           {dashboard ? <div className="admin-section-summary admin-user-summary" aria-label={copy.userPortfolio}><article><span>Free</span><strong>{number.format(dashboard.monetization.free_users)}</strong></article><article><span>Plus</span><strong>{number.format(dashboard.monetization.plus_users)}</strong></article><article><span>Pro</span><strong>{number.format(dashboard.monetization.pro_users)}</strong></article><article><span>{copy.credits}</span><strong>{number.format(dashboard.monetization.consumed_ai_credits)}</strong></article></div> : null}
           <div className="admin-table-scroll"><table><thead><tr><th>{copy.email}</th><th>{copy.plan}</th><th>{copy.lastSignIn}</th><th>{copy.usage}</th></tr></thead><tbody>
@@ -869,20 +922,20 @@ export function AdminPage() {
         <div>
           <section className="admin-section-summary admin-community-summary" aria-label={copy.community}><article><span>{copy.totalTopics}</span><strong>{number.format(topicsTotal)}</strong></article><article><span>{copy.reportedOnPage}</span><strong>{number.format(topics.filter((topic) => topic.report_count > 0).length)}</strong></article><article><span>{copy.removedOnPage}</span><strong>{number.format(topics.filter((topic) => topic.status === "removed").length)}</strong></article><article><span>{copy.auditOnPage}</span><strong>{number.format(audit.length)}</strong></article></section>
           <div className="admin-community-grid">
-          <section className="admin-panel">
+          {canModerateCommunity ? <section className="admin-panel">
             <h2>{copy.topics}</h2>
             <div className="admin-table-scroll"><table><thead><tr><th>{copy.topic}</th><th>{copy.author}</th><th>{copy.comments}</th><th>{copy.reports}</th><th>{copy.status}</th><th /></tr></thead><tbody>
               {topics.map((topic) => <tr key={topic.id}><td><strong>{topic.title}</strong><small>{date.format(new Date(topic.created_at))}</small></td><td>{topic.author_email}</td><td>{topic.comment_count}</td><td>{topic.report_count}</td><td>{topic.status === "removed" ? copy.removed : copy.active}</td><td><button type="button" className="btn btn-danger" disabled={topic.status === "removed"} onClick={(event) => { moderationTriggerRef.current = event.currentTarget; setModeratingTopic(topic); }}>{copy.remove}</button></td></tr>)}
             </tbody></table></div>
             <div className="admin-pager"><button type="button" className="btn" disabled={loading || topicPage <= 1} onClick={() => setTopicPage((current) => Math.max(1, current - 1))}>{copy.previous}</button><span>{copy.page} {topicPage} {copy.of} {Math.max(1, Math.ceil(topicsTotal / 25))}{locale === "zh-CN" ? " 页" : ""}</span><button type="button" className="btn" disabled={loading || topicPage >= Math.max(1, Math.ceil(topicsTotal / 25))} onClick={() => setTopicPage((current) => current + 1)}>{copy.next}</button></div>
-          </section>
-          <section className="admin-panel">
+          </section> : null}
+          {canReadAudit ? <section className="admin-panel">
             <h2>{copy.audit}</h2>
             <div className="admin-table-scroll"><table><thead><tr><th>{copy.time}</th><th>{copy.actor}</th><th>{copy.action}</th><th>{copy.target}</th></tr></thead><tbody>
               {audit.map((row) => <tr key={row.id}><td>{date.format(new Date(row.created_at))}</td><td>{row.actor_email}</td><td><strong>{row.action}</strong><small>{row.reason}</small></td><td>{row.target_type}{row.target_id ? ` · ${row.target_id}` : ""}</td></tr>)}
               {audit.length === 0 ? <tr><td colSpan={4}>{copy.noAudit}</td></tr> : null}
             </tbody></table></div>
-          </section>
+          </section> : null}
           </div>
         </div>
       ) : null}

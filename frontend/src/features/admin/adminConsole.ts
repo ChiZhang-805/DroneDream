@@ -471,7 +471,7 @@ const PREVIEW_AUDIT: AdminAuditRow[] = [
 
 export async function getAdminAccess(): Promise<AdminAccessSnapshot> {
   if (adminPreviewEnabled()) {
-    return { authorized: true, role: "owner", permissions: ["metrics.read", "users.read", "models.write", "community.moderate", "audit.read"] };
+    return { authorized: true, role: "owner", permissions: ["metrics.read", "users.read", "users.export", "models.write", "community.moderate", "audit.read"] };
   }
   return adminRequest<AdminAccessSnapshot>("/access");
 }
