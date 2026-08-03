@@ -271,8 +271,9 @@ async function collectTerminalEvidence(page, job) {
     report = {
       status: value.report_status || null,
       bestCandidateId: value.best_candidate_id || null,
-      firstQualifiedCandidateId: value.first_qualified_candidate_id || null,
-      firstQualifiedFreezeReceiptId: value.first_qualified_freeze_receipt_id || null,
+      firstQualifiedCandidateId: job.first_qualified_candidate_id || null,
+      firstQualifiedFreezeReceiptId: job.first_qualified_freeze_receipt_id || null,
+      firstQualifiedAt: job.first_qualified_at || null,
       winnerEvidenceId: value.winner_evidence_id || null,
       winnerFreezeReceiptId: value.winner_freeze_receipt_id || null,
     };
@@ -375,7 +376,7 @@ function buildCampaignManifest(options, registry, enginePack, accountHash, resul
     trials: receipt.trials.length,
     completedTrials: receipt.trials.filter((trial) => trial.status === "COMPLETED").length,
     failedTrials: receipt.trials.filter((trial) => trial.status === "FAILED").length,
-    passingTrials: receipt.trials.filter((trial) => trial.metrics?.passed === true).length,
+    passingTrials: receipt.trials.filter((trial) => trial.metrics?.pass_flag === true).length,
   }));
   return {
     schemaVersion: "dronedream.prefinal-physical-calibration-manifest/v1",

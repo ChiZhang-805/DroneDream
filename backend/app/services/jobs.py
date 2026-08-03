@@ -2152,6 +2152,11 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         provider_turns_attempted=job.provider_turns_attempted,
         provider_turns_succeeded=job.provider_turns_succeeded,
         first_qualified_candidate_id=job.first_qualified_candidate_id,
+        first_qualified_freeze_receipt_id=(
+            job.first_qualified_freeze.id
+            if job.first_qualified_freeze is not None
+            else None
+        ),
         first_qualified_at=job.first_qualified_at,
         continue_exploration_requested=job.continue_exploration_requested,
         exploration_budget=(

@@ -53,6 +53,7 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     assert job["provider_turns_attempted"] == 0
     assert job["provider_turns_succeeded"] == 0
     assert job["first_qualified_candidate_id"] is None
+    assert job["first_qualified_freeze_receipt_id"] is None
     assert job["continue_exploration_requested"] is False
     assert job["holdout_policy_version"] == "legacy-visible-v0"
 

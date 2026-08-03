@@ -962,6 +962,7 @@ class Job(BaseModel):
     provider_turns_attempted: int = 0
     provider_turns_succeeded: int = 0
     first_qualified_candidate_id: str | None = None
+    first_qualified_freeze_receipt_id: str | None = None
     first_qualified_at: datetime | None = None
     continue_exploration_requested: bool = False
     exploration_budget: ContinueExplorationBudget | None = None

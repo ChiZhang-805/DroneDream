@@ -6,6 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  buildCampaignManifest,
   parseArguments,
   prepareBaselinePayload,
   resolveEvidenceDirectory,
@@ -86,4 +87,32 @@ test("argument and output guards reject ambiguity and path escape", () => {
     resolveEvidenceDirectory("artifacts/test-runs/new-calibration"),
     path.join(repositoryRoot, "artifacts/test-runs/new-calibration"),
   );
+});
+
+test("campaign summary counts the API pass_flag field", () => {
+  const options = parseArguments(validArguments());
+  const campaign = buildCampaignManifest(
+    options,
+    registry,
+    { installedPackId: options.expectedPackId },
+    "f".repeat(64),
+    [
+      {
+        receiptPath: __filename,
+        receipt: {
+          problemId: "easy-hover-calm",
+          difficulty: "easy",
+          jobId: "job_unit",
+          status: "COMPLETED",
+          optimizationOutcome: "success",
+          trials: [
+            { status: "COMPLETED", metrics: { pass_flag: true } },
+            { status: "COMPLETED", metrics: { pass_flag: false } },
+          ],
+        },
+      },
+    ],
+  );
+  assert.equal(campaign.receipts[0].passingTrials, 1);
+  assert.equal(campaign.summary.passingTrials, 1);
 });

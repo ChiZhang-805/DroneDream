@@ -345,6 +345,7 @@ export interface Job {
   provider_turns_attempted?: number;
   provider_turns_succeeded?: number;
   first_qualified_candidate_id?: string | null;
+  first_qualified_freeze_receipt_id?: string | null;
   first_qualified_at?: string | null;
   continue_exploration_requested?: boolean;
   exploration_budget?: ContinueExplorationBudget | null;

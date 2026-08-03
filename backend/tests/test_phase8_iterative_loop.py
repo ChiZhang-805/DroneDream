@@ -228,6 +228,9 @@ def test_first_qualified_baseline_freezes_without_provider_call(gpt_ctx):
         assert baseline.qualified_at == job.first_qualified_at
         assert job.first_qualified_freeze is not None
         receipt = job.first_qualified_freeze
+        response = ctx["jobs_service"].to_job_schema(job)
+        assert response.first_qualified_candidate_id == baseline.id
+        assert response.first_qualified_freeze_receipt_id == receipt.id
         assert receipt.candidate_id == baseline.id
         assert receipt.provider_turns_attempted_to_first_qualified == 0
         assert receipt.provider_turns_succeeded_to_first_qualified == 0
