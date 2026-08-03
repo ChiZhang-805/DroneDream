@@ -516,6 +516,10 @@ export function ExperimentAssistant() {
 
   async function submitMessage(event: FormEvent): Promise<void> {
     event.preventDefault();
+    const submittedComposer = composer;
+    const submittedReferenceFileIds = new Set(
+      referenceFiles.map((file) => file.id),
+    );
     const visibleMessage = composer.trim() || copy.attachmentOnlyPrompt;
     if (
       (!composer.trim() && !referenceFiles.length)
@@ -609,8 +613,10 @@ export function ExperimentAssistant() {
       }
       setDraft(next);
       setLatest(result);
-      setComposer("");
-      setReferenceFiles([]);
+      setComposer((current) => current === submittedComposer ? "" : current);
+      setReferenceFiles((current) => current.filter(
+        (file) => !submittedReferenceFileIds.has(file.id),
+      ));
       void recordProductEvent("assistant_turn_succeeded", {
         access_mode: modelAccess.accessMode,
         provider: modelAccess.accessMode === "platform"
