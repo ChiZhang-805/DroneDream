@@ -123,6 +123,56 @@ def _apply_sqlite_lightweight_migrations() -> None:
         for column_name, column_type in experiment_columns.items():
             if column_name not in job_columns:
                 conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}"))
+        first_qualified_columns = {
+            "completion_policy": (
+                "VARCHAR(32) NOT NULL DEFAULT 'first_qualified_stop'"
+            ),
+            "job_kind": "VARCHAR(32) NOT NULL DEFAULT 'primary'",
+            "cognitive_policy_version": (
+                "VARCHAR(32) NOT NULL DEFAULT 'adaptive-2-4-v1'"
+            ),
+            "provider_turn_cap": "INTEGER NOT NULL DEFAULT 64",
+            "provider_turns_attempted": "INTEGER NOT NULL DEFAULT 0",
+            "provider_turns_succeeded": "INTEGER NOT NULL DEFAULT 0",
+            "next_candidate_dispatch_ordinal": "BIGINT NOT NULL DEFAULT 1",
+            "next_qualification_sequence": "BIGINT NOT NULL DEFAULT 1",
+            "first_qualified_candidate_id": "VARCHAR(64)",
+            "first_qualified_at": "DATETIME",
+            "continue_exploration_requested": "BOOLEAN NOT NULL DEFAULT 0",
+            "exploration_budget_json": "JSON",
+            "continuation_parent_job_id": "VARCHAR(64)",
+            "continuation_root_job_id": "VARCHAR(64)",
+            "holdout_policy_version": (
+                "VARCHAR(32) NOT NULL DEFAULT 'legacy-visible-v0'"
+            ),
+            "holdout_contract_json": "JSON",
+        }
+        for column_name, column_type in first_qualified_columns.items():
+            if column_name not in job_columns:
+                conn.execute(
+                    text(f"ALTER TABLE jobs ADD COLUMN {column_name} {column_type}")
+                )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_first_qualified_candidate_id "
+                "ON jobs(first_qualified_candidate_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_continuation_parent_job_id "
+                "ON jobs(continuation_parent_job_id)"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS "
+                "ix_jobs_continuation_root_job_id "
+                "ON jobs(continuation_root_job_id)"
+            )
+        )
         conn.execute(
             text(
                 "UPDATE jobs SET llm_access_mode = CASE "
@@ -199,6 +249,35 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         "ADD COLUMN optimizer_metadata_json JSON"
                     )
                 )
+            first_qualified_candidate_columns = {
+                "dispatch_ordinal": "BIGINT",
+                "qualification_sequence": "BIGINT",
+                "qualified_at": "DATETIME",
+            }
+            for column_name, column_type in first_qualified_candidate_columns.items():
+                if column_name not in candidate_columns:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE candidate_parameter_sets "
+                            f"ADD COLUMN {column_name} {column_type}"
+                        )
+                    )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_candidate_job_dispatch_ordinal "
+                    "ON candidate_parameter_sets(job_id, dispatch_ordinal) "
+                    "WHERE dispatch_ordinal IS NOT NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_candidate_job_qualification_sequence "
+                    "ON candidate_parameter_sets(job_id, qualification_sequence) "
+                    "WHERE qualification_sequence IS NOT NULL"
+                )
+            )
             if "evidence_ledger_required" not in candidate_columns:
                 conn.execute(
                     text(

@@ -487,6 +487,8 @@ def _create_job_from_config(
         max_iterations=req.max_iterations,
         trials_per_candidate=req.trials_per_candidate,
         max_total_trials=req.max_total_trials,
+        completion_policy=req.completion_policy,
+        provider_turn_cap=req.provider_turn_cap,
         target_rmse=req.acceptance_criteria.target_rmse,
         target_max_error=req.acceptance_criteria.target_max_error,
         min_pass_rate=req.acceptance_criteria.min_pass_rate,
@@ -523,6 +525,8 @@ def _create_job_from_config(
                 "optimizer_strategy": req.optimizer_strategy,
                 "max_iterations": req.max_iterations,
                 "trials_per_candidate": req.trials_per_candidate,
+                "completion_policy": req.completion_policy,
+                "provider_turn_cap": req.provider_turn_cap,
                 "baseline_parameters": req.baseline_parameters.model_dump(mode="json"),
                 "vehicle_profile": req.vehicle_profile.model_dump(mode="json"),
                 "parameter_catalog_version": req.parameter_catalog_version,
@@ -774,6 +778,8 @@ def rerun_job(
         max_iterations=source.max_iterations,
         trials_per_candidate=source.trials_per_candidate,
         max_total_trials=source.max_total_trials,
+        completion_policy=source.completion_policy,  # type: ignore[arg-type]
+        provider_turn_cap=source.provider_turn_cap,
         acceptance_criteria=schemas.AcceptanceCriteria(
             target_rmse=source.target_rmse,
             target_max_error=source.target_max_error,
@@ -1583,6 +1589,18 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         llm_access_mode=llm_access_mode,
         llm_provider=job.llm_provider,
         llm_base_url=job.llm_base_url,
+        completion_policy=job.completion_policy,  # type: ignore[arg-type]
+        job_kind=job.job_kind,  # type: ignore[arg-type]
+        cognitive_policy_version=job.cognitive_policy_version,
+        provider_turn_cap=job.provider_turn_cap,
+        provider_turns_attempted=job.provider_turns_attempted,
+        provider_turns_succeeded=job.provider_turns_succeeded,
+        first_qualified_candidate_id=job.first_qualified_candidate_id,
+        first_qualified_at=job.first_qualified_at,
+        continue_exploration_requested=job.continue_exploration_requested,
+        continuation_parent_job_id=job.continuation_parent_job_id,
+        continuation_root_job_id=job.continuation_root_job_id,
+        holdout_policy_version=job.holdout_policy_version,
     )
 
 
@@ -2013,6 +2031,9 @@ def optimization_history(job: models.Job) -> schemas.OptimizationHistory:
             schemas.Candidate(
                 id=candidate.id,
                 generation_index=candidate.generation_index,
+                dispatch_ordinal=candidate.dispatch_ordinal,
+                qualification_sequence=candidate.qualification_sequence,
+                qualified_at=candidate.qualified_at,
                 source_type=candidate.source_type,
                 label=candidate.label,
                 parameters=dict(candidate.parameter_json or {}),

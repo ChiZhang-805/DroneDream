@@ -15,6 +15,7 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
@@ -172,6 +173,26 @@ class BatchJob(Base):
 
 class Job(Base):
     __tablename__ = "jobs"
+    __table_args__ = (
+        CheckConstraint(
+            "provider_turn_cap >= 0 AND provider_turn_cap <= 128",
+            name="ck_jobs_provider_turn_cap",
+        ),
+        CheckConstraint(
+            "provider_turns_attempted >= 0 "
+            "AND provider_turns_succeeded >= 0 "
+            "AND provider_turns_succeeded <= provider_turns_attempted",
+            name="ck_jobs_provider_turn_counts",
+        ),
+        CheckConstraint(
+            "next_candidate_dispatch_ordinal >= 1",
+            name="ck_jobs_next_candidate_dispatch_ordinal",
+        ),
+        CheckConstraint(
+            "next_qualification_sequence >= 1",
+            name="ck_jobs_next_qualification_sequence",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("job"))
     user_id: Mapped[str | None] = mapped_column(
@@ -234,6 +255,86 @@ class Job(Base):
     max_total_trials: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     current_generation: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     optimization_outcome: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Versioned completion/cognition policy. Legacy rows are migrated to the
+    # safe default: stop after the first fully-qualified candidate.
+    completion_policy: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="first_qualified_stop",
+        server_default="first_qualified_stop",
+    )
+    job_kind: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="primary",
+        server_default="primary",
+    )
+    cognitive_policy_version: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="adaptive-2-4-v1",
+        server_default="adaptive-2-4-v1",
+    )
+    provider_turn_cap: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=64,
+        server_default="64",
+    )
+    provider_turns_attempted: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    provider_turns_succeeded: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    next_candidate_dispatch_ordinal: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    next_qualification_sequence: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    first_qualified_candidate_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, index=True
+    )
+    first_qualified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    continue_exploration_requested: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
+    exploration_budget_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    continuation_parent_job_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("jobs.id"), nullable=True, index=True
+    )
+    continuation_root_job_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("jobs.id"), nullable=True, index=True
+    )
+    holdout_policy_version: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="legacy-visible-v0",
+        server_default="legacy-visible-v0",
+    )
+    holdout_contract_json: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON, nullable=True
+    )
     # Cross-process finalization fencing. The opaque token identifies one
     # exact claim; generation prevents a stale claim from crossing a dispatch
     # boundary, and the explicit expiry is renewable without overloading
@@ -291,6 +392,12 @@ class Job(Base):
     winner_freeze: Mapped[WinnerFreezeReceipt | None] = relationship(
         back_populates="job", cascade="all, delete-orphan", uselist=False
     )
+    first_qualified_freeze: Mapped[FirstQualifiedFreezeReceipt | None] = relationship(
+        back_populates="job", cascade="all, delete-orphan", uselist=False
+    )
+    cognitive_turn_receipts: Mapped[list[HarnessCognitiveTurnReceipt]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
     events: Mapped[list[JobEvent]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
@@ -306,12 +413,39 @@ class Job(Base):
 
 class CandidateParameterSet(Base):
     __tablename__ = "candidate_parameter_sets"
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "dispatch_ordinal",
+            name="uq_candidate_job_dispatch_ordinal",
+        ),
+        UniqueConstraint(
+            "job_id",
+            "qualification_sequence",
+            name="uq_candidate_job_qualification_sequence",
+        ),
+        CheckConstraint(
+            "dispatch_ordinal IS NULL OR dispatch_ordinal >= 1",
+            name="ck_candidate_dispatch_ordinal",
+        ),
+        CheckConstraint(
+            "qualification_sequence IS NULL OR qualification_sequence >= 1",
+            name="ck_candidate_qualification_sequence",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("cand"))
     job_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("jobs.id"), nullable=False, index=True
     )
     generation_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Assigned by the server under the Job fence. These values, never UUID or
+    # client arrival order, define deterministic dispatch/qualification order.
+    dispatch_ordinal: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    qualification_sequence: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    qualified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     source_type: Mapped[str] = mapped_column(String(32), nullable=False, default="baseline")
     label: Mapped[str | None] = mapped_column(String(255), nullable=True)
     parameter_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
@@ -461,6 +595,163 @@ class WinnerFreezeReceipt(Base):
     job: Mapped[Job] = relationship(back_populates="winner_freeze")
     report: Mapped[JobReport | None] = relationship(
         back_populates="winner_freeze_receipt", uselist=False
+    )
+
+
+class FirstQualifiedFreezeReceipt(Base):
+    """Insert-once receipt for the first fully-qualified candidate.
+
+    Immutability guards and atomic freeze semantics are installed by the next
+    architecture layer; this model establishes the versioned persistence
+    contract without overloading the final winner receipt.
+    """
+
+    __tablename__ = "first_qualified_freeze_receipts"
+    __table_args__ = (
+        CheckConstraint(
+            "qualification_sequence >= 1 AND generation_index >= 0 "
+            "AND dispatch_ordinal >= 1 AND time_to_first_qualified_ms >= 0",
+            name="ck_first_qualified_order_and_time",
+        ),
+        CheckConstraint(
+            "simulations_to_first_qualified >= 0 "
+            "AND trials_to_first_qualified >= 0 "
+            "AND trials_completed_to_first_qualified >= 0 "
+            "AND trials_passed_to_first_qualified >= 0 "
+            "AND trials_failed_to_first_qualified >= 0 "
+            "AND trials_cancelled_to_first_qualified >= 0 "
+            "AND trials_timed_out_to_first_qualified >= 0 "
+            "AND trials_indeterminate_to_first_qualified >= 0 "
+            "AND generations_to_first_qualified >= 0 "
+            "AND provider_turns_attempted_to_first_qualified >= 0 "
+            "AND provider_turns_succeeded_to_first_qualified >= 0 "
+            "AND provider_turns_succeeded_to_first_qualified "
+            "<= provider_turns_attempted_to_first_qualified",
+            name="ck_first_qualified_nonnegative_accounting",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("fqf")
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("jobs.id"), nullable=False, unique=True, index=True
+    )
+    # The server verifies this identifier against the same Job transaction.
+    # It deliberately mirrors WinnerFreezeReceipt rather than adding a
+    # candidate FK that would make whole-Job deletion cyclic.
+    candidate_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    definition_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    evidence_id: Mapped[str] = mapped_column(String(71), nullable=False, unique=True)
+    holdout_contract_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    qualification_sequence: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    generation_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    dispatch_ordinal: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    time_to_first_qualified_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    simulations_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
+    trials_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
+    trials_completed_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
+    trials_passed_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
+    trials_failed_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
+    trials_cancelled_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
+    trials_timed_out_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
+    trials_indeterminate_to_first_qualified: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )
+    generations_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
+    provider_turns_attempted_to_first_qualified: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )
+    provider_turns_succeeded_to_first_qualified: Mapped[int] = mapped_column(
+        Integer, nullable=False
+    )
+    evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    frozen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(back_populates="first_qualified_freeze")
+
+
+class HarnessCognitiveTurnReceipt(Base):
+    """Append-only pre-provider-call receipt.
+
+    The row is committed before network I/O. Absence of a matching outcome is
+    therefore an indeterminate attempted turn that still consumes the cap.
+    """
+
+    __tablename__ = "harness_cognitive_turn_receipts"
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "generation_index",
+            "turn_index",
+            name="uq_harness_turn_job_generation_index",
+        ),
+        CheckConstraint(
+            "generation_index >= 0",
+            name="ck_harness_turn_generation",
+        ),
+        CheckConstraint(
+            "turn_index >= 1 AND turn_index <= 4",
+            name="ck_harness_turn_index",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("htr")
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("jobs.id"), nullable=False, index=True
+    )
+    receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    generation_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    turn_role: Mapped[str] = mapped_column(String(32), nullable=False)
+    trigger_policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    trigger_reasons_json: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    source_commit: Mapped[str] = mapped_column(String(40), nullable=False)
+    model_snapshot: Mapped[str] = mapped_column(String(128), nullable=False)
+    prompt_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    evidence_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    schema_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    tool_outputs_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(back_populates="cognitive_turn_receipts")
+    outcome: Mapped[HarnessCognitiveTurnOutcome | None] = relationship(
+        back_populates="turn_receipt", cascade="all, delete-orphan", uselist=False
+    )
+
+
+class HarnessCognitiveTurnOutcome(Base):
+    """Append-only terminal outcome for one attempted cognitive turn."""
+
+    __tablename__ = "harness_cognitive_turn_outcomes"
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("hto")
+    )
+    turn_receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("harness_cognitive_turn_receipts.id"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    outcome_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    response_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    turn_receipt: Mapped[HarnessCognitiveTurnReceipt] = relationship(
+        back_populates="outcome"
     )
 
 
@@ -921,6 +1212,9 @@ __all__ = [
     "CandidateEvidenceDeleteAuthorization",
     "CandidateEvidenceReceipt",
     "CandidateParameterSet",
+    "FirstQualifiedFreezeReceipt",
+    "HarnessCognitiveTurnOutcome",
+    "HarnessCognitiveTurnReceipt",
     "HarnessExperienceMemory",
     "Job",
     "JobEvent",

@@ -46,6 +46,33 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     assert job["sensor_noise_level"] == "medium"
     assert job["objective_profile"] == "robust"
     assert job["source_job_id"] is None
+    assert job["completion_policy"] == "first_qualified_stop"
+    assert job["job_kind"] == "primary"
+    assert job["cognitive_policy_version"] == "adaptive-2-4-v1"
+    assert job["provider_turn_cap"] == 64
+    assert job["provider_turns_attempted"] == 0
+    assert job["provider_turns_succeeded"] == 0
+    assert job["first_qualified_candidate_id"] is None
+    assert job["continue_exploration_requested"] is False
+    assert job["holdout_policy_version"] == "legacy-visible-v0"
+
+
+def test_rerun_preserves_bounded_completion_contract(client: TestClient) -> None:
+    created = client.post(
+        "/api/v1/jobs",
+        json={**HEURISTIC_JOB_PAYLOAD, "provider_turn_cap": 7},
+    )
+    assert created.status_code == 200, created.text
+    source = created.json()["data"]
+
+    rerun = client.post(f"/api/v1/jobs/{source['id']}/rerun")
+    assert rerun.status_code == 200, rerun.text
+    child = rerun.json()["data"]
+
+    assert child["completion_policy"] == "first_qualified_stop"
+    assert child["provider_turn_cap"] == 7
+    assert child["job_kind"] == "primary"
+    assert child["continuation_parent_job_id"] is None
 
 
 def test_baseline_only_job_accepts_locked_catalog_parameters(client: TestClient) -> None:

@@ -87,6 +87,18 @@ StarterExperienceTemplateKey = Literal[
     "first-circle@1",
     "light-wind-circle@1",
 ]
+CompletionPolicy = Literal["first_qualified_stop"]
+JobKind = Literal["primary", "continue_exploration"]
+CognitiveTurnRole = Literal["plan", "revision", "diagnosis", "critic"]
+CognitiveTurnOutcomeStatus = Literal[
+    "succeeded",
+    "provider_failed",
+    "invalid_schema",
+    "source_drift",
+    "cancelled",
+]
+
+MAX_PROVIDER_TURNS_PER_JOB = 128
 
 
 JOB_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
@@ -754,6 +766,11 @@ class JobCreateRequest(_Strict):
     max_iterations: Annotated[int, Field(ge=1, le=100)] = 20
     trials_per_candidate: Annotated[int, Field(ge=1, le=10)] = 3
     max_total_trials: Annotated[int, Field(ge=1, le=10000)] = 100
+    completion_policy: CompletionPolicy = "first_qualified_stop"
+    provider_turn_cap: Annotated[
+        int,
+        Field(ge=0, le=MAX_PROVIDER_TURNS_PER_JOB),
+    ] = 64
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
     openai: OpenAIConfig | None = None
     llm: LLMProviderConfig | None = None
@@ -879,6 +896,18 @@ class Job(BaseModel):
     llm_access_mode: Literal["platform", "byok"] | None = None
     llm_provider: str | None = None
     llm_base_url: str | None = None
+    completion_policy: CompletionPolicy = "first_qualified_stop"
+    job_kind: JobKind = "primary"
+    cognitive_policy_version: str = "adaptive-2-4-v1"
+    provider_turn_cap: int = 64
+    provider_turns_attempted: int = 0
+    provider_turns_succeeded: int = 0
+    first_qualified_candidate_id: str | None = None
+    first_qualified_at: datetime | None = None
+    continue_exploration_requested: bool = False
+    continuation_parent_job_id: str | None = None
+    continuation_root_job_id: str | None = None
+    holdout_policy_version: str = "legacy-visible-v0"
 
 
 class PaginatedJobs(BaseModel):
@@ -938,6 +967,9 @@ CandidateSourceType = Literal["baseline", "optimizer", "llm_optimizer"]
 class Candidate(BaseModel):
     id: str
     generation_index: int
+    dispatch_ordinal: int | None = None
+    qualification_sequence: int | None = None
+    qualified_at: datetime | None = None
     source_type: str
     label: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
@@ -957,6 +989,66 @@ class Candidate(BaseModel):
     is_baseline: bool
     created_at: datetime
     updated_at: datetime
+
+
+class FirstQualifiedAccounting(BaseModel):
+    """Non-beautified work counters frozen at first qualification."""
+
+    simulations_attempted: int = Field(ge=0)
+    trials_attempted: int = Field(ge=0)
+    trials_completed: int = Field(ge=0)
+    trials_passed: int = Field(ge=0)
+    trials_failed: int = Field(ge=0)
+    trials_cancelled: int = Field(ge=0)
+    trials_timed_out: int = Field(ge=0)
+    trials_indeterminate: int = Field(ge=0)
+    generations: int = Field(ge=0)
+    provider_turns_attempted: int = Field(ge=0)
+    provider_turns_succeeded: int = Field(ge=0)
+
+
+class FirstQualifiedFreezeReceipt(BaseModel):
+    receipt_schema: Literal["dronedream.first-qualified-freeze-receipt/v1"]
+    definition_version: Literal["server-sequence-deterministic-tiebreak/v1"]
+    id: str
+    job_id: str
+    candidate_id: str
+    evidence_id: str
+    holdout_contract_sha256: str
+    qualification_sequence: int = Field(ge=1)
+    generation_index: int = Field(ge=0)
+    dispatch_ordinal: int = Field(ge=1)
+    time_to_first_qualified_ms: int = Field(ge=0)
+    accounting: FirstQualifiedAccounting
+    frozen_at: datetime
+
+
+class HarnessCognitiveTurnReceipt(BaseModel):
+    receipt_schema: Literal["dronedream.harness-cognitive-turn-attempt/v1"]
+    id: str
+    job_id: str
+    generation_index: int = Field(ge=0)
+    turn_index: int = Field(ge=1, le=4)
+    turn_role: CognitiveTurnRole
+    trigger_policy_version: str
+    trigger_reasons: list[str] = Field(default_factory=list, max_length=16)
+    source_commit: str = Field(min_length=40, max_length=40)
+    model_snapshot: str = Field(min_length=1, max_length=128)
+    prompt_sha256: str = Field(min_length=64, max_length=64)
+    evidence_sha256: str = Field(min_length=64, max_length=64)
+    schema_sha256: str = Field(min_length=64, max_length=64)
+    tool_outputs_sha256: str = Field(min_length=64, max_length=64)
+    attempted_at: datetime
+
+
+class HarnessCognitiveTurnOutcome(BaseModel):
+    outcome_schema: Literal["dronedream.harness-cognitive-turn-outcome/v1"]
+    id: str
+    turn_receipt_id: str
+    status: CognitiveTurnOutcomeStatus
+    response_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    error_code: str | None = Field(default=None, max_length=64)
+    completed_at: datetime
 
 
 class OptimizationHistory(BaseModel):
@@ -1208,9 +1300,17 @@ __all__ = [
     "BaselineParameters",
     "ComparisonPoint",
     "Candidate",
+    "CognitiveTurnOutcomeStatus",
+    "CognitiveTurnRole",
+    "CompletionPolicy",
+    "FirstQualifiedAccounting",
+    "FirstQualifiedFreezeReceipt",
+    "HarnessCognitiveTurnOutcome",
+    "HarnessCognitiveTurnReceipt",
     "JOB_CANCELLABLE_STATUSES",
     "JOB_TERMINAL_STATUSES",
     "Job",
+    "JobKind",
     "JobCreateRequest",
     "JobErrorInfo",
     "JobEventInfo",
@@ -1233,6 +1333,7 @@ __all__ = [
     "ExperimentAssistantTurnResponse",
     "ExperimentAssistantUsage",
     "LLMProviderConfig",
+    "MAX_PROVIDER_TURNS_PER_JOB",
     "OpenAIConfig",
     "OptimizationOutcome",
     "OptimizationHistory",

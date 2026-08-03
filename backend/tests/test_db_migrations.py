@@ -247,6 +247,24 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     }.issubset(job_columns)
     assert "control_version" in job_columns
     assert "llm_access_mode" in job_columns
+    assert {
+        "completion_policy",
+        "job_kind",
+        "cognitive_policy_version",
+        "provider_turn_cap",
+        "provider_turns_attempted",
+        "provider_turns_succeeded",
+        "next_candidate_dispatch_ordinal",
+        "next_qualification_sequence",
+        "first_qualified_candidate_id",
+        "first_qualified_at",
+        "continue_exploration_requested",
+        "exploration_budget_json",
+        "continuation_parent_job_id",
+        "continuation_root_job_id",
+        "holdout_policy_version",
+        "holdout_contract_json",
+    }.issubset(job_columns)
     assert "lease_owner" in columns
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
@@ -256,6 +274,11 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     assert "expires_at" in secret_columns
     assert "optimizer_metadata_json" in candidate_columns
     assert "evidence_ledger_required" in candidate_columns
+    assert {
+        "dispatch_ordinal",
+        "qualification_sequence",
+        "qualified_at",
+    }.issubset(candidate_columns)
     assert candidate_evidence_requirements == {
         "candidate-v2": 0,
         "candidate-v3": 1,
@@ -399,6 +422,17 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "PRAGMA table_info('batch_jobs')"
             ).fetchall()
         }
+        first_qualified_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name IN ("
+                "'first_qualified_freeze_receipts', "
+                "'harness_cognitive_turn_receipts', "
+                "'harness_cognitive_turn_outcomes'"
+                ")"
+            ).fetchall()
+        }
     assert trigger_names == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
@@ -427,6 +461,11 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "winner_freeze_delete_authorizations",
     }
     assert api_idempotency_tables == {"api_idempotency_records"}
+    assert first_qualified_tables == {
+        "first_qualified_freeze_receipts",
+        "harness_cognitive_turn_receipts",
+        "harness_cognitive_turn_outcomes",
+    }
     assert {
         "user_id",
         "idempotency_key_hash",
@@ -439,11 +478,31 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
     }.issubset(api_idempotency_columns)
     assert "evidence_ledger_required" in candidate_columns
     assert {
+        "dispatch_ordinal",
+        "qualification_sequence",
+        "qualified_at",
+    }.issubset(candidate_columns)
+    assert {
         "finalization_claim_token",
         "finalization_claim_generation",
         "finalization_lease_expires_at",
     }.issubset(job_columns)
     assert "control_version" in job_columns
+    assert {
+        "completion_policy",
+        "job_kind",
+        "cognitive_policy_version",
+        "provider_turn_cap",
+        "provider_turns_attempted",
+        "provider_turns_succeeded",
+        "next_candidate_dispatch_ordinal",
+        "next_qualification_sequence",
+        "first_qualified_candidate_id",
+        "continue_exploration_requested",
+        "continuation_parent_job_id",
+        "continuation_root_job_id",
+        "holdout_policy_version",
+    }.issubset(job_columns)
     assert "control_version" in batch_columns
 
 
@@ -609,7 +668,68 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260729_0018 (head)"]
+    assert heads == ["20260803_0019 (head)"]
+
+
+def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
+    database_path = (tmp_path / "round-trip.db").as_posix()
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "APP_ENV": "test",
+            "DATABASE_URL": f"sqlite:///{database_path}",
+            "DATABASE_AUTO_CREATE": "false",
+        }
+    )
+    backend_root = Path(__file__).resolve().parents[1]
+
+    for command in (
+        ["upgrade", "head"],
+        ["downgrade", "20260729_0018"],
+        ["upgrade", "head"],
+    ):
+        result = subprocess.run(
+            [sys.executable, "-m", "alembic", *command],
+            cwd=backend_root,
+            env=environment,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    with sqlite3.connect(tmp_path / "round-trip.db") as connection:
+        version = connection.execute("SELECT version_num FROM alembic_version").fetchone()
+        table_names = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name IN ("
+                "'first_qualified_freeze_receipts', "
+                "'harness_cognitive_turn_receipts', "
+                "'harness_cognitive_turn_outcomes'"
+                ")"
+            ).fetchall()
+        }
+        candidate_triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='trigger' AND tbl_name='candidate_parameter_sets'"
+            ).fetchall()
+        }
+
+    assert version == ("20260803_0019",)
+    assert table_names == {
+        "first_qualified_freeze_receipts",
+        "harness_cognitive_turn_receipts",
+        "harness_cognitive_turn_outcomes",
+    }
+    assert {
+        "trg_candidate_evidence_required_no_downgrade",
+        "trg_candidate_provenance_no_mutation",
+    }.issubset(candidate_triggers)
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(
