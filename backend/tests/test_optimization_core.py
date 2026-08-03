@@ -718,6 +718,110 @@ def test_candidate_outcome_evidence_is_content_addressed_and_authoritative() -> 
     )
 
 
+@pytest.mark.parametrize(
+    ("aggregate_override", "selection_override"),
+    [
+        ({"feasible": False}, {"hard_feasible": True}),
+        ({"hard_constraint_violation": 0.25}, {"hard_constraint_violation": 0.0}),
+        ({"optimizer_learning_failure_rate": 0.25}, {"training_failure_rate": 0.0}),
+        ({"scalar_loss": 0.75}, {"decision_loss": 0.4}),
+        ({"training_completed_trial_count": 1}, {"evidence_complete": True}),
+        (
+            {"training_completed_trial_count": 1},
+            {"evidence_complete": False},
+        ),
+        ({"training_passing_trial_count": 3}, {}),
+        (
+            {
+                "training_trial_outcome_counts": {
+                    "success": 2,
+                    "domain_failure": 0,
+                    "infrastructure_failure": 0,
+                    "cancelled": 0,
+                    "invalid_evidence": 0,
+                }
+            },
+            {},
+        ),
+        (
+            {
+                "training_trial_outcome_rates": {
+                    "success": 1.0,
+                    "domain_failure": 0.0,
+                    "infrastructure_failure": 0.0,
+                    "cancelled": 0.0,
+                    "invalid_evidence": 0.0,
+                }
+            },
+            {},
+        ),
+    ],
+)
+def test_candidate_outcome_evidence_rejects_contradictory_selection_key(
+    aggregate_override: dict[str, object],
+    selection_override: dict[str, object],
+) -> None:
+    aggregate: dict[str, object] = {
+        "training_trial_count": 2,
+        "training_completed_trial_count": 2,
+        "training_failed_trial_count": 0,
+        "training_passing_trial_count": 2,
+        "training_trial_outcome_counts": {
+            "success": 2,
+            "domain_failure": 0,
+            "infrastructure_failure": 0,
+            "cancelled": 0,
+            "invalid_evidence": 0,
+            "unknown_failure": 0,
+        },
+        "training_trial_outcome_rates": {
+            "success": 1.0,
+            "domain_failure": 0.0,
+            "infrastructure_failure": 0.0,
+            "cancelled": 0.0,
+            "invalid_evidence": 0.0,
+            "unknown_failure": 0.0,
+        },
+        "optimizer_learning_failure_rate": 0.0,
+        "objective_values": {"rmse": 0.4},
+        "constraint_values": {"crash_flag:lte:0": 0.0},
+        "constraint_violations": {"crash_flag:lte:0": 0.0},
+        "feasible": True,
+        "hard_constraint_violation": 0.0,
+        "preference_loss": 0.4,
+        "soft_constraint_penalty": 0.0,
+        "scalar_loss": 0.4,
+        "selection_key": build_selection_key(
+            evidence_complete=True,
+            hard_feasible=True,
+            hard_constraint_violation=0.0,
+            training_failure_rate=0.0,
+            decision_loss=0.4,
+        ),
+        "acceptance_rmse": 0.4,
+        "acceptance_max_error": 0.8,
+        "acceptance_pass_rate": 1.0,
+        "acceptance_completion_rate": 1.0,
+    }
+    aggregate.update(aggregate_override)
+    selection_key = dict(aggregate["selection_key"])  # type: ignore[arg-type]
+    selection_key.update(selection_override)
+    aggregate["selection_key"] = selection_key
+
+    with pytest.raises(ValueError, match="selection key"):
+        compile_candidate_outcome_evidence(
+            outcome_contract_id="sha256:" + "a" * 64,
+            candidate_id="candidate-contradictory-selection",
+            generation_index=2,
+            parameter_snapshot={"MPC_XY_P": 0.95},
+            trial_evidence_rows=[
+                {"trial_id": "trial-1", "seed": 101, "rmse": 0.3},
+                {"trial_id": "trial-2", "seed": 102, "rmse": 0.5},
+            ],
+            aggregate=aggregate,
+        )
+
+
 def test_trial_holdout_role_requires_a_boolean_marker() -> None:
     assert trial_is_holdout(SimpleNamespace(scenario_config_json={"holdout": True}))
     assert not trial_is_holdout(SimpleNamespace(scenario_config_json={"holdout": False}))

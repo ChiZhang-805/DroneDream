@@ -25,6 +25,7 @@ from pydantic import (
 )
 
 from app.optimization.outcome_taxonomy import (
+    TRIAL_OUTCOME_CLASSES,
     TRIAL_OUTCOME_TAXONOMY_SCHEMA,
 )
 from app.orchestration.attempt_evidence import (
@@ -267,6 +268,54 @@ class CandidateOutcomeEvidenceV3(_FrozenModel):
         if self.accepted_attempt_count != self.trial_count:
             raise ValueError("every training Trial requires one accepted physical attempt")
         return self
+
+
+def _candidate_outcome_evidence_is_consistent(
+    evidence: CandidateOutcomeEvidenceV1 | CandidateOutcomeEvidenceV2 | CandidateOutcomeEvidenceV3,
+) -> bool:
+    outcome_classes = set(TRIAL_OUTCOME_CLASSES)
+    counts = evidence.trial_outcome_counts
+    rates = evidence.trial_outcome_rates
+    expected_complete = (
+        evidence.completed_trial_count == evidence.trial_count
+        and evidence.failed_trial_count == 0
+    )
+    expected_rate_total = 1.0 if evidence.trial_count > 0 else 0.0
+    return (
+        evidence.completed_trial_count + evidence.failed_trial_count
+        == evidence.trial_count
+        and evidence.passing_trial_count <= evidence.completed_trial_count
+        and set(counts) == outcome_classes
+        and sum(counts.values()) == evidence.trial_count
+        and counts["success"] == evidence.completed_trial_count
+        and set(rates) == outcome_classes
+        and math.isclose(
+            sum(rates.values()),
+            expected_rate_total,
+            rel_tol=0.0,
+            abs_tol=1e-8,
+        )
+        and math.isclose(
+            rates["success"],
+            evidence.acceptance_projection.completion_rate,
+            rel_tol=0.0,
+            abs_tol=1e-8,
+        )
+        and evidence.selection_key.evidence_complete is expected_complete
+        and evidence.selection_key.hard_feasible is evidence.feasible
+        and math.isclose(
+            evidence.selection_key.training_failure_rate,
+            evidence.optimizer_learning_failure_rate,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+        and math.isclose(
+            evidence.selection_key.decision_loss,
+            evidence.scalar_loss,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+    )
 
 
 class CandidateReportProjectionV1(_FrozenModel):
@@ -754,6 +803,67 @@ def compile_candidate_outcome_evidence(
     """Compile one deterministic search-role projection from accepted evidence."""
 
     selection_key = CandidateSelectionKeyV1.model_validate(aggregate.get("selection_key"))
+    trial_count = _nonnegative_int(
+        aggregate.get("training_trial_count"),
+        field_name="training_trial_count",
+    )
+    completed_trial_count = _nonnegative_int(
+        aggregate.get("training_completed_trial_count"),
+        field_name="training_completed_trial_count",
+    )
+    failed_trial_count = _nonnegative_int(
+        aggregate.get("training_failed_trial_count"),
+        field_name="training_failed_trial_count",
+    )
+    passing_trial_count = _nonnegative_int(
+        aggregate.get("training_passing_trial_count"),
+        field_name="training_passing_trial_count",
+    )
+    optimizer_learning_failure_rate = _finite_number(
+        aggregate.get("optimizer_learning_failure_rate"),
+        field_name="optimizer_learning_failure_rate",
+    )
+    scalar_loss = _finite_number(
+        aggregate.get("scalar_loss"),
+        field_name="scalar_loss",
+    )
+    feasible = aggregate.get("feasible")
+    evidence_complete = completed_trial_count == trial_count and failed_trial_count == 0
+    selection_consistent = (
+        isinstance(feasible, bool)
+        and selection_key.evidence_complete is evidence_complete
+        and selection_key.hard_feasible is feasible
+        and math.isclose(
+            selection_key.training_failure_rate,
+            optimizer_learning_failure_rate,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+        and math.isclose(
+            selection_key.decision_loss,
+            scalar_loss,
+            rel_tol=0.0,
+            abs_tol=1e-12,
+        )
+    )
+    raw_hard_constraint_violation = aggregate.get("hard_constraint_violation")
+    if raw_hard_constraint_violation is not None:
+        hard_constraint_violation = _finite_number(
+            raw_hard_constraint_violation,
+            field_name="hard_constraint_violation",
+        )
+        selection_consistent = (
+            selection_consistent
+            and hard_constraint_violation >= 0
+            and math.isclose(
+                selection_key.hard_constraint_violation,
+                hard_constraint_violation,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+        )
+    if not selection_consistent:
+        raise ValueError("selection key contradicts the Candidate aggregate")
     acceptance_projection = CandidateAcceptanceProjectionV1(
         rmse=_finite_number(
             aggregate.get("acceptance_rmse"),
@@ -801,29 +911,14 @@ def compile_candidate_outcome_evidence(
         "holdout_projection_sha256": (
             _sha256_id(aggregate["holdout"]) if "holdout" in aggregate else None
         ),
-        "trial_count": _nonnegative_int(
-            aggregate.get("training_trial_count"),
-            field_name="training_trial_count",
-        ),
-        "completed_trial_count": _nonnegative_int(
-            aggregate.get("training_completed_trial_count"),
-            field_name="training_completed_trial_count",
-        ),
-        "failed_trial_count": _nonnegative_int(
-            aggregate.get("training_failed_trial_count"),
-            field_name="training_failed_trial_count",
-        ),
-        "passing_trial_count": _nonnegative_int(
-            aggregate.get("training_passing_trial_count"),
-            field_name="training_passing_trial_count",
-        ),
+        "trial_count": trial_count,
+        "completed_trial_count": completed_trial_count,
+        "failed_trial_count": failed_trial_count,
+        "passing_trial_count": passing_trial_count,
         "trial_outcome_taxonomy_schema": (TRIAL_OUTCOME_TAXONOMY_SCHEMA),
         "trial_outcome_counts": aggregate.get("training_trial_outcome_counts"),
         "trial_outcome_rates": aggregate.get("training_trial_outcome_rates"),
-        "optimizer_learning_failure_rate": _finite_number(
-            aggregate.get("optimizer_learning_failure_rate"),
-            field_name="optimizer_learning_failure_rate",
-        ),
+        "optimizer_learning_failure_rate": optimizer_learning_failure_rate,
         "objective_values": _finite_mapping(
             aggregate.get("objective_values"),
             field_name="objective_values",
@@ -836,7 +931,7 @@ def compile_candidate_outcome_evidence(
             aggregate.get("constraint_violations"),
             field_name="constraint_violations",
         ),
-        "feasible": aggregate.get("feasible"),
+        "feasible": feasible,
         "preference_loss": _finite_number(
             aggregate.get("preference_loss"),
             field_name="preference_loss",
@@ -845,10 +940,7 @@ def compile_candidate_outcome_evidence(
             aggregate.get("soft_constraint_penalty"),
             field_name="soft_constraint_penalty",
         ),
-        "scalar_loss": _finite_number(
-            aggregate.get("scalar_loss"),
-            field_name="scalar_loss",
-        ),
+        "scalar_loss": scalar_loss,
         "selection_key": selection_key.model_dump(mode="json"),
         "acceptance_projection": acceptance_projection.model_dump(mode="json"),
     }
@@ -884,12 +976,15 @@ def compile_candidate_outcome_evidence(
         if bind_trial_attempts
         else (CandidateOutcomeEvidenceV2 if bind_trial_artifacts else CandidateOutcomeEvidenceV1)
     )
-    return model.model_validate(
+    evidence = model.model_validate(
         {
             "evidence_id": _sha256_id(payload),
             **payload,
         }
     )
+    if not _candidate_outcome_evidence_is_consistent(evidence):
+        raise ValueError("Candidate outcome evidence contradicts trial counts or selection key")
+    return evidence
 
 
 def compile_candidate_report_evidence(
@@ -1071,7 +1166,9 @@ def verify_candidate_outcome_evidence(
         return None
     payload = evidence.model_dump(mode="json")
     evidence_id = payload.pop("evidence_id")
-    if evidence_id != _sha256_id(payload):
+    if evidence_id != _sha256_id(payload) or not _candidate_outcome_evidence_is_consistent(
+        evidence
+    ):
         return None
     return evidence
 
