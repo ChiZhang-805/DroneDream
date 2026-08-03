@@ -298,6 +298,34 @@ def test_frozen_public_audit_rejects_tampered_authority(
         verify_public_installer_origin_audit(audit)
 
 
+def test_frozen_public_audit_rejects_self_hashed_signature_claim_tamper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    audit = _build_frozen_audit(monkeypatch)
+    for origin in audit["origins"].values():
+        origin["authenticode_status"] = "Valid"
+        origin["authenticode_valid"] = True
+        origin["pe"].update(
+            certificate_table_file_offset=512,
+            certificate_table_size=16,
+            has_certificate_table=True,
+        )
+    audit["conclusion"]["authenticode_valid_on_both_origins"] = True
+    unsigned = {key: value for key, value in audit.items() if key != "audit_sha256"}
+    audit["audit_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+    with pytest.raises(ValueError, match="known unsigned origin"):
+        verify_public_installer_origin_audit(audit)
+
+
 def test_future_immutable_release_contract_accepts_only_new_exact_signed_bytes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

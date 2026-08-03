@@ -555,6 +555,16 @@ def verify_public_installer_origin_audit(payload: object) -> dict[str, Any]:
         != AUTHORITATIVE_MIRROR_CHECKSUM_SHA256
     ):
         raise ValueError("public installer frozen origin bytes drifted")
+    for origin in (global_origin, mirror_origin):
+        pe = origin["pe"]
+        if (
+            origin["authenticode_status"] != "NotSigned"
+            or origin["authenticode_valid"] is not False
+            or pe["has_certificate_table"] is not False
+            or pe["certificate_table_file_offset"] != 0
+            or pe["certificate_table_size"] != 0
+        ):
+            raise ValueError("public installer known unsigned origin facts drifted")
     parity = (
         global_origin["sha256"] == mirror_origin["sha256"]
         and global_origin["bytes"] == mirror_origin["bytes"]
