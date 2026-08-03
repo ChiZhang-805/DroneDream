@@ -245,11 +245,11 @@ def _candidate_fidelity(candidate: object) -> float:
         return 1.0
     raw = metadata.get("requested_fidelity", metadata.get("fidelity", 1.0))
     if isinstance(raw, bool) or not isinstance(raw, str | int | float):
-        return 1.0
+        return 0.0
     try:
         fidelity = float(raw)
     except (TypeError, ValueError):
-        return 1.0
+        return 0.0
     return fidelity if math.isfinite(fidelity) and 0.0 < fidelity <= 1.0 else 0.0
 
 

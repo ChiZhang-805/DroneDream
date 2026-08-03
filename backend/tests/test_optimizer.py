@@ -1338,6 +1338,39 @@ def test_low_fidelity_candidate_is_visible_but_unranked_until_verified() -> None
     assert screened.is_best is False
 
 
+@pytest.mark.parametrize(
+    "optimizer_metadata",
+    [
+        {"requested_fidelity": True},
+        {"requested_fidelity": "invalid"},
+        {"requested_fidelity": 0.0},
+        {"requested_fidelity": 1.01},
+        {"requested_fidelity": float("nan")},
+    ],
+)
+def test_malformed_fidelity_candidate_is_never_ranked(
+    optimizer_metadata: dict[str, object],
+) -> None:
+    baseline = _FakeCandidate(
+        candidate_id="baseline-malformed-fidelity",
+        score=2.0,
+        is_baseline=True,
+        generation_index=0,
+    )
+    malformed = _FakeCandidate(
+        candidate_id="malformed-fidelity",
+        score=0.1,
+        generation_index=1,
+    )
+    malformed.optimizer_metadata_json = optimizer_metadata
+
+    winner = aggregation._rank_and_select_best([baseline, malformed])
+
+    assert winner is baseline
+    assert malformed.rank_in_job is None
+    assert malformed.is_best is False
+
+
 def test_rank_and_select_best_skips_ineligible_optimizer() -> None:
     baseline = _FakeCandidate(
         candidate_id="c_base",
