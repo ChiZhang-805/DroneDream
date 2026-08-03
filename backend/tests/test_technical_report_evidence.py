@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from scripts.export_technical_report_evidence import (
+    _load_backend_test_receipt,
     _read_test_log_text,
     build_report_evidence_bundle,
     summarize_scenario_generalization,
@@ -319,6 +320,88 @@ def test_report_evidence_refuses_validation_feedback_in_mixed_shift() -> None:
 
     with pytest.raises(ValueError, match="must not enter"):
         summarize_scenario_generalization(payload)
+
+
+def test_report_evidence_rejects_nonpositive_mixed_shift_baseline() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "evaluation_artifacts"
+        / "scenario-generalization-mock-v1.json"
+    )
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["baseline"]["validation_loss"] = 0.0
+
+    with pytest.raises(ValueError, match="baseline validation loss must be positive"):
+        summarize_scenario_generalization(payload)
+
+
+def test_report_evidence_rejects_mixed_shift_candidate_budget_overrun() -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "evaluation_artifacts"
+        / "scenario-generalization-mock-v1.json"
+    )
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    payload["evaluated_candidate_count"] = payload["candidate_budget"] + 1
+
+    with pytest.raises(ValueError, match="evaluated candidates exceed"):
+        summarize_scenario_generalization(payload)
+
+
+def test_report_evidence_rejects_focused_check_with_failed_tests(tmp_path: Path) -> None:
+    receipt = json.loads(_TEST_RECEIPT.read_text(encoding="utf-8"))
+    receipt["focused_checks"][0]["result"]["failed"] = 1
+    unsigned = dict(receipt)
+    unsigned.pop("receipt_sha256")
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="passing focused checks"):
+        _load_backend_test_receipt(
+            receipt_path,
+            source_commit=_TEST_SOURCE_COMMIT,
+        )
+
+
+def test_report_evidence_rejects_focused_check_log_count_mismatch(
+    tmp_path: Path,
+) -> None:
+    receipt = json.loads(_TEST_RECEIPT.read_text(encoding="utf-8"))
+    receipt["focused_checks"][0]["result"]["passed"] = 2
+    unsigned = dict(receipt)
+    unsigned.pop("receipt_sha256")
+    receipt["receipt_sha256"] = hashlib.sha256(
+        json.dumps(
+            unsigned,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+    receipt_path = tmp_path / "receipt.json"
+    receipt_path.write_text(
+        json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="does not contain the declared result"):
+        _load_backend_test_receipt(
+            receipt_path,
+            source_commit=_TEST_SOURCE_COMMIT,
+        )
 
 
 def test_report_evidence_rejects_reflection_sidecar_tamper(

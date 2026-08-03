@@ -307,12 +307,25 @@ def _load_backend_test_receipt(
         raise ValueError("backend full-suite log does not contain the declared result")
     if not focused_checks:
         raise ValueError("backend test receipt requires passing focused checks")
-    for check in focused_checks:
+    for index, check in enumerate(focused_checks):
         if not isinstance(check, dict):
             raise ValueError("backend test receipt focused check is invalid")
         check_result = check.get("result")
-        if not isinstance(check_result, dict) or check_result.get("status") != "passed":
+        if (
+            not isinstance(check_result, dict)
+            or check_result.get("status") != "passed"
+            or isinstance(check_result.get("passed"), bool)
+            or not isinstance(check_result.get("passed"), int)
+            or check_result["passed"] <= 0
+            or check_result.get("failed") != 0
+        ):
             raise ValueError("backend test receipt requires passing focused checks")
+        if f"{check_result['passed']} passed in" not in _read_test_log_text(
+            verified_logs[index + 1]
+        ):
+            raise ValueError(
+                "backend focused-check log does not contain the declared result"
+            )
     return payload
 
 
@@ -565,6 +578,8 @@ def summarize_scenario_generalization(payload: dict[str, Any]) -> dict[str, Any]
         baseline.get("validation_loss"),
         field="baseline.validation_loss",
     )
+    if baseline_validation_loss <= 0:
+        raise ValueError("mixed-shift baseline validation loss must be positive")
     declared_improvement = _as_finite_float(
         payload.get("baseline_to_selected_validation_improvement_rate"),
         field="baseline_to_selected_validation_improvement_rate",
@@ -577,6 +592,17 @@ def summarize_scenario_generalization(payload: dict[str, Any]) -> dict[str, Any]
         abs_tol=1e-12,
     ):
         raise ValueError("mixed-shift validation improvement does not recompute")
+
+    candidate_budget = _as_positive_int(
+        payload.get("candidate_budget"),
+        field="candidate_budget",
+    )
+    evaluated_candidate_count = _as_positive_int(
+        payload.get("evaluated_candidate_count"),
+        field="evaluated_candidate_count",
+    )
+    if evaluated_candidate_count > candidate_budget:
+        raise ValueError("mixed-shift evaluated candidates exceed the declared budget")
 
     evidence = verify_candidate_generalization_evidence(payload.get("generalization_evidence"))
     if evidence is None:
@@ -605,14 +631,8 @@ def summarize_scenario_generalization(payload: dict[str, Any]) -> dict[str, Any]
         "validation_case_count": len(validation_case_ids),
         "configuration_shift_case_count": len(configuration_shift_ids),
         "novel_scenario_type_case_count": len(novel_type_ids),
-        "candidate_budget": _as_positive_int(
-            payload.get("candidate_budget"),
-            field="candidate_budget",
-        ),
-        "evaluated_candidate_count": _as_positive_int(
-            payload.get("evaluated_candidate_count"),
-            field="evaluated_candidate_count",
-        ),
+        "candidate_budget": candidate_budget,
+        "evaluated_candidate_count": evaluated_candidate_count,
         "training_scalar_loss": training_loss,
         "validation_scalar_loss": validation_loss,
         "scalar_loss_relative_degradation": (evidence.scalar_loss_relative_degradation),
