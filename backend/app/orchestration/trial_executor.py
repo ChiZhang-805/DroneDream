@@ -668,7 +668,11 @@ _LEGACY_CONTROLLER_PARAMETERS = {
 }
 
 
-def _validate_trial_px4_parameters(ctx: TrialContext) -> TrialContext:
+def _validate_trial_px4_parameters(
+    ctx: TrialContext,
+    *,
+    require_explicit_px4_parameters: bool = False,
+) -> TrialContext:
     """Final safety fence before any simulator process is started."""
 
     profile = dict(ctx.job_config.vehicle_profile or {})
@@ -720,6 +724,8 @@ def _validate_trial_px4_parameters(ctx: TrialContext) -> TrialContext:
                 px4_values[name] = value
 
     if not px4_values:
+        if require_explicit_px4_parameters:
+            raise ValueError("real_cli optimization requires at least one explicit PX4 parameter")
         return ctx
     normalized = validate_parameter_values(
         px4_values,
@@ -1056,6 +1062,9 @@ def claim_and_run_one_pending_trial(
         )
     sim = adapter or get_simulator_adapter(backend_override)
     trial.simulator_backend = sim.backend_name
+    require_explicit_px4_parameters = bool(
+        sim.backend_name == "real_cli" and job is not None and job.optimizer_strategy != "none"
+    )
     attempt_id: str | None = None
     cancellation_event = threading.Event()
     ctx: TrialContext | None = None
@@ -1269,7 +1278,10 @@ def claim_and_run_one_pending_trial(
     db.commit()
 
     try:
-        ctx = _validate_trial_px4_parameters(ctx)
+        ctx = _validate_trial_px4_parameters(
+            ctx,
+            require_explicit_px4_parameters=require_explicit_px4_parameters,
+        )
     except (TypeError, ValueError) as exc:
         logger.warning(
             "rejected invalid PX4 candidate before simulation trial=%s: %s",

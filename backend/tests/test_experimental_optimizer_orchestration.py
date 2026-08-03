@@ -1966,8 +1966,25 @@ def test_legacy_mock_parameter_domain_can_reach_the_experimental_optimizer(
         assert all("kp_xy" in candidate.parameter_json for candidate in generated)
 
 
-def test_real_cli_experimental_optimizer_requires_explicit_px4_parameters(
+@pytest.mark.parametrize(
+    "optimizer_strategy",
+    [
+        "heuristic",
+        "gpt",
+        "llm_harness",
+        "cma_es",
+        "constrained_mobo",
+        "multi_fidelity_mobo",
+        "turbo",
+        "saasbo",
+        "surrogate_cma_es",
+        "bipop_cma_es",
+        "optimizer_portfolio",
+    ],
+)
+def test_real_cli_optimizer_requires_explicit_px4_parameters(
     experimental_ctx: dict[str, Any],
+    optimizer_strategy: str,
 ) -> None:
     schemas = experimental_ctx["schemas"]
 
@@ -1977,7 +1994,7 @@ def test_real_cli_experimental_optimizer_requires_explicit_px4_parameters(
     ):
         schemas.JobCreateRequest(
             simulator_backend="real_cli",
-            optimizer_strategy="turbo",
+            optimizer_strategy=optimizer_strategy,
             parameter_space=[],
             max_total_trials=100,
         )

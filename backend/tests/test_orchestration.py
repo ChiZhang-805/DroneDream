@@ -1469,7 +1469,12 @@ def test_worker_never_claims_trial_for_non_running_job(
         assert trial.execution_attempts == []
 
 
-def _seed_single_pending_trial(ctx: dict[str, object]) -> str:
+def _seed_single_pending_trial(
+    ctx: dict[str, object],
+    *,
+    optimizer_strategy: str = "heuristic",
+    simulator_backend_requested: str = "mock",
+) -> str:
     models = ctx["models"]
     with ctx["db_module"].SessionLocal() as db:
         user = models.User(display_name="u")
@@ -1482,7 +1487,8 @@ def _seed_single_pending_trial(ctx: dict[str, object]) -> str:
             sensor_noise_level="medium",
             objective_profile="robust",
             status="RUNNING",
-            simulator_backend_requested="mock",
+            simulator_backend_requested=simulator_backend_requested,
+            optimizer_strategy=optimizer_strategy,
         )
         db.add(job)
         db.flush()
@@ -2348,7 +2354,11 @@ def test_real_cli_artifacts_are_persisted_before_transient_run_cleanup(
     orchestration_ctx, monkeypatch, tmp_path
 ):
     ctx = orchestration_ctx
-    trial_id = _seed_single_pending_trial(ctx)
+    trial_id = _seed_single_pending_trial(
+        ctx,
+        optimizer_strategy="none",
+        simulator_backend_requested="real_cli",
+    )
     run_root = tmp_path / "transient-runs"
     durable_root = tmp_path / "durable-artifacts"
     monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{_EXAMPLE_SIM}"')
@@ -2402,7 +2412,11 @@ def test_real_cli_shared_root_cleanup_preserves_persisted_artifacts(
     orchestration_ctx, monkeypatch, tmp_path
 ):
     ctx = orchestration_ctx
-    trial_id = _seed_single_pending_trial(ctx)
+    trial_id = _seed_single_pending_trial(
+        ctx,
+        optimizer_strategy="none",
+        simulator_backend_requested="real_cli",
+    )
     shared_root = tmp_path / "shared-artifacts"
     monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{_EXAMPLE_SIM}"')
     monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(shared_root))
@@ -2589,6 +2603,115 @@ def test_invalid_px4_candidate_is_rejected_before_simulator_start(
         assert trial.failure_code == "INVALID_CANDIDATE_PARAMETERS"
         assert "OUTSIDE_SAFE_BOUNDS" in (trial.failure_reason or "")
         assert trial.metric is None
+
+
+def test_real_cli_optimizer_without_explicit_px4_parameter_fails_before_simulator_start(
+    orchestration_ctx,
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.job.optimizer_strategy = "heuristic"
+        trial.job.simulator_backend_requested = "real_cli"
+        trial.job.parameter_space_json = []
+        trial.candidate.parameter_json = {
+            "kp_xy": 1.0,
+            "kd_xy": 0.2,
+            "ki_xy": 0.05,
+            "vel_limit": 5.0,
+            "accel_limit": 3.0,
+            "disturbance_rejection": 0.5,
+        }
+        db.commit()
+
+    class NeverStartedRealCliAdapter(MockSimulatorAdapter):
+        backend_name = "real_cli"
+
+        def __init__(self) -> None:
+            self.prepared = False
+            self.ran = False
+
+        def prepare(self, trial_ctx: TrialContext) -> None:
+            self.prepared = True
+
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            self.ran = True
+            return super().run_trial(trial_ctx)
+
+    adapter = NeverStartedRealCliAdapter()
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-real-cli-parameter-fence",
+            adapter=adapter,
+        )
+
+    assert claimed == trial_id
+    assert adapter.prepared is False
+    assert adapter.ran is False
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "FAILED"
+        assert trial.failure_code == "INVALID_CANDIDATE_PARAMETERS"
+        assert "explicit PX4 parameter" in (trial.failure_reason or "")
+        assert trial.metric is None
+
+
+def test_real_cli_optimizer_with_explicit_px4_parameter_reaches_simulator(
+    orchestration_ctx,
+) -> None:
+    ctx = orchestration_ctx
+    trial_id = _seed_single_pending_trial(ctx)
+    models = ctx["models"]
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.job.optimizer_strategy = "heuristic"
+        trial.job.simulator_backend_requested = "real_cli"
+        trial.job.parameter_space_json = [
+            {
+                "name": "MPC_XY_P",
+                "enabled": True,
+                "locked": False,
+            }
+        ]
+        trial.job.vehicle_profile_json = {
+            "px4_version": "main",
+            "vehicle_type": "multicopter",
+            "airframe": "x500",
+        }
+        trial.candidate.parameter_json = {"MPC_XY_P": 0.95}
+        db.commit()
+
+    class RecordingRealCliAdapter(MockSimulatorAdapter):
+        backend_name = "real_cli"
+
+        def __init__(self) -> None:
+            self.prepared_parameters: dict[str, float] | None = None
+
+        def prepare(self, trial_ctx: TrialContext) -> None:
+            self.prepared_parameters = dict(trial_ctx.parameters)
+
+    adapter = RecordingRealCliAdapter()
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "worker-real-cli-explicit-parameter",
+            adapter=adapter,
+        )
+
+    assert claimed == trial_id
+    assert adapter.prepared_parameters == {"MPC_XY_P": 0.95}
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "COMPLETED"
+        assert trial.failure_code is None
+        assert trial.metric is not None
 
 
 def test_disabled_parameter_is_not_required_but_enabled_locked_parameter_is(

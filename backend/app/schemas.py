@@ -740,7 +740,9 @@ class JobCreateRequest(_Strict):
     baseline_parameters: BaselineParameters = Field(default_factory=BaselineParameters)
 
     # Advanced experiment definition. Empty ``parameter_space`` deliberately
-    # selects the legacy six-parameter domain so old API clients keep working.
+    # selects the legacy six-parameter domain for mock-backend compatibility.
+    # Real PX4 optimization must name the parameters that will be written and
+    # read back; otherwise several legacy dimensions are physically inert.
     vehicle_profile: VehicleProfileConfig = Field(default_factory=VehicleProfileConfig)
     parameter_catalog_version: str = Field(default="builtin-v1", min_length=1, max_length=128)
     parameter_space: list[ParameterSelection] = Field(default_factory=list, max_length=64)
@@ -790,24 +792,12 @@ class JobCreateRequest(_Strict):
         if len(set(parameter_names)) != len(parameter_names):
             raise ValueError("parameter_space names must be unique")
         enabled = [item for item in self.parameter_space if item.enabled and not item.locked]
-        experimental_optimizers = {
-            "llm_harness",
-            "constrained_mobo",
-            "multi_fidelity_mobo",
-            "turbo",
-            "saasbo",
-            "surrogate_cma_es",
-            "bipop_cma_es",
-            "optimizer_portfolio",
-        }
         if (
             self.simulator_backend == "real_cli"
-            and self.optimizer_strategy in experimental_optimizers
+            and self.optimizer_strategy != "none"
             and not self.parameter_space
         ):
-            raise ValueError(
-                "experimental real_cli optimization requires an explicit PX4 parameter_space"
-            )
+            raise ValueError("real_cli optimization requires an explicit PX4 parameter_space")
         if self.optimizer_strategy != "none" and self.parameter_space and not enabled:
             raise ValueError("parameter_space requires at least one enabled, unlocked parameter")
         if self.openai is not None and self.llm is not None:
