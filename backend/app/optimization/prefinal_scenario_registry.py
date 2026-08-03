@@ -13,10 +13,19 @@ import hashlib
 import json
 from collections import Counter
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, TypedDict
 
 from app.optimization.scenarios import scenario_matrix
-from app.schemas import JobCreateRequest, ScenarioCaseConfig, ScenarioSuiteConfig
+from app.schemas import (
+    AcceptanceCriteria,
+    AdvancedScenarioConfig,
+    JobCreateRequest,
+    ParameterSelection,
+    ScenarioCaseConfig,
+    ScenarioSuiteConfig,
+    TrackPoint,
+    WindVector,
+)
 from app.simulator.scenario_effects import build_scenario_effect_request
 
 PREFINAL_SCENARIO_REGISTRY_SCHEMA_VERSION = "dronedream.prefinal-scenario-registry/v1"
@@ -33,6 +42,33 @@ PREFINAL_SCENARIO_REGISTRY_CLAIM_BOUNDARY = (
 )
 
 Difficulty = Literal["easy", "representative", "hard"]
+
+
+class _ParameterSpaceSpec(TypedDict):
+    name: str
+    baseline: float
+    minimum: float
+    maximum: float
+    step: float
+
+
+class _BudgetSpec(TypedDict):
+    generation_cap: int
+    candidate_slots_per_generation: int
+    scenario_runs_per_candidate: int
+    baseline_scenario_runs: int
+    simulation_trial_cap: int
+    provider_turn_cap_per_job: int
+    provider_retry_cap: int
+    wall_time_cap_s: int
+    completion_policy: str
+    continue_exploration_default: bool
+
+
+class _AcceptanceCriteriaSpec(TypedDict):
+    target_rmse: float
+    target_max_error: float
+    min_pass_rate: float
 
 
 @dataclass(frozen=True)
@@ -342,7 +378,7 @@ def _problem_specs() -> tuple[_ProblemSpec, ...]:
     )
 
 
-_PARAMETER_SPACE = (
+_PARAMETER_SPACE: tuple[_ParameterSpaceSpec, ...] = (
     {"name": "MPC_XY_P", "baseline": 0.95, "minimum": 0.6, "maximum": 1.3, "step": 0.1},
     {
         "name": "MPC_XY_VEL_P_ACC",
@@ -427,7 +463,7 @@ _ARMS = (
     },
 )
 
-_BUDGET = {
+_BUDGET: _BudgetSpec = {
     "generation_cap": 8,
     "candidate_slots_per_generation": 2,
     "scenario_runs_per_candidate": 4,
@@ -440,7 +476,7 @@ _BUDGET = {
     "continue_exploration_default": False,
 }
 
-_CALIBRATION_THRESHOLDS = {
+_CALIBRATION_THRESHOLDS: dict[Difficulty, _AcceptanceCriteriaSpec] = {
     "easy": {"target_rmse": 0.35, "target_max_error": 0.90, "min_pass_rate": 1.0},
     "representative": {"target_rmse": 0.55, "target_max_error": 1.35, "min_pass_rate": 1.0},
     "hard": {"target_rmse": 0.80, "target_max_error": 1.80, "min_pass_rate": 1.0},
@@ -477,13 +513,16 @@ def _job_template(spec: _ProblemSpec, index: int) -> JobCreateRequest:
         display_name=f"Pre-final {spec.problem_id}",
         track_type=spec.track_type,  # type: ignore[arg-type]
         altitude_m=spec.altitude_m,
-        wind={"north": north, "east": east, "south": south, "west": west},
+        wind=WindVector(north=north, east=east, south=south, west=west),
         sensor_noise_level=spec.sensor_noise_level,  # type: ignore[arg-type]
         objective_profile="robust",
-        reference_track=[{"x": x, "y": y, "z": z} for x, y, z in spec.reference_track] or None,
-        advanced_scenario_config=spec.advanced,
+        reference_track=[TrackPoint(x=x, y=y, z=z) for x, y, z in spec.reference_track]
+        or None,
+        advanced_scenario_config=(
+            AdvancedScenarioConfig.model_validate(spec.advanced) if spec.advanced else None
+        ),
         parameter_catalog_version="builtin-v1",
-        parameter_space=list(_PARAMETER_SPACE),
+        parameter_space=[ParameterSelection.model_validate(item) for item in _PARAMETER_SPACE],
         scenario_suite=_scenario_suite(spec, index),
         simulator_backend="real_cli",
         optimizer_strategy="none",
@@ -492,7 +531,9 @@ def _job_template(spec: _ProblemSpec, index: int) -> JobCreateRequest:
         max_total_trials=_BUDGET["simulation_trial_cap"],
         completion_policy="first_qualified_stop",
         provider_turn_cap=0,
-        acceptance_criteria=_CALIBRATION_THRESHOLDS[spec.difficulty],
+        acceptance_criteria=AcceptanceCriteria.model_validate(
+            _CALIBRATION_THRESHOLDS[spec.difficulty]
+        ),
     )
 
 
