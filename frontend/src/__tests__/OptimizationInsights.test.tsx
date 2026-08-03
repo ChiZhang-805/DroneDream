@@ -102,6 +102,32 @@ describe("OptimizationInsights", () => {
     );
   });
 
+  it("uses the aggregated pass rate instead of treating feasibility as 100 percent", () => {
+    const rmseOnlyHistory: OptimizationHistory = {
+      ...history,
+      pareto_candidate_ids: ["candidate-balanced"],
+      recommendations: {},
+      objective_directions: { rmse: "minimize" },
+      items: [
+        {
+          ...history.items[1],
+          aggregated_metrics: { rmse: 0.7, pass_rate: 0.25 },
+          objective_values: { rmse: 0.7 },
+          feasible: true,
+        },
+      ],
+    };
+
+    render(<OptimizationInsights trials={[]} history={rmseOnlyHistory} />);
+
+    const row = screen.getAllByRole("row").find((candidateRow) =>
+      within(candidateRow).queryByText("Balanced"),
+    );
+    expect(row).toBeDefined();
+    expect(within(row!).getByText("25%")).toBeInTheDocument();
+    expect(within(row!).queryByText("100%")).not.toBeInTheDocument();
+  });
+
   it("does not mark an equal-score lower-pass candidate as Pareto optimal", () => {
     const trial = (
       candidateId: string,

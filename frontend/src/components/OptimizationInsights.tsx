@@ -74,10 +74,27 @@ function aggregateCandidates(trials: TrialSummary[]): CandidateAggregate[] {
   return rows.sort((a, b) => a.meanScore - b.meanScore);
 }
 
+function historyPassRate(candidate: OptimizationHistory["items"][number]): number | null {
+  const candidates = [
+    candidate.aggregated_metrics?.pass_rate,
+    candidate.objective_values?.pass_rate,
+    candidate.objective_values?.pass_flag,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function aggregateHistory(history: OptimizationHistory): CandidateAggregate[] {
   const pareto = new Set(history.pareto_candidate_ids);
   return history.items
-    .filter((candidate) => candidate.aggregated_score !== null)
+    .filter(
+      (candidate): candidate is typeof candidate & { aggregated_score: number } =>
+        candidate.aggregated_score !== null && Number.isFinite(candidate.aggregated_score),
+    )
     .map((candidate) => ({
       id: candidate.id,
       label: candidate.label ?? candidate.id,
@@ -86,14 +103,7 @@ function aggregateHistory(history: OptimizationHistory): CandidateAggregate[] {
       isBest: candidate.is_best,
       meanScore: Number(candidate.aggregated_score),
       bestScore: Number(candidate.aggregated_score),
-      passRate:
-        candidate.objective_values && Number.isFinite(candidate.objective_values.pass_flag)
-          ? Number(candidate.objective_values.pass_flag)
-          : candidate.feasible === null
-            ? null
-            : candidate.feasible
-              ? 1
-              : 0,
+      passRate: historyPassRate(candidate),
       completed: candidate.completed_trial_count,
       total: candidate.trial_count,
       scenarios: null,
