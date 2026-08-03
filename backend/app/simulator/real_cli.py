@@ -633,6 +633,8 @@ def _execute_command(
     stdout_path: Path,
     stderr_path: Path,
 ) -> _ProcessOutcome:
+    if cancellation_event is not None and cancellation_event.is_set():
+        raise _SimulatorCancelled
     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
     windows_job = _WindowsKillOnCloseJob.create()
     proc: subprocess.Popen[bytes] | None = None

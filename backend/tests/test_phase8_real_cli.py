@@ -2029,6 +2029,32 @@ def test_process_start_failure_is_not_masked_by_posix_cleanup(monkeypatch, tmp_p
         )
 
 
+def test_pre_cancelled_real_cli_attempt_never_starts_a_process(monkeypatch, tmp_path) -> None:
+    started = False
+
+    def unexpected_start(*_args, **_kwargs):
+        nonlocal started
+        started = True
+        raise AssertionError("cancelled simulator must not start")
+
+    cancellation = threading.Event()
+    cancellation.set()
+    monkeypatch.setattr(real_cli_module.subprocess, "Popen", unexpected_start)
+
+    with pytest.raises(real_cli_module._SimulatorCancelled):
+        real_cli_module._execute_command(
+            ["simulator"],
+            cwd=None,
+            env={},
+            timeout_seconds=1.0,
+            cancellation_event=cancellation,
+            stdout_path=tmp_path / "stdout.log",
+            stderr_path=tmp_path / "stderr.log",
+        )
+
+    assert started is False
+
+
 def test_real_cli_timeout_terminates_descendant_processes(monkeypatch, tmp_path) -> None:
     parent, child, sentinel = _write_process_tree_fixture(tmp_path)
     monkeypatch.setenv(
