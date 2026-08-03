@@ -37,6 +37,10 @@ from app.orchestration.attempt_evidence import (
     record_accepted_trial_attempt_outcome,
 )
 from app.orchestration.events import record_event
+from app.orchestration.winner_freeze import (
+    WinnerFreezeError,
+    require_winner_freeze_receipt,
+)
 from app.parameters import (
     classify_airframe,
     get_parameter,
@@ -1711,11 +1715,37 @@ def compare_jobs(
         optimized_metrics = (
             dict(job.report.optimized_metric_json or {}) if job.report is not None else None
         )
+        verified_real_winner = False
+        if (
+            job.simulator_backend_requested == "real_cli"
+            and job.best_candidate_id
+            and job.report is not None
+            and job.report.winner_freeze_receipt_id is not None
+        ):
+            if job.report.winner_freeze_receipt is None:
+                raise JobServiceError(
+                    "REPORT_EVIDENCE_INVALID",
+                    f"Winner freeze receipt for Job {job.id} is missing.",
+                    http_status=409,
+                )
+            try:
+                require_winner_freeze_receipt(
+                    job.report.winner_freeze_receipt,
+                    job=job,
+                    evidence=job.report.winner_evidence_json,
+                )
+            except WinnerFreezeError as exc:
+                raise JobServiceError(
+                    "REPORT_EVIDENCE_INVALID",
+                    f"Winner freeze receipt for Job {job.id} is invalid.",
+                    http_status=409,
+                ) from exc
+            verified_real_winner = True
         validated_best = bool(
             job.best_candidate_id
             and (
                 job.simulator_backend_requested != "real_cli"
-                or (job.report is not None and job.report.winner_freeze_receipt_id)
+                or verified_real_winner
             )
         )
         if job.status != "COMPLETED":

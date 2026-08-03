@@ -669,6 +669,59 @@ def test_compare_jobs_returns_completed_metrics(client: TestClient) -> None:
     assert items[0]["optimized_metrics"]["rmse"] == 0.8
 
 
+def test_compare_jobs_rejects_invalid_real_cli_winner_freeze(
+    client: TestClient,
+) -> None:
+    from app import models
+    from app.db import SessionLocal
+
+    job_ids = [
+        client.post("/api/v1/jobs", json=HEURISTIC_JOB_PAYLOAD).json()["data"]["id"]
+        for _ in range(2)
+    ]
+    with SessionLocal() as db:
+        for index, job_id in enumerate(job_ids):
+            job = db.get(models.Job, job_id)
+            assert job is not None
+            job.status = "COMPLETED"
+            job.simulator_backend_requested = "real_cli"
+            candidate = models.CandidateParameterSet(
+                id=f"cand_compare_invalid_freeze_{index}",
+                job_id=job.id,
+                parameter_json={"MPC_XY_P": 0.9},
+                is_baseline=True,
+                is_best=True,
+            )
+            receipt = models.WinnerFreezeReceipt(
+                job_id=job.id,
+                receipt_schema="dronedream.winner-freeze-receipt/v1",
+                evidence_id=f"sha256:{index + 1:064x}",
+                outcome_contract_id=f"sha256:{index + 11:064x}",
+                baseline_candidate_id=candidate.id,
+                winner_candidate_id=candidate.id,
+                evidence_json={},
+            )
+            job.candidates.append(candidate)
+            job.baseline_candidate_id = candidate.id
+            job.best_candidate_id = candidate.id
+            job.winner_freeze = receipt
+            job.report = models.JobReport(
+                job_id=job.id,
+                report_status="READY",
+                best_candidate_id=candidate.id,
+                baseline_metric_json={"rmse": 1.0},
+                optimized_metric_json={"rmse": 0.8},
+                winner_evidence_json={},
+                winner_freeze_receipt=receipt,
+            )
+        db.commit()
+
+    response = client.post("/api/v1/jobs/compare", json={"job_ids": job_ids})
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "REPORT_EVIDENCE_INVALID"
+
+
 def test_compare_jobs_keeps_no_winner_report_metrics_diagnostic(client: TestClient) -> None:
     from app import models
     from app.db import SessionLocal
