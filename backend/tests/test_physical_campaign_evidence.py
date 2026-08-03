@@ -10,6 +10,7 @@ import pytest
 
 from app.simulator import physical_campaign_evidence
 from app.simulator.physical_campaign_evidence import build_runtime_observation
+from app.simulator.telemetry_evidence import compile_telemetry_semantic_contract
 from scripts import observe_px4_runtime
 from scripts.observe_px4_runtime import write_new_runtime_observation
 
@@ -441,3 +442,48 @@ def test_attempt_four_reprocessing_remains_a_diagnostic_contract() -> None:
 
     assert summary["sample_count"] == 2
     assert summary["evidence_role"] == "post-fix-parser-diagnostic-not-success-trial"
+
+
+def test_physical_campaign_rejects_telemetry_samples_that_break_the_contract() -> None:
+    ulog = b"retained PX4 ULog"
+    ulog_sha = hashlib.sha256(ulog).hexdigest()
+    sample = {
+        "t": 0.0,
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "vx": 0.0,
+        "vy": 0.0,
+        "vz": 0.0,
+        "yaw": 0.0,
+        "armed": True,
+        "mode": "OFFBOARD",
+        "crashed": False,
+    }
+    samples = [sample, {**sample, "t": 0.1, "x": 0.1}]
+    contract = compile_telemetry_semantic_contract(
+        samples=samples,
+        source_bytes=ulog,
+        source_kind="px4_ulog",
+        extraction_revision="pyulog-vehicle-local-position-1.0",
+        synthetic=False,
+        origin_provenance={
+            "origin_source_sha256": f"sha256:{ulog_sha}",
+            "origin_source_byte_count": len(ulog),
+            "origin_extraction_revision": "pyulog-vehicle-local-position-1.0",
+            "origin_coordinate_frame": "PX4_LOCAL_NED",
+            "coordinate_transform": "PX4 NED to DroneDream z-up",
+        },
+    )
+    payload = {
+        "schema_version": "dronedream.telemetry.v2",
+        "semantic_contract": contract.model_dump(mode="json"),
+        "samples": [dict(item) for item in samples],
+    }
+    payload["samples"][1]["t"] = 0.0
+
+    with pytest.raises(ValueError, match="semantic contract is invalid"):
+        physical_campaign_evidence._validate_telemetry(
+            payload,
+            ulog_sha256=ulog_sha,
+        )

@@ -20,6 +20,8 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from app.simulator.telemetry_evidence import verify_telemetry_semantic_contract
+
 PHYSICAL_CAMPAIGN_SCHEMA_VERSION = "dronedream.px4-physical-campaign-evidence.v1"
 PHYSICAL_CAMPAIGN_RECEIPT_SCHEMA_VERSION = "dronedream.px4-physical-campaign-receipt.v1"
 PHYSICAL_CAMPAIGN_EVIDENCE_CLASS = "real_px4_gazebo_sitl_physical_campaign"
@@ -526,51 +528,29 @@ def _validate_telemetry(
     *,
     ulog_sha256: str,
 ) -> dict[str, Any]:
-    if payload.get("schema_version") != "dronedream.telemetry.v2":
-        raise ValueError("telemetry schema_version must be dronedream.telemetry.v2")
-    contract = _nested_mapping(payload.get("semantic_contract"), field="semantic_contract")
-    if contract.get("schema_id") != "dronedream.telemetry-semantic-contract/v1":
-        raise ValueError("telemetry semantic contract schema is invalid")
-    if contract.get("synthetic") is not False or contract.get("source_kind") != "px4_ulog":
+    contract = verify_telemetry_semantic_contract(payload)
+    if contract is None:
+        raise ValueError("telemetry semantic contract is invalid")
+    if contract.synthetic is not False or contract.source_kind != "px4_ulog":
         raise ValueError("telemetry must be non-synthetic PX4 ULog evidence")
-    if contract.get("coordinate_frame") != "dronedream_local_cartesian_z_up":
+    if contract.coordinate_frame != "dronedream_local_cartesian_z_up":
         raise ValueError("telemetry coordinate frame is invalid")
     origin_sha = _require_sha256(
-        contract.get("origin_source_sha256"),
+        contract.origin_source_sha256,
         field="semantic_contract.origin_source_sha256",
         prefix_allowed=True,
     )
     if origin_sha != ulog_sha256:
         raise ValueError("telemetry origin ULog SHA-256 does not match retained ULog")
-    contract_id = _require_sha256(
-        contract.get("contract_id"),
-        field="semantic_contract.contract_id",
-        prefix_allowed=True,
-    )
-    unsigned_contract = {key: value for key, value in contract.items() if key != "contract_id"}
-    if contract_id != _sha256_value(unsigned_contract):
-        raise ValueError("telemetry semantic contract_id does not recompute")
     samples = payload.get("samples")
-    if not isinstance(samples, list) or not samples:
-        raise ValueError("telemetry samples must be a non-empty array")
-    sampling = _nested_mapping(contract.get("sampling"), field="semantic_contract.sampling")
-    if sampling.get("sample_count") != len(samples):
-        raise ValueError("telemetry sampling sample_count does not match samples")
-    if any(not isinstance(sample, dict) for sample in samples):
-        raise ValueError("telemetry samples must contain objects")
+    assert isinstance(samples, list)  # established by the semantic verifier
     if any(sample.get("crashed") is True for sample in samples):
         raise ValueError("successful campaign telemetry cannot contain crashed=true")
     return {
-        "contract_id": f"sha256:{contract_id}",
+        "contract_id": contract.contract_id,
         "sample_count": len(samples),
-        "duration_s": _require_finite(
-            sampling.get("duration_s"),
-            field="semantic_contract.sampling.duration_s",
-        ),
-        "sampling_coverage": _require_finite(
-            sampling.get("sampling_coverage"),
-            field="semantic_contract.sampling.sampling_coverage",
-        ),
+        "duration_s": contract.sampling.duration_s,
+        "sampling_coverage": contract.sampling.sampling_coverage,
         "origin_ulog_sha256": f"sha256:{origin_sha}",
     }
 
