@@ -1435,6 +1435,40 @@ def test_claim_returns_none_when_no_pending(orchestration_ctx):
     assert trial_id is None
 
 
+@pytest.mark.parametrize(
+    "job_status",
+    ["QUEUED", "AGGREGATING", "FINALIZING", "COMPLETED", "FAILED", "CANCELLED"],
+)
+def test_worker_never_claims_trial_for_non_running_job(
+    orchestration_ctx,
+    job_status: str,
+) -> None:
+    """A stale child row must not revive work after its Job leaves RUNNING."""
+
+    ctx = orchestration_ctx
+    models = ctx["models"]
+    trial_id = _seed_single_pending_trial(ctx)
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        trial.job.status = job_status
+        db.commit()
+
+    with ctx["db_module"].SessionLocal() as db:
+        claimed = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            f"worker-non-running-{job_status.lower()}",
+        )
+
+    assert claimed is None
+    with ctx["db_module"].SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial is not None
+        assert trial.status == "PENDING"
+        assert trial.attempt_count == 0
+        assert trial.execution_attempts == []
+
+
 def _seed_single_pending_trial(ctx: dict[str, object]) -> str:
     models = ctx["models"]
     with ctx["db_module"].SessionLocal() as db:

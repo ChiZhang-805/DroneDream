@@ -935,6 +935,7 @@ def claim_and_run_one_pending_trial(
         selected_job_id = db.scalar(
             select(models.Job.id)
             .where(
+                models.Job.status == "RUNNING",
                 exists(
                     select(eligible_trial.id).where(
                         eligible_trial.job_id == models.Job.id,
