@@ -225,7 +225,10 @@ import sys
 payload = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
 if payload.get("parameter") != "MPC_XY_P":
     raise SystemExit("unexpected PX4 parameter readback marker")
-if not all(math.isfinite(float(payload[key])) for key in ("original", "written", "readBack")):
+if not all(
+    math.isfinite(float(payload[key]))
+    for key in ("original", "written", "readBack", "restored")
+):
     raise SystemExit("non-finite PX4 parameter value")
 if not 0.0 <= float(payload["written"]) <= 2.0:
     raise SystemExit("PX4 smoke value is outside the safe [0, 2] range")
@@ -233,6 +236,8 @@ if math.isclose(float(payload["original"]), float(payload["written"]), abs_tol=1
     raise SystemExit("PX4 smoke did not use a distinct parameter value")
 if abs(float(payload["written"]) - float(payload["readBack"])) > 1e-4:
     raise SystemExit("PX4 parameter write/readback mismatch")
+if abs(float(payload["original"]) - float(payload["restored"])) > 1e-4:
+    raise SystemExit("PX4 parameter restore mismatch")
 PY
     ;;
   *)
