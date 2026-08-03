@@ -56,6 +56,40 @@ _EXPECTED_RUNTIME_OBSERVATION_COMMANDS = (
     "gazebo_harmonic_package",
     "kernel",
 )
+_RUNTIME_OBSERVATION_COMMAND_SUFFIXES: dict[str, tuple[tuple[str, ...], ...]] = {
+    "px4_git_head": (
+        (
+            "git",
+            "-c",
+            "safe.directory=/opt/PX4-Autopilot",
+            "-C",
+            "/opt/PX4-Autopilot",
+            "rev-parse",
+            "HEAD",
+        ),
+    ),
+    "gazebo_sim_version": (("gz", "sim", "--version"),),
+    "python_version": (("/opt/dronedream/venv/bin/python3", "--version"),),
+    "mavsdk_version": (
+        (
+            "/opt/dronedream/venv/bin/python3",
+            "-c",
+            "import importlib.metadata as m; print(m.version('mavsdk'))",
+        ),
+    ),
+    "pyulog_version": (
+        (
+            "/opt/dronedream/venv/bin/python3",
+            "-c",
+            "import importlib.metadata as m; print(m.version('pyulog'))",
+        ),
+    ),
+    "ubuntu_release": (("cat", "/etc/os-release"),),
+    "gazebo_harmonic_package": (("dpkg-query", "-W", "gz-harmonic"),),
+    # The first frozen campaign used uname -a. New observations use -srmo to
+    # avoid persisting the host name; both are valid v1 command histories.
+    "kernel": (("uname", "-a"), ("uname", "-srmo")),
+}
 
 _COMMON_RETAINED = frozenset(
     {
@@ -357,6 +391,7 @@ def _validate_runtime_observation(
         != list(_EXPECTED_RUNTIME_OBSERVATION_COMMANDS)
     ):
         raise ValueError("Runtime observation command matrix is incomplete")
+    command_stdout: dict[str, str] = {}
     for index, raw_command in enumerate(commands):
         command = _nested_mapping(
             raw_command,
@@ -376,6 +411,44 @@ def _validate_runtime_observation(
             or command.get("stderr_sha256") != _sha256_bytes(stderr.encode("utf-8"))
         ):
             raise ValueError("Runtime observation command evidence is invalid")
+        name = str(command["name"])
+        executable = str(argv[0]).replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if (
+            executable != "wsl.exe"
+            or argv[1:4] != ["-d", "DroneDreamRuntime", "--"]
+            or tuple(argv[4:]) not in _RUNTIME_OBSERVATION_COMMAND_SUFFIXES[name]
+        ):
+            raise ValueError(f"Runtime observation command argv drifted: {name}")
+        command_stdout[name] = stdout
+
+    os_version = next(
+        (
+            line.split("=", 1)[1].strip().strip('"')
+            for line in command_stdout["ubuntu_release"].splitlines()
+            if line.startswith("VERSION_ID=")
+        ),
+        None,
+    )
+    gazebo_match = re.search(
+        r"(?:^|\n)Gazebo Sim, version ([0-9.]+)(?:\n|$)",
+        command_stdout["gazebo_sim_version"],
+    )
+    expected_outputs = {
+        "px4_git_head": payload["px4_commit"],
+        "python_version": f"Python {payload['python_version']}",
+        "mavsdk_version": payload["mavsdk_version"],
+        "pyulog_version": payload["pyulog_version"],
+        "kernel": payload.get("kernel"),
+    }
+    if any(command_stdout[name] != expected for name, expected in expected_outputs.items()):
+        raise ValueError("Runtime observation command output contradicts declared identity")
+    if gazebo_match is None or gazebo_match.group(1) != payload["gazebo_sim_version"]:
+        raise ValueError("Runtime observation command output contradicts declared Gazebo version")
+    if os_version != payload["ubuntu_version"]:
+        raise ValueError("Runtime observation command output contradicts declared Ubuntu version")
+    package_parts = command_stdout["gazebo_harmonic_package"].split()
+    if package_parts != ["gz-harmonic", payload["gazebo_harmonic_package"]]:
+        raise ValueError("Runtime observation command output contradicts declared Gazebo package")
     return {
         "observer_commit": payload["observer_commit"],
         "observed_at": payload["observed_at"],

@@ -29,14 +29,91 @@ _COMMAND_NAMES = (
 
 
 def _command_rows() -> list[dict[str, Any]]:
+    command_contract = {
+        "px4_git_head": (
+            [
+                "wsl.exe",
+                "-d",
+                "DroneDreamRuntime",
+                "--",
+                "git",
+                "-c",
+                "safe.directory=/opt/PX4-Autopilot",
+                "-C",
+                "/opt/PX4-Autopilot",
+                "rev-parse",
+                "HEAD",
+            ],
+            _PX4_COMMIT,
+        ),
+        "gazebo_sim_version": (
+            ["wsl.exe", "-d", "DroneDreamRuntime", "--", "gz", "sim", "--version"],
+            "Gazebo Sim, version 8.14.0",
+        ),
+        "python_version": (
+            [
+                "wsl.exe",
+                "-d",
+                "DroneDreamRuntime",
+                "--",
+                "/opt/dronedream/venv/bin/python3",
+                "--version",
+            ],
+            "Python 3.12.3",
+        ),
+        "mavsdk_version": (
+            [
+                "wsl.exe",
+                "-d",
+                "DroneDreamRuntime",
+                "--",
+                "/opt/dronedream/venv/bin/python3",
+                "-c",
+                "import importlib.metadata as m; print(m.version('mavsdk'))",
+            ],
+            "3.15.3",
+        ),
+        "pyulog_version": (
+            [
+                "wsl.exe",
+                "-d",
+                "DroneDreamRuntime",
+                "--",
+                "/opt/dronedream/venv/bin/python3",
+                "-c",
+                "import importlib.metadata as m; print(m.version('pyulog'))",
+            ],
+            "1.2.3",
+        ),
+        "ubuntu_release": (
+            ["wsl.exe", "-d", "DroneDreamRuntime", "--", "cat", "/etc/os-release"],
+            'NAME="Ubuntu"\nVERSION_ID="24.04"',
+        ),
+        "gazebo_harmonic_package": (
+            [
+                "wsl.exe",
+                "-d",
+                "DroneDreamRuntime",
+                "--",
+                "dpkg-query",
+                "-W",
+                "gz-harmonic",
+            ],
+            "gz-harmonic\t1.0.0-1~noble",
+        ),
+        "kernel": (
+            ["wsl.exe", "-d", "DroneDreamRuntime", "--", "uname", "-srmo"],
+            "Linux test 6.6.0 x86_64 GNU/Linux",
+        ),
+    }
     rows = []
     for name in _COMMAND_NAMES:
-        stdout = f"{name}-stdout"
+        argv, stdout = command_contract[name]
         stderr = ""
         rows.append(
             {
                 "name": name,
-                "argv": ["wsl.exe", "-d", "DroneDreamRuntime", "--", name],
+                "argv": argv,
                 "exit_code": 0,
                 "stdout": stdout,
                 "stderr": stderr,
@@ -143,6 +220,28 @@ def test_runtime_observation_rejects_failed_command() -> None:
 
     with pytest.raises(ValueError, match="command evidence"):
         _observation(commands=commands)
+
+
+def test_runtime_observation_rejects_command_or_declared_output_drift() -> None:
+    wrong_argv = _command_rows()
+    wrong_argv[0]["argv"] = [
+        "wsl.exe",
+        "-d",
+        "DroneDreamRuntime",
+        "--",
+        "echo",
+        _PX4_COMMIT,
+    ]
+    with pytest.raises(ValueError, match="command argv"):
+        _observation(commands=wrong_argv)
+
+    wrong_output = _command_rows()
+    wrong_output[0]["stdout"] = "b" * 40
+    wrong_output[0]["stdout_sha256"] = hashlib.sha256(
+        wrong_output[0]["stdout"].encode()
+    ).hexdigest()
+    with pytest.raises(ValueError, match="command output"):
+        _observation(commands=wrong_output)
 
 
 def test_runtime_release_fixture_binds_campaign_firmware() -> None:
