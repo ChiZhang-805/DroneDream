@@ -10,6 +10,7 @@ function ModelAccessProbe() {
     selectAccessMode,
     selectManagedProvider,
     selectProvider,
+    updateSettings,
   } = useModelAccess();
   return (
     <>
@@ -25,6 +26,12 @@ function ModelAccessProbe() {
       </button>
       <button type="button" onClick={() => selectManagedProvider("deepseek")}>
         Select managed DeepSeek
+      </button>
+      <button
+        type="button"
+        onClick={() => updateSettings({ baseUrl: "https://second.example/v1" })}
+      >
+        Change endpoint
       </button>
     </>
   );
@@ -51,6 +58,32 @@ describe("ModelAccessProvider", () => {
     await waitFor(() => {
       expect(window.localStorage.getItem("dronedream:model-access:v1"))
         .not.toContain("openai-secret");
+    });
+  });
+
+  it("clears the in-memory credential when its endpoint changes", async () => {
+    render(
+      <ModelAccessProvider
+        initialSettings={{
+          accessMode: "byok",
+          provider: "custom",
+          apiKey: "first-endpoint-secret",
+          baseUrl: "https://first.example/v1",
+        }}
+      >
+        <ModelAccessProbe />
+      </ModelAccessProvider>,
+    );
+
+    expect(screen.getByLabelText("api-key"))
+      .toHaveTextContent("first-endpoint-secret");
+    fireEvent.click(screen.getByRole("button", { name: "Change endpoint" }));
+
+    expect(screen.getByLabelText("api-key")).toBeEmptyDOMElement();
+    await waitFor(() => {
+      const stored = window.localStorage.getItem("dronedream:model-access:v1") ?? "";
+      expect(stored).toContain("https://second.example/v1");
+      expect(stored).not.toContain("first-endpoint-secret");
     });
   });
 

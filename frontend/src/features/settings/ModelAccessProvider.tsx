@@ -282,7 +282,19 @@ export function ModelAccessProvider({
       ...current,
       profiles: current.profiles.map((profile) =>
         profile.id === current.activeProfileId
-          ? { ...profile, ...values }
+          ? {
+              ...profile,
+              ...values,
+              // A BYOK credential is scoped to the endpoint where the user
+              // entered it. Editing that endpoint must not silently carry the
+              // old credential to a different host. A caller that deliberately
+              // replaces both values in one atomic update may provide apiKey.
+              ...(values.baseUrl !== undefined
+                && values.baseUrl !== profile.baseUrl
+                && values.apiKey === undefined
+                ? { apiKey: "" }
+                : {}),
+            }
           : profile
       ),
     }));
