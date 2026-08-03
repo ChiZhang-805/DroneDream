@@ -114,6 +114,14 @@ def _run_job_to_completion(
     req = schemas.JobCreateRequest(
         optimizer_strategy=optimizer_strategy,
         simulator_backend="mock",
+        # These tests exercise multi-candidate report and tamper-rejection
+        # paths.  Keep the baseline below the preregistered qualification bar
+        # so the product's default first-qualified policy does not correctly
+        # stop before an optimizer candidate is generated.
+        acceptance_criteria=schemas.AcceptanceCriteria(
+            target_rmse=0.01,
+            min_pass_rate=1.0,
+        ),
         **request_kwargs,
     )
     with db_module.SessionLocal() as db:

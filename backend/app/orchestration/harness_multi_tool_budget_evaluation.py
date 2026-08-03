@@ -26,7 +26,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app import models
+from app import models, schemas
 from app.orchestration import aggregation, job_manager, trial_executor
 from app.orchestration.decision_harness import (
     _generation_plan_history,
@@ -122,11 +122,47 @@ class _ScriptedMultiToolClient:
         self.calls = 0
         self.plan_calls = 0
         self.revision_calls = 0
+        self.diagnosis_calls = 0
+        self.critic_calls = 0
 
     def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
         del model, system
         self.calls += 1
         payload = json.loads(user)
+        if payload.get("role") == "diagnosis":
+            self.diagnosis_calls += 1
+            refs = payload["current_proposal_refs"]
+            reasons = payload["trigger_reasons"]
+            if (
+                not isinstance(refs, list)
+                or not refs
+                or not isinstance(reasons, list)
+                or not reasons
+            ):
+                raise ValueError("scripted diagnosis received an invalid closed review contract")
+            return {
+                "schema_version": "1.0",
+                "decision": "keep",
+                "selected_proposal_refs": refs,
+                "diagnosis_codes": [reasons[0]],
+            }
+        if payload.get("role") == "critic":
+            self.critic_calls += 1
+            refs = payload["current_proposal_refs"]
+            reasons = payload["trigger_reasons"]
+            if (
+                not isinstance(refs, list)
+                or not refs
+                or not isinstance(reasons, list)
+                or not reasons
+            ):
+                raise ValueError("scripted critic received an invalid closed review contract")
+            return {
+                "schema_version": "1.0",
+                "decision": "approve",
+                "approved_proposal_refs": refs,
+                "risk_codes": [reasons[0]],
+            }
         if "budget_opportunity" in payload:
             self.plan_calls += 1
             opportunity = payload["budget_opportunity"]
@@ -276,7 +312,41 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
             )
             db.add(user)
             db.flush()
-            request = _job_request(seed_block, arm=arm)
+            base_request = _job_request(seed_block, arm=arm)
+            # The live multi-tool dispatcher only exposes specialist tools
+            # whose capability preconditions match the frozen problem shape.
+            # A two-objective problem makes constrained MOBO and the
+            # deterministic portfolio independently eligible, so this fixture
+            # continues to prove actual multi-tool execution instead of merely
+            # exercising two provider messages around one fallback tool.
+            request_payload = base_request.model_dump(mode="json")
+            request_payload["objective_config"] = schemas.ObjectiveConfig(
+                objectives=[
+                    schemas.ObjectiveSpec(metric="rmse"),
+                    schemas.ObjectiveSpec(metric="max_error"),
+                ]
+            ).model_dump(mode="json")
+            # Give both specialists an actual bounded domain.  Without an
+            # explicit space their legacy fallback proposals collapse to the
+            # already-dispatched baseline, which correctly produces a
+            # search-space-exhausted receipt but does not exercise dispatch.
+            request_payload["parameter_space"] = [
+                schemas.ParameterSelection(
+                    name="MPC_XY_P",
+                    baseline=0.95,
+                    minimum=0.6,
+                    maximum=1.3,
+                    step=0.01,
+                ).model_dump(mode="json"),
+                schemas.ParameterSelection(
+                    name="MPC_XY_VEL_P_ACC",
+                    baseline=1.8,
+                    minimum=1.2,
+                    maximum=2.8,
+                    step=0.01,
+                ).model_dump(mode="json"),
+            ]
+            request = schemas.JobCreateRequest.model_validate(request_payload)
             job = job_services._create_job_from_config(
                 db,
                 user=user,
@@ -329,6 +399,8 @@ def _run_arm(seed_block: int, arm: str) -> dict[str, Any]:
         "scripted_decision_calls": 0 if client is None else client.calls,
         "scripted_plan_calls": 0 if client is None else client.plan_calls,
         "scripted_revision_calls": 0 if client is None else client.revision_calls,
+        "scripted_diagnosis_calls": 0 if client is None else client.diagnosis_calls,
+        "scripted_critic_calls": 0 if client is None else client.critic_calls,
         "network_calls": network_measurement.attempt_count,
         "real_credentials_used": False,
         "plan_trace": trace,
@@ -509,9 +581,9 @@ def _verify_plan_trace(
         "tool_execution_wall_ms",
         "actual_tool_cpu_ms",
     ):
-        observed = _finite_timing(accounting.get(name), field=name)
-        expected = round(sum(float(getattr(row, name)) for row in history), 3)
-        if not math.isclose(observed, expected, abs_tol=0.001):
+        observed_timing = _finite_timing(accounting.get(name), field=name)
+        expected_timing = round(sum(float(getattr(row, name)) for row in history), 3)
+        if not math.isclose(observed_timing, expected_timing, abs_tol=0.001):
             raise ValueError(f"multi-tool {name} accounting does not recompute")
     if arm_name == "direct_portfolio" and (
         history
@@ -567,7 +639,9 @@ def _verify_arm_row(
         arm_name=expected_name,
         block_index=block_index,
     )
-    accounting = trace["accounting"]
+    accounting = trace.get("accounting")
+    if not isinstance(accounting, dict):
+        raise ValueError("multi-tool trace accounting is invalid")
     scripted_calls = _nonnegative_int(
         arm.get("scripted_decision_calls"),
         field="scripted_decision_calls",
@@ -580,17 +654,45 @@ def _verify_arm_row(
         arm.get("scripted_revision_calls"),
         field="scripted_revision_calls",
     )
+    diagnosis_calls = _nonnegative_int(
+        arm.get("scripted_diagnosis_calls", 0),
+        field="scripted_diagnosis_calls",
+    )
+    critic_calls = _nonnegative_int(
+        arm.get("scripted_critic_calls", 0),
+        field="scripted_critic_calls",
+    )
+    accounted_provider_calls = _nonnegative_int(
+        accounting.get("provider_call_count"),
+        field="provider_call_count",
+    )
+    accounted_dispatched_candidates = _nonnegative_int(
+        accounting.get("dispatched_candidates"),
+        field="dispatched_candidates",
+    )
+    accounted_dispatched_trials = _nonnegative_int(
+        accounting.get("dispatched_trials"),
+        field="dispatched_trials",
+    )
+    verified_generation_count = _nonnegative_int(
+        trace.get("verified_generation_count"),
+        field="verified_generation_count",
+    )
+    multi_tool_generation_count = _nonnegative_int(
+        trace.get("multi_tool_generation_count"),
+        field="multi_tool_generation_count",
+    )
     if expected_name == "direct_portfolio":
-        if scripted_calls or plan_calls or revision_calls:
+        if scripted_calls or plan_calls or revision_calls or diagnosis_calls or critic_calls:
             raise ValueError("direct portfolio arm invoked the scripted planner")
     elif (
-        scripted_calls != plan_calls + revision_calls
-        or scripted_calls != accounting["provider_call_count"]
-        or plan_calls != trace["verified_generation_count"]
-        or revision_calls != trace["verified_generation_count"]
-        or trace["multi_tool_generation_count"] < 1
-        or accounting["dispatched_candidates"] > candidates
-        or accounting["dispatched_trials"] > dispatched
+        scripted_calls != plan_calls + revision_calls + diagnosis_calls + critic_calls
+        or scripted_calls != accounted_provider_calls
+        or plan_calls != verified_generation_count
+        or revision_calls != verified_generation_count
+        or multi_tool_generation_count < 1
+        or accounted_dispatched_candidates > candidates
+        or accounted_dispatched_trials > dispatched
     ):
         raise ValueError("scripted multi-tool call or dispatch accounting drifted")
     return arm
@@ -747,6 +849,8 @@ def build_harness_multi_tool_budget_manifest(
     _verify_provenance(source_commit, generated_at)
     verified_artifact = verify_harness_multi_tool_budget_artifact(artifact)
     seed_blocks = verified_artifact["seed_blocks"]
+    if not isinstance(seed_blocks, list):
+        raise ValueError("verified multi-tool seed blocks are invalid")
     expected_budget = {
         "max_iterations": HARNESS_OUTCOME_CAMPAIGN_MAX_ITERATIONS,
         "max_total_trials": HARNESS_OUTCOME_CAMPAIGN_MAX_TOTAL_TRIALS,

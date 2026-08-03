@@ -1944,21 +1944,21 @@ def delete_job(
                 attempt=attempt,
                 reason="job_delete",
             )
-        for receipt in candidate_evidence_rows:
+        for candidate_receipt in candidate_evidence_rows:
             authorize_candidate_evidence_deletion(
                 db,
-                receipt=receipt,
+                receipt=candidate_receipt,
                 reason="job_delete",
             )
-        for receipt in job.cognitive_turn_receipts:
+        for cognitive_receipt in job.cognitive_turn_receipts:
             cognitive_authorization = db.get(
                 models.HarnessCognitiveTurnDeleteAuthorization,
-                receipt.id,
+                cognitive_receipt.id,
             )
             if cognitive_authorization is None:
                 db.add(
                     models.HarnessCognitiveTurnDeleteAuthorization(
-                        receipt_id=receipt.id,
+                        receipt_id=cognitive_receipt.id,
                         reason="job_delete",
                     )
                 )

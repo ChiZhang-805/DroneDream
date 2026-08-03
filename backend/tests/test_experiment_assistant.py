@@ -44,6 +44,15 @@ def test_registered_fields_cover_shared_form_contract() -> None:
         "llm_base_url",
         "reference_track_json",
         "obstacles_json",
+        # Continuing after the first qualified candidate is an explicit user
+        # consent and cost decision.  The experiment assistant must not turn it
+        # on, or increase any of its server-enforced budgets, through a model
+        # generated field patch.
+        "continue_exploration_after_qualified",
+        "exploration_additional_generations",
+        "exploration_additional_trials",
+        "exploration_additional_provider_turns",
+        "exploration_additional_time_minutes",
     }
 
     assert form_fields == set(assistant.FIELD_REGISTRY) | intentionally_local_fields

@@ -1318,6 +1318,7 @@ class _FakeCandidate:
         trial_count: int = 3,
         completed: int = 3,
         generation_index: int = 1,
+        dispatch_ordinal: int | None = None,
         fidelity: float = 1.0,
         parameters: dict[str, float] | None = None,
     ) -> None:
@@ -1332,6 +1333,9 @@ class _FakeCandidate:
         self.completed_trial_count = completed
         self.failed_trial_count = trial_count - completed
         self.generation_index = generation_index
+        self.dispatch_ordinal = (
+            generation_index + 1 if dispatch_ordinal is None else dispatch_ordinal
+        )
         self.optimizer_metadata_json = {"requested_fidelity": fidelity}
         self.rank_in_job: int | None = None
         self.is_best: bool = False
