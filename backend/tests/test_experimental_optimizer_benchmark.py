@@ -78,6 +78,15 @@ def test_benchmark_rejects_duplicate_strategies() -> None:
         )
 
 
+def test_benchmark_rejects_empty_strategy_set() -> None:
+    with pytest.raises(ValueError, match="at least one"):
+        run_benchmark(
+            strategies=(),
+            generations=1,
+            batch_size=1,
+        )
+
+
 def test_benchmark_output_never_replaces_an_existing_result(tmp_path: Path) -> None:
     output = tmp_path / "benchmark.json"
     write_new_benchmark_result(output, "first\n")

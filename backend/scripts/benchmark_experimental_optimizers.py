@@ -271,6 +271,8 @@ def run_benchmark(
 
     if generations < 1 or batch_size < 1:
         raise ValueError("generations and batch_size must both be positive")
+    if not strategies:
+        raise ValueError("benchmark requires at least one optimizer strategy")
     unknown = set(strategies).difference(EXPERIMENTAL_OPTIMIZER_STRATEGIES)
     if unknown:
         raise ValueError(f"unsupported strategies: {', '.join(sorted(unknown))}")
