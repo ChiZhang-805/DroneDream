@@ -1203,6 +1203,37 @@ def test_scenario_matrix_is_fixed_across_candidates_and_splits_holdout() -> None
     }
 
 
+def test_scenario_matrix_isolates_nested_config_between_runs_and_source_suite() -> None:
+    suite = ScenarioSuiteConfig(
+        cases=[
+            ScenarioCaseConfig(
+                id="wind",
+                scenario_type="wind_perturbed",
+                seeds=[3, 5],
+                config={
+                    "advanced_scenario_config": {
+                        "wind_gusts": {"enabled": True, "magnitude_mps": 4.0}
+                    }
+                },
+            )
+        ]
+    )
+
+    runs = scenario_matrix(suite)
+    runs[0].config["advanced_scenario_config"]["wind_gusts"]["magnitude_mps"] = 99.0
+
+    assert runs[1].config["advanced_scenario_config"]["wind_gusts"]["magnitude_mps"] == 4.0
+    assert (
+        suite.cases[0].config["advanced_scenario_config"]["wind_gusts"]["magnitude_mps"]
+        == 4.0
+    )
+
+
+def test_scenario_generation_rejects_boolean_index() -> None:
+    with pytest.raises(ValueError, match="non-negative integer"):
+        scenario_matrix_for_generation(ScenarioSuiteConfig(), generation_index=True)
+
+
 def test_non_common_random_number_trial_resolves_against_its_generation() -> None:
     suite = ScenarioSuiteConfig(
         cases=[

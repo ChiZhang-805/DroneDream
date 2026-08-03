@@ -422,7 +422,7 @@ def scenario_matrix(suite: ScenarioSuiteConfig) -> list[ScenarioRun]:
                     seed=seed,
                     weight=case.weight,
                     holdout=case.holdout,
-                    config=dict(case.config),
+                    config=copy.deepcopy(case.config),
                 )
             )
     return runs
@@ -435,8 +435,12 @@ def scenario_matrix_for_generation(
 ) -> list[ScenarioRun]:
     """Return the exact deterministic matrix dispatched for one generation."""
 
-    if generation_index < 0:
-        raise ValueError("generation_index must be non-negative")
+    if (
+        isinstance(generation_index, bool)
+        or not isinstance(generation_index, int)
+        or generation_index < 0
+    ):
+        raise ValueError("generation_index must be a non-negative integer")
     runs = scenario_matrix(suite)
     if suite.common_random_numbers or generation_index == 0:
         return runs
@@ -449,7 +453,7 @@ def scenario_matrix_for_generation(
             seed=(run.seed + offset) % seed_modulus,
             weight=run.weight,
             holdout=run.holdout,
-            config=run.config,
+            config=copy.deepcopy(run.config),
         )
         for run in runs
     ]
