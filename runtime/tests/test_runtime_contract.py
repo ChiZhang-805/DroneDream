@@ -356,6 +356,14 @@ class RuntimeReleaseImmutabilityContractTests(unittest.TestCase):
         self.assertEqual(script.count('rm -f "$partial"'), 1)
 
 
+class Px4LogCleanupPortableTests(unittest.TestCase):
+    def test_missing_proc_inventory_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            missing = Path(directory) / "missing-proc"
+            with self.assertRaisesRegex(px4_log_cleanup.CleanupError, "process file table"):
+                px4_log_cleanup._open_file_identities(missing)
+
+
 @unittest.skipUnless(
     px4_log_cleanup.secure_dirfd_supported(),
     "secure ULog deletion is intentionally POSIX/WSL only",
@@ -479,6 +487,34 @@ class Px4LogCleanupTests(unittest.TestCase):
             self.assertGreaterEqual(result.skipped_changed_or_open, 1)
             self.assertTrue((root / "day-original" / original.name).exists())
             self.assertTrue(outside_log.exists())
+
+    def test_log_opened_immediately_before_delete_is_preserved(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            log = self._log(root, "flight.ulg", size=100, age_seconds=7200)
+            opened = None
+
+            def open_before_delete() -> None:
+                nonlocal opened
+                opened = log.open("rb")
+
+            try:
+                result = px4_log_cleanup.cleanup_logs(
+                    root,
+                    max_total_bytes=1,
+                    max_age_seconds=1,
+                    min_age_seconds=0,
+                    keep_recent=0,
+                    now_ns=self.NOW_NS,
+                    _before_delete=open_before_delete,
+                )
+            finally:
+                if opened is not None:
+                    opened.close()
+
+            self.assertEqual(result.deleted_files, 0)
+            self.assertEqual(result.skipped_changed_or_open, 1)
+            self.assertTrue(log.exists())
 
 
 class SystemdContractTests(unittest.TestCase):
