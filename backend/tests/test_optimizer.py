@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from app import models, schemas
+from app.optimization.candidate_evidence_ledger import candidate_evidence_chain_matches_current
 from app.optimization.domain import ParameterDomain, SearchSpace
 from app.optimization.outcome_contract import build_selection_key, selection_order_key
 from app.optimization.outcome_evidence import (
@@ -1369,6 +1370,19 @@ def test_malformed_fidelity_candidate_is_never_ranked(
     assert winner is baseline
     assert malformed.rank_in_job is None
     assert malformed.is_best is False
+
+
+def test_candidate_evidence_chain_fails_closed_when_receipts_are_unreadable() -> None:
+    class _UnreadableCandidateEvidence:
+        aggregated_metric_json: dict[str, object] = {}
+
+        @property
+        def evidence_receipts(self) -> list[object]:
+            raise RuntimeError("detached ORM relationship")
+
+    candidate = _UnreadableCandidateEvidence()
+
+    assert candidate_evidence_chain_matches_current(candidate) is False  # type: ignore[arg-type]
 
 
 def test_rank_and_select_best_skips_ineligible_optimizer() -> None:

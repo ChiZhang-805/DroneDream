@@ -15,6 +15,10 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from app import models, schemas
+from app.optimization.candidate_evidence_ledger import (
+    candidate_evidence_chain_matches_current,
+    candidate_evidence_receipt_required,
+)
 from app.optimization.outcome_evidence import (
     authoritative_candidate_trial_outcome_projection,
     candidate_outcome_evidence_required,
@@ -176,7 +180,9 @@ def compile_candidate_feedback(
         if isinstance(candidate.aggregated_metric_json, dict)
         else {}
     )
-    if not candidate_outcome_evidence_required(raw_aggregate):
+    ledger_required = candidate_evidence_receipt_required(candidate)
+    outcome_evidence_required = candidate_outcome_evidence_required(raw_aggregate)
+    if not outcome_evidence_required and not ledger_required:
         counts = _legacy_learning_counts(candidate, scenario_suite)
         feasible = raw_aggregate.get("feasible")
         return CandidateFeedbackView(
@@ -187,6 +193,20 @@ def compile_candidate_feedback(
             completed_trial_count=counts[1],
             failed_trial_count=counts[2],
             feasible=feasible if isinstance(feasible, bool) else None,
+        )
+
+    if ledger_required and not candidate_evidence_chain_matches_current(
+        candidate,
+        raw_aggregate,
+    ):
+        return CandidateFeedbackView(
+            aggregate={},
+            score=None,
+            feedback_status="quarantined",
+            learning_trial_count=0,
+            completed_trial_count=0,
+            failed_trial_count=0,
+            feasible=None,
         )
 
     trial_rows = candidate_training_trial_evidence_rows(candidate)

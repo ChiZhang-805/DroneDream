@@ -411,7 +411,7 @@ def candidate_evidence_chain_matches_current(
             and rows[-1].outcome_evidence_json == outcome.model_dump(mode="json")
             and rows[-1].report_evidence_json == report.model_dump(mode="json")
         )
-    except (TypeError, ValueError):
+    except Exception:  # detached/lazy ORM or malformed evidence always fails closed
         return False
 
 

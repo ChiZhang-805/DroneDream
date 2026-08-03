@@ -154,6 +154,25 @@ def test_verified_feedback_quarantines_parameter_or_trial_divergence() -> None:
     assert trial_tamper.aggregate == {}
 
 
+def test_sealed_feedback_cannot_fall_back_to_legacy_when_markers_are_stripped() -> None:
+    candidate = _verified_candidate()
+    candidate.evidence_ledger_required = True
+    candidate.evidence_receipts = []
+    candidate.aggregated_metric_json = {
+        "rmse": 0.000001,
+        "feasible": True,
+    }
+    candidate.aggregated_score = 0.000001
+
+    feedback = compile_candidate_feedback(candidate, scenario_suite=None)
+
+    assert feedback.feedback_status == "quarantined"
+    assert feedback.usable is False
+    assert feedback.score is None
+    assert feedback.aggregate == {}
+    assert feedback.learning_trial_count == 0
+
+
 def test_legacy_feedback_remains_available_but_explicitly_unsealed() -> None:
     candidate = SimpleNamespace(
         id="legacy-candidate",
