@@ -287,6 +287,14 @@ async function request<T>(
       try {
         response = await send();
       } catch (retryError) {
+        if (retryError instanceof FetchResponseSizeError) {
+          throw new ApiClientError(
+            "RESPONSE_TOO_LARGE",
+            retryError.message,
+            null,
+            retryError.httpStatus,
+          );
+        }
         throw new ApiClientError(
           "NETWORK_ERROR",
           retryError instanceof Error
