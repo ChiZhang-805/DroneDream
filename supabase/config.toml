@@ -10,3 +10,11 @@ verify_jwt = false
 
 [functions.billing-checkout]
 verify_jwt = false
+
+# These functions validate bearer tokens inside the handler so tests and
+# deployed behavior share one fail-closed authentication boundary.
+[functions.admin-console]
+verify_jwt = false
+
+[functions.product-events]
+verify_jwt = false

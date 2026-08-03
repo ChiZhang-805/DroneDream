@@ -1,8 +1,31 @@
-import { handleModelGatewayRequest, modelProviderResponseLimitBytes, readModelProviderResponseBody } from "./index.ts";
+import {
+  handleModelGatewayRequest,
+  modelProvider,
+  modelProviderResponseLimitBytes,
+  readModelProviderResponseBody,
+} from "./index.ts";
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
 }
+
+Deno.test("managed provider identifiers are an exact fail-closed allowlist", () => {
+  for (const provider of ["openai", "deepseek", "qwen"] as const) {
+    assert(
+      modelProvider(provider) === provider,
+      `${provider} must be accepted`,
+    );
+  }
+  for (const invalid of ["OpenAI", "azure", "", null]) {
+    let rejected = false;
+    try {
+      modelProvider(invalid);
+    } catch {
+      rejected = true;
+    }
+    assert(rejected, `${String(invalid)} must be rejected`);
+  }
+});
 
 async function responseErrorCode(response: Response): Promise<string> {
   const body = await response.json() as { error?: { code?: string } };

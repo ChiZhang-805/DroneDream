@@ -1,9 +1,25 @@
-import { createClient, type SupabaseClient, type User } from "npm:@supabase/supabase-js@2.110.8";
-import { BoundedResponseError, readBoundedResponseText } from "../_shared/bounded_response.ts";
-import { sensitiveAllowedOrigins, SensitiveCorsError, sensitiveCorsHeaders } from "../_shared/sensitive_cors.ts";
+import {
+  createClient,
+  type SupabaseClient,
+  type User,
+} from "npm:@supabase/supabase-js@2.110.8";
+import {
+  BoundedRequestError,
+  readBoundedJsonObject,
+} from "../_shared/bounded_request.ts";
+import {
+  BoundedResponseError,
+  readBoundedResponseText,
+} from "../_shared/bounded_response.ts";
+import {
+  sensitiveAllowedOrigins,
+  SensitiveCorsError,
+  sensitiveCorsHeaders,
+} from "../_shared/sensitive_cors.ts";
 
 type JsonRecord = Record<string, unknown>;
 type ModelPurpose = "assistant" | "job";
+export type ModelProvider = "openai" | "deepseek" | "qwen";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://getdronedream.com",
@@ -84,9 +100,11 @@ function corsHeaders(request: Request): HeadersInit {
   }
   return {
     ...originHeaders,
-    "Access-Control-Allow-Headers": "authorization, apikey, content-type, idempotency-key, x-client-info",
+    "Access-Control-Allow-Headers":
+      "authorization, apikey, content-type, idempotency-key, x-client-info",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Expose-Headers": "x-dronedream-usage-estimated, x-dronedream-consumed-credits",
+    "Access-Control-Expose-Headers":
+      "x-dronedream-usage-estimated, x-dronedream-consumed-credits",
   };
 }
 
@@ -118,6 +136,11 @@ function jsonResponse(
 }
 
 function errorResponse(request: Request, error: unknown): Response {
+  if (error instanceof BoundedRequestError) {
+    return jsonResponse(request, error.status, {
+      error: { code: error.code, message: error.message },
+    });
+  }
   if (error instanceof GatewayError) {
     if (
       error.code === "ORIGIN_NOT_ALLOWED" ||
@@ -136,6 +159,7 @@ function errorResponse(request: Request, error: unknown): Response {
     "MODEL_QUOTA_EXHAUSTED",
     "MODEL_GRANT_INVALID",
     "MODEL_PLAN_UNAVAILABLE",
+    "MODEL_PROVIDER_DISABLED",
     "CREDIT_POLICY_MISMATCH",
     "IDEMPOTENCY_CONFLICT",
   ].find((code) => rawMessage.includes(code));
@@ -213,48 +237,36 @@ function endpointPath(request: Request): string {
   const pathname = new URL(request.url).pathname.replace(/\/+$/, "");
   const marker = "/model-gateway";
   const markerIndex = pathname.lastIndexOf(marker);
-  return markerIndex >= 0 ? pathname.slice(markerIndex + marker.length) || "/" : pathname;
+  return markerIndex >= 0
+    ? pathname.slice(markerIndex + marker.length) || "/"
+    : pathname;
 }
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-async function readJsonBody(request: Request): Promise<JsonRecord> {
-  const announcedLength = Number(request.headers.get("Content-Length") ?? "0");
-  if (Number.isFinite(announcedLength) && announcedLength > MAX_REQUEST_BYTES) {
-    throw new GatewayError(
-      "REQUEST_TOO_LARGE",
-      "The request body is too large.",
-      413,
-    );
+function readJsonBody(request: Request): Promise<JsonRecord> {
+  return readBoundedJsonObject(request, MAX_REQUEST_BYTES);
+}
+
+export function modelProvider(value: unknown): ModelProvider {
+  if (value === "openai" || value === "deepseek" || value === "qwen") {
+    return value;
   }
-  const raw = await request.text();
-  if (new TextEncoder().encode(raw).byteLength > MAX_REQUEST_BYTES) {
-    throw new GatewayError(
-      "REQUEST_TOO_LARGE",
-      "The request body is too large.",
-      413,
-    );
-  }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new GatewayError(
-      "INVALID_REQUEST",
-      "The request body must be valid JSON.",
-      400,
-    );
-  }
-  if (!isRecord(parsed)) {
-    throw new GatewayError(
-      "INVALID_REQUEST",
-      "The request body must be a JSON object.",
-      400,
-    );
-  }
-  return parsed;
+  throw new GatewayError(
+    "INVALID_MODEL_PROVIDER",
+    "provider must be openai, deepseek, or qwen.",
+    400,
+  );
+}
+
+function grantKeysAreValid(body: JsonRecord): boolean {
+  const keys = Object.keys(body);
+  return keys.every((key) =>
+    ["scope", "provider", "scope_reference"].includes(key)
+  ) &&
+    keys.includes("scope") && keys.includes("provider");
 }
 
 function base64Url(bytes: Uint8Array): string {
@@ -308,9 +320,41 @@ async function handleUsage(request: Request): Promise<Response> {
   return jsonResponse(request, 200, { data: await usageSnapshot(user.id) });
 }
 
+async function handleModels(request: Request): Promise<Response> {
+  await authenticatedUser(request);
+  const { data, error } = await adminClient().from("model_provider_policies")
+    .select("provider,enabled,assistant_enabled,job_enabled,version,updated_at")
+    .order("provider");
+  if (error) {
+    throw new GatewayError(
+      "MODEL_CATALOG_UNAVAILABLE",
+      "The managed model catalog is unavailable.",
+      503,
+    );
+  }
+  return jsonResponse(request, 200, {
+    data: (data ?? []).map((row) => ({
+      provider: row.provider,
+      enabled: row.enabled,
+      assistant_enabled: row.assistant_enabled,
+      job_enabled: row.job_enabled,
+      version: row.version,
+      updated_at: row.updated_at,
+      managed_model: providerAlias(modelProvider(row.provider)),
+    })),
+  });
+}
+
 async function handleGrant(request: Request): Promise<Response> {
   const user = await authenticatedUser(request);
   const body = await readJsonBody(request);
+  if (!grantKeysAreValid(body)) {
+    throw new GatewayError(
+      "INVALID_REQUEST",
+      "The grant request body is invalid.",
+      400,
+    );
+  }
   const scope = body.scope;
   if (scope !== "assistant" && scope !== "job") {
     throw new GatewayError(
@@ -319,12 +363,14 @@ async function handleGrant(request: Request): Promise<Response> {
       400,
     );
   }
+  const provider = modelProvider(body.provider);
   const token = newGrantToken();
   const tokenHash = await sha256Hex(token);
   const { data, error } = await adminClient().rpc("model_gateway_issue_grant", {
     p_user_id: user.id,
     p_token_sha256: tokenHash,
     p_scope: scope,
+    p_provider: provider,
     p_scope_reference: validScopeReference(body.scope_reference),
   });
   if (error || !isRecord(data)) {
@@ -338,14 +384,14 @@ async function handleGrant(request: Request): Promise<Response> {
       access_mode: "platform",
       grant: token,
       scope,
+      provider,
       expires_at: data.expires_at,
       max_calls: data.max_calls,
       gateway_base_url: requestUrl.toString().replace(
         /\/chat\/completions$/u,
         "",
       ),
-      managed_model: Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim() ||
-        "DroneDream Managed",
+      managed_model: providerAlias(provider),
       usage: await usageSnapshot(user.id),
     },
   });
@@ -410,22 +456,56 @@ function idempotencyKey(request: Request): string {
   return raw;
 }
 
-function providerConfiguration() {
-  const baseUrl = (Deno.env.get("PLATFORM_LLM_BASE_URL")?.trim() ||
-    "https://api.openai.com/v1").replace(/\/+$/u, "");
+function providerAlias(provider: ModelProvider): string {
+  return Deno.env.get(`PLATFORM_${provider.toUpperCase()}_MODEL_ALIAS`)
+    ?.trim() ||
+    Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim() || "DroneDream Managed";
+}
+
+function providerConfiguration(provider: ModelProvider) {
+  const prefix = `PLATFORM_${provider.toUpperCase()}`;
+  const legacyBaseUrl = provider === "openai"
+    ? Deno.env.get("PLATFORM_LLM_BASE_URL")?.trim()
+    : undefined;
+  const baseUrl =
+    (Deno.env.get(`${prefix}_BASE_URL`)?.trim() || legacyBaseUrl ||
+      (provider === "openai" ? "https://api.openai.com/v1" : "")).replace(
+        /\/+$/u,
+        "",
+      );
+  if (!baseUrl) {
+    throw new GatewayError(
+      "SERVICE_NOT_CONFIGURED",
+      `${prefix}_BASE_URL is required.`,
+      503,
+    );
+  }
   const parsed = new URL(baseUrl);
   if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
     throw new GatewayError(
       "SERVICE_NOT_CONFIGURED",
-      "PLATFORM_LLM_BASE_URL must be a credential-free HTTPS URL.",
+      `${prefix}_BASE_URL must be a credential-free HTTPS URL.`,
       503,
     );
   }
   return {
-    apiKey: requiredEnv("PLATFORM_LLM_API_KEY"),
+    apiKey: requiredEnv(
+      Deno.env.get(`${prefix}_API_KEY`)?.trim()
+        ? `${prefix}_API_KEY`
+        : provider === "openai"
+        ? "PLATFORM_LLM_API_KEY"
+        : `${prefix}_API_KEY`,
+    ),
     baseUrl,
-    model: requiredEnv("PLATFORM_LLM_MODEL"),
-    provider: Deno.env.get("PLATFORM_LLM_PROVIDER")?.trim() || "openai",
+    model: requiredEnv(
+      Deno.env.get(`${prefix}_MODEL`)?.trim()
+        ? `${prefix}_MODEL`
+        : provider === "openai"
+        ? "PLATFORM_LLM_MODEL"
+        : `${prefix}_MODEL`,
+    ),
+    provider,
+    alias: providerAlias(provider),
     maxOutputTokens: positiveIntegerEnv(
       "PLATFORM_LLM_MAX_OUTPUT_TOKENS",
       2_048,
@@ -472,7 +552,9 @@ export function readModelProviderResponseBody(
 }
 
 function integerUsage(value: unknown): number | null {
-  return Number.isSafeInteger(value) && Number(value) >= 0 ? Number(value) : null;
+  return Number.isSafeInteger(value) && Number(value) >= 0
+    ? Number(value)
+    : null;
 }
 
 async function failReservation(requestId: string, code: string): Promise<void> {
@@ -504,19 +586,19 @@ async function handleChatCompletions(request: Request): Promise<Response> {
       400,
     );
   }
-  const config = providerConfiguration();
   const requestKey = idempotencyKey(request);
   const requestId = crypto.randomUUID();
   const tokenHash = await sha256Hex(grant);
   const { data: grantRecord, error: grantLookupError } = await adminClient()
     .from("model_gateway_grants")
-    .select("scope")
+    .select("scope,provider")
     .eq("token_sha256", tokenHash)
     .maybeSingle();
   if (
     grantLookupError ||
     !isRecord(grantRecord) ||
-    (grantRecord.scope !== "assistant" && grantRecord.scope !== "job")
+    (grantRecord.scope !== "assistant" && grantRecord.scope !== "job") ||
+    !["openai", "deepseek", "qwen"].includes(String(grantRecord.provider))
   ) {
     throw new GatewayError(
       "MODEL_GRANT_INVALID",
@@ -525,6 +607,8 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     );
   }
   const purpose = grantRecord.scope as ModelPurpose;
+  const provider = modelProvider(grantRecord.provider);
+  const config = providerConfiguration(provider);
   const serializedPromptBytes = new TextEncoder().encode(JSON.stringify({
     messages,
     response_format: responseFormat ?? null,
@@ -596,7 +680,9 @@ async function handleChatCompletions(request: Request): Promise<Response> {
       config.maxOutputTokens,
     );
   } catch (error) {
-    const rejectionCode = error instanceof BoundedResponseError ? error.code : "UPSTREAM_RESPONSE_READ_FAILED";
+    const rejectionCode = error instanceof BoundedResponseError
+      ? error.code
+      : "UPSTREAM_RESPONSE_READ_FAILED";
     await failReservation(requestId, rejectionCode);
     console.error("managed model provider response rejected", rejectionCode);
     throw new GatewayError(
@@ -641,7 +727,9 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   const hasActualUsage = inputTokens !== null &&
     outputTokens !== null &&
     totalTokens === inputTokens + outputTokens;
-  const consumedCredits = hasActualUsage ? inputTokens + outputTokens * config.outputCreditWeight : reservedCredits;
+  const consumedCredits = hasActualUsage
+    ? inputTokens + outputTokens * config.outputCreditWeight
+    : reservedCredits;
   const { error: settleError } = await adminClient().rpc("model_usage_settle", {
     p_request_id: requestId,
     p_consumed_ai_credits: consumedCredits,
@@ -649,7 +737,9 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     p_output_tokens: hasActualUsage ? outputTokens : null,
     p_total_tokens: hasActualUsage ? totalTokens : null,
     p_usage_estimated: !hasActualUsage,
-    p_provider_request_id: typeof providerJson.id === "string" ? providerJson.id : null,
+    p_provider_request_id: typeof providerJson.id === "string"
+      ? providerJson.id
+      : null,
   });
   if (settleError) {
     console.error(
@@ -666,8 +756,7 @@ async function handleChatCompletions(request: Request): Promise<Response> {
 
   // The managed service deliberately exposes a stable DroneDream alias rather
   // than leaking or coupling clients to the upstream provider/model choice.
-  providerJson.model = Deno.env.get("PLATFORM_LLM_MODEL_ALIAS")?.trim() ||
-    "DroneDream Managed";
+  providerJson.model = config.alias;
   delete providerJson.system_fingerprint;
   return new Response(JSON.stringify(providerJson), {
     status: 200,
@@ -692,6 +781,9 @@ export async function handleModelGatewayRequest(
     const path = endpointPath(request);
     if (request.method === "GET" && path === "/usage") {
       return await handleUsage(request);
+    }
+    if (request.method === "GET" && path === "/models") {
+      return await handleModels(request);
     }
     if (request.method === "POST" && path === "/grants") {
       return await handleGrant(request);
