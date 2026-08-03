@@ -1,0 +1,45 @@
+{
+  "archive": {
+    "bytes": 9519839,
+    "filename": "prefinal-px4-gazebo-06fc17f-raw-runs.tar.gz",
+    "sha256": "7a8b5220503a3bcb5af88f6a97fa93898274b4b4c8c3ee721b75984e64293734"
+  },
+  "checksum": {
+    "bytes": 110,
+    "filename": "prefinal-px4-gazebo-06fc17f-raw-runs.tar.gz.sha256",
+    "sha256": "7055ac46647f553cee550a1f61c22aaea055bb3d93fd6a11b7f480917e598253"
+  },
+  "executionSubject": "06fc17fc0e42e9521f6cc85aa4435e39944d001d",
+  "generatedAt": "2026-08-03T00:47:58.945139Z",
+  "inventory": {
+    "bytes": 8385,
+    "fileCount": 36,
+    "filename": "raw-simulator-runs.inventory.json",
+    "sha256": "e3f60e9ddf31bef929d006a8cbee755c2d4d584a2347ac96fcf68f37147015d0",
+    "sourceBytes": 37263904
+  },
+  "schemaVersion": "dronedream.raw-simulator-run-archive-receipt.v1",
+  "storage": {
+    "archiveAndMetadataBytes": 9528334,
+    "netBytesReclaimed": 27735570,
+    "rawBytesRemoved": 37263904
+  },
+  "verification": {
+    "archiveMembersSafe": true,
+    "canonicalApplicationArtifactsPreserved": true,
+    "extractedInventoryExact": true,
+    "jobStatuses": {
+      "job_2fb41ebf43ae": "COMPLETED",
+      "job_3aadb2c673a6": "COMPLETED",
+      "job_4ed7ac556d54": "COMPLETED",
+      "job_6ad4f6af0f6c": "COMPLETED",
+      "job_7d8dcb8fc243": "COMPLETED",
+      "job_b267261ebabc": "COMPLETED",
+      "job_c987378975c2": "COMPLETED",
+      "job_d5bed1b5e909": "COMPLETED"
+    },
+    "openFileDescriptors": 0,
+    "rawRunnerDirectoriesRemoved": 8,
+    "sensitiveScanMatches": 0
+  }
+}
