@@ -79,11 +79,7 @@ def assert_runtime_compatible(pack: dict[str, Any], runtime: dict[str, Any]) -> 
     px4 = details.get("px4")
     gazebo = details.get("gazebo")
     python = details.get("python")
-    if (
-        not isinstance(px4, dict)
-        or not isinstance(gazebo, dict)
-        or not isinstance(python, dict)
-    ):
+    if not isinstance(px4, dict) or not isinstance(gazebo, dict) or not isinstance(python, dict):
         raise EnginePackInstallError("Runtime component details are incomplete")
     build_id = runtime.get("runtimeId")
     try:
@@ -100,9 +96,7 @@ def assert_runtime_compatible(pack: dict[str, Any], runtime: dict[str, Any]) -> 
         "gazeboVersion": f"{gazebo.get('release')}@{gazebo.get('packageVersion')}",
         "dependencyLockSha256": locks.get("pythonRequirementsSha256"),
     }
-    mismatches = [
-        key for key, expected in compatibility.items() if observed.get(key) != expected
-    ]
+    mismatches = [key for key, expected in compatibility.items() if observed.get(key) != expected]
     if mismatches:
         raise EnginePackInstallError(
             "Engine Pack requires a different Runtime Base: " + ", ".join(sorted(mismatches))
@@ -219,9 +213,7 @@ def ensure_no_active_experiments(database: Path) -> None:
         try:
             tables = {
                 row[0]
-                for row in connection.execute(
-                    "SELECT name FROM sqlite_master WHERE type = 'table'"
-                )
+                for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
             }
             active_jobs = 0
             active_trials = 0
@@ -362,9 +354,7 @@ def install_pack(
     staging_root.mkdir(parents=True, exist_ok=True)
     target = releases / release_id
     previous = current_release(current)
-    manifest_bytes = (
-        descriptor_path.parent / descriptor["manifest"]["filename"]
-    ).read_bytes()
+    manifest_bytes = (descriptor_path.parent / descriptor["manifest"]["filename"]).read_bytes()
     if target.is_symlink() or (target.exists() and not target.is_dir()):
         raise EnginePackInstallError(
             "Engine Pack release target is not a managed ordinary directory"

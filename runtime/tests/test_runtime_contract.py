@@ -526,12 +526,8 @@ class SystemdContractTests(unittest.TestCase):
     def test_runtime_base_activates_a_versioned_engine_pack(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
         api = (RUNTIME / "systemd" / "dronedream-api.service").read_text(encoding="utf-8")
-        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(
-            encoding="utf-8"
-        )
-        environment = (RUNTIME / "config" / "runtime.env.default").read_text(
-            encoding="utf-8"
-        )
+        worker = (RUNTIME / "systemd" / "dronedream-worker.service").read_text(encoding="utf-8")
+        environment = (RUNTIME / "config" / "runtime.env.default").read_text(encoding="utf-8")
         self.assertIn("engine-pack-manager.py", dockerfile)
         self.assertIn("--no-services", dockerfile)
         self.assertIn("test -L /opt/dronedream/engine/current", dockerfile)

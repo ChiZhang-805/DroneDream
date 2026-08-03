@@ -747,12 +747,10 @@ def _set_navsat_noise(
     _ensure_xml_path(noise, "stddev").text = f"{white_stddev_m:.17g}"
     _ensure_xml_path(noise, "bias_mean").text = "0"
     _ensure_xml_path(noise, "bias_stddev").text = "0"
-    _ensure_xml_path(noise, "dynamic_bias_stddev").text = (
-        f"{dynamic_bias_stddev_m:.17g}"
-    )
-    _ensure_xml_path(noise, "dynamic_bias_correlation_time").text = (
-        f"{dynamic_bias_correlation_time_s:.17g}"
-    )
+    _ensure_xml_path(noise, "dynamic_bias_stddev").text = f"{dynamic_bias_stddev_m:.17g}"
+    _ensure_xml_path(
+        noise, "dynamic_bias_correlation_time"
+    ).text = f"{dynamic_bias_correlation_time_s:.17g}"
 
 
 def _apply_sensor_noise_sdf(
@@ -806,9 +804,7 @@ def _apply_sensor_noise_sdf(
         "gps_position_stddev_m": gps_stddev_m,
         "gazebo_navsat_white_stddev_m": gps_white_stddev_m,
         "gazebo_navsat_dynamic_bias_stddev_m": gps_dynamic_bias_stddev_m,
-        "gazebo_navsat_dynamic_bias_correlation_time_s": (
-            gps_dynamic_bias_correlation_time_s
-        ),
+        "gazebo_navsat_dynamic_bias_correlation_time_s": (gps_dynamic_bias_correlation_time_s),
         "gazebo_navsat_noise_composition_policy": str(
             profile["gazebo_navsat_noise_composition_policy"]
         ),
@@ -2293,9 +2289,7 @@ def _trial_gazebo_partition(run_dir: Path) -> str:
     launch_attempt_raw = os.environ.get("PX4_TRIAL_LAUNCH_ATTEMPT", "1").strip()
     if launch_attempt_raw not in {"1", "2"}:
         raise ValueError("PX4_TRIAL_LAUNCH_ATTEMPT must be 1 or 2")
-    identity = (
-        f"{run_dir.resolve(strict=False)}\0launcher-attempt={launch_attempt_raw}"
-    ).encode()
+    identity = (f"{run_dir.resolve(strict=False)}\0launcher-attempt={launch_attempt_raw}").encode()
     return f"dronedream_{hashlib.sha256(identity).hexdigest()[:24]}"
 
 
@@ -4386,8 +4380,7 @@ def main() -> int:
         except Exception as diagnostic_exc:
             _append_log(
                 args.stderr_log,
-                "[local_px4_launch_wrapper] Actuator-link diagnosis unavailable: "
-                f"{diagnostic_exc}",
+                f"[local_px4_launch_wrapper] Actuator-link diagnosis unavailable: {diagnostic_exc}",
             )
         _write_launcher_failure(args.run_dir, stage="real_execution", exc=exc)
         _append_log(args.stderr_log, f"[local_px4_launch_wrapper] Real mode failure: {exc}")

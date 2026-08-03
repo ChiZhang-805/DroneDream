@@ -3153,12 +3153,8 @@ def _preserve_actuator_link_failure_for_retry(
         "stdout.log": "actuator_link_transient_attempt_1.stdout.log",
         "stderr.log": "actuator_link_transient_attempt_1.stderr.log",
         "telemetry.json": "actuator_link_transient_attempt_1.telemetry.json",
-        APPLIED_EVIDENCE_NAME: (
-            "actuator_link_transient_attempt_1.px4_parameters.applied.json"
-        ),
-        EVIDENCE_ARTIFACT_NAME: (
-            "actuator_link_transient_attempt_1.scenario_effects.applied.json"
-        ),
+        APPLIED_EVIDENCE_NAME: ("actuator_link_transient_attempt_1.px4_parameters.applied.json"),
+        EVIDENCE_ARTIFACT_NAME: ("actuator_link_transient_attempt_1.scenario_effects.applied.json"),
     }
     required_sources = {
         "px4_source.ulg",
@@ -3170,8 +3166,7 @@ def _preserve_actuator_link_failure_for_retry(
     missing_required = sorted(
         source_name
         for source_name in required_sources
-        if not (run_dir / source_name).is_file()
-        or (run_dir / source_name).is_symlink()
+        if not (run_dir / source_name).is_file() or (run_dir / source_name).is_symlink()
     )
     if missing_required:
         raise RunnerError(
@@ -3184,9 +3179,7 @@ def _preserve_actuator_link_failure_for_retry(
         if not source.exists():
             continue
         if not source.is_file() or source.is_symlink():
-            raise RunnerError(
-                f"transient retry evidence is not a regular file: {source_name}"
-            )
+            raise RunnerError(f"transient retry evidence is not a regular file: {source_name}")
         target = run_dir / target_name
         if target.exists() or target.is_symlink():
             raise RunnerError(f"transient retry evidence already exists: {target_name}")
