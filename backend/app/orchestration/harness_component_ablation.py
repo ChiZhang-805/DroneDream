@@ -975,7 +975,14 @@ def build_harness_component_ablation_artifact() -> dict[str, Any]:
     }
 
 
-def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
+def _verify_arm(
+    arm: object,
+    *,
+    expected_name: str,
+    expected_prompt_count: int = HARNESS_COMPONENT_ABLATION_MAX_ITERATIONS,
+) -> dict[str, Any]:
+    if expected_prompt_count < 1:
+        raise ValueError("Harness component-ablation prompt count is invalid")
     if not isinstance(arm, dict) or arm.get("arm") != expected_name:
         raise ValueError("Harness component-ablation arm order or identity drifted")
     outcome = arm.get("outcome")
@@ -1003,10 +1010,12 @@ def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
     activation = arm.get("component_activation")
     if not isinstance(router_trace, list) or not isinstance(activation, dict):
         raise ValueError("Harness component-ablation intervention evidence is invalid")
+    removed_context_count = sum(range(expected_prompt_count))
+    changed_prompt_count = expected_prompt_count - 1
     expected_activations = {
         "full_aurora": {
             "component": "none",
-            "prompt_count": 2,
+            "prompt_count": expected_prompt_count,
             "changed_prompt_count": 0,
             "removed_memory_count": 0,
             "removed_reflection_count": 0,
@@ -1014,18 +1023,18 @@ def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
         },
         "no_decision_memory": {
             "component": "decision_memory",
-            "prompt_count": 2,
-            "changed_prompt_count": 1,
-            "removed_memory_count": 1,
+            "prompt_count": expected_prompt_count,
+            "changed_prompt_count": changed_prompt_count,
+            "removed_memory_count": removed_context_count,
             "removed_reflection_count": 0,
             "provider_visible_intervention_activated": True,
         },
         "no_observed_outcome_reflection": {
             "component": "observed_outcome_reflection",
-            "prompt_count": 2,
-            "changed_prompt_count": 1,
+            "prompt_count": expected_prompt_count,
+            "changed_prompt_count": changed_prompt_count,
             "removed_memory_count": 0,
-            "removed_reflection_count": 1,
+            "removed_reflection_count": removed_context_count,
             "provider_visible_intervention_activated": True,
         },
         "fixed_deterministic_portfolio": {
@@ -1055,9 +1064,11 @@ def _verify_arm(arm: object, *, expected_name: str) -> dict[str, Any]:
         ):
             raise ValueError("Harness component-ablation router trace does not recompute")
     expected_memory_counts = {
-        "full_aurora": [(0, 0), (1, 1)],
-        "no_decision_memory": [(0, 0), (0, 0)],
-        "no_observed_outcome_reflection": [(0, 0), (1, 0)],
+        "full_aurora": [(index, index) for index in range(expected_prompt_count)],
+        "no_decision_memory": [(0, 0)] * expected_prompt_count,
+        "no_observed_outcome_reflection": [
+            (index, 0) for index in range(expected_prompt_count)
+        ],
     }[expected_name]
     actual_memory_counts = [
         (

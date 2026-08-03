@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from app.orchestration import harness_reflection_outcome_stress as stress_module
 from app.orchestration.harness_reflection_outcome_stress import (
     build_harness_reflection_outcome_stress_artifact,
     build_harness_reflection_outcome_stress_manifest,
@@ -125,3 +126,23 @@ def test_outcome_stress_rejects_tamper() -> None:
     manifest["budget"]["max_total_trials"] += 1
     with pytest.raises(ValueError, match="hash does not recompute"):
         verify_harness_reflection_outcome_stress_manifest(manifest)
+
+
+def test_outcome_stress_rejects_self_consistent_forged_arm_metrics() -> None:
+    manifest = _load(MANIFEST_ARTIFACT)
+    artifact = _load(JSON_ARTIFACT)
+    first_arm = artifact["block_rows"][0]["arms"][0]
+    first_arm["result_metrics"]["total_trials"] += 1
+    first_arm["result_metrics_sha256"] = stress_module._sha256(
+        first_arm["result_metrics"]
+    )
+    forged = stress_module._build_from_blocks(
+        manifest=manifest,
+        block_rows=artifact["block_rows"],
+    )
+
+    with pytest.raises(ValueError, match="arm integrity"):
+        verify_harness_reflection_outcome_stress_artifact(
+            forged,
+            manifest=manifest,
+        )

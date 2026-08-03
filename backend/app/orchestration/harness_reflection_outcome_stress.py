@@ -18,6 +18,7 @@ from app.orchestration.harness_component_ablation import (
     HARNESS_COMPONENT_ABLATION_SEED_BLOCKS,
     HarnessComponentArm,
     _run_arm,
+    _verify_arm,
     build_harness_component_ablation_manifest,
 )
 
@@ -426,29 +427,42 @@ def verify_harness_reflection_outcome_stress_artifact(
             "Harness reflection outcome-stress artifact manifest binding drifted"
         )
     raw_blocks = payload.get("block_rows")
-    if not isinstance(raw_blocks, list):
+    if not isinstance(raw_blocks, list) or len(raw_blocks) != len(
+        HARNESS_COMPONENT_ABLATION_SEED_BLOCKS
+    ):
         raise ValueError("Harness reflection outcome-stress blocks are invalid")
-    for block in raw_blocks:
-        if not isinstance(block, dict):
+    for block_id, (block, seed_block) in enumerate(
+        zip(
+            raw_blocks,
+            HARNESS_COMPONENT_ABLATION_SEED_BLOCKS,
+            strict=True,
+        ),
+        start=1,
+    ):
+        if (
+            not isinstance(block, dict)
+            or block.get("block_id") != block_id
+            or block.get("seed_block") != seed_block
+            or block.get("training_seeds")
+            != [seed_block + 1, seed_block + 2, seed_block + 3]
+            or block.get("holdout_seeds") != [seed_block + 99]
+        ):
             raise ValueError("Harness reflection outcome-stress block is invalid")
         arms = block.get("arms")
         if not isinstance(arms, list) or [
             arm.get("arm") if isinstance(arm, dict) else None for arm in arms
         ] != list(HARNESS_COMPONENT_ABLATION_ARMS):
             raise ValueError("Harness reflection outcome-stress arm order drifted")
-        for arm in arms:
-            if (
-                not isinstance(arm, dict)
-                or arm.get("network_calls") != 0
-                or arm.get("network_connect_guard_enforced") is not True
-                or arm.get("real_credentials_used") is not False
-                or arm.get("outcome_sha256") != _sha256(arm.get("outcome"))
-                or arm.get("result_metrics_sha256")
-                != _sha256(arm.get("result_metrics"))
-            ):
-                raise ValueError(
-                    "Harness reflection outcome-stress arm integrity is invalid"
-                )
+        for arm, expected_name in zip(
+            arms,
+            HARNESS_COMPONENT_ABLATION_ARMS,
+            strict=True,
+        ):
+            _verify_arm(
+                arm,
+                expected_name=expected_name,
+                expected_prompt_count=HARNESS_REFLECTION_OUTCOME_STRESS_MAX_ITERATIONS,
+            )
     recomputed = _build_from_blocks(
         manifest=current_manifest,
         block_rows=cast(list[dict[str, Any]], raw_blocks),
