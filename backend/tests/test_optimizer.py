@@ -1588,8 +1588,11 @@ def test_publishable_gate_accepts_explicitly_nonsynthetic_px4_metrics() -> None:
     ]
 
     assert aggregation.candidate_is_publishable(candidate) is True
+    # Candidate-level scalar loss may be negative for a legitimate objective
+    # whose direction is ``maximize``. This differs from the non-negative
+    # per-Trial simulator score contract.
     candidate.aggregated_score = -0.1
-    assert aggregation.candidate_is_publishable(candidate) is False
+    assert aggregation.candidate_is_publishable(candidate) is True
 
 
 def test_rank_and_select_best_rejects_failed_holdout_verification() -> None:

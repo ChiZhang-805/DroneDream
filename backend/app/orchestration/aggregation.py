@@ -333,7 +333,6 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
         isinstance(score, bool)
         or not isinstance(score, int | float)
         or not math.isfinite(float(score))
-        or float(score) < 0.0
     ):
         return False
     aggregate = candidate.aggregated_metric_json
