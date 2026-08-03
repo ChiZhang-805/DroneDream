@@ -64,10 +64,17 @@ def run_harness_routing_campaign(
     normalized_model = model_snapshot.strip()
     if not normalized_provider:
         raise ValueError("provider is required")
+    if len(normalized_provider) > 64:
+        raise ValueError("provider must be at most 64 characters")
     if not normalized_model:
         raise ValueError("model_snapshot is required")
+    if len(normalized_model) > 160:
+        raise ValueError("model_snapshot must be at most 160 characters")
     if not cases:
         raise ValueError("routing campaign requires at least one case")
+    case_ids = tuple(case.case_id for case in cases)
+    if len(set(case_ids)) != len(case_ids):
+        raise ValueError("routing campaign case_id values must be unique")
 
     predictions: dict[str, HarnessRoutingPrediction] = {}
     for case in cases:

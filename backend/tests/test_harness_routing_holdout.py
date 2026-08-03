@@ -109,6 +109,19 @@ def test_locked_holdout_rejects_every_adaptive_writeback(
     assert not (tmp_path / "forbidden.json").exists()
 
 
+def test_routing_result_flow_rejects_unknown_runtime_labels() -> None:
+    with pytest.raises(ValueError, match="unknown routing corpus role"):
+        assert_routing_result_flow(  # type: ignore[arg-type]
+            "unregistered",
+            "evaluation_artifact",
+        )
+    with pytest.raises(ValueError, match="unknown routing result destination"):
+        assert_routing_result_flow(  # type: ignore[arg-type]
+            "development",
+            "unregistered",
+        )
+
+
 def test_provider_campaign_rejects_locked_holdout_before_client_call() -> None:
     development_cases = load_routing_eval_cases(DEVELOPMENT)
 

@@ -295,6 +295,15 @@ def assert_routing_result_flow(
     development evidence, or live optimizer feedback.
     """
 
+    if source_role not in {"development", "locked_holdout"}:
+        raise ValueError(f"unknown routing corpus role: {source_role}")
+    if destination not in {
+        "evaluation_artifact",
+        "development_evidence",
+        "router_training",
+        "runtime_feedback",
+    }:
+        raise ValueError(f"unknown routing result destination: {destination}")
     if source_role == "locked_holdout" and destination != "evaluation_artifact":
         raise ValueError(
             "locked Harness routing holdout results are evaluation-only and "

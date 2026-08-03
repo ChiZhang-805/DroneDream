@@ -247,6 +247,81 @@ def test_campaign_redacts_provider_errors() -> None:
     assert "provider-secret-body" not in str(exc_info.value)
 
 
+def test_campaign_rejects_duplicate_case_ids_before_client_creation() -> None:
+    case = load_routing_eval_cases(CORPUS)[0]
+    factory_calls = 0
+
+    def factory(_schema: dict[str, object]) -> _FakeClient:
+        nonlocal factory_calls
+        factory_calls += 1
+        return _FakeClient({})
+
+    with pytest.raises(ValueError, match="case_id values must be unique"):
+        run_harness_routing_campaign(
+            (case, case),
+            provider="openai",
+            model_snapshot="gpt-test-snapshot",
+            generation_config=HarnessRoutingGenerationConfig(),
+            client_factory=factory,
+        )
+
+    assert factory_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("provider", "model_snapshot", "message"),
+    [
+        ("p" * 65, "gpt-test-snapshot", "provider must be at most 64 characters"),
+        ("openai", "m" * 161, "model_snapshot must be at most 160 characters"),
+    ],
+)
+def test_campaign_rejects_invalid_identity_before_client_creation(
+    provider: str,
+    model_snapshot: str,
+    message: str,
+) -> None:
+    cases = load_routing_eval_cases(CORPUS)[:1]
+    factory_calls = 0
+
+    def factory(_schema: dict[str, object]) -> _FakeClient:
+        nonlocal factory_calls
+        factory_calls += 1
+        return _FakeClient({})
+
+    with pytest.raises(ValueError, match=message):
+        run_harness_routing_campaign(
+            cases,
+            provider=provider,
+            model_snapshot=model_snapshot,
+            generation_config=HarnessRoutingGenerationConfig(),
+            client_factory=factory,
+        )
+
+    assert factory_calls == 0
+
+
+def test_campaign_rejects_unknown_corpus_role_before_client_creation() -> None:
+    cases = load_routing_eval_cases(CORPUS)[:1]
+    factory_calls = 0
+
+    def factory(_schema: dict[str, object]) -> _FakeClient:
+        nonlocal factory_calls
+        factory_calls += 1
+        return _FakeClient({})
+
+    with pytest.raises(ValueError, match="unknown routing corpus role"):
+        run_harness_routing_campaign(
+            cases,
+            provider="openai",
+            model_snapshot="gpt-test-snapshot",
+            generation_config=HarnessRoutingGenerationConfig(),
+            client_factory=factory,
+            source_role="unknown",  # type: ignore[arg-type]
+        )
+
+    assert factory_calls == 0
+
+
 def test_frozen_writer_refuses_to_replace_existing_artifact(
     tmp_path: Path,
 ) -> None:
