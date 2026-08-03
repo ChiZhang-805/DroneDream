@@ -105,9 +105,13 @@ def _metrics(**overrides: object) -> TrialMetricsPayload:
         ({"max_error": float("inf")}, ValueError),
         ({"completion_time": -0.1}, ValueError),
         ({"final_error": -0.1}, ValueError),
+        ({"score": -0.1}, ValueError),
         ({"overshoot_count": True}, ValueError),
         ({"score": True}, TypeError),
         ({"crash_flag": 1}, TypeError),
+        ({"crash_flag": True}, ValueError),
+        ({"timeout_flag": True}, ValueError),
+        ({"instability_flag": True}, ValueError),
         ({"raw_metric_json": {"nested": float("inf")}}, ValueError),
     ],
 )
