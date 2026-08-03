@@ -1085,9 +1085,11 @@ def _validate_trial_input(
     if not isinstance(start_point, dict):
         raise RunnerError("start_point must be an object with x/y")
 
+    start_x_raw: Any = start_point.get("x")
+    start_y_raw: Any = start_point.get("y")
     try:
-        start_x = float(start_point.get("x"))
-        start_y = float(start_point.get("y"))
+        start_x = float(start_x_raw)
+        start_y = float(start_y_raw)
         altitude = float(altitude_m)
     except (TypeError, ValueError):
         raise RunnerError("start_point.x/y and altitude_m must be numeric") from None
@@ -1140,9 +1142,11 @@ def _validate_trial_input(
         for idx, point in enumerate(reference_track_raw):
             if not isinstance(point, dict):
                 raise RunnerError(f"reference_track[{idx}] must be an object with x/y")
+            x_raw: Any = point.get("x")
+            y_raw: Any = point.get("y")
             try:
-                x = float(point.get("x"))
-                y = float(point.get("y"))
+                x = float(x_raw)
+                y = float(y_raw)
             except (TypeError, ValueError):
                 raise RunnerError(f"reference_track[{idx}].x/y must be numeric") from None
             z_raw = point.get("z")
@@ -1528,7 +1532,7 @@ def _normalize_samples(samples: list[dict[str, Any]]) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for idx, raw in enumerate(samples):
         try:
-            s = {
+            s: dict[str, Any] = {
                 "t": float(raw["t"]),
                 "x": float(raw["x"]),
                 "y": float(raw["y"]),
@@ -2581,7 +2585,8 @@ def _compute_metrics(
     obstacle_count = (
         len(advanced.get("obstacles", [])) if isinstance(advanced.get("obstacles"), list) else 0
     )
-    wind_gusts = advanced.get("wind_gusts") if isinstance(advanced.get("wind_gusts"), dict) else {}
+    wind_gusts_raw = advanced.get("wind_gusts")
+    wind_gusts: dict[str, Any] = wind_gusts_raw if isinstance(wind_gusts_raw, dict) else {}
     wind_gust_enabled_raw = wind_gusts.get("enabled", False)
     if not isinstance(wind_gust_enabled_raw, bool):
         raise RunnerError("advanced_scenario_config.wind_gusts.enabled must be boolean")
@@ -2827,7 +2832,7 @@ def _run_lower_level_launcher(
             creationflags=creationflags,
             env=launch_env,
         )
-        previous_signal_handlers: dict[int, Any] = {}
+        previous_signal_handlers: dict[signal.Signals, Any] = {}
 
         def _forward_shutdown(signum: int, _frame: Any) -> None:
             _terminate_subprocess_tree(proc, force=True)
@@ -2835,7 +2840,7 @@ def _run_lower_level_launcher(
 
         if os.name != "nt":
             for shutdown_signal in (signal.SIGINT, signal.SIGTERM):
-                previous_signal_handlers[int(shutdown_signal)] = signal.getsignal(shutdown_signal)
+                previous_signal_handlers[shutdown_signal] = signal.getsignal(shutdown_signal)
                 signal.signal(shutdown_signal, _forward_shutdown)
         try:
             return proc.wait(timeout=timeout_seconds)
@@ -2871,8 +2876,14 @@ def _terminate_subprocess_tree(proc: subprocess.Popen[str], *, force: bool) -> N
             with contextlib.suppress(OSError):
                 proc.kill() if force else proc.terminate()
         return
+    kill_process_group = getattr(os, "killpg", None)
+    if not callable(kill_process_group):
+        with contextlib.suppress(OSError):
+            proc.kill() if force else proc.terminate()
+        return
+    kill_signal = getattr(signal, "SIGKILL", signal.SIGTERM) if force else signal.SIGTERM
     with contextlib.suppress(OSError):
-        os.killpg(proc.pid, signal.SIGKILL if force else signal.SIGTERM)
+        kill_process_group(proc.pid, kill_signal)
 
 
 def _failure_result(

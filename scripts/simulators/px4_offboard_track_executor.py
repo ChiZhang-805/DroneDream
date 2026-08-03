@@ -1349,7 +1349,7 @@ async def _wait_for_takeoff_stability(
             raise
 
         observed_at = time.monotonic()
-        payload = _position_velocity_payload(sample, target)
+        payload: dict[str, Any] = _position_velocity_payload(sample, target)
         payload["commanded_setpoint_ned"] = {
             "north_m": commanded.north_m,
             "east_m": commanded.east_m,

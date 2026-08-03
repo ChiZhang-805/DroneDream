@@ -1668,7 +1668,7 @@ def _runtime_sdf_profile_observation(
     expected_failure = applied_sdf_profile.get("actuator_failure")
     if isinstance(expected_failure, dict):
         expected_motors = {int(item["motor_number"]): item for item in expected_failure["motors"]}
-        observed_motors: set[int] = set()
+        observed_failure_motors: set[int] = set()
         for plugin in model.findall("plugin"):
             if plugin.get("name") != "gz::sim::systems::MulticopterMotorModel":
                 continue
@@ -1676,9 +1676,9 @@ def _runtime_sdf_profile_observation(
                 motor_number = int(plugin.findtext("motorNumber", default=""))
             except ValueError as exc:
                 raise RuntimeError("generated runtime SDF has invalid motorNumber") from exc
-            if motor_number in observed_motors or motor_number not in expected_motors:
+            if motor_number in observed_failure_motors or motor_number not in expected_motors:
                 raise RuntimeError("generated runtime SDF has invalid hard-stop motor coverage")
-            observed_motors.add(motor_number)
+            observed_failure_motors.add(motor_number)
             expected_motor = expected_motors[motor_number]
             actual_max = _required_float_text(
                 plugin,
@@ -1692,7 +1692,7 @@ def _runtime_sdf_profile_observation(
             )
             if plugin.findtext("jointName", default="") != expected_motor["joint_name"]:
                 raise RuntimeError(f"generated runtime SDF motor {motor_number} jointName mismatch")
-        if observed_motors != set(expected_motors):
+        if observed_failure_motors != set(expected_motors):
             raise RuntimeError(
                 "generated runtime SDF hard-stop motor coverage does not match the profile"
             )
@@ -3389,7 +3389,9 @@ def _augment_actuator_failure_record(
 ) -> None:
     evidence = record.get("evidence")
     verification = evidence.get("verification") if isinstance(evidence, dict) else None
-    observations = verification.get("observations") if isinstance(verification, dict) else None
+    if not isinstance(verification, dict):
+        raise RuntimeError("actuator-failure SDF evidence is missing verification metadata")
+    observations = verification.get("observations")
     if not isinstance(observations, list):
         raise RuntimeError("actuator-failure SDF evidence is missing verification observations")
     observations.append(
@@ -3672,7 +3674,7 @@ def _execution_identity_from_environment() -> dict[str, object]:
 def _write_actuator_link_health_evidence(
     args: argparse.Namespace,
     *,
-    px4_parameters: dict[str, float | int],
+    px4_parameters: dict[str, object],
     scenario_effect_request: dict[str, Any] | None,
 ) -> dict[str, Any]:
     ulog_path = args.run_dir / RETAINED_ULOG_NAME
@@ -4253,6 +4255,10 @@ def main() -> int:
                     raise
             executor_exit = _run_offboard_executor(args, args.stderr_log)
             if actuator_failure_observer is not None:
+                if scenario_effect_request is None:
+                    raise RuntimeError(
+                        "actuator-failure observer exists without a scenario-effect request"
+                    )
                 observer = actuator_failure_observer
                 actuator_failure_observer = None
                 try:
