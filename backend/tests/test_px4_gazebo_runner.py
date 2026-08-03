@@ -779,6 +779,62 @@ def test_px4_runner_timeout_maps_to_timeout(tmp_path: Path):
     assert result["failure"]["code"] == FAILURE_TIMEOUT
 
 
+def test_lower_level_launcher_reaps_posix_group_after_normal_parent_exit(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    cleanup_calls: list[int] = []
+
+    class CompletedParent:
+        pid = 7312
+
+        @staticmethod
+        def wait(*, timeout: float) -> int:
+            assert timeout == 5.0
+            return 0
+
+    monkeypatch.setattr(runner_module.os, "name", "posix")
+    monkeypatch.setattr(
+        runner_module.subprocess,
+        "Popen",
+        lambda *_args, **_kwargs: CompletedParent(),
+    )
+    monkeypatch.setattr(
+        runner_module,
+        "_terminate_posix_process_group",
+        cleanup_calls.append,
+    )
+
+    returncode = runner_module._run_lower_level_launcher(
+        launch_argv=["simulator-launcher"],
+        cwd=tmp_path,
+        stdout_log=tmp_path / "stdout.log",
+        stderr_log=tmp_path / "stderr.log",
+        timeout_seconds=5.0,
+    )
+
+    assert returncode == 0
+    assert cleanup_calls == [7312]
+
+
+def test_posix_launcher_group_cleanup_confirms_the_group_is_gone(monkeypatch) -> None:
+    calls: list[tuple[int, int]] = []
+
+    def fake_killpg(process_group_id: int, signal_number: int) -> None:
+        calls.append((process_group_id, signal_number))
+        if signal_number == 0:
+            raise ProcessLookupError
+
+    monkeypatch.setattr(runner_module.os, "killpg", fake_killpg, raising=False)
+
+    runner_module._terminate_posix_process_group(7312)
+
+    assert calls == [
+        (7312, runner_module.signal.SIGTERM),
+        (7312, 0),
+    ]
+
+
 def test_px4_runner_scales_one_x_timeout_for_slow_simulation(tmp_path: Path) -> None:
     launcher = _write_launcher_with_payloads(
         tmp_path / "slow_launcher.py",

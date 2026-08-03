@@ -108,6 +108,8 @@ FAILURE_SIMULATION = "SIMULATION_FAILED"
 FAILURE_UNSUPPORTED_SCENARIO_EFFECT = "UNSUPPORTED_SCENARIO_EFFECT"
 _MAX_ACTUATOR_LINK_HEALTH_BYTES = 256 * 1024
 _MAX_SLOW_SIMULATION_TIMEOUT_MULTIPLIER = 10.0
+_PROCESS_GROUP_POLL_SECONDS = 0.2
+_PROCESS_GROUP_TERMINATE_GRACE_SECONDS = 2.0
 _MAX_TELEMETRY_BYTES = 16 * 1024 * 1024
 _MAX_TELEMETRY_SAMPLES = 50_000
 _MAX_TRIAL_INPUT_BYTES = 8 * 1024 * 1024
@@ -2854,6 +2856,29 @@ def _run_lower_level_launcher(
         finally:
             for shutdown_signal, previous_handler in previous_signal_handlers.items():
                 signal.signal(shutdown_signal, previous_handler)
+            if os.name != "nt":
+                _terminate_posix_process_group(proc.pid)
+
+
+def _terminate_posix_process_group(process_group_id: int) -> None:
+    """Reap descendants that outlive a completed POSIX launcher parent."""
+
+    kill_process_group = getattr(os, "killpg", None)
+    if not callable(kill_process_group) or process_group_id <= 0:
+        return
+    try:
+        kill_process_group(process_group_id, signal.SIGTERM)
+    except OSError:
+        return
+    deadline = time.monotonic() + _PROCESS_GROUP_TERMINATE_GRACE_SECONDS
+    while time.monotonic() < deadline:
+        try:
+            kill_process_group(process_group_id, 0)
+        except OSError:
+            return
+        time.sleep(_PROCESS_GROUP_POLL_SECONDS)
+    with contextlib.suppress(OSError):
+        kill_process_group(process_group_id, getattr(signal, "SIGKILL", 9))
 
 
 def _terminate_subprocess_tree(proc: subprocess.Popen[str], *, force: bool) -> None:
