@@ -1055,15 +1055,94 @@ def enu_point_to_ned_setpoint(point: TrackPoint, yaw_deg: float) -> Setpoint:
     return Setpoint(north_m=point.x, east_m=point.y, down_m=-point.z, yaw_deg=yaw_deg)
 
 
-def _interpolate_points(start: TrackPoint, end: TrackPoint, parts: int) -> list[TrackPoint]:
-    result: list[TrackPoint] = []
-    for i in range(1, parts + 1):
-        ratio = i / parts
+def _build_motion_setpoints(
+    start: TrackPoint,
+    waypoints: list[TrackPoint],
+    params: ControllerParams,
+    rate_hz: float,
+    *,
+    max_samples: int,
+) -> list[Setpoint]:
+    """Time-parameterize a polyline with bounded scalar speed/acceleration."""
+
+    segments: list[tuple[TrackPoint, TrackPoint, float, float, float]] = []
+    cumulative_distance = 0.0
+    previous = start
+    for waypoint in waypoints:
+        distance = math.dist(
+            (previous.x, previous.y, previous.z),
+            (waypoint.x, waypoint.y, waypoint.z),
+        )
+        if distance > 1e-12:
+            segments.append(
+                (
+                    previous,
+                    waypoint,
+                    distance,
+                    cumulative_distance,
+                    cumulative_distance + distance,
+                )
+            )
+            cumulative_distance += distance
+        previous = waypoint
+    if not segments:
+        return []
+
+    acceleration_seconds = params.vel_limit / params.accel_limit
+    acceleration_distance = 0.5 * params.accel_limit * acceleration_seconds**2
+    if 2.0 * acceleration_distance >= cumulative_distance:
+        acceleration_seconds = math.sqrt(cumulative_distance / params.accel_limit)
+        peak_speed = params.accel_limit * acceleration_seconds
+        acceleration_distance = 0.5 * params.accel_limit * acceleration_seconds**2
+        cruise_seconds = 0.0
+    else:
+        peak_speed = params.vel_limit
+        cruise_seconds = (
+            cumulative_distance - 2.0 * acceleration_distance
+        ) / peak_speed
+    total_seconds = 2.0 * acceleration_seconds + cruise_seconds
+    sample_count = max(1, int(math.ceil(total_seconds * rate_hz)))
+    if sample_count > max_samples:
+        raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
+
+    cruise_distance = peak_speed * cruise_seconds
+    segment_index = 0
+    result: list[Setpoint] = []
+    for sample_index in range(1, sample_count + 1):
+        sample_time = min(sample_index / rate_hz, total_seconds)
+        if sample_time <= acceleration_seconds:
+            progress = 0.5 * params.accel_limit * sample_time**2
+        elif sample_time <= acceleration_seconds + cruise_seconds:
+            progress = acceleration_distance + peak_speed * (
+                sample_time - acceleration_seconds
+            )
+        else:
+            deceleration_time = sample_time - acceleration_seconds - cruise_seconds
+            progress = (
+                acceleration_distance
+                + cruise_distance
+                + peak_speed * deceleration_time
+                - 0.5 * params.accel_limit * deceleration_time**2
+            )
+        progress = min(cumulative_distance, max(0.0, progress))
+        while (
+            segment_index < len(segments) - 1
+            and progress >= segments[segment_index][4] - 1e-12
+        ):
+            segment_index += 1
+        segment_start, segment_end, segment_length, segment_offset, _ = segments[
+            segment_index
+        ]
+        ratio = min(1.0, max(0.0, (progress - segment_offset) / segment_length))
+        point = TrackPoint(
+            x=segment_start.x + (segment_end.x - segment_start.x) * ratio,
+            y=segment_start.y + (segment_end.y - segment_start.y) * ratio,
+            z=segment_start.z + (segment_end.z - segment_start.z) * ratio,
+        )
         result.append(
-            TrackPoint(
-                x=start.x + (end.x - start.x) * ratio,
-                y=start.y + (end.y - start.y) * ratio,
-                z=start.z + (end.z - start.z) * ratio,
+            enu_point_to_ned_setpoint(
+                point,
+                yaw_deg=compute_yaw_from_segment(segment_start, segment_end),
             )
         )
     return result
@@ -1087,8 +1166,6 @@ def build_setpoint_schedule_plan(
     if not points:
         raise ValueError("points cannot be empty")
 
-    dt = 1.0 / rate_hz
-    max_step = max(0.05, params.vel_limit * dt)
     takeoff = TrackPoint(0.0, 0.0, max(0.5, points[0].z))
     schedule: list[Setpoint] = []
 
@@ -1133,33 +1210,39 @@ def build_setpoint_schedule_plan(
             track_end_index=len(schedule) - 1,
         )
 
-    prev = takeoff
-    smoothed_speed = 0.0
-    for idx, point in enumerate(points):
-        seg_dx = point.x - prev.x
-        seg_dy = point.y - prev.y
-        seg_dz = point.z - prev.z
-        seg_dist = math.sqrt(seg_dx * seg_dx + seg_dy * seg_dy + seg_dz * seg_dz)
-        speed_target = min(params.vel_limit, smoothed_speed + params.accel_limit * dt)
-        smoothed_speed = speed_target
-        step_limit = max(0.05, speed_target * dt)
-        effective_step = min(max_step, step_limit)
-        parts = max(1, int(math.ceil(seg_dist / effective_step)))
-        if parts > MAX_SETPOINTS - len(schedule):
-            raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
-        yaw_deg = compute_yaw_from_segment(prev, point) if seg_dist > 1e-9 else 0.0
-        for interp in _interpolate_points(prev, point, parts):
-            schedule.append(enu_point_to_ned_setpoint(interp, yaw_deg=yaw_deg))
-        prev = point
-        if idx == len(points) - 1:
-            final_hold_samples = max(2, int(rate_hz * 0.5))
-            if final_hold_samples > MAX_SETPOINTS - len(schedule):
-                raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
-            for _ in range(final_hold_samples):
-                schedule.append(enu_point_to_ned_setpoint(point, yaw_deg=yaw_deg))
+    ingress = _build_motion_setpoints(
+        takeoff,
+        [points[0]],
+        params,
+        rate_hz,
+        max_samples=MAX_SETPOINTS - len(schedule),
+    )
+    schedule.extend(ingress)
+    track_start_index = len(schedule) - 1
 
-    track_start_index = takeoff_hold_samples
-    track_end_index = max(track_start_index, len(schedule) - 1)
+    track_motion = _build_motion_setpoints(
+        points[0],
+        points[1:],
+        params,
+        rate_hz,
+        max_samples=MAX_SETPOINTS - len(schedule),
+    )
+    schedule.extend(track_motion)
+
+    final_hold_samples = max(2, int(rate_hz * 0.5))
+    if final_hold_samples > MAX_SETPOINTS - len(schedule):
+        raise ValueError(f"setpoint schedule exceeds the {MAX_SETPOINTS}-sample limit")
+    final_yaw = (
+        track_motion[-1].yaw_deg
+        if track_motion
+        else ingress[-1].yaw_deg
+        if ingress
+        else 0.0
+    )
+    final_setpoint = enu_point_to_ned_setpoint(points[-1], yaw_deg=final_yaw)
+    schedule.extend(final_setpoint for _ in range(final_hold_samples))
+
+    track_end_index = len(schedule) - 1
     return SetpointSchedulePlan(
         schedule=schedule,
         track_start_index=track_start_index,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import math
 import subprocess
 import sys
 import threading
@@ -130,7 +131,91 @@ def test_build_setpoint_schedule_respects_vel_limit_and_takeoff_phase():
         d = (
             (b.north_m - a.north_m) ** 2 + (b.east_m - a.east_m) ** 2 + (b.down_m - a.down_m) ** 2
         ) ** 0.5
-        assert d <= max_step + 1e-6 or d <= 0.11
+        assert d <= max_step + 1e-6
+
+
+def test_build_setpoint_schedule_respects_low_velocity_limits() -> None:
+    points = [executor.TrackPoint(0.2, 0.0, 3.0)]
+    params = executor.ControllerParams(
+        1.0,
+        0.2,
+        0.1,
+        vel_limit=0.1,
+        accel_limit=0.1,
+        disturbance_rejection=0.5,
+    )
+    rate_hz = 10.0
+
+    schedule = executor.build_setpoint_schedule(points, params, rate_hz)
+
+    max_step = params.vel_limit / rate_hz
+    assert max(
+        math.dist(
+            (first.north_m, first.east_m, first.down_m),
+            (second.north_m, second.east_m, second.down_m),
+        )
+        for first, second in zip(schedule, schedule[1:], strict=False)
+    ) <= max_step + 1e-9
+
+
+def test_track_start_follows_safe_ingress_to_the_first_reference_point() -> None:
+    points = [executor.TrackPoint(5.0, 0.0, 3.0), executor.TrackPoint(5.0, 5.0, 3.0)]
+    params = executor.ControllerParams(1.0, 0.2, 0.1, 1.0, 1.0, 0.5)
+
+    plan = executor.build_setpoint_schedule_plan(points, params, 10.0)
+
+    entry = plan.schedule[plan.track_start_index]
+    assert (entry.north_m, entry.east_m, entry.down_m) == pytest.approx((5.0, 0.0, -3.0))
+    assert any(
+        0.0 < setpoint.north_m < entry.north_m
+        for setpoint in plan.schedule[: plan.track_start_index]
+    )
+
+
+def test_straight_track_schedule_respects_scalar_acceleration_limit() -> None:
+    points = [executor.TrackPoint(0.0, 0.0, 3.0), executor.TrackPoint(10.0, 0.0, 3.0)]
+    params = executor.ControllerParams(1.0, 0.2, 0.1, 2.0, 0.5, 0.5)
+    rate_hz = 10.0
+
+    plan = executor.build_setpoint_schedule_plan(points, params, rate_hz)
+    track = plan.schedule[plan.track_start_index : plan.track_end_index + 1]
+    speeds = [
+        math.dist(
+            (first.north_m, first.east_m, first.down_m),
+            (second.north_m, second.east_m, second.down_m),
+        )
+        * rate_hz
+        for first, second in zip(track, track[1:], strict=False)
+    ]
+
+    assert max(speeds) <= params.vel_limit + 1e-9
+    assert max(
+        abs(first - second)
+        for first, second in zip([0.0, *speeds], speeds, strict=False)
+    ) <= params.accel_limit / rate_hz + 1e-9
+
+
+def test_track_schedule_is_invariant_to_collinear_waypoint_density() -> None:
+    params = executor.ControllerParams(1.0, 0.2, 0.1, 2.0, 0.5, 0.5)
+    sparse = executor.build_setpoint_schedule_plan(
+        [executor.TrackPoint(0.0, 0.0, 3.0), executor.TrackPoint(10.0, 0.0, 3.0)],
+        params,
+        10.0,
+    )
+    dense = executor.build_setpoint_schedule_plan(
+        [
+            executor.TrackPoint(0.0, 0.0, 3.0),
+            executor.TrackPoint(2.5, 0.0, 3.0),
+            executor.TrackPoint(5.0, 0.0, 3.0),
+            executor.TrackPoint(7.5, 0.0, 3.0),
+            executor.TrackPoint(10.0, 0.0, 3.0),
+        ],
+        params,
+        10.0,
+    )
+
+    assert sparse.track_start_index == dense.track_start_index
+    assert sparse.track_end_index == dense.track_end_index
 
 
 def test_hover_schedule_has_rate_independent_ten_second_stationary_window(
