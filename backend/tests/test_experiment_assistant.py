@@ -197,6 +197,32 @@ def test_provider_rejects_prompt_above_configured_byte_limit(monkeypatch) -> Non
     assert error.value.status_code == 413
 
 
+def test_invalid_vehicle_context_is_rejected_before_provider_call(monkeypatch) -> None:
+    provider_called = False
+
+    def provider(*_args: object, **_kwargs: object) -> object:
+        nonlocal provider_called
+        provider_called = True
+        return _provider_result()
+
+    monkeypatch.setattr(assistant, "_provider_generate", provider)
+
+    with pytest.raises(assistant.ExperimentAssistantError) as error:
+        assistant.compile_experiment_turn(
+            _request(
+                current_values={
+                    "px4_version": "v0.0-unsupported",
+                    "vehicle_type": "multicopter",
+                    "airframe": "x500",
+                }
+            )
+        )
+
+    assert error.value.code == "INVALID_DRAFT_CONTEXT"
+    assert error.value.status_code == 422
+    assert provider_called is False
+
+
 def test_compiles_registered_fields_and_catalog_parameters(monkeypatch) -> None:
     monkeypatch.setattr(
         assistant,

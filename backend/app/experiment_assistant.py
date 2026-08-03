@@ -586,13 +586,16 @@ def _parameter_catalog(
             vehicle_type=vehicle_type,
             airframe=airframe,
         )
-    except ValueError:
-        px4_version, vehicle_type, airframe = "v1.16", "multicopter", "x500"
-        parameters = list_parameters(
-            px4_version=px4_version,
-            vehicle_type=vehicle_type,
-            airframe=airframe,
-        )
+    except ValueError as exc:
+        # A silent fallback would let the model propose parameters for a
+        # different firmware/vehicle tuple than the draft the user is
+        # reviewing.  Job creation validates the tuple again, but the model
+        # call and its UI advice must also remain bound to the same context.
+        raise ExperimentAssistantError(
+            "INVALID_DRAFT_CONTEXT",
+            "The draft references an unsupported PX4 version, vehicle, or airframe.",
+            status_code=422,
+        ) from exc
     prompt_catalog = [
         {
             "name": item.name,
