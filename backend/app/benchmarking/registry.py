@@ -12,6 +12,10 @@ from dataclasses import dataclass
 from typing import Literal
 
 from app.benchmarking.contracts import BenchmarkProposalAdapter
+from app.benchmarking.method_inventory import (
+    BENCHMARK_METHOD_INVENTORY,
+    require_execution_ready_method,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,17 +48,24 @@ _DESCRIPTORS = (
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
+        "true_lhs/v1",
+        "traditional",
+        "contract_only",
+        "true-lhs-adapter-pending",
+        "standard_reference",
+    ),
+    BenchmarkAdapterDescriptor(
         "bipop_cma_es/v1",
         "traditional",
         "contract_only",
-        "reference-adapter-pending",
+        "pycma-bipop-reference-adapter-pending",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
         "optuna_tpe/v1",
         "traditional",
         "contract_only",
-        "optuna-adapter-pending",
+        "optuna-multivariate-tpe-reference-adapter-pending",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
@@ -65,20 +76,52 @@ _DESCRIPTORS = (
         "product_native",
     ),
     BenchmarkAdapterDescriptor(
-        "reference_scbo/v1",
+        "reference_turbo/v1",
         "traditional",
         "contract_only",
-        "botorch-reference-adapter-pending",
+        "botorch-turbo-reference-adapter-pending",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
-        "hebo/v1", "traditional", "contract_only", "hebo-adapter-pending", "standard_reference"
+        "reference_scbo/v1",
+        "traditional",
+        "contract_only",
+        "botorch-scbo-reference-adapter-pending",
+        "standard_reference",
+    ),
+    BenchmarkAdapterDescriptor(
+        "hebo/v1",
+        "traditional",
+        "contract_only",
+        "hebo-reference-adapter-pending",
+        "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
         "optimizer_portfolio/v1",
         "traditional",
         "implemented",
         "native-deterministic-portfolio",
+        "product_native",
+    ),
+    BenchmarkAdapterDescriptor(
+        "repo_turbo_inspired/v1",
+        "traditional",
+        "contract_only",
+        "native-turbo-matern52-ard-gp",
+        "product_inspired",
+    ),
+    BenchmarkAdapterDescriptor(
+        "repo_bipop_cma_inspired/v1",
+        "traditional",
+        "contract_only",
+        "numpy-full-covariance-bipop-inspired",
+        "product_inspired",
+    ),
+    BenchmarkAdapterDescriptor(
+        "repo_surrogate_cma/v1",
+        "traditional",
+        "contract_only",
+        "numpy-full-covariance-cma-rbf",
         "product_native",
     ),
     BenchmarkAdapterDescriptor(
@@ -119,6 +162,23 @@ _DESCRIPTORS = (
 )
 
 BENCHMARK_ADAPTER_REGISTRY = {item.adapter_id: item for item in _DESCRIPTORS}
+if len(BENCHMARK_ADAPTER_REGISTRY) != len(_DESCRIPTORS):
+    raise RuntimeError("duplicate adapter_id in benchmark adapter registry")
+if set(BENCHMARK_ADAPTER_REGISTRY) != set(BENCHMARK_METHOD_INVENTORY):
+    raise RuntimeError("benchmark adapter registry and method inventory differ")
+for _descriptor in _DESCRIPTORS:
+    _inventory = BENCHMARK_METHOD_INVENTORY[_descriptor.adapter_id]
+    if (
+        _inventory.method_classification != _descriptor.method_classification
+        or _inventory.implementation_label != _descriptor.implementation_label
+    ):
+        raise RuntimeError(
+            f"benchmark adapter provenance differs from inventory: {_descriptor.adapter_id}"
+        )
+    if (_descriptor.availability == "implemented") != (_inventory.execution_readiness == "ready"):
+        raise RuntimeError(
+            f"benchmark adapter readiness differs from inventory: {_descriptor.adapter_id}"
+        )
 
 
 def require_registered_adapter(adapter_id: str) -> BenchmarkAdapterDescriptor:
@@ -134,6 +194,7 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
     descriptor = require_registered_adapter(adapter_id)
     if descriptor.availability != "implemented":
         raise ValueError(f"benchmark proposal adapter is not implemented: {adapter_id}")
+    require_execution_ready_method(adapter_id)
     from app.benchmarking.adapters import (
         ProductNativeOptimizerAdapterV1,
         RandomSearchAdapterV1,
