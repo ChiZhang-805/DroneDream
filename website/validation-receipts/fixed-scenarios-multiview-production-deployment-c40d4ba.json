@@ -1,0 +1,257 @@
+{
+  "schemaVersion": "dronedream.fixed-scenarios-multiview-production-deployment.v1",
+  "generatedAt": "2026-08-04T18:57:45.1896644Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "c40d4baefdba9f53ca08b00341a02d1fe57348a3",
+    "subjectTree": "adbe06b3a12ac53427a66132c2aab19e0dc7fa86",
+    "deployTag": "website-deploy-1.0.0-20260805-c40d4ba",
+    "deploymentPerformed": true,
+    "githubPagesDeploymentPerformed": true,
+    "aliyunDeploymentPerformed": true,
+    "githubReleaseAssetReplacementPerformed": false,
+    "installerRebuiltForThisWebsiteOnlyLayoutChange": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "paymentOrModelProductionMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforced": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "change": {
+    "requirements": [
+      "Use one responsive row with three cards at 1440px and four cards at 2048px, with pagination for the remaining scenarios.",
+      "Fill the available content width and align the visible cards at the right and bottom edges without large residual whitespace.",
+      "Provide independent XY, XZ, YZ, and 3D track views inside every card.",
+      "Present scenario facts as variable/value rows rather than separate rounded metric boxes.",
+      "Keep the preview and Use this scenario action in separate non-overlapping rows."
+    ],
+    "implementedBehavior": {
+      "scenarioDefinitions": 8,
+      "desktopCardCountAt1440": 3,
+      "wideCardCountAt2048": 4,
+      "mobileCardCountAt390": 1,
+      "factsPerCard": 6,
+      "viewModesPerCard": [
+        "XY",
+        "XZ",
+        "YZ",
+        "3D"
+      ],
+      "pagination": true,
+      "equalHeightCards": true
+    },
+    "sourceFiles": [
+      "frontend/src/features/experiment/ScenarioTrackPreview.tsx",
+      "frontend/src/pages/FixedScenarios.tsx",
+      "frontend/src/i18n/I18nProvider.tsx",
+      "frontend/src/styles.css",
+      "frontend/src/__tests__/FixedScenarios.test.tsx",
+      "frontend/scripts/verify-software-ui-layout.mjs"
+    ],
+    "manualDraftsExcluded": true,
+    "manualDraftPaths": [
+      "frontend/public/docs/downloads/DroneDream-Manual-en.md",
+      "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.md",
+      "website/manual-pdf/**",
+      "website/scripts/build_manual_pdf.py",
+      "website/scripts/audit_manual_pdf_layout.py",
+      "work/**"
+    ]
+  },
+  "validation": {
+    "focusedFixedScenarios": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "completeFrontendSuite": {
+      "files": 60,
+      "tests": 417,
+      "passed": 417,
+      "failed": 0,
+      "publicSitePricingAvailability": "passed"
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appProductionBuild": "passed with one non-failing Vite chunk-size advisory",
+    "siteProductionBuild": "passed",
+    "sharedSiteAndConsoleBuild": "passed",
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed",
+    "localBrowserLayoutVerification": {
+      "cases": 9,
+      "passed": 9,
+      "failed": 0,
+      "receiptSha256": "1584dd310a78178888f35b81ccff7e445c149da57a129bdf29f7f9495f61b575",
+      "representativeScreenshots": {
+        "desktopEnglishSha256": "98df990b3195a0bfd59f1c1cc79a4bd282c790bfdfe5ae04d401efa5a1e30dac",
+        "desktopChineseSha256": "7fea8f5014695a472bbfe75448bb2e05809e8ba5ac038531ff304f1d83f93eac",
+        "mobileEnglishSha256": "5b09919063d9737c19dbe37121db8789d7e1fa57ed55eb6db8ef688237922a27",
+        "mobileChineseSha256": "8a428ba302939220d5fdda90a80af221ca8ee0b8b0bc3ef37ecaf4cffcb597b7",
+        "wideEnglishSha256": "524ef624b71f0a4935a50367c7b054f0685f98c08701e0ecddf4ea7cd321fc48",
+        "wideChineseSha256": "5078b7d3f228dc7f6fbd01de26e04dc916cbdc1e60cc4cd5436e75caab2d638c"
+      },
+      "visualInspection": "passed"
+    },
+    "onlineBrowserAudit": {
+      "origins": [
+        "http://getdronedream.com",
+        "http://47.93.180.216"
+      ],
+      "browsers": [
+        "Chromium",
+        "Microsoft Edge",
+        "Firefox"
+      ],
+      "viewports": [
+        "1440x1000",
+        "2048x1000",
+        "390x844"
+      ],
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "cases": 18,
+      "passed": 18,
+      "failed": 0,
+      "desktopExpectedAndActualCards": 3,
+      "wideExpectedAndActualCards": 4,
+      "mobileExpectedAndActualCards": 1,
+      "factsPerCard": 6,
+      "viewButtonsPerCard": 4,
+      "allViewModesInteractive": true,
+      "documentWidthParity": true,
+      "maximumRightEdgeGapPx": 0.017,
+      "maximumBottomEdgeSpreadPx": 0,
+      "previewActionOverlapPx": 0,
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "receiptSha256": "e73978db37b980cc557f81a9abbf1342a130c74c8ffd199640c9027667ac7940",
+      "representativeScreenshots": {
+        "chromiumPagesDesktopSha256": "f9823d03c80cf10c2b591d456c2728f35db9346d374f6eda92f2b6d981b00994",
+        "chromiumPagesWideSha256": "9fbf64f09c22513ebfa368c6dbb973794b1258f309623339dd96c610a96437ca",
+        "chromiumPagesMobileChineseSha256": "0c319b85a4e517f0c926f3918eae7fd2754c6d64ddca35ff874ee0735465912d",
+        "edgePagesDesktopSha256": "901b02c23c9128cc34ff196af958431e60c60e7c2296d38d6b9bf985ae6fe548",
+        "edgePagesWideSha256": "e5ed09116cf7f8e4fde3390fd612965bf9e2a596d2074ab9e566eb6c8aae9124",
+        "edgePagesMobileChineseSha256": "1383f429606d00d0e9b1422732e647eee6982311c0d1eaf2c436125045e09c3e",
+        "firefoxPagesDesktopSha256": "93feadc565a286596c477bfe087aebb1e8f5e9014198d74ee345952f1fcfd03f",
+        "firefoxPagesWideSha256": "45b491792609ca5c511a89b1c692afa37157b64cfe6f8b9e7175b626b7731ba4",
+        "firefoxPagesMobileChineseSha256": "d4bd94a19349d26c4c221cb99b2ec0a6bf57e96cce59e486960b3f7b4777d4d6"
+      },
+      "visualInspection": "passed; 1440 renders three aligned cards, 2048 renders four aligned cards, and 390 renders one card without horizontal overflow"
+    }
+  },
+  "sharedArtifact": {
+    "buildCount": 1,
+    "sourceCommit": "c40d4baefdba9f53ca08b00341a02d1fe57348a3",
+    "workflowRunId": 30939254103,
+    "workflowRunUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30939254103",
+    "buildJobId": 92093136766,
+    "deployJobId": 92093360966,
+    "artifactId": 8904421799,
+    "artifactName": "dronedream-site-c40d4baefdba9f53ca08b00341a02d1fe57348a3",
+    "artifactBytes": 29719755,
+    "artifactDigest": "sha256:6178e08a8d7d85ded3f222ba52a4413a5d80702a6a955be437076f2d9435aadc",
+    "pagesArtifactId": 8904422740,
+    "pagesArtifactBytes": 29712748,
+    "pagesArtifactDigest": "sha256:dd8283a5d23c23093d7b6ba6edd2a0b58002c7148fa42145d03380da2598c7da",
+    "fileCount": 161,
+    "sha256SumsSha256": "827dd7dec0cc4920e9bbc684ad0dec2a022194c8aebf7d982fd1a21762d0657f",
+    "deploymentRule": "The exact GitHub Actions shared artifact was deployed to GitHub Pages and then downloaded, verified, and deployed to Aliyun without rebuilding either endpoint."
+  },
+  "deployments": {
+    "githubPages": {
+      "runId": 30939254103,
+      "status": "success",
+      "sourceCommit": "c40d4baefdba9f53ca08b00341a02d1fe57348a3",
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredEnvironmentPolicy": {
+        "count": 1,
+        "id": 55186327,
+        "name": "main",
+        "type": "branch"
+      },
+      "nonFailingAdvisory": "GitHub-hosted action runtime Node 20 to Node 24 migration notice"
+    },
+    "aliyun": {
+      "server": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260804T184215Z",
+      "rollbackReleaseCandidatesRetained": [
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T155206Z",
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T125353Z",
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T114043Z",
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T104345Z"
+      ],
+      "atomicSwitch": true,
+      "nginxConfigurationTest": "passed",
+      "allFilesVerifiedAgainstSha256Sums": 161,
+      "publicHtmlJsCssFilesVerified": 43,
+      "forbiddenServerTouched": false,
+      "forbiddenServer": "124.221.220.60"
+    }
+  },
+  "publicParity": {
+    "origins": [
+      "http://getdronedream.com",
+      "http://47.93.180.216"
+    ],
+    "siteArtifact": {
+      "buildManifestBytes": 1153,
+      "buildManifestSha256": "79e45db77b067c5a2660de3c93ee86f63cc6b3cd85ac4d135438a6a41d9f1e59",
+      "sha256SumsBytes": 17183,
+      "sha256SumsSha256": "827dd7dec0cc4920e9bbc684ad0dec2a022194c8aebf7d982fd1a21762d0657f",
+      "latestJsonBytes": 492,
+      "latestJsonSha256": "fd367b692f4785dd65a73bdc8bd2e0d3f64185f8303e1223b04d48dcfe7ff6e9",
+      "indexHtmlBytes": 1088,
+      "indexHtmlSha256": "ed91fa48b8249daa767ecbc6d6c9dbf4d10e3875e35dfbe3af257da00be0d1a2",
+      "consoleIndexHtmlBytes": 735,
+      "consoleIndexHtmlSha256": "64cb9e98c42927249dd0886af7c0e40e4ae18ff1d43f64a95bcecdec1d8a1f0",
+      "sourceCommit": "c40d4baefdba9f53ca08b00341a02d1fe57348a3",
+      "byteParity": true
+    },
+    "installerMetadata": {
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "exeBytes": 11115267,
+      "exeSha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "canonicalDownloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "latestJsonByteParity": true,
+      "changedByThisWebsiteOnlyLayoutDeployment": false
+    }
+  },
+  "repositoryGovernance": {
+    "remoteBranches": [
+      "main",
+      "codex/software",
+      "codex/website",
+      "codex/technical-report"
+    ],
+    "remoteBranchCount": 4,
+    "unexpectedRemoteBranches": [],
+    "forcePushPerformed": false,
+    "rootWorktreeModified": false
+  },
+  "remainingExternalGates": {
+    "desktopInstaller": "The deployed website and shared web console contain this Fixed Scenario Lab redesign, but the downloadable EXE was not rebuilt for this website-only follow-up. The software line must consume the shared frontend change and freeze a later installer before claiming that the desktop binary contains it.",
+    "tls": {
+      "status": "not complete",
+      "curlExitCode": 60,
+      "curlError": "SEC_E_WRONG_PRINCIPAL",
+      "httpsEnforced": false,
+      "conclusion": "HTTP production is live, but HTTPS is not claimed as complete and certificate validation was not bypassed."
+    },
+    "supabase": "Supabase Functions, migrations, Secrets, and production database state were not changed by this release.",
+    "payments": "Production payment configuration was not changed.",
+    "codeSigning": "The 1.0.0 installer remains an explicitly disclosed unsigned internal-test preview.",
+    "runtime": "Runtime assets were not changed by this website-only layout deployment.",
+    "manualPdfWorkInProgress": "The pre-existing manual and PDF drafts remain unstaged and unchanged by this receipt commit."
+  }
+}
