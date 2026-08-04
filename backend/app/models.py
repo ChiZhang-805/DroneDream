@@ -851,6 +851,10 @@ class Job(Base):
         back_populates="job",
         uselist=False,
     )
+    candidate_qualifications: Mapped[list[CandidateQualification]] = relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+    )
 
 
 class CandidateParameterSet(Base):
@@ -925,10 +929,131 @@ class CandidateParameterSet(Base):
         cascade="all, delete-orphan",
         order_by="CandidateEvidenceReceipt.revision",
     )
+    qualification: Mapped[CandidateQualification | None] = relationship(
+        back_populates="candidate",
+        uselist=False,
+    )
+
+
+class CandidateQualification(Base):
+    """Versioned two-stage screening and sealed qualification state.
+
+    Training/validation acceptance is deliberately not stored here.  This row
+    starts only after a candidate has been selected for the preregistered
+    screening gate, and it binds all later Trial receipts to one sealed holdout
+    contract without exposing holdout outcomes to proposal generation.
+    """
+
+    __tablename__ = "candidate_qualifications"
+    __table_args__ = (
+        UniqueConstraint("candidate_id", name="uq_candidate_qualification_candidate"),
+        UniqueConstraint(
+            "job_id",
+            "qualification_sequence",
+            name="uq_candidate_qualification_job_sequence",
+        ),
+        CheckConstraint(
+            "state IN ("
+            "'pending_screening', 'screening', 'screening_failed', "
+            "'sealed_qualification', 'qualification_10', "
+            "'qualification_extended_20', 'qualified', "
+            "'qualification_failed', 'indeterminate', 'cancelled'"
+            ")",
+            name="ck_candidate_qualification_state",
+        ),
+        CheckConstraint(
+            "state_revision >= 1 AND screening_required = 4 "
+            "AND qualification_initial_required = 10 "
+            "AND qualification_extended_required = 20 "
+            "AND direct_pass_min = 9 AND extension_trigger_passes = 8 "
+            "AND extended_pass_min = 18 AND max_candidates_per_run = 2",
+            name="ck_candidate_qualification_rule_v1",
+        ),
+        CheckConstraint(
+            "qualification_sequence IS NULL OR qualification_sequence >= 1",
+            name="ck_candidate_qualification_sequence",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("qlf")
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    candidate_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("candidate_parameter_sets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    contract_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    rule_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    rule_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    holdout_contract_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    selection_snapshot_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    state: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="pending_screening", index=True
+    )
+    state_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    qualification_sequence: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    screening_required: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
+    qualification_initial_required: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=10
+    )
+    qualification_extended_required: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=20
+    )
+    direct_pass_min: Mapped[int] = mapped_column(Integer, nullable=False, default=9)
+    extension_trigger_passes: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=8
+    )
+    extended_pass_min: Mapped[int] = mapped_column(Integer, nullable=False, default=18)
+    max_candidates_per_run: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    sealed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(back_populates="candidate_qualifications")
+    candidate: Mapped[CandidateParameterSet] = relationship(back_populates="qualification")
+    trials: Mapped[list[Trial]] = relationship(back_populates="qualification")
+    trial_receipts: Mapped[list[QualificationTrialReceipt]] = relationship(
+        back_populates="qualification",
+        cascade="all, delete-orphan",
+        order_by="QualificationTrialReceipt.ordinal",
+    )
 
 
 class Trial(Base):
     __tablename__ = "trials"
+    __table_args__ = (
+        UniqueConstraint(
+            "qualification_id",
+            "evaluation_phase",
+            "qualification_ordinal",
+            name="uq_trial_qualification_phase_ordinal",
+        ),
+        CheckConstraint(
+            "(evaluation_phase = 'optimization' "
+            "AND qualification_id IS NULL AND qualification_ordinal IS NULL) OR "
+            "(evaluation_phase = 'screening' "
+            "AND qualification_id IS NOT NULL "
+            "AND qualification_ordinal >= 1 AND qualification_ordinal <= 4) OR "
+            "(evaluation_phase = 'qualification' "
+            "AND qualification_id IS NOT NULL "
+            "AND qualification_ordinal >= 1 AND qualification_ordinal <= 20)",
+            name="ck_trial_evaluation_phase_binding",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("tri"))
     job_id: Mapped[str] = mapped_column(
@@ -937,6 +1062,16 @@ class Trial(Base):
     candidate_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("candidate_parameter_sets.id"), nullable=False, index=True
     )
+    qualification_id: Mapped[str | None] = mapped_column(
+        String(64),
+        ForeignKey("candidate_qualifications.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    evaluation_phase: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="optimization", server_default="optimization"
+    )
+    qualification_ordinal: Mapped[int | None] = mapped_column(Integer, nullable=True)
     seed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     scenario_type: Mapped[str] = mapped_column(String(32), nullable=False, default="nominal")
     scenario_config_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
@@ -970,6 +1105,13 @@ class Trial(Base):
 
     job: Mapped[Job] = relationship(back_populates="trials")
     candidate: Mapped[CandidateParameterSet] = relationship(back_populates="trials")
+    qualification: Mapped[CandidateQualification | None] = relationship(
+        back_populates="trials"
+    )
+    qualification_receipt: Mapped[QualificationTrialReceipt | None] = relationship(
+        back_populates="trial",
+        uselist=False,
+    )
     metric: Mapped[TrialMetric | None] = relationship(
         back_populates="trial", cascade="all, delete-orphan", uselist=False
     )
@@ -983,6 +1125,72 @@ class Trial(Base):
         post_update=True,
         uselist=False,
     )
+
+
+class QualificationTrialReceipt(Base):
+    """Append-only terminal evidence for one screening/qualification Trial."""
+
+    __tablename__ = "qualification_trial_receipts"
+    __table_args__ = (
+        UniqueConstraint("trial_id", name="uq_qualification_trial_receipt_trial"),
+        UniqueConstraint(
+            "qualification_id",
+            "phase",
+            "ordinal",
+            name="uq_qualification_trial_receipt_phase_ordinal",
+        ),
+        CheckConstraint(
+            "phase IN ('screening', 'qualification')",
+            name="ck_qualification_trial_receipt_phase",
+        ),
+        CheckConstraint(
+            "(phase = 'screening' AND ordinal >= 1 AND ordinal <= 4) OR "
+            "(phase = 'qualification' AND ordinal >= 1 AND ordinal <= 20)",
+            name="ck_qualification_trial_receipt_ordinal",
+        ),
+        CheckConstraint(
+            "terminal_status IN ("
+            "'COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'INDETERMINATE'"
+            ")",
+            name="ck_qualification_trial_receipt_terminal_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("qtr")
+    )
+    qualification_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("candidate_qualifications.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    trial_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("trials.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    phase: Mapped[str] = mapped_column(String(32), nullable=False)
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    terminal_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    safety_critical_failure: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    effect_readback_complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    evidence_complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    evidence_id: Mapped[str] = mapped_column(
+        String(71), nullable=False, unique=True, index=True
+    )
+    evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    finalized_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    qualification: Mapped[CandidateQualification] = relationship(
+        back_populates="trial_receipts"
+    )
+    trial: Mapped[Trial] = relationship(back_populates="qualification_receipt")
 
 
 class TrialMetric(Base):

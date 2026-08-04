@@ -33,6 +33,26 @@ JobStatus = Literal[
     "CANCELLED",
 ]
 TrialStatus = Literal["PENDING", "RUNNING", "COMPLETED", "FAILED", "CANCELLED"]
+QualificationState = Literal[
+    "pending_screening",
+    "screening",
+    "screening_failed",
+    "sealed_qualification",
+    "qualification_10",
+    "qualification_extended_20",
+    "qualified",
+    "qualification_failed",
+    "indeterminate",
+    "cancelled",
+]
+QualificationPhase = Literal["screening", "qualification"]
+QualificationTrialTerminalStatus = Literal[
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED",
+    "TIMEOUT",
+    "INDETERMINATE",
+]
 ScenarioType = Literal[
     "nominal",
     "noise_perturbed",
@@ -1050,6 +1070,90 @@ class Candidate(BaseModel):
     is_baseline: bool
     created_at: datetime
     updated_at: datetime
+
+
+class CandidateQualification(BaseModel):
+    """Persisted two-stage qualification contract, never proposal context."""
+
+    contract_schema: Literal["dronedream.candidate-qualification/v1"]
+    id: str
+    job_id: str
+    candidate_id: str
+    rule_version: Literal["screen-4-sealed-9of10-8to20-18of20/v1"]
+    rule_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    holdout_contract_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    selection_snapshot_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    state: QualificationState
+    state_revision: int = Field(ge=1)
+    qualification_sequence: int | None = Field(default=None, ge=1)
+    screening_required: Literal[4] = 4
+    qualification_initial_required: Literal[10] = 10
+    qualification_extended_required: Literal[20] = 20
+    direct_pass_min: Literal[9] = 9
+    extension_trigger_passes: Literal[8] = 8
+    extended_pass_min: Literal[18] = 18
+    max_candidates_per_run: Literal[2] = 2
+    sealed_at: datetime | None = None
+    decided_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    @model_validator(mode="after")
+    def _validate_terminal_binding(self) -> CandidateQualification:
+        sealed_states = {
+            "sealed_qualification",
+            "qualification_10",
+            "qualification_extended_20",
+            "qualified",
+            "qualification_failed",
+        }
+        terminal_states = {
+            "screening_failed",
+            "qualified",
+            "qualification_failed",
+            "indeterminate",
+            "cancelled",
+        }
+        if self.state in sealed_states and self.sealed_at is None:
+            raise ValueError("sealed qualification state requires sealed_at")
+        if self.state in terminal_states and self.decided_at is None:
+            raise ValueError("terminal qualification state requires decided_at")
+        if self.state == "qualified" and self.qualification_sequence is None:
+            raise ValueError("qualified state requires a server sequence")
+        if self.state != "qualified" and self.qualification_sequence is not None:
+            raise ValueError("only a qualified state may carry a server sequence")
+        return self
+
+
+class QualificationTrialReceipt(BaseModel):
+    """Secret-free, append-only terminal evidence for one gated Trial."""
+
+    receipt_schema: Literal["dronedream.qualification-trial-receipt/v1"]
+    id: str
+    qualification_id: str
+    trial_id: str
+    phase: QualificationPhase
+    ordinal: int = Field(ge=1, le=20)
+    terminal_status: QualificationTrialTerminalStatus
+    passed: bool
+    safety_critical_failure: bool
+    effect_readback_complete: bool
+    evidence_complete: bool
+    evidence_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    finalized_at: datetime
+
+    @model_validator(mode="after")
+    def _validate_outcome(self) -> QualificationTrialReceipt:
+        if self.phase == "screening" and self.ordinal > 4:
+            raise ValueError("screening ordinal exceeds the four-repeat gate")
+        if self.passed and (
+            self.terminal_status != "COMPLETED"
+            or self.safety_critical_failure
+            or not self.effect_readback_complete
+            or not self.evidence_complete
+        ):
+            raise ValueError("a passing receipt requires complete, safe evidence")
+        return self
 
 
 class FirstQualifiedAccounting(BaseModel):

@@ -329,6 +329,42 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        if "trials" in table_names:
+            trial_columns = {
+                row[1]
+                for row in conn.execute(
+                    text("PRAGMA table_info('trials')")
+                ).fetchall()
+            }
+            qualification_trial_columns = {
+                "qualification_id": "VARCHAR(64)",
+                "evaluation_phase": (
+                    "VARCHAR(32) NOT NULL DEFAULT 'optimization'"
+                ),
+                "qualification_ordinal": "INTEGER",
+            }
+            for column_name, column_type in qualification_trial_columns.items():
+                if column_name not in trial_columns:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE trials "
+                            f"ADD COLUMN {column_name} {column_type}"
+                        )
+                    )
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS "
+                    "ix_trials_qualification_id ON trials(qualification_id)"
+                )
+            )
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS "
+                    "uq_trial_qualification_phase_ordinal "
+                    "ON trials(qualification_id, evaluation_phase, qualification_ordinal) "
+                    "WHERE qualification_id IS NOT NULL"
+                )
+            )
         if "job_reports" in table_names:
             report_columns = {
                 row[1] for row in conn.execute(text("PRAGMA table_info('job_reports')")).fetchall()
@@ -965,6 +1001,23 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        if "qualification_trial_receipts" in table_names:
+            for operation in ("update", "delete"):
+                conn.execute(
+                    text(
+                        f"""
+                        CREATE TRIGGER IF NOT EXISTS
+                        trg_qualification_trial_receipts_no_{operation}
+                        BEFORE {operation.upper()} ON qualification_trial_receipts
+                        BEGIN
+                            SELECT RAISE(
+                                ABORT,
+                                'qualification Trial receipts are append-only'
+                            );
+                        END
+                        """
+                    )
+                )
 
 
 def get_db() -> Iterator[Session]:

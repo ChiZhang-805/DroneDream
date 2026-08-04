@@ -300,6 +300,11 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     assert "lease_expires_at" in columns
     assert "claimed_at" in columns
     assert "accepted_attempt_id" in columns
+    assert {
+        "qualification_id",
+        "evaluation_phase",
+        "qualification_ordinal",
+    }.issubset(columns)
     assert "cancelled_at" in batch_columns
     assert "control_version" in batch_columns
     assert "expires_at" in secret_columns
@@ -409,6 +414,7 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                  "'benchmark_budget_reservations', "
                  "'benchmark_campaign_batch_bindings', "
                  "'benchmark_campaign_run_bindings', "
+                 "'qualification_trial_receipts', "
                  "'trials'"
                 ")"
             ).fetchall()
@@ -457,6 +463,12 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "PRAGMA table_info('candidate_parameter_sets')"
             ).fetchall()
         }
+        trial_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('trials')"
+            ).fetchall()
+        }
         job_columns = {
             row[1]
             for row in connection.execute(
@@ -503,6 +515,17 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 ")"
             ).fetchall()
         }
+        qualification_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' "
+                "AND name IN ("
+                "'candidate_qualifications', "
+                "'qualification_trial_receipts'"
+                ")"
+            ).fetchall()
+        }
     assert trigger_names == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
@@ -529,6 +552,8 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "trg_benchmark_batch_binding_no_delete",
         "trg_benchmark_run_binding_no_update",
         "trg_benchmark_run_binding_no_delete",
+        "trg_qualification_trial_receipts_no_update",
+        "trg_qualification_trial_receipts_no_delete",
     }
     assert attempt_tables == {
         "trial_execution_attempts",
@@ -559,6 +584,10 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "benchmark_campaign_batch_bindings",
         "benchmark_campaign_run_bindings",
     }
+    assert qualification_tables == {
+        "candidate_qualifications",
+        "qualification_trial_receipts",
+    }
     assert {
         "user_id",
         "idempotency_key_hash",
@@ -575,6 +604,11 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "qualification_sequence",
         "qualified_at",
     }.issubset(candidate_columns)
+    assert {
+        "qualification_id",
+        "evaluation_phase",
+        "qualification_ordinal",
+    }.issubset(trial_columns)
     assert {
         "finalization_claim_token",
         "finalization_claim_generation",
@@ -761,7 +795,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0025 (head)"]
+    assert heads == ["20260804_0026 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -858,7 +892,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             for row in connection.execute("PRAGMA index_list('jobs')").fetchall()
         )
 
-    assert version == ("20260804_0025",)
+    assert version == ("20260804_0026",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
