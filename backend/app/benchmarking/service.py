@@ -14,6 +14,7 @@ from app.benchmarking.contracts import (
     canonical_sha256,
 )
 from app.benchmarking.registry import require_registered_adapter
+from app.orchestration.qualification import QUALIFICATION_RULE_SHA256
 
 
 class BenchmarkCampaignError(RuntimeError):
@@ -54,6 +55,20 @@ def _validate_registered_arms(manifest: BenchmarkCampaignManifestV1) -> None:
             )
 
 
+def _validate_frozen_qualification_rule(
+    manifest: BenchmarkCampaignManifestV1,
+) -> None:
+    if manifest.fairness.qualification_rule_sha256 != QUALIFICATION_RULE_SHA256:
+        raise BenchmarkCampaignError(
+            "BENCHMARK_QUALIFICATION_RULE_MISMATCH",
+            (
+                "campaign qualification_rule_sha256 does not match the "
+                "server's frozen two-stage qualification rule"
+            ),
+            http_status=422,
+        )
+
+
 def create_campaign(
     db: Session,
     manifest: BenchmarkCampaignManifestV1,
@@ -63,6 +78,7 @@ def create_campaign(
     """Insert one immutable campaign, replaying only an identical manifest."""
 
     _validate_registered_arms(manifest)
+    _validate_frozen_qualification_rule(manifest)
     manifest_payload = manifest.model_dump(mode="json", exclude_none=False)
     manifest_sha256 = canonical_sha256(manifest_payload)
     inventory_payload = manifest.composite_execution_inventory.model_dump(

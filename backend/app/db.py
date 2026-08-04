@@ -971,6 +971,25 @@ def _apply_sqlite_lightweight_migrations() -> None:
         ):
             if table_name not in table_names:
                 continue
+            if table_name == "benchmark_campaign_run_bindings":
+                run_binding_columns = {
+                    row[1]
+                    for row in conn.execute(
+                        text("PRAGMA table_info('benchmark_campaign_run_bindings')")
+                    ).fetchall()
+                }
+                for column_name in (
+                    "qualification_policy_version",
+                    "scenario_suite_sha256",
+                    "qualification_contract_sha256",
+                ):
+                    if column_name not in run_binding_columns:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE benchmark_campaign_run_bindings "
+                                f"ADD COLUMN {column_name} VARCHAR(64)"
+                            )
+                        )
             conn.execute(
                 text(
                     f"""

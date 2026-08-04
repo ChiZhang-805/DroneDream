@@ -23,9 +23,17 @@ from app.benchmarking.contracts import (
     BenchmarkCoordinatorLeaseV1,
     BenchmarkResourceVectorV1,
     BenchmarkRunBindingRecordV1,
+    BenchmarkRunBindingRequestV1,
     BenchmarkUsageDeltaV1,
     canonical_sha256,
 )
+from app.orchestration.qualification import (
+    SEALED_QUALIFICATION_POLICY_VERSION,
+    QualificationContractError,
+    compile_sealed_qualification_contract,
+    sealed_qualification_contract_sha256,
+)
+from app.schemas import ScenarioSuiteConfig
 from app.services import jobs as job_service
 
 
@@ -72,6 +80,70 @@ def _batch_binding_request_sha256(request: BenchmarkBatchBindingRequestV1) -> st
     payload = request.model_dump(mode="json", exclude_none=False)
     payload["runs"] = sorted(payload["runs"], key=lambda item: item["run_key"])
     return canonical_sha256(payload)
+
+
+def _sealed_job_contract(
+    job: models.Job,
+) -> tuple[dict[str, Any], str, str]:
+    raw_suite = job.scenario_suite_json
+    if not isinstance(raw_suite, dict):
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_SCENARIO_CONTRACT_MISSING",
+            "Every benchmark Job must persist an explicit scenario suite.",
+            http_status=422,
+        )
+    try:
+        suite = ScenarioSuiteConfig(**raw_suite)
+        contract = compile_sealed_qualification_contract(suite)
+    except (TypeError, ValueError, QualificationContractError) as exc:
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_QUALIFICATION_CONTRACT_INVALID",
+            (
+                "Every benchmark Job must preregister exactly four screening "
+                "runs and twenty disjoint sealed qualification runs."
+            ),
+            http_status=422,
+        ) from exc
+    normalized_suite = suite.model_dump(mode="json")
+    contract_payload = contract.model_dump(mode="json")
+    scenario_suite_sha256 = canonical_sha256(normalized_suite)
+    contract_sha256 = sealed_qualification_contract_sha256(contract)
+    if job.holdout_policy_version not in {
+        "legacy-visible-v0",
+        SEALED_QUALIFICATION_POLICY_VERSION,
+    }:
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_HOLDOUT_POLICY_CONFLICT",
+            "Benchmark Job already carries an incompatible holdout policy.",
+            http_status=409,
+        )
+    if (
+        job.holdout_policy_version == SEALED_QUALIFICATION_POLICY_VERSION
+        and job.holdout_contract_json != contract_payload
+    ):
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_HOLDOUT_CONTRACT_CONFLICT",
+            "Benchmark Job's existing sealed holdout contract has drifted.",
+            http_status=409,
+        )
+    return contract_payload, scenario_suite_sha256, contract_sha256
+
+
+def _run_binding_sha256(
+    run: BenchmarkRunBindingRequestV1,
+    *,
+    scenario_suite_sha256: str,
+    qualification_contract_sha256: str,
+) -> str:
+    return canonical_sha256(
+        {
+            "schema_id": "dronedream.benchmark-run-execution-binding/v1",
+            "run": run.model_dump(mode="json", exclude_none=False),
+            "qualification_policy_version": SEALED_QUALIFICATION_POLICY_VERSION,
+            "scenario_suite_sha256": scenario_suite_sha256,
+            "qualification_contract_sha256": qualification_contract_sha256,
+        }
+    )
 
 
 def _campaign(
@@ -404,7 +476,17 @@ def bind_batch(
             error.message,
             http_status=error.http_status,
         ) from error
-    children = list(batch.jobs)
+    # Lock every Job row before freezing execution semantics. PostgreSQL then
+    # serializes a competing Batch start or binding attempt; SQLite keeps the
+    # same validation path for local/test use.
+    children = list(
+        db.scalars(
+            select(models.Job)
+            .where(models.Job.batch_id == batch.id)
+            .order_by(models.Job.created_at, models.Job.id)
+            .with_for_update()
+        )
+    )
     child_by_id = {job.id: job for job in children}
     requested_job_ids = {run.job_id for run in request.runs}
     if requested_job_ids != set(child_by_id):
@@ -437,6 +519,35 @@ def bind_batch(
                 "Every run must reference an arm and version frozen in this campaign.",
                 http_status=422,
             )
+
+    sealed_by_job: dict[str, tuple[dict[str, Any], str, str]] = {}
+    scenario_by_seed_block: dict[str, str] = {}
+    for run in request.runs:
+        job = child_by_id[run.job_id]
+        sealed = _sealed_job_contract(job)
+        sealed_by_job[job.id] = sealed
+        scenario_sha256 = sealed[1]
+        existing_scenario_sha256 = scenario_by_seed_block.setdefault(
+            run.simulator_seed_block,
+            scenario_sha256,
+        )
+        if existing_scenario_sha256 != scenario_sha256:
+            raise BenchmarkCoordinatorError(
+                "BENCHMARK_PAIRED_SCENARIO_MISMATCH",
+                (
+                    "Every arm in one simulator_seed_block must use the exact "
+                    "same scenario suite and sealed holdout contract."
+                ),
+                http_status=422,
+            )
+
+    # The Batch is still untouched and locked. Promote all of its Jobs in the
+    # same transaction that creates the immutable run bindings, so no runner
+    # can observe a half-bound visible-holdout Job.
+    for job in children:
+        contract_payload, _, _ = sealed_by_job[job.id]
+        job.holdout_policy_version = SEALED_QUALIFICATION_POLICY_VERSION
+        job.holdout_contract_json = contract_payload
 
     reservation = reserve_budget(
         db,
@@ -499,6 +610,7 @@ def bind_batch(
     sorted_runs = sorted(request.runs, key=lambda item: item.run_key)
     for offset, run in enumerate(sorted_runs):
         arm = arm_by_semantic_id[(run.benchmark_arm_id, run.arm_version)]
+        _, scenario_sha256, qualification_sha256 = sealed_by_job[run.job_id]
         db.add(
             models.BenchmarkCampaignRunBinding(
                 campaign_id=campaign.id,
@@ -512,7 +624,14 @@ def bind_batch(
                 simulator_seed_block=run.simulator_seed_block,
                 provider_randomness_policy=run.provider_randomness_policy,
                 provider_seed=run.provider_seed,
-                binding_sha256=canonical_sha256(run),
+                qualification_policy_version=SEALED_QUALIFICATION_POLICY_VERSION,
+                scenario_suite_sha256=scenario_sha256,
+                qualification_contract_sha256=qualification_sha256,
+                binding_sha256=_run_binding_sha256(
+                    run,
+                    scenario_suite_sha256=scenario_sha256,
+                    qualification_contract_sha256=qualification_sha256,
+                ),
             )
         )
     try:
@@ -679,6 +798,9 @@ def to_batch_binding_record(
                 simulator_seed_block=run.simulator_seed_block,
                 provider_randomness_policy=run.provider_randomness_policy,  # type: ignore[arg-type]
                 provider_seed=run.provider_seed,
+                qualification_policy_version=run.qualification_policy_version,
+                scenario_suite_sha256=run.scenario_suite_sha256,
+                qualification_contract_sha256=run.qualification_contract_sha256,
                 binding_sha256=run.binding_sha256,
                 created_at=_as_utc(run.created_at),
             )

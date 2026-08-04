@@ -795,7 +795,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0026 (head)"]
+    assert heads == ["20260804_0027 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -891,8 +891,14 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             == ["continuation_parent_job_id"]
             for row in connection.execute("PRAGMA index_list('jobs')").fetchall()
         )
+        benchmark_run_binding_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('benchmark_campaign_run_bindings')"
+            ).fetchall()
+        }
 
-    assert version == ("20260804_0026",)
+    assert version == ("20260804_0027",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
@@ -919,6 +925,11 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
         "harness_cognitive_turn_delete_authorizations"
     }
     assert continuation_parent_is_unique is True
+    assert {
+        "qualification_policy_version",
+        "scenario_suite_sha256",
+        "qualification_contract_sha256",
+    }.issubset(benchmark_run_binding_columns)
 
 
 def test_postgresql_first_qualified_migration_emits_immutable_guard(

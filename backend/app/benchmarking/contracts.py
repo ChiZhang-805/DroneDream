@@ -647,6 +647,9 @@ class BenchmarkRunBindingRecordV1(_Strict):
         "provider_managed",
     ]
     provider_seed: int | None
+    qualification_policy_version: str | None = None
+    scenario_suite_sha256: Sha256Hex | None = None
+    qualification_contract_sha256: Sha256Hex | None = None
     binding_sha256: Sha256Hex
     created_at: datetime
 

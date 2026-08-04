@@ -21,11 +21,51 @@ from app.benchmarking.contracts import (
     BenchmarkProposalV1,
     canonical_sha256,
 )
+from app.orchestration.qualification import (
+    QUALIFICATION_RULE_SHA256,
+    compile_sealed_qualification_contract,
+    sealed_qualification_contract_sha256,
+)
+from app.schemas import ScenarioSuiteConfig
 
 from .test_jobs_api import HEURISTIC_JOB_PAYLOAD
 
 _SHA = "1" * 64
 _COMMIT = "a" * 40
+_BENCHMARK_SCENARIO_SUITE = {
+    "cases": [
+        {
+            "id": "screening-nominal",
+            "scenario_type": "nominal",
+            "seeds": [101, 102, 103, 104],
+            "enabled": True,
+            "holdout": False,
+        },
+        {
+            "id": "sealed-holdout",
+            "scenario_type": "combined_perturbed",
+            "seeds": list(range(901, 921)),
+            "enabled": True,
+            "holdout": True,
+            "config": {"wind_mps": 3.0},
+        },
+    ],
+    "common_random_numbers": True,
+}
+_NORMALIZED_BENCHMARK_SCENARIO_SUITE = ScenarioSuiteConfig(
+    **_BENCHMARK_SCENARIO_SUITE
+).model_dump(mode="json")
+_BENCHMARK_JOB_PAYLOAD = {
+    **HEURISTIC_JOB_PAYLOAD,
+    "scenario_suite": _BENCHMARK_SCENARIO_SUITE,
+    "max_total_trials": 100,
+}
+_INVALID_SEALED_MATRIX_JOB_PAYLOAD = deepcopy(_BENCHMARK_JOB_PAYLOAD)
+_INVALID_SEALED_MATRIX_JOB_PAYLOAD["scenario_suite"]["cases"][0]["seeds"] = [
+    101,
+    102,
+    103,
+]
 
 
 def _component(component_id: str) -> dict[str, object]:
@@ -77,8 +117,10 @@ def _manifest() -> dict[str, object]:
             "history_contract_sha256": "c" * 64,
             "failure_semantics_sha256": "d" * 64,
             "simulator_budget_sha256": "e" * 64,
-            "qualification_rule_sha256": "f" * 64,
-            "scenario_manifest_sha256": "0" * 64,
+            "qualification_rule_sha256": QUALIFICATION_RULE_SHA256,
+            "scenario_manifest_sha256": canonical_sha256(
+                _NORMALIZED_BENCHMARK_SCENARIO_SUITE
+            ),
             "seed_block_manifest_sha256": "1" * 64,
         },
         "budget_caps": {
@@ -218,6 +260,23 @@ def test_new_campaign_cannot_silently_execute_the_legacy_v1_observation_contract
 
     assert response.status_code == 422
     assert "frozen observation contract" in response.text
+
+
+def test_new_campaign_requires_the_server_frozen_qualification_rule(
+    client: TestClient,
+) -> None:
+    manifest = _manifest()
+    manifest["campaign_version"] = "wrong-qualification-rule"
+    manifest["fairness"]["qualification_rule_sha256"] = "f" * 64
+
+    response = client.post("/api/v1/benchmark-campaigns", json={"manifest": manifest})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == (
+        "BENCHMARK_QUALIFICATION_RULE_MISMATCH"
+    )
+
+
 def test_create_campaign_freezes_manifest_and_registered_arms(client: TestClient) -> None:
     manifest = _manifest()
     response = client.post(
@@ -511,8 +570,8 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
         json={
             "name": "paired-block-01",
             "jobs": [
-                {**HEURISTIC_JOB_PAYLOAD, "display_name": "random"},
-                {**HEURISTIC_JOB_PAYLOAD, "display_name": "adaptive"},
+                {**_BENCHMARK_JOB_PAYLOAD, "display_name": "random"},
+                {**_BENCHMARK_JOB_PAYLOAD, "display_name": "adaptive"},
             ],
         },
     ).json()["data"]
@@ -575,6 +634,35 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
     assert [run["batch_run_ordinal"] for run in binding["runs"]] == [1, 2]
     assert binding["runs"][0]["simulator_seed_block"] == "crn-block-01"
     assert binding["runs"][1]["provider_seed"] == 20260804
+    frozen_contract = compile_sealed_qualification_contract(
+        ScenarioSuiteConfig(**_BENCHMARK_SCENARIO_SUITE)
+    )
+    expected_contract_sha256 = sealed_qualification_contract_sha256(frozen_contract)
+    assert all(
+        run["qualification_policy_version"] == "sealed-two-stage-v1"
+        for run in binding["runs"]
+    )
+    assert all(
+        run["scenario_suite_sha256"]
+        == canonical_sha256(_NORMALIZED_BENCHMARK_SCENARIO_SUITE)
+        for run in binding["runs"]
+    )
+    assert all(
+        run["qualification_contract_sha256"] == expected_contract_sha256
+        for run in binding["runs"]
+    )
+
+    from app import models
+
+    with SessionLocal() as db:
+        bound_jobs = [db.get(models.Job, item["id"]) for item in jobs]
+        assert all(job is not None for job in bound_jobs)
+        assert all(
+            job.holdout_policy_version == "sealed-two-stage-v1"
+            and job.holdout_contract_json == frozen_contract.model_dump(mode="json")
+            for job in bound_jobs
+            if job is not None
+        )
 
     reordered_payload = deepcopy(payload)
     reordered_payload["runs"].reverse()
@@ -603,7 +691,7 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
 
     second_batch = client.post(
         "/api/v1/batches",
-        json={"name": "paired-block-02", "jobs": [HEURISTIC_JOB_PAYLOAD]},
+        json={"name": "paired-block-02", "jobs": [_BENCHMARK_JOB_PAYLOAD]},
     ).json()["data"]
     second_job = client.get(
         f"/api/v1/batches/{second_batch['id']}/jobs"
@@ -738,3 +826,227 @@ def test_campaign_batch_binding_rejects_partial_started_or_unknown_arm(
     )
     assert started.status_code == 409
     assert started.json()["error"]["code"] == "BENCHMARK_BATCH_ALREADY_STARTED"
+
+
+@pytest.mark.parametrize(
+    ("job_payload", "expected_error"),
+    [
+        (HEURISTIC_JOB_PAYLOAD, "BENCHMARK_SCENARIO_CONTRACT_MISSING"),
+        (
+            _INVALID_SEALED_MATRIX_JOB_PAYLOAD,
+            "BENCHMARK_QUALIFICATION_CONTRACT_INVALID",
+        ),
+    ],
+)
+def test_campaign_binding_rejects_a_job_without_exact_sealed_contract(
+    client: TestClient,
+    job_payload: dict[str, object],
+    expected_error: str,
+) -> None:
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _manifest()},
+    ).json()["data"]
+    batch = client.post(
+        "/api/v1/batches",
+        json={"name": "invalid-sealed-matrix", "jobs": [job_payload]},
+    ).json()["data"]
+    job = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"][0]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "campaign-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    response = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings",
+        json={
+            "binding_key": "invalid-sealed-matrix",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [
+                {
+                    "run_key": "run-invalid",
+                    "job_id": job["id"],
+                    "benchmark_arm_id": "random-search",
+                    "arm_version": "v1",
+                    "algorithm_seed": 101,
+                    "simulator_seed_block": "crn-invalid",
+                    "provider_randomness_policy": "not_applicable",
+                    "provider_seed": None,
+                }
+            ],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == expected_error
+    with SessionLocal() as db:
+        stored = db.get(models.Job, job["id"])
+        assert stored is not None
+        assert stored.holdout_policy_version == "legacy-visible-v0"
+        assert stored.holdout_contract_json is None
+
+
+def test_campaign_binding_rolls_back_job_sealing_when_global_cap_rejects(
+    client: TestClient,
+) -> None:
+    manifest = _manifest()
+    manifest["campaign_version"] = "atomic-cap-rejection"
+    manifest["budget_caps"]["jobs"] = 1
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": manifest},
+    ).json()["data"]
+    batch = client.post(
+        "/api/v1/batches",
+        json={
+            "name": "atomic-cap-rejection",
+            "jobs": [_BENCHMARK_JOB_PAYLOAD, _BENCHMARK_JOB_PAYLOAD],
+        },
+    ).json()["data"]
+    jobs = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "campaign-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    response = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings",
+        json={
+            "binding_key": "atomic-cap-rejection",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [
+                {
+                    "run_key": "run-random",
+                    "job_id": jobs[0]["id"],
+                    "benchmark_arm_id": "random-search",
+                    "arm_version": "v1",
+                    "algorithm_seed": 101,
+                    "simulator_seed_block": "crn-cap",
+                    "provider_randomness_policy": "not_applicable",
+                    "provider_seed": None,
+                },
+                {
+                    "run_key": "run-adaptive",
+                    "job_id": jobs[1]["id"],
+                    "benchmark_arm_id": "dronedream-adaptive",
+                    "arm_version": "v1",
+                    "algorithm_seed": 102,
+                    "simulator_seed_block": "crn-cap",
+                    "provider_randomness_policy": "fixed_seed",
+                    "provider_seed": 20260804,
+                },
+            ],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "BENCHMARK_CAMPAIGN_CAP_EXCEEDED"
+    usage = client.get(f"/api/v1/benchmark-campaigns/{created['id']}/usage")
+    assert usage.json()["data"]["used"]["jobs"] == 0
+    with SessionLocal() as db:
+        stored = [db.get(models.Job, job["id"]) for job in jobs]
+        assert all(item is not None for item in stored)
+        assert all(
+            item.holdout_policy_version == "legacy-visible-v0"
+            and item.holdout_contract_json is None
+            for item in stored
+            if item is not None
+        )
+
+
+def test_campaign_binding_rejects_paired_arms_with_scenario_drift(
+    client: TestClient,
+) -> None:
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _manifest()},
+    ).json()["data"]
+    drifted = deepcopy(_BENCHMARK_JOB_PAYLOAD)
+    drifted["scenario_suite"]["cases"][1]["config"] = {"wind_mps": 4.0}
+    batch = client.post(
+        "/api/v1/batches",
+        json={
+            "name": "drifted-pair",
+            "jobs": [_BENCHMARK_JOB_PAYLOAD, drifted],
+        },
+    ).json()["data"]
+    jobs = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "campaign-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    response = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings",
+        json={
+            "binding_key": "drifted-pair",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [
+                {
+                    "run_key": "run-random",
+                    "job_id": jobs[0]["id"],
+                    "benchmark_arm_id": "random-search",
+                    "arm_version": "v1",
+                    "algorithm_seed": 101,
+                    "simulator_seed_block": "crn-shared",
+                    "provider_randomness_policy": "not_applicable",
+                    "provider_seed": None,
+                },
+                {
+                    "run_key": "run-adaptive",
+                    "job_id": jobs[1]["id"],
+                    "benchmark_arm_id": "dronedream-adaptive",
+                    "arm_version": "v1",
+                    "algorithm_seed": 102,
+                    "simulator_seed_block": "crn-shared",
+                    "provider_randomness_policy": "fixed_seed",
+                    "provider_seed": 20260804,
+                },
+            ],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "BENCHMARK_PAIRED_SCENARIO_MISMATCH"
+    with SessionLocal() as db:
+        stored = [db.get(models.Job, job["id"]) for job in jobs]
+        assert all(item is not None for item in stored)
+        assert all(
+            item.holdout_policy_version == "legacy-visible-v0"
+            and item.holdout_contract_json is None
+            for item in stored
+            if item is not None
+        )
