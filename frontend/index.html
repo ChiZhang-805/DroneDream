@@ -4,6 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DroneDream</title>
+    <script>
+      (() => {
+        const redirectKey = "dronedream:spa-redirect";
+        try {
+          const redirectTarget = window.sessionStorage.getItem(redirectKey);
+          window.sessionStorage.removeItem(redirectKey);
+          if (
+            redirectTarget &&
+            redirectTarget.startsWith("/") &&
+            !redirectTarget.startsWith("//")
+          ) {
+            window.history.replaceState(null, "", redirectTarget);
+          }
+        } catch {
+          // The base console remains usable when session storage is unavailable.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -11,6 +11,24 @@
     <meta property="og:description" content="Configure, optimize, simulate, and compare PX4 control parameters in one local workflow." />
     <link rel="icon" type="image/png" href="/drone-favicon.png" />
     <title>DroneDream</title>
+    <script>
+      (() => {
+        const redirectKey = "dronedream:spa-redirect";
+        try {
+          const redirectTarget = window.sessionStorage.getItem(redirectKey);
+          window.sessionStorage.removeItem(redirectKey);
+          if (
+            redirectTarget &&
+            redirectTarget.startsWith("/") &&
+            !redirectTarget.startsWith("//")
+          ) {
+            window.history.replaceState(null, "", redirectTarget);
+          }
+        } catch {
+          // The public homepage remains usable when session storage is unavailable.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="site-root"></div>

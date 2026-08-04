@@ -204,6 +204,39 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
             workflow,
         )
 
+    def test_pages_404_bridge_restores_public_and_console_deep_links(self) -> None:
+        builder = self.read("website/scripts/build-pages-site.ps1")
+        console_entry = self.read("frontend/index.html")
+        site_entry = self.read("frontend/site.html")
+
+        self.assertNotIn(
+            'Copy-Item -LiteralPath $siteHtml -Destination '
+            '(Join-Path $outputDirectory "404.html")',
+            builder,
+        )
+        self.assertIn('const redirectKey = "dronedream:spa-redirect";', builder)
+        self.assertIn('window.location.pathname === "/console"', builder)
+        self.assertIn('window.location.pathname.startsWith("/console/")', builder)
+        self.assertIn(
+            'const entryPath = isConsolePath ? "/console/" : "/";', builder
+        )
+        self.assertIn(
+            "window.sessionStorage.setItem(redirectKey, requestedPath)", builder
+        )
+        self.assertIn("window.location.replace(entryPath)", builder)
+
+        for entry in (console_entry, site_entry):
+            with self.subTest(entry=entry[:40]):
+                self.assertIn(
+                    'const redirectKey = "dronedream:spa-redirect";', entry
+                )
+                self.assertIn("window.sessionStorage.getItem(redirectKey)", entry)
+                self.assertIn("window.sessionStorage.removeItem(redirectKey)", entry)
+                self.assertIn(
+                    "window.history.replaceState(null, \"\", redirectTarget)", entry
+                )
+                self.assertIn('!redirectTarget.startsWith("//")', entry)
+
     def test_parity_verifies_public_release_metadata_on_both_origins(self) -> None:
         parity = self.read("website/scripts/verify-site-parity.ps1")
         readme = self.read("website/README.md")

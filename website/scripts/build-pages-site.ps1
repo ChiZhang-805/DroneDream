@@ -171,7 +171,41 @@ foreach ($marker in @(
 }
 
 Copy-Item -LiteralPath $siteHtml -Destination (Join-Path $outputDirectory "index.html") -Force
-Copy-Item -LiteralPath $siteHtml -Destination (Join-Path $outputDirectory "404.html") -Force
+$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+$pagesNotFoundHtml = @'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>DroneDream</title>
+    <script>
+      (() => {
+        const redirectKey = "dronedream:spa-redirect";
+        const requestedPath =
+          window.location.pathname + window.location.search + window.location.hash;
+        const isConsolePath =
+          window.location.pathname === "/console" ||
+          window.location.pathname.startsWith("/console/");
+        const entryPath = isConsolePath ? "/console/" : "/";
+        try {
+          window.sessionStorage.setItem(redirectKey, requestedPath);
+        } catch {
+          // Falling back to the correct application root is still safe.
+        }
+        window.location.replace(entryPath);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
+'@
+[IO.File]::WriteAllText(
+    (Join-Path $outputDirectory "404.html"),
+    $pagesNotFoundHtml,
+    $utf8WithoutBom
+)
 $downloadsDirectory = Join-Path $outputDirectory "downloads"
 New-Item -ItemType Directory -Force -Path $downloadsDirectory | Out-Null
 
@@ -230,7 +264,6 @@ foreach ($publicationInput in $publicationInputs) {
     }
 }
 
-$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
 $metadataJson = $metadata | ConvertTo-Json
 [IO.File]::WriteAllText(
     (Join-Path $downloadsDirectory "latest.json"),
