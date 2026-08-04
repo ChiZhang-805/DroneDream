@@ -228,6 +228,10 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         for entry in (console_entry, site_entry):
             with self.subTest(entry=entry[:40]):
                 self.assertIn(
+                    '<link rel="icon" type="image/png" href="/drone-favicon.png" />',
+                    entry,
+                )
+                self.assertIn(
                     'const redirectKey = "dronedream:spa-redirect";', entry
                 )
                 self.assertIn("window.sessionStorage.getItem(redirectKey)", entry)
