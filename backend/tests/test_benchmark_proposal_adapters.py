@@ -6,8 +6,9 @@ import pytest
 
 from app.benchmarking.adapters import BenchmarkAdapterError
 from app.benchmarking.contracts import (
-    BenchmarkHistoryItemV1,
-    BenchmarkObservationV1,
+    BenchmarkHistoryItemV2,
+    BenchmarkObservationV2,
+    BenchmarkOptimizerOutcomeV1,
     BenchmarkProposalAdapter,
     BenchmarkProposalV1,
     canonical_sha256,
@@ -77,9 +78,9 @@ def _observation(
     *,
     adapter_id: str,
     ordinal: int = 1,
-    history: list[BenchmarkHistoryItemV1] | None = None,
-) -> BenchmarkObservationV1:
-    return BenchmarkObservationV1(
+    history: list[BenchmarkHistoryItemV2] | None = None,
+) -> BenchmarkObservationV2:
+    return BenchmarkObservationV2(
         campaign_id="campaign-1",
         run_id="run-1",
         benchmark_arm_id=adapter_id.replace("/", "-"),
@@ -127,12 +128,22 @@ def test_adapters_skip_a_previously_dispatched_candidate(adapter_id: str) -> Non
     initial = _observation(adapter_id=adapter_id)
     first = adapter.propose(initial)
     history = [
-        BenchmarkHistoryItemV1(
+        BenchmarkHistoryItemV2(
             candidate_ref=first.candidate_ref,
             generation_index=1,
             dispatch_ordinal=1,
             parameters=first.parameters,
             screening_status="passed",
+            outcome=BenchmarkOptimizerOutcomeV1(
+                role="objective",
+                loss=0.25,
+                objectives={"tracking_error": 0.25},
+                objective_directions={"tracking_error": "minimize"},
+                constraint_violations={"safety": 0.0},
+                feasible=True,
+                failure_rate=0.0,
+                completed=True,
+            ),
         )
     ]
 
@@ -146,7 +157,7 @@ def test_random_and_halton_receive_identical_information_and_budget() -> None:
     random_observation = _observation(adapter_id="random_search/v1")
     halton_payload = random_observation.model_dump(mode="json")
     halton_payload["benchmark_arm_id"] = "seeded-halton-v1"
-    halton_observation = BenchmarkObservationV1.model_validate(halton_payload)
+    halton_observation = BenchmarkObservationV2.model_validate(halton_payload)
 
     random = create_benchmark_adapter("random_search/v1").propose(random_observation)
     halton = create_benchmark_adapter("seeded_halton/v1").propose(halton_observation)
@@ -166,13 +177,13 @@ def test_random_and_halton_receive_identical_information_and_budget() -> None:
 def test_adapters_fail_closed_on_bad_domain_or_exhausted_budget() -> None:
     bad_payload = _observation(adapter_id="random_search/v1").model_dump(mode="json")
     bad_payload["parameter_domain"][0]["unreviewed_hint"] = 1
-    bad = BenchmarkObservationV1.model_validate(bad_payload)
+    bad = BenchmarkObservationV2.model_validate(bad_payload)
     with pytest.raises(BenchmarkAdapterError, match="unsupported parameter-domain"):
         create_benchmark_adapter("random_search/v1").propose(bad)
 
     no_budget_payload = _observation(adapter_id="random_search/v1").model_dump(mode="json")
     no_budget_payload["simulator_budget_remaining"] = 0
-    no_budget = BenchmarkObservationV1.model_validate(no_budget_payload)
+    no_budget = BenchmarkObservationV2.model_validate(no_budget_payload)
     with pytest.raises(BenchmarkAdapterError, match="budget is exhausted"):
         create_benchmark_adapter("random_search/v1").propose(no_budget)
 
@@ -250,7 +261,7 @@ def test_numeric_landscape_rejects_partial_or_unknown_parameter_sets() -> None:
     space = SearchSpace((ParameterDomain("x", 0.5, 0.0, 1.0),))
     evaluator = DeterministicConstrainedLandscapeV1(space)
     proposal = create_benchmark_adapter("random_search/v1").propose(
-        BenchmarkObservationV1(
+        BenchmarkObservationV2(
             campaign_id="campaign-1",
             run_id="run-1",
             benchmark_arm_id="random-search",

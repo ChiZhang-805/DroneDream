@@ -11,8 +11,13 @@ from sqlalchemy.exc import DatabaseError
 
 from app.benchmarking.contracts import (
     BENCHMARK_OBSERVATION_CONTRACT_SHA256,
+    BENCHMARK_OBSERVATION_V1_CONTRACT_SHA256,
     BenchmarkCampaignManifestV1,
+    BenchmarkHistoryItemV2,
     BenchmarkObservationV1,
+    BenchmarkObservationV2,
+    BenchmarkOptimizerOutcomeV1,
+    BenchmarkProposalContextV1,
     BenchmarkProposalV1,
     canonical_sha256,
 )
@@ -119,8 +124,10 @@ def _manifest() -> dict[str, object]:
 
 
 def test_unified_observation_excludes_holdout_and_sensitive_payloads() -> None:
-    schema = BenchmarkObservationV1.model_json_schema()
-    assert "holdout" not in " ".join(schema["properties"]).lower()
+    v1_schema = BenchmarkObservationV1.model_json_schema()
+    v2_schema = BenchmarkObservationV2.model_json_schema()
+    assert "holdout" not in " ".join(v1_schema["properties"]).lower()
+    assert "holdout" not in " ".join(v2_schema["properties"]).lower()
 
     with pytest.raises(ValueError, match="sensitive field"):
         BenchmarkProposalV1(
@@ -129,6 +136,88 @@ def test_unified_observation_excludes_holdout_and_sensitive_payloads() -> None:
             reason_code="bounded-proposal",
             proposal_receipt={"api_key": "forbidden"},
         )
+
+    with pytest.raises(ValueError, match="objective outcomes"):
+        BenchmarkOptimizerOutcomeV1(
+            role="objective",
+            loss=None,
+            objectives={},
+            objective_directions={},
+            constraint_violations={},
+            feasible=True,
+            failure_rate=0.0,
+            completed=True,
+        )
+
+    assert BENCHMARK_OBSERVATION_CONTRACT_SHA256 != BENCHMARK_OBSERVATION_V1_CONTRACT_SHA256
+
+
+def test_v2_history_fails_closed_on_sensitive_oversized_or_inconsistent_provenance() -> None:
+    with pytest.raises(ValueError, match="sensitive field"):
+        BenchmarkProposalContextV1(
+            proposal_adapter_id="optimizer_portfolio/v1",
+            reason_code="portfolio-proposal",
+            proposal_receipt_sha256="1" * 64,
+            optimizer_strategy="optimizer_portfolio",
+            optimizer_metadata={"raw_prompt": "forbidden"},
+        )
+
+    with pytest.raises(ValueError, match="65536 UTF-8 bytes"):
+        BenchmarkProposalContextV1(
+            proposal_adapter_id="optimizer_portfolio/v1",
+            reason_code="portfolio-proposal",
+            proposal_receipt_sha256="1" * 64,
+            optimizer_strategy="optimizer_portfolio",
+            optimizer_metadata={"diagnostic": "x" * 66_000},
+        )
+
+    objective = BenchmarkOptimizerOutcomeV1(
+        role="objective",
+        loss=0.2,
+        objectives={"tracking": 0.2},
+        objective_directions={"tracking": "minimize"},
+        constraint_violations={"safety": 0.0},
+        feasible=True,
+        failure_rate=0.0,
+        completed=True,
+    )
+    with pytest.raises(ValueError, match="must be quarantined"):
+        BenchmarkHistoryItemV2(
+            candidate_ref="indeterminate-candidate",
+            generation_index=1,
+            dispatch_ordinal=1,
+            parameters={"x": 0.5},
+            screening_status="indeterminate",
+            outcome=objective,
+            failure_code="worker-lost",
+        )
+
+    with pytest.raises(ValueError, match="constraint-only outcomes"):
+        BenchmarkOptimizerOutcomeV1(
+            role="constraint_only",
+            loss=99.0,
+            objectives={},
+            objective_directions={},
+            constraint_violations={"safety": 1.0},
+            feasible=False,
+            failure_rate=1.0,
+            completed=True,
+        )
+
+
+def test_new_campaign_cannot_silently_execute_the_legacy_v1_observation_contract(
+    client: TestClient,
+) -> None:
+    manifest = _manifest()
+    manifest["campaign_version"] = "legacy-observation-v1"
+    manifest["fairness"][
+        "observation_contract_sha256"
+    ] = BENCHMARK_OBSERVATION_V1_CONTRACT_SHA256
+
+    response = client.post("/api/v1/benchmark-campaigns", json={"manifest": manifest})
+
+    assert response.status_code == 422
+    assert "frozen observation contract" in response.text
 def test_create_campaign_freezes_manifest_and_registered_arms(client: TestClient) -> None:
     manifest = _manifest()
     response = client.post(

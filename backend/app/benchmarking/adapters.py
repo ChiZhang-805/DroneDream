@@ -1,7 +1,7 @@
 """Deterministic proposal adapters for the frozen benchmark observation contract.
 
 The adapters in this module are deliberately simulator- and provider-independent.
-They consume only :class:`BenchmarkObservationV1`, never sealed qualification
+They consume only :class:`BenchmarkObservationV2`, never sealed qualification
 outcomes, and return exactly one bounded proposal.  Publication campaigns may
 therefore compare them under the same evaluator and simulator budget.
 """
@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from app.benchmarking.contracts import (
-    BenchmarkObservationV1,
+    BenchmarkObservationV2,
     BenchmarkProposalV1,
     canonical_json_bytes,
     canonical_sha256,
@@ -101,7 +101,7 @@ def _domain_from_payload(payload: Mapping[str, Any]) -> ParameterDomain:
         raise BenchmarkAdapterError(str(exc)) from exc
 
 
-def search_space_from_observation(observation: BenchmarkObservationV1) -> SearchSpace:
+def search_space_from_observation(observation: BenchmarkObservationV2) -> SearchSpace:
     """Build the one allowed search-space view from a frozen observation."""
 
     try:
@@ -121,7 +121,7 @@ def _candidate_key(parameters: Mapping[str, float]) -> tuple[tuple[str, float], 
 
 
 def _seen_candidates(
-    observation: BenchmarkObservationV1,
+    observation: BenchmarkObservationV2,
     space: SearchSpace,
 ) -> set[tuple[tuple[str, float], ...]]:
     seen: set[tuple[tuple[str, float], ...]] = set()
@@ -136,14 +136,14 @@ def _seen_candidates(
     return seen
 
 
-def _require_available_budget(observation: BenchmarkObservationV1) -> None:
+def _require_available_budget(observation: BenchmarkObservationV2) -> None:
     if observation.simulator_budget_remaining < 1:
         raise BenchmarkAdapterError("simulator budget is exhausted")
     if observation.wall_time_remaining_ms < 1:
         raise BenchmarkAdapterError("wall-time budget is exhausted")
 
 
-def _seed_material(observation: BenchmarkObservationV1, adapter_id: str) -> bytes:
+def _seed_material(observation: BenchmarkObservationV2, adapter_id: str) -> bytes:
     payload = {
         "adapter_id": adapter_id,
         "algorithm_seed": observation.algorithm_seed,
@@ -166,7 +166,7 @@ def _sha_uniform(seed: bytes, *, attempt: int, dimension: int) -> float:
 def _proposal(
     *,
     adapter_id: str,
-    observation: BenchmarkObservationV1,
+    observation: BenchmarkObservationV2,
     parameters: dict[str, float],
     reason_code: str,
     seed: bytes,
@@ -202,7 +202,7 @@ class RandomSearchAdapterV1:
 
     adapter_id: str = "random_search/v1"
 
-    def propose(self, observation: BenchmarkObservationV1) -> BenchmarkProposalV1:
+    def propose(self, observation: BenchmarkObservationV2) -> BenchmarkProposalV1:
         _require_available_budget(observation)
         space = search_space_from_observation(observation)
         seen = _seen_candidates(observation, space)
@@ -238,7 +238,7 @@ class SeededHaltonAdapterV1:
 
     adapter_id: str = "seeded_halton/v1"
 
-    def propose(self, observation: BenchmarkObservationV1) -> BenchmarkProposalV1:
+    def propose(self, observation: BenchmarkObservationV2) -> BenchmarkProposalV1:
         _require_available_budget(observation)
         space = search_space_from_observation(observation)
         seen = _seen_candidates(observation, space)

@@ -6,6 +6,9 @@ from app.benchmarking.contracts import (
     BenchmarkCampaignManifestV1,
     BenchmarkEvaluationV1,
     BenchmarkObservationV1,
+    BenchmarkObservationV2,
+    BenchmarkOptimizerOutcomeV1,
+    BenchmarkProposalContextV1,
     BenchmarkProposalV1,
     canonical_sha256,
 )
@@ -16,6 +19,9 @@ __all__ = [
     "BenchmarkCampaignManifestV1",
     "BenchmarkEvaluationV1",
     "BenchmarkObservationV1",
+    "BenchmarkObservationV2",
+    "BenchmarkOptimizerOutcomeV1",
     "BenchmarkProposalV1",
+    "BenchmarkProposalContextV1",
     "canonical_sha256",
 ]
