@@ -108,3 +108,28 @@ python distribution/tools/distribution_contract.py vehicle-packs `
   --policy distribution/capabilities/core-capabilities.v1.json `
   distribution/tests/fixtures/vehicle-pack-contract-only.v1.json
 ```
+
+## E1 composite installation contract
+
+`schemas/composite-installation-manifest.schema.json` binds one product source
+and common-core hash to the exact edition manifest, desktop, Runtime Base,
+Engine Pack, Vehicle Pack manifests and payloads, module set, capability set,
+resource estimate, and license notice. Desktop and Engine Pack must match the
+common source commit; a stable Runtime Base may use a different commit only when
+its own version, build ID, manifest, artifact hash, size, signature state, and
+validation tier are explicit.
+
+A planned composite must list blockers. It cannot become `installable` while
+the edition is contract-only, a Vehicle Pack is unvalidated/unsigned, or the
+Runtime Base/Engine Pack signature is unverified. The fixture is intentionally
+planned and uses nonexistent tiny artifacts; it is not a build or release.
+
+```powershell
+python distribution/tools/distribution_contract.py composite `
+  --edition distribution/editions/sim.v1.json `
+  --policy distribution/capabilities/core-capabilities.v1.json `
+  --inventory distribution/upstream-sources.v1.json `
+  --vehicle-pack distribution/tests/fixtures/vehicle-pack-contract-only.v1.json `
+  --expected-source 6b50f86ed80c190b816f19d06de143a328bda7e2 `
+  distribution/tests/fixtures/composite-sim-planned.v1.json
+```

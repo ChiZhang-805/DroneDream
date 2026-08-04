@@ -180,6 +180,56 @@ VEHICLE_VALIDATION_TIERS = {
 }
 AUTOPILOT_FAMILIES = {"px4", "ardupilot", "crazyflie"}
 ADAPTER_STATUSES = {"integrated-contract", "contract-only", "planned"}
+COMPOSITE_INSTALLATION_KEYS = {
+    "schemaVersion",
+    "kind",
+    "inventoryVersion",
+    "sourceCommit",
+    "commonCoreHash",
+    "productDisplayVersion",
+    "edition",
+    "region",
+    "targetArchitecture",
+    "components",
+    "vehiclePacks",
+    "selectedModules",
+    "capabilities",
+    "resourceEstimate",
+    "installability",
+    "licenseNotice",
+}
+COMPOSITE_EDITION_KEYS = {"editionId", "editionVersion", "manifestSha256"}
+COMPOSITE_COMPONENT_KEYS = {"desktop", "runtimeBase", "enginePack"}
+COMPOSITE_COMPONENT_REF_KEYS = {
+    "componentId",
+    "version",
+    "buildId",
+    "sourceCommit",
+    "manifestSha256",
+    "artifactSha256",
+    "artifactBytes",
+    "signatureState",
+    "validationTier",
+}
+COMPOSITE_VEHICLE_REF_KEYS = {
+    "packId",
+    "packVersion",
+    "manifestSha256",
+    "payloadSha256",
+    "artifactSha256",
+    "artifactBytes",
+    "signatureState",
+    "validationTier",
+}
+COMPOSITE_RESOURCE_KEYS = {
+    "downloadBytes",
+    "installedBytes",
+    "requiresWsl",
+    "requiresGazebo",
+}
+COMPOSITE_INSTALLABILITY_KEYS = {"state", "blockers", "physicalCapabilityStatus"}
+COMPOSITE_LICENSE_NOTICE_KEYS = {"path", "sha256", "sizeBytes"}
+SIGNATURE_STATES = {"verified", "not-issued"}
 
 
 class DistributionContractError(ValueError):
@@ -1047,6 +1097,253 @@ def load_vehicle_pack_manifests(
     return packs
 
 
+def _validate_composite_component_ref(
+    value: Any, label: str
+) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise DistributionContractError(f"{label} must be an object")
+    _require_exact_keys(value, COMPOSITE_COMPONENT_REF_KEYS, label)
+    for field in ("componentId", "version", "buildId", "validationTier"):
+        _require_nonempty_string(value[field], f"{label}.{field}")
+    if not isinstance(value["sourceCommit"], str) or not COMMIT_RE.fullmatch(
+        value["sourceCommit"]
+    ):
+        raise DistributionContractError(f"{label}.sourceCommit is invalid")
+    for field in ("manifestSha256", "artifactSha256"):
+        if not isinstance(value[field], str) or not SHA256_RE.fullmatch(value[field]):
+            raise DistributionContractError(f"{label}.{field} is invalid")
+    if not isinstance(value["artifactBytes"], int) or value["artifactBytes"] < 0:
+        raise DistributionContractError(f"{label}.artifactBytes is invalid")
+    if value["signatureState"] not in SIGNATURE_STATES:
+        raise DistributionContractError(f"{label}.signatureState is unsupported")
+    return value
+
+
+def validate_composite_installation_manifest(
+    document: Any,
+    *,
+    edition: dict[str, Any],
+    edition_manifest_sha256: str,
+    vehicle_packs: dict[str, dict[str, Any]],
+    vehicle_pack_manifest_sha256: dict[str, str],
+    expected_source_commit: str | None = None,
+) -> dict[str, Any]:
+    if not isinstance(document, dict):
+        raise DistributionContractError("composite installation manifest must be an object")
+    _require_exact_keys(
+        document,
+        COMPOSITE_INSTALLATION_KEYS,
+        "composite installation manifest",
+    )
+    if (
+        document["schemaVersion"] != 1
+        or document["kind"] != "dronedream-composite-installation"
+        or not SEMVER_RE.fullmatch(str(document["inventoryVersion"]))
+    ):
+        raise DistributionContractError("composite installation identity is unsupported")
+    source_commit = document["sourceCommit"]
+    if not isinstance(source_commit, str) or not COMMIT_RE.fullmatch(source_commit):
+        raise DistributionContractError("composite sourceCommit is invalid")
+    if expected_source_commit is not None and source_commit != expected_source_commit:
+        raise DistributionContractError("composite sourceCommit drifted from expected source")
+    if not isinstance(document["commonCoreHash"], str) or not SHA256_RE.fullmatch(
+        document["commonCoreHash"]
+    ):
+        raise DistributionContractError("composite commonCoreHash is invalid")
+    if document["productDisplayVersion"] != "1.0.0":
+        raise DistributionContractError("closed beta product display version must remain 1.0.0")
+    if document["region"] not in REGIONS or document["targetArchitecture"] != "windows-x86_64":
+        raise DistributionContractError("composite target is unsupported")
+
+    edition_ref = document["edition"]
+    if not isinstance(edition_ref, dict):
+        raise DistributionContractError("composite edition reference must be an object")
+    _require_exact_keys(edition_ref, COMPOSITE_EDITION_KEYS, "composite edition")
+    expected_edition_ref = {
+        "editionId": edition["editionId"],
+        "editionVersion": edition["editionVersion"],
+        "manifestSha256": edition_manifest_sha256,
+    }
+    if edition_ref != expected_edition_ref:
+        raise DistributionContractError("composite edition reference drifted")
+    edition_id = edition["editionId"]
+
+    components = document["components"]
+    if not isinstance(components, dict):
+        raise DistributionContractError("composite components must be an object")
+    _require_exact_keys(components, COMPOSITE_COMPONENT_KEYS, "composite components")
+    component_refs = {
+        component_id: _validate_composite_component_ref(
+            components[component_id], f"composite components.{component_id}"
+        )
+        for component_id in sorted(COMPOSITE_COMPONENT_KEYS)
+    }
+    if component_refs["desktop"]["componentId"] != "desktop-core":
+        raise DistributionContractError("composite desktop component id is invalid")
+    if component_refs["runtimeBase"]["componentId"] != "runtime-base":
+        raise DistributionContractError("composite Runtime Base component id is invalid")
+    if component_refs["enginePack"]["componentId"] != "engine-pack":
+        raise DistributionContractError("composite Engine Pack component id is invalid")
+    for component_id in ("desktop", "enginePack"):
+        if component_refs[component_id]["sourceCommit"] != source_commit:
+            raise DistributionContractError(
+                f"composite {component_id} must bind the common sourceCommit"
+            )
+
+    selected_modules = _validate_unique_text_list(
+        document["selectedModules"], "composite selectedModules"
+    )
+    required_modules = set(edition["modules"]["required"])
+    optional_modules = set(edition["modules"]["optional"])
+    forbidden_modules = set(edition["modules"]["forbidden"])
+    if (
+        not required_modules <= selected_modules
+        or not selected_modules <= required_modules | optional_modules
+        or selected_modules & forbidden_modules
+    ):
+        raise DistributionContractError("composite selectedModules violate edition policy")
+    capabilities = _validate_unique_text_list(
+        document["capabilities"], "composite capabilities"
+    )
+    if capabilities != set(edition["capabilities"]["enabledOrConditioned"]):
+        raise DistributionContractError("composite capabilities drifted from edition")
+
+    vehicle_refs = document["vehiclePacks"]
+    if not isinstance(vehicle_refs, list) or not vehicle_refs:
+        raise DistributionContractError("composite vehiclePacks must be non-empty")
+    selected_pack_ids: set[str] = set()
+    vehicle_artifact_bytes = 0
+    all_vehicle_packs_validated = True
+    all_vehicle_signatures_verified = True
+    for index, vehicle_ref in enumerate(vehicle_refs):
+        label = f"composite vehiclePacks[{index}]"
+        if not isinstance(vehicle_ref, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(vehicle_ref, COMPOSITE_VEHICLE_REF_KEYS, label)
+        pack_id = vehicle_ref["packId"]
+        if pack_id not in vehicle_packs or pack_id in selected_pack_ids:
+            raise DistributionContractError(f"{label}.packId is unknown or duplicated")
+        if pack_id not in vehicle_pack_manifest_sha256:
+            raise DistributionContractError(f"{label} is missing a manifest hash")
+        selected_pack_ids.add(pack_id)
+        pack = vehicle_packs[pack_id]
+        expected_vehicle_ref = {
+            "packId": pack_id,
+            "packVersion": pack["packVersion"],
+            "manifestSha256": vehicle_pack_manifest_sha256[pack_id],
+            "payloadSha256": pack["integrity"]["payloadSha256"],
+            "artifactSha256": vehicle_ref["artifactSha256"],
+            "artifactBytes": vehicle_ref["artifactBytes"],
+            "signatureState": pack["integrity"]["signature"]["state"],
+            "validationTier": pack["validationTier"],
+        }
+        if vehicle_ref != expected_vehicle_ref:
+            raise DistributionContractError(f"{label} drifted from Vehicle Pack manifest")
+        if edition_id not in pack["supportedEditions"] or document["region"] not in pack[
+            "availabilityRegions"
+        ]:
+            raise DistributionContractError(f"{label} is incompatible with edition or region")
+        if not isinstance(vehicle_ref["artifactBytes"], int) or vehicle_ref[
+            "artifactBytes"
+        ] < 0:
+            raise DistributionContractError(f"{label}.artifactBytes is invalid")
+        if not isinstance(vehicle_ref["artifactSha256"], str) or not SHA256_RE.fullmatch(
+            vehicle_ref["artifactSha256"]
+        ):
+            raise DistributionContractError(f"{label}.artifactSha256 is invalid")
+        vehicle_artifact_bytes += vehicle_ref["artifactBytes"]
+        all_vehicle_packs_validated &= pack["validationStatus"] == "validated"
+        all_vehicle_signatures_verified &= vehicle_ref["signatureState"] == "verified"
+
+    resource = document["resourceEstimate"]
+    if not isinstance(resource, dict):
+        raise DistributionContractError("composite resourceEstimate must be an object")
+    _require_exact_keys(resource, COMPOSITE_RESOURCE_KEYS, "composite resourceEstimate")
+    for field in ("downloadBytes", "installedBytes"):
+        if not isinstance(resource[field], int) or resource[field] < 0:
+            raise DistributionContractError(f"composite resourceEstimate.{field} is invalid")
+    expected_download_bytes = vehicle_artifact_bytes + sum(
+        component["artifactBytes"] for component in component_refs.values()
+    )
+    if resource["downloadBytes"] != expected_download_bytes:
+        raise DistributionContractError("composite downloadBytes do not match artifacts")
+    if resource["installedBytes"] < resource["downloadBytes"]:
+        raise DistributionContractError("composite installedBytes cannot be below downloadBytes")
+    if not isinstance(resource["requiresWsl"], bool) or not isinstance(
+        resource["requiresGazebo"], bool
+    ):
+        raise DistributionContractError("composite resource booleans are invalid")
+    includes_simulator = edition["runtimeProfile"]["includesLargeSimulator"]
+    if resource["requiresGazebo"] is not includes_simulator:
+        raise DistributionContractError("composite Gazebo requirement drifted from edition")
+    if edition_id == "field" and resource["requiresWsl"]:
+        raise DistributionContractError("Field lightweight contract cannot require WSL")
+
+    installability = document["installability"]
+    if not isinstance(installability, dict):
+        raise DistributionContractError("composite installability must be an object")
+    _require_exact_keys(
+        installability,
+        COMPOSITE_INSTALLABILITY_KEYS,
+        "composite installability",
+    )
+    if installability["state"] not in {"installable", "planned"}:
+        raise DistributionContractError("composite installability state is unsupported")
+    blockers = _validate_unique_text_list(
+        installability["blockers"],
+        "composite installability.blockers",
+        allow_empty=True,
+    )
+    if installability["physicalCapabilityStatus"] not in {
+        "disabled",
+        "contract-only",
+        "validated",
+    }:
+        raise DistributionContractError("composite physical capability status is unsupported")
+    if edition_id == "sim" and installability["physicalCapabilityStatus"] != "disabled":
+        raise DistributionContractError("Sim physical capabilities must be disabled")
+    if edition_id in {"lab", "field"} and edition["validationTier"] == "contract-only" and (
+        installability["physicalCapabilityStatus"] != "contract-only"
+    ):
+        raise DistributionContractError("hardware edition cannot overstate physical validation")
+    if installability["state"] == "installable":
+        if blockers:
+            raise DistributionContractError("installable composite cannot retain blockers")
+        if edition["implementationStatus"] != "integrated-contract":
+            raise DistributionContractError("contract-only edition cannot be installable")
+        if not all_vehicle_packs_validated or not all_vehicle_signatures_verified:
+            raise DistributionContractError(
+                "installable composite requires validated signed Vehicle Packs"
+            )
+        for component_id in ("runtimeBase", "enginePack"):
+            if component_refs[component_id]["signatureState"] != "verified":
+                raise DistributionContractError(
+                    "installable composite requires signed Runtime Base and Engine Pack"
+                )
+    elif not blockers:
+        raise DistributionContractError("planned composite must explain its blockers")
+
+    license_notice = document["licenseNotice"]
+    if not isinstance(license_notice, dict):
+        raise DistributionContractError("composite licenseNotice must be an object")
+    _require_exact_keys(
+        license_notice,
+        COMPOSITE_LICENSE_NOTICE_KEYS,
+        "composite licenseNotice",
+    )
+    if not isinstance(license_notice["path"], str) or not SAFE_RELATIVE_PATH_RE.fullmatch(
+        license_notice["path"]
+    ):
+        raise DistributionContractError("composite license notice path is unsafe")
+    if not isinstance(license_notice["sha256"], str) or not SHA256_RE.fullmatch(
+        license_notice["sha256"]
+    ):
+        raise DistributionContractError("composite license notice hash is invalid")
+    if not isinstance(license_notice["sizeBytes"], int) or license_notice["sizeBytes"] <= 0:
+        raise DistributionContractError("composite license notice size is invalid")
+    return document
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1055,23 +1352,63 @@ def main() -> int:
     editions = subparsers.add_parser("editions", help="validate the capability policy and editions")
     editions.add_argument("--policy", type=Path, required=True)
     editions.add_argument("manifests", nargs="+", type=Path)
-    vehicle_packs = subparsers.add_parser(
+    vehicle_packs_parser = subparsers.add_parser(
         "vehicle-packs", help="validate Vehicle Pack manifests"
     )
-    vehicle_packs.add_argument("--inventory", type=Path, required=True)
-    vehicle_packs.add_argument("--policy", type=Path, required=True)
-    vehicle_packs.add_argument("manifests", nargs="+", type=Path)
+    vehicle_packs_parser.add_argument("--inventory", type=Path, required=True)
+    vehicle_packs_parser.add_argument("--policy", type=Path, required=True)
+    vehicle_packs_parser.add_argument("manifests", nargs="+", type=Path)
+    composite = subparsers.add_parser(
+        "composite", help="validate a composite installation manifest"
+    )
+    composite.add_argument("--edition", type=Path, required=True)
+    composite.add_argument("--policy", type=Path, required=True)
+    composite.add_argument("--inventory", type=Path, required=True)
+    composite.add_argument("--vehicle-pack", type=Path, action="append", required=True)
+    composite.add_argument("--expected-source", required=True)
+    composite.add_argument("manifest", type=Path)
     args = parser.parse_args()
     try:
         if args.command == "upstream":
             load_upstream_source_inventory(args.inventory)
         elif args.command == "editions":
             load_edition_manifests(args.manifests, policy_path=args.policy)
-        else:
+        elif args.command == "vehicle-packs":
             load_vehicle_pack_manifests(
                 args.manifests,
                 upstream_inventory_path=args.inventory,
                 capability_policy_path=args.policy,
+            )
+        else:
+            policy = load_capability_policy(args.policy)
+            edition = validate_edition_manifest(
+                _load_json_document(args.edition, "edition manifest"),
+                policy=policy,
+                policy_sha256=sha256_file(args.policy),
+            )
+            pack_manifests = load_vehicle_pack_manifests(
+                args.vehicle_pack,
+                upstream_inventory_path=args.inventory,
+                capability_policy_path=args.policy,
+            )
+            vehicle_pack_shas = {
+                pack["packId"]: sha256_file(path)
+                for path, pack in zip(
+                    args.vehicle_pack,
+                    (
+                        _load_json_document(path, "Vehicle Pack manifest")
+                        for path in args.vehicle_pack
+                    ),
+                    strict=True,
+                )
+            }
+            validate_composite_installation_manifest(
+                _load_json_document(args.manifest, "composite installation manifest"),
+                edition=edition,
+                edition_manifest_sha256=sha256_file(args.edition),
+                vehicle_packs=pack_manifests,
+                vehicle_pack_manifest_sha256=vehicle_pack_shas,
+                expected_source_commit=args.expected_source,
             )
     except DistributionContractError as exc:
         parser.error(str(exc))
