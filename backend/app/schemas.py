@@ -1240,6 +1240,77 @@ class HarnessCognitiveTurnOutcome(BaseModel):
     completed_at: datetime
 
 
+class ProviderPriceSnapshot(_Strict):
+    """Immutable per-request price inputs; no credential or billing identity."""
+
+    schema_version: Literal["dronedream.provider-price-snapshot/v1"]
+    currency: Literal["USD"] = "USD"
+    source: Literal["preregistered", "unavailable"]
+    input_microusd_per_million_tokens: int | None = Field(default=None, ge=0)
+    output_microusd_per_million_tokens: int | None = Field(default=None, ge=0)
+    effective_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _validate_price_availability(self) -> ProviderPriceSnapshot:
+        rates = (
+            self.input_microusd_per_million_tokens,
+            self.output_microusd_per_million_tokens,
+        )
+        if self.source == "preregistered" and (
+            any(rate is None for rate in rates) or self.effective_at is None
+        ):
+            raise ValueError("preregistered price snapshots require both rates and time")
+        if self.source == "unavailable" and (
+            any(rate is not None for rate in rates) or self.effective_at is not None
+        ):
+            raise ValueError("unavailable price snapshots cannot invent rates or time")
+        return self
+
+
+class ProviderNetworkRequestReceipt(BaseModel):
+    """Safe public shape of a pre-network immutable request receipt."""
+
+    receipt_schema: Literal["dronedream.provider-network-request-attempt/v1"]
+    id: str
+    cognitive_turn_receipt_id: str
+    request_index: int = Field(ge=1, le=8)
+    request_kind: Literal["primary", "retry", "compatibility_fallback"]
+    retry_policy_version: Literal["explicit-network-attempts-v1"]
+    provider: str = Field(min_length=1, max_length=64)
+    model_snapshot: str = Field(min_length=1, max_length=128)
+    api_surface: str = Field(min_length=1, max_length=64)
+    base_url_normalized: str = Field(min_length=1, max_length=2048)
+    base_url_sha256: str = Field(min_length=64, max_length=64)
+    region: str | None = Field(default=None, max_length=64)
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    top_p: float | None = Field(default=None, gt=0, le=1)
+    provider_seed: int | None = None
+    response_schema_sha256: str = Field(min_length=64, max_length=64)
+    prompt_sha256: str = Field(min_length=64, max_length=64)
+    tool_outputs_sha256: str = Field(min_length=64, max_length=64)
+    request_body_sha256: str = Field(min_length=64, max_length=64)
+    input_utf8_bytes: int = Field(ge=0)
+    price_snapshot: ProviderPriceSnapshot
+    price_snapshot_sha256: str = Field(min_length=64, max_length=64)
+    attempted_at: datetime
+
+
+class ProviderNetworkRequestOutcome(BaseModel):
+    outcome_schema: Literal["dronedream.provider-network-request-outcome/v1"]
+    id: str
+    request_receipt_id: str
+    status: Literal["succeeded", "failed", "indeterminate"]
+    response_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    output_utf8_bytes: int = Field(ge=0)
+    input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    total_tokens: int | None = Field(default=None, ge=0)
+    provider_cost_microusd: int | None = Field(default=None, ge=0)
+    latency_ms: int = Field(ge=0)
+    error_code: str | None = Field(default=None, max_length=64)
+    completed_at: datetime
+
+
 class OptimizationHistory(BaseModel):
     items: list[Candidate]
     pareto_candidate_ids: list[str] = Field(default_factory=list)
@@ -1498,6 +1569,9 @@ __all__ = [
     "FirstQualifiedFreezeReceipt",
     "HarnessCognitiveTurnOutcome",
     "HarnessCognitiveTurnReceipt",
+    "ProviderNetworkRequestOutcome",
+    "ProviderNetworkRequestReceipt",
+    "ProviderPriceSnapshot",
     "JOB_CANCELLABLE_STATUSES",
     "JOB_TERMINAL_STATUSES",
     "Job",
