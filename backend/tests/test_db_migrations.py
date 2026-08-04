@@ -795,7 +795,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0029 (head)"]
+    assert heads == ["20260804_0030 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -854,6 +854,12 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "SELECT name FROM sqlite_master "
                 "WHERE type='trigger' "
                 "AND tbl_name='first_qualified_freeze_receipts'"
+            ).fetchall()
+        }
+        first_qualified_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('first_qualified_freeze_receipts')"
             ).fetchall()
         }
         first_qualified_authorization_tables = {
@@ -920,7 +926,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             ).fetchall()
         }
 
-    assert version == ("20260804_0029",)
+    assert version == ("20260804_0030",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
@@ -935,7 +941,12 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
     assert first_qualified_triggers == {
         "trg_first_qualified_freeze_receipts_no_update",
         "trg_first_qualified_freeze_receipts_no_delete",
+        "trg_first_qualified_provider_request_counts_insert",
     }
+    assert {
+        "provider_requests_attempted_to_first_qualified",
+        "provider_requests_succeeded_to_first_qualified",
+    }.issubset(first_qualified_columns)
     assert first_qualified_authorization_tables == {
         "first_qualified_freeze_delete_authorizations"
     }

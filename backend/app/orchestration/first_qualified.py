@@ -27,12 +27,22 @@ from app.simulator.base import (
     FAILURE_TIMEOUT,
 )
 
-FIRST_QUALIFIED_RECEIPT_SCHEMA = (
+FIRST_QUALIFIED_RECEIPT_SCHEMA_V1 = (
     "dronedream.first-qualified-freeze-receipt/v1"
 )
-FIRST_QUALIFIED_DEFINITION_VERSION = (
+FIRST_QUALIFIED_RECEIPT_SCHEMA = (
+    "dronedream.first-qualified-freeze-receipt/v2"
+)
+FIRST_QUALIFIED_DEFINITION_VERSION_V1 = (
     "server-sequence-deterministic-tiebreak/v1"
 )
+FIRST_QUALIFIED_DEFINITION_VERSION = (
+    "server-sequence-deterministic-tiebreak/v2"
+)
+_SUPPORTED_RECEIPT_VERSIONS = {
+    FIRST_QUALIFIED_RECEIPT_SCHEMA_V1: FIRST_QUALIFIED_DEFINITION_VERSION_V1,
+    FIRST_QUALIFIED_RECEIPT_SCHEMA: FIRST_QUALIFIED_DEFINITION_VERSION,
+}
 _TERMINAL_TRIAL_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 _TIMEOUT_CODES = frozenset({FAILURE_TIMEOUT, FAILURE_EXECUTION_TIMEOUT})
 
@@ -180,6 +190,8 @@ def _accounting(
         ),
         "provider_turns_attempted": max(0, job.provider_turns_attempted),
         "provider_turns_succeeded": max(0, job.provider_turns_succeeded),
+        "provider_requests_attempted": max(0, job.provider_requests_attempted),
+        "provider_requests_succeeded": max(0, job.provider_requests_succeeded),
     }
 
 
@@ -263,10 +275,24 @@ def require_first_qualified_freeze_receipt(
             receipt.provider_turns_succeeded_to_first_qualified
         ),
     }
+    if receipt.receipt_schema == FIRST_QUALIFIED_RECEIPT_SCHEMA:
+        expected_accounting.update(
+            {
+                "provider_requests_attempted": (
+                    receipt.provider_requests_attempted_to_first_qualified
+                ),
+                "provider_requests_succeeded": (
+                    receipt.provider_requests_succeeded_to_first_qualified
+                ),
+            }
+        )
+    expected_definition = _SUPPORTED_RECEIPT_VERSIONS.get(receipt.receipt_schema)
     scalar_match = (
-        receipt.receipt_schema == FIRST_QUALIFIED_RECEIPT_SCHEMA
-        and receipt.definition_version == FIRST_QUALIFIED_DEFINITION_VERSION
+        expected_definition is not None
+        and receipt.definition_version == expected_definition
         and receipt.evidence_id == expected_id
+        and evidence.get("receipt_schema") == receipt.receipt_schema
+        and evidence.get("definition_version") == receipt.definition_version
         and evidence.get("job_id") == receipt.job_id
         and evidence.get("candidate_id") == receipt.candidate_id
         and evidence.get("qualification_sequence") == receipt.qualification_sequence
@@ -440,6 +466,12 @@ def freeze_first_qualified_candidate(
         provider_turns_succeeded_to_first_qualified=accounting[
             "provider_turns_succeeded"
         ],
+        provider_requests_attempted_to_first_qualified=accounting[
+            "provider_requests_attempted"
+        ],
+        provider_requests_succeeded_to_first_qualified=accounting[
+            "provider_requests_succeeded"
+        ],
         evidence_json=evidence,
         frozen_at=now,
     )
@@ -517,7 +549,9 @@ def stage_first_qualified_dispatch_stop(
 
 __all__ = [
     "FIRST_QUALIFIED_DEFINITION_VERSION",
+    "FIRST_QUALIFIED_DEFINITION_VERSION_V1",
     "FIRST_QUALIFIED_RECEIPT_SCHEMA",
+    "FIRST_QUALIFIED_RECEIPT_SCHEMA_V1",
     "FirstQualifiedFreezeError",
     "freeze_first_qualified_candidate",
     "require_first_qualified_freeze_receipt",

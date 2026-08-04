@@ -1322,7 +1322,11 @@ class FirstQualifiedFreezeReceipt(Base):
             "AND provider_turns_attempted_to_first_qualified >= 0 "
             "AND provider_turns_succeeded_to_first_qualified >= 0 "
             "AND provider_turns_succeeded_to_first_qualified "
-            "<= provider_turns_attempted_to_first_qualified",
+            "<= provider_turns_attempted_to_first_qualified "
+            "AND provider_requests_attempted_to_first_qualified >= 0 "
+            "AND provider_requests_succeeded_to_first_qualified >= 0 "
+            "AND provider_requests_succeeded_to_first_qualified "
+            "<= provider_requests_attempted_to_first_qualified",
             name="ck_first_qualified_nonnegative_accounting",
         ),
     )
@@ -1361,6 +1365,12 @@ class FirstQualifiedFreezeReceipt(Base):
     )
     provider_turns_succeeded_to_first_qualified: Mapped[int] = mapped_column(
         Integer, nullable=False
+    )
+    provider_requests_attempted_to_first_qualified: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    provider_requests_succeeded_to_first_qualified: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
     )
     evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     frozen_at: Mapped[datetime] = mapped_column(

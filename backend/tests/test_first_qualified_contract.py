@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -119,6 +122,127 @@ def test_first_qualified_receipt_keeps_failed_and_indeterminate_work_visible() -
     assert receipt.accounting.trials_cancelled == 1
     assert receipt.accounting.trials_indeterminate == 1
     assert receipt.accounting.provider_turns_attempted == 4
+    assert receipt.accounting.provider_requests_attempted is None
+
+
+def test_first_qualified_v2_receipt_requires_actual_request_counts() -> None:
+    receipt = schemas.FirstQualifiedFreezeReceipt(
+        receipt_schema="dronedream.first-qualified-freeze-receipt/v2",
+        definition_version="server-sequence-deterministic-tiebreak/v2",
+        id="fqf_request_counts",
+        job_id="job_request_counts",
+        candidate_id="cand_request_counts",
+        evidence_id="sha256:" + "c" * 64,
+        holdout_contract_sha256="d" * 64,
+        qualification_sequence=1,
+        generation_index=1,
+        dispatch_ordinal=2,
+        time_to_first_qualified_ms=20_000,
+        accounting=schemas.FirstQualifiedAccounting(
+            simulations_attempted=6,
+            trials_attempted=6,
+            trials_completed=5,
+            trials_passed=4,
+            trials_failed=1,
+            trials_cancelled=0,
+            trials_timed_out=1,
+            trials_indeterminate=0,
+            generations=1,
+            provider_turns_attempted=2,
+            provider_turns_succeeded=2,
+            provider_requests_attempted=3,
+            provider_requests_succeeded=2,
+        ),
+        frozen_at=datetime.now(timezone.utc),
+    )
+
+    assert receipt.accounting.provider_requests_attempted == 3
+    assert receipt.accounting.provider_requests_succeeded == 2
+    with pytest.raises(ValidationError):
+        schemas.FirstQualifiedFreezeReceipt(
+            **{
+                **receipt.model_dump(),
+                "receipt_schema": "dronedream.first-qualified-freeze-receipt/v1",
+            }
+        )
+
+
+def test_legacy_v1_first_qualified_evidence_remains_verifiable() -> None:
+    from app.orchestration.first_qualified import (
+        require_first_qualified_freeze_receipt,
+    )
+
+    frozen_at = datetime(2026, 8, 3, 12, 0, tzinfo=timezone.utc)
+    accounting = {
+        "simulations_attempted": 7,
+        "trials_attempted": 7,
+        "trials_completed": 5,
+        "trials_passed": 3,
+        "trials_failed": 2,
+        "trials_cancelled": 1,
+        "trials_timed_out": 0,
+        "trials_indeterminate": 1,
+        "generations": 2,
+        "provider_turns_attempted": 4,
+        "provider_turns_succeeded": 3,
+    }
+    evidence = {
+        "receipt_schema": "dronedream.first-qualified-freeze-receipt/v1",
+        "definition_version": "server-sequence-deterministic-tiebreak/v1",
+        "job_id": "job_legacy",
+        "candidate_id": "cand_legacy",
+        "qualification_sequence": 2,
+        "generation_index": 1,
+        "dispatch_ordinal": 3,
+        "qualified_at": "2026-08-03T12:00:00.000000Z",
+        "time_to_first_qualified_ms": 12_345,
+        "holdout_contract_sha256": "b" * 64,
+        "accounting": accounting,
+    }
+    evidence_sha = hashlib.sha256(
+        json.dumps(
+            evidence,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode()
+    ).hexdigest()
+    legacy = SimpleNamespace(
+        receipt_schema=evidence["receipt_schema"],
+        definition_version=evidence["definition_version"],
+        evidence_id=f"sha256:{evidence_sha}",
+        evidence_json=evidence,
+        job_id=evidence["job_id"],
+        candidate_id=evidence["candidate_id"],
+        qualification_sequence=evidence["qualification_sequence"],
+        generation_index=evidence["generation_index"],
+        dispatch_ordinal=evidence["dispatch_ordinal"],
+        time_to_first_qualified_ms=evidence["time_to_first_qualified_ms"],
+        holdout_contract_sha256=evidence["holdout_contract_sha256"],
+        frozen_at=frozen_at,
+        simulations_to_first_qualified=accounting["simulations_attempted"],
+        trials_to_first_qualified=accounting["trials_attempted"],
+        trials_completed_to_first_qualified=accounting["trials_completed"],
+        trials_passed_to_first_qualified=accounting["trials_passed"],
+        trials_failed_to_first_qualified=accounting["trials_failed"],
+        trials_cancelled_to_first_qualified=accounting["trials_cancelled"],
+        trials_timed_out_to_first_qualified=accounting["trials_timed_out"],
+        trials_indeterminate_to_first_qualified=accounting["trials_indeterminate"],
+        generations_to_first_qualified=accounting["generations"],
+        provider_turns_attempted_to_first_qualified=accounting[
+            "provider_turns_attempted"
+        ],
+        provider_turns_succeeded_to_first_qualified=accounting[
+            "provider_turns_succeeded"
+        ],
+        # Migrated columns exist with zero defaults, but v1 evidence never
+        # claimed those counters and therefore must not be rehashed with them.
+        provider_requests_attempted_to_first_qualified=0,
+        provider_requests_succeeded_to_first_qualified=0,
+    )
+
+    assert require_first_qualified_freeze_receipt(legacy) == evidence
 
 
 def test_cognitive_turn_contract_rejects_a_fifth_turn() -> None:

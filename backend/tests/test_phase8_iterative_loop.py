@@ -234,9 +234,17 @@ def test_first_qualified_baseline_freezes_without_provider_call(gpt_ctx):
         assert receipt.candidate_id == baseline.id
         assert receipt.provider_turns_attempted_to_first_qualified == 0
         assert receipt.provider_turns_succeeded_to_first_qualified == 0
+        assert receipt.provider_requests_attempted_to_first_qualified == 0
+        assert receipt.provider_requests_succeeded_to_first_qualified == 0
+        assert (
+            receipt.receipt_schema
+            == "dronedream.first-qualified-freeze-receipt/v2"
+        )
         assert receipt.trials_to_first_qualified == len(job.trials)
         assert receipt.simulations_to_first_qualified == len(job.trials)
         assert receipt.evidence_json["candidate_id"] == baseline.id
+        assert receipt.evidence_json["accounting"]["provider_requests_attempted"] == 0
+        assert receipt.evidence_json["accounting"]["provider_requests_succeeded"] == 0
         assert any(
             event.event_type == "first_qualified_candidate_frozen"
             for event in job.events

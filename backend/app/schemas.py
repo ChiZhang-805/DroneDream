@@ -1194,11 +1194,35 @@ class FirstQualifiedAccounting(BaseModel):
     generations: int = Field(ge=0)
     provider_turns_attempted: int = Field(ge=0)
     provider_turns_succeeded: int = Field(ge=0)
+    provider_requests_attempted: int | None = Field(default=None, ge=0)
+    provider_requests_succeeded: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _validate_provider_counts(self) -> FirstQualifiedAccounting:
+        if self.provider_turns_succeeded > self.provider_turns_attempted:
+            raise ValueError("provider turn successes cannot exceed attempts")
+        if (self.provider_requests_attempted is None) != (
+            self.provider_requests_succeeded is None
+        ):
+            raise ValueError("provider request counts must be supplied together")
+        if (
+            self.provider_requests_attempted is not None
+            and self.provider_requests_succeeded is not None
+            and self.provider_requests_succeeded > self.provider_requests_attempted
+        ):
+            raise ValueError("provider request successes cannot exceed attempts")
+        return self
 
 
 class FirstQualifiedFreezeReceipt(BaseModel):
-    receipt_schema: Literal["dronedream.first-qualified-freeze-receipt/v1"]
-    definition_version: Literal["server-sequence-deterministic-tiebreak/v1"]
+    receipt_schema: Literal[
+        "dronedream.first-qualified-freeze-receipt/v1",
+        "dronedream.first-qualified-freeze-receipt/v2",
+    ]
+    definition_version: Literal[
+        "server-sequence-deterministic-tiebreak/v1",
+        "server-sequence-deterministic-tiebreak/v2",
+    ]
     id: str
     job_id: str
     candidate_id: str
@@ -1210,6 +1234,16 @@ class FirstQualifiedFreezeReceipt(BaseModel):
     time_to_first_qualified_ms: int = Field(ge=0)
     accounting: FirstQualifiedAccounting
     frozen_at: datetime
+
+    @model_validator(mode="after")
+    def _validate_versioned_accounting(self) -> FirstQualifiedFreezeReceipt:
+        is_v2 = self.receipt_schema.endswith("/v2")
+        if is_v2 != self.definition_version.endswith("/v2"):
+            raise ValueError("receipt schema and definition versions must match")
+        has_request_counts = self.accounting.provider_requests_attempted is not None
+        if is_v2 != has_request_counts:
+            raise ValueError("v2 receipts require actual provider request counts")
+        return self
 
 
 class HarnessCognitiveTurnReceipt(BaseModel):
