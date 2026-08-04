@@ -1,0 +1,223 @@
+{
+  "schemaVersion": "dronedream.website-mobile-navigation-production-deployment.v1",
+  "generatedAt": "2026-08-04T06:47:40.4217572Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "827f3b880a2b8b0e83c72a4fec0d6d27cf47da0c",
+    "subjectTree": "c1e856dd831b47411bb21d80707f2408715858c1",
+    "deployTag": "website-deploy-1.0.0-20260804-827f3b8-routing",
+    "softwareProductSource": "a4b27c73d15b6847044a3b1ca22073eb87a83eb3",
+    "runtimeSubject": "755c511539fe561207ca38ff5079f471a4110896",
+    "deploymentPerformed": true,
+    "githubPagesDeploymentPerformed": true,
+    "aliyunDeploymentPerformed": true,
+    "githubReleaseAssetReplacementPerformed": true,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "paymentOrModelProductionMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforced": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "change": {
+    "mobileNavigation": "At 520px and below, the right-aligned compact menu shrink-wraps the longest visible row instead of occupying a fixed near-viewport width.",
+    "widthContract": "width:max-content; min-width:0; max-width:calc(100vw - 1.8rem); rows remain content-sized and nowrap within the viewport cap",
+    "pagesDeepRouteRepair": "The Pages 404 document now stores the requested console path and query in sessionStorage before redirecting to the app shell, which restores the deep route without serving the public-site 404 page.",
+    "websiteAuthority": "The website-owned public site, pricing availability, community, manual, security, and deployment contracts remained authoritative.",
+    "manualDraftsExcluded": true,
+    "manualDraftPaths": [
+      "frontend/public/docs/downloads/DroneDream-Manual-en.md",
+      "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.md",
+      "website/manual-pdf/**",
+      "website/scripts/build_manual_pdf.py",
+      "website/scripts/audit_manual_pdf_layout.py",
+      "work/**"
+    ]
+  },
+  "installer": {
+    "version": "1.0.0",
+    "fileName": "DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 11090973,
+    "sha256": "d2009beaab9347d29f66065872118b369a99ec91a3cd8b8e3bfde61e679a77a5",
+    "authenticode": "NotSigned",
+    "releaseChannel": "unsigned internal-test preview",
+    "checksumFileBytes": 98,
+    "checksumFileSha256": "07de3dc7dcd8800b3262c0abec6e6e48205f8706eabb7d8d357f50469bc13621",
+    "checksumDeclaration": "d2009beaab9347d29f66065872118b369a99ec91a3cd8b8e3bfde61e679a77a5  DroneDream_1.0.0_x64-setup.exe",
+    "updaterSignatureBytes": 420,
+    "updaterSignatureSha256": "eb81b96fddb6865c82d4b2f029c49ecf0f62e2f8bf679c5ddeea62614f18d5b6",
+    "tauriLatestJsonSha256": "42ec8d158fbcd6d7a2aef5a3de0035b6d3f1e634ec76f30a16613b26bd479b03",
+    "handoffReceiptSha256": "b15dfe842c2fb71fa6173fcfb6f560242c5e0da0a8c6f56df9266399a1241f40",
+    "handoffManifestSha256": "4e0b2db7004c55fa7f4e22049613a27be9a4397f095f99da6b692b916574bc07",
+    "rebuiltForThisChange": true,
+    "runtimeAssetsChanged": false
+  },
+  "githubRelease": {
+    "tag": "signpath-candidate-v1.0.0",
+    "prerelease": true,
+    "newAssetIds": {
+      "exe": 500907004,
+      "checksum": 500907005,
+      "signature": 500907002,
+      "latestJson": 500907017,
+      "sourceInventory": 500907016
+    },
+    "rollbackAssetIds": {
+      "exe": 500905545,
+      "checksum": 500905540,
+      "signature": 500905538,
+      "latestJson": 500905541,
+      "sourceInventory": 500905539
+    }
+  },
+  "sharedArtifact": {
+    "buildCount": 1,
+    "sourceCommit": "827f3b880a2b8b0e83c72a4fec0d6d27cf47da0c",
+    "workflowRunId": 30882833940,
+    "workflowRunUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30882833940",
+    "artifactId": 8881937600,
+    "artifactName": "dronedream-site-827f3b880a2b8b0e83c72a4fec0d6d27cf47da0c",
+    "artifactBytes": 29687294,
+    "artifactDigest": "sha256:1a7c94ef4993065d207500bf4d1b98784f2b75fa9e46f9d4f8d0a39448315c7b",
+    "integrityEntries": 150,
+    "buildManifestSha256": "cb6f72f5297c79acb029be1798bcccb2e492692ac8bcd0bae6f13127912a1a58",
+    "sha256SumsSha256": "deb3b53a95f40c0a470fc964361d30b8d28e94f19e3a7cd6d28423128c4bf3cc",
+    "notFoundDocumentSha256": "59c3a110cc82cd6629ce575dc3700979e92f0cd1757a6f8d89cd702baa4df33b",
+    "integrityFailures": 0,
+    "deploymentRule": "The exact workflow artifact was deployed to both GitHub Pages and Aliyun; neither endpoint rebuilt the site."
+  },
+  "deployments": {
+    "githubPages": {
+      "runId": 30882833940,
+      "pagesArtifactId": 8881938604,
+      "status": "success",
+      "sourceCommit": "827f3b880a2b8b0e83c72a4fec0d6d27cf47da0c",
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredEnvironmentPolicy": {
+        "count": 1,
+        "id": 55186327,
+        "name": "main",
+        "type": "branch"
+      }
+    },
+    "aliyun": {
+      "server": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260804T063632Z",
+      "rollbackRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260804T053300Z",
+      "atomicSwitch": true,
+      "nginxConfigurationTest": "passed",
+      "forbiddenServerTouched": false,
+      "forbiddenServer": "124.221.220.60"
+    },
+    "supersededTransitionalDeployment": {
+      "status": "retained as rollback and audit history",
+      "sourceCommit": "5e7e6729cefb58fb9feaf15c3acd9d3b89e9f2b7",
+      "pagesRunId": 30878960964,
+      "sharedArtifactId": 8880551317,
+      "aliyunRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260804T053300Z",
+      "reason": "The initial Pages deployment exposed a console deep-route 404 shell mismatch; it was superseded by source 827f3b8."
+    }
+  },
+  "validation": {
+    "completeFrontendSuite": {
+      "files": 60,
+      "tests": 415,
+      "passed": 415,
+      "failed": 0,
+      "publicSitePricingAvailability": "passed"
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "sharedSiteAndConsoleBuild": "passed with one non-failing Vite chunk-size advisory",
+    "deploymentContract": {
+      "tests": 12,
+      "passed": 12,
+      "failed": 0
+    },
+    "priorFullBrowserMatrixOnMobileNavigationSource": {
+      "sourceCommit": "5e7e6729cefb58fb9feaf15c3acd9d3b89e9f2b7",
+      "cases": 120,
+      "passed": 120,
+      "failed": 0,
+      "note": "The later 827f3b8 source changed only Pages route-bridge HTML/scripts/tests; it did not change the mobile-menu CSS or components."
+    },
+    "onlineDeepRouteVerification": {
+      "origins": ["http://getdronedream.com", "http://47.93.180.216"],
+      "browsers": ["Edge", "Chrome", "Firefox"],
+      "path": "/console/scenarios?docsPreview=1",
+      "pathnamePreserved": true,
+      "queryPreserved": true,
+      "documentWidthParity": true
+    },
+    "onlineMobileNavigation": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "origins": ["http://getdronedream.com", "http://47.93.180.216"],
+      "languages": ["en", "zh-CN"],
+      "viewport": "390x844",
+      "englishPanelWidthPx": 170.390625,
+      "englishLongestRowWidthPx": 168,
+      "chinesePanelWidthPx": 143.265625,
+      "chineseLongestRowWidthPx": 141,
+      "rightGapPx": 14.390625,
+      "documentWidthParity": true,
+      "visualInspection": "passed for all four screenshots; the panel is right-aligned, content-sized, readable, and does not overflow"
+    }
+  },
+  "publicParity": {
+    "siteArtifact": {
+      "pagesOrigin": "http://getdronedream.com",
+      "aliyunOrigin": "http://47.93.180.216",
+      "buildManifestBytes": 1153,
+      "buildManifestSha256": "cb6f72f5297c79acb029be1798bcccb2e492692ac8bcd0bae6f13127912a1a58",
+      "sha256SumsBytes": 16277,
+      "sha256SumsSha256": "deb3b53a95f40c0a470fc964361d30b8d28e94f19e3a7cd6d28423128c4bf3cc",
+      "notFoundDocumentBytes": 911,
+      "notFoundDocumentSha256": "59c3a110cc82cd6629ce575dc3700979e92f0cd1757a6f8d89cd702baa4df33b",
+      "byteParity": true
+    },
+    "installerThreeWay": {
+      "origins": ["GitHub Release", "GitHub Pages download endpoint", "Aliyun download endpoint"],
+      "exeBytes": 11090973,
+      "exeSha256": "d2009beaab9347d29f66065872118b369a99ec91a3cd8b8e3bfde61e679a77a5",
+      "checksumFileBytes": 98,
+      "checksumFileSha256": "07de3dc7dcd8800b3262c0abec6e6e48205f8706eabb7d8d357f50469bc13621",
+      "signatureBytes": 420,
+      "signatureSha256": "eb81b96fddb6865c82d4b2f029c49ecf0f62e2f8bf679c5ddeea62614f18d5b6",
+      "byteParity": true
+    },
+    "siteLatestMetadata": {
+      "pagesAndAliyunBytes": 492,
+      "pagesAndAliyunSha256": "2705ae6c8206dea2416b667d7a78c5016542f92628db51100bebdbd62a9d3e4d",
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "installerSha256": "d2009beaab9347d29f66065872118b369a99ec91a3cd8b8e3bfde61e679a77a5",
+      "byteParity": true,
+      "githubReleaseLatestNote": "The GitHub Release latest.json is the Tauri updater schema and is separately verified at SHA-256 42ec8d15; the two site latest.json endpoints use the website download schema and are identical."
+    }
+  },
+  "repositoryGovernance": {
+    "remoteBranches": ["main", "codex/software", "codex/website", "codex/technical-report"],
+    "remoteBranchCount": 4,
+    "unexpectedRemoteBranches": [],
+    "forcePushPerformed": false,
+    "rootWorktreeModified": false
+  },
+  "remainingExternalGates": {
+    "tls": {
+      "status": "not complete",
+      "pagesCertificateState": "authorization_created",
+      "pagesCertificateDescription": "Authorization created",
+      "domains": ["getdronedream.com", "www.getdronedream.com"],
+      "httpsEnforced": false,
+      "conclusion": "HTTP production is live, but HTTPS is not claimed as complete and certificate validation must not be bypassed."
+    },
+    "supabase": "The locally validated security/admin Functions and migrations were not deployed in this release.",
+    "payments": "Production payment configuration was not changed.",
+    "codeSigning": "The 1.0.0 installer remains an explicitly disclosed unsigned internal-test preview.",
+    "runtime": "The public Runtime beta2 assets remain bound to runtime subject 755c511 and were not changed by this release."
+  }
+}
