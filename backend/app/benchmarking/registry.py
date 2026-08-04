@@ -106,21 +106,21 @@ _DESCRIPTORS = (
     BenchmarkAdapterDescriptor(
         "repo_turbo_inspired/v1",
         "traditional",
-        "contract_only",
+        "implemented",
         "native-turbo-matern52-ard-gp",
         "product_inspired",
     ),
     BenchmarkAdapterDescriptor(
         "repo_bipop_cma_inspired/v1",
         "traditional",
-        "contract_only",
+        "implemented",
         "numpy-full-covariance-bipop-inspired",
         "product_inspired",
     ),
     BenchmarkAdapterDescriptor(
         "repo_surrogate_cma/v1",
         "traditional",
-        "contract_only",
+        "implemented",
         "numpy-full-covariance-cma-rbf",
         "product_native",
     ),
@@ -196,8 +196,8 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
         raise ValueError(f"benchmark proposal adapter is not implemented: {adapter_id}")
     require_execution_ready_method(adapter_id)
     from app.benchmarking.adapters import (
-        ProductNativeOptimizerAdapterV1,
         RandomSearchAdapterV1,
+        RepositoryOptimizerAdapterV1,
         SeededHaltonAdapterV1,
         SeededLatinHypercubeAdapterV1,
     )
@@ -206,11 +206,26 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
         "random_search/v1": RandomSearchAdapterV1,
         "seeded_halton/v1": SeededHaltonAdapterV1,
         "true_lhs/v1": SeededLatinHypercubeAdapterV1,
-        "repo_constrained_mobo/v1": lambda: ProductNativeOptimizerAdapterV1(
+        "repo_constrained_mobo/v1": lambda: RepositoryOptimizerAdapterV1(
             "repo_constrained_mobo/v1", "constrained_mobo"
         ),
-        "optimizer_portfolio/v1": lambda: ProductNativeOptimizerAdapterV1(
+        "optimizer_portfolio/v1": lambda: RepositoryOptimizerAdapterV1(
             "optimizer_portfolio/v1", "optimizer_portfolio"
+        ),
+        "repo_turbo_inspired/v1": lambda: RepositoryOptimizerAdapterV1(
+            "repo_turbo_inspired/v1",
+            "turbo",
+            "product_inspired",
+        ),
+        "repo_bipop_cma_inspired/v1": lambda: RepositoryOptimizerAdapterV1(
+            "repo_bipop_cma_inspired/v1",
+            "bipop_cma_es",
+            "product_inspired",
+        ),
+        "repo_surrogate_cma/v1": lambda: RepositoryOptimizerAdapterV1(
+            "repo_surrogate_cma/v1",
+            "surrogate_cma_es",
+            "product_native",
         ),
     }
     implementation = implementations.get(adapter_id)

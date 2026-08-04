@@ -42,6 +42,14 @@ _DOMAIN_KEYS: Final = {
 _MAX_SELECTION_ATTEMPTS: Final = 4096
 _MAX_LHS_DESIGN_SIZE: Final = 4096
 _HALTON_SEED_OFFSET_MODULUS: Final = 1_000_003
+BenchmarkRepositoryStrategy = Literal[
+    "constrained_mobo",
+    "optimizer_portfolio",
+    "turbo",
+    "bipop_cma_es",
+    "surrogate_cma_es",
+]
+BenchmarkRepositoryMethodClassification = Literal["product_native", "product_inspired"]
 
 
 class BenchmarkAdapterError(ValueError):
@@ -418,7 +426,7 @@ def _objective_preferences(
 def native_optimizer_request_from_observation(
     observation: BenchmarkObservationV2,
     *,
-    strategy: Literal["constrained_mobo", "optimizer_portfolio"],
+    strategy: BenchmarkRepositoryStrategy,
 ) -> OptimizerRequest:
     """Translate v2 history without fabricating learning signal for failures."""
 
@@ -489,11 +497,18 @@ def native_optimizer_request_from_observation(
 
 
 @dataclass(frozen=True, slots=True)
-class ProductNativeOptimizerAdapterV1:
-    """Bridge one reviewed product-native optimizer into the benchmark contract."""
+class RepositoryOptimizerAdapterV1:
+    """Bridge one reviewed repository optimizer into the benchmark contract."""
 
-    adapter_id: Literal["repo_constrained_mobo/v1", "optimizer_portfolio/v1"]
-    strategy: Literal["constrained_mobo", "optimizer_portfolio"]
+    adapter_id: Literal[
+        "repo_constrained_mobo/v1",
+        "optimizer_portfolio/v1",
+        "repo_turbo_inspired/v1",
+        "repo_bipop_cma_inspired/v1",
+        "repo_surrogate_cma/v1",
+    ]
+    strategy: BenchmarkRepositoryStrategy
+    method_classification: BenchmarkRepositoryMethodClassification = "product_native"
 
     def propose(self, observation: BenchmarkObservationV2) -> BenchmarkProposalV1:
         _require_available_budget(observation)
@@ -502,7 +517,7 @@ class ProductNativeOptimizerAdapterV1:
             observation,
             strategy=self.strategy,
         )
-        if self.strategy == "constrained_mobo":
+        if self.strategy in {"constrained_mobo", "turbo"}:
             from app.optimization.bayesian_optimizers import propose_bayesian_candidates
 
             proposals = propose_bayesian_candidates(space, request)
@@ -520,16 +535,17 @@ class ProductNativeOptimizerAdapterV1:
             raise BenchmarkAdapterError(
                 f"{self.adapter_id} repeated a previously dispatched candidate"
             )
-        seed = _seed_material(observation, f"product-native/{self.strategy}")
+        source_kind = self.method_classification.replace("_", "-")
+        seed = _seed_material(observation, f"{source_kind}/{self.strategy}")
         return _proposal(
             adapter_id=self.adapter_id,
             observation=observation,
             parameters=parameters,
-            reason_code=f"product-native-{self.strategy.replace('_', '-')}",
+            reason_code=f"{source_kind}-{self.strategy.replace('_', '-')}",
             seed=seed,
             selection_attempt=0,
             extra_receipt={
-                "method_classification": "product_native",
+                "method_classification": self.method_classification,
                 "native_label": native.label,
                 "native_metadata": dict(native.metadata),
                 "native_metadata_sha256": canonical_sha256(dict(native.metadata)),
@@ -541,9 +557,16 @@ class ProductNativeOptimizerAdapterV1:
         )
 
 
+# Compatibility name retained for callers from the first product-native adapter closure.
+ProductNativeOptimizerAdapterV1 = RepositoryOptimizerAdapterV1
+
+
 __all__ = [
+    "BenchmarkRepositoryMethodClassification",
+    "BenchmarkRepositoryStrategy",
     "BenchmarkAdapterError",
     "ProductNativeOptimizerAdapterV1",
+    "RepositoryOptimizerAdapterV1",
     "RandomSearchAdapterV1",
     "SeededHaltonAdapterV1",
     "SeededLatinHypercubeAdapterV1",

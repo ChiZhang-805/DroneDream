@@ -254,6 +254,9 @@ def test_registry_never_mislabels_product_inspired_code_as_a_reference() -> None
     )
     assert BENCHMARK_ADAPTER_REGISTRY["repo_constrained_mobo/v1"].availability == "implemented"
     assert BENCHMARK_ADAPTER_REGISTRY["optimizer_portfolio/v1"].availability == "implemented"
+    assert BENCHMARK_ADAPTER_REGISTRY["repo_turbo_inspired/v1"].availability == "implemented"
+    assert BENCHMARK_ADAPTER_REGISTRY["repo_bipop_cma_inspired/v1"].availability == "implemented"
+    assert BENCHMARK_ADAPTER_REGISTRY["repo_surrogate_cma/v1"].availability == "implemented"
     with pytest.raises(ValueError, match="not implemented"):
         create_benchmark_adapter("reference_scbo/v1")
 
@@ -289,15 +292,19 @@ def _history_item(
 
 
 @pytest.mark.parametrize(
-    ("adapter_id", "strategy"),
+    ("adapter_id", "strategy", "classification"),
     (
-        ("repo_constrained_mobo/v1", "constrained_mobo"),
-        ("optimizer_portfolio/v1", "optimizer_portfolio"),
+        ("repo_constrained_mobo/v1", "constrained_mobo", "product_native"),
+        ("optimizer_portfolio/v1", "optimizer_portfolio", "product_native"),
+        ("repo_turbo_inspired/v1", "turbo", "product_inspired"),
+        ("repo_bipop_cma_inspired/v1", "bipop_cma_es", "product_inspired"),
+        ("repo_surrogate_cma/v1", "surrogate_cma_es", "product_native"),
     ),
 )
-def test_product_native_adapters_use_the_same_v2_observation_contract(
+def test_repository_adapters_use_the_same_v2_observation_contract(
     adapter_id: str,
     strategy: str,
+    classification: str,
 ) -> None:
     observation = _observation(adapter_id=adapter_id)
     adapter = create_benchmark_adapter(adapter_id)
@@ -306,7 +313,8 @@ def test_product_native_adapters_use_the_same_v2_observation_contract(
     second = adapter.propose(observation)
 
     assert first == second
-    assert first.proposal_receipt["method_classification"] == "product_native"
+    assert first.proposal_receipt["method_classification"] == classification
+    assert first.reason_code.startswith(classification.replace("_", "-"))
     assert first.proposal_receipt["native_strategy"] == strategy
     assert first.proposal_receipt["observation_sha256"] == canonical_sha256(observation)
     assert set(first.parameters) == {item["name"] for item in _domain()}

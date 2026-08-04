@@ -320,47 +320,23 @@ _ENTRIES = (
         "product_native",
         "backend/app/optimization/portfolio_optimizer.py",
     ),
-    BenchmarkMethodInventoryEntryV1(
-        adapter_id="repo_turbo_inspired/v1",
-        method_classification="product_inspired",
-        implementation_label="native-turbo-matern52-ard-gp",
-        execution_readiness="blocked",
-        environment_boundary="product_runtime",
-        sources=(
-            _project_source(
-                "repo-turbo-inspired",
-                "backend/app/optimization/bayesian_optimizers.py",
-            ),
-        ),
-        blocker_codes=("adapter_not_implemented",),
+    _ready_project(
+        "repo_turbo_inspired/v1",
+        "native-turbo-matern52-ard-gp",
+        "product_inspired",
+        "backend/app/optimization/bayesian_optimizers.py",
     ),
-    BenchmarkMethodInventoryEntryV1(
-        adapter_id="repo_bipop_cma_inspired/v1",
-        method_classification="product_inspired",
-        implementation_label="numpy-full-covariance-bipop-inspired",
-        execution_readiness="blocked",
-        environment_boundary="product_runtime",
-        sources=(
-            _project_source(
-                "repo-bipop-cma-inspired",
-                "backend/app/optimization/cma_optimizers.py",
-            ),
-        ),
-        blocker_codes=("adapter_not_implemented",),
+    _ready_project(
+        "repo_bipop_cma_inspired/v1",
+        "numpy-full-covariance-bipop-inspired",
+        "product_inspired",
+        "backend/app/optimization/cma_optimizers.py",
     ),
-    BenchmarkMethodInventoryEntryV1(
-        adapter_id="repo_surrogate_cma/v1",
-        method_classification="product_native",
-        implementation_label="numpy-full-covariance-cma-rbf",
-        execution_readiness="blocked",
-        environment_boundary="product_runtime",
-        sources=(
-            _project_source(
-                "repo-surrogate-cma",
-                "backend/app/optimization/cma_optimizers.py",
-            ),
-        ),
-        blocker_codes=("adapter_not_implemented",),
+    _ready_project(
+        "repo_surrogate_cma/v1",
+        "numpy-full-covariance-cma-rbf",
+        "product_native",
+        "backend/app/optimization/cma_optimizers.py",
     ),
     *(
         BenchmarkMethodInventoryEntryV1(

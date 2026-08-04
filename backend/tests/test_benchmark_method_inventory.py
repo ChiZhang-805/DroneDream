@@ -34,6 +34,9 @@ def test_method_inventory_is_complete_and_matches_registry_provenance() -> None:
         "true_lhs/v1",
         "repo_constrained_mobo/v1",
         "optimizer_portfolio/v1",
+        "repo_turbo_inspired/v1",
+        "repo_bipop_cma_inspired/v1",
+        "repo_surrogate_cma/v1",
     ),
 )
 def test_only_reviewed_project_adapters_are_execution_ready(adapter_id: str) -> None:
@@ -89,6 +92,8 @@ def test_reference_and_product_inspired_turbo_bipop_are_distinct_methods() -> No
     assert BENCHMARK_METHOD_INVENTORY["repo_bipop_cma_inspired/v1"].implementation_label.startswith(
         "numpy-"
     )
+    assert BENCHMARK_METHOD_INVENTORY["repo_turbo_inspired/v1"].execution_readiness == "ready"
+    assert BENCHMARK_METHOD_INVENTORY["repo_bipop_cma_inspired/v1"].execution_readiness == "ready"
 
 
 def test_seeded_halton_is_not_relabelled_as_true_lhs() -> None:
