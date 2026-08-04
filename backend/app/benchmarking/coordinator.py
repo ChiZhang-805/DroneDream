@@ -9,20 +9,24 @@ from typing import Any
 
 from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app import models
 from app.benchmarking import service
 from app.benchmarking.contracts import (
+    BenchmarkBatchBindingRecordV1,
+    BenchmarkBatchBindingRequestV1,
     BenchmarkBudgetCapsV1,
     BenchmarkBudgetReservationRecordV1,
     BenchmarkBudgetReservationRequestV1,
     BenchmarkCampaignUsageV1,
     BenchmarkCoordinatorLeaseV1,
     BenchmarkResourceVectorV1,
+    BenchmarkRunBindingRecordV1,
     BenchmarkUsageDeltaV1,
     canonical_sha256,
 )
+from app.services import jobs as job_service
 
 
 class BenchmarkCoordinatorError(RuntimeError):
@@ -62,6 +66,12 @@ def _token_hash(token: str) -> str:
             http_status=409,
         )
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _batch_binding_request_sha256(request: BenchmarkBatchBindingRequestV1) -> str:
+    payload = request.model_dump(mode="json", exclude_none=False)
+    payload["runs"] = sorted(payload["runs"], key=lambda item: item["run_key"])
+    return canonical_sha256(payload)
 
 
 def _campaign(
@@ -343,6 +353,195 @@ def reserve_budget(
     return to_reservation_record(reservation)
 
 
+def bind_batch(
+    db: Session,
+    campaign_id: str,
+    request: BenchmarkBatchBindingRequestV1,
+    *,
+    user: models.User,
+    lease_token: str,
+) -> BenchmarkBatchBindingRecordV1:
+    campaign = _campaign(db, campaign_id, user=user)
+    request_sha256 = _batch_binding_request_sha256(request)
+    existing = db.scalar(
+        select(models.BenchmarkCampaignBatchBinding)
+        .options(
+            selectinload(models.BenchmarkCampaignBatchBinding.runs).selectinload(
+                models.BenchmarkCampaignRunBinding.arm
+            )
+        )
+        .where(
+            models.BenchmarkCampaignBatchBinding.campaign_id == campaign.id,
+            models.BenchmarkCampaignBatchBinding.binding_key == request.binding_key,
+        )
+    )
+    if existing is not None:
+        if existing.binding_sha256 == request_sha256:
+            return to_batch_binding_record(existing)
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_BATCH_BINDING_KEY_CONFLICT",
+            "binding_key is already bound to a different immutable Batch request.",
+            http_status=409,
+        )
+
+    other_batch_binding = db.scalar(
+        select(models.BenchmarkCampaignBatchBinding).where(
+            models.BenchmarkCampaignBatchBinding.batch_id == request.batch_id
+        )
+    )
+    if other_batch_binding is not None:
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_BATCH_ALREADY_BOUND",
+            "A Batch can belong to only one immutable benchmark campaign binding.",
+            http_status=409,
+        )
+
+    try:
+        batch = job_service.get_batch(db, request.batch_id, user=user)
+    except job_service.JobServiceError as error:
+        raise BenchmarkCoordinatorError(
+            error.code,
+            error.message,
+            http_status=error.http_status,
+        ) from error
+    children = list(batch.jobs)
+    child_by_id = {job.id: job for job in children}
+    requested_job_ids = {run.job_id for run in request.runs}
+    if requested_job_ids != set(child_by_id):
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_BATCH_JOB_SET_MISMATCH",
+            "A benchmark Batch binding must cover every child Job exactly once.",
+            http_status=422,
+        )
+    if batch.status != "QUEUED" or any(
+        job.status != "QUEUED"
+        or job.current_generation != 0
+        or job.progress_completed_trials != 0
+        or bool(job.candidates)
+        or bool(job.trials)
+        for job in children
+    ):
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_BATCH_ALREADY_STARTED",
+            "Only an untouched QUEUED Batch can be bound to a benchmark campaign.",
+            http_status=409,
+        )
+
+    arm_by_semantic_id = {
+        (arm.benchmark_arm_id, arm.arm_version): arm for arm in campaign.arms
+    }
+    for run in request.runs:
+        if (run.benchmark_arm_id, run.arm_version) not in arm_by_semantic_id:
+            raise BenchmarkCoordinatorError(
+                "BENCHMARK_RUN_ARM_NOT_IN_CAMPAIGN",
+                "Every run must reference an arm and version frozen in this campaign.",
+                http_status=422,
+            )
+
+    reservation = reserve_budget(
+        db,
+        campaign_id,
+        BenchmarkBudgetReservationRequestV1(
+            reservation_key=f"batch-bind/{request.binding_key}",
+            lease_generation=request.lease_generation,
+            reason="benchmark-batch-binding",
+            usage=BenchmarkUsageDeltaV1(jobs=len(children)),
+        ),
+        user=user,
+        lease_token=lease_token,
+    )
+    state = _coordinator_state(db, campaign)
+    db.refresh(state)
+    now = _now()
+    token_hash = _token_hash(lease_token)
+    batch_ordinal = state.next_batch_ordinal
+    first_run_ordinal = state.next_run_ordinal
+    allocate = (
+        update(models.BenchmarkCampaignCoordinatorState)
+        .where(
+            models.BenchmarkCampaignCoordinatorState.campaign_id == campaign.id,
+            models.BenchmarkCampaignCoordinatorState.lease_token_hash == token_hash,
+            models.BenchmarkCampaignCoordinatorState.lease_generation
+            == request.lease_generation,
+            models.BenchmarkCampaignCoordinatorState.lease_expires_at > now,
+            models.BenchmarkCampaignCoordinatorState.next_batch_ordinal
+            == batch_ordinal,
+            models.BenchmarkCampaignCoordinatorState.next_run_ordinal
+            == first_run_ordinal,
+        )
+        .values(
+            next_batch_ordinal=batch_ordinal + 1,
+            next_run_ordinal=first_run_ordinal + len(children),
+            updated_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    allocation_result = db.execute(allocate)
+    if allocation_result.rowcount != 1:  # type: ignore[attr-defined]
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_COORDINATOR_FENCE_REJECTED",
+            "Coordinator lease or ordinal allocation changed during Batch binding.",
+            http_status=409,
+        )
+
+    batch_binding = models.BenchmarkCampaignBatchBinding(
+        campaign_id=campaign.id,
+        batch_id=batch.id,
+        binding_key=request.binding_key,
+        binding_sha256=request_sha256,
+        batch_ordinal=batch_ordinal,
+        lease_generation=request.lease_generation,
+        job_count=len(children),
+        budget_reservation_id=reservation.id,
+    )
+    db.add(batch_binding)
+    db.flush()
+    sorted_runs = sorted(request.runs, key=lambda item: item.run_key)
+    for offset, run in enumerate(sorted_runs):
+        arm = arm_by_semantic_id[(run.benchmark_arm_id, run.arm_version)]
+        db.add(
+            models.BenchmarkCampaignRunBinding(
+                campaign_id=campaign.id,
+                batch_binding_id=batch_binding.id,
+                benchmark_arm_id=arm.id,
+                job_id=run.job_id,
+                run_key=run.run_key,
+                run_ordinal=first_run_ordinal + offset,
+                batch_run_ordinal=offset + 1,
+                algorithm_seed=run.algorithm_seed,
+                simulator_seed_block=run.simulator_seed_block,
+                provider_randomness_policy=run.provider_randomness_policy,
+                provider_seed=run.provider_seed,
+                binding_sha256=canonical_sha256(run),
+            )
+        )
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        replay = db.scalar(
+            select(models.BenchmarkCampaignBatchBinding)
+            .options(
+                selectinload(models.BenchmarkCampaignBatchBinding.runs).selectinload(
+                    models.BenchmarkCampaignRunBinding.arm
+                )
+            )
+            .where(
+                models.BenchmarkCampaignBatchBinding.campaign_id == campaign_id,
+                models.BenchmarkCampaignBatchBinding.binding_key == request.binding_key,
+            )
+        )
+        if replay is not None and replay.binding_sha256 == request_sha256:
+            return to_batch_binding_record(replay)
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_BATCH_BINDING_CONFLICT",
+            "Concurrent Batch binding collided with immutable campaign provenance.",
+            http_status=409,
+        ) from None
+    db.refresh(batch_binding, attribute_names=["runs"])
+    return to_batch_binding_record(batch_binding)
+
+
 def _as_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
@@ -357,6 +556,28 @@ def get_usage(
 ) -> BenchmarkCampaignUsageV1:
     campaign = _campaign(db, campaign_id, user=user)
     return to_usage(campaign, _coordinator_state(db, campaign))
+
+
+def list_batch_bindings(
+    db: Session,
+    campaign_id: str,
+    *,
+    user: models.User,
+) -> list[BenchmarkBatchBindingRecordV1]:
+    campaign = _campaign(db, campaign_id, user=user)
+    bindings = list(
+        db.scalars(
+            select(models.BenchmarkCampaignBatchBinding)
+            .options(
+                selectinload(models.BenchmarkCampaignBatchBinding.runs).selectinload(
+                    models.BenchmarkCampaignRunBinding.arm
+                )
+            )
+            .where(models.BenchmarkCampaignBatchBinding.campaign_id == campaign.id)
+            .order_by(models.BenchmarkCampaignBatchBinding.batch_ordinal)
+        )
+    )
+    return [to_batch_binding_record(binding) for binding in bindings]
 
 
 def _resource_vector(
@@ -431,13 +652,52 @@ def to_reservation_record(
     )
 
 
+def to_batch_binding_record(
+    binding: models.BenchmarkCampaignBatchBinding,
+) -> BenchmarkBatchBindingRecordV1:
+    runs = sorted(binding.runs, key=lambda item: item.batch_run_ordinal)
+    return BenchmarkBatchBindingRecordV1(
+        id=binding.id,
+        campaign_id=binding.campaign_id,
+        binding_key=binding.binding_key,
+        batch_id=binding.batch_id,
+        batch_ordinal=binding.batch_ordinal,
+        lease_generation=binding.lease_generation,
+        job_count=binding.job_count,
+        binding_sha256=binding.binding_sha256,
+        budget_reservation_id=binding.budget_reservation_id,
+        runs=[
+            BenchmarkRunBindingRecordV1(
+                id=run.id,
+                run_key=run.run_key,
+                job_id=run.job_id,
+                benchmark_arm_id=run.arm.benchmark_arm_id,
+                arm_version=run.arm.arm_version,
+                run_ordinal=run.run_ordinal,
+                batch_run_ordinal=run.batch_run_ordinal,
+                algorithm_seed=run.algorithm_seed,
+                simulator_seed_block=run.simulator_seed_block,
+                provider_randomness_policy=run.provider_randomness_policy,  # type: ignore[arg-type]
+                provider_seed=run.provider_seed,
+                binding_sha256=run.binding_sha256,
+                created_at=_as_utc(run.created_at),
+            )
+            for run in runs
+        ],
+        created_at=_as_utc(binding.created_at),
+    )
+
+
 __all__ = [
     "BenchmarkCoordinatorError",
+    "bind_batch",
     "claim_lease",
     "get_usage",
+    "list_batch_bindings",
     "release_lease",
     "renew_lease",
     "reserve_budget",
     "to_reservation_record",
+    "to_batch_binding_record",
     "to_usage",
 ]

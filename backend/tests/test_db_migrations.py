@@ -407,6 +407,8 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                  "'benchmark_campaigns', "
                  "'benchmark_arms', "
                  "'benchmark_budget_reservations', "
+                 "'benchmark_campaign_batch_bindings', "
+                 "'benchmark_campaign_run_bindings', "
                  "'trials'"
                 ")"
             ).fetchall()
@@ -495,7 +497,9 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "'benchmark_campaigns', "
                 "'benchmark_arms', "
                 "'benchmark_campaign_coordinator_states', "
-                "'benchmark_budget_reservations'"
+                "'benchmark_budget_reservations', "
+                "'benchmark_campaign_batch_bindings', "
+                "'benchmark_campaign_run_bindings'"
                 ")"
             ).fetchall()
         }
@@ -521,6 +525,10 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "trg_benchmark_arm_manifest_immutable",
         "trg_benchmark_budget_reservation_no_update",
         "trg_benchmark_budget_reservation_no_delete",
+        "trg_benchmark_batch_binding_no_update",
+        "trg_benchmark_batch_binding_no_delete",
+        "trg_benchmark_run_binding_no_update",
+        "trg_benchmark_run_binding_no_delete",
     }
     assert attempt_tables == {
         "trial_execution_attempts",
@@ -548,6 +556,8 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "benchmark_arms",
         "benchmark_campaign_coordinator_states",
         "benchmark_budget_reservations",
+        "benchmark_campaign_batch_bindings",
+        "benchmark_campaign_run_bindings",
     }
     assert {
         "user_id",
@@ -751,7 +761,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0024 (head)"]
+    assert heads == ["20260804_0025 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -848,7 +858,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             for row in connection.execute("PRAGMA index_list('jobs')").fetchall()
         )
 
-    assert version == ("20260804_0024",)
+    assert version == ("20260804_0025",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",

@@ -17,6 +17,8 @@ from app.benchmarking.contracts import (
     canonical_sha256,
 )
 
+from .test_jobs_api import HEURISTIC_JOB_PAYLOAD
+
 _SHA = "1" * 64
 _COMMIT = "a" * 40
 
@@ -405,3 +407,244 @@ def test_coordinator_endpoints_preserve_not_found_contract(client: TestClient) -
     usage = client.get(f"/api/v1/benchmark-campaigns/{campaign_id}/usage")
     assert usage.status_code == 404
     assert usage.json()["error"]["code"] == "BENCHMARK_CAMPAIGN_NOT_FOUND"
+
+
+def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
+    client: TestClient,
+) -> None:
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _manifest()},
+    ).json()["data"]
+    batch = client.post(
+        "/api/v1/batches",
+        json={
+            "name": "paired-block-01",
+            "jobs": [
+                {**HEURISTIC_JOB_PAYLOAD, "display_name": "random"},
+                {**HEURISTIC_JOB_PAYLOAD, "display_name": "adaptive"},
+            ],
+        },
+    ).json()["data"]
+    jobs = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"]
+
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "campaign-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    payload = {
+        "binding_key": "pilot-a-block-01",
+        "lease_generation": claimed["lease_generation"],
+        "batch_id": batch["id"],
+        "runs": [
+            {
+                "run_key": "run-02-adaptive",
+                "job_id": jobs[1]["id"],
+                "benchmark_arm_id": "dronedream-adaptive",
+                "arm_version": "v1",
+                "algorithm_seed": 102,
+                "simulator_seed_block": "crn-block-01",
+                "provider_randomness_policy": "fixed_seed",
+                "provider_seed": 20260804,
+            },
+            {
+                "run_key": "run-01-random",
+                "job_id": jobs[0]["id"],
+                "benchmark_arm_id": "random-search",
+                "arm_version": "v1",
+                "algorithm_seed": 101,
+                "simulator_seed_block": "crn-block-01",
+                "provider_randomness_policy": "not_applicable",
+                "provider_seed": None,
+            },
+        ],
+    }
+    endpoint = f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings"
+    response = client.post(
+        endpoint,
+        json=payload,
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert response.status_code == 200, response.text
+    binding = response.json()["data"]
+    assert binding["batch_ordinal"] == 1
+    assert binding["job_count"] == 2
+    assert [run["run_key"] for run in binding["runs"]] == [
+        "run-01-random",
+        "run-02-adaptive",
+    ]
+    assert [run["run_ordinal"] for run in binding["runs"]] == [1, 2]
+    assert [run["batch_run_ordinal"] for run in binding["runs"]] == [1, 2]
+    assert binding["runs"][0]["simulator_seed_block"] == "crn-block-01"
+    assert binding["runs"][1]["provider_seed"] == 20260804
+
+    reordered_payload = deepcopy(payload)
+    reordered_payload["runs"].reverse()
+    replay = client.post(
+        endpoint,
+        json=reordered_payload,
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["data"]["id"] == binding["id"]
+    changed = deepcopy(payload)
+    changed["runs"][0]["algorithm_seed"] = 999
+    conflict = client.post(
+        endpoint,
+        json=changed,
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "BENCHMARK_BATCH_BINDING_KEY_CONFLICT"
+
+    listing = client.get(endpoint)
+    assert listing.status_code == 200
+    assert listing.json()["data"] == [binding]
+    usage = client.get(f"/api/v1/benchmark-campaigns/{created['id']}/usage")
+    assert usage.json()["data"]["used"]["jobs"] == 2
+
+    second_batch = client.post(
+        "/api/v1/batches",
+        json={"name": "paired-block-02", "jobs": [HEURISTIC_JOB_PAYLOAD]},
+    ).json()["data"]
+    second_job = client.get(
+        f"/api/v1/batches/{second_batch['id']}/jobs"
+    ).json()["data"][0]
+    second_binding = client.post(
+        endpoint,
+        json={
+            "binding_key": "pilot-a-block-02",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": second_batch["id"],
+            "runs": [
+                {
+                    "run_key": "run-03-random",
+                    "job_id": second_job["id"],
+                    "benchmark_arm_id": "random-search",
+                    "arm_version": "v1",
+                    "algorithm_seed": 103,
+                    "simulator_seed_block": "crn-block-02",
+                    "provider_randomness_policy": "not_applicable",
+                    "provider_seed": None,
+                }
+            ],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert second_binding.status_code == 200, second_binding.text
+    assert second_binding.json()["data"]["batch_ordinal"] == 2
+    assert second_binding.json()["data"]["runs"][0]["run_ordinal"] == 3
+    usage = client.get(f"/api/v1/benchmark-campaigns/{created['id']}/usage")
+    assert usage.json()["data"]["used"]["jobs"] == 3
+
+    with SessionLocal() as db:
+        with pytest.raises(DatabaseError, match="execution bindings are append-only"):
+            db.execute(
+                text(
+                    "UPDATE benchmark_campaign_run_bindings SET algorithm_seed=999 "
+                    "WHERE id=:id"
+                ),
+                {"id": binding["runs"][0]["id"]},
+            )
+            db.commit()
+        db.rollback()
+
+
+def test_campaign_batch_binding_rejects_partial_started_or_unknown_arm(
+    client: TestClient,
+) -> None:
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _manifest()},
+    ).json()["data"]
+    batch = client.post(
+        "/api/v1/batches",
+        json={
+            "name": "paired-block-02",
+            "jobs": [HEURISTIC_JOB_PAYLOAD, HEURISTIC_JOB_PAYLOAD],
+        },
+    ).json()["data"]
+    jobs = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"]
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "campaign-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    endpoint = f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings"
+    base_run = {
+        "run_key": "run-01",
+        "job_id": jobs[0]["id"],
+        "benchmark_arm_id": "random-search",
+        "arm_version": "v1",
+        "algorithm_seed": 101,
+        "simulator_seed_block": "crn-block-02",
+        "provider_randomness_policy": "not_applicable",
+        "provider_seed": None,
+    }
+    partial = client.post(
+        endpoint,
+        json={
+            "binding_key": "partial",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [base_run],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert partial.status_code == 422
+    assert partial.json()["error"]["code"] == "BENCHMARK_BATCH_JOB_SET_MISMATCH"
+
+    unknown = deepcopy(base_run)
+    unknown["benchmark_arm_id"] = "unregistered-arm"
+    unknown["job_id"] = jobs[1]["id"]
+    unknown["run_key"] = "run-02"
+    arm_failure = client.post(
+        endpoint,
+        json={
+            "binding_key": "unknown-arm",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [base_run, unknown],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert arm_failure.status_code == 422
+    assert arm_failure.json()["error"]["code"] == "BENCHMARK_RUN_ARM_NOT_IN_CAMPAIGN"
+
+    with SessionLocal() as db:
+        from app import models
+
+        job = db.get(models.Job, jobs[0]["id"])
+        assert job is not None
+        job.status = "RUNNING"
+        db.commit()
+    second_run = deepcopy(base_run)
+    second_run["job_id"] = jobs[1]["id"]
+    second_run["run_key"] = "run-02"
+    started = client.post(
+        endpoint,
+        json={
+            "binding_key": "started",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [base_run, second_run],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert started.status_code == 409
+    assert started.json()["error"]["code"] == "BENCHMARK_BATCH_ALREADY_STARTED"

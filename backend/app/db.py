@@ -929,6 +929,42 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        for table_name, trigger_prefix in (
+            ("benchmark_campaign_batch_bindings", "batch"),
+            ("benchmark_campaign_run_bindings", "run"),
+        ):
+            if table_name not in table_names:
+                continue
+            conn.execute(
+                text(
+                    f"""
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_{trigger_prefix}_binding_no_update
+                    BEFORE UPDATE ON {table_name}
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark execution bindings are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    f"""
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_{trigger_prefix}_binding_no_delete
+                    BEFORE DELETE ON {table_name}
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark execution bindings are append-only'
+                        );
+                    END
+                    """
+                )
+            )
 
 
 def get_db() -> Iterator[Session]:

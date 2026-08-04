@@ -173,6 +173,10 @@ class BatchJob(Base):
 
     user: Mapped[User | None] = relationship(back_populates="batch_jobs")
     jobs: Mapped[list[Job]] = relationship(back_populates="batch")
+    benchmark_binding: Mapped[BenchmarkCampaignBatchBinding | None] = relationship(
+        back_populates="batch",
+        uselist=False,
+    )
 
 
 class BenchmarkCampaign(Base):
@@ -270,6 +274,16 @@ class BenchmarkCampaign(Base):
         back_populates="campaign",
         cascade="all, delete-orphan",
     )
+    batch_bindings: Mapped[list[BenchmarkCampaignBatchBinding]] = relationship(
+        back_populates="campaign",
+        cascade="all, delete-orphan",
+        order_by="BenchmarkCampaignBatchBinding.batch_ordinal",
+    )
+    run_bindings: Mapped[list[BenchmarkCampaignRunBinding]] = relationship(
+        back_populates="campaign",
+        cascade="all, delete-orphan",
+        order_by="BenchmarkCampaignRunBinding.run_ordinal",
+    )
 
 
 class BenchmarkArm(Base):
@@ -317,6 +331,9 @@ class BenchmarkArm(Base):
     )
 
     campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="arms")
+    run_bindings: Mapped[list[BenchmarkCampaignRunBinding]] = relationship(
+        back_populates="arm"
+    )
 
 
 class BenchmarkCampaignCoordinatorState(Base):
@@ -454,6 +471,138 @@ class BenchmarkBudgetReservation(Base):
     )
 
     campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="budget_reservations")
+
+
+class BenchmarkCampaignBatchBinding(Base):
+    """Immutable link between one owned Batch and a campaign-global ordinal."""
+
+    __tablename__ = "benchmark_campaign_batch_bindings"
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "binding_key", name="uq_benchmark_batch_binding_key"),
+        UniqueConstraint(
+            "campaign_id",
+            "batch_ordinal",
+            name="uq_benchmark_batch_binding_ordinal",
+        ),
+        CheckConstraint(
+            "batch_ordinal >= 1 AND lease_generation >= 1 "
+            "AND job_count >= 1 AND job_count <= 50",
+            name="ck_benchmark_batch_binding_ordinals",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("bbnd")
+    )
+    campaign_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    batch_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("batch_jobs.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    binding_key: Mapped[str] = mapped_column(String(96), nullable=False)
+    binding_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    batch_ordinal: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    lease_generation: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    job_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    budget_reservation_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_budget_reservations.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="batch_bindings")
+    batch: Mapped[BatchJob] = relationship(back_populates="benchmark_binding")
+    runs: Mapped[list[BenchmarkCampaignRunBinding]] = relationship(
+        back_populates="batch_binding",
+        cascade="all, delete-orphan",
+        order_by="BenchmarkCampaignRunBinding.batch_run_ordinal",
+    )
+
+
+class BenchmarkCampaignRunBinding(Base):
+    """Immutable Job/arm/seed provenance for one campaign run."""
+
+    __tablename__ = "benchmark_campaign_run_bindings"
+    __table_args__ = (
+        UniqueConstraint("campaign_id", "run_key", name="uq_benchmark_run_binding_key"),
+        UniqueConstraint(
+            "campaign_id",
+            "run_ordinal",
+            name="uq_benchmark_run_binding_ordinal",
+        ),
+        UniqueConstraint(
+            "batch_binding_id",
+            "batch_run_ordinal",
+            name="uq_benchmark_batch_run_ordinal",
+        ),
+        CheckConstraint(
+            "run_ordinal >= 1 AND batch_run_ordinal >= 1 "
+            "AND algorithm_seed >= 0 AND (provider_seed IS NULL OR provider_seed >= 0)",
+            name="ck_benchmark_run_binding_ordinals",
+        ),
+        CheckConstraint(
+            "provider_randomness_policy IN "
+            "('not_applicable', 'fixed_seed', 'provider_managed')",
+            name="ck_benchmark_run_provider_policy",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("brun")
+    )
+    campaign_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    batch_binding_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaign_batch_bindings.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    benchmark_arm_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_arms.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("jobs.id", ondelete="RESTRICT"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    run_key: Mapped[str] = mapped_column(String(96), nullable=False)
+    run_ordinal: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    batch_run_ordinal: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    algorithm_seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    simulator_seed_block: Mapped[str] = mapped_column(String(128), nullable=False)
+    provider_randomness_policy: Mapped[str] = mapped_column(String(32), nullable=False)
+    provider_seed: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    binding_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="run_bindings")
+    batch_binding: Mapped[BenchmarkCampaignBatchBinding] = relationship(back_populates="runs")
+    arm: Mapped[BenchmarkArm] = relationship(back_populates="run_bindings")
+    job: Mapped[Job] = relationship(back_populates="benchmark_run_binding")
 
 
 class Job(Base):
@@ -698,6 +847,10 @@ class Job(Base):
         cascade="all, delete-orphan",
     )
     batch: Mapped[BatchJob | None] = relationship(back_populates="jobs")
+    benchmark_run_binding: Mapped[BenchmarkCampaignRunBinding | None] = relationship(
+        back_populates="job",
+        uselist=False,
+    )
 
 
 class CandidateParameterSet(Base):

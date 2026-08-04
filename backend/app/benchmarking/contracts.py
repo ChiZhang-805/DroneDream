@@ -426,6 +426,92 @@ class BenchmarkCampaignUsageV1(_Strict):
     lease_expires_at: datetime | None = None
 
 
+class BenchmarkRunBindingRequestV1(_Strict):
+    run_key: Annotated[
+        str,
+        Field(pattern=r"^[a-z0-9][a-z0-9._/-]{0,95}$"),
+    ]
+    job_id: Annotated[str, Field(min_length=1, max_length=64)]
+    benchmark_arm_id: Identifier
+    arm_version: Annotated[str, Field(min_length=1, max_length=64)]
+    algorithm_seed: Annotated[int, Field(ge=0, le=9_223_372_036_854_775_807)]
+    simulator_seed_block: Identifier
+    provider_randomness_policy: Literal[
+        "not_applicable",
+        "fixed_seed",
+        "provider_managed",
+    ]
+    provider_seed: Annotated[
+        int,
+        Field(ge=0, le=9_223_372_036_854_775_807),
+    ] | None = None
+
+    @model_validator(mode="after")
+    def _validate_provider_randomness(self) -> BenchmarkRunBindingRequestV1:
+        if (self.provider_randomness_policy == "fixed_seed") != (
+            self.provider_seed is not None
+        ):
+            raise ValueError("fixed_seed requires provider_seed and other policies forbid it")
+        return self
+
+
+class BenchmarkBatchBindingRequestV1(_Strict):
+    schema_id: Literal["dronedream.benchmark-batch-binding/v1"] = (
+        "dronedream.benchmark-batch-binding/v1"
+    )
+    binding_key: Annotated[
+        str,
+        Field(pattern=r"^[a-z0-9][a-z0-9._/-]{0,95}$"),
+    ]
+    lease_generation: Annotated[int, Field(ge=1)]
+    batch_id: Annotated[str, Field(min_length=1, max_length=64)]
+    runs: list[BenchmarkRunBindingRequestV1] = Field(min_length=1, max_length=50)
+
+    @model_validator(mode="after")
+    def _validate_unique_runs(self) -> BenchmarkBatchBindingRequestV1:
+        run_keys = [run.run_key for run in self.runs]
+        job_ids = [run.job_id for run in self.runs]
+        if len(run_keys) != len(set(run_keys)):
+            raise ValueError("run_key values must be unique within a Batch binding")
+        if len(job_ids) != len(set(job_ids)):
+            raise ValueError("job_id values must be unique within a Batch binding")
+        return self
+
+
+class BenchmarkRunBindingRecordV1(_Strict):
+    id: str
+    run_key: str
+    job_id: str
+    benchmark_arm_id: str
+    arm_version: str
+    run_ordinal: Annotated[int, Field(ge=1)]
+    batch_run_ordinal: Annotated[int, Field(ge=1)]
+    algorithm_seed: int
+    simulator_seed_block: str
+    provider_randomness_policy: Literal[
+        "not_applicable",
+        "fixed_seed",
+        "provider_managed",
+    ]
+    provider_seed: int | None
+    binding_sha256: Sha256Hex
+    created_at: datetime
+
+
+class BenchmarkBatchBindingRecordV1(_Strict):
+    id: str
+    campaign_id: str
+    binding_key: str
+    batch_id: str
+    batch_ordinal: Annotated[int, Field(ge=1)]
+    lease_generation: Annotated[int, Field(ge=1)]
+    job_count: Annotated[int, Field(ge=1, le=50)]
+    binding_sha256: Sha256Hex
+    budget_reservation_id: str
+    runs: list[BenchmarkRunBindingRecordV1]
+    created_at: datetime
+
+
 # The hash is derived from the actual server-side schema rather than a hand-kept
 # string, so a shape change necessarily changes every campaign fairness binding.
 BENCHMARK_OBSERVATION_CONTRACT_SHA256 = canonical_sha256(
@@ -438,6 +524,8 @@ __all__ = [
     "BENCHMARK_OBSERVATION_CONTRACT_SHA256",
     "BenchmarkArmManifestV1",
     "BenchmarkBudgetCapsV1",
+    "BenchmarkBatchBindingRecordV1",
+    "BenchmarkBatchBindingRequestV1",
     "BenchmarkCampaignManifestV1",
     "BenchmarkCampaignCreateRequest",
     "BenchmarkCampaignRecordV1",
@@ -456,6 +544,8 @@ __all__ = [
     "BenchmarkBudgetReservationRecordV1",
     "BenchmarkBudgetReservationRequestV1",
     "BenchmarkResourceVectorV1",
+    "BenchmarkRunBindingRecordV1",
+    "BenchmarkRunBindingRequestV1",
     "BenchmarkUsageDeltaV1",
     "CompositeExecutionInventoryV1",
     "ExecutionComponentV1",

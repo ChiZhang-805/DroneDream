@@ -12,6 +12,7 @@ from app.api_idempotency import begin_mutation
 from app.auth import get_current_user
 from app.benchmarking import coordinator, service
 from app.benchmarking.contracts import (
+    BenchmarkBatchBindingRequestV1,
     BenchmarkBudgetReservationRequestV1,
     BenchmarkCampaignCreateRequest,
     BenchmarkCoordinatorClaimRequestV1,
@@ -227,3 +228,46 @@ def get_benchmark_campaign_usage(
     except coordinator.BenchmarkCoordinatorError as error:
         _raise_coordinator(error)
     return ok(usage.model_dump(mode="json"))
+
+
+@router.post("/benchmark-campaigns/{campaign_id}/batch-bindings")
+def bind_benchmark_batch(
+    campaign_id: str,
+    request: BenchmarkBatchBindingRequestV1,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    lease_token: Annotated[
+        str,
+        Header(
+            alias="X-Benchmark-Lease-Token",
+            min_length=32,
+            max_length=256,
+        ),
+    ],
+) -> dict[str, object]:
+    try:
+        binding = coordinator.bind_batch(
+            db,
+            campaign_id,
+            request,
+            user=user,
+            lease_token=lease_token,
+        )
+        db.commit()
+    except coordinator.BenchmarkCoordinatorError as error:
+        db.rollback()
+        _raise_coordinator(error)
+    return ok(binding.model_dump(mode="json"))
+
+
+@router.get("/benchmark-campaigns/{campaign_id}/batch-bindings")
+def list_benchmark_batch_bindings(
+    campaign_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        bindings = coordinator.list_batch_bindings(db, campaign_id, user=user)
+    except coordinator.BenchmarkCoordinatorError as error:
+        _raise_coordinator(error)
+    return ok([binding.model_dump(mode="json") for binding in bindings])
