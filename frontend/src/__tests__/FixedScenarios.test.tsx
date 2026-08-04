@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe("fixed scenario library", () => {
-  it("groups four versioned common scenarios without creating a job", async () => {
+  it("presents four compact common scenarios without creating a job", async () => {
     const createSpy = vi.spyOn(apiClient, "createJob");
     const { router } = renderPage();
 
@@ -42,8 +42,14 @@ describe("fixed scenario library", () => {
     expect(screen.getAllByText("Simple")).toHaveLength(2);
     expect(screen.getAllByText("Medium")).toHaveLength(2);
     expect(document.querySelectorAll("[data-template-key]")).toHaveLength(4);
-    expect(screen.getAllByText("Local track preview")).toHaveLength(4);
-    expect(screen.getByText(/never creates or starts a job/i)).toBeVisible();
+    expect(screen.queryByText("PX4 / GAZEBO STUDY")).not.toBeInTheDocument();
+    expect(screen.queryByText("Scenario catalog v1")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Choose a common flight study/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("hover-basics@1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vertical climb and stationary hover")).not.toBeInTheDocument();
+    expect(screen.queryByText("Preview only")).not.toBeInTheDocument();
+    expect(screen.queryByText(/generated points/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("What this tests")).not.toBeInTheDocument();
 
     const combinedCard = screen.getByRole("heading", {
       name: "Wind and sensor-noise circle",

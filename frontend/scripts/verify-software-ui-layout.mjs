@@ -434,7 +434,6 @@ async function verifyFixedScenarios(page, testCase) {
     };
     const navElement = document.querySelector(".app-nav");
     const pageElement = document.querySelector(".fixed-scenarios-page");
-    const version = document.querySelector(".fixed-scenarios-version");
     const navLinks = Array.from(document.querySelectorAll(".app-nav > a"));
     const scenarioCards = Array.from(document.querySelectorAll(".fixed-scenario-card"));
     if (!(navElement instanceof HTMLElement) || !(pageElement instanceof HTMLElement)) {
@@ -443,7 +442,6 @@ async function verifyFixedScenarios(page, testCase) {
     return {
       nav: bounds(navElement),
       page: bounds(pageElement),
-      version: version instanceof HTMLElement ? bounds(version) : null,
       navEntries: navLinks.map((link) => {
         const label = link.querySelector(".app-nav-entry > span");
         return {
@@ -456,12 +454,24 @@ async function verifyFixedScenarios(page, testCase) {
         };
       }),
       cards: scenarioCards.map(bounds),
+      explanatoryElements: document.querySelectorAll([
+        ".fixed-scenarios-header .page-eyebrow",
+        ".fixed-scenarios-header .page-header-subtitle",
+        ".fixed-scenarios-version",
+        ".fixed-scenarios-assurance",
+        ".fixed-scenario-card-heading code",
+        ".fixed-scenario-card > p",
+        ".fixed-scenario-card .experience-preview figcaption",
+        ".fixed-scenario-card .experience-preview-meta",
+        ".fixed-scenario-goal",
+      ].join(",")).length,
       documentWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
+      viewportHeight: window.innerHeight,
     };
   });
 
-  assert(metrics.version, `${testCase.id}: scenario catalog version badge is missing`);
+  assert.equal(metrics.explanatoryElements, 0);
   assert.equal(metrics.navEntries.filter((entry) => entry.active).length, 1);
   assert.equal(
     metrics.navEntries.find((entry) => entry.active)?.href,
@@ -476,23 +486,18 @@ async function verifyFixedScenarios(page, testCase) {
     metrics.documentWidth,
     `${testCase.id}: fixed scenarios caused horizontal document overflow`,
   );
-  assert(
-    metrics.version.left >= metrics.page.left - 1
-      && metrics.version.right <= metrics.page.right + 1,
-    `${testCase.id}: catalog version badge escaped the page bounds`,
-  );
-
-  if (testCase.viewport.width >= 1000) {
+  if (testCase.viewport.width > 1350) {
+    assert(metrics.cards.every((card) => closeEnough(card.top, metrics.cards[0].top, 1)));
+    assert(metrics.cards.every((card) => closeEnough(card.width, metrics.cards[0].width, 1)));
+    assert(
+      Math.max(...metrics.cards.map((card) => card.bottom)) <= metrics.viewportHeight,
+      `${testCase.id}: fixed scenarios do not fit within the desktop viewport`,
+    );
+  } else if (testCase.viewport.width > 620) {
     assert(closeEnough(metrics.cards[0].top, metrics.cards[1].top, 1));
     assert(closeEnough(metrics.cards[2].top, metrics.cards[3].top, 1));
     assert(closeEnough(metrics.cards[0].width, metrics.cards[1].width, 1));
     assert(closeEnough(metrics.cards[2].width, metrics.cards[3].width, 1));
-    assert(
-      metrics.navEntries.every((entry, index, entries) => (
-        index === 0 || entry.top > entries[index - 1].top
-      )),
-      `${testCase.id}: desktop navigation entries are not vertically ordered`,
-    );
   } else {
     assert(
       metrics.cards.every((card) => (
@@ -501,6 +506,16 @@ async function verifyFixedScenarios(page, testCase) {
       )),
       `${testCase.id}: mobile scenario cards do not share one column`,
     );
+  }
+
+  if (testCase.viewport.width >= 1000) {
+    assert(
+      metrics.navEntries.every((entry, index, entries) => (
+        index === 0 || entry.top > entries[index - 1].top
+      )),
+      `${testCase.id}: desktop navigation entries are not vertically ordered`,
+    );
+  } else {
     const trailingEntry = metrics.navEntries.at(-1);
     assert(trailingEntry);
     if (testCase.viewport.width <= 520) {

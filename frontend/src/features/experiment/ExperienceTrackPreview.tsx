@@ -9,6 +9,7 @@ interface ExperienceTrackPreviewProps {
   routeLabel: string;
   pointCountLabel: string;
   localOnlyLabel: string;
+  compact?: boolean;
 }
 
 const VIEWBOX_WIDTH = 320;
@@ -55,17 +56,23 @@ export function ExperienceTrackPreview({
   routeLabel,
   pointCountLabel,
   localOnlyLabel,
+  compact = false,
 }: ExperienceTrackPreviewProps) {
   const safePoints = finitePlanarPoints(points);
   const polyline = projectedPolyline(safePoints);
   const isHover = trackType === "hover";
 
   return (
-    <figure className="experience-preview" aria-label={title}>
-      <figcaption>
-        <strong>{title}</strong>
-        <span>{isHover ? hoverLabel : routeLabel}</span>
-      </figcaption>
+    <figure
+      className={`experience-preview${compact ? " experience-preview-compact" : ""}`}
+      aria-label={title}
+    >
+      {!compact && (
+        <figcaption>
+          <strong>{title}</strong>
+          <span>{isHover ? hoverLabel : routeLabel}</span>
+        </figcaption>
+      )}
       <svg
         className="experience-preview-canvas"
         viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
@@ -98,10 +105,12 @@ export function ExperienceTrackPreview({
           </text>
         )}
       </svg>
-      <div className="experience-preview-meta">
-        <span>{pointCountLabel}</span>
-        <span>{localOnlyLabel}</span>
-      </div>
+      {!compact && (
+        <div className="experience-preview-meta">
+          <span>{pointCountLabel}</span>
+          <span>{localOnlyLabel}</span>
+        </div>
+      )}
     </figure>
   );
 }

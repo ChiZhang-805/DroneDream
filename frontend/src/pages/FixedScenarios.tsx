@@ -1,10 +1,9 @@
-import { ArrowRight, Gauge, ShieldCheck, Wind } from "lucide-react";
+import { ArrowRight, Gauge, Wind } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { recordProductEvent } from "../features/analytics/productEvents";
 import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
 import {
-  STARTER_EXPERIENCE_CATALOG_VERSION,
   STARTER_EXPERIENCE_TEMPLATES,
   type StarterExperienceId,
 } from "../features/experiment/experienceTemplates";
@@ -18,8 +17,6 @@ interface FixedScenarioDefinition {
   id: StarterExperienceId;
   difficulty: ScenarioDifficulty;
   titleKey: TranslationKey;
-  descriptionKey: TranslationKey;
-  goalKey: TranslationKey;
 }
 
 const FIXED_SCENARIO_DEFINITIONS: readonly FixedScenarioDefinition[] = Object.freeze([
@@ -27,29 +24,21 @@ const FIXED_SCENARIO_DEFINITIONS: readonly FixedScenarioDefinition[] = Object.fr
     id: "hover-basics",
     difficulty: "simple",
     titleKey: "scenarioLibrary.hover.title",
-    descriptionKey: "scenarioLibrary.hover.description",
-    goalKey: "scenarioLibrary.hover.goal",
   },
   {
     id: "first-circle",
     difficulty: "simple",
     titleKey: "scenarioLibrary.circle.title",
-    descriptionKey: "scenarioLibrary.circle.description",
-    goalKey: "scenarioLibrary.circle.goal",
   },
   {
     id: "light-wind-circle",
     difficulty: "medium",
     titleKey: "scenarioLibrary.wind.title",
-    descriptionKey: "scenarioLibrary.wind.description",
-    goalKey: "scenarioLibrary.wind.goal",
   },
   {
     id: "wind-sensor-circle",
     difficulty: "medium",
     titleKey: "scenarioLibrary.combined.title",
-    descriptionKey: "scenarioLibrary.combined.description",
-    goalKey: "scenarioLibrary.combined.goal",
   },
 ]);
 
@@ -76,22 +65,8 @@ export function FixedScenarios() {
   return (
     <div className="fixed-scenarios-page">
       <header className="page-header fixed-scenarios-header">
-        <div>
-          <div className="page-eyebrow">PX4 / GAZEBO STUDY</div>
-          <h1>{t("scenarioLibrary.title")}</h1>
-          <p className="page-header-subtitle">{t("scenarioLibrary.subtitle")}</p>
-        </div>
-        <span className="fixed-scenarios-version">
-          {t("scenarioLibrary.catalogVersion", {
-            version: STARTER_EXPERIENCE_CATALOG_VERSION,
-          })}
-        </span>
+        <h1>{t("scenarioLibrary.title")}</h1>
       </header>
-
-      <div className="fixed-scenarios-assurance" role="note">
-        <ShieldCheck aria-hidden="true" />
-        <span>{t("scenarioLibrary.safeHandoff")}</span>
-      </div>
 
       <div className="fixed-scenarios-grid">
         {FIXED_SCENARIO_DEFINITIONS.map((definition) => {
@@ -125,9 +100,7 @@ export function FixedScenarios() {
                   </span>
                   <h2>{t(definition.titleKey)}</h2>
                 </div>
-                <code>{template.key}</code>
               </div>
-              <p>{t(definition.descriptionKey)}</p>
               <dl className="fixed-scenario-facts">
                 <div>
                   <dt>{t("scenarioLibrary.track")}</dt>
@@ -175,11 +148,8 @@ export function FixedScenarios() {
                 routeLabel={t("wizard.preview.route")}
                 pointCountLabel={t("wizard.preview.pointCount", { count: points.length })}
                 localOnlyLabel={t("scenarioLibrary.localPreview")}
+                compact
               />
-              <div className="fixed-scenario-goal">
-                <strong>{t("scenarioLibrary.goal")}</strong>
-                <span>{t(definition.goalKey)}</span>
-              </div>
               <Link
                 className="btn btn-primary fixed-scenario-use"
                 to={`/jobs/new?scenario=${encodeURIComponent(template.key)}`}
