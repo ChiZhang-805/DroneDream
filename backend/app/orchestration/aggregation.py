@@ -103,6 +103,11 @@ from app.orchestration.first_qualified import (
     stage_first_qualified_dispatch_stop,
 )
 from app.orchestration.outcome_contract_guard import check_job_outcome_contract
+from app.orchestration.qualification import SEALED_QUALIFICATION_POLICY_VERSION
+from app.orchestration.qualification_coordinator import (
+    QualificationCoordinatorError,
+    advance_sealed_qualifications,
+)
 
 logger = logging.getLogger("drone_dream.orchestration.aggregation")
 
@@ -320,6 +325,16 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     legacy optimizers, while experimental optimizers require an explicit result.
     """
 
+    job = getattr(candidate, "job", None)
+    if (
+        getattr(job, "holdout_policy_version", None)
+        == SEALED_QUALIFICATION_POLICY_VERSION
+        and (
+            candidate.qualification is None
+            or candidate.qualification.state != "qualified"
+        )
+    ):
+        return False
     if not candidate.is_baseline and _candidate_fidelity(candidate) < 1.0 - 1e-9:
         return False
     trial_count = _safe_candidate_count(candidate.trial_count)
@@ -1610,6 +1625,32 @@ def finalize_job_if_ready(
             message="Baseline candidate row missing.",
         )
         return True
+
+    if all_trials_terminal:
+        try:
+            qualification_advance = advance_sealed_qualifications(db, job=job)
+        except QualificationCoordinatorError as exc:
+            job_id = job.id
+            db.rollback()
+            db.expire_all()
+            failed_job = db.get(models.Job, job_id)
+            if failed_job is None:
+                return True
+            _fail_job(
+                db,
+                failed_job,
+                finalization_claim=finalization_claim,
+                code="QUALIFICATION_EVIDENCE_INVALID",
+                message=str(exc),
+            )
+            return True
+        if qualification_advance.dispatched_trials:
+            _release_partial_finalization_claim(
+                db,
+                job,
+                finalization_claim=finalization_claim,
+            )
+            return False
 
     # Aggregate only candidates whose complete dispatched matrix is terminal.
     # A candidate can become ready while unrelated parallel work is still in
