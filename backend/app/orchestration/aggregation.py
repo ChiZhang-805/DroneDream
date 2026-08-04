@@ -107,7 +107,9 @@ from app.orchestration.qualification import SEALED_QUALIFICATION_POLICY_VERSION
 from app.orchestration.qualification_coordinator import (
     QualificationCoordinatorError,
     advance_sealed_qualifications,
+    qualified_candidate_evidence_projection,
 )
+from app.orchestration.qualification_dispatch import sealed_contract_for_job
 
 logger = logging.getLogger("drone_dream.orchestration.aggregation")
 
@@ -280,6 +282,30 @@ def _configured_scenario_contract(
         raw_suite = getattr(job, "scenario_suite_json", None)
     except Exception:  # pragma: no cover - detached ORM state is not publishable
         return Counter(), False
+    typed_job = job if isinstance(job, models.Job) else None
+    if (
+        typed_job is not None
+        and typed_job.holdout_policy_version
+        == SEALED_QUALIFICATION_POLICY_VERSION
+    ):
+        try:
+            projection = qualified_candidate_evidence_projection(candidate)  # type: ignore[arg-type]
+            contract = sealed_contract_for_job(typed_job)
+        except QualificationCoordinatorError:
+            return Counter(), False
+        if projection is None or contract is None:
+            return Counter(), False
+        target = projection.get("qualification_target")
+        if isinstance(target, bool) or target not in {10, 20}:
+            return Counter(), False
+        expected = Counter(
+            [(item.case_id, False) for item in contract.screening]
+            + [
+                (item.case_id, True)
+                for item in contract.qualification[: int(target)]
+            ]
+        )
+        return expected, True
     if raw_suite is None:
         return None
     if not isinstance(raw_suite, dict):
@@ -326,15 +352,17 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     """
 
     job = getattr(candidate, "job", None)
+    sealed_projection: dict[str, Any] | None = None
     if (
         getattr(job, "holdout_policy_version", None)
         == SEALED_QUALIFICATION_POLICY_VERSION
-        and (
-            candidate.qualification is None
-            or candidate.qualification.state != "qualified"
-        )
     ):
-        return False
+        try:
+            sealed_projection = qualified_candidate_evidence_projection(candidate)
+        except QualificationCoordinatorError:
+            return False
+        if sealed_projection is None:
+            return False
     if not candidate.is_baseline and _candidate_fidelity(candidate) < 1.0 - 1e-9:
         return False
     trial_count = _safe_candidate_count(candidate.trial_count)
@@ -433,13 +461,17 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
         or any(_trial_is_holdout(trial) for trial in trials)
     )
     if expects_holdout:
-        holdout_result = aggregate.get("holdout")
-        if not (
-            isinstance(holdout_result, dict)
-            and holdout_result.get("validation_status") == "passed"
-            and holdout_result.get("feasible") is True
-        ):
-            return False
+        if sealed_projection is not None:
+            if aggregate.get("sealed_qualification") != sealed_projection:
+                return False
+        else:
+            holdout_result = aggregate.get("holdout")
+            if not (
+                isinstance(holdout_result, dict)
+                and holdout_result.get("validation_status") == "passed"
+                and holdout_result.get("feasible") is True
+            ):
+                return False
     return True
 
 
@@ -1311,6 +1343,9 @@ def _aggregate_candidate(
                     mode="json"
                 )
             agg["holdout"] = holdout_payload
+        sealed_qualification = qualified_candidate_evidence_projection(candidate)
+        if sealed_qualification is not None:
+            agg["sealed_qualification"] = sealed_qualification
         if outcome_contract is not None:
             ordered_training_trials = sorted(
                 training_trials,

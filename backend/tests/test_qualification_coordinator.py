@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 import pytest
 
 from app import models
+from app.orchestration import aggregation
+from app.orchestration.acceptance import AcceptanceResult
+from app.orchestration.first_qualified import freeze_first_qualified_candidate
 from app.orchestration.qualification import (
     QUALIFICATION_CONTRACT_SCHEMA,
     QUALIFICATION_RULE_SHA256,
@@ -17,6 +20,7 @@ from app.orchestration.qualification import (
 from app.orchestration.qualification_coordinator import (
     QualificationCoordinatorError,
     advance_sealed_qualifications,
+    qualified_candidate_evidence_projection,
 )
 from app.orchestration.qualification_receipts import (
     QUALIFICATION_TRIAL_EVIDENCE_SCHEMA,
@@ -29,7 +33,20 @@ class _RecordingSession:
         self.added: list[object] = []
 
     def add(self, value: object) -> None:
+        if isinstance(value, models.Trial) and value.id is None:
+            value.id = (
+                f"tri-{value.qualification_id}-{value.evaluation_phase}-"
+                f"{value.qualification_ordinal}"
+            )
         self.added.append(value)
+
+    class _NoRows:
+        @staticmethod
+        def first() -> None:
+            return None
+
+    def scalars(self, _statement: object) -> _NoRows:
+        return self._NoRows()
 
 
 def _sha256_id(value: object) -> str:
@@ -62,11 +79,15 @@ def _suite() -> ScenarioSuiteConfig:
     )
 
 
-def _passing_receipt(
+def _receipt(
     qualification: models.CandidateQualification,
     trial: models.Trial,
+    *,
+    passed: bool = True,
 ) -> models.QualificationTrialReceipt:
-    finalized_at = datetime(2026, 8, 4, 1, 2, 3, tzinfo=timezone.utc)
+    finalized_at = trial.finished_at or datetime(
+        2026, 8, 4, 1, 2, 3, tzinfo=timezone.utc
+    )
     payload: dict[str, object] = {
         "schema_id": QUALIFICATION_TRIAL_EVIDENCE_SCHEMA,
         "receipt_schema": "dronedream.qualification-trial-receipt/v1",
@@ -75,10 +96,10 @@ def _passing_receipt(
         "job_id": qualification.job_id,
         "candidate_id": qualification.candidate_id,
         "holdout_contract_sha256": qualification.holdout_contract_sha256,
-        "phase": "screening",
+        "phase": trial.evaluation_phase,
         "ordinal": trial.qualification_ordinal,
         "terminal_status": "COMPLETED",
-        "passed": True,
+        "passed": passed,
         "safety_critical_failure": False,
         "effect_readback_complete": True,
         "evidence_complete": True,
@@ -98,10 +119,10 @@ def _passing_receipt(
         qualification_id=qualification.id,
         trial_id=trial.id,
         receipt_schema="dronedream.qualification-trial-receipt/v1",
-        phase="screening",
+        phase=trial.evaluation_phase,
         ordinal=int(trial.qualification_ordinal or 0),
         terminal_status="COMPLETED",
-        passed=True,
+        passed=passed,
         safety_critical_failure=False,
         effect_readback_complete=True,
         evidence_complete=True,
@@ -178,7 +199,7 @@ def _job_with_screened_candidates(
             trial.job = job
             trial.candidate = candidate
             trial.qualification = qualification
-            _passing_receipt(qualification, trial)
+            _receipt(qualification, trial)
     return job
 
 
@@ -221,3 +242,148 @@ def test_coordinator_fails_closed_before_exceeding_trial_cap() -> None:
             _RecordingSession(),
             job=job,
         )
+
+
+def test_first_qualified_stops_before_another_candidate_extension() -> None:
+    job = _job_with_screened_candidates()
+    db = _RecordingSession()
+    advance_sealed_qualifications(db, job=job)  # type: ignore[arg-type]
+    by_id = {item.candidate_id: item for item in job.candidate_qualifications}
+    extending = by_id["cand-m"]
+    direct = by_id["cand-a"]
+    for qualification, pass_count in ((extending, 8), (direct, 9)):
+        holdout_trials = [
+            trial
+            for trial in qualification.trials
+            if trial.evaluation_phase == "qualification"
+        ]
+        for index, trial in enumerate(holdout_trials, start=1):
+            trial.status = "COMPLETED"
+            trial.finished_at = datetime(2026, 8, 4, 1, 3, 3, tzinfo=timezone.utc)
+            _receipt(qualification, trial, passed=index <= pass_count)
+
+    result = advance_sealed_qualifications(db, job=job)  # type: ignore[arg-type]
+
+    assert result.dispatched_trials == 0
+    assert result.qualified_candidates == ("cand-a",)
+    assert direct.state == "qualified"
+    assert direct.candidate.qualification_sequence == 2
+    assert direct.candidate.qualified_at == direct.decided_at
+    assert extending.state == "cancelled"
+    assert len(extending.trials) == 14
+    projection = qualified_candidate_evidence_projection(direct.candidate)
+    assert projection is not None
+    assert projection["qualification_target"] == 10
+    assert projection["qualification_passed"] == 9
+    configured = aggregation._configured_scenario_contract(direct.candidate)
+    assert configured is not None
+    expected_cases, expects_holdout = configured
+    assert expected_cases[("screen", False)] == 4
+    assert expected_cases[("holdout", True)] == 10
+    assert sum(expected_cases.values()) == 14
+    assert expects_holdout is True
+
+    aware_evidence_id = projection["evidence_id"]
+    assert direct.decided_at is not None
+    direct.decided_at = direct.decided_at.replace(tzinfo=None)
+    assert direct.candidate.qualified_at is not None
+    direct.candidate.qualified_at = direct.candidate.qualified_at.replace(tzinfo=None)
+    roundtrip_projection = qualified_candidate_evidence_projection(direct.candidate)
+    assert roundtrip_projection is not None
+    assert roundtrip_projection["evidence_id"] == aware_evidence_id
+    assert roundtrip_projection["decided_at"].endswith("Z")
+
+    original_rule_sha256 = direct.rule_sha256
+    direct.rule_sha256 = "f" * 64
+    with pytest.raises(QualificationCoordinatorError, match="frozen rule"):
+        qualified_candidate_evidence_projection(direct.candidate)
+    direct.rule_sha256 = original_rule_sha256
+
+
+def test_eight_of_ten_extends_only_when_no_candidate_qualified() -> None:
+    job = _job_with_screened_candidates()
+    db = _RecordingSession()
+    advance_sealed_qualifications(db, job=job)  # type: ignore[arg-type]
+    by_id = {item.candidate_id: item for item in job.candidate_qualifications}
+    extending = by_id["cand-m"]
+    failing = by_id["cand-a"]
+    for qualification, pass_count in ((extending, 8), (failing, 7)):
+        holdout_trials = [
+            trial
+            for trial in qualification.trials
+            if trial.evaluation_phase == "qualification"
+        ]
+        for index, trial in enumerate(holdout_trials, start=1):
+            trial.status = "COMPLETED"
+            trial.finished_at = datetime(2026, 8, 4, 1, 3, 3, tzinfo=timezone.utc)
+            _receipt(qualification, trial, passed=index <= pass_count)
+
+    result = advance_sealed_qualifications(db, job=job)  # type: ignore[arg-type]
+
+    assert result.dispatched_trials == 10
+    assert result.qualified_candidates == ()
+    assert extending.state == "qualification_extended_20"
+    assert extending.candidate.trial_count == 24
+    assert len(extending.trials) == 24
+    assert [
+        trial.qualification_ordinal
+        for trial in extending.trials
+        if trial.evaluation_phase == "qualification"
+    ] == list(range(1, 21))
+    assert failing.state == "qualification_failed"
+
+
+def test_first_qualified_freeze_reuses_server_verdict_order_and_time() -> None:
+    job = _job_with_screened_candidates()
+    job.created_at = datetime(2026, 8, 4, 1, 0, 0, tzinfo=timezone.utc)
+    job.completion_policy = "first_qualified_stop"
+    job.current_generation = 0
+    job.provider_turns_attempted = 0
+    job.provider_turns_succeeded = 0
+    db = _RecordingSession()
+    advance_sealed_qualifications(db, job=job)  # type: ignore[arg-type]
+    by_id = {item.candidate_id: item for item in job.candidate_qualifications}
+    direct = by_id["cand-a"]
+    other = by_id["cand-m"]
+    for qualification, pass_count in ((other, 7), (direct, 9)):
+        for index, trial in enumerate(
+            (
+                item
+                for item in qualification.trials
+                if item.evaluation_phase == "qualification"
+            ),
+            start=1,
+        ):
+            trial.status = "COMPLETED"
+            trial.finished_at = datetime(2026, 8, 4, 1, 3, 3, tzinfo=timezone.utc)
+            _receipt(qualification, trial, passed=index <= pass_count)
+    advance_sealed_qualifications(db, job=job)  # type: ignore[arg-type]
+    assert direct.decided_at is not None
+    frozen_decision_time = direct.decided_at
+    next_sequence_before_freeze = job.next_qualification_sequence
+
+    receipt = freeze_first_qualified_candidate(  # type: ignore[arg-type]
+        db,
+        job=job,
+        qualified=[
+            (
+                direct.candidate,
+                AcceptanceResult(
+                    passed=True,
+                    reason="sealed qualification passed",
+                    pass_rate=0.9,
+                    completion_rate=1.0,
+                    rmse=0.25,
+                    max_error=0.5,
+                ),
+            )
+        ],
+        frozen_at=frozen_decision_time,
+    )
+
+    assert receipt is not None
+    assert receipt.candidate_id == "cand-a"
+    assert receipt.qualification_sequence == 2
+    assert receipt.frozen_at == frozen_decision_time
+    assert job.first_qualified_at == frozen_decision_time
+    assert job.next_qualification_sequence == next_sequence_before_freeze

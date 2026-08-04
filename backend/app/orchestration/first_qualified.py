@@ -16,6 +16,11 @@ from app import models
 from app.optimization.outcome_contract import selection_order_key
 from app.orchestration.acceptance import AcceptanceResult
 from app.orchestration.events import record_event
+from app.orchestration.qualification import SEALED_QUALIFICATION_POLICY_VERSION
+from app.orchestration.qualification_coordinator import (
+    QualificationCoordinatorError,
+    qualified_candidate_evidence_projection,
+)
 from app.simulator.base import (
     FAILURE_CANCELLED,
     FAILURE_EXECUTION_TIMEOUT,
@@ -82,6 +87,27 @@ def _candidate_order_key(candidate: models.CandidateParameterSet) -> tuple[float
     and the server dispatch ordinal define "first" before the preregistered
     objective order.  Candidate UUIDs are deliberately absent.
     """
+
+    job = candidate.job
+    if job.holdout_policy_version == SEALED_QUALIFICATION_POLICY_VERSION:
+        try:
+            projection = qualified_candidate_evidence_projection(candidate)
+        except QualificationCoordinatorError as exc:
+            raise FirstQualifiedFreezeError(
+                "sealed first-qualified evidence failed revalidation"
+            ) from exc
+        if (
+            projection is None
+            or candidate.qualification_sequence is None
+            or candidate.qualified_at is None
+        ):
+            raise FirstQualifiedFreezeError(
+                "sealed first-qualified candidate lacks a frozen verdict"
+            )
+        return (
+            _utc(candidate.qualified_at).timestamp(),
+            float(candidate.qualification_sequence),
+        )
 
     ordinal = candidate.dispatch_ordinal
     if ordinal is None or ordinal < 1:
@@ -326,23 +352,48 @@ def freeze_first_qualified_candidate(
 
     ordered = sorted(qualified, key=lambda item: _candidate_order_key(item[0]))
     now = _utc(frozen_at or datetime.now(timezone.utc))
-    next_sequence = job.next_qualification_sequence
-    if next_sequence < 1:
-        raise FirstQualifiedFreezeError("invalid next qualification sequence")
-    for offset, (candidate, _) in enumerate(ordered):
-        if candidate.job_id != job.id:
-            raise FirstQualifiedFreezeError(
-                "qualified candidate belongs to a different Job"
-            )
-        if candidate.qualification_sequence is not None or candidate.qualified_at is not None:
-            raise FirstQualifiedFreezeError(
-                "qualified candidate already carries partial ordering state"
-            )
-        candidate.qualification_sequence = next_sequence + offset
-        candidate.qualified_at = now
-    job.next_qualification_sequence = next_sequence + len(ordered)
+    sealed_job = job.holdout_policy_version == SEALED_QUALIFICATION_POLICY_VERSION
+    if sealed_job:
+        for candidate, _ in ordered:
+            if (
+                candidate.job_id != job.id
+                or candidate.qualification_sequence is None
+                or candidate.qualified_at is None
+            ):
+                raise FirstQualifiedFreezeError(
+                    "sealed qualified candidate lacks server ordering state"
+                )
+        first_sequence = int(ordered[0][0].qualification_sequence or 0)
+    else:
+        next_sequence = job.next_qualification_sequence
+        if next_sequence < 1:
+            raise FirstQualifiedFreezeError("invalid next qualification sequence")
+        for offset, (candidate, _) in enumerate(ordered):
+            if candidate.job_id != job.id:
+                raise FirstQualifiedFreezeError(
+                    "qualified candidate belongs to a different Job"
+                )
+            if candidate.qualification_sequence is not None or candidate.qualified_at is not None:
+                raise FirstQualifiedFreezeError(
+                    "qualified candidate already carries partial ordering state"
+                )
+            candidate.qualification_sequence = next_sequence + offset
+            candidate.qualified_at = now
+        job.next_qualification_sequence = next_sequence + len(ordered)
+        first_sequence = next_sequence
 
     first, acceptance = ordered[0]
+    if sealed_job:
+        qualified_at = first.qualified_at
+        if qualified_at is None:  # pragma: no cover - guarded above
+            raise FirstQualifiedFreezeError(
+                "sealed first-qualified candidate has no decision time"
+            )
+        now = _utc(qualified_at)
+        if frozen_at is not None and _utc(frozen_at) != now:
+            raise FirstQualifiedFreezeError(
+                "sealed first-qualified freeze cannot rewrite its decision time"
+            )
     job.first_qualified_candidate_id = first.id
     job.first_qualified_at = now
     holdout_contract_sha256 = _sha256(_holdout_contract_binding(job))
@@ -351,7 +402,7 @@ def freeze_first_qualified_candidate(
         job=job,
         candidate=first,
         acceptance=acceptance,
-        qualification_sequence=next_sequence,
+        qualification_sequence=first_sequence,
         accounting=accounting,
         frozen_at=now,
         holdout_contract_sha256=holdout_contract_sha256,
@@ -370,7 +421,7 @@ def freeze_first_qualified_candidate(
         definition_version=FIRST_QUALIFIED_DEFINITION_VERSION,
         evidence_id=evidence_id,
         holdout_contract_sha256=holdout_contract_sha256,
-        qualification_sequence=next_sequence,
+        qualification_sequence=first_sequence,
         generation_index=first.generation_index,
         dispatch_ordinal=int(first.dispatch_ordinal or 0),
         time_to_first_qualified_ms=elapsed_ms,
@@ -400,7 +451,7 @@ def freeze_first_qualified_candidate(
         "first_qualified_candidate_frozen",
         {
             "candidate_id": first.id,
-            "qualification_sequence": next_sequence,
+            "qualification_sequence": first_sequence,
             "generation_index": first.generation_index,
             "dispatch_ordinal": first.dispatch_ordinal,
             "definition_version": FIRST_QUALIFIED_DEFINITION_VERSION,

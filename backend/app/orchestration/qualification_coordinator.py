@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -12,9 +14,14 @@ from app import models
 from app.optimization.scenarios import ScenarioRun, scenario_execution_payload
 from app.orchestration.events import record_event
 from app.orchestration.qualification import (
+    QUALIFICATION_CONTRACT_SCHEMA,
+    QUALIFICATION_RULE_SHA256,
+    QUALIFICATION_RULE_VERSION,
+    SEALED_QUALIFICATION_POLICY_VERSION,
     QualificationProgress,
     QualificationTrialObservation,
     evaluate_qualification_progress,
+    sealed_qualification_contract_sha256,
 )
 from app.orchestration.qualification_dispatch import (
     QualificationDispatchError,
@@ -51,6 +58,26 @@ class QualificationAdvanceResult:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _iso_utc(value: datetime) -> str:
+    return _utc(value).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def _canonical_json(value: object) -> str:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
 
 
 def _candidate_order_key(
@@ -222,6 +249,123 @@ def _apply_terminal_progress(
     return changed
 
 
+def _bind_qualified_candidate(
+    qualification: models.CandidateQualification,
+) -> None:
+    sequence = qualification.qualification_sequence
+    decided_at = qualification.decided_at
+    candidate = qualification.candidate
+    if sequence is None or sequence < 1 or decided_at is None:
+        raise QualificationCoordinatorError(
+            "qualified candidate is missing its server sequence or decision time"
+        )
+    if candidate.qualification_sequence not in {None, sequence}:
+        raise QualificationCoordinatorError(
+            "candidate qualification sequence diverges from sealed state"
+        )
+    if (
+        candidate.qualified_at is not None
+        and _utc(candidate.qualified_at) != _utc(decided_at)
+    ):
+        raise QualificationCoordinatorError(
+            "candidate qualification time diverges from sealed state"
+        )
+    candidate.qualification_sequence = sequence
+    candidate.qualified_at = decided_at
+
+
+def qualified_candidate_evidence_projection(
+    candidate: models.CandidateParameterSet,
+) -> dict[str, Any] | None:
+    """Return a revalidated, content-addressed sealed qualification verdict."""
+
+    try:
+        job = getattr(candidate, "job", None)
+    except Exception as exc:  # pragma: no cover - detached sealed rows fail closed
+        raise QualificationCoordinatorError(
+            "candidate Job binding is unavailable for qualification revalidation"
+        ) from exc
+    try:
+        qualification = getattr(candidate, "qualification", None)
+    except Exception as exc:  # pragma: no cover - detached sealed rows fail closed
+        raise QualificationCoordinatorError(
+            "candidate qualification binding is unavailable for revalidation"
+        ) from exc
+    if job is None:
+        if qualification is not None:
+            raise QualificationCoordinatorError(
+                "qualification row is orphaned from its Job binding"
+            )
+        return None
+    if (
+        getattr(job, "holdout_policy_version", None)
+        != SEALED_QUALIFICATION_POLICY_VERSION
+    ):
+        if qualification is not None:
+            raise QualificationCoordinatorError(
+                "qualification row is bound to an incompatible Job policy"
+            )
+        return None
+    if qualification is None or qualification.state != "qualified":
+        return None
+    contract = sealed_contract_for_job(job)
+    if contract is None:
+        raise QualificationCoordinatorError(
+            "sealed qualification Job has no revalidatable holdout contract"
+        )
+    expected_contract_sha256 = sealed_qualification_contract_sha256(contract)
+    if (
+        qualification.job_id != job.id
+        or qualification.candidate_id != candidate.id
+        or qualification.contract_schema != QUALIFICATION_CONTRACT_SCHEMA
+        or qualification.rule_version != QUALIFICATION_RULE_VERSION
+        or qualification.rule_sha256 != QUALIFICATION_RULE_SHA256
+        or qualification.holdout_contract_sha256 != expected_contract_sha256
+    ):
+        raise QualificationCoordinatorError(
+            "qualified state diverges from the frozen rule or holdout contract"
+        )
+    progress = evaluate_qualification_progress(_observations(qualification))
+    if not progress.qualified or not progress.terminal or not progress.sealed:
+        raise QualificationCoordinatorError(
+            "persisted qualified state diverges from immutable Trial receipts"
+        )
+    if (
+        qualification.qualification_sequence is None
+        or qualification.qualification_sequence < 1
+        or qualification.decided_at is None
+    ):
+        raise QualificationCoordinatorError(
+            "qualified state is missing its deterministic sequence or timestamp"
+        )
+    payload: dict[str, Any] = {
+        "schema_id": "dronedream.sealed-candidate-qualification/v1",
+        "job_id": job.id,
+        "candidate_id": candidate.id,
+        "qualification_id": qualification.id,
+        "qualification_sequence": qualification.qualification_sequence,
+        "rule_version": qualification.rule_version,
+        "rule_sha256": qualification.rule_sha256,
+        "holdout_contract_sha256": qualification.holdout_contract_sha256,
+        "state_revision": qualification.state_revision,
+        "screening_attempted": progress.screening_attempted,
+        "screening_passed": progress.screening_passed,
+        "qualification_attempted": progress.qualification_attempted,
+        "qualification_passed": progress.qualification_passed,
+        "qualification_target": progress.qualification_target,
+        "decision_reason": progress.reason,
+        "decided_at": _iso_utc(qualification.decided_at),
+        "receipt_evidence_ids": sorted(
+            receipt.evidence_id for receipt in qualification.trial_receipts
+        ),
+    }
+    return {
+        "evidence_id": "sha256:"
+        + hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest(),
+        **payload,
+    }
+
+
 def advance_sealed_qualifications(
     db: Session,
     *,
@@ -245,16 +389,56 @@ def advance_sealed_qualifications(
     if len(selected) > 2:
         raise QualificationCoordinatorError("sealed Job exceeds its qualification candidate cap")
 
-    dispatched = 0
-    state_changes = 0
-    eligible: list[models.CandidateQualification] = []
-    qualified_ids: list[str] = []
+    progress_by_id: dict[str, QualificationProgress] = {}
+    qualified_ids = [
+        item.candidate_id for item in qualifications if item.state == "qualified"
+    ]
     for qualification in qualifications:
         if qualification.state in _TERMINAL_STATES:
-            if qualification.state == "qualified":
-                qualified_ids.append(qualification.candidate_id)
             continue
-        progress = evaluate_qualification_progress(_observations(qualification))
+        progress_by_id[qualification.id] = evaluate_qualification_progress(
+            _observations(qualification)
+        )
+        if progress_by_id[qualification.id].qualified:
+            qualified_ids.append(qualification.candidate_id)
+
+    dispatched = 0
+    state_changes = 0
+    if qualified_ids:
+        for qualification in qualifications:
+            progress = progress_by_id.get(qualification.id)
+            if qualification.state == "qualified":
+                if qualified_candidate_evidence_projection(qualification.candidate) is None:
+                    raise QualificationCoordinatorError(
+                        "persisted qualified state has no sealed evidence projection"
+                    )
+                _bind_qualified_candidate(qualification)
+                continue
+            if progress is not None and progress.qualified:
+                if _apply_terminal_progress(qualification, progress, now=now):
+                    state_changes += 1
+                _bind_qualified_candidate(qualification)
+                continue
+            if progress is not None and progress.terminal:
+                if _apply_terminal_progress(qualification, progress, now=now):
+                    state_changes += 1
+                continue
+            if qualification.state not in _TERMINAL_STATES:
+                qualification.state = "cancelled"
+                qualification.decided_at = now
+                qualification.state_revision += 1
+                state_changes += 1
+        return QualificationAdvanceResult(
+            dispatched_trials=0,
+            state_changes=state_changes,
+            qualified_candidates=tuple(qualified_ids),
+        )
+
+    eligible: list[models.CandidateQualification] = []
+    for qualification in qualifications:
+        if qualification.state in _TERMINAL_STATES:
+            continue
+        progress = progress_by_id[qualification.id]
         if progress.action == "seal_and_dispatch_qualification":
             if qualification.qualification_sequence is None:
                 eligible.append(qualification)
@@ -286,6 +470,7 @@ def advance_sealed_qualifications(
         if _apply_terminal_progress(qualification, progress, now=now):
             state_changes += 1
         if progress.qualified:
+            _bind_qualified_candidate(qualification)
             qualified_ids.append(qualification.candidate_id)
 
     available = 2 - len(selected)
@@ -348,4 +533,5 @@ __all__ = [
     "QualificationAdvanceResult",
     "QualificationCoordinatorError",
     "advance_sealed_qualifications",
+    "qualified_candidate_evidence_projection",
 ]
