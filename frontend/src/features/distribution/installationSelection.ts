@@ -18,6 +18,55 @@ export interface DistributionSelectionDraft {
   optionalModules: string[];
 }
 
+export const DISTRIBUTION_SELECTION_STORAGE_KEY =
+  "dronedream:distribution-selection:v1";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function parseDistributionSelectionDraft(
+  value: unknown,
+  catalog: DistributionCatalog = DISTRIBUTION_CATALOG,
+): DistributionSelectionDraft {
+  if (!isRecord(value)) throw new Error("distribution selection must be an object");
+  const expectedKeys = [
+    "schemaVersion",
+    "editionId",
+    "region",
+    "vehiclePackId",
+    "controllerKey",
+    "optionalModules",
+  ].sort();
+  const actualKeys = Object.keys(value).sort();
+  if (
+    actualKeys.length !== expectedKeys.length
+    || actualKeys.some((key, index) => key !== expectedKeys[index])
+  ) {
+    throw new Error("distribution selection has unsupported or missing fields");
+  }
+  if (
+    value.schemaVersion !== 1
+    || typeof value.editionId !== "string"
+    || !catalog.editions.some((edition) => edition.editionId === value.editionId)
+    || (value.region !== "cn" && value.region !== "global")
+    || typeof value.vehiclePackId !== "string"
+    || (value.controllerKey !== null && typeof value.controllerKey !== "string")
+    || !Array.isArray(value.optionalModules)
+    || value.optionalModules.some((moduleId) => typeof moduleId !== "string" || !moduleId)
+  ) {
+    throw new Error("distribution selection is malformed or unsupported");
+  }
+  return normalizeDistributionSelection({
+    schemaVersion: 1,
+    editionId: value.editionId as EditionId,
+    region: value.region,
+    vehiclePackId: value.vehiclePackId,
+    controllerKey: value.controllerKey,
+    optionalModules: value.optionalModules as string[],
+  }, catalog);
+}
+
 export type DistributionSelectionIssueCode =
   | "vehicle-pack-required"
   | "vehicle-pack-incompatible"

@@ -39,6 +39,7 @@ import {
   type AvatarCropCopy,
 } from "./components/AvatarCropDialog";
 import { BrandLockup } from "./components/BrandLockup";
+import { DistributionSetupPanel } from "./components/DistributionSetupPanel";
 import {
   getDesktopWindowHandle,
   isDesktopRuntime,
@@ -705,6 +706,7 @@ function SettingsDialog({
           <i aria-hidden="true">✓</i>
         </button>
       </fieldset>
+      <DistributionSetupPanel variant="settings" />
       <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
         <div className="settings-memory-heading">
           <div>

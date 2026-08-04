@@ -13,6 +13,7 @@ import { apiClient } from "../api/client";
 import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
+import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
 import {
   autoStartInstallerRuntime,
   beginBrowserAuth,
@@ -1659,6 +1660,8 @@ export function DesktopSetup() {
           </button>
         ) : null}
       </header>
+
+      {!desktopAvailable ? <DistributionSetupPanel variant="setup" /> : null}
 
       {requestedFeatureLabel && !localRuntimeReady ? (
         <Alert tone="warning" title={t("runtimeGate.redirectTitle")}>

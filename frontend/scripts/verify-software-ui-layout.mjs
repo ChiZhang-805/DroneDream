@@ -245,12 +245,110 @@ async function verifySettings(page, testCase) {
   await page.keyboard.press("Tab");
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
+  const distribution = dialog.locator(".distribution-setup-panel-settings");
+  await distribution.scrollIntoViewIfNeeded();
+  const distributionMetrics = await distribution.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const editionCards = Array.from(
+      element.querySelectorAll(".distribution-edition-options label > span"),
+    );
+    const selects = Array.from(element.querySelectorAll("select"));
+    return {
+      left: bounds.left,
+      right: bounds.right,
+      width: bounds.width,
+      documentWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      canApply: element.getAttribute("data-can-apply"),
+      buttonCount: element.querySelectorAll("button").length,
+      editionCardCount: editionCards.length,
+      editionCardsFit: editionCards.every(
+        (card) => card.scrollWidth <= card.clientWidth + 1,
+      ),
+      selectsFit: selects.every(
+        (select) => select.scrollWidth <= select.clientWidth + 1,
+      ),
+      textColor: getComputedStyle(element).color,
+      mutedColor: getComputedStyle(
+        element.querySelector(".distribution-edition-options legend"),
+      ).color,
+      columnCount: getComputedStyle(
+        element.querySelector(".distribution-edition-options"),
+      ).gridTemplateColumns.split(" ").filter(Boolean).length,
+    };
+  });
+  assert.equal(distributionMetrics.canApply, "false");
+  assert.equal(distributionMetrics.buttonCount, 0);
+  assert.equal(distributionMetrics.editionCardCount, 3);
+  assert.equal(distributionMetrics.textColor, "rgb(30, 23, 33)");
+  assert.equal(distributionMetrics.mutedColor, "rgb(116, 94, 123)");
+  assert(distributionMetrics.editionCardsFit, `${testCase.id}: edition copy overflowed its cards`);
+  assert(distributionMetrics.selectsFit, `${testCase.id}: distribution selects overflowed`);
+  assert.equal(
+    distributionMetrics.documentScrollWidth,
+    distributionMetrics.documentWidth,
+    `${testCase.id}: Distribution settings caused horizontal document overflow`,
+  );
+  assert(distributionMetrics.left >= 0 && distributionMetrics.right <= testCase.viewport.width + 1);
+  assert.equal(
+    distributionMetrics.columnCount,
+    testCase.viewport.width <= 760 ? 1 : 3,
+    `${testCase.id}: Distribution edition grid did not match its responsive contract`,
+  );
+  const distributionImage = await screenshot(page, testCase.id, "distribution-settings");
   await dialog.locator(".launcher-settings-close").click();
   return {
     ...metrics,
     keyboardFocusOrder: "manage-subscription -> refresh-usage",
     assistantModelImage,
     image,
+    distribution: {
+      ...distributionMetrics,
+      image: distributionImage,
+    },
+  };
+}
+
+async function verifyDistributionSetup(page, testCase) {
+  await page.goto(`${origin}/desktop/setup?docsPreview=1`, { waitUntil: "networkidle" });
+  const panel = page.locator(".distribution-setup-panel-setup");
+  await panel.waitFor();
+  await panel.scrollIntoViewIfNeeded();
+  const metrics = await panel.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const stored = window.localStorage.getItem("dronedream:distribution-selection:v1");
+    return {
+      left: bounds.left,
+      right: bounds.right,
+      width: bounds.width,
+      documentWidth: document.documentElement.clientWidth,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      canApply: element.getAttribute("data-can-apply"),
+      buttonCount: element.querySelectorAll("button").length,
+      stored,
+      storedHasSensitiveField: /password|api.?key|secret|token|hardwareAuthorized/i.test(
+        stored ?? "",
+      ),
+      visibleSelects: Array.from(element.querySelectorAll("select")).every((select) => {
+        const selectBounds = select.getBoundingClientRect();
+        return selectBounds.width > 0 && select.scrollWidth <= select.clientWidth + 1;
+      }),
+    };
+  });
+  assert.equal(metrics.canApply, "false");
+  assert.equal(metrics.buttonCount, 0);
+  assert(metrics.stored, `${testCase.id}: Distribution draft was not persisted`);
+  assert.equal(metrics.storedHasSensitiveField, false);
+  assert(metrics.visibleSelects, `${testCase.id}: Setup selection overflowed a select`);
+  assert.equal(
+    metrics.documentScrollWidth,
+    metrics.documentWidth,
+    `${testCase.id}: Distribution setup caused horizontal document overflow`,
+  );
+  assert(metrics.left >= 0 && metrics.right <= testCase.viewport.width + 1);
+  return {
+    ...metrics,
+    image: await screenshot(page, testCase.id, "distribution-setup"),
   };
 }
 
@@ -1005,6 +1103,7 @@ try {
     const entry = { case: testCase };
     try {
       entry.settings = await verifySettings(page, testCase);
+      entry.distributionSetup = await verifyDistributionSetup(page, testCase);
       entry.avatar = await verifyAvatar(page, testCase, avatarBytes);
       entry.fixedScenarios = await verifyFixedScenarios(page, testCase);
       if (mobileMenuOnly || fixedScenariosOnly) {

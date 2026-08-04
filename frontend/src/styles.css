@@ -5909,6 +5909,380 @@ a {
   color: #73edff;
 }
 
+.distribution-setup-panel {
+  --distribution-border: rgba(58, 31, 70, 0.14);
+  --distribution-surface: rgba(255, 255, 255, 0.82);
+  --distribution-surface-strong: #ffffff;
+  --distribution-text: var(--text);
+  --distribution-muted: var(--text-muted);
+  display: grid;
+  min-width: 0;
+  gap: 0.85rem;
+  padding: 1rem;
+  color: var(--distribution-text);
+  border: 1px solid var(--distribution-border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 92% 4%, rgba(83, 216, 242, 0.1), transparent 30%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(249, 245, 253, 0.88));
+  box-shadow: 0 14px 38px rgba(48, 21, 63, 0.07);
+}
+
+.distribution-setup-panel-settings {
+  --distribution-border: rgba(58, 31, 70, 0.14);
+  --distribution-surface: rgba(250, 247, 252, 0.82);
+  --distribution-surface-strong: #ffffff;
+  --distribution-text: #1e1721;
+  --distribution-muted: #745e7b;
+  margin-top: 1rem;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--distribution-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.distribution-setup-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.distribution-setup-heading h3,
+.distribution-setup-heading p,
+.distribution-no-action,
+.distribution-boundary-note p {
+  margin: 0;
+}
+
+.distribution-setup-heading h3 {
+  margin-top: 0.2rem;
+  font-size: 1.04rem;
+}
+
+.distribution-setup-heading p {
+  max-width: 680px;
+  margin-top: 0.18rem;
+  color: var(--distribution-muted);
+  font-size: 0.76rem;
+  line-height: 1.48;
+}
+
+.distribution-setup-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--active);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.distribution-setup-eyebrow svg,
+.distribution-selection-grid label > span svg,
+.distribution-boundary-note svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.distribution-version-badge {
+  flex: 0 0 auto;
+  padding: 0.28rem 0.52rem;
+  color: #8443ab;
+  border: 1px solid rgba(168, 85, 247, 0.24);
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.07);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.distribution-setup-panel-settings .distribution-version-badge {
+  color: #8443ab;
+  border-color: rgba(168, 85, 247, 0.24);
+  background: rgba(168, 85, 247, 0.07);
+}
+
+.distribution-edition-options,
+.distribution-optional-modules {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.distribution-edition-options legend,
+.distribution-optional-modules legend {
+  grid-column: 1 / -1;
+  margin-bottom: 0.08rem;
+  color: var(--distribution-muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.distribution-edition-options label {
+  position: relative;
+  display: block;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.distribution-edition-options input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.distribution-edition-options label > span {
+  display: grid;
+  align-content: start;
+  gap: 0.22rem;
+  min-height: 92px;
+  padding: 0.7rem;
+  border: 1px solid var(--distribution-border);
+  border-radius: 12px;
+  background: var(--distribution-surface);
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.distribution-edition-options label:hover > span,
+.distribution-edition-options input:focus-visible + span {
+  border-color: rgba(168, 85, 247, 0.48);
+  transform: translateY(-1px);
+}
+
+.distribution-edition-options input:focus-visible + span {
+  outline: 2px solid rgba(79, 197, 232, 0.62);
+  outline-offset: 2px;
+}
+
+.distribution-edition-options input:checked + span {
+  border-color: rgba(168, 85, 247, 0.62);
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(73, 208, 236, 0.08));
+  box-shadow: inset 3px 0 #b14fd2;
+}
+
+.distribution-edition-options strong {
+  min-width: 0;
+  font-size: 0.8rem;
+  line-height: 1.25;
+}
+
+.distribution-edition-options small {
+  color: var(--distribution-muted);
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
+.distribution-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.distribution-selection-grid label {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+}
+
+.distribution-selection-grid label > span {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  color: var(--distribution-muted);
+  font-size: 0.69rem;
+  font-weight: 720;
+}
+
+.distribution-selection-grid select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0.42rem 2rem 0.42rem 0.58rem;
+  color: var(--distribution-text);
+  border: 1px solid var(--distribution-border);
+  border-radius: 10px;
+  background-color: var(--distribution-surface-strong);
+  font-size: 0.72rem;
+}
+
+.distribution-setup-panel-settings .distribution-selection-grid select option {
+  color: #24162a;
+  background: #ffffff;
+}
+
+.distribution-optional-modules {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.distribution-optional-modules label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--distribution-border);
+  border-radius: 10px;
+  background: var(--distribution-surface);
+  font-size: 0.72rem;
+}
+
+.distribution-optional-modules input {
+  accent-color: #a855f7;
+}
+
+.distribution-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.distribution-preview-grid > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+  padding: 0.55rem 0.62rem;
+  border: 1px solid var(--distribution-border);
+  border-radius: 10px;
+  background: var(--distribution-surface);
+}
+
+.distribution-preview-grid span {
+  color: var(--distribution-muted);
+  font-size: 0.62rem;
+}
+
+.distribution-preview-grid strong {
+  overflow-wrap: anywhere;
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.distribution-required-modules,
+.distribution-issues {
+  min-width: 0;
+  border-top: 1px solid var(--distribution-border);
+}
+
+.distribution-required-modules summary,
+.distribution-issues summary {
+  padding-top: 0.62rem;
+  color: var(--distribution-muted);
+  font-size: 0.7rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.distribution-required-modules > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+.distribution-required-modules span {
+  padding: 0.26rem 0.48rem;
+  color: var(--distribution-muted);
+  border: 1px solid var(--distribution-border);
+  border-radius: 999px;
+  background: var(--distribution-surface);
+  font-size: 0.62rem;
+}
+
+.distribution-boundary-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.62rem 0.68rem;
+  color: #0d795c;
+  border: 1px solid rgba(18, 154, 113, 0.2);
+  border-radius: 11px;
+  background: rgba(27, 190, 138, 0.07);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.distribution-setup-panel-settings .distribution-boundary-note {
+  color: #0d795c;
+}
+
+.distribution-issues ul {
+  display: grid;
+  gap: 0.32rem;
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--distribution-muted);
+  font-size: 0.68rem;
+  line-height: 1.42;
+}
+
+.distribution-issues li[data-severity="blocking"]::marker {
+  color: #d8557e;
+}
+
+.distribution-issues li[data-severity="notice"]::marker {
+  color: #d29c38;
+}
+
+.distribution-no-action {
+  color: var(--distribution-muted);
+  font-size: 0.66rem;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .distribution-edition-options,
+  .distribution-selection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .distribution-edition-options label > span {
+    min-height: 0;
+  }
+
+  .distribution-preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .distribution-setup-panel {
+    gap: 0.72rem;
+    padding: 0.8rem;
+    border-radius: 13px;
+  }
+
+  .distribution-setup-panel-settings {
+    padding: 0.9rem 0 0;
+    border-radius: 0;
+  }
+
+  .distribution-setup-heading {
+    gap: 0.6rem;
+  }
+
+  .distribution-setup-heading h3 {
+    font-size: 0.98rem;
+  }
+
+  .distribution-version-badge {
+    padding-inline: 0.42rem;
+  }
+
+  .distribution-preview-grid,
+  .distribution-optional-modules {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settings-model-panel {
   display: grid;
   gap: 0.75rem;
