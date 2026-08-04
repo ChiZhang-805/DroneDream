@@ -1,0 +1,483 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-unified-edition-build-plan",
+  "planVersion": "1.0.0",
+  "planId": "software-1.0.0-065382b68bfa",
+  "state": "plan-only",
+  "blockers": [
+    "No edition installer or precombined bundle has been built by this plan.",
+    "All eight Vehicle Packs remain contract-only or planned; zero are validated.",
+    "Release branches remain absent and cannot be created by this plan.",
+    "Artifact-specific license, NOTICE, signature, and rollback evidence is pending."
+  ],
+  "productDisplayVersion": "1.0.0",
+  "internalBuildId": "software-1.0.0-065382b68bfa-plan1",
+  "targetArchitecture": "windows-x86_64",
+  "source": {
+    "commit": "065382b68bfa04052d910cd4ed3b782617245049",
+    "treeState": "clean",
+    "commonCorePaths": [
+      "backend",
+      "desktop",
+      "engine-pack",
+      "frontend",
+      "runtime",
+      "worker"
+    ],
+    "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9"
+  },
+  "execution": {
+    "canBuildInstaller": false,
+    "canBundleModules": false,
+    "canCreateReleaseBranch": false,
+    "canPromote": false,
+    "canInstall": false,
+    "canMigrateRuntime": false
+  },
+  "policyBindings": {
+    "capabilityPolicy": {
+      "path": "distribution/capabilities/core-capabilities.v1.json",
+      "sha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903"
+    },
+    "upstreamInventory": {
+      "path": "distribution/upstream-sources.v1.json",
+      "sha256": "a8852b550debb736146465c5ee3ed9882cb69f9d58559ac5216c2d4f94d6e270"
+    },
+    "vehiclePackRegistry": {
+      "path": "distribution/vehicle-packs/registry.v1.json",
+      "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"
+    }
+  },
+  "components": [
+    {
+      "componentId": "desktop-core",
+      "version": "1.0.0",
+      "buildId": "desktop-core-1.0.0-065382b68bfa-plan1",
+      "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+      "contract": {
+        "path": "desktop/src-tauri/tauri.conf.json",
+        "sha256": "cbcd45f68670e61c9e221ee292baeb4cefd26c492fb8511a20e9d41c34145cd5"
+      },
+      "artifactState": "planned-not-built",
+      "artifactManifestSha256": null,
+      "artifactSha256": null,
+      "artifactBytes": null,
+      "signatureState": "not-issued",
+      "planningDownloadBytes": 16777216,
+      "planningInstalledBytes": 67108864
+    },
+    {
+      "componentId": "engine-pack",
+      "version": "1.0.0",
+      "buildId": "engine-pack-1.0.0-065382b68bfa-plan1",
+      "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+      "contract": {
+        "path": "engine-pack/manifest.schema.json",
+        "sha256": "f6f3f6a1217928a7c690da21222ea8eabffbd6c50dfc3b40dc187a2ee572cb52"
+      },
+      "artifactState": "planned-not-built",
+      "artifactManifestSha256": null,
+      "artifactSha256": null,
+      "artifactBytes": null,
+      "signatureState": "not-issued",
+      "planningDownloadBytes": 67108864,
+      "planningInstalledBytes": 201326592
+    },
+    {
+      "componentId": "runtime-base-full-simulation",
+      "version": "0.1.0-beta.2",
+      "buildId": "runtime-base-full-simulation-0.1.0-beta.2-755c511539fe-reference",
+      "sourceCommit": "755c511539fe561207ca38ff5079f471a4110896",
+      "contract": {
+        "path": "runtime/release-manifest.schema.json",
+        "sha256": "d87514e72d69d5d1f0ab5c4854eafb047440fddd6430b0f7328aa85a9443cba8"
+      },
+      "artifactState": "verified-existing-reference",
+      "artifactManifestSha256": "e8e2eac23054179d9d40569c115c9e7f6d44325d82e85726acf0196ea2e627c9",
+      "artifactSha256": "936be3c4fed9f5f28e621872d0a2708e3212524323ba08eaf94ee563da3115f9",
+      "artifactBytes": 6141118464,
+      "signatureState": "verified",
+      "planningDownloadBytes": 6141118464,
+      "planningInstalledBytes": 6141118464
+    },
+    {
+      "componentId": "runtime-base-field-lightweight",
+      "version": "0.1.0",
+      "buildId": "runtime-base-field-lightweight-0.1.0-065382b68bfa-plan1",
+      "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+      "contract": {
+        "path": "runtime/manifest.schema.json",
+        "sha256": "96ef81054a1e04a18a7396042120cbe0f548f95111a1cd873efdba09b58fea72"
+      },
+      "artifactState": "planned-not-built",
+      "artifactManifestSha256": null,
+      "artifactSha256": null,
+      "artifactBytes": null,
+      "signatureState": "not-issued",
+      "planningDownloadBytes": 536870912,
+      "planningInstalledBytes": 2147483648
+    }
+  ],
+  "editions": [
+    {
+      "editionId": "field",
+      "editionManifest": {
+        "path": "distribution/editions/field.v1.json",
+        "sha256": "13b585d4cd9adb90b11d6332f4fad796df8fdeeb107581da6903bd134ae2ae27"
+      },
+      "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
+      "componentIds": [
+        "desktop-core",
+        "engine-pack",
+        "runtime-base-field-lightweight"
+      ],
+      "vehiclePack": {
+        "packId": "amovlab-p450-px4",
+        "packVersion": "1.0.0",
+        "manifest": {
+          "path": "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
+          "sha256": "36e8f51915cc1877e38104f2d8ee8725d4a2ea5688a5d71d9b7ab40abbbe7885"
+        },
+        "payloadSha256": "4e853fef37e5d65519e790bb88d34c59629d08316d93d8d81f26222e0d56954c",
+        "validationStatus": "planned",
+        "validationTier": "planned",
+        "controllerModel": "Allspark V6C",
+        "region": "cn"
+      },
+      "selectedModules": [
+        "desktop-core",
+        "engine-pack",
+        "hardware-bridge",
+        "runtime-core",
+        "vehicle-pack-hardware",
+        "vehicle-pack-validation"
+      ],
+      "capabilities": [
+        "external.qgroundcontrol.launch",
+        "hardware.arm",
+        "hardware.discover",
+        "hardware.emergency-stop",
+        "hardware.flight",
+        "hardware.parameter.read",
+        "hardware.parameter.write",
+        "hardware.preflight.execute",
+        "qualification.trusted.consume",
+        "updater.module.apply",
+        "vehicle-pack.install"
+      ],
+      "artifact": {
+        "fileName": "DroneDream-Field-1.0.0.exe",
+        "buildId": "field-1.0.0-065382b68bfa-plan1",
+        "state": "planned-not-built",
+        "sha256": null,
+        "bytes": null,
+        "packaging": "tauri-nsis-planned"
+      },
+      "resourceEstimate": {
+        "basis": "planning-upper-bound-v1",
+        "downloadBytes": 654311424,
+        "installedBytes": 2550136832,
+        "requiresWsl": false,
+        "requiresGazebo": false
+      },
+      "licenseIds": [
+        "px4-bsd-3-clause"
+      ],
+      "promotion": {
+        "targetBranch": "codex/release-field",
+        "creationState": "planned-not-created",
+        "observedBranchHead": null,
+        "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+        "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
+        "promotionManifestState": "planned-not-generated",
+        "prOnly": true,
+        "forcePushAllowed": false,
+        "supersedes": [],
+        "rollback": {
+          "policy": "previous-verified-promotion",
+          "targetPromotionId": null,
+          "targetArtifactSha256": null
+        }
+      },
+      "blockers": [
+        "The edition installer has not been built or validated.",
+        "The selected Vehicle Pack is not validated and signed for this edition.",
+        "The artifact-specific binary license and NOTICE closure has not been generated.",
+        "Physical-flight capability remains contract-only and unauthorized."
+      ]
+    },
+    {
+      "editionId": "lab",
+      "editionManifest": {
+        "path": "distribution/editions/lab.v1.json",
+        "sha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356"
+      },
+      "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
+      "componentIds": [
+        "desktop-core",
+        "engine-pack",
+        "runtime-base-full-simulation"
+      ],
+      "vehiclePack": {
+        "packId": "holybro-s500-v2-pixhawk6c",
+        "packVersion": "1.0.0",
+        "manifest": {
+          "path": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+          "sha256": "02ba34bccd6656e6d20e8022a94db1976b9e4a849757e0f9d78927a72883ba0d"
+        },
+        "payloadSha256": "1d3d26646a7d78aca1c0a4073020210f61d98198e284d7b89f58c2641aa54cbb",
+        "validationStatus": "contract-only",
+        "validationTier": "contract-only",
+        "controllerModel": "Pixhawk 6C",
+        "region": "global"
+      },
+      "selectedModules": [
+        "desktop-core",
+        "engine-pack",
+        "hardware-bridge",
+        "runtime-core",
+        "runtime-simulation",
+        "simulator-gazebo-harmonic",
+        "simulator-px4-sitl",
+        "vehicle-pack-hardware",
+        "vehicle-pack-sim",
+        "vehicle-pack-validation"
+      ],
+      "capabilities": [
+        "external.qgroundcontrol.launch",
+        "hardware.arm",
+        "hardware.discover",
+        "hardware.emergency-stop",
+        "hardware.flight",
+        "hardware.hitl.execute",
+        "hardware.parameter.read",
+        "hardware.parameter.write",
+        "hardware.preflight.execute",
+        "qualification.simulation.issue",
+        "qualification.trusted.consume",
+        "simulation.execute",
+        "simulation.parameter.write",
+        "simulation.vehicle.arm",
+        "updater.module.apply",
+        "vehicle-pack.install"
+      ],
+      "artifact": {
+        "fileName": "DroneDream-Lab-1.0.0.exe",
+        "buildId": "lab-1.0.0-065382b68bfa-plan1",
+        "state": "planned-not-built",
+        "sha256": null,
+        "bytes": null,
+        "packaging": "tauri-nsis-planned"
+      },
+      "resourceEstimate": {
+        "basis": "planning-upper-bound-v1",
+        "downloadBytes": 6359222272,
+        "installedBytes": 6946424832,
+        "requiresWsl": true,
+        "requiresGazebo": true
+      },
+      "licenseIds": [
+        "px4-bsd-3-clause"
+      ],
+      "promotion": {
+        "targetBranch": "codex/release-lab",
+        "creationState": "planned-not-created",
+        "observedBranchHead": null,
+        "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+        "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
+        "promotionManifestState": "planned-not-generated",
+        "prOnly": true,
+        "forcePushAllowed": false,
+        "supersedes": [],
+        "rollback": {
+          "policy": "previous-verified-promotion",
+          "targetPromotionId": null,
+          "targetArtifactSha256": null
+        }
+      },
+      "blockers": [
+        "The edition installer has not been built or validated.",
+        "The selected Vehicle Pack is not validated and signed for this edition.",
+        "The artifact-specific binary license and NOTICE closure has not been generated.",
+        "Physical-flight capability remains contract-only and unauthorized."
+      ]
+    },
+    {
+      "editionId": "sim",
+      "editionManifest": {
+        "path": "distribution/editions/sim.v1.json",
+        "sha256": "e6f71a0c80dfdfd3fbe31879e43de7ff5322f0a826888c161534e41a1bff454f"
+      },
+      "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
+      "componentIds": [
+        "desktop-core",
+        "engine-pack",
+        "runtime-base-full-simulation"
+      ],
+      "vehiclePack": {
+        "packId": "px4-gazebo-x500-reference",
+        "packVersion": "1.0.0",
+        "manifest": {
+          "path": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+          "sha256": "cb5b9bf431571292024dacbbf8fdf03d1e7f19ae0cac0f614b42c1ee3a0b56c4"
+        },
+        "payloadSha256": "58f757ce03b4425219484c20a2f705758f52bd31dfad699d9fc1092d3581a162",
+        "validationStatus": "contract-only",
+        "validationTier": "contract-only",
+        "controllerModel": null,
+        "region": "global"
+      },
+      "selectedModules": [
+        "desktop-core",
+        "engine-pack",
+        "runtime-core",
+        "runtime-simulation",
+        "simulator-gazebo-harmonic",
+        "simulator-px4-sitl",
+        "vehicle-pack-sim",
+        "vehicle-pack-validation"
+      ],
+      "capabilities": [
+        "qualification.simulation.issue",
+        "simulation.execute",
+        "simulation.parameter.write",
+        "simulation.vehicle.arm",
+        "updater.module.apply",
+        "vehicle-pack.install"
+      ],
+      "artifact": {
+        "fileName": "DroneDream-Sim-1.0.0.exe",
+        "buildId": "sim-1.0.0-065382b68bfa-plan1",
+        "state": "planned-not-built",
+        "sha256": null,
+        "bytes": null,
+        "packaging": "tauri-nsis-planned"
+      },
+      "resourceEstimate": {
+        "basis": "planning-upper-bound-v1",
+        "downloadBytes": 6359222272,
+        "installedBytes": 6946424832,
+        "requiresWsl": true,
+        "requiresGazebo": true
+      },
+      "licenseIds": [
+        "px4-bsd-3-clause"
+      ],
+      "promotion": {
+        "targetBranch": "codex/release-sim",
+        "creationState": "planned-not-created",
+        "observedBranchHead": null,
+        "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+        "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
+        "promotionManifestState": "planned-not-generated",
+        "prOnly": true,
+        "forcePushAllowed": false,
+        "supersedes": [],
+        "rollback": {
+          "policy": "previous-verified-promotion",
+          "targetPromotionId": null,
+          "targetArtifactSha256": null
+        }
+      },
+      "blockers": [
+        "The edition installer has not been built or validated.",
+        "The selected Vehicle Pack is not validated and signed for this edition.",
+        "The artifact-specific binary license and NOTICE closure has not been generated."
+      ]
+    }
+  ],
+  "precombinedBundles": [
+    {
+      "bundleId": "sim-x500-reference",
+      "editionId": "sim",
+      "editionBuildId": "sim-1.0.0-065382b68bfa-plan1",
+      "vehiclePackId": "px4-gazebo-x500-reference",
+      "controllerModel": null,
+      "region": "global",
+      "artifact": {
+        "fileName": "DroneDream-Sim-X500-Reference-1.0.0.exe",
+        "buildId": "sim-x500-reference-1.0.0-065382b68bfa-plan1",
+        "state": "planned-not-built",
+        "sha256": null,
+        "bytes": null,
+        "packaging": "tauri-nsis-planned"
+      },
+      "resourceEstimate": {
+        "basis": "planning-upper-bound-v1",
+        "downloadBytes": 6359222272,
+        "installedBytes": 6946424832,
+        "requiresWsl": true,
+        "requiresGazebo": true
+      },
+      "state": "plan-only"
+    },
+    {
+      "bundleId": "lab-s500-pixhawk6c",
+      "editionId": "lab",
+      "editionBuildId": "lab-1.0.0-065382b68bfa-plan1",
+      "vehiclePackId": "holybro-s500-v2-pixhawk6c",
+      "controllerModel": "Pixhawk 6C",
+      "region": "global",
+      "artifact": {
+        "fileName": "DroneDream-Lab-S500-Pixhawk6C-1.0.0.exe",
+        "buildId": "lab-s500-pixhawk6c-1.0.0-065382b68bfa-plan1",
+        "state": "planned-not-built",
+        "sha256": null,
+        "bytes": null,
+        "packaging": "tauri-nsis-planned"
+      },
+      "resourceEstimate": {
+        "basis": "planning-upper-bound-v1",
+        "downloadBytes": 6359222272,
+        "installedBytes": 6946424832,
+        "requiresWsl": true,
+        "requiresGazebo": true
+      },
+      "state": "plan-only"
+    },
+    {
+      "bundleId": "field-p450-allspark-v6c",
+      "editionId": "field",
+      "editionBuildId": "field-1.0.0-065382b68bfa-plan1",
+      "vehiclePackId": "amovlab-p450-px4",
+      "controllerModel": "Allspark V6C",
+      "region": "cn",
+      "artifact": {
+        "fileName": "DroneDream-Field-P450-AllsparkV6C-1.0.0.exe",
+        "buildId": "field-p450-allspark-v6c-1.0.0-065382b68bfa-plan1",
+        "state": "planned-not-built",
+        "sha256": null,
+        "bytes": null,
+        "packaging": "tauri-nsis-planned"
+      },
+      "resourceEstimate": {
+        "basis": "planning-upper-bound-v1",
+        "downloadBytes": 654311424,
+        "installedBytes": 2550136832,
+        "requiresWsl": false,
+        "requiresGazebo": false
+      },
+      "state": "plan-only"
+    }
+  ],
+  "licenseClosure": {
+    "state": "plan-only-incomplete-artifact-closure",
+    "notice": {
+      "path": "runtime/THIRD_PARTY_NOTICES.md",
+      "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa",
+      "bytes": 4410
+    },
+    "upstreamInventory": {
+      "path": "distribution/upstream-sources.v1.json",
+      "sha256": "a8852b550debb736146465c5ee3ed9882cb69f9d58559ac5216c2d4f94d6e270"
+    },
+    "licenseIds": [
+      "px4-bsd-3-clause"
+    ],
+    "blockers": [
+      "The existing Runtime NOTICE is bound for planning only.",
+      "Each future installer must regenerate and verify its exact binary-package closure.",
+      "No third-party payload is newly copied or distributed by this plan."
+    ]
+  }
+}
