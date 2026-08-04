@@ -2780,7 +2780,8 @@ a {
 
 .fixed-scenarios-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
   gap: 0.65rem;
   min-width: 0;
 }
@@ -2806,7 +2807,7 @@ a {
 
 .fixed-scenario-facts {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.38rem;
   margin: 0;
 }
@@ -2859,13 +2860,9 @@ a {
   height: 17px;
 }
 
-@media (max-width: 1350px) {
-  .fixed-scenarios-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+@media (max-width: 1100px) {
   .fixed-scenario-facts {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

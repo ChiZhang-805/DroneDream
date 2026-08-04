@@ -486,19 +486,21 @@ async function verifyFixedScenarios(page, testCase) {
     metrics.documentWidth,
     `${testCase.id}: fixed scenarios caused horizontal document overflow`,
   );
-  if (testCase.viewport.width > 1350) {
-    assert(metrics.cards.every((card) => closeEnough(card.top, metrics.cards[0].top, 1)));
+  if (testCase.viewport.width > 620) {
+    assert(closeEnough(metrics.cards[0].top, metrics.cards[1].top, 1));
+    assert(closeEnough(metrics.cards[2].top, metrics.cards[3].top, 1));
+    assert(metrics.cards[2].top > metrics.cards[0].bottom);
+    assert(closeEnough(metrics.cards[0].left, metrics.cards[2].left, 1));
+    assert(closeEnough(metrics.cards[1].left, metrics.cards[3].left, 1));
     assert(metrics.cards.every((card) => closeEnough(card.width, metrics.cards[0].width, 1)));
+    assert(metrics.cards.every((card) => closeEnough(card.height, metrics.cards[0].height, 1)));
+  }
+  if (testCase.viewport.width >= 1000) {
     assert(
       Math.max(...metrics.cards.map((card) => card.bottom)) <= metrics.viewportHeight,
       `${testCase.id}: fixed scenarios do not fit within the desktop viewport`,
     );
-  } else if (testCase.viewport.width > 620) {
-    assert(closeEnough(metrics.cards[0].top, metrics.cards[1].top, 1));
-    assert(closeEnough(metrics.cards[2].top, metrics.cards[3].top, 1));
-    assert(closeEnough(metrics.cards[0].width, metrics.cards[1].width, 1));
-    assert(closeEnough(metrics.cards[2].width, metrics.cards[3].width, 1));
-  } else {
+  } else if (testCase.viewport.width <= 620) {
     assert(
       metrics.cards.every((card) => (
         closeEnough(card.left, metrics.cards[0].left, 1)
