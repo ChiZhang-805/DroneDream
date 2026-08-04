@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-e5-b-edition-safety-verification-receipt",
+  "generatedAt": "2026-08-04T21:15:35Z",
+  "subjectCommit": "31bac42f3bc87e12203ce03b9e71eb01ecc8bad0",
+  "branch": "codex/software",
+  "resourceClass": "GREEN",
+  "scope": {
+    "phase": "E5-B",
+    "decisionOnly": true,
+    "executionAuthorized": false,
+    "hardwareActionHandlersImplemented": false,
+    "validatedVehiclePackCount": 0,
+    "productionHardwareDecision": "deny"
+  },
+  "contracts": {
+    "executionGatePolicySha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456",
+    "authorizationSchemaSha256": "1feff6e1d3b0f9887156267622bd3ac6fe5bfff793996b95f605677d69df75b1",
+    "requiredDecisionLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "layerDisagreementDecision": "deny",
+    "fakeValidatedCatalogAllowedOnlyWhen": "APP_ENV=test and request.testOnly=true"
+  },
+  "sourceFiles": [
+    {
+      "path": "backend/app/distribution_safety.py",
+      "bytes": 20101,
+      "sha256": "5fc6b9cc49dcf6faf4d49bdfd7732f6b553cadeb005c49d628a95fd6076ab6e6"
+    },
+    {
+      "path": "backend/tests/test_distribution_safety.py",
+      "bytes": 6857,
+      "sha256": "847b0d34a2491d9b6c264e16686fb1d9948f0fb1979b381ef5236f726c7d77bf"
+    },
+    {
+      "path": "engine-pack/tools/engine_pack.py",
+      "bytes": 23961,
+      "sha256": "5694ef5aafdbcbe2d4f0f88cb0172a8bdbefb42dd90e0db9c83e2cdd822c7a29"
+    },
+    {
+      "path": "engine-pack/tests/test_engine_pack.py",
+      "bytes": 10535,
+      "sha256": "44a10b75aa187a55a6a7558908b40fb5f520c7660349b268aefd81ca2c8a48c5"
+    },
+    {
+      "path": "runtime/scripts/edition-safety-gate.py",
+      "bytes": 21776,
+      "sha256": "efe51c29e6e52503a357fcd20efc79c4da3a566a9925d192191ca7d0f9953999"
+    },
+    {
+      "path": "runtime/tests/test_edition_safety_gate.py",
+      "bytes": 16060,
+      "sha256": "9611bb9219b0a096951c176cd924e827acfe69ca2bacfed6062f2ac418e1db9e"
+    }
+  ],
+  "checks": [
+    {
+      "name": "backend-focused",
+      "command": "pytest backend/tests/test_distribution_safety.py -q",
+      "result": "pass",
+      "passed": 10
+    },
+    {
+      "name": "runtime-safety-and-contract",
+      "command": "pytest runtime/tests/test_edition_safety_gate.py runtime/tests/test_runtime_contract.py -q",
+      "result": "pass",
+      "passed": 46,
+      "skipped": 5,
+      "subtestsPassed": 7
+    },
+    {
+      "name": "distribution-contracts",
+      "command": "pytest distribution/tests -q",
+      "result": "pass",
+      "passed": 120,
+      "subtestsPassed": 14
+    },
+    {
+      "name": "engine-pack-source-whitelist",
+      "command": "pytest engine-pack/tests/test_engine_pack.py::EnginePackTests::test_runtime_distribution_contract_whitelist_is_exact_and_hashed -q",
+      "result": "pass",
+      "passed": 1
+    },
+    {
+      "name": "ruff",
+      "result": "pass"
+    },
+    {
+      "name": "mypy-backend-strict-project",
+      "result": "pass"
+    },
+    {
+      "name": "mypy-runtime-strict",
+      "result": "pass"
+    },
+    {
+      "name": "python-py-compile",
+      "result": "pass"
+    },
+    {
+      "name": "git-diff-check",
+      "result": "pass"
+    }
+  ],
+  "negativeCoverage": [
+    "catalog-tamper",
+    "engine-pack-signature-unverified",
+    "request-replay",
+    "nonce-replay",
+    "clock-before-issued",
+    "clock-at-expiry",
+    "fake-issuer-production-reject",
+    "unknown-schema-field",
+    "cross-device-id",
+    "cross-device-hardware-identity",
+    "cross-parameter-candidate",
+    "actual-target-mismatch",
+    "trusted-evidence-mismatch",
+    "backend-runtime-layer-disagreement"
+  ],
+  "enginePackDistributionBoundary": {
+    "exactWhitelistHasPerFileHashes": true,
+    "includesLicense": true,
+    "includesThirdPartyNotice": true,
+    "excludedPrefixes": [
+      "distribution/build-planning/",
+      "distribution/build-plans/",
+      "distribution/tests/"
+    ],
+    "archiveBuilt": false,
+    "reasonNotBuilt": "E5-B is contract-only and explicitly forbids building an Engine Pack."
+  },
+  "notExecuted": [
+    "Engine Pack archive build",
+    "Runtime installation or migration",
+    "NSIS or Tauri packaging",
+    "PX4 or Gazebo",
+    "HITL or real hardware",
+    "device discovery, parameter write, arm, flight, or installation action",
+    "OpenAI or any provider API"
+  ],
+  "nextPhase": "E5-C desktop native decision layer; still decision-only until separately authorized"
+}
