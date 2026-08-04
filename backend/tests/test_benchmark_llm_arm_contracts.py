@@ -13,13 +13,19 @@ from app.benchmarking.llm_arm_contracts import (
     BenchmarkLLMContractError,
     assert_unique_turn_bindings,
     build_llm_turn_request,
+    critic_response_schema,
+    diagnosis_response_schema,
     fair_provider_evidence,
     parse_bounded_json_response,
     proposal_response_schema,
+    react_response_schema,
     require_llm_arm_policy,
     selection_response_schema,
     tool_action_response_schema,
+    validate_critic_response,
+    validate_diagnosis_response,
     validate_proposal_response,
+    validate_react_response,
     validate_selection_response,
     validate_tool_action_response,
 )
@@ -201,6 +207,17 @@ def test_tool_and_selection_schemas_allow_only_preregistered_existing_refs() -> 
             },
             policy,
         )
+    assert "stop" not in str(tool_action_response_schema(policy, allow_stop=False))
+    with pytest.raises(BenchmarkLLMContractError, match="cannot stop"):
+        validate_tool_action_response(
+            {
+                "schema_version": "1.0",
+                "decision": "stop",
+                "tool_adapter_ids": [],
+            },
+            policy,
+            allow_stop=False,
+        )
 
     refs = ("proposal_0", "proposal_1")
     assert "proposal_0" in str(selection_response_schema(refs))
@@ -232,3 +249,97 @@ def test_response_parser_has_a_hard_utf8_cap_and_rejects_nonfinite_json() -> Non
         parse_bounded_json_response('{"value":NaN}')
     with pytest.raises(BenchmarkLLMContractError, match="exceeds"):
         parse_bounded_json_response("x" * (BENCHMARK_LLM_MAX_RESPONSE_BYTES + 1))
+
+
+def test_react_contract_is_a_bounded_action_or_existing_ref_selection() -> None:
+    policy = require_llm_arm_policy("llm_react/v1")
+    refs = ("proposal_0",)
+    assert "dispatch" in str(react_response_schema(policy, refs, allow_action=True))
+    assert validate_react_response(
+        {
+            "schema_version": "1.0",
+            "decision": "act",
+            "tool_adapter_ids": ["seeded_halton/v1"],
+            "selected_proposal_ref": None,
+        },
+        policy,
+        refs,
+        allow_action=True,
+    ) == ("act", ("seeded_halton/v1",), None)
+    assert validate_react_response(
+        {
+            "schema_version": "1.0",
+            "decision": "dispatch",
+            "tool_adapter_ids": [],
+            "selected_proposal_ref": "proposal_0",
+        },
+        policy,
+        refs,
+        allow_action=False,
+    ) == ("dispatch", (), "proposal_0")
+    with pytest.raises(BenchmarkLLMContractError, match="bounded loop"):
+        validate_react_response(
+            {
+                "schema_version": "1.0",
+                "decision": "act",
+                "tool_adapter_ids": ["seeded_halton/v1"],
+                "selected_proposal_ref": None,
+            },
+            policy,
+            refs,
+            allow_action=False,
+        )
+
+
+def test_diagnosis_and_critic_can_only_narrow_existing_proposals() -> None:
+    refs = ("proposal_0", "proposal_1")
+    assert "replace" in str(diagnosis_response_schema(refs))
+    assert (
+        validate_diagnosis_response(
+            {
+                "schema_version": "1.0",
+                "decision": "replace",
+                "selected_proposal_ref": "proposal_1",
+            },
+            refs,
+            "proposal_0",
+        )
+        == "proposal_1"
+    )
+    with pytest.raises(BenchmarkLLMContractError, match="another existing"):
+        validate_diagnosis_response(
+            {
+                "schema_version": "1.0",
+                "decision": "replace",
+                "selected_proposal_ref": "proposal_0",
+            },
+            refs,
+            "proposal_0",
+        )
+
+    assert "approve" in str(critic_response_schema("proposal_1"))
+    assert validate_critic_response(
+        {
+            "schema_version": "1.0",
+            "decision": "approve",
+            "selected_proposal_ref": "proposal_1",
+        },
+        "proposal_1",
+    )
+    assert not validate_critic_response(
+        {
+            "schema_version": "1.0",
+            "decision": "veto",
+            "selected_proposal_ref": None,
+        },
+        "proposal_1",
+    )
+    with pytest.raises(BenchmarkLLMContractError, match="expand or replace"):
+        validate_critic_response(
+            {
+                "schema_version": "1.0",
+                "decision": "approve",
+                "selected_proposal_ref": "proposal_9",
+            },
+            "proposal_1",
+        )

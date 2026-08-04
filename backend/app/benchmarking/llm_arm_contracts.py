@@ -76,6 +76,7 @@ class BenchmarkLLMArmPolicyV1(_FrozenStrict):
     )
     adapter_id: BenchmarkLLMAdapterId
     provider_intervention_id: BenchmarkProviderInterventionId
+    provider_instruction: Annotated[str, Field(min_length=16, max_length=512)]
     prompt_version: Literal["benchmark-fair-observation-v1"] = "benchmark-fair-observation-v1"
     minimum_turns_per_generation: Annotated[int, Field(ge=1, le=4)]
     maximum_turns_per_generation: Annotated[int, Field(ge=1, le=4)]
@@ -170,6 +171,7 @@ def _policy(
     adapter_id: BenchmarkLLMAdapterId,
     *,
     provider_intervention_id: BenchmarkProviderInterventionId,
+    provider_instruction: str,
     minimum_turns: int,
     maximum_turns: int,
     roles: tuple[BenchmarkTurnRole, ...],
@@ -178,6 +180,7 @@ def _policy(
     return BenchmarkLLMArmPolicyV1(
         adapter_id=adapter_id,
         provider_intervention_id=provider_intervention_id,
+        provider_instruction=provider_instruction,
         minimum_turns_per_generation=minimum_turns,
         maximum_turns_per_generation=maximum_turns,
         allowed_turn_roles=roles,
@@ -190,6 +193,10 @@ _POLICIES = (
     _policy(
         "llm_direct/v1",
         provider_intervention_id="single_turn_proposal/v1",
+        provider_instruction=(
+            "Propose exactly one bounded parameter vector directly from the shared observation. "
+            "Do not request or emulate local tools."
+        ),
         minimum_turns=1,
         maximum_turns=1,
         roles=("direct_proposal",),
@@ -198,6 +205,10 @@ _POLICIES = (
     _policy(
         "llm_react/v1",
         provider_intervention_id="bounded_tool_loop/v1",
+        provider_instruction=(
+            "Use the bounded action loop to call only allowlisted local proposal tools, then "
+            "dispatch one existing proposal reference or abandon."
+        ),
         minimum_turns=1,
         maximum_turns=4,
         roles=("react_action",),
@@ -206,6 +217,10 @@ _POLICIES = (
     _policy(
         "llambo_uav/v1",
         provider_intervention_id="uav_llm_bo_proposal/v1",
+        provider_instruction=(
+            "Treat the shared history as noisy constrained UAV optimization observations and "
+            "produce one bounded next candidate without claiming a standard LLAMBO reproduction."
+        ),
         minimum_turns=1,
         maximum_turns=1,
         roles=("llambo_proposal",),
@@ -214,6 +229,10 @@ _POLICIES = (
     _policy(
         "dronedream_fixed_two_turn/v1",
         provider_intervention_id="fixed_plan_revision/v1",
+        provider_instruction=(
+            "First choose up to two allowlisted local proposal tools; then select exactly one "
+            "existing returned proposal reference or abandon after reviewing their outputs."
+        ),
         minimum_turns=2,
         maximum_turns=2,
         roles=("plan", "revision"),
@@ -222,6 +241,11 @@ _POLICIES = (
     _policy(
         "dronedream_adaptive_1_4/v1",
         provider_intervention_id="adaptive_plan_revision_review/v1",
+        provider_instruction=(
+            "Plan and revise with allowlisted local proposals; optional diagnosis and critic "
+            "reviews may only narrow existing references when deterministic triggers authorize "
+            "them."
+        ),
         minimum_turns=1,
         maximum_turns=4,
         roles=("plan", "revision", "diagnosis", "critic"),
@@ -289,7 +313,11 @@ def proposal_response_schema(observation: BenchmarkObservationV2) -> dict[str, A
     }
 
 
-def tool_action_response_schema(policy: BenchmarkLLMArmPolicyV1) -> dict[str, Any]:
+def tool_action_response_schema(
+    policy: BenchmarkLLMArmPolicyV1,
+    *,
+    allow_stop: bool = True,
+) -> dict[str, Any]:
     if policy.tool_mode == "none":
         raise BenchmarkLLMContractError("tool-free arms cannot request an action schema")
     return {
@@ -298,7 +326,10 @@ def tool_action_response_schema(policy: BenchmarkLLMArmPolicyV1) -> dict[str, An
         "required": ["schema_version", "decision", "tool_adapter_ids"],
         "properties": {
             "schema_version": {"type": "string", "enum": ["1.0"]},
-            "decision": {"type": "string", "enum": ["act", "stop"]},
+            "decision": {
+                "type": "string",
+                "enum": (["act", "stop"] if allow_stop else ["act"]),
+            },
             "tool_adapter_ids": {
                 "type": "array",
                 "items": {"type": "string", "enum": list(policy.allowed_tool_adapter_ids)},
@@ -322,6 +353,87 @@ def selection_response_schema(proposal_refs: tuple[str, ...]) -> dict[str, Any]:
             "selected_proposal_ref": {
                 "anyOf": [
                     {"type": "string", "enum": list(proposal_refs)},
+                    {"type": "null"},
+                ]
+            },
+        },
+    }
+
+
+def react_response_schema(
+    policy: BenchmarkLLMArmPolicyV1,
+    proposal_refs: tuple[str, ...],
+    *,
+    allow_action: bool,
+) -> dict[str, Any]:
+    if policy.tool_mode != "bounded_react":
+        raise BenchmarkLLMContractError("ReAct schema requires a bounded-react policy")
+    decisions = ["abandon"]
+    if allow_action:
+        decisions.insert(0, "act")
+    if proposal_refs:
+        decisions.insert(0, "dispatch")
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": [
+            "schema_version",
+            "decision",
+            "tool_adapter_ids",
+            "selected_proposal_ref",
+        ],
+        "properties": {
+            "schema_version": {"type": "string", "enum": ["1.0"]},
+            "decision": {"type": "string", "enum": decisions},
+            "tool_adapter_ids": {
+                "type": "array",
+                "items": {"type": "string", "enum": list(policy.allowed_tool_adapter_ids)},
+                "uniqueItems": True,
+                "maxItems": 2,
+            },
+            "selected_proposal_ref": {
+                "anyOf": [
+                    {"type": "string", "enum": list(proposal_refs)},
+                    {"type": "null"},
+                ]
+            },
+        },
+    }
+
+
+def diagnosis_response_schema(proposal_refs: tuple[str, ...]) -> dict[str, Any]:
+    if not proposal_refs or len(set(proposal_refs)) != len(proposal_refs):
+        raise BenchmarkLLMContractError("diagnosis schema requires unique proposal references")
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["schema_version", "decision", "selected_proposal_ref"],
+        "properties": {
+            "schema_version": {"type": "string", "enum": ["1.0"]},
+            "decision": {"type": "string", "enum": ["keep", "replace", "abandon"]},
+            "selected_proposal_ref": {
+                "anyOf": [
+                    {"type": "string", "enum": list(proposal_refs)},
+                    {"type": "null"},
+                ]
+            },
+        },
+    }
+
+
+def critic_response_schema(selected_proposal_ref: str) -> dict[str, Any]:
+    if not selected_proposal_ref:
+        raise BenchmarkLLMContractError("critic schema requires a selected proposal reference")
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["schema_version", "decision", "selected_proposal_ref"],
+        "properties": {
+            "schema_version": {"type": "string", "enum": ["1.0"]},
+            "decision": {"type": "string", "enum": ["approve", "veto"]},
+            "selected_proposal_ref": {
+                "anyOf": [
+                    {"type": "string", "enum": [selected_proposal_ref]},
                     {"type": "null"},
                 ]
             },
@@ -371,6 +483,7 @@ def build_llm_turn_request(
         "schema_id": "dronedream.benchmark-llm-turn-input/v1",
         "prompt_version": policy.prompt_version,
         "arm_intervention": policy.provider_intervention_id,
+        "cognitive_instruction": policy.provider_instruction,
         "turn_index": turn_index,
         "turn_role": turn_role,
         "observation": evidence,
@@ -456,6 +569,8 @@ def validate_proposal_response(
 def validate_tool_action_response(
     raw: object,
     policy: BenchmarkLLMArmPolicyV1,
+    *,
+    allow_stop: bool = True,
 ) -> tuple[Literal["act", "stop"], tuple[str, ...]]:
     if not isinstance(raw, dict) or set(raw) != {
         "schema_version",
@@ -467,6 +582,8 @@ def validate_tool_action_response(
     tools = raw.get("tool_adapter_ids")
     if raw.get("schema_version") != "1.0" or decision not in {"act", "stop"}:
         raise BenchmarkLLMContractError("tool action has an invalid version or decision")
+    if decision == "stop" and not allow_stop:
+        raise BenchmarkLLMContractError("this fixed-turn plan cannot stop before revision")
     if not isinstance(tools, list) or any(not isinstance(item, str) for item in tools):
         raise BenchmarkLLMContractError("tool_adapter_ids must be a string array")
     selected = tuple(tools)
@@ -504,6 +621,96 @@ def validate_selection_response(
     return selected
 
 
+def validate_react_response(
+    raw: object,
+    policy: BenchmarkLLMArmPolicyV1,
+    proposal_refs: tuple[str, ...],
+    *,
+    allow_action: bool,
+) -> tuple[Literal["act", "dispatch", "abandon"], tuple[str, ...], str | None]:
+    required = {
+        "schema_version",
+        "decision",
+        "tool_adapter_ids",
+        "selected_proposal_ref",
+    }
+    if not isinstance(raw, dict) or set(raw) != required:
+        raise BenchmarkLLMContractError("ReAct response does not match the closed schema")
+    if raw.get("schema_version") != "1.0":
+        raise BenchmarkLLMContractError("ReAct response has an invalid version")
+    decision = raw.get("decision")
+    tools = raw.get("tool_adapter_ids")
+    selected = raw.get("selected_proposal_ref")
+    if decision not in {"act", "dispatch", "abandon"}:
+        raise BenchmarkLLMContractError("ReAct response has an invalid decision")
+    if not isinstance(tools, list) or any(not isinstance(item, str) for item in tools):
+        raise BenchmarkLLMContractError("ReAct tool_adapter_ids must be a string array")
+    tool_ids = tuple(tools)
+    if len(tool_ids) != len(set(tool_ids)) or len(tool_ids) > 2:
+        raise BenchmarkLLMContractError("ReAct response contains duplicate or excessive tools")
+    if not set(tool_ids).issubset(policy.allowed_tool_adapter_ids):
+        raise BenchmarkLLMContractError("ReAct response selected an unreviewed tool")
+    if decision == "act":
+        if not allow_action or not tool_ids or selected is not None:
+            raise BenchmarkLLMContractError("ReAct act decision violates the bounded loop state")
+        return "act", tool_ids, None
+    if tool_ids:
+        raise BenchmarkLLMContractError("ReAct terminal decisions cannot select tools")
+    if decision == "abandon":
+        if selected is not None:
+            raise BenchmarkLLMContractError("ReAct abandon cannot select a proposal")
+        return "abandon", (), None
+    if not isinstance(selected, str) or selected not in proposal_refs:
+        raise BenchmarkLLMContractError("ReAct dispatch selected an unknown proposal reference")
+    return "dispatch", (), selected
+
+
+def validate_diagnosis_response(
+    raw: object,
+    proposal_refs: tuple[str, ...],
+    current_proposal_ref: str,
+) -> str | None:
+    required = {"schema_version", "decision", "selected_proposal_ref"}
+    if not isinstance(raw, dict) or set(raw) != required:
+        raise BenchmarkLLMContractError("diagnosis response does not match the closed schema")
+    decision = raw.get("decision")
+    selected = raw.get("selected_proposal_ref")
+    if raw.get("schema_version") != "1.0" or decision not in {"keep", "replace", "abandon"}:
+        raise BenchmarkLLMContractError("diagnosis response has an invalid version or decision")
+    if current_proposal_ref not in proposal_refs:
+        raise BenchmarkLLMContractError(
+            "diagnosis current proposal is not in the closed reference set"
+        )
+    if decision == "abandon":
+        if selected is not None:
+            raise BenchmarkLLMContractError("diagnosis abandon cannot select a proposal")
+        return None
+    if not isinstance(selected, str) or selected not in proposal_refs:
+        raise BenchmarkLLMContractError("diagnosis selected an unknown proposal reference")
+    if decision == "keep" and selected != current_proposal_ref:
+        raise BenchmarkLLMContractError("diagnosis keep must preserve the current proposal")
+    if decision == "replace" and selected == current_proposal_ref:
+        raise BenchmarkLLMContractError("diagnosis replace must select another existing proposal")
+    return selected
+
+
+def validate_critic_response(raw: object, current_proposal_ref: str) -> bool:
+    required = {"schema_version", "decision", "selected_proposal_ref"}
+    if not isinstance(raw, dict) or set(raw) != required:
+        raise BenchmarkLLMContractError("critic response does not match the closed schema")
+    decision = raw.get("decision")
+    selected = raw.get("selected_proposal_ref")
+    if raw.get("schema_version") != "1.0" or decision not in {"approve", "veto"}:
+        raise BenchmarkLLMContractError("critic response has an invalid version or decision")
+    if decision == "veto":
+        if selected is not None:
+            raise BenchmarkLLMContractError("critic veto cannot select a proposal")
+        return False
+    if selected != current_proposal_ref:
+        raise BenchmarkLLMContractError("critic cannot expand or replace the selected proposal")
+    return True
+
+
 def assert_unique_turn_bindings(requests: tuple[BenchmarkLLMTurnRequestV1, ...]) -> None:
     bindings = [request.binding_sha256 for request in requests]
     if len(bindings) != len(set(bindings)):
@@ -536,13 +743,19 @@ __all__ = [
     "BenchmarkLLMTurnRequestV1",
     "assert_unique_turn_bindings",
     "build_llm_turn_request",
+    "critic_response_schema",
+    "diagnosis_response_schema",
     "fair_provider_evidence",
     "parse_bounded_json_response",
     "proposal_response_schema",
+    "react_response_schema",
     "require_llm_arm_policy",
     "selection_response_schema",
     "tool_action_response_schema",
     "validate_proposal_response",
+    "validate_critic_response",
+    "validate_diagnosis_response",
+    "validate_react_response",
     "validate_selection_response",
     "validate_tool_action_response",
 ]
