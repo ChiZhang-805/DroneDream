@@ -1,0 +1,230 @@
+{
+  "schemaVersion": "dronedream.fixed-scenarios-2x2-production-deployment.v1",
+  "generatedAt": "2026-08-04T13:08:09.7432726Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "9d2a41b8ef67d94f2c3d05530c47cacb7b667bca",
+    "subjectTree": "c68822f3424040b87bb744b7c0071ed339807407",
+    "deployTag": "website-deploy-1.0.0-20260804-9d2a41b",
+    "deploymentPerformed": true,
+    "githubPagesDeploymentPerformed": true,
+    "aliyunDeploymentPerformed": true,
+    "githubReleaseAssetReplacementPerformed": false,
+    "installerRebuiltForThisLayoutChange": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "paymentOrModelProductionMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforced": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "change": {
+    "fixedScenariosDesktopLayout": "The four Fixed Scenario cards render as an exact two-column by two-row grid above the mobile breakpoint.",
+    "fixedScenariosMobileLayout": "At 620px and below the grid falls back to one column.",
+    "cardSizing": "Both desktop rows use equal-height cards; the grid remains within the 1440x1000 viewport without document overflow.",
+    "sourceFiles": [
+      "frontend/src/styles.css",
+      "frontend/scripts/verify-software-ui-layout.mjs"
+    ],
+    "manualDraftsExcluded": true,
+    "manualDraftPaths": [
+      "frontend/public/docs/downloads/DroneDream-Manual-en.md",
+      "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.md",
+      "website/manual-pdf/**",
+      "website/scripts/build_manual_pdf.py",
+      "website/scripts/audit_manual_pdf_layout.py",
+      "work/**"
+    ]
+  },
+  "validation": {
+    "focusedFixedScenarios": {
+      "files": 1,
+      "tests": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "completeFrontendSuite": {
+      "files": 60,
+      "tests": 416,
+      "passed": 416,
+      "failed": 0,
+      "publicSitePricingAvailability": "passed"
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appProductionBuild": "passed with one non-failing Vite chunk-size advisory",
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed",
+    "edgeLayoutVerification": {
+      "cases": 7,
+      "passed": 7,
+      "failed": 0,
+      "receiptSha256": "3ddc3f014bfa80b0f8263d02186d77ad55d7c56208772ad488765e77ddd1eeec"
+    },
+    "onlineVisualAudit": {
+      "origins": [
+        "http://getdronedream.com",
+        "http://47.93.180.216"
+      ],
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "viewport": "1440x1000",
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "cardCount": 4,
+      "rowTopsPx": [135, 513],
+      "columnLeftsPx": [264, 845],
+      "cardWidthPx": [570.796875, 570.8125],
+      "cardHeightPx": 368.421875,
+      "maxCardBottomPx": 881.828125,
+      "documentWidthParity": true,
+      "pageErrors": 0,
+      "metricsSha256": "d04145bbffa0c57436a130a0f1d795a2596045c6d6d3f8cb399d464dee2118fa",
+      "englishScreenshotSha256": "0e59f199b79d5f38bae190f5df1be2b789fafbcbcd20ae7bd65c2f954b692f25",
+      "chineseScreenshotSha256": "43bb0fc70c41c89c4f4545b084f5037b6b7cc82f080e1ad551fb7771ee72fa0f",
+      "crossOriginScreenshotByteParityByLanguage": true,
+      "visualInspection": "passed"
+    }
+  },
+  "sharedArtifact": {
+    "buildCount": 1,
+    "sourceCommit": "9d2a41b8ef67d94f2c3d05530c47cacb7b667bca",
+    "workflowRunId": 30909738722,
+    "workflowRunUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30909738722",
+    "buildJobId": 91993207804,
+    "deployJobId": 91993425161,
+    "artifactId": 8892544835,
+    "artifactName": "dronedream-site-9d2a41b8ef67d94f2c3d05530c47cacb7b667bca",
+    "artifactBytes": 29715222,
+    "artifactDigest": "sha256:9cabba0bd3cfc78db8ebda36b10f69499d40dc8b0b5877649e3db90ecdbb420d",
+    "remoteTarSha256": "e0e2076e7d41bde0624bab376ee567f6db36f52fdeff115f0bf7ce3a28638deb",
+    "pagesArtifactId": 8892545936,
+    "pagesArtifactBytes": 29709159,
+    "pagesArtifactDigest": "sha256:cac6cc2b8a03f9146863bd3237985265bd49cdeb3cde7e3f4693c2649f95e15e",
+    "deploymentRule": "The exact GitHub Actions shared artifact was deployed to both GitHub Pages and Aliyun; neither endpoint rebuilt the site."
+  },
+  "deployments": {
+    "githubPages": {
+      "runId": 30909738722,
+      "status": "success",
+      "sourceCommit": "9d2a41b8ef67d94f2c3d05530c47cacb7b667bca",
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredEnvironmentPolicy": {
+        "count": 1,
+        "id": 55186327,
+        "name": "main",
+        "type": "branch"
+      }
+    },
+    "aliyun": {
+      "server": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260804T125353Z",
+      "rollbackReleaseCandidatesRetained": [
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T114043Z",
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T104345Z",
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T095323Z"
+      ],
+      "exactPreviousSymlinkTargetReReadAfterDeployment": false,
+      "atomicSwitch": true,
+      "nginxConfigurationTest": "passed",
+      "forbiddenServerTouched": false,
+      "forbiddenServer": "124.221.220.60"
+    },
+    "supersededSlowTransferAttempt": {
+      "status": "aborted safely before public switch",
+      "method": "direct workstation-to-server SCP",
+      "reason": "The measured transfer rate was approximately 10 KiB/s, so the deployment was restarted using a server-side download of the exact immutable Actions artifact.",
+      "publicStateChangedByAttempt": false
+    }
+  },
+  "publicParity": {
+    "origins": [
+      "http://getdronedream.com",
+      "http://47.93.180.216"
+    ],
+    "siteArtifact": {
+      "buildManifestBytes": 1153,
+      "buildManifestSha256": "f206da670a1fa5b2b6270e2a9d8e3e0c445614b06e59a6049ca5b9dff4e155d7",
+      "sha256SumsBytes": 17183,
+      "sha256SumsSha256": "ecdfe494195e76fa3d5629b5436c7ed5c5b2ad620dafa04c42576c86b491f7a8",
+      "latestJsonBytes": 492,
+      "latestJsonSha256": "fd367b692f4785dd65a73bdc8bd2e0d3f64185f8303e1223b04d48dcfe7ff6e9",
+      "indexHtmlBytes": 1088,
+      "indexHtmlSha256": "b77ad1183f8aeb10a54673b5f9b66497bf5b06c587ac81d5153243b4b564dc9f",
+      "consoleIndexHtmlBytes": 735,
+      "consoleIndexHtmlSha256": "086af66bbb2c682e48bcc50dff8c399242e106bd3d3e95a98be6ccdcafb848cb",
+      "sourceCommit": "9d2a41b8ef67d94f2c3d05530c47cacb7b667bca",
+      "byteParity": true
+    },
+    "installerThreeWay": {
+      "origins": [
+        "GitHub Release",
+        "GitHub Pages download endpoint",
+        "Aliyun download endpoint"
+      ],
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "exeBytes": 11115267,
+      "exeSha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "checksumFileBytes": 98,
+      "checksumFileSha256": "ed0c1f6c12360b9231e2c17ded3677ff658098126b159ab42726a93fd3f79cc8",
+      "signatureBytes": 420,
+      "signatureSha256": "24eda3efccc57e5c5e1dd5c29ea7a5692a5b607fc1adfb1adf81f77ff1b9aea7",
+      "tauriLatestJsonSha256": "deee3fd550b2fd4948ceff43b64fa8ee9941f7ffed477593e68ebaf28e73638a",
+      "byteParity": true
+    }
+  },
+  "githubRelease": {
+    "releaseId": 357114097,
+    "tag": "signpath-candidate-v1.0.0",
+    "prerelease": true,
+    "canonicalAssetIds": {
+      "exe": 501108422,
+      "checksum": 501108423,
+      "signature": 501108420,
+      "latestJson": 501108421,
+      "sourceInventory": 501108424
+    },
+    "assetsChangedByThisLayoutDeployment": false
+  },
+  "repositoryGovernance": {
+    "remoteBranches": [
+      "main",
+      "codex/software",
+      "codex/website",
+      "codex/technical-report"
+    ],
+    "remoteBranchCount": 4,
+    "unexpectedRemoteBranches": [],
+    "forcePushPerformed": false,
+    "rootWorktreeModified": false
+  },
+  "remainingExternalGates": {
+    "tls": {
+      "status": "not complete",
+      "curlExitCode": 60,
+      "curlError": "SEC_E_WRONG_PRINCIPAL",
+      "pagesProtectedDomainState": "verified",
+      "pagesCertificateState": "authorization_created",
+      "domains": [
+        "getdronedream.com",
+        "www.getdronedream.com"
+      ],
+      "httpsEnforced": false,
+      "conclusion": "HTTP production is live, but HTTPS is not claimed as complete and certificate validation was not bypassed."
+    },
+    "supabase": "Supabase Functions, migrations, Secrets, and production database state were not changed by this release.",
+    "payments": "Production payment configuration was not changed.",
+    "codeSigning": "The 1.0.0 installer remains an explicitly disclosed unsigned internal-test preview.",
+    "runtime": "Runtime assets were not changed by this layout deployment."
+  }
+}
