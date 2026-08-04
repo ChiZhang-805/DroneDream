@@ -15,8 +15,8 @@ const developmentFallbackRelease: WebsiteRelease = {
   fileName: "DroneDream_1.0.0_x64-setup.exe",
   downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
   checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe.sha256",
-  sha256: "a1ae101b3d69a9bf99af519f4e24d34c350e85e75cd852d64dfb747dc7aa7b27",
-  sizeBytes: 11_092_905,
+  sha256: "d2009beaab9347d29f66065872118b369a99ec91a3cd8b8e3bfde61e679a77a5",
+  sizeBytes: 11_090_973,
   publishedAt: "2026-08-04",
 };
 

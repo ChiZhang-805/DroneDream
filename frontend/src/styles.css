@@ -11194,7 +11194,7 @@ a {
     z-index: 820;
     display: none;
     width: max-content;
-    min-width: min(13rem, calc(100vw - 1.8rem));
+    min-width: 0;
     max-width: calc(100vw - 1.8rem);
     max-height: calc(100dvh - 5rem);
     overflow-y: auto;
@@ -11220,6 +11220,7 @@ a {
   }
 
   .app-mobile-menu-panel .app-account-button {
+    width: auto;
     grid-template-columns: auto minmax(0, 1fr);
     min-height: 3.8rem;
     padding: 0.5rem 0.65rem;
@@ -11260,7 +11261,7 @@ a {
   .app-mobile-menu-panel .app-nav > a:nth-last-of-type(2):nth-of-type(3n + 1),
   .app-mobile-menu-panel .app-nav > a:last-of-type:nth-of-type(odd) {
     display: flex;
-    width: 100%;
+    width: auto;
     min-height: 3.05rem;
     grid-column: auto;
     justify-content: flex-start;
@@ -11285,7 +11286,7 @@ a {
   .app-mobile-settings-entry {
     order: 3;
     display: flex;
-    width: 100%;
+    width: auto;
     min-height: 3.05rem;
     align-items: center;
     gap: 0.72rem;
