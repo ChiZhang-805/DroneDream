@@ -395,6 +395,7 @@ async function verifyFixedScenarios(page, testCase) {
       }
       return {
         panel: bounds(element),
+        panelMinWidth: getComputedStyle(element).minWidth,
         account: bounds(account),
         settings: bounds(settings),
         links: links.map(bounds),
@@ -415,14 +416,19 @@ async function verifyFixedScenarios(page, testCase) {
       2,
     )));
     assert(mobileMenu.rowsFit, `${testCase.id}: mobile menu text is clipped or wrapped`);
+    assert.equal(
+      mobileMenu.panelMinWidth,
+      "0px",
+      `${testCase.id}: mobile menu still has a fixed minimum width`,
+    );
     assert(closeEnough(
       mobileMenu.panel.right,
       menuButtonBounds.right,
       2,
     ), `${testCase.id}: mobile menu is not right-aligned with its trigger`);
     assert(
-      mobileMenu.panel.width < mobileMenu.documentWidth - 64,
-      `${testCase.id}: mobile menu still spans almost the full viewport`,
+      mobileMenu.panel.width < mobileMenu.documentWidth * 0.65,
+      `${testCase.id}: mobile menu is ${mobileMenu.panel.width}px instead of shrink-wrapping its longest row`,
     );
     assert.equal(mobileMenu.documentScrollWidth, mobileMenu.documentWidth);
     mobileMenuMetrics = { ...mobileMenu, trigger: menuButtonBounds };
