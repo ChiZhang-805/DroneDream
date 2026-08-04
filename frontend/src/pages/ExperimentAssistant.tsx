@@ -23,7 +23,6 @@ import {
 
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
-import { WebDesktopRequired } from "../components/WebDesktopRequired";
 import { isDesktopRuntime } from "../desktop/bridge";
 import { recordProductEvent } from "../features/analytics/productEvents";
 import { isWebConsolePreviewRuntime } from "../features/demo/publicDemo";
@@ -626,7 +625,6 @@ export function ExperimentAssistant() {
 
   return (
     <section className={`experiment-assistant-page ${messages.length ? "has-messages" : ""}`}>
-      {webPreview ? <WebDesktopRequired compact /> : null}
       <div className="experiment-assistant-stage">
         {messages.length === 0 ? (
           <div className="assistant-empty-state">

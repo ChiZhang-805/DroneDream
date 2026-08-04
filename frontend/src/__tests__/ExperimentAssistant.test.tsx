@@ -103,6 +103,17 @@ describe("conversational experiment drafting", () => {
     Reflect.deleteProperty(window, "SpeechRecognition");
   });
 
+  it("keeps the web assistant layout aligned with the desktop without a preview banner", () => {
+    window.history.replaceState({}, "", "/console/assistant?webPreview=1");
+
+    renderAssistant();
+
+    expect(screen.queryByText("Web preview and draft mode")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", {
+      name: "What flight experiment should we build?",
+    })).toBeVisible();
+  });
+
   it("compiles a turn into the shared V3 draft without persisting the API key", async () => {
     vi.spyOn(apiClient, "compileExperimentAssistantTurn").mockImplementation(
       async (request) => {
