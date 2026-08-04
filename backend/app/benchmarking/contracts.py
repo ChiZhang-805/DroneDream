@@ -353,6 +353,79 @@ class BenchmarkCampaignRecordV1(_Strict):
     updated_at: datetime
 
 
+class BenchmarkCoordinatorClaimRequestV1(_Strict):
+    owner_id: Identifier
+    lease_seconds: Annotated[int, Field(ge=5, le=300)] = 60
+
+
+class BenchmarkCoordinatorLeaseV1(_Strict):
+    campaign_id: str
+    owner_id: str
+    lease_token: Annotated[str, Field(min_length=32, max_length=256)]
+    lease_generation: Annotated[int, Field(ge=1)]
+    lease_expires_at: datetime
+
+
+class BenchmarkCoordinatorRenewRequestV1(_Strict):
+    lease_generation: Annotated[int, Field(ge=1)]
+    lease_seconds: Annotated[int, Field(ge=5, le=300)] = 60
+
+
+class BenchmarkCoordinatorReleaseRequestV1(_Strict):
+    lease_generation: Annotated[int, Field(ge=1)]
+
+
+class BenchmarkResourceVectorV1(_Strict):
+    jobs: Annotated[int, Field(ge=0)] = 0
+    trials: Annotated[int, Field(ge=0)] = 0
+    logical_turns: Annotated[int, Field(ge=0)] = 0
+    network_requests: Annotated[int, Field(ge=0)] = 0
+    input_utf8_bytes: Annotated[int, Field(ge=0)] = 0
+    output_utf8_bytes: Annotated[int, Field(ge=0)] = 0
+    provider_tokens: Annotated[int, Field(ge=0)] = 0
+    provider_cost_microusd: Annotated[int, Field(ge=0)] = 0
+    wall_time_seconds: Annotated[int, Field(ge=0)] = 0
+    disk_bytes: Annotated[int, Field(ge=0)] = 0
+
+
+class BenchmarkUsageDeltaV1(BenchmarkResourceVectorV1):
+
+    @model_validator(mode="after")
+    def _require_consumed_resource(self) -> BenchmarkUsageDeltaV1:
+        if not any(self.model_dump().values()):
+            raise ValueError("a budget reservation must consume at least one resource")
+        return self
+
+
+class BenchmarkBudgetReservationRequestV1(_Strict):
+    reservation_key: Identifier
+    lease_generation: Annotated[int, Field(ge=1)]
+    reason: Identifier
+    usage: BenchmarkUsageDeltaV1
+
+
+class BenchmarkBudgetReservationRecordV1(_Strict):
+    id: str
+    campaign_id: str
+    reservation_key: str
+    lease_generation: int
+    reason: str
+    reservation_sha256: Sha256Hex
+    usage: BenchmarkUsageDeltaV1
+    created_at: datetime
+
+
+class BenchmarkCampaignUsageV1(_Strict):
+    campaign_id: str
+    status: Literal["PREREGISTERED", "ACTIVE", "COMPLETED", "FAILED", "CANCELLED"]
+    caps: BenchmarkBudgetCapsV1
+    used: BenchmarkResourceVectorV1
+    remaining: BenchmarkResourceVectorV1
+    lease_owner: str | None = None
+    lease_generation: Annotated[int, Field(ge=0)]
+    lease_expires_at: datetime | None = None
+
+
 # The hash is derived from the actual server-side schema rather than a hand-kept
 # string, so a shape change necessarily changes every campaign fairness binding.
 BENCHMARK_OBSERVATION_CONTRACT_SHA256 = canonical_sha256(
@@ -368,6 +441,11 @@ __all__ = [
     "BenchmarkCampaignManifestV1",
     "BenchmarkCampaignCreateRequest",
     "BenchmarkCampaignRecordV1",
+    "BenchmarkCampaignUsageV1",
+    "BenchmarkCoordinatorClaimRequestV1",
+    "BenchmarkCoordinatorLeaseV1",
+    "BenchmarkCoordinatorReleaseRequestV1",
+    "BenchmarkCoordinatorRenewRequestV1",
     "BenchmarkCandidateEvaluator",
     "BenchmarkEvaluationV1",
     "BenchmarkFairnessContractV1",
@@ -375,6 +453,10 @@ __all__ = [
     "BenchmarkProposalAdapter",
     "BenchmarkProposalV1",
     "BenchmarkArmRecordV1",
+    "BenchmarkBudgetReservationRecordV1",
+    "BenchmarkBudgetReservationRequestV1",
+    "BenchmarkResourceVectorV1",
+    "BenchmarkUsageDeltaV1",
     "CompositeExecutionInventoryV1",
     "ExecutionComponentV1",
     "canonical_json_bytes",

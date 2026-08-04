@@ -117,6 +117,7 @@ def create_campaign(
     )
     db.add(campaign)
     db.flush()
+    db.add(models.BenchmarkCampaignCoordinatorState(campaign_id=campaign.id))
     for arm in manifest.arms:
         arm_payload = arm.model_dump(mode="json", exclude_none=False)
         db.add(

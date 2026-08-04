@@ -861,6 +861,74 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        if {
+            "benchmark_campaigns",
+            "benchmark_campaign_coordinator_states",
+        }.issubset(table_names):
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO benchmark_campaign_coordinator_states (
+                        campaign_id,
+                        lease_generation,
+                        next_batch_ordinal,
+                        next_run_ordinal,
+                        jobs_used,
+                        trials_used,
+                        logical_turns_used,
+                        network_requests_used,
+                        input_utf8_bytes_used,
+                        output_utf8_bytes_used,
+                        provider_tokens_used,
+                        provider_cost_microusd_used,
+                        wall_time_seconds_used,
+                        disk_bytes_used,
+                        created_at,
+                        updated_at
+                    )
+                    SELECT
+                        campaign.id, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                    FROM benchmark_campaigns AS campaign
+                    WHERE NOT EXISTS (
+                        SELECT 1
+                        FROM benchmark_campaign_coordinator_states AS state
+                        WHERE state.campaign_id = campaign.id
+                    )
+                    """
+                )
+            )
+        if "benchmark_budget_reservations" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_budget_reservation_no_update
+                    BEFORE UPDATE ON benchmark_budget_reservations
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark budget reservations are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_budget_reservation_no_delete
+                    BEFORE DELETE ON benchmark_budget_reservations
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark budget reservations are append-only'
+                        );
+                    END
+                    """
+                )
+            )
 
 
 def get_db() -> Iterator[Session]:

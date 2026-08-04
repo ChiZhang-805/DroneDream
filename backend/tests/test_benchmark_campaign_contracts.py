@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from copy import deepcopy
 
@@ -212,3 +213,195 @@ def test_manifest_rejects_secret_shaped_fields_before_persistence(client: TestCl
     listing = client.get("/api/v1/benchmark-campaigns")
     assert listing.status_code == 200
     assert listing.json()["data"]["total"] == 0
+
+
+def test_campaign_coordinator_fences_and_idempotently_accounts_global_caps(
+    client: TestClient,
+) -> None:
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _manifest()},
+    )
+    assert created.status_code == 200, created.text
+    campaign_id = created.json()["data"]["id"]
+
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/coordinator/claim",
+        json={"owner_id": "coordinator-a", "lease_seconds": 120},
+    )
+    assert claimed.status_code == 200, claimed.text
+    lease = claimed.json()["data"]
+    token = lease["lease_token"]
+    generation = lease["lease_generation"]
+    assert generation == 1
+
+    competing = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/coordinator/claim",
+        json={"owner_id": "coordinator-b", "lease_seconds": 120},
+    )
+    assert competing.status_code == 409
+    assert competing.json()["error"]["code"] == "BENCHMARK_COORDINATOR_LEASE_HELD"
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        state = db.get(models.BenchmarkCampaignCoordinatorState, campaign_id)
+        assert state is not None
+        assert state.lease_token_hash != token
+        assert state.lease_token_hash == hashlib.sha256(token.encode("utf-8")).hexdigest()
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": campaign_id},
+        )
+        db.commit()
+
+    reservation_payload = {
+        "reservation_key": "run-001-dispatch",
+        "lease_generation": generation,
+        "reason": "run-dispatch",
+        "usage": {
+            "jobs": 2,
+            "trials": 20,
+            "logical_turns": 2,
+            "network_requests": 2,
+            "input_utf8_bytes": 4096,
+            "output_utf8_bytes": 1024,
+            "provider_tokens": 900,
+            "provider_cost_microusd": 25000,
+            "wall_time_seconds": 120,
+            "disk_bytes": 2048,
+        },
+    }
+    wrong_token = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/budget-reservations",
+        json=reservation_payload,
+        headers={"X-Benchmark-Lease-Token": "x" * 32},
+    )
+    assert wrong_token.status_code == 409
+    assert wrong_token.json()["error"]["code"] == "BENCHMARK_COORDINATOR_FENCE_REJECTED"
+
+    reserved = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/budget-reservations",
+        json=reservation_payload,
+        headers={"X-Benchmark-Lease-Token": token},
+    )
+    assert reserved.status_code == 200, reserved.text
+    reservation = reserved.json()["data"]
+    replay = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/budget-reservations",
+        json=reservation_payload,
+        headers={"X-Benchmark-Lease-Token": token},
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["data"]["id"] == reservation["id"]
+
+    conflict_payload = deepcopy(reservation_payload)
+    conflict_payload["usage"]["trials"] = 21
+    conflict = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/budget-reservations",
+        json=conflict_payload,
+        headers={"X-Benchmark-Lease-Token": token},
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "BENCHMARK_RESERVATION_KEY_CONFLICT"
+
+    exceeds = deepcopy(reservation_payload)
+    exceeds["reservation_key"] = "run-002-dispatch"
+    exceeds["usage"]["jobs"] = 95
+    cap_failure = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/budget-reservations",
+        json=exceeds,
+        headers={"X-Benchmark-Lease-Token": token},
+    )
+    assert cap_failure.status_code == 409
+    assert cap_failure.json()["error"]["code"] == "BENCHMARK_CAMPAIGN_CAP_EXCEEDED"
+
+    usage = client.get(f"/api/v1/benchmark-campaigns/{campaign_id}/usage")
+    assert usage.status_code == 200
+    assert usage.json()["data"]["used"] == reservation_payload["usage"]
+    assert usage.json()["data"]["remaining"]["jobs"] == 94
+
+    with SessionLocal() as db:
+        with pytest.raises(DatabaseError, match="reservations are append-only"):
+            db.execute(
+                text(
+                    "UPDATE benchmark_budget_reservations SET trials=999 "
+                    "WHERE id=:id"
+                ),
+                {"id": reservation["id"]},
+            )
+            db.commit()
+        db.rollback()
+
+    released = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/coordinator/release",
+        json={"lease_generation": generation},
+        headers={"X-Benchmark-Lease-Token": token},
+    )
+    assert released.status_code == 200, released.text
+    assert released.json()["data"]["lease_owner"] is None
+
+    stale = deepcopy(reservation_payload)
+    stale["reservation_key"] = "stale-generation"
+    stale_response = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/budget-reservations",
+        json=stale,
+        headers={"X-Benchmark-Lease-Token": token},
+    )
+    assert stale_response.status_code == 409
+    assert stale_response.json()["error"]["code"] == "BENCHMARK_COORDINATOR_FENCE_REJECTED"
+
+    reclaimed = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/coordinator/claim",
+        json={"owner_id": "coordinator-b", "lease_seconds": 60},
+    )
+    assert reclaimed.status_code == 200, reclaimed.text
+    assert reclaimed.json()["data"]["lease_generation"] == 2
+
+
+def test_expired_coordinator_lease_is_recoverable_without_resetting_usage(
+    client: TestClient,
+) -> None:
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _manifest()},
+    ).json()["data"]
+    first = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "crashed-coordinator", "lease_seconds": 60},
+    )
+    assert first.status_code == 200, first.text
+
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text(
+                "UPDATE benchmark_campaign_coordinator_states "
+                "SET lease_expires_at='2000-01-01 00:00:00' WHERE campaign_id=:id"
+            ),
+            {"id": created["id"]},
+        )
+        db.commit()
+
+    recovered = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "recovery-coordinator", "lease_seconds": 60},
+    )
+    assert recovered.status_code == 200, recovered.text
+    assert recovered.json()["data"]["lease_generation"] == 2
+
+
+def test_coordinator_endpoints_preserve_not_found_contract(client: TestClient) -> None:
+    campaign_id = "00000000-0000-4000-8000-000000000099"
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{campaign_id}/coordinator/claim",
+        json={"owner_id": "coordinator-a", "lease_seconds": 60},
+    )
+    assert claimed.status_code == 404
+    assert claimed.json()["error"]["code"] == "BENCHMARK_CAMPAIGN_NOT_FOUND"
+
+    usage = client.get(f"/api/v1/benchmark-campaigns/{campaign_id}/usage")
+    assert usage.status_code == 404
+    assert usage.json()["error"]["code"] == "BENCHMARK_CAMPAIGN_NOT_FOUND"

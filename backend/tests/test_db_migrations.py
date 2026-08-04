@@ -406,6 +406,7 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                  "'harness_cognitive_turn_outcomes', "
                  "'benchmark_campaigns', "
                  "'benchmark_arms', "
+                 "'benchmark_budget_reservations', "
                  "'trials'"
                 ")"
             ).fetchall()
@@ -490,7 +491,12 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
             for row in connection.execute(
                 "SELECT name FROM sqlite_master "
                 "WHERE type='table' "
-                "AND name IN ('benchmark_campaigns', 'benchmark_arms')"
+                "AND name IN ("
+                "'benchmark_campaigns', "
+                "'benchmark_arms', "
+                "'benchmark_campaign_coordinator_states', "
+                "'benchmark_budget_reservations'"
+                ")"
             ).fetchall()
         }
     assert trigger_names == {
@@ -513,6 +519,8 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "trg_harness_cognitive_turn_outcomes_no_delete",
         "trg_benchmark_campaign_manifest_immutable",
         "trg_benchmark_arm_manifest_immutable",
+        "trg_benchmark_budget_reservation_no_update",
+        "trg_benchmark_budget_reservation_no_delete",
     }
     assert attempt_tables == {
         "trial_execution_attempts",
@@ -535,7 +543,12 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
     assert cognitive_authorization_tables == {
         "harness_cognitive_turn_delete_authorizations"
     }
-    assert benchmark_tables == {"benchmark_campaigns", "benchmark_arms"}
+    assert benchmark_tables == {
+        "benchmark_campaigns",
+        "benchmark_arms",
+        "benchmark_campaign_coordinator_states",
+        "benchmark_budget_reservations",
+    }
     assert {
         "user_id",
         "idempotency_key_hash",
@@ -738,7 +751,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0023 (head)"]
+    assert heads == ["20260804_0024 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -835,7 +848,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             for row in connection.execute("PRAGMA index_list('jobs')").fetchall()
         )
 
-    assert version == ("20260804_0023",)
+    assert version == ("20260804_0024",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",

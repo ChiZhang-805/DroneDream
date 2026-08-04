@@ -261,6 +261,15 @@ class BenchmarkCampaign(Base):
         cascade="all, delete-orphan",
         order_by="BenchmarkArm.benchmark_arm_id",
     )
+    coordinator_state: Mapped[BenchmarkCampaignCoordinatorState | None] = relationship(
+        back_populates="campaign",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    budget_reservations: Mapped[list[BenchmarkBudgetReservation]] = relationship(
+        back_populates="campaign",
+        cascade="all, delete-orphan",
+    )
 
 
 class BenchmarkArm(Base):
@@ -308,6 +317,143 @@ class BenchmarkArm(Base):
     )
 
     campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="arms")
+
+
+class BenchmarkCampaignCoordinatorState(Base):
+    """Mutable, fenced coordinator state kept separate from frozen manifests."""
+
+    __tablename__ = "benchmark_campaign_coordinator_states"
+    __table_args__ = (
+        CheckConstraint(
+            "lease_generation >= 0 AND next_batch_ordinal >= 1 "
+            "AND next_run_ordinal >= 1",
+            name="ck_benchmark_coordinator_sequence",
+        ),
+        CheckConstraint(
+            "jobs_used >= 0 AND trials_used >= 0 AND logical_turns_used >= 0 "
+            "AND network_requests_used >= 0 AND input_utf8_bytes_used >= 0 "
+            "AND output_utf8_bytes_used >= 0 AND provider_tokens_used >= 0 "
+            "AND provider_cost_microusd_used >= 0 AND wall_time_seconds_used >= 0 "
+            "AND disk_bytes_used >= 0",
+            name="ck_benchmark_coordinator_usage_nonnegative",
+        ),
+    )
+
+    campaign_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaigns.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_token_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, unique=True
+    )
+    lease_generation: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    next_batch_ordinal: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=1, server_default="1"
+    )
+    next_run_ordinal: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=1, server_default="1"
+    )
+    jobs_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    trials_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    logical_turns_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    network_requests_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    input_utf8_bytes_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    output_utf8_bytes_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    provider_tokens_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    provider_cost_microusd_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    wall_time_seconds_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    disk_bytes_used: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
+    )
+
+    campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="coordinator_state")
+
+
+class BenchmarkBudgetReservation(Base):
+    """Append-only idempotency and accounting receipt for consumed campaign work."""
+
+    __tablename__ = "benchmark_budget_reservations"
+    __table_args__ = (
+        UniqueConstraint(
+            "campaign_id",
+            "reservation_key",
+            name="uq_benchmark_budget_reservation_key",
+        ),
+        CheckConstraint(
+            "lease_generation >= 1 AND jobs >= 0 AND trials >= 0 "
+            "AND logical_turns >= 0 AND network_requests >= 0 "
+            "AND input_utf8_bytes >= 0 AND output_utf8_bytes >= 0 "
+            "AND provider_tokens >= 0 AND provider_cost_microusd >= 0 "
+            "AND wall_time_seconds >= 0 AND disk_bytes >= 0",
+            name="ck_benchmark_budget_reservation_nonnegative",
+        ),
+        CheckConstraint(
+            "jobs + trials + logical_turns + network_requests + input_utf8_bytes + "
+            "output_utf8_bytes + provider_tokens + provider_cost_microusd + "
+            "wall_time_seconds + disk_bytes > 0",
+            name="ck_benchmark_budget_reservation_nonzero",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("bres")
+    )
+    campaign_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    reservation_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    lease_generation: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    reason: Mapped[str] = mapped_column(String(128), nullable=False)
+    reservation_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    jobs: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    trials: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    logical_turns: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    network_requests: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    input_utf8_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    output_utf8_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    provider_tokens: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    provider_cost_microusd: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    wall_time_seconds: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    disk_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="budget_reservations")
 
 
 class Job(Base):
@@ -1383,7 +1529,9 @@ class JobSecret(Base):
 __all__ = [
     "Artifact",
     "BenchmarkArm",
+    "BenchmarkBudgetReservation",
     "BenchmarkCampaign",
+    "BenchmarkCampaignCoordinatorState",
     "BatchJob",
     "CandidateEvidenceDeleteAuthorization",
     "CandidateEvidenceReceipt",

@@ -10,8 +10,14 @@ from sqlalchemy.orm import Session
 from app import models
 from app.api_idempotency import begin_mutation
 from app.auth import get_current_user
-from app.benchmarking import service
-from app.benchmarking.contracts import BenchmarkCampaignCreateRequest
+from app.benchmarking import coordinator, service
+from app.benchmarking.contracts import (
+    BenchmarkBudgetReservationRequestV1,
+    BenchmarkCampaignCreateRequest,
+    BenchmarkCoordinatorClaimRequestV1,
+    BenchmarkCoordinatorReleaseRequestV1,
+    BenchmarkCoordinatorRenewRequestV1,
+)
 from app.db import get_db
 from app.response import ok
 
@@ -19,6 +25,13 @@ router = APIRouter(tags=["benchmark-campaigns"])
 
 
 def _raise(error: service.BenchmarkCampaignError) -> None:
+    raise HTTPException(
+        status_code=error.http_status,
+        detail={"code": error.code, "message": error.message},
+    )
+
+
+def _raise_coordinator(error: coordinator.BenchmarkCoordinatorError) -> None:
     raise HTTPException(
         status_code=error.http_status,
         detail={"code": error.code, "message": error.message},
@@ -88,3 +101,129 @@ def get_benchmark_campaign(
     except service.BenchmarkCampaignError as error:
         _raise(error)
     return ok(service.to_record(campaign).model_dump(mode="json"))
+
+
+@router.post("/benchmark-campaigns/{campaign_id}/coordinator/claim")
+def claim_benchmark_coordinator(
+    campaign_id: str,
+    request: BenchmarkCoordinatorClaimRequestV1,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        lease = coordinator.claim_lease(
+            db,
+            campaign_id,
+            user=user,
+            owner_id=request.owner_id,
+            lease_seconds=request.lease_seconds,
+        )
+        db.commit()
+    except coordinator.BenchmarkCoordinatorError as error:
+        db.rollback()
+        _raise_coordinator(error)
+    return ok(lease.model_dump(mode="json"))
+
+
+@router.post("/benchmark-campaigns/{campaign_id}/coordinator/renew")
+def renew_benchmark_coordinator(
+    campaign_id: str,
+    request: BenchmarkCoordinatorRenewRequestV1,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    lease_token: Annotated[
+        str,
+        Header(
+            alias="X-Benchmark-Lease-Token",
+            min_length=32,
+            max_length=256,
+        ),
+    ],
+) -> dict[str, object]:
+    try:
+        lease = coordinator.renew_lease(
+            db,
+            campaign_id,
+            user=user,
+            lease_token=lease_token,
+            lease_generation=request.lease_generation,
+            lease_seconds=request.lease_seconds,
+        )
+        db.commit()
+    except coordinator.BenchmarkCoordinatorError as error:
+        db.rollback()
+        _raise_coordinator(error)
+    return ok(lease.model_dump(mode="json"))
+
+
+@router.post("/benchmark-campaigns/{campaign_id}/coordinator/release")
+def release_benchmark_coordinator(
+    campaign_id: str,
+    request: BenchmarkCoordinatorReleaseRequestV1,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    lease_token: Annotated[
+        str,
+        Header(
+            alias="X-Benchmark-Lease-Token",
+            min_length=32,
+            max_length=256,
+        ),
+    ],
+) -> dict[str, object]:
+    try:
+        usage = coordinator.release_lease(
+            db,
+            campaign_id,
+            user=user,
+            lease_token=lease_token,
+            lease_generation=request.lease_generation,
+        )
+        db.commit()
+    except coordinator.BenchmarkCoordinatorError as error:
+        db.rollback()
+        _raise_coordinator(error)
+    return ok(usage.model_dump(mode="json"))
+
+
+@router.post("/benchmark-campaigns/{campaign_id}/budget-reservations")
+def reserve_benchmark_budget(
+    campaign_id: str,
+    request: BenchmarkBudgetReservationRequestV1,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    lease_token: Annotated[
+        str,
+        Header(
+            alias="X-Benchmark-Lease-Token",
+            min_length=32,
+            max_length=256,
+        ),
+    ],
+) -> dict[str, object]:
+    try:
+        reservation = coordinator.reserve_budget(
+            db,
+            campaign_id,
+            request,
+            user=user,
+            lease_token=lease_token,
+        )
+        db.commit()
+    except coordinator.BenchmarkCoordinatorError as error:
+        db.rollback()
+        _raise_coordinator(error)
+    return ok(reservation.model_dump(mode="json"))
+
+
+@router.get("/benchmark-campaigns/{campaign_id}/usage")
+def get_benchmark_campaign_usage(
+    campaign_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    try:
+        usage = coordinator.get_usage(db, campaign_id, user=user)
+    except coordinator.BenchmarkCoordinatorError as error:
+        _raise_coordinator(error)
+    return ok(usage.model_dump(mode="json"))
