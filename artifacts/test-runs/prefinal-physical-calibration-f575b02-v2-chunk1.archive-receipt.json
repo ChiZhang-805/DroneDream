@@ -1,0 +1,14 @@
+{
+  "archive_bytes": 13426,
+  "archive_path": "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\prefinal-physical-calibration-f575b02-v2-chunk1.zip",
+  "archive_sha256": "dad09142288f11b4a1ae696b972eee337180699408d13e475f6b73b694f4d3b0",
+  "delete_source_after_verify_performed": true,
+  "delete_source_after_verify_requested": true,
+  "file_count": 5,
+  "manifest_sha256": "9a43e26c24d2bebcf2c7ce03e851e6cb5a66f6ed10ec016aff1decf42c0e2078",
+  "original_bytes": 91132,
+  "schema_version": "dronedream.experiment-evidence-archive-receipt/v1",
+  "source_label": "prefinal physical calibration f575b02 v2 chunk1",
+  "terminal_status": "mixed",
+  "verification": "passed"
+}
