@@ -1,0 +1,272 @@
+{
+  "schemaVersion": "dronedream.website-shared-console-donors-validation.v1",
+  "generatedAt": "2026-08-04T02:34:18.6752692Z",
+  "scope": {
+    "branch": "codex/website",
+    "baselineHead": "6b5536f6921abce89d123773d413d0d1a411b375",
+    "previousIntegrationSource": "13da20122f87c9f7e69216ebbcfc44ca01908b48",
+    "subjectCommit": "8ddd006e357a4c9388ede786bfc2c4cd59387f15",
+    "subjectTree": "5b53a962af2b01a984c80b532b87b0b26db68dfa",
+    "sourceCommits": [
+      "a88868a1c8d68a359091273a26b5b1696122961b",
+      "5d0c7fddad875a7bd6be4024d0c91f77168608ef",
+      "8ddd006e357a4c9388ede786bfc2c4cd59387f15"
+    ],
+    "softwareFrontendEndpoint": "86a2af21acc1250ffb9f760fe62ddacd27ad865c",
+    "softwareFrontendTree": "b5dc6440dfc58952fa690cdac885f9cf5539ca0e",
+    "deploymentPerformed": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "paymentMutationPerformed": false,
+    "installerRebuiltOrReplaced": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "integrationBoundaries": {
+    "donorSelection": "frontend/** only, excluding frontend/src/site/**; each shared file was merged against the website authority rather than replacing the tree",
+    "websiteSiteAuthority": "frontend/src/site/** has no delta from the website baseline through the subject commit",
+    "pricingAvailability": "the website-authoritative PublicSite billing-checkout availability contract remains covered by the complete frontend suite",
+    "webCapability": "Web can browse, edit, preview, and keep local drafts; executable job and native/runtime operations fail closed before transport",
+    "desktopCapability": "desktop/Tauri execution branches remain available and are not replaced by Web preview behavior",
+    "adminAuthorization": "production Admin visibility remains server-/access-authorized; development preview is not a production authorization path",
+    "manualDraftsExcluded": true,
+    "manualDraftPaths": [
+      "frontend/public/docs/downloads/DroneDream-Manual-en.md",
+      "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.md",
+      "website/manual-pdf/**",
+      "website/scripts/build_manual_pdf.py",
+      "website/scripts/audit_manual_pdf_layout.py",
+      "work/**"
+    ]
+  },
+  "donors": [
+    {
+      "order": 1,
+      "source": "bd5925c0b35fd8f78aabbfba41f9ad184b814445",
+      "status": "integrated",
+      "capability": "JobDetail reconciliation and result-state coverage"
+    },
+    {
+      "order": 2,
+      "source": "5c26443f94477f97fa249ac2bf84c35bb37a972b",
+      "status": "integrated",
+      "capability": "model access account isolation"
+    },
+    {
+      "order": 3,
+      "source": "e012194c0db05556d334d5b05ae2e56317adcf2a",
+      "status": "integrated",
+      "capability": "optimization insight evidence accounting"
+    },
+    {
+      "order": 4,
+      "source": "84348b9680a009ca86ac5a2ff9abcaba8e119809",
+      "status": "integrated",
+      "capability": "bounded API error handling"
+    },
+    {
+      "order": 5,
+      "source": "d5315afa266df86be423077fcd886ad9162fb1a4",
+      "status": "integrated",
+      "capability": "New Job draft retention and bilingual copy"
+    },
+    {
+      "order": 6,
+      "source": "50489e7c535ae14df01ff82532fc6566ef71c65d",
+      "status": "integrated",
+      "capability": "assistant draft behavior"
+    },
+    {
+      "order": 7,
+      "source": "78f6f6537550edc9135055755a66f58418fda556",
+      "status": "integrated",
+      "capability": "History compare concurrency reconciliation"
+    },
+    {
+      "order": 8,
+      "source": "f7d2a7e5da5ae2cff3f5b2729474de7cdda7bb47",
+      "status": "integrated",
+      "capability": "JobDetail terminal and active trial reconciliation"
+    },
+    {
+      "order": 9,
+      "source": "df7a8cb04ed7f033993d73681dc82d3c6d59be8b",
+      "status": "integrated",
+      "capability": "corrupt trajectory rejection"
+    },
+    {
+      "order": 10,
+      "source": "c029c0ffaf4e1c2676f9df5cfcb3f4e385e059bc",
+      "status": "integrated",
+      "capability": "failed trials remain in insight denominators"
+    },
+    {
+      "order": 11,
+      "source": "6e87fe767401d2e3cb35d499510026c4ff706f1f",
+      "status": "integrated",
+      "capability": "granular Admin permissions"
+    },
+    {
+      "order": 12,
+      "source": "8084ece31cde6f97eca9406e9d81cf0b50bef0cf",
+      "status": "integrated",
+      "capability": "model access provider state isolation"
+    },
+    {
+      "order": 13,
+      "source": "4d63a329d23816e1734588ee7b9d5afd5baddbd6",
+      "status": "integrated",
+      "capability": "first-qualified default, explicit bounded exploration, API/form/type/style contract"
+    },
+    {
+      "order": 14,
+      "source": "86a2af21acc1250ffb9f760fe62ddacd27ad865c",
+      "status": "integrated",
+      "capability": "first-qualified freeze receipt type field"
+    }
+  ],
+  "webExecutionGate": {
+    "apiClientRule": "Web rejects every non-GET/HEAD/OPTIONS request with WEB_DESKTOP_REQUIRED and HTTP 405 before fetch transport",
+    "productEvents": "suppressed in Web preview",
+    "newJob": "local draft only",
+    "assistant": "local guide/manual form only; no fabricated model or simulation result",
+    "jobDetailAndCompare": "no Web execution queries",
+    "nativeAndRuntimeCalls": "not invoked in Web preview",
+    "softwareUiObservedCreateRequests": 0,
+    "unsafeApiRequests": 0
+  },
+  "validation": {
+    "environment": {
+      "platform": "Windows",
+      "nodeInstall": "npm ci in an exact detached validation clone",
+      "productionCredentials": "not used",
+      "buildPlaceholders": [
+        "VITE_SUPABASE_URL=https://example.supabase.co",
+        "VITE_SUPABASE_PUBLISHABLE_KEY=non-secret validation placeholder"
+      ]
+    },
+    "focusedDonors1To12": {
+      "files": 10,
+      "tests": 116,
+      "passed": 116,
+      "failed": 0
+    },
+    "focusedDonors13And14": {
+      "files": 4,
+      "tests": 87,
+      "passed": 87,
+      "failed": 0
+    },
+    "completeFrontendSuite": {
+      "command": "npm.cmd test -- --run --maxWorkers=1",
+      "files": 60,
+      "tests": 415,
+      "passed": 415,
+      "failed": 0,
+      "publicSitePricingAvailability": "passed"
+    },
+    "webDesktopIsolationFocused": {
+      "command": "npm.cmd test -- --run AppShellAuthentication AuthContext browserAuth DesktopSetup AppShellLauncher WebsiteAuthFlow --maxWorkers=1",
+      "files": 6,
+      "tests": 70,
+      "passed": 70,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appBuild": "passed with a non-failing Vite chunk-size advisory",
+    "sharedSiteBuild": "passed using non-secret validation placeholders",
+    "sharedConsoleBuild": "passed using non-secret validation placeholders",
+    "deploymentContract": {
+      "command": "python -m unittest runtime.tests.test_website_deployment -v",
+      "tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "softwareUiLayout": {
+      "cases": 7,
+      "passed": 7,
+      "failed": 0,
+      "languages": ["en", "zh-CN"],
+      "viewports": ["1440x1000", "760x900", "390x844"],
+      "documentWidthParity": true,
+      "fixedScenarioCreateRequests": 0,
+      "receiptSha256": "ce8a41200ff75237f34dfd581a97fa37f5d9f81a9de83f18872fba3f6400406a"
+    },
+    "resultHonestyLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "receiptSha256": "075d39201dc969d0ee455c0ac7b235d66fa543e153ae0ef6e6b3cc7e91b6a87a"
+    },
+    "historyLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "desktopDocumentWidth": "1440/1440",
+      "mobileDocumentWidth": "390/390",
+      "historyResultsScrollWidth": 1280,
+      "documentWidthParity": true,
+      "receiptSha256": "069fded683c51802e55b28411689991a7e6494811168022084af36b569c7c7f0"
+    },
+    "adminConsoleLayout": {
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "receiptSha256": "782618ff2b1fa6a05f6165d97b3231306b078f365cc5f37974216b73e58ac37f"
+    },
+    "publicBrowserMatrix": {
+      "browsers": ["edge", "chrome", "firefox"],
+      "checks": 96,
+      "passed": 96,
+      "failed": 0,
+      "externalWarnings": 19,
+      "receiptSha256": "043c841add76818e1ad1f43709e2a6d384d67b2c39c897d7139d66fc904bc4b3"
+    },
+    "visualReview": {
+      "performed": true,
+      "reviewed": [
+        "desktop EN Fixed Scenarios",
+        "desktop ZH Settings",
+        "mobile EN compact navigation",
+        "tablet ZH Fixed Scenarios",
+        "desktop EN no-validated-winner JobDetail",
+        "mobile ZH JobCompare local-scroll table",
+        "Edge desktop console assistant preview",
+        "Chrome mobile ZH homepage",
+        "Firefox desktop EN homepage",
+        "mobile ZH Admin overview/models/users/community"
+      ],
+      "finding": "no page-level horizontal overflow, clipping, overlap, or unreachable control; wide data tables scroll inside their own container"
+    },
+    "localValidationArtifact": {
+      "kind": "validation-only shared site+console output; not deployed",
+      "files": 143,
+      "bytes": 22021084,
+      "canonicalSha256SumsDigest": "c774bc70e5b93a97f8a0b7bec37f99207e9cf1edf58255391f0451992dcecede"
+    },
+    "credentialScan": {
+      "changedFrontendFiles": 29,
+      "secretPatternsMatched": 0,
+      "passed": true
+    },
+    "diffCheck": "passed"
+  },
+  "validationNotes": {
+    "optionalPreviewMatrix": "An additional optional console-preview harness reported 106/128 because its History fixture did not mock /api/v1/jobs and it assumed the <=520 navigation was already expanded. These are stale harness assumptions; the exact product contracts are covered by 415/415 unit tests, 7/7 interactive software UI cases, 4/4 History layout cases, and 96/96 public browser checks.",
+    "desktopStaticBrowserAuth": "The software-owned desktop/src-tauri/browser-auth.html is intentionally absent from the website worktree, so its static verifier is not applicable here. The shared frontend Web/Desktop isolation contract passed 70/70 focused tests.",
+    "siteBuildConfiguration": "The exact validation clone intentionally contained no production .env. Site and console builds used explicit non-secret placeholders and did not contact production services.",
+    "npmAudit": "npm ci reported 5 dependency advisories (1 moderate, 4 high). No audit fix or dependency mutation was authorized in this source.",
+    "softwarePublicSiteSnapshot": "The software branch's older PublicSite billing availability failure is a cross-line snapshot difference. The website-authoritative complete suite passes 415/415 without replacing frontend/src/site/**."
+  },
+  "remainingGates": [
+    "deploymentPerformed=false; this source has not been published to GitHub Pages or Aliyun",
+    "the current website release metadata remains bound to the previously approved installer and was not changed by this frontend-only task",
+    "a future production release still requires one commit-pinned artifact deployed byte-for-byte to GitHub Pages and 47.93.180.216",
+    "admin-console and product-events server/migration production availability remains independently gated",
+    "Supabase Functions, production Secrets, payment, DNS, TLS, and https_enforced were not changed",
+    "getdronedream.com TLS must be validated normally and must not be treated as passing through certificate-verification bypasses"
+  ]
+}
