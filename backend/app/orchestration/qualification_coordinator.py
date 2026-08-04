@@ -18,6 +18,7 @@ from app.orchestration.qualification import (
     QUALIFICATION_RULE_SHA256,
     QUALIFICATION_RULE_VERSION,
     SEALED_QUALIFICATION_POLICY_VERSION,
+    QualificationContractError,
     QualificationProgress,
     QualificationTrialObservation,
     evaluate_qualification_progress,
@@ -43,6 +44,7 @@ _TERMINAL_STATES = frozenset(
         "qualified",
     }
 )
+_TERMINAL_TRIAL_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
 
 class QualificationCoordinatorError(QualificationDispatchError):
@@ -396,9 +398,23 @@ def advance_sealed_qualifications(
     for qualification in qualifications:
         if qualification.state in _TERMINAL_STATES:
             continue
-        progress_by_id[qualification.id] = evaluate_qualification_progress(
-            _observations(qualification)
-        )
+        # Trial execution is parallel and receipts may arrive out of ordinal
+        # order. Evaluate one Candidate only after its complete currently
+        # dispatched matrix is terminal; this still allows candidate A to stop
+        # the Job while candidate B remains in flight.
+        if not qualification.trials or any(
+            trial.status not in _TERMINAL_TRIAL_STATUSES
+            for trial in qualification.trials
+        ):
+            continue
+        try:
+            progress_by_id[qualification.id] = evaluate_qualification_progress(
+                _observations(qualification)
+            )
+        except QualificationContractError as exc:
+            raise QualificationCoordinatorError(
+                "qualification Trial sequence violates the frozen rule"
+            ) from exc
         if progress_by_id[qualification.id].qualified:
             qualified_ids.append(qualification.candidate_id)
 
@@ -438,7 +454,9 @@ def advance_sealed_qualifications(
     for qualification in qualifications:
         if qualification.state in _TERMINAL_STATES:
             continue
-        progress = progress_by_id[qualification.id]
+        progress = progress_by_id.get(qualification.id)
+        if progress is None:
+            continue
         if progress.action == "seal_and_dispatch_qualification":
             if qualification.qualification_sequence is None:
                 eligible.append(qualification)
@@ -472,6 +490,23 @@ def advance_sealed_qualifications(
         if progress.qualified:
             _bind_qualified_candidate(qualification)
             qualified_ids.append(qualification.candidate_id)
+
+    unselected_nonterminal = [
+        qualification
+        for qualification in qualifications
+        if qualification.state not in _TERMINAL_STATES
+        and qualification.qualification_sequence is None
+    ]
+    selection_window_closed = all(
+        qualification.id in progress_by_id
+        for qualification in unselected_nonterminal
+    )
+    if not selection_window_closed:
+        return QualificationAdvanceResult(
+            dispatched_trials=dispatched,
+            state_changes=state_changes,
+            qualified_candidates=tuple(qualified_ids),
+        )
 
     available = 2 - len(selected)
     ordered_eligible = sorted(eligible, key=_candidate_order_key)

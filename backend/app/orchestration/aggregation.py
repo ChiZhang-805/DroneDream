@@ -1661,31 +1661,30 @@ def finalize_job_if_ready(
         )
         return True
 
-    if all_trials_terminal:
-        try:
-            qualification_advance = advance_sealed_qualifications(db, job=job)
-        except QualificationCoordinatorError as exc:
-            job_id = job.id
-            db.rollback()
-            db.expire_all()
-            failed_job = db.get(models.Job, job_id)
-            if failed_job is None:
-                return True
-            _fail_job(
-                db,
-                failed_job,
-                finalization_claim=finalization_claim,
-                code="QUALIFICATION_EVIDENCE_INVALID",
-                message=str(exc),
-            )
+    try:
+        qualification_advance = advance_sealed_qualifications(db, job=job)
+    except QualificationCoordinatorError as exc:
+        job_id = job.id
+        db.rollback()
+        db.expire_all()
+        failed_job = db.get(models.Job, job_id)
+        if failed_job is None:
             return True
-        if qualification_advance.dispatched_trials:
-            _release_partial_finalization_claim(
-                db,
-                job,
-                finalization_claim=finalization_claim,
-            )
-            return False
+        _fail_job(
+            db,
+            failed_job,
+            finalization_claim=finalization_claim,
+            code="QUALIFICATION_EVIDENCE_INVALID",
+            message=str(exc),
+        )
+        return True
+    if qualification_advance.dispatched_trials:
+        _release_partial_finalization_claim(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+        )
+        return False
 
     # Aggregate only candidates whose complete dispatched matrix is terminal.
     # A candidate can become ready while unrelated parallel work is still in
@@ -1842,6 +1841,22 @@ def finalize_job_if_ready(
         _acquire_finalization_commit_fence(db, finalization_claim)
         db.commit()
         db.refresh(job)
+
+    # A sealed qualification matrix may be progressing while unrelated Trials
+    # remain in flight.  Preserve partial aggregates for observability, but do
+    # not dispatch another generation or publish a terminal Job until a sealed
+    # first-qualified receipt exists or the current matrices are all terminal.
+    if (
+        job.holdout_policy_version == SEALED_QUALIFICATION_POLICY_VERSION
+        and job.first_qualified_candidate_id is None
+        and not all_trials_terminal
+    ):
+        _release_partial_finalization_claim(
+            db,
+            job,
+            finalization_claim=finalization_claim,
+        )
+        return False
 
     # Iterative optimizer loop (GPT / CMA-ES-style): possibly dispatch another
     # generation instead of finalizing.

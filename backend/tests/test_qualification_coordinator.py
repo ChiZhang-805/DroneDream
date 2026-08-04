@@ -234,6 +234,39 @@ def test_coordinator_selects_two_by_server_order_and_dispatches_exact_holdout() 
         assert qualification.candidate.trial_count == 14
 
 
+def test_selection_waits_for_complete_screening_window() -> None:
+    job = _job_with_screened_candidates()
+    pending = next(
+        trial
+        for trial in job.trials
+        if trial.candidate_id == "cand-z" and trial.qualification_ordinal == 4
+    )
+    receipt = pending.qualification_receipt
+    assert receipt is not None
+    pending.qualification_receipt = None
+    if receipt in pending.qualification.trial_receipts:
+        pending.qualification.trial_receipts.remove(receipt)
+    pending.status = "PENDING"
+    pending.finished_at = None
+
+    result = advance_sealed_qualifications(  # type: ignore[arg-type]
+        _RecordingSession(),
+        job=job,
+    )
+
+    assert result.dispatched_trials == 0
+    assert result.qualified_candidates == ()
+    assert job.next_qualification_sequence == 1
+    assert all(
+        qualification.qualification_sequence is None
+        for qualification in job.candidate_qualifications
+    )
+    assert all(
+        qualification.state == "screening"
+        for qualification in job.candidate_qualifications
+    )
+
+
 def test_coordinator_fails_closed_before_exceeding_trial_cap() -> None:
     job = _job_with_screened_candidates(max_total_trials=31)
 
@@ -298,6 +331,47 @@ def test_first_qualified_stops_before_another_candidate_extension() -> None:
     with pytest.raises(QualificationCoordinatorError, match="frozen rule"):
         qualified_candidate_evidence_projection(direct.candidate)
     direct.rule_sha256 = original_rule_sha256
+
+
+def test_first_qualified_does_not_wait_for_parallel_candidate() -> None:
+    job = _job_with_screened_candidates()
+    db = _RecordingSession()
+    advance_sealed_qualifications(db, job=job)  # type: ignore[arg-type]
+    by_id = {item.candidate_id: item for item in job.candidate_qualifications}
+    in_flight = by_id["cand-m"]
+    direct = by_id["cand-a"]
+
+    direct_trials = [
+        trial
+        for trial in direct.trials
+        if trial.evaluation_phase == "qualification"
+    ]
+    for index, trial in enumerate(direct_trials, start=1):
+        trial.status = "COMPLETED"
+        trial.finished_at = datetime(2026, 8, 4, 1, 3, 3, tzinfo=timezone.utc)
+        _receipt(direct, trial, passed=index <= 9)
+
+    in_flight_trials = [
+        trial
+        for trial in in_flight.trials
+        if trial.evaluation_phase == "qualification"
+    ]
+    for trial in in_flight_trials[:8]:
+        trial.status = "COMPLETED"
+        trial.finished_at = datetime(2026, 8, 4, 1, 3, 3, tzinfo=timezone.utc)
+        _receipt(in_flight, trial, passed=True)
+    in_flight_trials[8].status = "RUNNING"
+    in_flight_trials[9].status = "PENDING"
+
+    result = advance_sealed_qualifications(db, job=job)  # type: ignore[arg-type]
+
+    assert result.dispatched_trials == 0
+    assert result.qualified_candidates == ("cand-a",)
+    assert direct.state == "qualified"
+    assert in_flight.state == "cancelled"
+    assert in_flight_trials[8].status == "RUNNING"
+    assert in_flight_trials[9].status == "PENDING"
+    assert len(in_flight.trials) == 14
 
 
 def test_eight_of_ten_extends_only_when_no_candidate_qualified() -> None:
