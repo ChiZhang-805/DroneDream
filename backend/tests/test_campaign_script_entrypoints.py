@@ -13,6 +13,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 @pytest.mark.parametrize(
     "script",
     (
+        "backend/scripts/evaluate_benchmark_statistics.py",
         "backend/scripts/run_locked_harness_routing_policy_holdout.py",
         "backend/scripts/run_scenario_generalization_campaign.py",
         "backend/scripts/run_simulation_coverage_campaign.py",
