@@ -43,6 +43,7 @@ from app.optimization.outcome_taxonomy import classify_trial_outcome
 from app.optimization.scenarios import validate_scenario_execution_contract
 from app.orchestration.attempt_evidence import (
     TrialAttemptEvidenceError,
+    accepted_trial_attempt_evidence,
     record_accepted_trial_attempt_outcome,
     record_superseded_trial_attempt_outcome,
     record_trial_attempt_claim,
@@ -51,6 +52,9 @@ from app.orchestration.attempt_evidence import (
 )
 from app.orchestration.events import record_event
 from app.orchestration.outcome_contract_guard import check_job_outcome_contract
+from app.orchestration.qualification_receipts import (
+    record_qualification_trial_receipt,
+)
 from app.parameters import get_parameter, validate_parameter_values
 from app.simulator import (
     ArtifactMetadata,
@@ -209,6 +213,33 @@ def _seal_accepted_attempt(
             trial,
             verify_bytes=True,
         ),
+    )
+
+
+def _seal_qualification_trial_receipt(
+    db: Session,
+    *,
+    trial: models.Trial,
+) -> None:
+    """Persist the terminal qualification receipt in the Trial transaction."""
+
+    if trial.qualification_id is None:
+        return
+    db.flush()
+    artifact_evidence = _trial_artifact_evidence(
+        trial,
+        verify_bytes=True,
+    )
+    db.expire(trial, ["accepted_attempt", "qualification_receipt"])
+    accepted_attempt = accepted_trial_attempt_evidence(
+        trial,
+        artifact_evidence=artifact_evidence,
+    )
+    record_qualification_trial_receipt(
+        db,
+        trial=trial,
+        accepted_attempt=accepted_attempt,
+        artifact_evidence=artifact_evidence,
     )
 
 
@@ -1497,6 +1528,7 @@ def claim_and_run_one_pending_trial(
         trial=trial,
         attempt_id=attempt_id,
     )
+    _seal_qualification_trial_receipt(db, trial=trial)
 
     _refresh_progress_counters(db, job)
     record_event(
@@ -1560,6 +1592,7 @@ def _mark_trial_failed(
         trial=trial,
         attempt_id=attempt_id,
     )
+    _seal_qualification_trial_receipt(db, trial=trial)
 
     job = db.get(models.Job, trial.job_id)
     if job is not None:

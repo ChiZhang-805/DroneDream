@@ -680,6 +680,109 @@ def test_claim_and_run_one_pending_trial_completes(orchestration_ctx):
         assert event_types.count("trial_completed") == 1
 
 
+def _create_sealed_screening_job(ctx: dict[str, object]) -> str:
+    schemas = ctx["schemas"]
+    db_module = ctx["db_module"]
+    suite = schemas.ScenarioSuiteConfig(
+        cases=[
+            schemas.ScenarioCaseConfig(
+                id="screen",
+                scenario_type="nominal",
+                seeds=[101, 102, 103, 104],
+            ),
+            schemas.ScenarioCaseConfig(
+                id="holdout",
+                scenario_type="combined_perturbed",
+                seeds=list(range(901, 921)),
+                holdout=True,
+                config={"wind_mps": 3.0},
+            ),
+        ]
+    )
+    from app.orchestration.qualification import compile_sealed_qualification_contract
+
+    contract = compile_sealed_qualification_contract(suite)
+    with db_module.SessionLocal() as db:
+        job = ctx["jobs_service"].create_job(
+            db,
+            schemas.JobCreateRequest(
+                simulator_backend="mock",
+                optimizer_strategy="heuristic",
+                scenario_suite=suite,
+            ),
+        )
+        job.holdout_policy_version = "sealed-two-stage-v1"
+        job.holdout_contract_json = contract.model_dump(mode="json")
+        db.commit()
+        job_id = job.id
+
+    with db_module.SessionLocal() as db:
+        assert ctx["job_manager"].start_queued_jobs(db) == [job_id]
+    return job_id
+
+
+def test_sealed_screening_trial_persists_terminal_receipt(orchestration_ctx):
+    ctx = orchestration_ctx
+    db_module = ctx["db_module"]
+    models = ctx["models"]
+    _create_sealed_screening_job(ctx)
+
+    with db_module.SessionLocal() as db:
+        trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "qualification-worker",
+        )
+    assert trial_id is not None
+
+    with db_module.SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial.status == "COMPLETED"
+        assert trial.evaluation_phase == "screening"
+        assert trial.qualification_receipt is not None
+        assert trial.qualification_receipt.terminal_status == "COMPLETED"
+        # The mock adapter is deliberately not publication-grade PX4 evidence.
+        assert trial.qualification_receipt.passed is False
+        assert trial.qualification_receipt.evidence_complete is False
+
+
+def test_failed_sealed_screening_trial_preserves_failure_receipt(orchestration_ctx):
+    ctx = orchestration_ctx
+    db_module = ctx["db_module"]
+    models = ctx["models"]
+    _create_sealed_screening_job(ctx)
+
+    class CrashingAdapter(MockSimulatorAdapter):
+        def run_trial(self, trial_ctx: TrialContext) -> TrialResult:
+            return TrialResult(
+                success=False,
+                backend=self.backend_name,
+                failure=TrialFailure(
+                    code="SIMULATION_FAILED",
+                    reason="PX4 reported a vehicle crash",
+                ),
+                artifacts=[],
+                log_excerpt="PX4 crash retained",
+            )
+
+    with db_module.SessionLocal() as db:
+        trial_id = ctx["trial_executor"].claim_and_run_one_pending_trial(
+            db,
+            "qualification-failure-worker",
+            adapter=CrashingAdapter(),
+        )
+    assert trial_id is not None
+
+    with db_module.SessionLocal() as db:
+        trial = db.get(models.Trial, trial_id)
+        assert trial.status == "FAILED"
+        assert trial.failure_code == "SIMULATION_FAILED"
+        assert trial.log_excerpt == "PX4 crash retained"
+        assert trial.qualification_receipt is not None
+        assert trial.qualification_receipt.terminal_status == "FAILED"
+        assert trial.qualification_receipt.safety_critical_failure is True
+        assert trial.qualification_receipt.passed is False
+
+
 def test_trial_executor_rejects_mismatched_adapter_backend(orchestration_ctx):
     """A result cannot be attributed to a different backend than the adapter."""
 
