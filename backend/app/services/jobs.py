@@ -169,6 +169,16 @@ def _raise_control_version_conflict(
 def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
     if req.optimizer_strategy not in {"gpt", "llm_harness"}:
         return
+    settings = get_settings()
+    if req.provider_max_retries > settings.llm_max_retries:
+        raise JobServiceError(
+            "PROVIDER_RETRY_POLICY_UNAVAILABLE",
+            (
+                "provider_max_retries exceeds the server deployment policy; "
+                "reduce the Job retry cap or update the reviewed server policy."
+            ),
+            http_status=422,
+        )
     provider_config = req.llm or req.openai
     if provider_config is None:
         raise JobServiceError(
@@ -178,7 +188,7 @@ def _validate_gpt_request(req: schemas.JobCreateRequest) -> None:
         )
     if isinstance(provider_config, schemas.LLMProviderConfig):
         if provider_config.access_mode == "platform":
-            if not get_settings().model_gateway_base_url.strip():
+            if not settings.model_gateway_base_url.strip():
                 raise JobServiceError(
                     "MODEL_GATEWAY_NOT_CONFIGURED",
                     "The DroneDream managed-model gateway is not configured.",

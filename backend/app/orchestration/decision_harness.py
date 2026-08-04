@@ -80,7 +80,11 @@ from app.orchestration.harness_context import (
 from app.orchestration.llm_parameter_proposer import (
     OpenAIClientLike,
     OpenAIJsonClient,
+    bind_provider_request_accounting,
     load_job_api_key,
+)
+from app.orchestration.provider_request_accounting import (
+    provider_request_outcome_pending,
 )
 
 logger = logging.getLogger("drone_dream.orchestration.decision_harness")
@@ -1485,7 +1489,7 @@ def select_optimizer_budget_plan(
             proposal_schema=plan_schema,
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
-            max_retries=settings.llm_max_retries,
+            max_retries=job.provider_max_retries,
             max_response_bytes=settings.llm_max_response_bytes,
         )
 
@@ -1520,6 +1524,12 @@ def select_optimizer_budget_plan(
         schema_sha256=sha256_json(plan_schema),
         tool_outputs_sha256=empty_tool_outputs_sha256(),
     )
+    effective_client = bind_provider_request_accounting(
+        effective_client,
+        db,
+        job,
+        cognitive_turn_receipt_id=attempt.receipt_id,
+    )
     try:
         raw = effective_client.generate(
             model=chosen_model,
@@ -1527,6 +1537,11 @@ def select_optimizer_budget_plan(
             user=user,
         )
     except Exception as exc:
+        if provider_request_outcome_pending(
+            db,
+            cognitive_turn_receipt_id=attempt.receipt_id,
+        ):
+            raise CognitiveTurnPending() from exc
         finish_cognitive_turn(
             db,
             job,
@@ -1845,7 +1860,7 @@ def select_plan_revision(
             proposal_schema=revision_schema,
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
-            max_retries=settings.llm_max_retries,
+            max_retries=job.provider_max_retries,
             max_response_bytes=settings.llm_max_response_bytes,
         )
     record_event(
@@ -1879,6 +1894,12 @@ def select_plan_revision(
             [proposal.model_dump(mode="json") for proposal in proposals]
         ),
     )
+    effective_client = bind_provider_request_accounting(
+        effective_client,
+        db,
+        job,
+        cognitive_turn_receipt_id=attempt.receipt_id,
+    )
     try:
         raw = effective_client.generate(
             model=plan_decision.model or _DEFAULT_MODEL,
@@ -1886,6 +1907,11 @@ def select_plan_revision(
             user=user,
         )
     except Exception as exc:
+        if provider_request_outcome_pending(
+            db,
+            cognitive_turn_receipt_id=attempt.receipt_id,
+        ):
+            raise CognitiveTurnPending() from exc
         finish_cognitive_turn(
             db,
             job,
@@ -2091,7 +2117,7 @@ def select_optimizer_tool(
             proposal_schema=decision_schema_for_snapshot(evidence_snapshot),
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
-            max_retries=settings.llm_max_retries,
+            max_retries=job.provider_max_retries,
             max_response_bytes=settings.llm_max_response_bytes,
         )
 

@@ -81,6 +81,106 @@ class ProviderUsage:
     total_tokens: int | None = None
 
 
+class BoundProviderRequestAccountant:
+    """Bind safe request accounting to one Job cognitive turn."""
+
+    def __init__(
+        self,
+        db: Session,
+        job: models.Job,
+        *,
+        cognitive_turn_receipt_id: str,
+        provider: str,
+        region: str | None = None,
+    ) -> None:
+        self._db = db
+        self._job = job
+        self._cognitive_turn_receipt_id = cognitive_turn_receipt_id
+        self._provider = provider
+        self._region = region
+
+    def begin(
+        self,
+        *,
+        request_kind: RequestKind,
+        model_snapshot: str,
+        api_surface: str,
+        base_url: str,
+        temperature: float | None,
+        top_p: float | None,
+        provider_seed: int | None,
+        response_schema_sha256: str,
+        prompt_sha256: str,
+        request_body: Mapping[str, Any],
+        price_snapshot: schemas.ProviderPriceSnapshot,
+    ) -> ProviderRequestAttempt:
+        turn = _turn_receipt(
+            self._db,
+            self._job,
+            self._cognitive_turn_receipt_id,
+        )
+        existing_count = self._db.scalar(
+            select(func.count(models.ProviderNetworkRequestReceipt.id)).where(
+                models.ProviderNetworkRequestReceipt.cognitive_turn_receipt_id
+                == turn.id
+            )
+        )
+        return begin_provider_network_request(
+            self._db,
+            self._job,
+            cognitive_turn_receipt_id=turn.id,
+            request_index=int(existing_count or 0) + 1,
+            request_kind=request_kind,
+            provider=self._provider,
+            model_snapshot=model_snapshot,
+            api_surface=api_surface,
+            base_url=base_url,
+            region=self._region,
+            temperature=temperature,
+            top_p=top_p,
+            provider_seed=provider_seed,
+            response_schema_sha256=response_schema_sha256,
+            prompt_sha256=prompt_sha256,
+            tool_outputs_sha256=turn.tool_outputs_sha256,
+            request_body=request_body,
+            price_snapshot=price_snapshot,
+        )
+
+    def succeed(
+        self,
+        attempt: ProviderRequestAttempt,
+        *,
+        response_content: str | bytes,
+        usage: ProviderUsage,
+        latency_ms: int,
+    ) -> None:
+        finish_provider_network_request(
+            self._db,
+            self._job,
+            attempt,
+            status="succeeded",
+            response_content=response_content,
+            usage=usage,
+            latency_ms=latency_ms,
+        )
+
+    def fail(
+        self,
+        attempt: ProviderRequestAttempt,
+        *,
+        latency_ms: int,
+        error_code: str,
+    ) -> None:
+        finish_provider_network_request(
+            self._db,
+            self._job,
+            attempt,
+            status="failed",
+            latency_ms=latency_ms,
+            error_code=error_code,
+        )
+
+
 def canonical_json(value: object) -> str:
     return json.dumps(
         value,
@@ -708,19 +808,37 @@ def provider_request_counts_for_turn(
     return int(attempted or 0), int(succeeded or 0)
 
 
+def provider_request_outcome_pending(
+    db: Session,
+    *,
+    cognitive_turn_receipt_id: str,
+) -> bool:
+    pending = db.scalar(
+        select(models.ProviderNetworkRequestReceipt.id).where(
+            models.ProviderNetworkRequestReceipt.cognitive_turn_receipt_id
+            == cognitive_turn_receipt_id,
+            ~models.ProviderNetworkRequestReceipt.outcome.has(),
+        )
+    )
+    return pending is not None
+
+
 __all__ = [
     "MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB",
     "MAX_PROVIDER_NETWORK_REQUESTS_PER_TURN",
     "PROVIDER_REQUEST_ATTEMPT_SCHEMA",
     "PROVIDER_REQUEST_OUTCOME_SCHEMA",
     "PROVIDER_RETRY_POLICY_VERSION",
+    "BoundProviderRequestAccountant",
     "ProviderRequestAttempt",
     "ProviderRequestBlocked",
     "ProviderRequestPending",
     "ProviderUsage",
+    "RequestKind",
     "begin_provider_network_request",
     "finish_provider_network_request",
     "provider_request_counts_for_turn",
+    "provider_request_outcome_pending",
     "recover_abandoned_provider_requests",
     "unavailable_price_snapshot",
 ]

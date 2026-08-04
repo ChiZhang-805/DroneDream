@@ -893,6 +893,37 @@ def test_proposer_handles_client_exception_without_persisting_provider_body(
         assert "error_type=RuntimeError" in caplog.text
 
 
+def test_proposer_defers_logical_outcome_while_network_receipt_is_pending(
+    llm_ctx,
+    monkeypatch,
+):
+    ctx = llm_ctx
+    job_id = _create_gpt_job(ctx)
+    fake = FakeOpenAIClient(RuntimeError("simulated outcome persistence gap"))
+    monkeypatch.setattr(
+        ctx["proposer"],
+        "provider_request_outcome_pending",
+        lambda *args, **kwargs: True,
+    )
+    with ctx["db_module"].SessionLocal() as db:
+        job = db.get(ctx["models"].Job, job_id)
+        criteria = ctx["acceptance"].criteria_for_job(job)
+        result = ctx["proposer"].propose_candidates(
+            db,
+            job,
+            criteria,
+            client=fake,
+        )
+        receipt = db.scalar(
+            __import__("sqlalchemy")
+            .select(ctx["models"].HarnessCognitiveTurnReceipt)
+            .where(ctx["models"].HarnessCognitiveTurnReceipt.job_id == job_id)
+        )
+        assert result.error == "provider_request_outcome_pending"
+        assert receipt is not None
+        assert receipt.outcome is None
+
+
 def test_proposer_rejects_nan_or_extra_keys(llm_ctx):
     ctx = llm_ctx
     job_id = _create_gpt_job(ctx)

@@ -30,7 +30,11 @@ from app.orchestration.harness_budget_planner import HarnessProposalSummary
 from app.orchestration.llm_parameter_proposer import (
     OpenAIClientLike,
     OpenAIJsonClient,
+    bind_provider_request_accounting,
     load_job_api_key,
+)
+from app.orchestration.provider_request_accounting import (
+    provider_request_outcome_pending,
 )
 
 COGNITIVE_REVIEW_PROMPT_VERSION = "adaptive-cognitive-review-v1"
@@ -260,7 +264,7 @@ def _run_review_turn(
             proposal_schema=schema,
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
-            max_retries=settings.llm_max_retries,
+            max_retries=job.provider_max_retries,
             max_response_bytes=settings.llm_max_response_bytes,
         )
     attempt = begin_cognitive_turn(
@@ -278,9 +282,20 @@ def _run_review_turn(
             [dict(proposal_details[ref]) for ref in sorted(proposal_details)]
         ),
     )
+    effective_client = bind_provider_request_accounting(
+        effective_client,
+        db,
+        job,
+        cognitive_turn_receipt_id=attempt.receipt_id,
+    )
     try:
         raw = effective_client.generate(model=model, system=system, user=user)
-    except Exception:
+    except Exception as exc:
+        if provider_request_outcome_pending(
+            db,
+            cognitive_turn_receipt_id=attempt.receipt_id,
+        ):
+            raise CognitiveTurnPending() from exc
         finish_cognitive_turn(
             db,
             job,

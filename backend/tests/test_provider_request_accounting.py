@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import sys
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -86,6 +89,8 @@ def _create_job_and_turn(
     *,
     request_cap: int = 8,
     max_retries: int = 1,
+    prompt_sha256: str = "a" * 64,
+    schema_sha256: str = "c" * 64,
 ) -> tuple[Any, Any]:
     models = provider_db.models
     job = models.Job(
@@ -115,9 +120,9 @@ def _create_job_and_turn(
         trigger_reasons_json=["test"],
         source_commit="1" * 40,
         model_snapshot="gpt-4.1-2025-04-14",
-        prompt_sha256="a" * 64,
+        prompt_sha256=prompt_sha256,
         evidence_sha256="b" * 64,
-        schema_sha256="c" * 64,
+        schema_sha256=schema_sha256,
         tool_outputs_sha256="d" * 64,
     )
     db.add(turn)
@@ -519,3 +524,246 @@ def test_authorized_job_delete_cascades_request_receipts(
             )
             == 0
         )
+
+
+def test_openai_adapter_accounts_compatibility_fallback_exactly(
+    provider_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import provider_request_accounting as accounting
+    from app.orchestration.llm_parameter_proposer import OpenAIJsonClient
+
+    system = "bounded system"
+    user = "bounded user"
+    response_schema = {"type": "object", "additionalProperties": False}
+    prompt_hash = hashlib.sha256(f"{system}\n{user}".encode()).hexdigest()
+    schema_hash = hashlib.sha256(
+        json.dumps(
+            response_schema,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode()
+    ).hexdigest()
+    captured: dict[str, Any] = {"calls": []}
+
+    class _UnsupportedFormat(Exception):
+        status_code = 400
+
+    class _FakeCompletions:
+        def create(self, **arguments: Any) -> Any:
+            captured["calls"].append(arguments)
+            if len(captured["calls"]) == 1:
+                raise _UnsupportedFormat("response_format is not supported")
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="{}"))],
+                usage=SimpleNamespace(
+                    prompt_tokens=12,
+                    completion_tokens=2,
+                    total_tokens=14,
+                ),
+            )
+
+    class _FakeOpenAI:
+        def __init__(self, **arguments: Any) -> None:
+            captured["client"] = arguments
+            self.chat = SimpleNamespace(completions=_FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=_FakeOpenAI))
+    with Session(provider_db.engine) as db:
+        job, turn = _create_job_and_turn(
+            db,
+            provider_db,
+            request_cap=2,
+            max_retries=0,
+            prompt_sha256=prompt_hash,
+            schema_sha256=schema_hash,
+        )
+        accountant = accounting.BoundProviderRequestAccountant(
+            db,
+            job,
+            cognitive_turn_receipt_id=turn.id,
+            provider="compatible-test",
+        )
+        client = OpenAIJsonClient(
+            "not-persisted-test-key",
+            proposal_schema=response_schema,
+            base_url="https://compatible.example/v1",
+            max_retries=0,
+            price_snapshot=_price(provider_db, available=True),
+            request_accountant=accountant,
+        )
+
+        assert client.generate(model=turn.model_snapshot, system=system, user=user) == {}
+        assert captured["client"]["max_retries"] == 0
+        assert len(captured["calls"]) == 2
+        assert "response_format" in captured["calls"][0]
+        assert "response_format" not in captured["calls"][1]
+        db.refresh(turn)
+        assert [receipt.request_kind for receipt in turn.network_requests] == [
+            "primary",
+            "compatibility_fallback",
+        ]
+        assert [receipt.outcome.status for receipt in turn.network_requests] == [
+            "failed",
+            "succeeded",
+        ]
+        assert job.provider_requests_attempted == 2
+        assert job.provider_requests_succeeded == 1
+        serialized = " ".join(str(receipt.__dict__) for receipt in turn.network_requests)
+        assert "not-persisted-test-key" not in serialized
+
+
+def test_openai_adapter_retries_explicitly_with_one_idempotency_key(
+    provider_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import provider_request_accounting as accounting
+    from app.orchestration.llm_parameter_proposer import OpenAIJsonClient
+
+    system = "bounded system"
+    user = "bounded user"
+    response_schema = {"type": "object", "additionalProperties": False}
+    prompt_hash = hashlib.sha256(f"{system}\n{user}".encode()).hexdigest()
+    schema_hash = hashlib.sha256(
+        json.dumps(
+            response_schema,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode()
+    ).hexdigest()
+    captured: dict[str, Any] = {"calls": []}
+
+    class _FakeCompletions:
+        def create(self, **arguments: Any) -> Any:
+            captured["calls"].append(arguments)
+            if len(captured["calls"]) == 1:
+                raise TimeoutError("simulated provider timeout")
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="{}"))],
+                usage=None,
+            )
+
+    class _FakeOpenAI:
+        def __init__(self, **arguments: Any) -> None:
+            captured["client"] = arguments
+            self.chat = SimpleNamespace(completions=_FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=_FakeOpenAI))
+    with Session(provider_db.engine) as db:
+        job, turn = _create_job_and_turn(
+            db,
+            provider_db,
+            request_cap=2,
+            max_retries=1,
+            prompt_sha256=prompt_hash,
+            schema_sha256=schema_hash,
+        )
+        client = OpenAIJsonClient(
+            "not-persisted-test-key",
+            proposal_schema=response_schema,
+            max_retries=1,
+            request_accountant=accounting.BoundProviderRequestAccountant(
+                db,
+                job,
+                cognitive_turn_receipt_id=turn.id,
+                provider="openai",
+            ),
+        )
+
+        assert client.generate(model=turn.model_snapshot, system=system, user=user) == {}
+        assert captured["client"]["max_retries"] == 0
+        assert len(captured["calls"]) == 2
+        assert (
+            captured["calls"][0]["extra_headers"]["Idempotency-Key"]
+            == captured["calls"][1]["extra_headers"]["Idempotency-Key"]
+        )
+        assert [receipt.request_kind for receipt in turn.network_requests] == [
+            "primary",
+            "retry",
+        ]
+        assert [receipt.outcome.status for receipt in turn.network_requests] == [
+            "failed",
+            "succeeded",
+        ]
+        assert job.provider_requests_attempted == 2
+        assert job.provider_requests_succeeded == 1
+
+
+def test_provider_success_with_unwritten_outcome_is_not_replayed(
+    provider_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import provider_request_accounting as accounting
+    from app.orchestration.llm_parameter_proposer import OpenAIJsonClient
+
+    system = "bounded system"
+    user = "bounded user"
+    response_schema = {"type": "object", "additionalProperties": False}
+    prompt_hash = hashlib.sha256(f"{system}\n{user}".encode()).hexdigest()
+    schema_hash = hashlib.sha256(
+        json.dumps(
+            response_schema,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode()
+    ).hexdigest()
+    calls = 0
+
+    class _FakeCompletions:
+        def create(self, **arguments: Any) -> Any:
+            nonlocal calls
+            calls += 1
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="{}"))],
+                usage=None,
+            )
+
+    class _FakeOpenAI:
+        def __init__(self, **arguments: Any) -> None:
+            self.chat = SimpleNamespace(completions=_FakeCompletions())
+
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=_FakeOpenAI))
+    with Session(provider_db.engine) as db:
+        job, turn = _create_job_and_turn(
+            db,
+            provider_db,
+            request_cap=2,
+            max_retries=1,
+            prompt_sha256=prompt_hash,
+            schema_sha256=schema_hash,
+        )
+        client = OpenAIJsonClient(
+            "not-persisted-test-key",
+            proposal_schema=response_schema,
+            max_retries=1,
+            request_accountant=accounting.BoundProviderRequestAccountant(
+                db,
+                job,
+                cognitive_turn_receipt_id=turn.id,
+                provider="openai",
+            ),
+        )
+        monkeypatch.setattr(
+            accounting,
+            "finish_provider_network_request",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                RuntimeError("simulated outcome persistence failure")
+            ),
+        )
+
+        with pytest.raises(RuntimeError, match="outcome persistence failure"):
+            client.generate(model=turn.model_snapshot, system=system, user=user)
+        assert calls == 1
+        assert accounting.provider_request_outcome_pending(
+            db,
+            cognitive_turn_receipt_id=turn.id,
+        )
+        db.refresh(job)
+        assert job.provider_requests_attempted == 1
+        assert job.provider_requests_succeeded == 0

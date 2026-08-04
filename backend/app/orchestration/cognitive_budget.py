@@ -32,6 +32,10 @@ from app.optimization.outcome_taxonomy import (
 from app.optimization.scenarios import resolve_scenario_case
 from app.orchestration.harness_context import HarnessEvidenceSnapshot
 from app.orchestration.provider_feedback import compile_candidate_feedback
+from app.orchestration.provider_request_accounting import (
+    provider_request_outcome_pending,
+    recover_abandoned_provider_requests,
+)
 from app.simulator.base import (
     FAILURE_SIMULATION,
     FAILURE_TIMEOUT,
@@ -144,9 +148,20 @@ def recover_existing_cognitive_turn(
     from app.config import get_settings
 
     settings = get_settings()
+    recover_abandoned_provider_requests(
+        db,
+        job,
+        cognitive_turn_receipt_id=receipt.id,
+        request_timeout_seconds=settings.llm_request_timeout_seconds,
+    )
+    if provider_request_outcome_pending(
+        db,
+        cognitive_turn_receipt_id=receipt.id,
+    ):
+        return "pending"
     outcome_deadline = _as_utc(receipt.attempted_at) + timedelta(
         seconds=(
-            settings.llm_request_timeout_seconds * (settings.llm_max_retries + 1)
+            settings.llm_request_timeout_seconds * (job.provider_max_retries + 2)
             + 60
         )
     )

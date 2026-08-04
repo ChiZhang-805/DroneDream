@@ -13,9 +13,12 @@ never returned to callers or included in any persisted payload.
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import logging
 import math
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -35,9 +38,24 @@ from app.optimization.outcome_taxonomy import (
 from app.optimization.scenarios import resolve_scenario_case
 from app.orchestration import constants
 from app.orchestration.acceptance import AcceptanceCriteria
+from app.orchestration.cognitive_budget import (
+    CognitiveTurnAttempt,
+    begin_cognitive_turn,
+    empty_tool_outputs_sha256,
+    finish_cognitive_turn,
+    recover_existing_cognitive_turn,
+)
 from app.orchestration.events import record_event
 from app.orchestration.parameter_constraints import validator_for_job
 from app.orchestration.provider_feedback import compile_candidate_feedback
+from app.orchestration.provider_request_accounting import (
+    BoundProviderRequestAccountant,
+    ProviderRequestAttempt,
+    ProviderUsage,
+    RequestKind,
+    provider_request_outcome_pending,
+    unavailable_price_snapshot,
+)
 from app.parameters import (
     SUPPORTED_PX4_VERSIONS,
     SUPPORTED_TRIAL_METRICS,
@@ -100,6 +118,17 @@ _SAFE_OBJECTIVE_METRICS = frozenset(
 _INVALID_PROMPT_VALUE = object()
 
 
+def _canonical_sha256(value: object) -> str:
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _is_unsupported_response_format_error(exc: Exception) -> bool:
     """Conservatively recognize provider rejection of response_format.
 
@@ -130,6 +159,13 @@ def _safe_nonnegative_int(value: Any, *, default: int = 0) -> int:
     numeric = _finite_number(value)
     if numeric is None or numeric < 0 or not numeric.is_integer():
         return default
+    return int(numeric)
+
+
+def _optional_nonnegative_int(value: Any) -> int | None:
+    numeric = _finite_number(value)
+    if numeric is None or numeric < 0 or not numeric.is_integer():
+        return None
     return int(numeric)
 
 
@@ -215,6 +251,8 @@ class OpenAIJsonClient:
         temperature: float | None = None,
         top_p: float | None = None,
         seed: int | None = None,
+        price_snapshot: schemas.ProviderPriceSnapshot | None = None,
+        request_accountant: BoundProviderRequestAccountant | None = None,
     ) -> None:
         if temperature is not None and (
             isinstance(temperature, bool)
@@ -232,6 +270,12 @@ class OpenAIJsonClient:
             raise ValueError("top_p must be a finite number greater than 0 and at most 1")
         if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
             raise ValueError("seed must be an integer")
+        if (
+            isinstance(max_retries, bool)
+            or not isinstance(max_retries, int)
+            or not 0 <= max_retries <= 5
+        ):
+            raise ValueError("max_retries must be an integer between 0 and 5")
         self._api_key = api_key
         self._proposal_schema = proposal_schema
         self._base_url = base_url
@@ -241,6 +285,18 @@ class OpenAIJsonClient:
         self._temperature = None if temperature is None else float(temperature)
         self._top_p = None if top_p is None else float(top_p)
         self._seed = seed
+        self._price_snapshot = price_snapshot or unavailable_price_snapshot()
+        self._request_accountant = request_accountant
+
+    def with_request_accountant(
+        self,
+        accountant: BoundProviderRequestAccountant,
+    ) -> OpenAIJsonClient:
+        """Return an isolated client view bound to one durable cognitive turn."""
+
+        bound = copy.copy(self)
+        bound._request_accountant = accountant
+        return bound
 
     def generate(self, *, model: str, system: str, user: str) -> dict[str, Any]:
         try:
@@ -254,7 +310,10 @@ class OpenAIJsonClient:
         client_kwargs: dict[str, Any] = {
             "api_key": self._api_key,
             "timeout": self._timeout_seconds,
-            "max_retries": self._max_retries,
+            # SDK retries are intentionally disabled because they obscure the
+            # number of actual HTTP requests. Product retries are explicit
+            # below and each receives its own durable receipt.
+            "max_retries": 0,
         }
         if self._base_url:
             client_kwargs["base_url"] = self._base_url
@@ -275,16 +334,10 @@ class OpenAIJsonClient:
                 },
             }
 
-        def create_completion(*, include_response_format: bool) -> Any:
-            arguments: dict[str, Any] = {
+        def request_body(*, include_response_format: bool) -> dict[str, Any]:
+            body: dict[str, Any] = {
                 "model": model,
                 "messages": messages,
-                # The managed gateway uses this key to make SDK network retries
-                # non-billable duplicates. A deliberate response-format
-                # fallback gets a new key because it is a distinct request.
-                "extra_headers": {
-                    "Idempotency-Key": f"dd-{uuid.uuid4()}",
-                },
             }
             for name, value in (
                 ("temperature", self._temperature),
@@ -292,19 +345,108 @@ class OpenAIJsonClient:
                 ("seed", self._seed),
             ):
                 if value is not None:
-                    arguments[name] = value
+                    body[name] = value
             if include_response_format:
-                arguments["response_format"] = response_format
-            return client.chat.completions.create(**arguments)
+                body["response_format"] = response_format
+            return body
+
+        retries_used = 0
+
+        def explicit_request(
+            *,
+            include_response_format: bool,
+            initial_kind: RequestKind,
+        ) -> Any:
+            nonlocal retries_used
+            body = request_body(include_response_format=include_response_format)
+            accountant = self._request_accountant
+            # Exact retries reuse one idempotency key. The compatibility body
+            # is a distinct request and therefore receives a distinct key.
+            idempotency_key = f"dd-{uuid.uuid4()}"
+            request_kind = initial_kind
+            while True:
+                accounting_attempt: ProviderRequestAttempt | None = None
+                if accountant is not None:
+                    accounting_attempt = accountant.begin(
+                        request_kind=request_kind,
+                        model_snapshot=model,
+                        api_surface="chat_completions",
+                        base_url=self._base_url or "https://api.openai.com/v1",
+                        temperature=self._temperature,
+                        top_p=self._top_p,
+                        provider_seed=self._seed,
+                        response_schema_sha256=_canonical_sha256(
+                            self._proposal_schema
+                        ),
+                        prompt_sha256=hashlib.sha256(
+                            f"{system}\n{user}".encode()
+                        ).hexdigest(),
+                        request_body=body,
+                        price_snapshot=self._price_snapshot,
+                    )
+                started_ns = time.perf_counter_ns()
+                try:
+                    chat = client.chat.completions.create(
+                        **body,
+                        extra_headers={"Idempotency-Key": idempotency_key},
+                    )
+                except Exception as exc:
+                    latency_ms = max(0, (time.perf_counter_ns() - started_ns) // 1_000_000)
+                    unsupported = _is_unsupported_response_format_error(exc)
+                    if accounting_attempt is not None and accountant is not None:
+                        accountant.fail(
+                            accounting_attempt,
+                            latency_ms=latency_ms,
+                            error_code=(
+                                "unsupported_response_format"
+                                if unsupported
+                                else "provider_request_failed"
+                            ),
+                        )
+                    if unsupported or retries_used >= self._max_retries:
+                        raise
+                    retries_used += 1
+                    request_kind = "retry"
+                    continue
+
+                content = chat.choices[0].message.content or "{}"
+                usage = getattr(chat, "usage", None)
+                if accounting_attempt is not None and accountant is not None:
+                    accountant.succeed(
+                        accounting_attempt,
+                        response_content=content,
+                        usage=ProviderUsage(
+                            input_tokens=_optional_nonnegative_int(
+                                getattr(usage, "prompt_tokens", None)
+                            ),
+                            output_tokens=_optional_nonnegative_int(
+                                getattr(usage, "completion_tokens", None)
+                            ),
+                            total_tokens=_optional_nonnegative_int(
+                                getattr(usage, "total_tokens", None)
+                            ),
+                        ),
+                        latency_ms=max(
+                            0,
+                            (time.perf_counter_ns() - started_ns) // 1_000_000,
+                        ),
+                    )
+                return chat
 
         try:
-            chat = create_completion(include_response_format=True)
+            chat = explicit_request(
+                include_response_format=True,
+                initial_kind="primary",
+            )
         except Exception as exc:
             if not self._base_url or not _is_unsupported_response_format_error(exc):
                 raise
             # Some OpenAI-compatible providers accept chat completions but not
             # response_format. The prompt and local validator remain strict.
-            chat = create_completion(include_response_format=False)
+            chat = explicit_request(
+                include_response_format=False,
+                initial_kind="compatibility_fallback",
+            )
         content = chat.choices[0].message.content or "{}"
         if len(content.encode("utf-8")) > self._max_response_bytes:
             raise RuntimeError(f"LLM response exceeds {self._max_response_bytes} byte limit")
@@ -315,6 +457,27 @@ class OpenAIJsonClient:
             )
         except (json.JSONDecodeError, ValueError) as exc:
             raise RuntimeError(f"OpenAI returned non-JSON content: {exc}") from exc
+
+
+def bind_provider_request_accounting(
+    client: OpenAIClientLike,
+    db: Session,
+    job: models.Job,
+    *,
+    cognitive_turn_receipt_id: str,
+) -> OpenAIClientLike:
+    """Bind the real adapter to a turn; fake/local clients remain unchanged."""
+
+    if not isinstance(client, OpenAIJsonClient):
+        return client
+    return client.with_request_accountant(
+        BoundProviderRequestAccountant(
+            db,
+            job,
+            cognitive_turn_receipt_id=cognitive_turn_receipt_id,
+            provider=job.llm_provider or "openai",
+        )
+    )
 
 
 # --- JSON schema used for structured outputs ---------------------------
@@ -959,7 +1122,7 @@ def propose_candidates(
             proposal_schema=_proposal_schema(search_space),
             base_url=job.llm_base_url,
             timeout_seconds=settings.llm_request_timeout_seconds,
-            max_retries=settings.llm_max_retries,
+            max_retries=job.provider_max_retries,
             max_response_bytes=settings.llm_max_response_bytes,
         )
 
@@ -975,34 +1138,104 @@ def propose_candidates(
         },
     )
 
+    attempt: CognitiveTurnAttempt | None = None
     try:
         system, user, prompt_metadata = _build_prompt(
             job, criteria, list(job.candidates), search_space
         )
         if prompt_metadata["history_omitted"] or prompt_metadata["scenario_suite_compacted"]:
             record_event(db, job.id, "llm_prompt_compacted", prompt_metadata)
+        generation = job.current_generation + 1
+        turn_state = recover_existing_cognitive_turn(
+            db,
+            job,
+            generation_index=generation,
+            turn_index=1,
+        )
+        if turn_state != "new":
+            reason = (
+                "provider_turn_pending"
+                if turn_state == "pending"
+                else "provider_turn_consumed"
+            )
+            record_event(
+                db,
+                job.id,
+                "llm_proposal_failed",
+                {"reason": reason, "model": chosen_model},
+            )
+            return LlmProposerResult(error=reason, model=chosen_model)
+        proposal_schema = _proposal_schema(search_space)
+        attempt = begin_cognitive_turn(
+            db,
+            job,
+            generation_index=generation,
+            turn_index=1,
+            turn_role="plan",
+            trigger_reasons=("direct_single_turn_proposal",),
+            model_snapshot=chosen_model,
+            prompt_sha256=hashlib.sha256(f"{system}\n{user}".encode()).hexdigest(),
+            evidence_sha256=hashlib.sha256(user.encode()).hexdigest(),
+            schema_sha256=_canonical_sha256(proposal_schema),
+            tool_outputs_sha256=empty_tool_outputs_sha256(),
+        )
+        effective_client = bind_provider_request_accounting(
+            effective_client,
+            db,
+            job,
+            cognitive_turn_receipt_id=attempt.receipt_id,
+        )
         raw = effective_client.generate(model=chosen_model, system=system, user=user)
     except Exception as exc:  # OpenAI client failure, network, etc.
+        pending_request = bool(
+            attempt is not None
+            and provider_request_outcome_pending(
+                db,
+                cognitive_turn_receipt_id=attempt.receipt_id,
+            )
+        )
+        if attempt is not None and not pending_request:
+            finish_cognitive_turn(
+                db,
+                job,
+                attempt,
+                status="provider_failed",
+                error_code="client_error",
+            )
         error_type = type(exc).__name__
         logger.warning(
             "LLM proposer call failed for job %s (error_type=%s)",
             job.id,
             error_type,
         )
+        failure_reason = (
+            "provider_request_outcome_pending"
+            if pending_request
+            else "client_error"
+        )
         record_event(
             db,
             job.id,
             "llm_proposal_failed",
             {
-                "reason": "client_error",
+                "reason": failure_reason,
                 "error_type": error_type[:128],
                 "model": chosen_model,
             },
         )
-        return LlmProposerResult(error="client_error", model=chosen_model)
+        return LlmProposerResult(error=failure_reason, model=chosen_model)
 
+    if attempt is None:  # pragma: no cover - defensive static narrowing
+        raise RuntimeError("Cognitive turn attempt is missing after provider success")
     proposals = _validate_response(raw, search_space)
     if not proposals:
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="invalid_schema",
+            error_code="invalid_response",
+        )
         record_event(
             db,
             job.id,
@@ -1031,6 +1264,13 @@ def propose_candidates(
             for proposal in proposals
         ]
     }
+    finish_cognitive_turn(
+        db,
+        job,
+        attempt,
+        status="succeeded",
+        response=persisted_response,
+    )
     return LlmProposerResult(
         proposals=proposals,
         raw_response=persisted_response,
@@ -1096,6 +1336,7 @@ __all__ = [
     "LlmProposerResult",
     "OpenAIJsonClient",
     "OpenAIClientLike",
+    "bind_provider_request_accounting",
     "load_job_api_key",
     "propose_candidates",
 ]
