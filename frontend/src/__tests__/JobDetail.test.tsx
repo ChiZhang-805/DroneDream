@@ -1,10 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { JobDetail } from "../pages/JobDetail";
 import { apiClient } from "../api/client";
+import * as cloudModelAccess from "../features/settings/cloudModelAccess";
 import type { Artifact, Job, JobReport, TrialSummary } from "../types/api";
 
 const PHASE8_DEFAULTS = {
@@ -453,8 +454,125 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("rerun for gpt asks for a fresh OpenAI key and stays gpt-based", async () => {
-    const job = makeJob({ status: "COMPLETED", optimizer_strategy: "gpt" });
+  it("creates a bounded continuation child only after explicit confirmation and a fresh managed grant", async () => {
+    const budget = {
+      additional_generation_cap: 4,
+      additional_trial_cap: 80,
+      additional_provider_turn_cap: 16,
+      additional_time_budget_seconds: 3600,
+    };
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "llm_harness",
+      llm_access_mode: "platform",
+      llm_provider: "dronedream",
+      completion_policy: "first_qualified_stop",
+      job_kind: "primary",
+      first_qualified_candidate_id: "cand_best",
+      first_qualified_at: "2026-04-22T09:04:30Z",
+      continue_exploration_requested: false,
+      exploration_budget: budget,
+      provider_turns_attempted: 5,
+      provider_turns_succeeded: 5,
+      provider_turn_cap: 32,
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    vi.spyOn(cloudModelAccess, "issueManagedModelGrant").mockResolvedValue({
+      access_mode: "platform",
+      grant: `ddg_${"B".repeat(48)}`,
+      scope: "job",
+      expires_at: "2026-07-29T12:00:00Z",
+      max_calls: 16,
+      gateway_base_url: "https://gateway.example.test",
+      managed_model: "DroneDream Managed",
+      usage: {
+        plan: {
+          id: "free", name: "Free", monthly_price_cny_fen: 0,
+          included_ai_credits: 20, capability_set: "core-v1",
+        },
+        period: {
+          starts_at: "2026-07-01T00:00:00Z",
+          ends_at: "2026-08-01T00:00:00Z",
+        },
+        usage: {
+          reserved_ai_credits: 0, consumed_ai_credits: 0,
+          remaining_ai_credits: 20, request_count: 0,
+          input_tokens: 0, output_tokens: 0, total_tokens: 0,
+          estimated_request_count: 0, credit_policy_version: 1,
+        },
+        recent_requests: [],
+      },
+    });
+    const continueSpy = vi.spyOn(apiClient, "continueExploration").mockResolvedValue({
+      ...job,
+      id: "job_child",
+      job_kind: "continue_exploration",
+      continuation_parent_job_id: job.id,
+    });
+
+    renderWithJob(job.id);
+    fireEvent.click(await screen.findByRole("button", { name: /Continue exploring/i }));
+    const dialog = screen.getByRole("dialog", { name: /Confirm a separate exploration job/i });
+    expect(within(dialog).getByLabelText(/Extra generations/i)).toBeDisabled();
+    const confirm = within(dialog).getByRole("button", { name: /Confirm and start exploration/i });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(within(dialog).getByLabelText(/I understand the additional limits/i));
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(continueSpy).toHaveBeenCalledWith(
+      job.id,
+      job.control_version,
+      {
+        budget,
+        llm: {
+          access_mode: "platform",
+          provider: "dronedream",
+          api_key: null,
+          platform_grant: `ddg_${"B".repeat(48)}`,
+          model: null,
+          base_url: null,
+        },
+      },
+    ));
+    expect(cloudModelAccess.issueManagedModelGrant).toHaveBeenCalledWith("job", job.id);
+  });
+
+  it("keeps the parent first-qualified result reachable from an exploration child", async () => {
+    const job = makeJob({
+      id: "job_child",
+      job_kind: "continue_exploration",
+      continuation_parent_job_id: "job_parent",
+      completion_policy: "exploration_budget_stop",
+      optimization_outcome: "exploration_no_improvement",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    expect(await screen.findAllByText("Best validated after exploration")).not.toHaveLength(0);
+    expect(screen.getByRole("link", { name: /Open first-qualified result/i })).toHaveAttribute(
+      "href", "/jobs/job_parent",
+    );
+    expect(
+      screen.getAllByText(/parent first-qualified result remains authoritative/i)[0],
+    ).toBeVisible();
+  });
+
+  it("rerun for a BYOK job preserves its provider, model, and endpoint", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "gpt",
+      llm_access_mode: "byok",
+      llm_provider: "deepseek",
+      llm_base_url: "https://api.deepseek.com/v1",
+      openai_model: "deepseek-chat",
+    });
     vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
     vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
     vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
@@ -462,16 +580,24 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     const rerunSpy = vi
       .spyOn(apiClient, "rerunJob")
       .mockResolvedValue({ ...job, id: "job_rerun_1" });
-    vi.spyOn(window, "prompt").mockReturnValue("sk-rerun");
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("fresh-key");
 
     renderWithJob(job.id);
 
     fireEvent.click(await screen.findByRole("button", { name: /Rerun/i }));
     await waitFor(() =>
       expect(rerunSpy).toHaveBeenCalledWith(job.id, {
-        openai: { api_key: "sk-rerun", model: null },
+        llm: {
+          access_mode: "byok",
+          provider: "deepseek",
+          api_key: "fresh-key",
+          platform_grant: null,
+          model: "deepseek-chat",
+          base_url: "https://api.deepseek.com/v1",
+        },
       }),
     );
+    expect(promptSpy).toHaveBeenCalledWith(expect.stringContaining("deepseek"));
   });
 
   it("coalesces duplicate rerun requests while the first request is pending", async () => {

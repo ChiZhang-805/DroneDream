@@ -259,6 +259,10 @@ const FIELD_STEPS: Record<string, number> = {
   max_iterations: 3,
   trials_per_candidate: 3,
   max_total_trials: 3,
+  exploration_additional_generations: 3,
+  exploration_additional_trials: 3,
+  exploration_additional_provider_turns: 3,
+  exploration_additional_time_minutes: 3,
   target_rmse: 3,
   target_max_error: 3,
   min_pass_rate: 3,
@@ -858,6 +862,50 @@ function validate(
       );
     }
   }
+  if (form.continue_exploration_after_qualified) {
+    const generations = parseNumber(form.exploration_additional_generations);
+    const explorationTrials = parseNumber(form.exploration_additional_trials);
+    const providerTurns = parseNumber(form.exploration_additional_provider_turns);
+    const timeMinutes = parseNumber(form.exploration_additional_time_minutes);
+    if (
+      generations === null || !Number.isInteger(generations)
+      || generations < 1 || generations > 32
+    ) {
+      errors.exploration_additional_generations = t(
+        "wizard.validation.integerBetween", { min: 1, max: 32 },
+      );
+    }
+    if (
+      explorationTrials === null || !Number.isInteger(explorationTrials)
+      || explorationTrials < 2 || explorationTrials > 5000
+    ) {
+      errors.exploration_additional_trials = t(
+        "wizard.validation.integerBetween", { min: 2, max: 5000 },
+      );
+    }
+    if (optimizerUsesModelAccess(form.optimizer_strategy)) {
+      if (
+        providerTurns === null || !Number.isInteger(providerTurns)
+        || providerTurns < 0 || providerTurns > 128
+      ) {
+        errors.exploration_additional_provider_turns = t(
+          "wizard.validation.integerBetween", { min: 0, max: 128 },
+        );
+      } else if (generations !== null && providerTurns > generations * 4) {
+        errors.exploration_additional_provider_turns = t(
+          "wizard.validation.explorationProviderCap", { count: generations * 4 },
+        );
+      }
+    }
+    if (
+      timeMinutes === null || !Number.isInteger(timeMinutes)
+      || timeMinutes < 1 || timeMinutes > 1440
+    ) {
+      errors.exploration_additional_time_minutes = t(
+        "wizard.validation.integerBetween", { min: 1, max: 1440 },
+      );
+    }
+  }
   if (form.target_rmse.trim() !== "") {
     const value = parseNumber(form.target_rmse);
     if (value === null || value < 0 || value > 100) errors.target_rmse = t("wizard.validation.between", { min: 0, max: 100 });
@@ -1095,7 +1143,20 @@ function formToRequest(
       target_max_error: form.target_max_error.trim() === "" ? null : Number(form.target_max_error),
       min_pass_rate: Number(form.min_pass_rate),
     },
+    completion_policy: "first_qualified_stop",
   };
+  if (form.continue_exploration_after_qualified) {
+    request.continue_exploration_after_qualified = true;
+    request.exploration_budget = {
+      additional_generation_cap: Number(form.exploration_additional_generations),
+      additional_trial_cap: Number(form.exploration_additional_trials),
+      additional_provider_turn_cap: optimizerUsesModelAccess(form.optimizer_strategy)
+        ? Number(form.exploration_additional_provider_turns)
+        : 0,
+      additional_time_budget_seconds:
+        Number(form.exploration_additional_time_minutes) * 60,
+    };
+  }
   if (optimizerUsesModelAccess(form.optimizer_strategy)) {
     request.llm = form.llm_access_mode === "platform"
       ? {
@@ -1127,6 +1188,10 @@ function legacyRequest(request: JobCreateRequest): JobCreateRequest {
   delete legacy.objective_config;
   delete legacy.scenario_suite;
   delete legacy.max_total_trials;
+  delete legacy.completion_policy;
+  delete legacy.provider_turn_cap;
+  delete legacy.continue_exploration_after_qualified;
+  delete legacy.exploration_budget;
   delete legacy.llm;
   if (llm) {
     if (llm.access_mode === "platform" || !llm.api_key) return legacy;
@@ -1194,6 +1259,9 @@ function isLegacyContractRejection(
   if (!(error instanceof ApiClientError) || ![400, 422].includes(error.httpStatus)) {
     return false;
   }
+  // An old backend cannot enforce an immutable first-qualified receipt or a
+  // separately bounded continuation child. Never silently erase that choice.
+  if (request.continue_exploration_after_qualified) return false;
   if (request.llm && request.llm.provider !== "openai") return false;
   const evidence = `${error.message} ${JSON.stringify(error.details ?? "")}`.toLowerCase();
   const advancedFields = [
@@ -1203,6 +1271,10 @@ function isLegacyContractRejection(
     "scenario_suite",
     "max_total_trials",
     "llm",
+    "completion_policy",
+    "provider_turn_cap",
+    "continue_exploration_after_qualified",
+    "exploration_budget",
   ];
   const rejectionSignal =
     /\b(extra (fields?|inputs?)|unexpected (fields?|arguments?|properties?)|unknown (fields?|properties?)|unrecognized (fields?|properties?)|unsupported (fields?|properties?)|inputs? (are|is) not permitted)\b/u.test(
@@ -2660,6 +2732,59 @@ export function NewJob() {
                 }
               />
             </div>
+            <section className="completion-policy-card" aria-labelledby="completion-policy-title">
+              <div className="completion-policy-heading">
+                <div>
+                  <h3 id="completion-policy-title">{t("wizard.completionPolicy.title")}</h3>
+                  <p>{t("wizard.completionPolicy.firstQualifiedBody")}</p>
+                </div>
+                <span className="completion-policy-badge">
+                  {t("wizard.completionPolicy.firstQualifiedBadge")}
+                </span>
+              </div>
+              <label className="completion-policy-toggle">
+                <input
+                  type="checkbox"
+                  checked={form.continue_exploration_after_qualified}
+                  onChange={(event) => update(
+                    "continue_exploration_after_qualified",
+                    event.target.checked,
+                  )}
+                />
+                <span>
+                  <strong>{t("wizard.completionPolicy.continueTitle")}</strong>
+                  <small>{t("wizard.completionPolicy.continueBody")}</small>
+                </span>
+              </label>
+              {form.continue_exploration_after_qualified ? (
+                <div className="form-grid completion-policy-budget">
+                  <Field label={t("wizard.completionPolicy.generations")} required htmlFor="exploration_additional_generations" error={errors.exploration_additional_generations}>
+                    <input id="exploration_additional_generations" type="number" min="1" max="32" step="1" value={form.exploration_additional_generations} onChange={handleTextChange("exploration_additional_generations")} />
+                  </Field>
+                  <Field label={t("wizard.completionPolicy.trials")} required htmlFor="exploration_additional_trials" error={errors.exploration_additional_trials}>
+                    <input id="exploration_additional_trials" type="number" min="2" max="5000" step="1" value={form.exploration_additional_trials} onChange={handleTextChange("exploration_additional_trials")} />
+                  </Field>
+                  <Field label={t("wizard.completionPolicy.providerTurns")} required htmlFor="exploration_additional_provider_turns" error={errors.exploration_additional_provider_turns}>
+                    <input
+                      id="exploration_additional_provider_turns"
+                      type="number"
+                      min="0"
+                      max="128"
+                      step="1"
+                      disabled={!optimizerUsesModelAccess(form.optimizer_strategy)}
+                      value={optimizerUsesModelAccess(form.optimizer_strategy) ? form.exploration_additional_provider_turns : "0"}
+                      onChange={handleTextChange("exploration_additional_provider_turns")}
+                    />
+                  </Field>
+                  <Field label={t("wizard.completionPolicy.minutes")} required htmlFor="exploration_additional_time_minutes" error={errors.exploration_additional_time_minutes}>
+                    <input id="exploration_additional_time_minutes" type="number" min="1" max="1440" step="1" value={form.exploration_additional_time_minutes} onChange={handleTextChange("exploration_additional_time_minutes")} />
+                  </Field>
+                  <p className="completion-policy-warning">
+                    {t("wizard.completionPolicy.confirmationWarning")}
+                  </p>
+                </div>
+              ) : null}
+            </section>
           </SectionCard>
         </div>
 
@@ -2741,6 +2866,20 @@ export function NewJob() {
                 <ReviewFact label={t("wizard.field.targetRmse")} value={form.target_rmse || t("wizard.review.notSet")} />
                 <ReviewFact label={t("wizard.field.targetMaxError")} value={form.target_max_error || t("wizard.review.notSet")} />
                 <ReviewFact label={t("wizard.field.minPassRate")} value={form.min_pass_rate} />
+                <ReviewFact label={t("wizard.completionPolicy.title")} value={t("wizard.completionPolicy.firstQualifiedBadge")} />
+                <ReviewFact
+                  label={t("wizard.completionPolicy.continueTitle")}
+                  value={form.continue_exploration_after_qualified
+                    ? t("wizard.completionPolicy.reviewBudget", {
+                        generations: form.exploration_additional_generations,
+                        trials: form.exploration_additional_trials,
+                        turns: optimizerUsesModelAccess(form.optimizer_strategy)
+                          ? form.exploration_additional_provider_turns
+                          : "0",
+                        minutes: form.exploration_additional_time_minutes,
+                      })
+                    : t("wizard.completionPolicy.notRequested")}
+                />
               </ReviewBlock>
             </div>
             <section className="review-block review-parameter-card" aria-labelledby="selected-parameters-title">
