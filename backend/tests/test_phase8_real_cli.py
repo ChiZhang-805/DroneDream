@@ -8,10 +8,14 @@ import logging
 import sys
 import threading
 import time
+from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from app.orchestration.attempt_evidence import TrialAcceptedAttemptEvidenceV1
+from app.orchestration.qualification_receipts import compile_qualification_trial_evidence
 from app.simulator import real_cli as real_cli_module
 from app.simulator.artifact_schema import (
     _MAX_REFERENCE_POINTS,
@@ -100,6 +104,62 @@ def _valid_result(**overrides: object) -> dict[str, object]:
     }
     payload.update(overrides)
     return payload
+
+
+def test_real_px4_metric_can_form_a_passing_qualification_receipt(tmp_path: Path) -> None:
+    _raw, metrics, _artifacts, _telemetry = _px4_metric_evidence(tmp_path)
+    metric_snapshot = asdict(metrics)
+    artifact_evidence = {
+        "schema_id": "dronedream.trial-artifact-evidence/v1",
+        "trial_id": "trial-1",
+        "artifact_count": 1,
+        "sealed_artifact_count": 1,
+        "metadata_only_artifact_count": 0,
+        "artifacts": [{"artifact_id": "artifact-1", "content_sha256": "a" * 64}],
+    }
+
+    def sha256_id(value: object) -> str:
+        canonical = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        return "sha256:" + hashlib.sha256(canonical).hexdigest()
+
+    accepted = TrialAcceptedAttemptEvidenceV1(
+        trial_id="trial-1",
+        attempt_id="attempt-1",
+        attempt_count=1,
+        claim_evidence_id="sha256:" + "1" * 64,
+        outcome_evidence_id="sha256:" + "2" * 64,
+        terminal_status="COMPLETED",
+        outcome_class="success",
+        metric_sha256=sha256_id(metric_snapshot),
+        artifact_evidence_sha256=sha256_id(artifact_evidence),
+    )
+
+    receipt = compile_qualification_trial_evidence(
+        qualification_id="qlf-1",
+        trial_id="trial-1",
+        job_id="job-1",
+        candidate_id="candidate-1",
+        holdout_contract_sha256="f" * 64,
+        phase="qualification",
+        ordinal=1,
+        accepted_attempt=accepted,
+        artifact_evidence=artifact_evidence,
+        metric_snapshot=metric_snapshot,
+        failure_code=None,
+        finalized_at=datetime(2026, 8, 4, tzinfo=timezone.utc),
+    )
+
+    assert receipt.terminal_status == "COMPLETED"
+    assert receipt.passed is True
+    assert receipt.evidence_complete is True
+    assert receipt.effect_readback_complete is True
+    assert receipt.safety_critical_failure is False
 
 
 def _write_result_simulator(script: Path, result: dict[str, object], *, exit_code: int = 0) -> None:
