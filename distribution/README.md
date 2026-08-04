@@ -79,3 +79,32 @@ python distribution/tools/distribution_contract.py editions `
   distribution/editions/lab.v1.json `
   distribution/editions/field.v1.json
 ```
+
+## E1 Vehicle Pack contract
+
+`schemas/vehicle-pack-manifest.schema.json` defines a single versioned pack
+format with separate `sim`, `hardware`, `sensors`, and `validation` components.
+Every component binds reviewed upstream source IDs, immutable artifact hashes,
+license/NOTICE records, a capability-policy hash, and bounded controller
+parameters. `sourceBindings.pinSha256` is the deterministic canonical-JSON hash
+of the matching E0 inventory `pin` object, so a plausible-looking arbitrary
+hash cannot hide source drift. A pack may be `planned` or `contract-only`
+without a signature, but it cannot claim a validated tier until a detached
+Ed25519 signature and at least
+one validation artifact exist. Self-declaring `signature.state=verified` is not
+enough: the validator requires the independently verified payload SHA (the
+RFC8785-JCS payload excludes the `integrity` envelope) to match. The default CLI
+therefore fails closed on validated packs until E4 supplies the cryptographic
+verifier. Hardware validation additionally requires an included hardware
+component and an explicitly listed controller.
+
+The JSON file under `tests/fixtures/` is deliberately synthetic, unsigned, and
+contract-only. It is not a distributable Vehicle Pack and must never appear in
+the download catalog.
+
+```powershell
+python distribution/tools/distribution_contract.py vehicle-packs `
+  --inventory distribution/upstream-sources.v1.json `
+  --policy distribution/capabilities/core-capabilities.v1.json `
+  distribution/tests/fixtures/vehicle-pack-contract-only.v1.json
+```

@@ -111,6 +111,75 @@ TARGET_KINDS = {"installation", "simulation", "hitl", "real-hardware"}
 RISK_LEVELS = {"read-only", "controlled", "safety-critical"}
 DECISIONS = {"allow", "conditioned", "deny"}
 SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+SAFE_RELATIVE_PATH_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+)
+ED25519_KEY_ID_RE = re.compile(r"^ed25519:[0-9a-f]{64}$")
+PARAMETER_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
+VEHICLE_PACK_KEYS = {
+    "schemaVersion",
+    "kind",
+    "packId",
+    "packVersion",
+    "displayName",
+    "manufacturer",
+    "vehicleClass",
+    "availabilityRegions",
+    "supportedEditions",
+    "validationStatus",
+    "validationTier",
+    "autopilot",
+    "controllers",
+    "components",
+    "safety",
+    "sourceBindings",
+    "licenses",
+    "integrity",
+    "knownGaps",
+}
+VEHICLE_COMPONENT_KEYS = {"status", "sourceIds", "artifacts"}
+VEHICLE_COMPONENT_IDS = {"sim", "hardware", "sensors", "validation"}
+VEHICLE_COMPONENT_STATUSES = {"included", "external", "unsupported", "planned"}
+VEHICLE_ARTIFACT_KEYS = {"path", "sizeBytes", "sha256", "licenseIds"}
+VEHICLE_SOURCE_BINDING_KEYS = {"sourceId", "pinSha256"}
+VEHICLE_LICENSE_KEYS = {"id", "spdxExpression", "noticePath", "redistribution"}
+VEHICLE_CONTROLLER_KEYS = {"vendor", "model", "status", "regions"}
+VEHICLE_AUTOPILOT_KEYS = {
+    "family",
+    "adapterStatus",
+    "supportedFirmwareVersions",
+}
+VEHICLE_SAFETY_KEYS = {
+    "capabilityPolicySha256",
+    "frontendIsAuthority",
+    "hardwareActionsRequireValidatedTier",
+    "parameterBounds",
+}
+VEHICLE_PARAMETER_BOUND_KEYS = {"name", "minimum", "maximum", "unit"}
+VEHICLE_INTEGRITY_KEYS = {"canonicalization", "payloadSha256", "signature"}
+VEHICLE_SIGNATURE_KEYS = {
+    "state",
+    "algorithm",
+    "keyId",
+    "detachedSignatureSha256",
+}
+VEHICLE_CLASSES = {
+    "multicopter-small",
+    "multicopter-medium",
+    "multicopter-research",
+    "fixed-wing",
+    "hybrid-vtol",
+}
+REGIONS = {"cn", "global"}
+VEHICLE_VALIDATION_STATUSES = {"validated", "contract-only", "planned"}
+VEHICLE_VALIDATION_TIERS = {
+    "sim-validated",
+    "hardware-validated",
+    "contract-only",
+    "planned",
+}
+AUTOPILOT_FAMILIES = {"px4", "ardupilot", "crazyflie"}
+ADAPTER_STATUSES = {"integrated-contract", "contract-only", "planned"}
 
 
 class DistributionContractError(ValueError):
@@ -196,6 +265,16 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def sha256_canonical_json(value: Any) -> str:
+    encoded = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _validate_pin(value: Any, label: str) -> None:
@@ -643,6 +722,331 @@ def load_edition_manifests(
     return editions
 
 
+def validate_vehicle_pack_manifest(
+    document: Any,
+    *,
+    upstream_inventory: dict[str, Any],
+    capability_policy_sha256: str,
+    verified_signature_payload_sha256: str | None = None,
+) -> dict[str, Any]:
+    if not isinstance(document, dict):
+        raise DistributionContractError("Vehicle Pack manifest must be an object")
+    _require_exact_keys(document, VEHICLE_PACK_KEYS, "Vehicle Pack manifest")
+    if document["schemaVersion"] != 1 or document["kind"] != "dronedream-vehicle-pack":
+        raise DistributionContractError("Vehicle Pack identity is unsupported")
+    if not isinstance(document["packId"], str) or not ID_RE.fullmatch(document["packId"]):
+        raise DistributionContractError("Vehicle Pack id is invalid")
+    if not SEMVER_RE.fullmatch(str(document["packVersion"])):
+        raise DistributionContractError("Vehicle Pack version is invalid")
+    display_name = document["displayName"]
+    if not isinstance(display_name, dict):
+        raise DistributionContractError("Vehicle Pack displayName must be localized")
+    _require_exact_keys(display_name, {"en", "zh-CN"}, "Vehicle Pack displayName")
+    for locale in ("en", "zh-CN"):
+        _require_nonempty_string(display_name[locale], f"Vehicle Pack displayName.{locale}")
+    _require_nonempty_string(document["manufacturer"], "Vehicle Pack manufacturer")
+    if document["vehicleClass"] not in VEHICLE_CLASSES:
+        raise DistributionContractError("Vehicle Pack class is unsupported")
+    regions = _validate_unique_text_list(
+        document["availabilityRegions"], "Vehicle Pack availabilityRegions"
+    )
+    editions = _validate_unique_text_list(
+        document["supportedEditions"], "Vehicle Pack supportedEditions"
+    )
+    if not regions <= REGIONS or not editions <= EDITION_IDS:
+        raise DistributionContractError("Vehicle Pack region or edition is unsupported")
+    validation_status = document["validationStatus"]
+    validation_tier = document["validationTier"]
+    if (
+        validation_status not in VEHICLE_VALIDATION_STATUSES
+        or validation_tier not in VEHICLE_VALIDATION_TIERS
+    ):
+        raise DistributionContractError("Vehicle Pack validation claim is unsupported")
+    expected_tier_by_status = {
+        "contract-only": "contract-only",
+        "planned": "planned",
+    }
+    if validation_status in expected_tier_by_status and (
+        validation_tier != expected_tier_by_status[validation_status]
+    ):
+        raise DistributionContractError("Vehicle Pack validation status and tier disagree")
+    if validation_status == "validated" and validation_tier not in {
+        "sim-validated",
+        "hardware-validated",
+    }:
+        raise DistributionContractError("validated Vehicle Pack requires a validated tier")
+
+    autopilot = document["autopilot"]
+    if not isinstance(autopilot, dict):
+        raise DistributionContractError("Vehicle Pack autopilot must be an object")
+    _require_exact_keys(autopilot, VEHICLE_AUTOPILOT_KEYS, "Vehicle Pack autopilot")
+    if (
+        autopilot["family"] not in AUTOPILOT_FAMILIES
+        or autopilot["adapterStatus"] not in ADAPTER_STATUSES
+    ):
+        raise DistributionContractError("Vehicle Pack autopilot contract is unsupported")
+    _validate_unique_text_list(
+        autopilot["supportedFirmwareVersions"],
+        "Vehicle Pack supportedFirmwareVersions",
+    )
+
+    controllers = document["controllers"]
+    if not isinstance(controllers, list):
+        raise DistributionContractError("Vehicle Pack controllers must be a list")
+    controller_keys: set[tuple[str, str]] = set()
+    for index, controller in enumerate(controllers):
+        label = f"Vehicle Pack controllers[{index}]"
+        if not isinstance(controller, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(controller, VEHICLE_CONTROLLER_KEYS, label)
+        vendor = _require_nonempty_string(controller["vendor"], f"{label}.vendor")
+        model = _require_nonempty_string(controller["model"], f"{label}.model")
+        key = (vendor.casefold(), model.casefold())
+        if key in controller_keys:
+            raise DistributionContractError(f"{label} duplicates a controller")
+        controller_keys.add(key)
+        if controller["status"] not in VEHICLE_VALIDATION_STATUSES:
+            raise DistributionContractError(f"{label}.status is unsupported")
+        controller_regions = _validate_unique_text_list(
+            controller["regions"], f"{label}.regions"
+        )
+        if not controller_regions <= regions:
+            raise DistributionContractError(f"{label}.regions exceed pack availability")
+
+    upstream_sources = {
+        source["id"]: source for source in upstream_inventory["sources"]
+    }
+    known_source_ids = set(upstream_sources)
+    source_bindings = document["sourceBindings"]
+    if not isinstance(source_bindings, list) or not source_bindings:
+        raise DistributionContractError("Vehicle Pack sourceBindings must be non-empty")
+    bound_source_ids: set[str] = set()
+    for index, binding in enumerate(source_bindings):
+        label = f"Vehicle Pack sourceBindings[{index}]"
+        if not isinstance(binding, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(binding, VEHICLE_SOURCE_BINDING_KEYS, label)
+        source_id = binding["sourceId"]
+        if source_id not in known_source_ids or source_id in bound_source_ids:
+            raise DistributionContractError(f"{label} is unknown or duplicated")
+        bound_source_ids.add(source_id)
+        if not isinstance(binding["pinSha256"], str) or not SHA256_RE.fullmatch(
+            binding["pinSha256"]
+        ):
+            raise DistributionContractError(f"{label}.pinSha256 is invalid")
+        expected_pin_sha256 = sha256_canonical_json(upstream_sources[source_id]["pin"])
+        if binding["pinSha256"] != expected_pin_sha256:
+            raise DistributionContractError(f"{label}.pinSha256 drifted from upstream inventory")
+
+    licenses = document["licenses"]
+    if not isinstance(licenses, list) or not licenses:
+        raise DistributionContractError("Vehicle Pack licenses must be non-empty")
+    license_ids: set[str] = set()
+    for index, license_binding in enumerate(licenses):
+        label = f"Vehicle Pack licenses[{index}]"
+        if not isinstance(license_binding, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(license_binding, VEHICLE_LICENSE_KEYS, label)
+        license_id = license_binding["id"]
+        if not isinstance(license_id, str) or not ID_RE.fullmatch(license_id):
+            raise DistributionContractError(f"{label}.id is invalid")
+        if license_id in license_ids:
+            raise DistributionContractError(f"duplicate Vehicle Pack license: {license_id}")
+        license_ids.add(license_id)
+        _require_nonempty_string(
+            license_binding["spdxExpression"], f"{label}.spdxExpression"
+        )
+        notice_path = license_binding["noticePath"]
+        if not isinstance(notice_path, str) or not SAFE_RELATIVE_PATH_RE.fullmatch(
+            notice_path
+        ):
+            raise DistributionContractError(f"{label}.noticePath is unsafe")
+        if license_binding["redistribution"] not in {
+            "bundled",
+            "external-launch",
+            "not-distributed",
+        }:
+            raise DistributionContractError(f"{label}.redistribution is unsupported")
+
+    components = document["components"]
+    if not isinstance(components, dict):
+        raise DistributionContractError("Vehicle Pack components must be an object")
+    _require_exact_keys(components, VEHICLE_COMPONENT_IDS, "Vehicle Pack components")
+    artifact_count = 0
+    validation_artifact_count = 0
+    for component_id in sorted(VEHICLE_COMPONENT_IDS):
+        component = components[component_id]
+        label = f"Vehicle Pack components.{component_id}"
+        if not isinstance(component, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(component, VEHICLE_COMPONENT_KEYS, label)
+        if component["status"] not in VEHICLE_COMPONENT_STATUSES:
+            raise DistributionContractError(f"{label}.status is unsupported")
+        component_sources = _validate_unique_text_list(
+            component["sourceIds"], f"{label}.sourceIds", allow_empty=True
+        )
+        if not component_sources <= bound_source_ids:
+            raise DistributionContractError(f"{label} references an unbound source")
+        artifacts = component["artifacts"]
+        if not isinstance(artifacts, list):
+            raise DistributionContractError(f"{label}.artifacts must be a list")
+        seen_paths: set[str] = set()
+        for artifact_index, artifact in enumerate(artifacts):
+            artifact_label = f"{label}.artifacts[{artifact_index}]"
+            if not isinstance(artifact, dict):
+                raise DistributionContractError(f"{artifact_label} must be an object")
+            _require_exact_keys(artifact, VEHICLE_ARTIFACT_KEYS, artifact_label)
+            artifact_path = artifact["path"]
+            if (
+                not isinstance(artifact_path, str)
+                or not SAFE_RELATIVE_PATH_RE.fullmatch(artifact_path)
+                or artifact_path in seen_paths
+            ):
+                raise DistributionContractError(f"{artifact_label}.path is unsafe or duplicated")
+            seen_paths.add(artifact_path)
+            if not isinstance(artifact["sizeBytes"], int) or artifact["sizeBytes"] < 0:
+                raise DistributionContractError(f"{artifact_label}.sizeBytes is invalid")
+            if not isinstance(artifact["sha256"], str) or not SHA256_RE.fullmatch(
+                artifact["sha256"]
+            ):
+                raise DistributionContractError(f"{artifact_label}.sha256 is invalid")
+            artifact_license_ids = _validate_unique_text_list(
+                artifact["licenseIds"], f"{artifact_label}.licenseIds"
+            )
+            if not artifact_license_ids <= license_ids:
+                raise DistributionContractError(f"{artifact_label} references an unknown license")
+            artifact_count += 1
+            if component_id == "validation":
+                validation_artifact_count += 1
+
+    safety = document["safety"]
+    if not isinstance(safety, dict):
+        raise DistributionContractError("Vehicle Pack safety must be an object")
+    _require_exact_keys(safety, VEHICLE_SAFETY_KEYS, "Vehicle Pack safety")
+    if (
+        safety["capabilityPolicySha256"] != capability_policy_sha256
+        or safety["frontendIsAuthority"] is not False
+        or safety["hardwareActionsRequireValidatedTier"] is not True
+    ):
+        raise DistributionContractError("Vehicle Pack safety authority drifted")
+    bounds = safety["parameterBounds"]
+    if not isinstance(bounds, list) or not bounds:
+        raise DistributionContractError("Vehicle Pack parameter bounds must be non-empty")
+    bound_names: set[str] = set()
+    for index, bound in enumerate(bounds):
+        label = f"Vehicle Pack safety.parameterBounds[{index}]"
+        if not isinstance(bound, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(bound, VEHICLE_PARAMETER_BOUND_KEYS, label)
+        name = bound["name"]
+        if (
+            not isinstance(name, str)
+            or not PARAMETER_NAME_RE.fullmatch(name)
+            or name in bound_names
+        ):
+            raise DistributionContractError(f"{label}.name is invalid or duplicated")
+        bound_names.add(name)
+        if (
+            not isinstance(bound["minimum"], (int, float))
+            or isinstance(bound["minimum"], bool)
+            or not isinstance(bound["maximum"], (int, float))
+            or isinstance(bound["maximum"], bool)
+            or bound["minimum"] > bound["maximum"]
+        ):
+            raise DistributionContractError(f"{label} has invalid bounds")
+        _require_nonempty_string(bound["unit"], f"{label}.unit")
+
+    integrity = document["integrity"]
+    if not isinstance(integrity, dict):
+        raise DistributionContractError("Vehicle Pack integrity must be an object")
+    _require_exact_keys(integrity, VEHICLE_INTEGRITY_KEYS, "Vehicle Pack integrity")
+    if integrity["canonicalization"] != "RFC8785-JCS":
+        raise DistributionContractError("Vehicle Pack canonicalization is unsupported")
+    if not isinstance(integrity["payloadSha256"], str) or not SHA256_RE.fullmatch(
+        integrity["payloadSha256"]
+    ):
+        raise DistributionContractError("Vehicle Pack payload hash is invalid")
+    signature = integrity["signature"]
+    if not isinstance(signature, dict):
+        raise DistributionContractError("Vehicle Pack signature must be an object")
+    _require_exact_keys(signature, VEHICLE_SIGNATURE_KEYS, "Vehicle Pack signature")
+    if signature["algorithm"] != "Ed25519" or signature["state"] not in {
+        "verified",
+        "not-issued",
+    }:
+        raise DistributionContractError("Vehicle Pack signature contract is unsupported")
+    if signature["state"] == "verified":
+        if (
+            not isinstance(signature["keyId"], str)
+            or not ED25519_KEY_ID_RE.fullmatch(signature["keyId"])
+            or not isinstance(signature["detachedSignatureSha256"], str)
+            or not SHA256_RE.fullmatch(signature["detachedSignatureSha256"])
+        ):
+            raise DistributionContractError("verified Vehicle Pack signature is incomplete")
+    elif (
+        signature["keyId"] is not None
+        or signature["detachedSignatureSha256"] is not None
+    ):
+        raise DistributionContractError("unissued Vehicle Pack signature must not imply trust")
+    if validation_status == "validated" and (
+        signature["state"] != "verified"
+        or artifact_count == 0
+        or validation_artifact_count == 0
+    ):
+        raise DistributionContractError(
+            "validated Vehicle Pack requires signed payload and validation artifacts"
+        )
+    if validation_status == "validated" and (
+        verified_signature_payload_sha256 != integrity["payloadSha256"]
+    ):
+        raise DistributionContractError(
+            "validated Vehicle Pack requires external cryptographic signature verification"
+        )
+    if validation_tier == "sim-validated" and (
+        not editions & {"sim", "lab"}
+        or components["sim"]["status"] not in {"included", "external"}
+    ):
+        raise DistributionContractError(
+            "sim-validated Vehicle Pack requires a supported simulation edition and component"
+        )
+    if validation_tier == "hardware-validated" and (
+        not editions & {"lab", "field"}
+        or components["hardware"]["status"] != "included"
+        or not controllers
+    ):
+        raise DistributionContractError(
+            "hardware-validated Vehicle Pack requires hardware artifacts and controllers"
+        )
+    _validate_text_list(document["knownGaps"], "Vehicle Pack knownGaps")
+    return document
+
+
+def load_vehicle_pack_manifests(
+    paths: list[Path],
+    *,
+    upstream_inventory_path: Path,
+    capability_policy_path: Path,
+) -> dict[str, dict[str, Any]]:
+    upstream_inventory = load_upstream_source_inventory(upstream_inventory_path)
+    capability_policy = load_capability_policy(capability_policy_path)
+    del capability_policy
+    capability_policy_sha256 = sha256_file(capability_policy_path)
+    packs: dict[str, dict[str, Any]] = {}
+    for path in paths:
+        document = validate_vehicle_pack_manifest(
+            _load_json_document(path, "Vehicle Pack manifest"),
+            upstream_inventory=upstream_inventory,
+            capability_policy_sha256=capability_policy_sha256,
+        )
+        pack_id = document["packId"]
+        if pack_id in packs:
+            raise DistributionContractError(f"duplicate Vehicle Pack id: {pack_id}")
+        packs[pack_id] = document
+    if not packs:
+        raise DistributionContractError("at least one Vehicle Pack manifest is required")
+    return packs
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -651,12 +1055,24 @@ def main() -> int:
     editions = subparsers.add_parser("editions", help="validate the capability policy and editions")
     editions.add_argument("--policy", type=Path, required=True)
     editions.add_argument("manifests", nargs="+", type=Path)
+    vehicle_packs = subparsers.add_parser(
+        "vehicle-packs", help="validate Vehicle Pack manifests"
+    )
+    vehicle_packs.add_argument("--inventory", type=Path, required=True)
+    vehicle_packs.add_argument("--policy", type=Path, required=True)
+    vehicle_packs.add_argument("manifests", nargs="+", type=Path)
     args = parser.parse_args()
     try:
         if args.command == "upstream":
             load_upstream_source_inventory(args.inventory)
-        else:
+        elif args.command == "editions":
             load_edition_manifests(args.manifests, policy_path=args.policy)
+        else:
+            load_vehicle_pack_manifests(
+                args.manifests,
+                upstream_inventory_path=args.inventory,
+                capability_policy_path=args.policy,
+            )
     except DistributionContractError as exc:
         parser.error(str(exc))
     return 0
