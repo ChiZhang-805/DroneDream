@@ -200,6 +200,7 @@ def test_unregistered_or_unimplemented_arm_fails_closed(client: TestClient) -> N
 
     premature = _manifest()
     premature["campaign_version"] = "v2"
+    premature["arms"][0]["proposal_adapter_id"] = "reference_scbo/v1"
     premature["arms"][0]["execution_enabled"] = True
     response = client.post("/api/v1/benchmark-campaigns", json={"manifest": premature})
     assert response.status_code == 422
