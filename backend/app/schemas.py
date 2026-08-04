@@ -123,6 +123,7 @@ CognitiveTurnOutcomeStatus = Literal[
 ]
 
 MAX_PROVIDER_TURNS_PER_JOB = 128
+MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB = 256
 
 
 JOB_TERMINAL_STATUSES: frozenset[str] = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
@@ -830,6 +831,10 @@ class JobCreateRequest(_Strict):
         int,
         Field(ge=0, le=MAX_PROVIDER_TURNS_PER_JOB),
     ] = 64
+    provider_request_cap: Annotated[
+        int,
+        Field(ge=0, le=MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB),
+    ] = 128
     continue_exploration_after_qualified: bool = False
     exploration_budget: ContinueExplorationBudget | None = None
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
@@ -901,6 +906,20 @@ class JobCreateRequest(_Strict):
             elif self.provider_turn_cap > worst_case_provider_turns:
                 raise ValueError(
                     "provider_turn_cap cannot exceed four turns per generation"
+                )
+            worst_case_provider_requests = min(
+                MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB,
+                self.provider_turn_cap * 2,
+            )
+            if "provider_request_cap" not in self.model_fields_set:
+                self.provider_request_cap = min(
+                    self.provider_request_cap,
+                    worst_case_provider_requests,
+                )
+            elif self.provider_request_cap > worst_case_provider_requests:
+                raise ValueError(
+                    "provider_request_cap cannot exceed two actual requests "
+                    "per logical provider turn"
                 )
         scenario_trial_count = sum(
             len(case.seeds) for case in self.scenario_suite.cases if case.enabled
@@ -981,6 +1000,9 @@ class Job(BaseModel):
     provider_turn_cap: int = 64
     provider_turns_attempted: int = 0
     provider_turns_succeeded: int = 0
+    provider_request_cap: int = 128
+    provider_requests_attempted: int = 0
+    provider_requests_succeeded: int = 0
     first_qualified_candidate_id: str | None = None
     first_qualified_freeze_receipt_id: str | None = None
     first_qualified_at: datetime | None = None
@@ -1501,6 +1523,7 @@ __all__ = [
     "ExperimentAssistantUsage",
     "LLMProviderConfig",
     "MAX_PROVIDER_TURNS_PER_JOB",
+    "MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB",
     "OpenAIConfig",
     "OptimizationOutcome",
     "OptimizationHistory",

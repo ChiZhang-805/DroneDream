@@ -52,6 +52,9 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     assert job["provider_turn_cap"] == 64
     assert job["provider_turns_attempted"] == 0
     assert job["provider_turns_succeeded"] == 0
+    assert job["provider_request_cap"] == 128
+    assert job["provider_requests_attempted"] == 0
+    assert job["provider_requests_succeeded"] == 0
     assert job["first_qualified_candidate_id"] is None
     assert job["first_qualified_freeze_receipt_id"] is None
     assert job["continue_exploration_requested"] is False
@@ -61,7 +64,11 @@ def test_create_job_returns_queued(client: TestClient) -> None:
 def test_rerun_preserves_bounded_completion_contract(client: TestClient) -> None:
     created = client.post(
         "/api/v1/jobs",
-        json={**HEURISTIC_JOB_PAYLOAD, "provider_turn_cap": 7},
+        json={
+            **HEURISTIC_JOB_PAYLOAD,
+            "provider_turn_cap": 7,
+            "provider_request_cap": 11,
+        },
     )
     assert created.status_code == 200, created.text
     source = created.json()["data"]
@@ -72,6 +79,7 @@ def test_rerun_preserves_bounded_completion_contract(client: TestClient) -> None
 
     assert child["completion_policy"] == "first_qualified_stop"
     assert child["provider_turn_cap"] == 7
+    assert child["provider_request_cap"] == 11
     assert child["job_kind"] == "primary"
     assert child["continuation_parent_job_id"] is None
 

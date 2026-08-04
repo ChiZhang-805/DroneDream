@@ -632,6 +632,16 @@ class Job(Base):
             name="ck_jobs_provider_turn_counts",
         ),
         CheckConstraint(
+            "provider_request_cap >= 0 AND provider_request_cap <= 256",
+            name="ck_jobs_provider_request_cap",
+        ),
+        CheckConstraint(
+            "provider_requests_attempted >= 0 "
+            "AND provider_requests_succeeded >= 0 "
+            "AND provider_requests_succeeded <= provider_requests_attempted",
+            name="ck_jobs_provider_request_counts",
+        ),
+        CheckConstraint(
             "next_candidate_dispatch_ordinal >= 1",
             name="ck_jobs_next_candidate_dispatch_ordinal",
         ),
@@ -735,6 +745,24 @@ class Job(Base):
         server_default="0",
     )
     provider_turns_succeeded: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    provider_request_cap: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=128,
+        server_default="128",
+    )
+    provider_requests_attempted: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+    provider_requests_succeeded: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         default=0,
@@ -1383,6 +1411,10 @@ class HarnessCognitiveTurnReceipt(Base):
     outcome: Mapped[HarnessCognitiveTurnOutcome | None] = relationship(
         back_populates="turn_receipt", cascade="all, delete-orphan", uselist=False
     )
+    network_requests: Mapped[list[ProviderNetworkRequestReceipt]] = relationship(
+        back_populates="turn_receipt",
+        cascade="all, delete-orphan",
+    )
 
 
 class HarnessCognitiveTurnOutcome(Base):
@@ -1409,6 +1441,132 @@ class HarnessCognitiveTurnOutcome(Base):
     )
 
     turn_receipt: Mapped[HarnessCognitiveTurnReceipt] = relationship(
+        back_populates="outcome"
+    )
+
+
+class ProviderNetworkRequestReceipt(Base):
+    """Append-only receipt committed immediately before one HTTP request.
+
+    The row deliberately excludes credentials, provider request identifiers,
+    and raw prompt/chat content. One cognitive turn may have more than one row
+    only when a separately bounded retry or compatibility fallback is actually
+    sent over the network.
+    """
+
+    __tablename__ = "provider_network_request_receipts"
+    __table_args__ = (
+        UniqueConstraint(
+            "cognitive_turn_receipt_id",
+            "request_index",
+            name="uq_provider_request_turn_index",
+        ),
+        CheckConstraint(
+            "request_index >= 1 AND request_index <= 8",
+            name="ck_provider_request_index",
+        ),
+        CheckConstraint(
+            "input_utf8_bytes >= 0",
+            name="ck_provider_request_input_bytes",
+        ),
+        CheckConstraint(
+            "temperature IS NULL OR (temperature >= 0 AND temperature <= 2)",
+            name="ck_provider_request_temperature",
+        ),
+        CheckConstraint(
+            "top_p IS NULL OR (top_p > 0 AND top_p <= 1)",
+            name="ck_provider_request_top_p",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("pnr")
+    )
+    cognitive_turn_receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("harness_cognitive_turn_receipts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    model_snapshot: Mapped[str] = mapped_column(String(128), nullable=False)
+    api_surface: Mapped[str] = mapped_column(String(64), nullable=False)
+    base_url_normalized: Mapped[str] = mapped_column(String(2048), nullable=False)
+    base_url_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    region: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    temperature: Mapped[float | None] = mapped_column(Float, nullable=True)
+    top_p: Mapped[float | None] = mapped_column(Float, nullable=True)
+    provider_seed: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    response_schema_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    prompt_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    tool_outputs_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_body_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    input_utf8_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    price_snapshot_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    price_snapshot_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    attempted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    turn_receipt: Mapped[HarnessCognitiveTurnReceipt] = relationship(
+        back_populates="network_requests"
+    )
+    outcome: Mapped[ProviderNetworkRequestOutcome | None] = relationship(
+        back_populates="request_receipt",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+
+class ProviderNetworkRequestOutcome(Base):
+    """Append-only terminal outcome for one actual provider HTTP request."""
+
+    __tablename__ = "provider_network_request_outcomes"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('succeeded', 'failed', 'indeterminate')",
+            name="ck_provider_request_outcome_status",
+        ),
+        CheckConstraint(
+            "output_utf8_bytes >= 0 AND latency_ms >= 0",
+            name="ck_provider_request_outcome_bytes_latency",
+        ),
+        CheckConstraint(
+            "(input_tokens IS NULL OR input_tokens >= 0) "
+            "AND (output_tokens IS NULL OR output_tokens >= 0) "
+            "AND (total_tokens IS NULL OR total_tokens >= 0) "
+            "AND (provider_cost_microusd IS NULL OR provider_cost_microusd >= 0)",
+            name="ck_provider_request_outcome_usage",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("pno")
+    )
+    request_receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("provider_network_request_receipts.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    outcome_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    response_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    output_utf8_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    input_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    output_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    total_tokens: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    provider_cost_microusd: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    latency_ms: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    request_receipt: Mapped[ProviderNetworkRequestReceipt] = relationship(
         back_populates="outcome"
     )
 
@@ -1916,6 +2074,8 @@ __all__ = [
     "JobEvent",
     "JobReport",
     "JobSecret",
+    "ProviderNetworkRequestOutcome",
+    "ProviderNetworkRequestReceipt",
     "Trial",
     "TrialExecutionAttempt",
     "TrialExecutionAttemptDeleteAuthorization",

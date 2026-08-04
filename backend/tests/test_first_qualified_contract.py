@@ -14,6 +14,7 @@ def test_job_create_defaults_to_bounded_first_qualified_policy() -> None:
 
     assert request.completion_policy == "first_qualified_stop"
     assert request.provider_turn_cap == 64
+    assert request.provider_request_cap == 128
 
     with pytest.raises(ValidationError):
         schemas.JobCreateRequest(provider_turn_cap=129)
@@ -23,11 +24,19 @@ def test_job_create_defaults_to_bounded_first_qualified_policy() -> None:
         max_iterations=1,
     )
     assert bounded_default.provider_turn_cap == 4
+    assert bounded_default.provider_request_cap == 8
     with pytest.raises(ValidationError):
         schemas.JobCreateRequest(
             optimizer_strategy="gpt",
             max_iterations=1,
             provider_turn_cap=5,
+        )
+    with pytest.raises(ValidationError):
+        schemas.JobCreateRequest(
+            optimizer_strategy="gpt",
+            max_iterations=1,
+            provider_turn_cap=4,
+            provider_request_cap=9,
         )
 
     budget = schemas.ContinueExplorationBudget(
@@ -65,6 +74,8 @@ def test_first_qualified_and_cognitive_models_have_durable_constraints() -> None
 
     assert "ck_jobs_provider_turn_cap" in job_constraints
     assert "ck_jobs_provider_turn_counts" in job_constraints
+    assert "ck_jobs_provider_request_cap" in job_constraints
+    assert "ck_jobs_provider_request_counts" in job_constraints
     assert "uq_jobs_continuation_parent_job_id" in job_constraints
     assert "uq_candidate_job_dispatch_ordinal" in candidate_constraints
     assert "uq_candidate_job_qualification_sequence" in candidate_constraints

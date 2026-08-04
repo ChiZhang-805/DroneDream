@@ -795,7 +795,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0027 (head)"]
+    assert heads == ["20260804_0028 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -835,7 +835,9 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "WHERE type='table' AND name IN ("
                 "'first_qualified_freeze_receipts', "
                 "'harness_cognitive_turn_receipts', "
-                "'harness_cognitive_turn_outcomes'"
+                "'harness_cognitive_turn_outcomes', "
+                "'provider_network_request_receipts', "
+                "'provider_network_request_outcomes'"
                 ")"
             ).fetchall()
         }
@@ -880,6 +882,20 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "'harness_cognitive_turn_delete_authorizations'"
             ).fetchall()
         }
+        provider_network_triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='trigger' AND tbl_name IN ("
+                "'provider_network_request_receipts', "
+                "'provider_network_request_outcomes'"
+                ")"
+            ).fetchall()
+        }
+        provider_accounting_columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info('jobs')").fetchall()
+        }
         continuation_parent_is_unique = any(
             row[2] == 1
             and [
@@ -898,11 +914,13 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             ).fetchall()
         }
 
-    assert version == ("20260804_0027",)
+    assert version == ("20260804_0028",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
         "harness_cognitive_turn_outcomes",
+        "provider_network_request_receipts",
+        "provider_network_request_outcomes",
     }
     assert {
         "trg_candidate_evidence_required_no_downgrade",
@@ -924,6 +942,17 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
     assert cognitive_authorization_tables == {
         "harness_cognitive_turn_delete_authorizations"
     }
+    assert provider_network_triggers == {
+        "trg_provider_network_request_receipts_no_update",
+        "trg_provider_network_request_receipts_no_delete",
+        "trg_provider_network_request_outcomes_no_update",
+        "trg_provider_network_request_outcomes_no_delete",
+    }
+    assert {
+        "provider_request_cap",
+        "provider_requests_attempted",
+        "provider_requests_succeeded",
+    }.issubset(provider_accounting_columns)
     assert continuation_parent_is_unique is True
     assert {
         "qualification_policy_version",
@@ -1004,6 +1033,45 @@ def test_postgresql_cognitive_turn_migration_emits_immutable_guards(
     assert "BEFORE UPDATE OR DELETE ON harness_cognitive_turn_outcomes" in sql
     assert "harness_cognitive_turn_delete_authorizations" in sql
     assert "cognitive turn records are append-only" in sql
+
+
+def test_postgresql_provider_request_migration_emits_immutable_guards(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260804_0028_provider_network_request_accounting.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "provider_network_request_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _PostgresOp:
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration._install_postgres_guards()
+
+    sql = "\n".join(emitted)
+    assert (
+        "CREATE FUNCTION dronedream_reject_provider_network_request_mutation()"
+        in sql
+    )
+    assert "BEFORE UPDATE OR DELETE ON provider_network_request_receipts" in sql
+    assert "BEFORE UPDATE OR DELETE ON provider_network_request_outcomes" in sql
+    assert "harness_cognitive_turn_delete_authorizations" in sql
+    assert "provider network request records are append-only" in sql
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

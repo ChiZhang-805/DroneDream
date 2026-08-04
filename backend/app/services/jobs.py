@@ -501,6 +501,7 @@ def _create_job_from_config(
         completion_policy=req.completion_policy,
         job_kind=job_kind,
         provider_turn_cap=req.provider_turn_cap,
+        provider_request_cap=req.provider_request_cap,
         # A creation-time budget is only a preregistration.  It must not look
         # like the authenticated post-qualification continuation action has
         # already happened; that flag flips only when the child Job is claimed.
@@ -553,6 +554,7 @@ def _create_job_from_config(
                 "completion_policy": req.completion_policy,
                 "job_kind": job_kind,
                 "provider_turn_cap": req.provider_turn_cap,
+                "provider_request_cap": req.provider_request_cap,
                 "continue_exploration_preregistered": (
                     req.continue_exploration_after_qualified
                 ),
@@ -824,6 +826,7 @@ def rerun_job(
         max_total_trials=source.max_total_trials,
         completion_policy=source.completion_policy,  # type: ignore[arg-type]
         provider_turn_cap=source.provider_turn_cap,
+        provider_request_cap=source.provider_request_cap,
         acceptance_criteria=schemas.AcceptanceCriteria(
             target_rmse=source.target_rmse,
             target_max_error=source.target_max_error,
@@ -2151,6 +2154,9 @@ def to_job_schema(job: models.Job) -> schemas.Job:
         provider_turn_cap=job.provider_turn_cap,
         provider_turns_attempted=job.provider_turns_attempted,
         provider_turns_succeeded=job.provider_turns_succeeded,
+        provider_request_cap=job.provider_request_cap,
+        provider_requests_attempted=job.provider_requests_attempted,
+        provider_requests_succeeded=job.provider_requests_succeeded,
         first_qualified_candidate_id=job.first_qualified_candidate_id,
         first_qualified_freeze_receipt_id=(
             job.first_qualified_freeze.id

@@ -134,6 +134,9 @@ def _apply_sqlite_lightweight_migrations() -> None:
             "provider_turn_cap": "INTEGER NOT NULL DEFAULT 64",
             "provider_turns_attempted": "INTEGER NOT NULL DEFAULT 0",
             "provider_turns_succeeded": "INTEGER NOT NULL DEFAULT 0",
+            "provider_request_cap": "INTEGER NOT NULL DEFAULT 128",
+            "provider_requests_attempted": "INTEGER NOT NULL DEFAULT 0",
+            "provider_requests_succeeded": "INTEGER NOT NULL DEFAULT 0",
             "next_candidate_dispatch_ordinal": "BIGINT NOT NULL DEFAULT 1",
             "next_qualification_sequence": "BIGINT NOT NULL DEFAULT 1",
             "first_qualified_candidate_id": "VARCHAR(64)",
@@ -566,6 +569,80 @@ def _apply_sqlite_lightweight_migrations() -> None:
                         SELECT RAISE(
                             ABORT,
                             'cognitive turn outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "provider_network_request_receipts" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_receipts_no_update
+                    BEFORE UPDATE ON provider_network_request_receipts
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_receipts_no_delete
+                    BEFORE DELETE ON provider_network_request_receipts
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations
+                        WHERE receipt_id = OLD.cognitive_turn_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request receipts are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+        if "provider_network_request_outcomes" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_outcomes_no_update
+                    BEFORE UPDATE ON provider_network_request_outcomes
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request outcomes are append-only'
+                        );
+                    END
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_provider_network_request_outcomes_no_delete
+                    BEFORE DELETE ON provider_network_request_outcomes
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM harness_cognitive_turn_delete_authorizations AS authorization
+                        JOIN provider_network_request_receipts AS receipt
+                          ON receipt.cognitive_turn_receipt_id = authorization.receipt_id
+                        WHERE receipt.id = OLD.request_receipt_id
+                    )
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'provider network request outcomes are append-only'
                         );
                     END
                     """
