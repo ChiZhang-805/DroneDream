@@ -1,0 +1,14 @@
+{
+  "archive_bytes": 10547,
+  "archive_path": "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\prefinal-physical-calibration-9db5df2-smoke3.zip",
+  "archive_sha256": "7284e9d05ec226738d329558d3adc8bde2becd7070c7aa09e97d9f691ce19f03",
+  "delete_source_after_verify_performed": true,
+  "delete_source_after_verify_requested": true,
+  "file_count": 4,
+  "manifest_sha256": "6e538b27e098c9cdd58d713e20814136353cf2e2434b3f7b3541cc0a1e752481",
+  "original_bytes": 69377,
+  "schema_version": "dronedream.experiment-evidence-archive-receipt/v1",
+  "source_label": "v1 three-scenario baseline calibration including preserved prearm failure",
+  "terminal_status": "mixed",
+  "verification": "passed"
+}

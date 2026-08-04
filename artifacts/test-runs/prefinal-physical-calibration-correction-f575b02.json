@@ -1,0 +1,65 @@
+{
+  "schema_version": "dronedream.prefinal-physical-calibration-correction/v1",
+  "generated_at": "2026-08-04T00:15:44.4032618Z",
+  "correction_source_commit": "86a2af21acc1250ffb9f760fe62ddacd27ad865c",
+  "registry_revision_commit": "f575b0292af9aa17973f926fa9a2ea4f2bc2a1cb",
+  "provider_calls_attempted": 0,
+  "provider_calls_succeeded": 0,
+  "v1_archive": {
+    "path": "artifacts/test-runs/prefinal-physical-calibration-9db5df2-smoke3.zip",
+    "sha256": "7284e9d05ec226738d329558d3adc8bde2becd7070c7aa09e97d9f691ce19f03",
+    "execution_source": "9db5df212ef14927e0ba47a30304b026d3c0bc4c",
+    "engine_pack_id": "sha256:28347545e0160d459513e432bfa83af3c36a8497a800933bfe0982bc68095674"
+  },
+  "corrections": [
+    {
+      "field": "campaign-manifest.json.summary.passingTrials",
+      "recorded": 0,
+      "corrected": 4,
+      "reason": "The collector read metrics.passed, while the authenticated Trial API returns metrics.pass_flag. All four easy-hover-calm Trial receipts contain pass_flag=true.",
+      "outcome_bytes_modified": false
+    },
+    {
+      "field": "easy-hover-calm-receipt.json.report.firstQualifiedCandidateId",
+      "recorded": null,
+      "corrected": "cand_de2d03b3b474",
+      "reason": "The collector read first-qualified fields from the legacy report response instead of the terminal Job response.",
+      "outcome_bytes_modified": false
+    },
+    {
+      "field": "easy-hover-calm-receipt.json.report.firstQualifiedFreezeReceiptId",
+      "recorded": null,
+      "corrected": "fqf_18c0af2091c2",
+      "reason": "The immutable server receipt existed in the execution database but its ID was not exposed by the Job API before correction commit 86a2af2.",
+      "outcome_bytes_modified": false
+    }
+  ],
+  "server_first_qualified_receipt": {
+    "job_id": "job_ce55e4c02f7a",
+    "candidate_id": "cand_de2d03b3b474",
+    "receipt_id": "fqf_18c0af2091c2",
+    "evidence_id": "sha256:811b8e43d8d23223e64aa9647e34f5a8864924a9547e8983d5f981645a0cd1dc",
+    "definition_version": "server-sequence-deterministic-tiebreak/v1",
+    "time_to_first_qualified_ms": 270994,
+    "trials_attempted": 4,
+    "trials_completed": 4,
+    "trials_passed": 4,
+    "trials_failed": 0,
+    "provider_turns_attempted": 0,
+    "provider_turns_succeeded": 0,
+    "frozen_at": "2026-08-03T23:32:47.425312Z"
+  },
+  "v2_hard_recalibration": {
+    "path": "artifacts/test-runs/prefinal-physical-calibration-f575b02-v2-hard.zip",
+    "sha256": "36759678577cd41cdbee3fd9057305d88678e285d9aca147fb322d939af5de36",
+    "execution_source": "f575b0292af9aa17973f926fa9a2ea4f2bc2a1cb",
+    "engine_pack_id": "sha256:915ed8a06b460043356e13bc50693d3b8b71fb890849296cf9a4f78a483f8771",
+    "job_id": "job_322eeea1b4c4",
+    "trials_completed": 4,
+    "trials_passed": 3,
+    "trials_failed": 0,
+    "optimization_outcome": "no_usable_candidate",
+    "first_qualified_candidate_id": null
+  },
+  "claim_boundary": "This correction repairs evidence-field mapping only. It does not alter any Job, Trial, telemetry, metric, failure, qualification decision, winner decision, or frozen v1 archive byte."
+}

@@ -1,0 +1,14 @@
+{
+  "archive_bytes": 4718,
+  "archive_path": "Z:\\DroneDream-worktrees\\aurora-20260728\\artifacts\\test-runs\\prefinal-physical-calibration-f575b02-v2-hard.zip",
+  "archive_sha256": "36759678577cd41cdbee3fd9057305d88678e285d9aca147fb322d939af5de36",
+  "delete_source_after_verify_performed": true,
+  "delete_source_after_verify_requested": true,
+  "file_count": 2,
+  "manifest_sha256": "698cce7cb118ba1f883e6e3acae95a0b445cca65db778bc37ccb7f6aa60a855c",
+  "original_bytes": 25123,
+  "schema_version": "dronedream.experiment-evidence-archive-receipt/v1",
+  "source_label": "v2 calibrated hard hover baseline with three of four passing trials",
+  "terminal_status": "mixed",
+  "verification": "passed"
+}
