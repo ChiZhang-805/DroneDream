@@ -100,7 +100,11 @@ def validate_frontend_catalog_parity(catalog: dict[str, Any]) -> None:
         manifest_path = ROOT / entry["manifestPath"]
         manifest = load_json(manifest_path)
         frontend = frontend_packs[pack_id]
-        require_equal(entry["manifestSha256"], sha256_file(manifest_path), f"{pack_id} registry SHA")
+        require_equal(
+            entry["manifestSha256"],
+            sha256_file(manifest_path),
+            f"{pack_id} registry SHA",
+        )
         expected = {
             "packVersion": manifest["packVersion"],
             "displayName": manifest["displayName"],

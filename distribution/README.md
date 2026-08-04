@@ -188,8 +188,9 @@ signature. Authenticode may honestly remain `not-signed` for the current
 closed-beta policy.
 
 The fixture is synthetic, planned, and contains no installer. It does not
-authorize branch creation. The three release branches remain absent until E4
-adds the build planner, observed-Git checks, and governance approval.
+authorize branch creation. The three release branches remain absent until a
+future promotion has complete artifact evidence and explicit governance
+approval.
 
 ```powershell
 python distribution/tools/distribution_contract.py promotion `
@@ -200,4 +201,50 @@ python distribution/tools/distribution_contract.py promotion `
   --composite distribution/tests/fixtures/composite-sim-planned.v1.json `
   --expected-source 6b50f86ed80c190b816f19d06de143a328bda7e2 `
   distribution/tests/fixtures/release-promotion-sim-planned.v1.json
+```
+
+## E4 unified edition build planner
+
+`build-planning/e4-request.v1.json` is the reviewed input to the deterministic
+plan-only coordinator in `tools/edition_build_planner.py`. The planner binds
+one clean product source and one Git-derived common-core hash to the Sim, Lab,
+and Field edition manifests, exact component contracts, selected Vehicle Pack
+manifests/controllers, resource ceilings, NOTICE inputs, artifact names,
+rollback policy, and the three independently observed release-channel heads.
+
+The planner deliberately has no output-file or build option. It writes a JSON
+plan to stdout only after confirming that the source tree is clean and that
+`codex/release-sim`, `codex/release-lab`, and `codex/release-field` are still
+absent on the observed remote. It never runs Tauri, NSIS, Runtime migration,
+PX4, Gazebo, an installer, a release API, or a branch mutation. Every generated
+edition and precombined bundle therefore remains `planned-not-built`, with
+`sha256=null` and `bytes=null`.
+
+The full-simulation Runtime Base is an exact, verified reuse reference to the
+existing beta.2 handoff. The current desktop, Engine Pack, lightweight Field
+Runtime, all three installers, and all precombined bundles remain unbuilt.
+Resource values are planning upper bounds, not observed artifact sizes. The
+existing Runtime NOTICE is bound for planning, but each future binary must
+regenerate and verify its own exact dependency/NOTICE closure.
+
+There are still zero validated Vehicle Packs. Sim has no physical authority;
+Lab and Field remain contract-only and cannot arm, write hardware parameters,
+or fly. The planner's execution flags are all false and cannot create a
+release branch or promote an artifact.
+
+Generate a plan from an exact clean checkpoint:
+
+```powershell
+python distribution/tools/edition_build_planner.py `
+  distribution/build-planning/e4-request.v1.json
+```
+
+After a plan-only receipt is committed under `distribution/build-plans/`, its
+source may remain the preceding implementation commit. Validation permits only
+that receipt-only suffix and rejects any other post-source change:
+
+```powershell
+python distribution/tools/edition_build_planner.py `
+  distribution/build-planning/e4-request.v1.json `
+  --validate distribution/build-plans/<plan>.json
 ```
