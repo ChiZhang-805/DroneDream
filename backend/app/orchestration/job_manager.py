@@ -72,6 +72,11 @@ from app.orchestration.outcome_contract_guard import (
     check_job_outcome_contract,
 )
 from app.orchestration.parameter_constraints import validator_for_job
+from app.orchestration.qualification_dispatch import (
+    ensure_candidate_screening_qualification,
+    qualification_trial_binding,
+    screening_runs,
+)
 from app.simulator.base import (
     FAILURE_ADAPTER_UNAVAILABLE,
     FAILURE_ARTIFACT_PERSISTENCE,
@@ -171,6 +176,45 @@ def _configured_scenario_runs(
     return scenario_matrix_for_generation(
         suite,
         generation_index=generation_index,
+    )
+
+
+def _candidate_dispatch_runs(
+    db: Session,
+    job: models.Job,
+    candidate: models.CandidateParameterSet,
+) -> tuple[list[ScenarioRun] | None, models.CandidateQualification | None]:
+    """Select legacy matrix or the exact four-run sealed screening matrix."""
+
+    qualification, contract = ensure_candidate_screening_qualification(
+        db,
+        job=job,
+        candidate=candidate,
+    )
+    if qualification is not None:
+        if contract is None:  # pragma: no cover - guarded by dispatch contract
+            raise RuntimeError("sealed qualification is missing its contract")
+        return list(screening_runs(contract)), qualification
+    return (
+        _configured_scenario_runs(
+            job,
+            generation_index=candidate.generation_index,
+        ),
+        None,
+    )
+
+
+def _qualification_trial_fields(
+    qualification: models.CandidateQualification | None,
+    *,
+    ordinal: int,
+) -> dict[str, Any]:
+    if qualification is None:
+        return {}
+    return qualification_trial_binding(
+        qualification=qualification,
+        phase="screening",
+        ordinal=ordinal,
     )
 
 
@@ -508,9 +552,9 @@ def _dispatch_llm_candidate_trials(
 ) -> list[models.Trial]:
     trials: list[models.Trial] = []
     now = _now()
-    configured_runs = _configured_scenario_runs(job, generation_index=candidate.generation_index)
+    configured_runs, qualification = _candidate_dispatch_runs(db, job, candidate)
     if configured_runs is not None:
-        for run in configured_runs:
+        for ordinal, run in enumerate(configured_runs, start=1):
             trial = models.Trial(
                 job_id=job.id,
                 candidate_id=candidate.id,
@@ -524,6 +568,7 @@ def _dispatch_llm_candidate_trials(
                 ),
                 status="PENDING",
                 queued_at=now,
+                **_qualification_trial_fields(qualification, ordinal=ordinal),
             )
             db.add(trial)
             db.flush()
@@ -540,6 +585,8 @@ def _dispatch_llm_candidate_trials(
                     "scenario_case_id": run.case_id,
                     "seed": run.seed,
                     "generation_index": candidate.generation_index,
+                    "evaluation_phase": trial.evaluation_phase,
+                    "qualification_ordinal": trial.qualification_ordinal,
                 },
             )
         candidate.trial_count = len(trials)
@@ -591,9 +638,9 @@ def _dispatch_baseline_trials(
 
     trials: list[models.Trial] = []
     now = _now()
-    configured_runs = _configured_scenario_runs(job, generation_index=0)
+    configured_runs, qualification = _candidate_dispatch_runs(db, job, candidate)
     if configured_runs is not None:
-        for run in configured_runs:
+        for ordinal, run in enumerate(configured_runs, start=1):
             trial = models.Trial(
                 job_id=job.id,
                 candidate_id=candidate.id,
@@ -604,6 +651,7 @@ def _dispatch_baseline_trials(
                 ),
                 status="PENDING",
                 queued_at=now,
+                **_qualification_trial_fields(qualification, ordinal=ordinal),
             )
             db.add(trial)
             db.flush()
@@ -619,6 +667,8 @@ def _dispatch_baseline_trials(
                     "scenario": run.scenario_type,
                     "scenario_case_id": run.case_id,
                     "seed": run.seed,
+                    "evaluation_phase": trial.evaluation_phase,
+                    "qualification_ordinal": trial.qualification_ordinal,
                 },
             )
         candidate.trial_count = len(trials)
@@ -765,11 +815,21 @@ def _dispatch_optimizer_trials(
 
     trials: list[models.Trial] = []
     now = _now()
-    configured_runs = _configured_scenario_runs(job, generation_index=candidate.generation_index)
+    configured_runs, qualification = _candidate_dispatch_runs(db, job, candidate)
     if configured_runs is not None:
         full_training_count = sum(1 for run in configured_runs if not run.holdout)
         fidelity = _optimizer_fidelity(candidate.optimizer_metadata_json)
         requested_fidelity = _optimizer_requested_fidelity(candidate.optimizer_metadata_json)
+        if qualification is not None and (
+            not math.isclose(fidelity, 1.0, rel_tol=0.0, abs_tol=1e-12)
+            or not math.isclose(
+                requested_fidelity,
+                1.0,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+        ):
+            raise RuntimeError("sealed qualification screening requires full fidelity")
         if requested_fidelity < 1.0:
             configured_runs = _low_fidelity_scenario_runs(
                 configured_runs,
@@ -786,7 +846,7 @@ def _dispatch_optimizer_trials(
                     raise RuntimeError(
                         "dispatched Trial coverage diverged from sealed optimizer fidelity"
                     )
-        for run in configured_runs:
+        for ordinal, run in enumerate(configured_runs, start=1):
             payload = _scenario_payload(
                 job,
                 run,
@@ -803,6 +863,7 @@ def _dispatch_optimizer_trials(
                 scenario_config_json=payload,
                 status="PENDING",
                 queued_at=now,
+                **_qualification_trial_fields(qualification, ordinal=ordinal),
             )
             db.add(trial)
             db.flush()
@@ -818,6 +879,8 @@ def _dispatch_optimizer_trials(
                     "scenario": run.scenario_type,
                     "scenario_case_id": run.case_id,
                     "seed": run.seed,
+                    "evaluation_phase": trial.evaluation_phase,
+                    "qualification_ordinal": trial.qualification_ordinal,
                 },
             )
         candidate.trial_count = len(trials)
