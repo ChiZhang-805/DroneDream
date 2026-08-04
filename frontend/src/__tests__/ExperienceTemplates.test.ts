@@ -15,8 +15,12 @@ describe("starter experience templates", () => {
       "first-circle@1",
       "light-wind-circle@1",
       "wind-sensor-circle@1",
+      "precision-hover@1",
+      "compact-circle@1",
+      "gust-recovery-circle@1",
+      "crosswind-figure-eight@1",
     ]);
-    expect(new Set(STARTER_EXPERIENCE_TEMPLATES.map((template) => template.key)).size).toBe(4);
+    expect(new Set(STARTER_EXPERIENCE_TEMPLATES.map((template) => template.key)).size).toBe(8);
     expect(Object.isFrozen(STARTER_EXPERIENCE_TEMPLATES)).toBe(true);
     expect(STARTER_EXPERIENCE_TEMPLATES.every((template) => Object.isFrozen(template.patch))).toBe(
       true,

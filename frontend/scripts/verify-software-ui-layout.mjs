@@ -44,6 +44,16 @@ const cases = [
 ].filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
 const fixedScenarioOnlyCases = [
   {
+    id: "wide-fixed-scenarios-en",
+    locale: "en",
+    viewport: { width: 2048, height: 1200 },
+  },
+  {
+    id: "wide-fixed-scenarios-zh",
+    locale: "zh-CN",
+    viewport: { width: 2048, height: 1200 },
+  },
+  {
     id: "tablet-fixed-scenarios-en",
     locale: "en",
     viewport: { width: 760, height: 900 },
@@ -454,16 +464,25 @@ async function verifyFixedScenarios(page, testCase) {
         };
       }),
       cards: scenarioCards.map((card) => {
+        const heading = card.querySelector(".fixed-scenario-card-heading");
+        const title = heading?.querySelector("h2");
+        const difficulty = heading?.querySelector(".fixed-scenario-difficulty");
         const facts = card.querySelector(".fixed-scenario-facts");
         const preview = card.querySelector(".experience-preview");
         const action = card.querySelector(".fixed-scenario-use");
-        if (!(facts instanceof HTMLElement)
+        if (!(heading instanceof HTMLElement)
+          || !(title instanceof HTMLElement)
+          || !(difficulty instanceof HTMLElement)
+          || !(facts instanceof HTMLElement)
           || !(preview instanceof HTMLElement)
           || !(action instanceof HTMLElement)) {
           throw new Error("Fixed-scenario card is missing an aligned content region");
         }
         return {
           ...bounds(card),
+          heading: bounds(heading),
+          title: bounds(title),
+          difficulty: bounds(difficulty),
           facts: bounds(facts),
           preview: bounds(preview),
           action: bounds(action),
@@ -509,6 +528,8 @@ async function verifyFixedScenarios(page, testCase) {
     assert(closeEnough(metrics.cards[1].left, metrics.cards[3].left, 1));
     assert(metrics.cards.every((card) => closeEnough(card.width, metrics.cards[0].width, 1)));
     assert(metrics.cards.every((card) => closeEnough(card.height, metrics.cards[0].height, 1)));
+    assert(metrics.cards.every((card) => closeEnough(card.title.top, card.difficulty.top, 2)));
+    assert(metrics.cards.every((card) => card.title.left < card.difficulty.left));
     for (const [leftIndex, rightIndex] of [[0, 1], [2, 3]]) {
       const leftCard = metrics.cards[leftIndex];
       const rightCard = metrics.cards[rightIndex];
@@ -521,8 +542,12 @@ async function verifyFixedScenarios(page, testCase) {
   }
   if (testCase.viewport.width >= 1000) {
     assert(
+      metrics.page.right >= metrics.documentWidth - 26,
+      `${testCase.id}: fixed-scenario page leaves excessive space at the right edge`,
+    );
+    assert(
       Math.max(...metrics.cards.map((card) => card.bottom)) <= metrics.viewportHeight,
-      `${testCase.id}: fixed scenarios do not fit within the desktop viewport`,
+      `${testCase.id}: fixed scenarios bottom ${Math.max(...metrics.cards.map((card) => card.bottom))} exceeds viewport ${metrics.viewportHeight}; first card=${JSON.stringify(metrics.cards[0])}`,
     );
     assert(
       metrics.cards.every((card) => card.preview.height >= 180),
@@ -530,7 +555,7 @@ async function verifyFixedScenarios(page, testCase) {
     );
     assert(
       Math.max(...metrics.cards.map((card) => card.bottom)) >= metrics.viewportHeight - 60,
-      `${testCase.id}: fixed scenarios leave excessive unused space below the grid`,
+      `${testCase.id}: fixed scenarios end at ${Math.max(...metrics.cards.map((card) => card.bottom))} within viewport ${metrics.viewportHeight}`,
     );
   } else if (testCase.viewport.width <= 620) {
     assert(
@@ -578,6 +603,20 @@ async function verifyFixedScenarios(page, testCase) {
     await page.locator(".app-mobile-menu-button").click();
   }
   const image = await screenshot(page, testCase.id, "fixed-scenarios");
+  const nextGroup = page.getByRole("button", {
+    name: testCase.locale === "zh-CN" ? "查看下一组场景" : "Show next scenarios",
+  });
+  await nextGroup.click();
+  assert.equal(await cards.count(), 4);
+  assert.equal(
+    await page.locator('.fixed-scenario-card[data-template-key="precision-hover@1"]').count(),
+    1,
+  );
+  const nextImage = await screenshot(page, testCase.id, "fixed-scenarios-group-2");
+  const previousGroup = page.getByRole("button", {
+    name: testCase.locale === "zh-CN" ? "查看上一组场景" : "Show previous scenarios",
+  });
+  await previousGroup.click();
   let createRequests = 0;
   const countCreateRequest = (request) => {
     if (request.method() === "POST" && /\/api\/v1\/jobs(?:\?|$)/u.test(request.url())) {
@@ -607,6 +646,7 @@ async function verifyFixedScenarios(page, testCase) {
     mobileMenu: mobileMenuMetrics,
     mobileMenuImage,
     image,
+    nextImage,
   };
 }
 

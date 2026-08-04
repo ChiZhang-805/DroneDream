@@ -1,4 +1,5 @@
-import { ArrowRight, Gauge, Wind } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, Gauge, Wind } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { recordProductEvent } from "../features/analytics/productEvents";
@@ -40,7 +41,29 @@ const FIXED_SCENARIO_DEFINITIONS: readonly FixedScenarioDefinition[] = Object.fr
     difficulty: "medium",
     titleKey: "scenarioLibrary.combined.title",
   },
+  {
+    id: "precision-hover",
+    difficulty: "simple",
+    titleKey: "scenarioLibrary.precisionHover.title",
+  },
+  {
+    id: "compact-circle",
+    difficulty: "simple",
+    titleKey: "scenarioLibrary.compactCircle.title",
+  },
+  {
+    id: "gust-recovery-circle",
+    difficulty: "medium",
+    titleKey: "scenarioLibrary.gustRecovery.title",
+  },
+  {
+    id: "crosswind-figure-eight",
+    difficulty: "medium",
+    titleKey: "scenarioLibrary.figureEight.title",
+  },
 ]);
+
+const SCENARIOS_PER_PAGE = 4;
 
 function scenarioPreviewPoints(id: StarterExperienceId) {
   const template = STARTER_EXPERIENCE_TEMPLATES.find((candidate) => candidate.id === id);
@@ -61,15 +84,51 @@ function scenarioPreviewPoints(id: StarterExperienceId) {
 
 export function FixedScenarios() {
   const { t } = useI18n();
+  const [pageIndex, setPageIndex] = useState(0);
+  const pageCount = Math.ceil(FIXED_SCENARIO_DEFINITIONS.length / SCENARIOS_PER_PAGE);
+  const visibleDefinitions = FIXED_SCENARIO_DEFINITIONS.slice(
+    pageIndex * SCENARIOS_PER_PAGE,
+    (pageIndex + 1) * SCENARIOS_PER_PAGE,
+  );
+
+  const changePage = (direction: -1 | 1) => {
+    setPageIndex((current) => (current + direction + pageCount) % pageCount);
+  };
 
   return (
     <div className="fixed-scenarios-page">
       <header className="page-header fixed-scenarios-header">
         <h1>{t("scenarioLibrary.title")}</h1>
+        <div
+          className="fixed-scenarios-pagination"
+          role="group"
+          aria-label={t("scenarioLibrary.pagination.label")}
+        >
+          <button
+            type="button"
+            onClick={() => changePage(-1)}
+            aria-label={t("scenarioLibrary.pagination.previous")}
+          >
+            <ChevronLeft aria-hidden="true" />
+          </button>
+          <span aria-live="polite">
+            {t("scenarioLibrary.pagination.status", {
+              current: pageIndex + 1,
+              total: pageCount,
+            })}
+          </span>
+          <button
+            type="button"
+            onClick={() => changePage(1)}
+            aria-label={t("scenarioLibrary.pagination.next")}
+          >
+            <ChevronRight aria-hidden="true" />
+          </button>
+        </div>
       </header>
 
       <div className="fixed-scenarios-grid">
-        {FIXED_SCENARIO_DEFINITIONS.map((definition) => {
+        {visibleDefinitions.map((definition) => {
           const template = STARTER_EXPERIENCE_TEMPLATES.find(
             (candidate) => candidate.id === definition.id,
           );
@@ -91,22 +150,24 @@ export function FixedScenarios() {
               data-template-key={template.key}
             >
               <div className="fixed-scenario-card-heading">
-                <div>
-                  <span className="fixed-scenario-difficulty">
-                    {definition.difficulty === "simple"
-                      ? <Gauge aria-hidden="true" />
-                      : <Wind aria-hidden="true" />}
-                    {t(difficultyKey)}
-                  </span>
-                  <h2>{t(definition.titleKey)}</h2>
-                </div>
+                <h2>{t(definition.titleKey)}</h2>
+                <span className="fixed-scenario-difficulty">
+                  {definition.difficulty === "simple"
+                    ? <Gauge aria-hidden="true" />
+                    : <Wind aria-hidden="true" />}
+                  {t(difficultyKey)}
+                </span>
               </div>
               <dl className="fixed-scenario-facts">
                 <div>
                   <dt>{t("scenarioLibrary.track")}</dt>
                   <dd>{template.patch.track_type === "hover"
                     ? t("scenarioLibrary.track.hover")
-                    : t("scenarioLibrary.track.circle")}</dd>
+                    : template.patch.track_type === "circle"
+                      ? t("scenarioLibrary.track.circle", {
+                        radius: template.patch.circle_radius_m,
+                      })
+                      : t("scenarioLibrary.track.figureEight")}</dd>
                 </div>
                 <div>
                   <dt>{t("scenarioLibrary.altitude")}</dt>

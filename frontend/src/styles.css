@@ -2748,14 +2748,75 @@ a {
 
 .fixed-scenarios-page {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.6rem;
   width: 100%;
+  min-height: 0;
   min-width: 0;
 }
 
+.app-main:has(.fixed-scenarios-page) {
+  display: flex;
+  max-width: none;
+  min-height: 0;
+  padding-bottom: 0.75rem;
+}
+
 .fixed-scenarios-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
   margin: 0;
+}
+
+.fixed-scenarios-pagination {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.18rem;
+  min-height: 2.3rem;
+  padding: 0.18rem;
+  border: 1px solid #decfe2;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 22px rgba(66, 38, 75, 0.06);
+}
+
+.fixed-scenarios-pagination button {
+  display: inline-grid;
+  width: 1.95rem;
+  height: 1.95rem;
+  padding: 0;
+  color: #8b328f;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  place-items: center;
+}
+
+.fixed-scenarios-pagination button:hover,
+.fixed-scenarios-pagination button:focus-visible {
+  background: #f6eaf7;
+}
+
+.fixed-scenarios-pagination button:focus-visible {
+  outline: 2px solid #b33bb5;
+  outline-offset: 1px;
+}
+
+.fixed-scenarios-pagination svg {
+  width: 18px;
+  height: 18px;
+}
+
+.fixed-scenarios-pagination span {
+  min-width: 2.8rem;
+  color: #6d5872;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 750;
 }
 
 .fixed-scenario-difficulty {
@@ -2780,9 +2841,12 @@ a {
 
 .fixed-scenarios-grid {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
   gap: 0.65rem;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -2798,8 +2862,17 @@ a {
   box-shadow: 0 10px 28px rgba(66, 38, 75, 0.06);
 }
 
+.fixed-scenario-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.4rem;
+}
+
 .fixed-scenario-card h2 {
-  margin: 0.36rem 0 0;
+  min-width: 0;
+  margin: 0;
   color: #251929;
   font-size: 1rem;
   line-height: 1.18;
@@ -2814,6 +2887,7 @@ a {
 
 .fixed-scenario-facts > div {
   min-width: 0;
+  height: 4.5rem;
   min-height: 4.5rem;
   padding: 0.42rem 0.48rem;
   border: 1px solid #eadfeb;
@@ -2840,13 +2914,19 @@ a {
 }
 
 .fixed-scenario-card .experience-preview {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
   padding: 0.35rem;
   border-color: #e5d8e7;
   background: #faf7fb;
 }
 
 .fixed-scenario-card .experience-preview-compact .experience-preview-canvas {
-  height: 176px;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 176px;
   margin: 0;
 }
 
@@ -2861,17 +2941,51 @@ a {
   height: 17px;
 }
 
+@media (min-width: 1000px) {
+  .app-shell:has(.fixed-scenarios-page) {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-shell:has(.fixed-scenarios-page) .app-sidebar {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .app-body:has(.fixed-scenarios-page) {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-body:has(.fixed-scenarios-page) > .app-header,
+  .app-body:has(.fixed-scenarios-page) > .app-footer {
+    flex: 0 0 auto;
+  }
+
+  .app-main:has(.fixed-scenarios-page) {
+    flex: 1 1 0;
+    overflow: hidden;
+  }
+}
+
 @media (max-width: 1100px) {
   .fixed-scenario-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .fixed-scenario-card .experience-preview-compact .experience-preview-canvas {
-    height: 142px;
+    min-height: 142px;
   }
 }
 
 @media (max-width: 620px) {
+  .fixed-scenarios-header {
+    align-items: center;
+  }
+
   .fixed-scenarios-grid {
     grid-template-columns: 1fr;
   }

@@ -150,6 +150,22 @@ const STARTER_EXPERIENCE_I18N: Record<
     title: "wizard.starter.combined.title",
     description: "wizard.starter.combined.description",
   },
+  "precision-hover": {
+    title: "wizard.starter.precisionHover.title",
+    description: "wizard.starter.precisionHover.description",
+  },
+  "compact-circle": {
+    title: "wizard.starter.compactCircle.title",
+    description: "wizard.starter.compactCircle.description",
+  },
+  "gust-recovery-circle": {
+    title: "wizard.starter.gustRecovery.title",
+    description: "wizard.starter.gustRecovery.description",
+  },
+  "crosswind-figure-eight": {
+    title: "wizard.starter.figureEight.title",
+    description: "wizard.starter.figureEight.description",
+  },
 };
 
 const OBJECTIVE_WEIGHT_PRESETS: Record<

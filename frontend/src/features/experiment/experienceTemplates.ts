@@ -6,7 +6,11 @@ export type StarterExperienceId =
   | "hover-basics"
   | "first-circle"
   | "light-wind-circle"
-  | "wind-sensor-circle";
+  | "wind-sensor-circle"
+  | "precision-hover"
+  | "compact-circle"
+  | "gust-recovery-circle"
+  | "crosswind-figure-eight";
 
 type TemplateField =
   | "tuning_mode"
@@ -182,6 +186,61 @@ export const STARTER_EXPERIENCE_TEMPLATES: readonly StarterExperienceTemplate[] 
       noise_search_enabled: true,
       combined_holdout_enabled: true,
       scenario_preset: "stress",
+    }),
+    freezeTemplate("precision-hover", {
+      ...COMMON_BEGINNER_FIELDS,
+      ...STABLE_OBJECTIVE,
+      track_type: "hover",
+      altitude_m: "5",
+      circle_radius_m: "5",
+      wind_north: "0",
+      wind_east: "0",
+      wind_south: "0",
+      wind_west: "0",
+      wind_search_enabled: false,
+      scenario_preset: "nominal",
+    }),
+    freezeTemplate("compact-circle", {
+      ...COMMON_BEGINNER_FIELDS,
+      ...STABLE_OBJECTIVE,
+      track_type: "circle",
+      circle_radius_m: "3",
+      wind_north: "0",
+      wind_east: "0",
+      wind_south: "0",
+      wind_west: "0",
+      wind_search_enabled: false,
+      scenario_preset: "nominal",
+    }),
+    freezeTemplate("gust-recovery-circle", {
+      ...COMMON_BEGINNER_FIELDS,
+      ...ROBUST_OBJECTIVE,
+      track_type: "circle",
+      circle_radius_m: "5",
+      wind_north: "1",
+      wind_east: "0",
+      wind_south: "0",
+      wind_west: "0",
+      wind_search_enabled: true,
+      gust_enabled: true,
+      gust_magnitude_mps: "2",
+      gust_direction_deg: "90",
+      gust_period_s: "8",
+      combined_holdout_enabled: true,
+      scenario_preset: "stress",
+    }),
+    freezeTemplate("crosswind-figure-eight", {
+      ...COMMON_BEGINNER_FIELDS,
+      ...ROBUST_OBJECTIVE,
+      track_type: "lemniscate",
+      circle_radius_m: "4",
+      wind_north: "0",
+      wind_east: "2",
+      wind_south: "0",
+      wind_west: "0",
+      wind_search_enabled: true,
+      combined_holdout_enabled: true,
+      scenario_preset: "wind",
     }),
   ]);
 

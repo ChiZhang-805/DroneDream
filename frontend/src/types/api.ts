@@ -49,7 +49,11 @@ export type StarterExperienceTemplateKey =
   | "hover-basics@1"
   | "first-circle@1"
   | "light-wind-circle@1"
-  | "wind-sensor-circle@1";
+  | "wind-sensor-circle@1"
+  | "precision-hover@1"
+  | "compact-circle@1"
+  | "gust-recovery-circle@1"
+  | "crosswind-figure-eight@1";
 export type UserDefaultTrackType =
   | "hover"
   | "circle"

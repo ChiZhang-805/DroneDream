@@ -34,7 +34,7 @@ afterEach(() => {
 });
 
 describe("fixed scenario library", () => {
-  it("presents four compact common scenarios without creating a job", async () => {
+  it("presents compact common scenarios in switchable groups of four without creating a job", async () => {
     const createSpy = vi.spyOn(apiClient, "createJob");
     const { router } = renderPage();
 
@@ -50,6 +50,16 @@ describe("fixed scenario library", () => {
     expect(screen.queryByText("Preview only")).not.toBeInTheDocument();
     expect(screen.queryByText(/generated points/i)).not.toBeInTheDocument();
     expect(screen.queryByText("What this tests")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show next scenarios" }));
+    expect(document.querySelectorAll("[data-template-key]")).toHaveLength(4);
+    expect(screen.getByRole("heading", { name: "Precision hover" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Crosswind figure eight" })).toBeVisible();
+    expect(screen.getByText("2 / 2")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show previous scenarios" }));
+    expect(screen.getByRole("heading", { name: "Stable hover" })).toBeVisible();
+    expect(screen.getByText("1 / 2")).toBeVisible();
 
     const combinedCard = screen.getByRole("heading", {
       name: "Wind and sensor-noise circle",
