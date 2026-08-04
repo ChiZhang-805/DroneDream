@@ -5,14 +5,7 @@ const fs = require("fs");
 const path = require("path");
 
 const REPOSITORY_ROOT = path.resolve(__dirname, "../..");
-const REGISTRY_PATH = path.join(
-  REPOSITORY_ROOT,
-  "backend/evaluation_artifacts/prefinal-realistic-scenario-registry-v1.json",
-);
-const REGISTRY_MANIFEST_PATH = path.join(
-  REPOSITORY_ROOT,
-  "backend/evaluation_artifacts/prefinal-realistic-scenario-registry-v1.manifest.json",
-);
+const DEFAULT_REGISTRY_STEM = "prefinal-realistic-scenario-registry-v1";
 const EVIDENCE_ROOT = path.join(REPOSITORY_ROOT, "artifacts/test-runs");
 const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELLED"]);
 
@@ -63,6 +56,7 @@ function atomicWriteJson(target, value, initializedPaths) {
 function parseArguments(argv) {
   const options = {
     problems: [],
+    registryStem: DEFAULT_REGISTRY_STEM,
     cdpUrl: "http://127.0.0.1:9223",
     timeoutSeconds: 45 * 60,
   };
@@ -74,6 +68,7 @@ function parseArguments(argv) {
     }
     index += 1;
     if (name === "--problem") options.problems.push(value);
+    else if (name === "--registry-stem") options.registryStem = value;
     else if (name === "--output-directory") options.outputDirectory = value;
     else if (name === "--expected-source") options.expectedSource = value;
     else if (name === "--expected-pack-id") options.expectedPackId = value;
@@ -85,6 +80,9 @@ function parseArguments(argv) {
     else fail(`unknown argument ${name}`);
   }
   if (options.problems.length === 0) fail("at least one --problem is required");
+  if (!/^prefinal-realistic-scenario-registry-v\d+$/.test(options.registryStem)) {
+    fail("--registry-stem must name a versioned pre-final registry");
+  }
   if (new Set(options.problems).size !== options.problems.length) {
     fail("problem IDs must not be duplicated");
   }
@@ -107,6 +105,17 @@ function parseArguments(argv) {
   return options;
 }
 
+function resolveRegistryPaths(stem) {
+  if (!/^prefinal-realistic-scenario-registry-v\d+$/.test(stem)) {
+    fail("registry stem is invalid");
+  }
+  const root = path.join(REPOSITORY_ROOT, "backend/evaluation_artifacts");
+  return {
+    registryPath: path.join(root, `${stem}.json`),
+    manifestPath: path.join(root, `${stem}.manifest.json`),
+  };
+}
+
 function resolveEvidenceDirectory(value) {
   const target = path.resolve(REPOSITORY_ROOT, value);
   const relative = path.relative(EVIDENCE_ROOT, target);
@@ -116,12 +125,19 @@ function resolveEvidenceDirectory(value) {
   return target;
 }
 
-function selectProblems(registry, requestedIds) {
-  const frozenRegistry = JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf8"));
-  const manifest = JSON.parse(fs.readFileSync(REGISTRY_MANIFEST_PATH, "utf8"));
+function selectProblems(
+  registry,
+  requestedIds,
+  registryPaths = resolveRegistryPaths(DEFAULT_REGISTRY_STEM),
+) {
+  const frozenRegistry = JSON.parse(fs.readFileSync(registryPaths.registryPath, "utf8"));
+  const manifest = JSON.parse(fs.readFileSync(registryPaths.manifestPath, "utf8"));
   if (
-    registry.schema_version !== "dronedream.prefinal-scenario-registry/v1"
-    || registry.status !== "design_only_not_execution_approved"
+    !/^dronedream\.prefinal-scenario-registry\/v\d+$/.test(registry.schema_version)
+    || !new Set([
+      "design_only_not_execution_approved",
+      "baseline_calibration_in_progress",
+    ]).has(registry.status)
     || registry.report_eligible !== false
     || registry.calibration_protocol?.uses_provider !== false
     || registry.calibration_protocol?.uses_optimizer !== false
@@ -129,7 +145,7 @@ function selectProblems(registry, requestedIds) {
     fail("scenario registry is not a baseline-only pre-final calibration contract");
   }
   const registryFile = manifest.files?.find(
-    (record) => record.path === path.basename(REGISTRY_PATH),
+    (record) => record.path === path.basename(registryPaths.registryPath),
   );
   const unsignedManifest = { ...manifest };
   delete unsignedManifest.manifest_sha256;
@@ -139,8 +155,8 @@ function selectProblems(registry, requestedIds) {
     || manifest.report_eligible !== false
     || manifest.registry_sha256 !== registry.registry_sha256
     || manifest.manifest_sha256 !== sha256(canonicalJson(unsignedManifest))
-    || registryFile?.bytes !== fs.statSync(REGISTRY_PATH).size
-    || registryFile?.sha256 !== fileSha256(REGISTRY_PATH)
+    || registryFile?.bytes !== fs.statSync(registryPaths.registryPath).size
+    || registryFile?.sha256 !== fileSha256(registryPaths.registryPath)
     || canonicalJson(registry) !== canonicalJson(frozenRegistry)
   ) {
     fail("scenario registry hash verification failed");
@@ -364,6 +380,7 @@ async function runProblem(page, problem, options, outputDirectory, initializedPa
 }
 
 function buildCampaignManifest(options, registry, enginePack, accountHash, results) {
+  const registryPaths = resolveRegistryPaths(options.registryStem);
   const receipts = results.map(({ receiptPath, receipt }) => ({
     file: path.basename(receiptPath),
     bytes: fs.statSync(receiptPath).size,
@@ -393,8 +410,8 @@ function buildCampaignManifest(options, registry, enginePack, accountHash, resul
     runtime: { expectedProviderCalls: 0, providerRetries: 0 },
     accountSubjectSha256: accountHash,
     registry: {
-      file: path.relative(REPOSITORY_ROOT, REGISTRY_PATH).replaceAll("\\", "/"),
-      fileSha256: fileSha256(REGISTRY_PATH),
+      file: path.relative(REPOSITORY_ROOT, registryPaths.registryPath).replaceAll("\\", "/"),
+      fileSha256: fileSha256(registryPaths.registryPath),
       registrySha256: registry.registry_sha256,
       version: registry.registry_version,
       claimBoundary: registry.claim_boundary,
@@ -418,12 +435,13 @@ function buildCampaignManifest(options, registry, enginePack, accountHash, resul
 
 async function main(argv = process.argv.slice(2)) {
   const options = parseArguments(argv);
+  const registryPaths = resolveRegistryPaths(options.registryStem);
   const outputDirectory = resolveEvidenceDirectory(options.outputDirectory);
   if (fs.existsSync(outputDirectory)) fail(`output directory already exists: ${outputDirectory}`);
   fs.mkdirSync(outputDirectory);
   const initializedPaths = new Set();
-  const registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, "utf8"));
-  const problems = selectProblems(registry, options.problems);
+  const registry = JSON.parse(fs.readFileSync(registryPaths.registryPath, "utf8"));
+  const problems = selectProblems(registry, options.problems, registryPaths);
   const campaignPath = path.join(outputDirectory, "campaign-manifest.json");
   const { browser, page } = await connectToDesktop(options.cdpUrl);
   const results = [];
@@ -483,5 +501,6 @@ module.exports = {
   parseArguments,
   prepareBaselinePayload,
   resolveEvidenceDirectory,
+  resolveRegistryPaths,
   selectProblems,
 };

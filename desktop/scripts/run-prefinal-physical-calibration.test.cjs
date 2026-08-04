@@ -10,6 +10,7 @@ const {
   parseArguments,
   prepareBaselinePayload,
   resolveEvidenceDirectory,
+  resolveRegistryPaths,
   selectProblems,
 } = require("./run-prefinal-physical-calibration.cjs");
 
@@ -19,6 +20,15 @@ const registry = JSON.parse(
     path.join(
       repositoryRoot,
       "backend/evaluation_artifacts/prefinal-realistic-scenario-registry-v1.json",
+    ),
+    "utf8",
+  ),
+);
+const calibratedRegistry = JSON.parse(
+  fs.readFileSync(
+    path.join(
+      repositoryRoot,
+      "backend/evaluation_artifacts/prefinal-realistic-scenario-registry-v2.json",
     ),
     "utf8",
   ),
@@ -56,6 +66,16 @@ test("selects only intact pre-registered problems", () => {
   assert.throws(() => selectProblems(tampered, ["easy-hover-calm"]), /hash/);
 });
 
+test("selects the calibrated v2 registry only through its exact manifest", () => {
+  const paths = resolveRegistryPaths("prefinal-realistic-scenario-registry-v2");
+  const selected = selectProblems(calibratedRegistry, ["hard-hover-wind-dropout"], paths);
+  assert.equal(selected[0].threshold_status, "v1_prearm_invalid_revised_recalibration_required");
+  assert.equal(
+    selected[0].job_template.advanced_scenario_config.sensor_degradation.gps_noise_m,
+    0,
+  );
+});
+
 test("baseline payload is bounded and cannot call a provider", () => {
   const [problem] = selectProblems(registry, ["representative-circle-crosswind"]);
   const payload = prepareBaselinePayload(problem, "abcdef0");
@@ -87,6 +107,8 @@ test("argument and output guards reject ambiguity and path escape", () => {
     resolveEvidenceDirectory("artifacts/test-runs/new-calibration"),
     path.join(repositoryRoot, "artifacts/test-runs/new-calibration"),
   );
+  assert.match(resolveRegistryPaths("prefinal-realistic-scenario-registry-v2").registryPath, /v2\.json$/);
+  assert.throws(() => resolveRegistryPaths("../../outside"), /invalid/);
 });
 
 test("campaign summary counts the API pass_flag field", () => {

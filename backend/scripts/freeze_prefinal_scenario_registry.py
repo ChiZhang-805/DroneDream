@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -91,13 +92,15 @@ def render_prefinal_scenario_registry_files(
     json_name: str,
     csv_name: str,
     manifest_name: str,
+    verify_registry: Callable[[dict[str, Any]], bool] = verify_prefinal_scenario_registry,
+    manifest_schema_version: str = PREFINAL_SCENARIO_REGISTRY_MANIFEST_SCHEMA_VERSION,
 ) -> tuple[bytes, bytes, bytes, bytes, dict[str, Any]]:
-    if not verify_prefinal_scenario_registry(registry):
+    if not verify_registry(registry):
         raise ValueError("pre-final scenario registry failed deterministic verification")
     json_payload = _json_bytes(registry)
     csv_payload = _csv_bytes(registry)
     manifest = {
-        "schema_version": PREFINAL_SCENARIO_REGISTRY_MANIFEST_SCHEMA_VERSION,
+        "schema_version": manifest_schema_version,
         "registry_version": registry["registry_version"],
         "registry_sha256": registry["registry_sha256"],
         "status": registry["status"],
