@@ -151,6 +151,19 @@ struct VerifiedCatalog {
     vehicle_packs: BTreeMap<String, VerifiedDocument>,
 }
 
+// E5-C intentionally keeps this verified snapshot behind the native decision
+// boundary without registering a Tauri command or an execution handler yet.
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub(crate) struct NativeSafetyCatalogSnapshot {
+    pub(crate) capability_policy: Value,
+    pub(crate) capability_policy_sha256: String,
+    pub(crate) edition: Value,
+    pub(crate) edition_manifest_sha256: String,
+    pub(crate) vehicle_pack: Value,
+    pub(crate) vehicle_pack_manifest_sha256: String,
+}
+
 fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
     hex::encode(Sha256::digest(bytes.as_ref()))
 }
@@ -719,6 +732,30 @@ pub fn validate_distribution_plan(
     request: DistributionPlanRequest,
 ) -> Result<DistributionPlanValidation, String> {
     build_distribution_plan(request)
+}
+
+#[allow(dead_code)]
+pub(crate) fn native_safety_catalog_snapshot(
+    edition_id: &str,
+    vehicle_pack_id: &str,
+) -> Result<NativeSafetyCatalogSnapshot, String> {
+    let catalog = verify_embedded_catalog()?;
+    let edition = catalog
+        .editions
+        .get(edition_id)
+        .ok_or_else(|| format!("unknown edition {edition_id}"))?;
+    let vehicle_pack = catalog
+        .vehicle_packs
+        .get(vehicle_pack_id)
+        .ok_or_else(|| format!("unknown Vehicle Pack {vehicle_pack_id}"))?;
+    Ok(NativeSafetyCatalogSnapshot {
+        capability_policy: catalog.policy.value.clone(),
+        capability_policy_sha256: catalog.policy.raw_sha256.clone(),
+        edition: edition.value.clone(),
+        edition_manifest_sha256: edition.raw_sha256.clone(),
+        vehicle_pack: vehicle_pack.value.clone(),
+        vehicle_pack_manifest_sha256: vehicle_pack.raw_sha256.clone(),
+    })
 }
 
 #[cfg(test)]

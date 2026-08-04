@@ -2,6 +2,7 @@ mod app_update;
 mod browser_auth;
 mod desktop_api_bridge;
 mod distribution_plan;
+mod edition_safety;
 mod engine_pack;
 mod installer_handoff;
 mod preferences;
