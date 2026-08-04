@@ -115,8 +115,7 @@ def active_observation(
         actual_parameter_candidate_hash=str(request["parameterCandidateHash"]),
         actual_target_kind=str(request["targetKind"]),
         locally_verified_evidence_hashes={
-            str(receipt["receiptType"]): str(receipt["evidenceHash"])
-            for receipt in receipts
+            str(receipt["receiptType"]): str(receipt["evidenceHash"]) for receipt in receipts
         },
         observed_at=dt.datetime(2026, 8, 5, 0, 1, 0, tzinfo=dt.UTC),
         app_env="test",
@@ -138,9 +137,7 @@ def allow_override(
 
 def test_runtime_independently_denies_current_unvalidated_catalog(tmp_path: Path) -> None:
     request = request_fixture()
-    result = gate.evaluate_runtime_authorization(
-        request, active_observation(tmp_path, request)
-    )
+    result = gate.evaluate_runtime_authorization(request, active_observation(tmp_path, request))
     assert result.decision == "deny"
     assert {
         "runtime.pack.unvalidated",
@@ -178,9 +175,7 @@ def test_runtime_uses_actual_target_not_backend_claims(
     tmp_path: Path, change: dict[str, object], reason: str
 ) -> None:
     request = request_fixture()
-    observation = replace(
-        allow_override(active_observation(tmp_path, request)), **change
-    )
+    observation = replace(allow_override(active_observation(tmp_path, request)), **change)
     result = gate.evaluate_runtime_authorization(request, observation)
     assert result.decision == "deny"
     assert reason in result.reason_codes
@@ -234,24 +229,18 @@ def test_replay_local_evidence_disagreement_and_clock_boundary_are_closed(
         consumed_nonces=frozenset({str(request["nonce"])}),
     )
     result = gate.evaluate_runtime_authorization(request, replay)
-    assert {"runtime.request.replayed", "runtime.nonce.replayed"} <= set(
-        result.reason_codes
-    )
+    assert {"runtime.request.replayed", "runtime.nonce.replayed"} <= set(result.reason_codes)
 
     result = gate.evaluate_runtime_authorization(
         request, replace(observation, locally_verified_evidence_hashes={})
     )
     assert "runtime.evidence.local-state-mismatch" in result.reason_codes
 
-    expired = replace(
-        observation, observed_at=dt.datetime(2026, 8, 5, 0, 5, 0, tzinfo=dt.UTC)
-    )
+    expired = replace(observation, observed_at=dt.datetime(2026, 8, 5, 0, 5, 0, tzinfo=dt.UTC))
     with pytest.raises(gate.RuntimeEditionSafetyError, match="failed closed"):
         gate.evaluate_runtime_authorization(request, expired)
 
-    future = replace(
-        observation, observed_at=dt.datetime(2026, 8, 4, 23, 59, 59, tzinfo=dt.UTC)
-    )
+    future = replace(observation, observed_at=dt.datetime(2026, 8, 4, 23, 59, 59, tzinfo=dt.UTC))
     with pytest.raises(gate.RuntimeEditionSafetyError, match="failed closed"):
         gate.evaluate_runtime_authorization(request, future)
 
@@ -264,9 +253,7 @@ def test_unknown_schema_and_fake_issuer_in_production_fail_closed(tmp_path: Path
     with pytest.raises(gate.RuntimeEditionSafetyError, match="failed closed"):
         gate.evaluate_runtime_authorization(unknown, observation)
     with pytest.raises(gate.RuntimeEditionSafetyError, match="failed closed"):
-        gate.evaluate_runtime_authorization(
-            request, replace(observation, app_env="production")
-        )
+        gate.evaluate_runtime_authorization(request, replace(observation, app_env="production"))
 
 
 def test_backend_allow_runtime_deny_cannot_become_joint_allow(tmp_path: Path) -> None:
@@ -302,8 +289,7 @@ def test_backend_allow_runtime_deny_cannot_become_joint_allow(tmp_path: Path) ->
         firmware_identity_hash=str(vehicle["firmwareIdentityHash"]),
         parameter_candidate_hash=str(request["parameterCandidateHash"]),
         trusted_evidence_hashes={
-            str(receipt["receiptType"]): str(receipt["evidenceHash"])
-            for receipt in receipts
+            str(receipt["receiptType"]): str(receipt["evidenceHash"]) for receipt in receipts
         },
         observed_at=runtime_observation.observed_at,
         app_env="test",
@@ -349,8 +335,7 @@ def test_backend_allow_runtime_deny_cannot_become_joint_allow(tmp_path: Path) ->
         "authorizationRequestHash": contract.authorization_request_hash(request),
         "contextHash": contract.authorization_context_hash(request),
         "layerDecisionHashes": {
-            str(receipt["layer"]): receipt["canonicalDecisionHash"]
-            for receipt in layers
+            str(receipt["layer"]): receipt["canonicalDecisionHash"] for receipt in layers
         },
         "decision": "deny",
         "reasonCodes": list(runtime_result.reason_codes),

@@ -58,9 +58,7 @@ async def _round_trip() -> dict[str, float | str]:
                 )
             )
             if not math.isfinite(restored) or abs(original - restored) > 1e-4:
-                raise RuntimeError(
-                    f"PX4 parameter restore mismatch: {original} != {restored}"
-                )
+                raise RuntimeError(f"PX4 parameter restore mismatch: {original} != {restored}")
     if read_back is None or restored is None:
         raise RuntimeError("PX4 parameter round-trip did not complete")
     if not all(math.isfinite(value) for value in (original, written, read_back, restored)):

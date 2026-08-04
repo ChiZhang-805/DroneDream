@@ -278,9 +278,7 @@ class RuntimeReleaseTests(unittest.TestCase):
             signature = Path(f"{manifest_path}{runtime_release.SIGNATURE_SUFFIX}")
 
             with (
-                _temporary_environment(
-                    variable, private_key.read_text(encoding="ascii").strip()
-                ),
+                _temporary_environment(variable, private_key.read_text(encoding="ascii").strip()),
                 self.assertRaisesRegex(runtime_release.ReleaseError, "refusing to overwrite"),
             ):
                 runtime_release.sign_manifest(manifest_path, variable, public_output)

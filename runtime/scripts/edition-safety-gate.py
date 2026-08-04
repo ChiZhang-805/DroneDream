@@ -178,27 +178,31 @@ def _active_inventory_reasons(
     except RuntimeEditionSafetyError:
         return ["runtime.inventory.unreadable"]
 
-    if contract.sha256_file(observed.active_engine_pack_manifest_path) != request["source"][
-        "enginePackManifestSha256"
-    ]:
+    if (
+        contract.sha256_file(observed.active_engine_pack_manifest_path)
+        != request["source"]["enginePackManifestSha256"]
+    ):
         reasons.append("runtime.engine-pack.manifest-hash-mismatch")
-    if contract.sha256_file(observed.active_runtime_base_manifest_path) != request["source"][
-        "runtimeBaseManifestSha256"
-    ]:
+    if (
+        contract.sha256_file(observed.active_runtime_base_manifest_path)
+        != request["source"]["runtimeBaseManifestSha256"]
+    ):
         reasons.append("runtime.runtime-base.manifest-hash-mismatch")
     if not observed.engine_pack_signature_verified:
         reasons.append("runtime.engine-pack.signature-unverified")
     if engine_manifest.get("kind") != "dronedream-engine-pack":
         reasons.append("runtime.engine-pack.kind-unsupported")
     source = engine_manifest.get("source")
-    if not isinstance(source, dict) or source.get("gitCommit") != request["source"][
-        "repositoryCommit"
-    ]:
+    if (
+        not isinstance(source, dict)
+        or source.get("gitCommit") != request["source"]["repositoryCommit"]
+    ):
         reasons.append("runtime.engine-pack.source-mismatch")
     runtime_source = runtime_manifest.get("source")
-    if not isinstance(runtime_source, dict) or runtime_source.get(
-        "droneDreamCommit"
-    ) != request["source"]["repositoryCommit"]:
+    if (
+        not isinstance(runtime_source, dict)
+        or runtime_source.get("droneDreamCommit") != request["source"]["repositoryCommit"]
+    ):
         reasons.append("runtime.runtime-base.source-mismatch")
 
     records = _manifest_records(engine_manifest)
@@ -397,9 +401,7 @@ def _catalog_reasons(
         reasons.append("runtime.pack.edition-incompatible")
     if request["vehicle"]["firmwareFamily"] != pack["autopilot"]["family"]:
         reasons.append("runtime.firmware.family-incompatible")
-    if request["vehicle"]["firmwareVersion"] not in pack["autopilot"][
-        "supportedFirmwareVersions"
-    ]:
+    if request["vehicle"]["firmwareVersion"] not in pack["autopilot"]["supportedFirmwareVersions"]:
         reasons.append("runtime.firmware.version-incompatible")
 
     requested_controller = _normalize_controller(str(request["vehicle"]["controllerId"]))
@@ -460,9 +462,7 @@ def _build_receipt(
         "nonce": f"runtime:{request['nonce']}:{request['sequence']}",
         "sequence": request["sequence"],
         "issuer": (
-            "test-fixture:e5-runtime"
-            if request["testOnly"]
-            else "runtime:edition-safety-v1"
+            "test-fixture:e5-runtime" if request["testOnly"] else "runtime:edition-safety-v1"
         ),
         "testOnly": request["testOnly"],
         "consumptionState": "unconsumed",
@@ -482,9 +482,7 @@ def evaluate_runtime_authorization(
     capability_path = (
         observed.active_engine_root / "distribution/capabilities/core-capabilities.v1.json"
     )
-    gate_path = (
-        observed.active_engine_root / "distribution/safety/edition-execution-gate.v1.json"
-    )
+    gate_path = observed.active_engine_root / "distribution/safety/edition-execution-gate.v1.json"
     capability_policy = _load_object(capability_path, "active capability policy")
     gate_policy = contract.validate_gate_policy(
         _load_object(gate_path, "active execution gate policy"),
@@ -501,9 +499,7 @@ def evaluate_runtime_authorization(
         )
     except contract.EditionSafetyContractError as error:
         raise RuntimeEditionSafetyError("authorization request failed closed") from error
-    _edition, pack = _validate_active_catalog(
-        contract, observed.active_engine_root, validated
-    )
+    _edition, pack = _validate_active_catalog(contract, observed.active_engine_root, validated)
     reasons = _active_inventory_reasons(contract, validated, observed)
     reasons.extend(_local_target_reasons(validated, observed))
     reasons.extend(

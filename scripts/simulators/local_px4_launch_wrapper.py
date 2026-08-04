@@ -2572,9 +2572,7 @@ def _strict_ulog_timestamp_source_indices(
     duplicate_count = 0
     for source_index, value in enumerate(values):
         if isinstance(value, bool) or not isinstance(value, numbers.Real):
-            raise ValueError(
-                f"{dataset_name}.timestamp sample {source_index} is not numeric"
-            )
+            raise ValueError(f"{dataset_name}.timestamp sample {source_index} is not numeric")
         numeric = float(value)
         if not math.isfinite(numeric) or not numeric.is_integer() or numeric < 0:
             raise ValueError(
@@ -2721,9 +2719,7 @@ def _extract_vehicle_status(
     return armed, mode
 
 
-def _extract_crash_flags(
-    dataset_map: dict[str, Any], target_timestamps: list[int]
-) -> list[bool]:
+def _extract_crash_flags(dataset_map: dict[str, Any], target_timestamps: list[int]) -> list[bool]:
     sample_count = len(target_timestamps)
     failure = dataset_map.get("failure_detector_status")
     if failure is None:
@@ -2980,9 +2976,7 @@ def ulog_to_telemetry_json(ulog_path: Path, output_path: Path, vehicle: str, wor
             "origin_extraction_revision": "pyulog-vehicle-local-position-1.2",
             "origin_timestamp_duplicate_count": duplicate_timestamp_count,
             "origin_timestamp_duplicate_policy": "retain_last_exact_microsecond_sample",
-            "origin_secondary_topic_alignment_policy": (
-                "latest_at_or_before_position_timestamp"
-            ),
+            "origin_secondary_topic_alignment_policy": ("latest_at_or_before_position_timestamp"),
             "origin_preobservation_state_policy": (
                 "armed=false;mode=unknown;crashed=false;yaw=velocity_derived"
             ),
