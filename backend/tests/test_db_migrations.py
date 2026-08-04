@@ -402,9 +402,11 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "'trial_execution_attempt_outcomes', "
                 "'candidate_evidence_receipts', "
                 "'candidate_parameter_sets', "
-                "'harness_cognitive_turn_receipts', "
-                "'harness_cognitive_turn_outcomes', "
-                "'trials'"
+                 "'harness_cognitive_turn_receipts', "
+                 "'harness_cognitive_turn_outcomes', "
+                 "'benchmark_campaigns', "
+                 "'benchmark_arms', "
+                 "'trials'"
                 ")"
             ).fetchall()
         }
@@ -483,6 +485,14 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "AND name='harness_cognitive_turn_delete_authorizations'"
             ).fetchall()
         }
+        benchmark_tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' "
+                "AND name IN ('benchmark_campaigns', 'benchmark_arms')"
+            ).fetchall()
+        }
     assert trigger_names == {
         "trg_winner_freeze_receipts_no_update",
         "trg_winner_freeze_receipts_no_delete",
@@ -501,6 +511,8 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "trg_harness_cognitive_turn_receipts_no_delete",
         "trg_harness_cognitive_turn_outcomes_no_update",
         "trg_harness_cognitive_turn_outcomes_no_delete",
+        "trg_benchmark_campaign_manifest_immutable",
+        "trg_benchmark_arm_manifest_immutable",
     }
     assert attempt_tables == {
         "trial_execution_attempts",
@@ -523,6 +535,7 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
     assert cognitive_authorization_tables == {
         "harness_cognitive_turn_delete_authorizations"
     }
+    assert benchmark_tables == {"benchmark_campaigns", "benchmark_arms"}
     assert {
         "user_id",
         "idempotency_key_hash",
@@ -725,7 +738,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0022 (head)"]
+    assert heads == ["20260804_0023 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -822,7 +835,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             for row in connection.execute("PRAGMA index_list('jobs')").fetchall()
         )
 
-    assert version == ("20260804_0022",)
+    assert version == ("20260804_0023",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",

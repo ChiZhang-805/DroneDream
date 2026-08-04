@@ -53,12 +53,14 @@ def client(tmp_path, monkeypatch) -> Iterator[TestClient]:
 
     import app.routers.artifacts as artifacts_router_module
     import app.routers.batches as batches_router_module
+    import app.routers.benchmark_campaigns as benchmark_campaigns_router_module
     import app.routers.jobs as jobs_router_module
     import app.routers.preferences as preferences_router_module
     import app.routers.trials as trials_router_module
 
     importlib.reload(artifacts_router_module)
     importlib.reload(batches_router_module)
+    importlib.reload(benchmark_campaigns_router_module)
     importlib.reload(jobs_router_module)
     importlib.reload(preferences_router_module)
     importlib.reload(trials_router_module)

@@ -804,6 +804,63 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        if "benchmark_campaigns" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_campaign_manifest_immutable
+                    BEFORE UPDATE ON benchmark_campaigns
+                    WHEN NEW.user_id IS NOT OLD.user_id
+                      OR NEW.campaign_key IS NOT OLD.campaign_key
+                      OR NEW.campaign_version IS NOT OLD.campaign_version
+                      OR NEW.name IS NOT OLD.name
+                      OR NEW.panel IS NOT OLD.panel
+                      OR NEW.protocol_sha256 IS NOT OLD.protocol_sha256
+                      OR NEW.manifest_sha256 IS NOT OLD.manifest_sha256
+                      OR NEW.manifest_json IS NOT OLD.manifest_json
+                      OR NEW.composite_inventory_sha256
+                         IS NOT OLD.composite_inventory_sha256
+                      OR NEW.composite_inventory_json
+                         IS NOT OLD.composite_inventory_json
+                      OR NEW.job_cap IS NOT OLD.job_cap
+                      OR NEW.trial_cap IS NOT OLD.trial_cap
+                      OR NEW.logical_turn_cap IS NOT OLD.logical_turn_cap
+                      OR NEW.network_request_cap IS NOT OLD.network_request_cap
+                      OR NEW.input_utf8_byte_cap IS NOT OLD.input_utf8_byte_cap
+                      OR NEW.output_utf8_byte_cap IS NOT OLD.output_utf8_byte_cap
+                      OR NEW.provider_token_cap IS NOT OLD.provider_token_cap
+                      OR NEW.provider_cost_microusd_cap
+                         IS NOT OLD.provider_cost_microusd_cap
+                      OR NEW.wall_time_second_cap IS NOT OLD.wall_time_second_cap
+                      OR NEW.disk_byte_cap IS NOT OLD.disk_byte_cap
+                      OR NEW.preregistered_at IS NOT OLD.preregistered_at
+                      OR NEW.created_at IS NOT OLD.created_at
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark campaign preregistration is immutable'
+                        );
+                    END
+                    """
+                )
+            )
+        if "benchmark_arms" in table_names:
+            conn.execute(
+                text(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS
+                    trg_benchmark_arm_manifest_immutable
+                    BEFORE UPDATE ON benchmark_arms
+                    BEGIN
+                        SELECT RAISE(
+                            ABORT,
+                            'benchmark arm preregistration is immutable'
+                        );
+                    END
+                    """
+                )
+            )
 
 
 def get_db() -> Iterator[Session]:

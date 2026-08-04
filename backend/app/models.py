@@ -66,6 +66,10 @@ class User(Base):
 
     jobs: Mapped[list[Job]] = relationship(back_populates="user")
     batch_jobs: Mapped[list[BatchJob]] = relationship(back_populates="user")
+    benchmark_campaigns: Mapped[list[BenchmarkCampaign]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     harness_experiences: Mapped[list[HarnessExperienceMemory]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -169,6 +173,141 @@ class BatchJob(Base):
 
     user: Mapped[User | None] = relationship(back_populates="batch_jobs")
     jobs: Mapped[list[Job]] = relationship(back_populates="batch")
+
+
+class BenchmarkCampaign(Base):
+    """Immutable preregistration manifest for a cross-Batch benchmark campaign."""
+
+    __tablename__ = "benchmark_campaigns"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "campaign_key",
+            "campaign_version",
+            name="uq_benchmark_campaign_owner_key_version",
+        ),
+        CheckConstraint(
+            "status IN ('PREREGISTERED', 'ACTIVE', 'COMPLETED', 'FAILED', 'CANCELLED')",
+            name="ck_benchmark_campaign_status",
+        ),
+        CheckConstraint(
+            "job_cap >= 1 AND trial_cap >= 1 AND logical_turn_cap >= 0 "
+            "AND network_request_cap >= 0 AND input_utf8_byte_cap >= 0 "
+            "AND output_utf8_byte_cap >= 0 AND provider_token_cap >= 0 "
+            "AND provider_cost_microusd_cap >= 0 AND wall_time_second_cap >= 1 "
+            "AND disk_byte_cap >= 1",
+            name="ck_benchmark_campaign_caps",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+        default=lambda: _new_id("bmk"),
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    campaign_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    campaign_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    panel: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        default="PREREGISTERED",
+        server_default="PREREGISTERED",
+        index=True,
+    )
+    control_version: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
+    )
+    protocol_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    manifest_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    composite_inventory_sha256: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True
+    )
+    composite_inventory_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    job_cap: Mapped[int] = mapped_column(Integer, nullable=False)
+    trial_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    logical_turn_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    network_request_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    input_utf8_byte_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    output_utf8_byte_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    provider_token_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    provider_cost_microusd_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    wall_time_second_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    disk_byte_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    preregistered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, onupdate=_now, nullable=False
+    )
+
+    user: Mapped[User] = relationship(back_populates="benchmark_campaigns")
+    arms: Mapped[list[BenchmarkArm]] = relationship(
+        back_populates="campaign",
+        cascade="all, delete-orphan",
+        order_by="BenchmarkArm.benchmark_arm_id",
+    )
+
+
+class BenchmarkArm(Base):
+    """One server-registered proposal arm frozen into a campaign manifest."""
+
+    __tablename__ = "benchmark_arms"
+    __table_args__ = (
+        UniqueConstraint(
+            "campaign_id",
+            "benchmark_arm_id",
+            name="uq_benchmark_arm_campaign_id",
+        ),
+        CheckConstraint(
+            "arm_family IN ('traditional', 'llm_harness')",
+            name="ck_benchmark_arm_family",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64),
+        primary_key=True,
+        default=lambda: _new_id("bar"),
+    )
+    campaign_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaigns.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    benchmark_arm_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    arm_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    arm_family: Mapped[str] = mapped_column(String(32), nullable=False)
+    proposal_adapter_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    evaluator_contract_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    manifest_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    execution_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="arms")
 
 
 class Job(Base):
@@ -1243,6 +1382,8 @@ class JobSecret(Base):
 
 __all__ = [
     "Artifact",
+    "BenchmarkArm",
+    "BenchmarkCampaign",
     "BatchJob",
     "CandidateEvidenceDeleteAuthorization",
     "CandidateEvidenceReceipt",
