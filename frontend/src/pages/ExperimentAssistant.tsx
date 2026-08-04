@@ -23,8 +23,10 @@ import {
 
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
+import { WebDesktopRequired } from "../components/WebDesktopRequired";
 import { isDesktopRuntime } from "../desktop/bridge";
 import { recordProductEvent } from "../features/analytics/productEvents";
+import { isWebConsolePreviewRuntime } from "../features/demo/publicDemo";
 import {
   applyAssistantTurn,
   assistantCurrentParameters,
@@ -301,6 +303,7 @@ function assistantErrorMessage(
 export function ExperimentAssistant() {
   const navigate = useNavigate();
   const { locale } = useI18n();
+  const webPreview = isWebConsolePreviewRuntime();
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
   const copy = COPY[locale];
@@ -357,6 +360,11 @@ export function ExperimentAssistant() {
 
   useEffect(() => {
     if (modelAccess.accessMode !== "platform") return;
+    if (webPreview) {
+      setManagedModels([]);
+      setManagedModelsReady(true);
+      return;
+    }
     if (docsPreview) {
       setManagedModelsReady(true);
       return;
@@ -389,6 +397,7 @@ export function ExperimentAssistant() {
     auth?.account,
     docsPreview,
     modelAccess.accessMode,
+    webPreview,
   ]);
 
   useEffect(() => {
@@ -474,6 +483,19 @@ export function ExperimentAssistant() {
     if ((!composer.trim() && !referenceFiles.length) || pending) return;
     if (message.length > MAX_ASSISTANT_MESSAGE_LENGTH) {
       setError(copy.messageTooLong);
+      return;
+    }
+    if (webPreview) {
+      try {
+        window.sessionStorage.setItem(
+          "dronedream.web.assistant-note.v1",
+          visibleMessage.slice(0, MAX_ASSISTANT_MESSAGE_LENGTH),
+        );
+      } catch {
+        // A restrictive browser may disable session storage. The manual form
+        // remains available and no network request is attempted.
+      }
+      navigate("/jobs/new");
       return;
     }
     if (modelAccess.accessMode === "byok" && !modelAccess.apiKey.trim()) {
@@ -598,6 +620,7 @@ export function ExperimentAssistant() {
 
   return (
     <section className={`experiment-assistant-page ${messages.length ? "has-messages" : ""}`}>
+      {webPreview ? <WebDesktopRequired compact /> : null}
       <div className="experiment-assistant-stage">
         {messages.length === 0 ? (
           <div className="assistant-empty-state">
@@ -701,6 +724,7 @@ export function ExperimentAssistant() {
           tabIndex={-1}
           accept=".json,.txt,.md,.csv,.yaml,.yml,.toml,.xml,.log,text/plain,text/csv,application/json"
           aria-hidden="true"
+          disabled={webPreview}
           onChange={(event) => {
             void importReferenceFiles(event);
           }}
@@ -769,6 +793,7 @@ export function ExperimentAssistant() {
                 <button
                   type="button"
                   role="menuitem"
+                  disabled={webPreview}
                   onClick={() => {
                     setActionMenuOpen(false);
                     fileInputRef.current?.click();
@@ -786,7 +811,8 @@ export function ExperimentAssistant() {
             aria-label={copy.model}
             value={selectedModelProfileId}
             disabled={
-              pending
+              webPreview
+              || pending
               || (modelAccess.accessMode === "platform" && !managedModelsReady)
             }
             onChange={(event) => {
@@ -835,6 +861,7 @@ export function ExperimentAssistant() {
             title={
               voice.state === "listening" ? copy.stopVoice : copy.microphone
             }
+            disabled={webPreview}
             onClick={() => {
               if (voice.state === "listening") {
                 voice.stop();

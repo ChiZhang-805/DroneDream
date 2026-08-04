@@ -57,11 +57,34 @@ afterEach(() => {
   resetDesktopStartupGateSession();
   delete window.__TAURI__;
   localStorage.clear();
+  window.history.replaceState(null, "", "/");
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("apiClient envelope handling", () => {
+  it("fails closed before transport for every web-console write request", async () => {
+    window.history.replaceState(null, "", "/console/jobs/new?webPreview=1");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(
+      apiClient.createJob({
+        track_type: "circle",
+        start_point: { x: 0, y: 0 },
+        altitude_m: 3,
+        wind: { north: 0, east: 0, south: 0, west: 0 },
+        sensor_noise_level: "medium",
+        objective_profile: "robust",
+      }),
+    ).rejects.toMatchObject({
+      name: "ApiClientError",
+      code: "WEB_DESKTOP_REQUIRED",
+      httpStatus: 405,
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("builds artifact download URLs from VITE_API_BASE_URL", () => {
     expect(artifactDownloadUrl("art_abc")).toBe(
       "http://127.0.0.1:8000/api/v1/artifacts/art_abc/download",

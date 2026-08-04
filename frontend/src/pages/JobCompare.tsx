@@ -4,11 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 
 import { apiClient } from "../api/client";
 import { SectionCard } from "../components/SectionCard";
+import { WebDesktopRequired } from "../components/WebDesktopRequired";
 import { Loading, ErrorState } from "../components/States";
 import { StatusBadge } from "../components/StatusBadge";
 import { optimizerStrategyLabel } from "../features/experiment/optimizerStrategies";
 import type { JobCompareItem } from "../types/api";
 import { useI18n } from "../i18n/I18nProvider";
+import { isWebConsolePreviewRuntime } from "../features/demo/publicDemo";
 
 const HIGHER_IS_BETTER_METRICS = new Set([
   "pass_rate",
@@ -60,12 +62,13 @@ function useJobIds(): string[] {
 
 export function JobCompare() {
   const { t } = useI18n();
+  const webPreview = isWebConsolePreviewRuntime();
   const jobIds = useJobIds();
   const [downloadError, setDownloadError] = useState(false);
   const query = useQuery({
     queryKey: ["jobs-compare", jobIds.join(",")],
     queryFn: () => apiClient.compareJobs(jobIds),
-    enabled: jobIds.length >= 2,
+    enabled: !webPreview && jobIds.length >= 2,
   });
   const items = useMemo(() => query.data?.items ?? [], [query.data]);
   const metricKeys = useMemo(() => {
@@ -92,6 +95,14 @@ export function JobCompare() {
     }
     return best;
   }, [items, metricKeys]);
+
+  if (webPreview) {
+    return (
+      <section className="stack-md">
+        <WebDesktopRequired />
+      </section>
+    );
+  }
 
   if (jobIds.length < 2) {
     return <ErrorState title={t("jobCompare.notEnoughTitle")} description={t("jobCompare.notEnoughBody")} />;

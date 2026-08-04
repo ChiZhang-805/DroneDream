@@ -11,9 +11,10 @@ import { Alert } from "../components/Alert";
 import { ParameterSelector } from "../components/ParameterSelector";
 import { SectionCard } from "../components/SectionCard";
 import { TrackEditor2D } from "../components/TrackEditor2D";
+import { WebDesktopRequired } from "../components/WebDesktopRequired";
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
-import { publicDemoConsole } from "../features/demo/publicDemo";
+import { isWebConsolePreviewRuntime } from "../features/demo/publicDemo";
 import { recordProductEvent } from "../features/analytics/productEvents";
 import {
   EXPERIMENTAL_OPTIMIZER_STRATEGIES,
@@ -1225,6 +1226,7 @@ export function NewJob() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t } = useI18n();
+  const webPreview = isWebConsolePreviewRuntime();
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
   const { settings: modelAccess } = useModelAccess();
@@ -1298,6 +1300,7 @@ export function NewJob() {
   const [experimentNameError, setExperimentNameError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showAdvancedScenario, setShowAdvancedScenario] = useState(false);
   const [showTrackEditor, setShowTrackEditor] = useState(false);
@@ -1851,6 +1854,7 @@ export function NewJob() {
     event.preventDefault();
     if (step !== 4 || submittingRef.current) return;
     setSubmitError(null);
+    setDraftSaved(false);
     const nextErrors = validate(form, selections, catalog, capabilities, t);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -1867,7 +1871,7 @@ export function NewJob() {
     setSubmitting(true);
     let usedLegacyApi = false;
     try {
-      if (publicDemoConsole) {
+      if (webPreview) {
         persistDraft(4);
         if (workspaceId) {
           updateExperimentWorkspace(ownerId, workspaceId, {
@@ -1876,7 +1880,7 @@ export function NewJob() {
             completedSteps: [0, 1, 2, 3, 4],
           });
         }
-        navigate("/dashboard", { replace: false });
+        setDraftSaved(true);
         return;
       }
       const platformGrant = (
@@ -2068,6 +2072,8 @@ export function NewJob() {
         </div>
       </header>
 
+      {webPreview ? <WebDesktopRequired compact /> : null}
+
       <nav aria-label={t("wizard.aria.steps")}>
         <ol className="wizard-stepper">
           {WIZARD_STEPS.map((wizardStep, index) => {
@@ -2090,6 +2096,7 @@ export function NewJob() {
 
       <form onSubmit={handleSubmit} noValidate className="experiment-form">
         {submitError ? <Alert tone="danger" title={t("wizard.submissionFailed")}>{submitError}</Alert> : null}
+        {draftSaved ? <Alert tone="success" title={t("wizard.saved")} /> : null}
 
         <div hidden={step !== 0} className="wizard-panel">
           <SectionCard title={t("wizard.section.flightSetup")}>
@@ -2815,7 +2822,7 @@ export function NewJob() {
         <div className="wizard-actions">
           {step > 0 ? <button type="button" className="btn btn-ghost" disabled={submitting} onClick={previousStep}>{t("wizard.back")}</button> : null}
           {step < 4 ? <button type="button" className="btn btn-primary" disabled={submitting || currentStepHasErrors} onClick={nextStep}>{t("wizard.next")}</button> : null}
-          {step === 4 ? <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? t("wizard.creating") : t("wizard.create")}</button> : null}
+          {step === 4 ? <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? t("wizard.creating") : t(webPreview ? "wizard.save" : "wizard.create")}</button> : null}
         </div>
       </form>
     </section>

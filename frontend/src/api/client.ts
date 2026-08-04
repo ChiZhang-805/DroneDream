@@ -8,7 +8,7 @@ import {
 } from "../desktop/readiness";
 import { getDesktopStartupGateSession } from "../desktop/startupGate";
 import { getAuthAccessToken } from "../features/auth/authTokenStore";
-import { publicDemoConsole } from "../features/demo/publicDemo";
+import { isWebConsolePreviewRuntime } from "../features/demo/publicDemo";
 import type {
   ApiEnvelope,
   Artifact,
@@ -213,6 +213,20 @@ async function request<T>(
   init?: RequestInit,
   policy: RequestPolicy = {},
 ): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  if (
+    isWebConsolePreviewRuntime()
+    && method !== "GET"
+    && method !== "HEAD"
+    && method !== "OPTIONS"
+  ) {
+    throw new ApiClientError(
+      "WEB_DESKTOP_REQUIRED",
+      "The web console can preview and save local drafts, but experiments run only in the DroneDream desktop app with Runtime installed.",
+      null,
+      405,
+    );
+  }
   if (isDesktopRuntime() && policy.requireRuntimeLiveness) {
     const readiness = getDesktopReadinessSession()?.snapshot;
     if (!readiness?.ready) {
@@ -439,7 +453,7 @@ export const apiClient = {
     page_size?: number;
     status?: JobStatus;
   }): Promise<PaginatedJobs> {
-    if (publicDemoConsole) {
+    if (isWebConsolePreviewRuntime()) {
       return {
         items: [],
         page: params?.page ?? 1,

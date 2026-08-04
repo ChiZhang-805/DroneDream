@@ -14,6 +14,7 @@ import { SectionCard } from "../components/SectionCard";
 import { MetricCard } from "../components/MetricCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { Alert } from "../components/Alert";
+import { WebDesktopRequired } from "../components/WebDesktopRequired";
 import { DataTable, type Column } from "../components/DataTable";
 import { Loading, ErrorState, Empty } from "../components/States";
 import { ComparisonChart } from "../components/ComparisonChart";
@@ -26,6 +27,7 @@ import {
 } from "../features/experiment/optimizerStrategies";
 import { optimizerUsesModelAccess } from "../types/api";
 import { useI18n } from "../i18n/I18nProvider";
+import { isWebConsolePreviewRuntime } from "../features/demo/publicDemo";
 
 // Polling interval for active jobs. The frontend only polls; all state
 // transitions are driven by the backend worker process (Phase 3+). See
@@ -155,6 +157,7 @@ function buildTrialColumns(
 
 export function JobDetail() {
   const { t } = useI18n();
+  const webPreview = isWebConsolePreviewRuntime();
   const { jobId } = useParams<{ jobId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -204,7 +207,7 @@ export function JobDetail() {
   const jobQuery = useQuery({
     queryKey: ["job", safeId],
     queryFn: () => apiClient.getJob(safeId),
-    enabled: !!safeId,
+    enabled: !webPreview && !!safeId,
     refetchInterval: (q) => {
       const j = q.state.data as Job | undefined;
       return j && isActiveJobStatus(j.status) ? ACTIVE_POLL_INTERVAL_MS : false;
@@ -215,7 +218,7 @@ export function JobDetail() {
   const trialsQuery = useQuery({
     queryKey: ["job-trials", safeId],
     queryFn: () => apiClient.listJobTrials(safeId),
-    enabled: !!safeId,
+    enabled: !webPreview && !!safeId,
     refetchInterval:
       jobStatus && isActiveJobStatus(jobStatus)
         ? ACTIVE_POLL_INTERVAL_MS
@@ -225,7 +228,7 @@ export function JobDetail() {
   const candidatesQuery = useQuery({
     queryKey: ["job-candidates", safeId],
     queryFn: () => apiClient.listJobCandidates(safeId),
-    enabled: !!safeId,
+    enabled: !webPreview && !!safeId,
     refetchInterval:
       jobStatus && isActiveJobStatus(jobStatus)
         ? ACTIVE_POLL_INTERVAL_MS
@@ -237,11 +240,15 @@ export function JobDetail() {
   // Phase 8: FAILED jobs (e.g. MAX_ITERATIONS_REACHED) may still have a
   // best-so-far READY report; the backend returns it if available and
   // otherwise returns JOB_FAILED, which we handle as a reportQuery error.
-  const reportEnabled = job?.status === "COMPLETED" || job?.status === "FAILED";
+  const reportEnabled = !webPreview
+    && (job?.status === "COMPLETED" || job?.status === "FAILED");
   const artifactsEnabled =
-    job?.status === "COMPLETED" ||
-    job?.status === "FAILED" ||
-    job?.status === "CANCELLED";
+    !webPreview
+    && (
+      job?.status === "COMPLETED"
+      || job?.status === "FAILED"
+      || job?.status === "CANCELLED"
+    );
 
   const reportQuery = useQuery({
     queryKey: ["job-report", safeId],
@@ -256,6 +263,14 @@ export function JobDetail() {
     enabled: artifactsEnabled,
     retry: false,
   });
+
+  if (webPreview) {
+    return (
+      <section className="stack-md">
+        <WebDesktopRequired />
+      </section>
+    );
+  }
 
   if (jobQuery.isLoading) {
     return <Loading label={t("jobDetail.loading")} />;

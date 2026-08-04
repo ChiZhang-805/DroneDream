@@ -1,5 +1,6 @@
 import { getAuthAccessToken } from "../auth/authTokenStore";
 import { fetchWithDeadline } from "../../api/fetchWithDeadline";
+import { isWebConsolePreviewRuntime } from "../demo/publicDemo";
 
 export type ProductEventName =
   | "assistant_turn_succeeded"
@@ -54,6 +55,7 @@ export async function recordProductEvent(
   name: ProductEventName,
   properties: ProductEventProperties = {},
 ): Promise<boolean> {
+  if (isWebConsolePreviewRuntime()) return false;
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("docsPreview")) {
     return false;
   }
