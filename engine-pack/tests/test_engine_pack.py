@@ -20,6 +20,47 @@ SPEC.loader.exec_module(engine_pack)
 
 
 class EnginePackTests(unittest.TestCase):
+    def test_runtime_distribution_contract_whitelist_is_exact_and_hashed(self) -> None:
+        files = engine_pack.production_files(ROOT)
+        distribution_files = {
+            path for path, _source in files if path.startswith("distribution/")
+        }
+        expected_distribution = {
+            path
+            for path in engine_pack.RUNTIME_DISTRIBUTION_PATHS
+            if path.startswith("distribution/")
+        }
+        self.assertEqual(distribution_files, expected_distribution)
+        self.assertFalse(
+            any(
+                path.startswith(
+                    (
+                        "distribution/build-planning/",
+                        "distribution/build-plans/",
+                        "distribution/tests/",
+                    )
+                )
+                for path in distribution_files
+            )
+        )
+        records = {record["path"]: record for record in engine_pack.file_records(files)}
+        for relative in engine_pack.RUNTIME_DISTRIBUTION_PATHS:
+            self.assertIn(relative, records)
+            self.assertEqual(records[relative]["sha256"], engine_pack.sha256_file(ROOT / relative))
+
+        runtime_spec = importlib.util.spec_from_file_location(
+            "engine_pack_runtime_safety_gate_contract_test",
+            ROOT / "runtime/scripts/edition-safety-gate.py",
+        )
+        assert runtime_spec and runtime_spec.loader
+        runtime_gate = importlib.util.module_from_spec(runtime_spec)
+        sys.modules[runtime_spec.name] = runtime_gate
+        runtime_spec.loader.exec_module(runtime_gate)
+        self.assertEqual(
+            engine_pack.RUNTIME_DISTRIBUTION_PATHS,
+            runtime_gate.RUNTIME_DISTRIBUTION_PATHS,
+        )
+
     def build(self, output: Path) -> None:
         commit = "1" * 40
         previous = engine_pack.source_date_epoch
@@ -112,7 +153,10 @@ class EnginePackTests(unittest.TestCase):
             self.assertIn("payload/scripts/simulators/px4_gazebo_runner.py", names)
             self.assertFalse(any("/tests/" in name for name in names))
             self.assertFalse(any(name.startswith("payload/frontend/") for name in names))
-            self.assertFalse(any(name.startswith("payload/runtime/") for name in names))
+            self.assertEqual(
+                [name for name in names if name.startswith("payload/runtime/")],
+                ["payload/runtime/THIRD_PARTY_NOTICES.md"],
+            )
 
     def test_manifest_binds_runtime_compatibility(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

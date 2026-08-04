@@ -25,6 +25,29 @@ MANIFEST_FILENAME = "engine-pack-manifest.json"
 KIND = "dronedream-engine-pack"
 SCHEMA_VERSION = 1
 ENGINE_API_VERSION = 1
+RUNTIME_DISTRIBUTION_PATHS = (
+    "LICENSE",
+    "runtime/THIRD_PARTY_NOTICES.md",
+    "distribution/capabilities/core-capabilities.v1.json",
+    "distribution/editions/field.v1.json",
+    "distribution/editions/lab.v1.json",
+    "distribution/editions/sim.v1.json",
+    "distribution/safety/edition-execution-gate.v1.json",
+    "distribution/schemas/edition-execution-authorization.schema.json",
+    "distribution/schemas/edition-execution-gate-policy.schema.json",
+    "distribution/tools/distribution_contract.py",
+    "distribution/tools/edition_safety_contract.py",
+    "distribution/upstream-sources.v1.json",
+    "distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
+    "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
+    "distribution/vehicle-packs/bitcraze-crazyflie-2-1-plus.v1.json",
+    "distribution/vehicle-packs/holybro-qav250-pixhawk6c-mini.v1.json",
+    "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+    "distribution/vehicle-packs/holybro-x500-v2-pixhawk6.v1.json",
+    "distribution/vehicle-packs/holybro-x650-pixhawk6.v1.json",
+    "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+    "distribution/vehicle-packs/registry.v1.json",
+)
 SOURCE_PATHS = (
     "backend/app",
     "backend/alembic",
@@ -33,6 +56,7 @@ SOURCE_PATHS = (
     "worker/drone_dream_worker",
     "worker/pyproject.toml",
     "scripts/simulators",
+    *RUNTIME_DISTRIBUTION_PATHS,
 )
 IGNORED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
