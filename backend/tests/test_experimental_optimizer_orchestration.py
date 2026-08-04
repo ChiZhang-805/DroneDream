@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Iterator
 from pathlib import Path
 from types import SimpleNamespace
@@ -42,16 +41,13 @@ def experimental_ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterato
     from app import config as config_module
 
     config_module.get_settings.cache_clear()
-    for name in list(sys.modules):
-        if name == "app" or name.startswith("app."):
-            del sys.modules[name]
-
     import app.db as db_module
     import app.models as models_module
     import app.orchestration.runner as runner
     import app.schemas as schemas_module
     import app.services.jobs as jobs_service
 
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
     yield {
         "db": db_module,

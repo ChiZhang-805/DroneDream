@@ -7,9 +7,7 @@ the `/api/v1/jobs/{job_id}/report` endpoint's failure-path behaviour.
 
 from __future__ import annotations
 
-import importlib
 import json
-import sys
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -20,15 +18,16 @@ from sqlalchemy.exc import DatabaseError
 
 
 def _clear_settings_cache() -> None:
-    """Clear the currently loaded config module, not a stale pre-reload alias."""
+    """Clear the process-wide settings cache."""
 
-    config_module = importlib.import_module("app.config")
+    from app import config as config_module
+
     config_module.get_settings.cache_clear()
 
 
 @pytest.fixture()
 def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
-    """Reload the backend against an isolated SQLite DB."""
+    """Bind the backend to an isolated SQLite DB."""
 
     db_path = tmp_path / "report.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
@@ -38,40 +37,17 @@ def ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
-    models_was_loaded = "app.models" in sys.modules
-
     import app.db as db_module
-
-    importlib.reload(db_module)
-
-    if models_was_loaded:
-        models_module = importlib.reload(sys.modules["app.models"])
-    else:
-        models_module = importlib.import_module("app.models")
-
-    import app.services.jobs as jobs_service_module
-
-    importlib.reload(jobs_service_module)
-
+    import app.models as models_module
     import app.orchestration.aggregation as aggregation_module
-    import app.orchestration.constants as constants_module
-    import app.orchestration.events as events_module
     import app.orchestration.job_manager as job_manager_module
     import app.orchestration.metrics as metrics_module  # noqa: F401
-    import app.orchestration.optimizer as optimizer_module
     import app.orchestration.report_generator as report_generator_module
     import app.orchestration.runner as runner_module
     import app.orchestration.trial_executor as trial_executor_module
+    import app.services.jobs as jobs_service_module
 
-    importlib.reload(constants_module)
-    importlib.reload(optimizer_module)
-    importlib.reload(events_module)
-    importlib.reload(job_manager_module)
-    importlib.reload(trial_executor_module)
-    importlib.reload(report_generator_module)
-    importlib.reload(aggregation_module)
-    importlib.reload(runner_module)
-
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
 
     yield {
@@ -1650,15 +1626,9 @@ def test_build_job_report_lines_includes_new_sections(ctx):
 
 
 def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     job_id = _run_job_to_completion(
         ctx,
@@ -1671,7 +1641,7 @@ def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
         expected_evidence_id = job.report.winner_evidence_json["evidence_id"]
         expected_receipt_id = job.winner_freeze.id
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         response = client.get(f"/api/v1/jobs/{job_id}/report")
 
     assert response.status_code == 200
@@ -1680,15 +1650,9 @@ def test_report_endpoint_exposes_bound_winner_evidence_id(ctx):
 
 
 def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     job_id = _run_job_to_completion(
         ctx,
@@ -1702,7 +1666,7 @@ def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
         job.winner_freeze.winner_candidate_id = "cand_tampered"
         db.commit()
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         response = client.get(f"/api/v1/jobs/{job_id}/report")
 
     assert response.status_code == 409
@@ -1712,15 +1676,9 @@ def test_report_endpoint_rejects_mutated_winner_freeze_receipt(ctx):
 def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
     """A FAILED job returns a structured JOB_FAILED error with context."""
 
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
@@ -1742,7 +1700,7 @@ def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
         job_ref.latest_error_message = "All baseline trials failed; cannot produce a report."
         db.commit()
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         resp = client.get(f"/api/v1/jobs/{job_id}/report")
         assert resp.status_code == 409
         body = resp.json()
@@ -1754,15 +1712,9 @@ def test_report_endpoint_returns_job_failed_when_job_failed(ctx):
 
 
 def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     schemas = ctx["schemas"]
     jobs_service = ctx["jobs_service"]
@@ -1779,7 +1731,7 @@ def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
         job_id = job.id
         jobs_service.cancel_job(db, job_id)
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         resp = client.get(f"/api/v1/jobs/{job_id}/report")
         assert resp.status_code == 409
         body = resp.json()
@@ -1790,18 +1742,12 @@ def test_report_endpoint_returns_job_cancelled_when_cancelled(ctx):
 
 
 def test_job_detail_includes_recent_events(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
 
+    import app.main as main_module
+
     job_id = _run_job_to_completion(ctx)
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         body = client.get(f"/api/v1/jobs/{job_id}").json()["data"]
 
     events = body.get("recent_events")
@@ -1818,19 +1764,13 @@ def test_job_detail_includes_recent_events(ctx):
 
 
 def test_artifacts_endpoint_exposes_job_artifacts(ctx):
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
+
+    import app.main as main_module
 
     job_id = _run_job_to_completion(ctx)
 
-    with TestClient(main_module.app) as client:
+    with TestClient(main_module.create_app()) as client:
         body = client.get(f"/api/v1/jobs/{job_id}/artifacts").json()["data"]
 
     assert isinstance(body, list)

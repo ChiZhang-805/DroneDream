@@ -40,10 +40,6 @@ def gpt_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
-    for name in list(sys.modules):
-        if name == "app" or name.startswith("app."):
-            del sys.modules[name]
-
     import app.db as db_module  # type: ignore[import-not-found]
     import app.models as models_module  # type: ignore[import-not-found]
     import app.orchestration.acceptance as acceptance  # type: ignore[import-not-found]
@@ -53,6 +49,7 @@ def gpt_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     import app.orchestration.trial_executor as trial_executor  # type: ignore[import-not-found]
     import app.services.jobs as jobs_service  # type: ignore[import-not-found]  # noqa: I001
 
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
 
     yield {

@@ -8,7 +8,60 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from sqlalchemy import BigInteger, text
+
+
+def test_database_rebind_preserves_session_and_orm_identity(tmp_path, monkeypatch):
+    database_url = f"sqlite:///{tmp_path / 'identity.db'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("APP_ENV", "test")
+
+    from app import config as config_module
+    from app import db as db_module
+    from app import models as models_module
+
+    config_module.get_settings.cache_clear()
+    session_factory = db_module.SessionLocal
+    declarative_base = db_module.Base
+    user_model = models_module.User
+
+    db_module.rebind_database_for_testing(database_url)
+    db_module.init_db()
+
+    assert db_module.SessionLocal is session_factory
+    assert db_module.Base is declarative_base
+    assert models_module.User is user_model
+    assert str(db_module.engine.url) == database_url
+
+
+def test_database_rebind_is_forbidden_outside_tests(tmp_path, monkeypatch):
+    database_url = f"sqlite:///{tmp_path / 'forbidden.db'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("APP_ENV", "development")
+
+    from app import config as config_module
+    from app import db as db_module
+
+    config_module.get_settings.cache_clear()
+    with pytest.raises(RuntimeError, match="only when APP_ENV=test"):
+        db_module.rebind_database_for_testing(database_url)
+
+
+def test_backend_tests_do_not_reload_the_database_model_graph() -> None:
+    tests_root = Path(__file__).resolve().parent
+    forbidden_fragments = (
+        "importlib.reload(" + "db_module)",
+        'importlib.reload(sys.modules["app.' + 'models"])',
+        "del sys." + "modules[name]",
+    )
+    offenders = {
+        path.name: fragment
+        for path in tests_root.glob("test_*.py")
+        for fragment in forbidden_fragments
+        if fragment in path.read_text(encoding="utf-8")
+    }
+    assert offenders == {}
 
 
 def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeypatch):
@@ -22,7 +75,7 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
 
     import app.db as db_module
 
-    importlib.reload(db_module)
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
 
     with db_module.engine.begin() as conn:
         conn.execute(

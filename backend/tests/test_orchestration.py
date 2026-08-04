@@ -7,7 +7,6 @@ independently of the HTTP layer.
 
 from __future__ import annotations
 
-import importlib
 import sys
 import threading
 import time
@@ -37,7 +36,7 @@ _EXAMPLE_SIM = (
 
 @pytest.fixture()
 def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
-    """Yield a reloaded orchestration context bound to a per-test SQLite DB."""
+    """Yield an orchestration context bound to a per-test SQLite DB."""
 
     db_path = tmp_path / "orch.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
@@ -47,44 +46,17 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
-    models_was_loaded = "app.models" in sys.modules
-
     import app.db as db_module
-
-    importlib.reload(db_module)
-
-    if models_was_loaded:
-        models_module = importlib.reload(sys.modules["app.models"])
-    else:
-        models_module = importlib.import_module("app.models")
-
-    import app.orchestration.attempt_evidence as attempt_evidence_module
-
-    importlib.reload(attempt_evidence_module)
-
-    import app.services.jobs as jobs_service_module
-
-    importlib.reload(jobs_service_module)
-
-    # Reload orchestration submodules so they pick up the freshly-reloaded
-    # models/db (they otherwise cache Base/metadata from the previous import).
+    import app.models as models_module
     import app.orchestration.aggregation as aggregation_module
-    import app.orchestration.constants as constants_module
-    import app.orchestration.events as events_module
+    import app.orchestration.attempt_evidence as attempt_evidence_module
     import app.orchestration.job_manager as job_manager_module
     import app.orchestration.metrics as metrics_module  # noqa: F401
-    import app.orchestration.optimizer as optimizer_module
     import app.orchestration.runner as runner_module
     import app.orchestration.trial_executor as trial_executor_module
+    import app.services.jobs as jobs_service_module
 
-    importlib.reload(constants_module)
-    importlib.reload(optimizer_module)
-    importlib.reload(events_module)
-    importlib.reload(job_manager_module)
-    importlib.reload(trial_executor_module)
-    importlib.reload(aggregation_module)
-    importlib.reload(runner_module)
-
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
 
     yield {
@@ -3181,18 +3153,11 @@ def test_api_report_endpoint_returns_ready_after_worker_runs(
 
     ctx = orchestration_ctx
 
-    # Reload main so the FastAPI app picks up the patched DB URL.
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
 
-    with TestClient(main_module.app) as client:
+    import app.main as main_module
+
+    with TestClient(main_module.create_app()) as client:
         created = client.post(
             "/api/v1/jobs",
             json={
@@ -3336,17 +3301,11 @@ def test_report_for_failed_job_returns_structured_failure(orchestration_ctx, mon
                 break
 
     # Drive the HTTP layer directly so we cover the router error envelope.
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
 
-    with TestClient(main_module.app) as client:
+    import app.main as main_module
+
+    with TestClient(main_module.create_app()) as client:
         resp = client.get(f"/api/v1/jobs/{job_id}/report")
         assert resp.status_code == 409
         body = resp.json()
@@ -3378,17 +3337,11 @@ def test_list_jobs_filters_by_status(orchestration_ctx):
     with ctx["db_module"].SessionLocal() as db:
         jobs_service.cancel_job(db, cancelled_id)
 
-    import app.main as main_module
-    import app.routers.jobs as jobs_router
-    import app.routers.trials as trials_router
-
-    importlib.reload(jobs_router)
-    importlib.reload(trials_router)
-    importlib.reload(main_module)
-
     from fastapi.testclient import TestClient
 
-    with TestClient(main_module.app) as client:
+    import app.main as main_module
+
+    with TestClient(main_module.create_app()) as client:
         queued = client.get("/api/v1/jobs?status=QUEUED").json()["data"]
         cancelled = client.get("/api/v1/jobs?status=CANCELLED").json()["data"]
 

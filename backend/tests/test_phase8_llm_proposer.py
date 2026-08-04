@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 import time
 from collections.abc import Iterator
 from datetime import datetime, timedelta, timezone
@@ -60,12 +59,6 @@ def llm_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
-    # Evict every cached `app.*` module so the fresh engine/metadata cannot be
-    # polluted by earlier tests that imported models against the original Base.
-    for name in list(sys.modules):
-        if name == "app" or name.startswith("app."):
-            del sys.modules[name]
-
     import app.db as db_module  # type: ignore[import-not-found]
     import app.models as models_module  # type: ignore[import-not-found]
     import app.orchestration.acceptance as acceptance_module  # type: ignore[import-not-found]
@@ -76,6 +69,7 @@ def llm_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
     import app.orchestration.llm_parameter_proposer as proposer_module  # type: ignore[import-not-found]
     import app.services.jobs as jobs_service_module  # type: ignore[import-not-found]  # noqa: I001
 
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
 
     yield {

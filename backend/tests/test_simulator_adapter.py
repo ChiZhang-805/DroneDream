@@ -7,8 +7,6 @@ adapter rather than hardcoding simulator logic.
 
 from __future__ import annotations
 
-import importlib
-import sys
 from collections.abc import Iterator
 from types import SimpleNamespace
 
@@ -454,33 +452,13 @@ def orchestration_ctx(tmp_path, monkeypatch) -> Iterator[dict[str, object]]:
 
     config_module.get_settings.cache_clear()
 
-    models_was_loaded = "app.models" in sys.modules
-
     import app.db as db_module
-
-    importlib.reload(db_module)
-
-    if models_was_loaded:
-        models_module = importlib.reload(sys.modules["app.models"])
-    else:
-        models_module = importlib.import_module("app.models")
-
+    import app.models as models_module
+    import app.orchestration.job_manager as job_manager_module
+    import app.orchestration.trial_executor as trial_executor_module
     import app.services.jobs as jobs_service_module
 
-    importlib.reload(jobs_service_module)
-
-    import app.orchestration.aggregation as aggregation_module
-    import app.orchestration.events as events_module
-    import app.orchestration.job_manager as job_manager_module
-    import app.orchestration.runner as runner_module
-    import app.orchestration.trial_executor as trial_executor_module
-
-    importlib.reload(events_module)
-    importlib.reload(job_manager_module)
-    importlib.reload(trial_executor_module)
-    importlib.reload(aggregation_module)
-    importlib.reload(runner_module)
-
+    db_module.rebind_database_for_testing(f"sqlite:///{db_path}")
     db_module.init_db()
 
     yield {

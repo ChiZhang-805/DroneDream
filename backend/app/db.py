@@ -52,6 +52,36 @@ engine: Engine = _build_engine(_settings.database_url)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, future=True)
 
 
+def rebind_database_for_testing(database_url: str) -> None:
+    """Rebind the process-wide session factory without reloading ORM modules.
+
+    Pytest imports test modules during collection, so reloading ``app.db`` or
+    ``app.models`` later creates duplicate ``Base``/model class identities.
+    SQLAlchemy then correctly rejects objects created from the stale class,
+    and FastAPI dependencies can remain bound to stale session factories.
+
+    Tests instead keep one module graph and reconfigure the *same*
+    ``SessionLocal`` object that services and routers imported.  The guard is
+    deliberately fail-closed: production/development code may not redirect a
+    live process to a different database through this helper.
+    """
+
+    global _settings, engine
+
+    settings = get_settings()
+    if settings.app_env.strip().lower() != "test":
+        raise RuntimeError("Database rebinding is allowed only when APP_ENV=test")
+    if database_url != settings.database_url:
+        raise RuntimeError("Test database URL must match the active Settings value")
+
+    previous_engine = engine
+    replacement_engine = _build_engine(database_url)
+    SessionLocal.configure(bind=replacement_engine)
+    engine = replacement_engine
+    _settings = settings
+    previous_engine.dispose()
+
+
 def init_db() -> None:
     """Create development tables unless schema management is external.
 
@@ -1127,4 +1157,11 @@ def get_db() -> Iterator[Session]:
         db.close()
 
 
-__all__ = ["Base", "SessionLocal", "engine", "get_db", "init_db"]
+__all__ = [
+    "Base",
+    "SessionLocal",
+    "engine",
+    "get_db",
+    "init_db",
+    "rebind_database_for_testing",
+]
