@@ -237,6 +237,29 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
                 )
                 self.assertIn('!redirectTarget.startsWith("//")', entry)
 
+    def test_pages_build_publishes_real_fixed_console_route_entries(self) -> None:
+        builder = self.read("website/scripts/build-pages-site.ps1")
+
+        self.assertIn('$consoleStaticRoutes = @(', builder)
+        for route in (
+            "assistant",
+            "dashboard",
+            "history",
+            "scenarios",
+            "admin",
+            "compare",
+            "jobs\\new",
+            "desktop\\setup",
+        ):
+            with self.subTest(route=route):
+                self.assertRegex(builder, rf'(?m)^    "{re.escape(route)}",?$')
+        self.assertIn(
+            '$routeDirectory = Join-Path (Join-Path $outputDirectory "console") '
+            "$consoleStaticRoute",
+            builder,
+        )
+        self.assertIn('Join-Path $routeDirectory "index.html"', builder)
+
     def test_parity_verifies_public_release_metadata_on_both_origins(self) -> None:
         parity = self.read("website/scripts/verify-site-parity.ps1")
         readme = self.read("website/README.md")

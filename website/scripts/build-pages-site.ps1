@@ -154,6 +154,28 @@ if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
     throw "The console build completed without producing $consoleHtml"
 }
 
+# GitHub Pages has no server-side SPA fallback. Publish real index files for
+# every fixed console route so direct navigation returns HTTP 200 instead of
+# relying on the 404 bridge. Dynamic job/trial identifiers continue to use the
+# bridge below because their path segments cannot be enumerated at build time.
+$consoleStaticRoutes = @(
+    "assistant",
+    "dashboard",
+    "history",
+    "scenarios",
+    "admin",
+    "compare",
+    "jobs\new",
+    "desktop\setup"
+)
+foreach ($consoleStaticRoute in $consoleStaticRoutes) {
+    $routeDirectory = Join-Path (Join-Path $outputDirectory "console") $consoleStaticRoute
+    New-Item -ItemType Directory -Force -Path $routeDirectory | Out-Null
+    Copy-Item -LiteralPath $consoleHtml -Destination (
+        Join-Path $routeDirectory "index.html"
+    ) -Force
+}
+
 $builtJavaScript = @(
     Get-ChildItem -LiteralPath $assetDirectory -Filter "*.js" -File |
         ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
