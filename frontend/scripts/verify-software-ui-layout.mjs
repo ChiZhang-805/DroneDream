@@ -469,12 +469,14 @@ async function verifyFixedScenarios(page, testCase) {
         const difficulty = heading?.querySelector(".fixed-scenario-difficulty");
         const facts = card.querySelector(".fixed-scenario-facts");
         const preview = card.querySelector(".experience-preview");
+        const previewCanvas = preview?.querySelector(".experience-preview-canvas");
         const action = card.querySelector(".fixed-scenario-use");
         if (!(heading instanceof HTMLElement)
           || !(title instanceof HTMLElement)
           || !(difficulty instanceof HTMLElement)
           || !(facts instanceof HTMLElement)
           || !(preview instanceof HTMLElement)
+          || !(previewCanvas instanceof SVGElement)
           || !(action instanceof HTMLElement)) {
           throw new Error("Fixed-scenario card is missing an aligned content region");
         }
@@ -485,6 +487,7 @@ async function verifyFixedScenarios(page, testCase) {
           difficulty: bounds(difficulty),
           facts: bounds(facts),
           preview: bounds(preview),
+          previewCanvas: bounds(previewCanvas),
           action: bounds(action),
         };
       }),
@@ -530,6 +533,14 @@ async function verifyFixedScenarios(page, testCase) {
     assert(metrics.cards.every((card) => closeEnough(card.height, metrics.cards[0].height, 1)));
     assert(metrics.cards.every((card) => closeEnough(card.title.top, card.difficulty.top, 2)));
     assert(metrics.cards.every((card) => card.title.left < card.difficulty.left));
+    assert(
+      metrics.cards.every((card) => card.previewCanvas.bottom <= card.preview.bottom + 1),
+      `${testCase.id}: a scenario preview canvas escapes its preview region`,
+    );
+    assert(
+      metrics.cards.every((card) => card.preview.bottom + 6 <= card.action.top),
+      `${testCase.id}: a scenario preview overlaps its action`,
+    );
     for (const [leftIndex, rightIndex] of [[0, 1], [2, 3]]) {
       const leftCard = metrics.cards[leftIndex];
       const rightCard = metrics.cards[rightIndex];

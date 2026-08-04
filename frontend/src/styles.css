@@ -2851,10 +2851,12 @@ a {
 }
 
 .fixed-scenario-card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 0.52rem;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
   padding: 0.72rem;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -2915,25 +2917,26 @@ a {
 
 .fixed-scenario-card .experience-preview {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
   padding: 0.35rem;
   border-color: #e5d8e7;
   background: #faf7fb;
 }
 
 .fixed-scenario-card .experience-preview-compact .experience-preview-canvas {
-  flex: 1 1 auto;
-  height: auto;
-  min-height: 176px;
+  flex: 1 1 0;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
   margin: 0;
 }
 
 .fixed-scenario-use {
   justify-content: center;
   width: 100%;
-  margin-top: auto;
+  margin-top: 0;
 }
 
 .fixed-scenario-use svg {
@@ -2976,9 +2979,6 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .fixed-scenario-card .experience-preview-compact .experience-preview-canvas {
-    min-height: 142px;
-  }
 }
 
 @media (max-width: 620px) {
