@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/edition-manifest.v1.json",
+  "title": "DroneDream edition manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "editionId",
+    "editionVersion",
+    "productDisplayVersion",
+    "displayName",
+    "description",
+    "implementationStatus",
+    "validationTier",
+    "artifactBaseName",
+    "capabilityPolicy",
+    "modules",
+    "capabilities",
+    "runtimeProfile",
+    "qualification",
+    "sourcePolicy",
+    "releaseChannel",
+    "knownGaps"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-edition-manifest"},
+    "editionId": {"enum": ["sim", "lab", "field"]},
+    "editionVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "productDisplayVersion": {"const": "1.0.0"},
+    "displayName": {"$ref": "#/$defs/localizedText"},
+    "description": {"$ref": "#/$defs/localizedText"},
+    "implementationStatus": {"enum": ["integrated-contract", "contract-only"]},
+    "validationTier": {"enum": ["sim-runtime-contract", "contract-only"]},
+    "artifactBaseName": {
+      "type": "string",
+      "pattern": "^DroneDream-(?:Sim|Lab|Field)-1\\.0\\.0\\.exe$"
+    },
+    "capabilityPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policyId", "policyVersion", "sha256"],
+      "properties": {
+        "policyId": {"const": "core-capabilities"},
+        "policyVersion": {"const": "1.0.0"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "modules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "optional", "forbidden"],
+      "properties": {
+        "required": {"$ref": "#/$defs/identifierArray"},
+        "optional": {"$ref": "#/$defs/identifierArray"},
+        "forbidden": {"$ref": "#/$defs/identifierArray"}
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabledOrConditioned", "forbidden"],
+      "properties": {
+        "enabledOrConditioned": {"$ref": "#/$defs/identifierArray"},
+        "forbidden": {"$ref": "#/$defs/identifierArray"}
+      }
+    },
+    "runtimeProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "currentAvailability", "includesLargeSimulator"],
+      "properties": {
+        "profileId": {"enum": ["full-simulation", "full-lab", "lightweight-hardware"]},
+        "currentAvailability": {"enum": ["integrated-contract", "contract-only"]},
+        "includesLargeSimulator": {"type": "boolean"}
+      }
+    },
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mayIssueSimulationReceipt",
+        "mayConsumeTrustedReceipt",
+        "hardwareActionRule",
+        "receiptCompatibilityFailClosed"
+      ],
+      "properties": {
+        "mayIssueSimulationReceipt": {"type": "boolean"},
+        "mayConsumeTrustedReceipt": {"type": "boolean"},
+        "hardwareActionRule": {
+          "enum": [
+            "not-applicable",
+            "trusted-sim-or-hitl-receipt-or-prescribed-preflight"
+          ]
+        },
+        "receiptCompatibilityFailClosed": {"const": true}
+      }
+    },
+    "sourcePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "developmentBranch",
+        "integrationBranch",
+        "editionSourceDivergenceAllowed",
+        "hotfixMustReturnToCore",
+        "commonCoreHashRequired"
+      ],
+      "properties": {
+        "developmentBranch": {"const": "codex/software"},
+        "integrationBranch": {"const": "main"},
+        "editionSourceDivergenceAllowed": {"const": false},
+        "hotfixMustReturnToCore": {"const": true},
+        "commonCoreHashRequired": {"const": true}
+      }
+    },
+    "releaseChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "creationState", "promotionManifestRequired", "forcePushAllowed"],
+      "properties": {
+        "branch": {"enum": ["codex/release-sim", "codex/release-lab", "codex/release-field"]},
+        "creationState": {"enum": ["planned-not-created", "created-protected"]},
+        "promotionManifestRequired": {"const": true},
+        "forcePushAllowed": {"const": false}
+      }
+    },
+    "knownGaps": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "maxLength": 512}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "identifier": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "identifierArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/identifier"}
+    },
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "zh-CN"],
+      "properties": {
+        "en": {"type": "string", "minLength": 1, "maxLength": 512},
+        "zh-CN": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    }
+  }
+}

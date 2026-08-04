@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-manifest",
+  "editionId": "sim",
+  "editionVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "displayName": {
+    "en": "DroneDream Sim",
+    "zh-CN": "DroneDream 纯仿真版"
+  },
+  "description": {
+    "en": "Simulation-only PX4 SITL, Gazebo, and Harness workflows with physical hardware actions denied below the UI.",
+    "zh-CN": "仅运行 PX4 SITL、Gazebo 与 Harness；所有真机和 HITL 操作都在前端以下强制拒绝。"
+  },
+  "implementationStatus": "integrated-contract",
+  "validationTier": "sim-runtime-contract",
+  "artifactBaseName": "DroneDream-Sim-1.0.0.exe",
+  "capabilityPolicy": {
+    "policyId": "core-capabilities",
+    "policyVersion": "1.0.0",
+    "sha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903"
+  },
+  "modules": {
+    "required": [
+      "desktop-core",
+      "engine-pack",
+      "runtime-core",
+      "runtime-simulation",
+      "simulator-gazebo-harmonic",
+      "simulator-px4-sitl",
+      "vehicle-pack-sim",
+      "vehicle-pack-validation"
+    ],
+    "optional": [],
+    "forbidden": [
+      "hardware-bridge",
+      "qgroundcontrol-external",
+      "vehicle-pack-hardware"
+    ]
+  },
+  "capabilities": {
+    "enabledOrConditioned": [
+      "qualification.simulation.issue",
+      "simulation.execute",
+      "simulation.parameter.write",
+      "simulation.vehicle.arm",
+      "updater.module.apply",
+      "vehicle-pack.install"
+    ],
+    "forbidden": [
+      "external.qgroundcontrol.launch",
+      "hardware.arm",
+      "hardware.discover",
+      "hardware.emergency-stop",
+      "hardware.flight",
+      "hardware.hitl.execute",
+      "hardware.parameter.read",
+      "hardware.parameter.write",
+      "hardware.preflight.execute",
+      "qualification.trusted.consume"
+    ]
+  },
+  "runtimeProfile": {
+    "profileId": "full-simulation",
+    "currentAvailability": "integrated-contract",
+    "includesLargeSimulator": true
+  },
+  "qualification": {
+    "mayIssueSimulationReceipt": true,
+    "mayConsumeTrustedReceipt": false,
+    "hardwareActionRule": "not-applicable",
+    "receiptCompatibilityFailClosed": true
+  },
+  "sourcePolicy": {
+    "developmentBranch": "codex/software",
+    "integrationBranch": "main",
+    "editionSourceDivergenceAllowed": false,
+    "hotfixMustReturnToCore": true,
+    "commonCoreHashRequired": true
+  },
+  "releaseChannel": {
+    "branch": "codex/release-sim",
+    "creationState": "planned-not-created",
+    "promotionManifestRequired": true,
+    "forcePushAllowed": false
+  },
+  "knownGaps": [
+    "A dedicated Sim installer and promotion manifest have not yet been built or published.",
+    "Existing simulator executors still require E5 target-context enforcement before the edition can be called physically incapable."
+  ]
+}

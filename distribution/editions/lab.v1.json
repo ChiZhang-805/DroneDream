@@ -1,0 +1,89 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-manifest",
+  "editionId": "lab",
+  "editionVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "displayName": {
+    "en": "DroneDream Lab",
+    "zh-CN": "DroneDream 实验室版"
+  },
+  "description": {
+    "en": "Unified simulation, HITL, and real-hardware laboratory workflows behind native, runtime, and backend safety fences.",
+    "zh-CN": "统一提供仿真、HITL 与真机实验，但所有真机能力都必须通过 native、Runtime 与后端三层安全门。"
+  },
+  "implementationStatus": "contract-only",
+  "validationTier": "contract-only",
+  "artifactBaseName": "DroneDream-Lab-1.0.0.exe",
+  "capabilityPolicy": {
+    "policyId": "core-capabilities",
+    "policyVersion": "1.0.0",
+    "sha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903"
+  },
+  "modules": {
+    "required": [
+      "desktop-core",
+      "engine-pack",
+      "hardware-bridge",
+      "runtime-core",
+      "runtime-simulation",
+      "simulator-gazebo-harmonic",
+      "simulator-px4-sitl",
+      "vehicle-pack-hardware",
+      "vehicle-pack-sim",
+      "vehicle-pack-validation"
+    ],
+    "optional": ["qgroundcontrol-external"],
+    "forbidden": []
+  },
+  "capabilities": {
+    "enabledOrConditioned": [
+      "external.qgroundcontrol.launch",
+      "hardware.arm",
+      "hardware.discover",
+      "hardware.emergency-stop",
+      "hardware.flight",
+      "hardware.hitl.execute",
+      "hardware.parameter.read",
+      "hardware.parameter.write",
+      "hardware.preflight.execute",
+      "qualification.simulation.issue",
+      "qualification.trusted.consume",
+      "simulation.execute",
+      "simulation.parameter.write",
+      "simulation.vehicle.arm",
+      "updater.module.apply",
+      "vehicle-pack.install"
+    ],
+    "forbidden": []
+  },
+  "runtimeProfile": {
+    "profileId": "full-lab",
+    "currentAvailability": "contract-only",
+    "includesLargeSimulator": true
+  },
+  "qualification": {
+    "mayIssueSimulationReceipt": true,
+    "mayConsumeTrustedReceipt": true,
+    "hardwareActionRule": "trusted-sim-or-hitl-receipt-or-prescribed-preflight",
+    "receiptCompatibilityFailClosed": true
+  },
+  "sourcePolicy": {
+    "developmentBranch": "codex/software",
+    "integrationBranch": "main",
+    "editionSourceDivergenceAllowed": false,
+    "hotfixMustReturnToCore": true,
+    "commonCoreHashRequired": true
+  },
+  "releaseChannel": {
+    "branch": "codex/release-lab",
+    "creationState": "planned-not-created",
+    "promotionManifestRequired": true,
+    "forcePushAllowed": false
+  },
+  "knownGaps": [
+    "No real-hardware or HITL capability is implemented or validated by this manifest alone.",
+    "The existing simulator runner does not yet prove physical target identity at backend, runtime, and native layers.",
+    "A dedicated Lab installer, hardware bridge, and promotion manifest have not yet been built or published."
+  ]
+}

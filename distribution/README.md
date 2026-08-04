@@ -42,3 +42,40 @@ the exact files and artifact closure. In particular:
 Future E1/E4 contracts will live beside this audit and will bind edition,
 capability, Vehicle Pack, composite installation, promotion, rollback, and
 download-catalog manifests to one common core source.
+
+## E1 capability and edition contracts
+
+`capabilities/core-capabilities.v1.json` is authoritative for the distinction
+between simulated targets, HITL targets, and real hardware. Simulated arming
+and parameter writes are deliberately different capabilities from physical
+arming and writes. A UI flag is never authority: safety-critical hardware
+actions require backend, Runtime, and native enforcement, and an unknown target
+is denied. The LLM remains at generation boundaries while PX4 or the selected
+vehicle autopilot owns the high-frequency control loop.
+
+The three files under `editions/` describe one common-source product:
+
+- Sim includes the full simulation Runtime profile and forbids physical/HITL
+  capabilities;
+- Lab declares the combined capability set but remains `contract-only` until
+  the hardware bridge and safety fences pass E5;
+- Field omits the large simulation module and consumes a compatible trusted
+  qualification receipt or performs the prescribed hardware preflight. Its
+  lightweight Runtime profile is also still `contract-only`.
+
+All three release branches remain `planned-not-created`. They may be created
+only after promotion and branch-protection contracts are validated and the
+governance owner explicitly approves creation.
+
+Validate the contracts without installing dependencies:
+
+```powershell
+python distribution/tools/distribution_contract.py upstream `
+  distribution/upstream-sources.v1.json
+
+python distribution/tools/distribution_contract.py editions `
+  --policy distribution/capabilities/core-capabilities.v1.json `
+  distribution/editions/sim.v1.json `
+  distribution/editions/lab.v1.json `
+  distribution/editions/field.v1.json
+```
