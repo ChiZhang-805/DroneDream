@@ -9,6 +9,39 @@ const runtimeSessionContractMocks = vi.hoisted(() => ({
 const openerMocks = vi.hoisted(() => ({
   openUrl: vi.fn(async () => undefined),
 }));
+const distributionPlanMocks = vi.hoisted(() => ({
+  validate: vi.fn(async (request: { selection: Record<string, unknown> }) => ({
+    schemaVersion: 1,
+    kind: "dronedream-distribution-plan-validation",
+    planVersion: "1.0.0",
+    productDisplayVersion: "1.0.0",
+    sourceCommit: "a".repeat(40),
+    sourceTreeClean: true,
+    planSha256: "b".repeat(64),
+    selection: request.selection,
+    catalog: {
+      registryManifestSha256: "c".repeat(64),
+      capabilityPolicySha256: "d".repeat(64),
+      editionManifestSha256: "e".repeat(64),
+      vehiclePackManifestSha256: "f".repeat(64),
+      vehiclePackPayloadSha256: "1".repeat(64),
+      vehiclePackSignatureState: "missing",
+      validationTier: "contract-only",
+    },
+    requiredModules: ["desktop-core", "runtime-simulation"],
+    optionalModules: [],
+    capabilities: {
+      defaultDecision: "deny",
+      frontendIsAuthority: false,
+      enabledOrConditioned: ["simulation.execute"],
+      denied: ["hardware.arm", "hardware.flight", "hardware.parameter.write"],
+    },
+    rollback: { status: "missing", reference: null },
+    blockers: ["native-apply-not-implemented"],
+    canApply: false,
+    executionAuthorized: false,
+  })),
+}));
 
 vi.mock("../desktop/runtimeSessionContract", async (importOriginal) => {
   const original = await importOriginal<
@@ -23,6 +56,14 @@ vi.mock("../desktop/runtimeSessionContract", async (importOriginal) => {
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: openerMocks.openUrl,
 }));
+
+vi.mock("../desktop/bridge", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../desktop/bridge")>();
+  return {
+    ...original,
+    validateDistributionPlan: distributionPlanMocks.validate,
+  };
+});
 
 import { apiClient } from "../api/client";
 import { AppShell } from "../AppShell";
@@ -103,6 +144,7 @@ afterEach(() => {
     runtimeSessionContractMocks.verify.mockImplementation(async (report) => report);
     openerMocks.openUrl.mockReset();
     openerMocks.openUrl.mockResolvedValue(undefined);
+    distributionPlanMocks.validate.mockClear();
     delete window.__TAURI__;
     window.localStorage.clear();
     vi.restoreAllMocks();
