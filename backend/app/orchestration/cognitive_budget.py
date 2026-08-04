@@ -517,6 +517,26 @@ def finish_cognitive_turn(
     return final_status
 
 
+def cancel_cognitive_turn_if_job_terminal(
+    db: Session,
+    job: models.Job,
+    attempt: CognitiveTurnAttempt,
+) -> str | None:
+    """Re-read server state after provider I/O and seal a stale result safely."""
+
+    db.refresh(job)
+    if job.status not in schemas.JOB_TERMINAL_STATUSES:
+        return None
+    finish_cognitive_turn(
+        db,
+        job,
+        attempt,
+        status="cancelled",
+        error_code=f"job_{job.status.lower()}_during_provider_turn",
+    )
+    return job.status
+
+
 def cognitive_turn_counts(
     db: Session,
     job: models.Job,
@@ -769,6 +789,7 @@ __all__ = [
     "CognitiveTurnBlocked",
     "CognitiveTurnPending",
     "begin_cognitive_turn",
+    "cancel_cognitive_turn_if_job_terminal",
     "canonical_json",
     "cognitive_turn_counts",
     "empty_tool_outputs_sha256",

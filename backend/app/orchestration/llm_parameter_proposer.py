@@ -41,6 +41,7 @@ from app.orchestration.acceptance import AcceptanceCriteria
 from app.orchestration.cognitive_budget import (
     CognitiveTurnAttempt,
     begin_cognitive_turn,
+    cancel_cognitive_turn_if_job_terminal,
     empty_tool_outputs_sha256,
     finish_cognitive_turn,
     recover_existing_cognitive_turn,
@@ -1227,6 +1228,12 @@ def propose_candidates(
 
     if attempt is None:  # pragma: no cover - defensive static narrowing
         raise RuntimeError("Cognitive turn attempt is missing after provider success")
+    terminal_status = cancel_cognitive_turn_if_job_terminal(db, job, attempt)
+    if terminal_status is not None:
+        return LlmProposerResult(
+            error=f"job_{terminal_status.lower()}_during_provider_turn",
+            model=chosen_model,
+        )
     proposals = _validate_response(raw, search_space)
     if not proposals:
         finish_cognitive_turn(

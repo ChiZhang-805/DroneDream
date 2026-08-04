@@ -21,6 +21,7 @@ from app.orchestration.cognitive_budget import (
     CognitiveTurnBlocked,
     CognitiveTurnPending,
     begin_cognitive_turn,
+    cancel_cognitive_turn_if_job_terminal,
     finish_cognitive_turn,
     recover_existing_cognitive_turn,
     sha256_json,
@@ -304,6 +305,12 @@ def _run_review_turn(
             error_code=f"{role}_provider_failed",
         )
         return None, None, f"{role}_provider_failed"
+    terminal_status = cancel_cognitive_turn_if_job_terminal(db, job, attempt)
+    if terminal_status is not None:
+        raise CognitiveTurnBlocked(
+            "job_terminal_during_provider_turn",
+            f"Job became {terminal_status} while the {role} turn was in flight.",
+        )
     if not isinstance(raw, Mapping):
         finish_cognitive_turn(
             db,

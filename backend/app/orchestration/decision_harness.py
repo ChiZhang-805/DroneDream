@@ -28,6 +28,7 @@ from app.orchestration.cognitive_budget import (
     CognitiveTurnBlocked,
     CognitiveTurnPending,
     begin_cognitive_turn,
+    cancel_cognitive_turn_if_job_terminal,
     empty_tool_outputs_sha256,
     finish_cognitive_turn,
     recover_existing_cognitive_turn,
@@ -1566,6 +1567,12 @@ def select_optimizer_budget_plan(
             prompt_sha256=prompt_sha256,
             model=chosen_model,
         )
+    terminal_status = cancel_cognitive_turn_if_job_terminal(db, job, attempt)
+    if terminal_status is not None:
+        raise CognitiveTurnBlocked(
+            "job_terminal_during_provider_turn",
+            f"Job became {terminal_status} while the plan turn was in flight.",
+        )
 
     plan, validation = validate_generation_plan(raw, opportunity)
     if plan is None:
@@ -1937,6 +1944,12 @@ def select_plan_revision(
             prompt_sha256=prompt_sha256,
             model=plan_decision.model,
             error_type=type(exc).__name__,
+        )
+    terminal_status = cancel_cognitive_turn_if_job_terminal(db, job, attempt)
+    if terminal_status is not None:
+        raise CognitiveTurnBlocked(
+            "job_terminal_during_provider_turn",
+            f"Job became {terminal_status} while the revision turn was in flight.",
         )
     revision, validation = validate_plan_revision(
         raw,
