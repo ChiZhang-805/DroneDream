@@ -1,7 +1,11 @@
 import { Boxes, Globe2, HardDrive, ShieldCheck } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
-import { isDesktopRuntime } from "../desktop/bridge";
+import {
+  isDesktopRuntime,
+  validateDistributionPlan,
+  type DistributionPlanValidation,
+} from "../desktop/bridge";
 import {
   controllerKey,
   DISTRIBUTION_CATALOG,
@@ -43,6 +47,10 @@ const COPY = {
     golden: "Validation priority",
     browserBoundary: "This browser saves a draft only. It cannot install modules or control hardware.",
     desktopBoundary: "Nothing is installed from this panel. Native verification must approve a future plan.",
+    nativeChecking: "Native plan check in progress — no changes are being applied.",
+    nativeBlocked: "Native plan checked and safely blocked",
+    nativeError: "Native plan check failed closed — no changes were applied.",
+    blockerCount: "blockers",
     noAction: "Preview saved locally · no installation started",
     issueTitle: "Why this selection cannot be applied yet",
     issue: {
@@ -77,6 +85,10 @@ const COPY = {
     golden: "优先验证候选",
     browserBoundary: "网页只保存选择草稿，不能安装模块或控制真机。",
     desktopBoundary: "此面板不会开始安装；未来计划仍须通过原生端同源校验。",
+    nativeChecking: "原生计划正在校验，不会应用任何变更。",
+    nativeBlocked: "原生计划已校验并安全阻断",
+    nativeError: "原生计划校验失败并已安全阻断，未应用任何变更。",
+    blockerCount: "项阻断原因",
     noAction: "选择已保存在本机 · 未开始安装",
     issueTitle: "当前不能应用此选择的原因",
     issue: {
@@ -122,6 +134,10 @@ export function DistributionSetupPanel({
   const [selection, setSelection] = useState<DistributionSelectionDraft>(() => (
     initialSelection(locale)
   ));
+  const [nativePlanState, setNativePlanState] = useState<
+    | { status: "browser" | "checking" | "failed" }
+    | { status: "blocked"; plan: DistributionPlanValidation }
+  >({ status: isDesktopRuntime() ? "checking" : "browser" });
   const preview = buildDistributionInstallationPreview(selection);
   const updateSelection = (next: DistributionSelectionDraft) => {
     setSelection(normalizeDistributionSelection(next));
@@ -139,6 +155,26 @@ export function DistributionSetupPanel({
     }
   }, [selection]);
 
+  useEffect(() => {
+    if (!isDesktopRuntime()) {
+      setNativePlanState({ status: "browser" });
+      return undefined;
+    }
+    let active = true;
+    setNativePlanState({ status: "checking" });
+    void validateDistributionPlan({
+      selection,
+      rollbackReference: null,
+    }).then((plan) => {
+      if (active) setNativePlanState({ status: "blocked", plan });
+    }).catch(() => {
+      if (active) setNativePlanState({ status: "failed" });
+    });
+    return () => {
+      active = false;
+    };
+  }, [selection]);
+
   const selectedPack = preview.selectedVehiclePack;
   const blockingIssues = preview.issues.filter((issue) => issue.severity === "blocking");
   const noticeIssues = preview.issues.filter((issue) => issue.severity === "notice");
@@ -150,6 +186,7 @@ export function DistributionSetupPanel({
       aria-labelledby={`${id}-title`}
       data-can-apply="false"
       data-edition={selection.editionId}
+      data-native-plan-status={nativePlanState.status}
     >
       <header className="distribution-setup-heading">
         <div>
@@ -291,7 +328,17 @@ export function DistributionSetupPanel({
 
       <div className="distribution-boundary-note" role="note">
         <ShieldCheck aria-hidden="true" />
-        <p>{isDesktopRuntime() ? copy.desktopBoundary : copy.browserBoundary}</p>
+        <p>
+          {isDesktopRuntime() ? copy.desktopBoundary : copy.browserBoundary}
+          {nativePlanState.status === "checking" ? ` ${copy.nativeChecking}` : null}
+          {nativePlanState.status === "failed" ? ` ${copy.nativeError}` : null}
+          {nativePlanState.status === "blocked" ? (
+            <>
+              {` ${copy.nativeBlocked} · ${nativePlanState.plan.sourceCommit.slice(0, 8)} · `}
+              {nativePlanState.plan.blockers.length} {copy.blockerCount}
+            </>
+          ) : null}
+        </p>
       </div>
 
       {blockingIssues.length + noticeIssues.length > 0 ? (

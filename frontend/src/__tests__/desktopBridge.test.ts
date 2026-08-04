@@ -23,6 +23,7 @@ import {
   startRuntime,
   startRuntimeInstall,
   stopRuntimeForExit,
+  validateDistributionPlan,
 } from "../desktop/bridge";
 
 const prerequisiteReport = {
@@ -130,6 +131,52 @@ const installSnapshot = {
   updatedAt: "2026-07-12T10:00:00Z",
 };
 
+const distributionSelection = {
+  schemaVersion: 1 as const,
+  editionId: "sim",
+  region: "global",
+  vehiclePackId: "px4-gazebo-x500-reference",
+  controllerKey: null,
+  optionalModules: [],
+};
+
+const distributionPlan = {
+  schemaVersion: 1,
+  kind: "dronedream-distribution-plan-validation",
+  planVersion: "1.0.0",
+  productDisplayVersion: "1.0.0",
+  sourceCommit: "a".repeat(40),
+  sourceTreeClean: true,
+  planSha256: "b".repeat(64),
+  selection: distributionSelection,
+  catalog: {
+    registryManifestSha256: "c".repeat(64),
+    capabilityPolicySha256: "d".repeat(64),
+    editionManifestSha256: "e".repeat(64),
+    vehiclePackManifestSha256: "f".repeat(64),
+    vehiclePackPayloadSha256: "1".repeat(64),
+    vehiclePackSignatureState: "missing",
+    validationTier: "contract-only",
+  },
+  requiredModules: ["desktop-core", "runtime-simulation"],
+  optionalModules: [],
+  capabilities: {
+    defaultDecision: "deny",
+    frontendIsAuthority: false,
+    enabledOrConditioned: ["simulation.execute"],
+    denied: ["hardware.arm", "hardware.flight", "hardware.parameter.write"],
+  },
+  rollback: { status: "missing", reference: null },
+  blockers: [
+    "native-apply-not-implemented",
+    "rollback-reference-required",
+    "vehicle-pack-signature-not-verified",
+    "vehicle-pack-unvalidated",
+  ],
+  canApply: false,
+  executionAuthorized: false,
+};
+
 describe("desktop bridge", () => {
   it("stays unavailable in a normal browser", async () => {
     expect(isDesktopRuntime()).toBe(false);
@@ -188,6 +235,86 @@ describe("desktop bridge", () => {
       },
     });
     expect(invoke).toHaveBeenNthCalledWith(2, "cancel_browser_auth", undefined);
+  });
+
+  it("routes a source-bound distribution preview and preserves every native deny", async () => {
+    const invoke = vi.fn(async () => distributionPlan);
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).resolves.toMatchObject({
+      sourceCommit: "a".repeat(40),
+      sourceTreeClean: true,
+      planSha256: "b".repeat(64),
+      canApply: false,
+      executionAuthorized: false,
+      capabilities: {
+        defaultDecision: "deny",
+        frontendIsAuthority: false,
+      },
+    });
+    expect(invoke).toHaveBeenCalledWith("validate_distribution_plan", {
+      request: {
+        selection: distributionSelection,
+        rollbackReference: null,
+      },
+    });
+  });
+
+  it("fails closed when a distribution plan drifts or claims apply authority", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+
+    invoke.mockResolvedValueOnce({ ...distributionPlan, canApply: true });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).rejects.toMatchObject({
+      name: "DesktopCommandContractError",
+      command: "validate_distribution_plan",
+    });
+
+    invoke.mockResolvedValueOnce({
+      ...distributionPlan,
+      selection: { ...distributionSelection, region: "cn" },
+    });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).rejects.toThrow(/must exactly match/i);
+
+    invoke.mockResolvedValueOnce({
+      ...distributionPlan,
+      blockers: ["rollback-reference-required"],
+    });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).rejects.toThrow(/native apply implementation blocker/i);
+
+    invoke.mockResolvedValueOnce({
+      ...distributionPlan,
+      sourceTreeClean: false,
+    });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).rejects.toThrow(/source tree state/i);
+
+    invoke.mockResolvedValueOnce({
+      ...distributionPlan,
+      sourceTreeClean: false,
+      blockers: [...distributionPlan.blockers, "source-tree-dirty-at-build"],
+    });
+    await expect(validateDistributionPlan({
+      selection: distributionSelection,
+      rollbackReference: null,
+    })).resolves.toMatchObject({
+      sourceTreeClean: false,
+      canApply: false,
+    });
   });
 
   it("validates Engine Pack identities and routes the idle preflight", async () => {

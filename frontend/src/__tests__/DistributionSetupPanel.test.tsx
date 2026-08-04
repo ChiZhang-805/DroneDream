@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
 import {
@@ -14,6 +14,52 @@ function renderPanel(variant: "settings" | "setup" = "setup") {
       <DistributionSetupPanel variant={variant} />
     </I18nProvider>,
   );
+}
+
+function nativeBlockedPlan() {
+  return {
+    schemaVersion: 1,
+    kind: "dronedream-distribution-plan-validation",
+    planVersion: "1.0.0",
+    productDisplayVersion: "1.0.0",
+    sourceCommit: "a".repeat(40),
+    sourceTreeClean: true,
+    planSha256: "b".repeat(64),
+    selection: {
+      schemaVersion: 1,
+      editionId: "sim",
+      region: "global",
+      vehiclePackId: "px4-gazebo-x500-reference",
+      controllerKey: null,
+      optionalModules: [],
+    },
+    catalog: {
+      registryManifestSha256: "c".repeat(64),
+      capabilityPolicySha256: "d".repeat(64),
+      editionManifestSha256: "e".repeat(64),
+      vehiclePackManifestSha256: "f".repeat(64),
+      vehiclePackPayloadSha256: "1".repeat(64),
+      vehiclePackSignatureState: "missing",
+      validationTier: "contract-only",
+    },
+    requiredModules: ["desktop-core", "runtime-simulation"],
+    optionalModules: [],
+    capabilities: {
+      defaultDecision: "deny",
+      frontendIsAuthority: false,
+      enabledOrConditioned: ["simulation.execute"],
+      denied: ["hardware.arm", "hardware.flight", "hardware.parameter.write"],
+    },
+    rollback: { status: "missing", reference: null },
+    blockers: [
+      "native-apply-not-implemented",
+      "rollback-reference-required",
+      "vehicle-pack-signature-not-verified",
+      "vehicle-pack-unvalidated",
+    ],
+    canApply: false,
+    executionAuthorized: false,
+  };
 }
 
 describe("DistributionSetupPanel", () => {
@@ -102,13 +148,41 @@ describe("DistributionSetupPanel", () => {
     );
   });
 
-  it("keeps desktop selection behind the future native plan boundary", () => {
-    window.__TAURI__ = { core: { invoke: async () => null } };
-    renderPanel("settings");
+  it("keeps desktop selection behind the source-bound native plan boundary", async () => {
+    const invoke = vi.fn(async () => nativeBlockedPlan());
+    window.__TAURI__ = { core: { invoke } };
+    const { container } = renderPanel("settings");
 
-    expect(screen.getByText(
-      "Nothing is installed from this panel. Native verification must approve a future plan.",
-    )).toBeInTheDocument();
+    expect(screen.getByText((_, element) => (
+      element?.tagName === "P"
+      && element.textContent?.startsWith(
+        "Nothing is installed from this panel. Native verification must approve a future plan.",
+      ) === true
+    ))).toBeInTheDocument();
+    await waitFor(() => {
+      expect(container.querySelector("[data-native-plan-status='blocked']")).toBeTruthy();
+    });
+    expect(screen.getByText(/Native plan checked and safely blocked · aaaaaaaa · 4 blockers/))
+      .toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("validate_distribution_plan", {
+      request: {
+        selection: nativeBlockedPlan().selection,
+        rollbackReference: null,
+      },
+    });
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("renders native contract failures as a fail-closed preview", async () => {
+    window.__TAURI__ = {
+      core: { invoke: vi.fn(async () => ({ ...nativeBlockedPlan(), canApply: true })) },
+    };
+    const { container } = renderPanel("settings");
+
+    await waitFor(() => {
+      expect(container.querySelector("[data-native-plan-status='failed']")).toBeTruthy();
+    });
+    expect(screen.getByText(/Native plan check failed closed/)).toBeInTheDocument();
     expect(screen.queryAllByRole("button")).toHaveLength(0);
   });
 });

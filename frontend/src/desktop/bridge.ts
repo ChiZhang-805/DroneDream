@@ -119,6 +119,61 @@ export interface BrowserAuthSession {
   refreshToken: string;
 }
 
+export interface DistributionPlanSelection {
+  schemaVersion: 1;
+  editionId: string;
+  region: string;
+  vehiclePackId: string;
+  controllerKey: string | null;
+  optionalModules: string[];
+}
+
+export interface DistributionPlanRollbackReference {
+  installationId: string;
+  manifestSha256: string;
+  sourceCommit: string;
+}
+
+export interface DistributionPlanRequest {
+  selection: DistributionPlanSelection;
+  rollbackReference: DistributionPlanRollbackReference | null;
+}
+
+export interface DistributionPlanValidation {
+  schemaVersion: 1;
+  kind: "dronedream-distribution-plan-validation";
+  planVersion: "1.0.0";
+  productDisplayVersion: "1.0.0";
+  sourceCommit: string;
+  sourceTreeClean: boolean;
+  planSha256: string;
+  selection: DistributionPlanSelection;
+  catalog: {
+    registryManifestSha256: string;
+    capabilityPolicySha256: string;
+    editionManifestSha256: string;
+    vehiclePackManifestSha256: string;
+    vehiclePackPayloadSha256: string;
+    vehiclePackSignatureState: string;
+    validationTier: string;
+  };
+  requiredModules: string[];
+  optionalModules: string[];
+  capabilities: {
+    defaultDecision: "deny";
+    frontendIsAuthority: false;
+    enabledOrConditioned: string[];
+    denied: string[];
+  };
+  rollback: {
+    status: "missing" | "reference-only";
+    reference: DistributionPlanRollbackReference | null;
+  };
+  blockers: string[];
+  canApply: false;
+  executionAuthorized: false;
+}
+
 export interface RuntimeInstallStep {
   id: string;
   title: string;
@@ -408,6 +463,17 @@ export function cancelBrowserAuth(): Promise<boolean> {
     expectBoolean(value, "response"));
 }
 
+export function validateDistributionPlan(
+  request: DistributionPlanRequest,
+): Promise<DistributionPlanValidation> {
+  const normalizedRequest = parseDistributionPlanRequest(request, "request");
+  return invokeDesktop(
+    "validate_distribution_plan",
+    (value) => parseDistributionPlanValidation(value, normalizedRequest),
+    { request: normalizedRequest },
+  );
+}
+
 export function probeSystemPrerequisites(): Promise<SystemPrerequisiteReport> {
   return invokeDesktop("probe_system_prerequisites", parsePrerequisiteReport);
 }
@@ -539,6 +605,258 @@ function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
       record.refreshToken,
       "response.refreshToken",
     ),
+  };
+}
+
+function parseDistributionPlanSelection(
+  value: unknown,
+  path: string,
+): DistributionPlanSelection {
+  const record = expectExactRecord(value, path, [
+    "schemaVersion",
+    "editionId",
+    "region",
+    "vehiclePackId",
+    "controllerKey",
+    "optionalModules",
+  ]);
+  if (record.schemaVersion !== 1) {
+    throw new Error(`${path}.schemaVersion must equal 1`);
+  }
+  const selection: DistributionPlanSelection = {
+    schemaVersion: 1,
+    editionId: expectIdentifier(record.editionId, `${path}.editionId`),
+    region: expectIdentifier(record.region, `${path}.region`),
+    vehiclePackId: expectIdentifier(record.vehiclePackId, `${path}.vehiclePackId`),
+    controllerKey: record.controllerKey == null
+      ? null
+      : expectControllerKey(record.controllerKey, `${path}.controllerKey`),
+    optionalModules: parseIdentifierArray(
+      record.optionalModules,
+      `${path}.optionalModules`,
+    ),
+  };
+  if (selection.optionalModules.length > 64) {
+    throw new Error(`${path}.optionalModules exceeds the bounded module count`);
+  }
+  return selection;
+}
+
+function parseDistributionRollbackReference(
+  value: unknown,
+  path: string,
+): DistributionPlanRollbackReference {
+  const record = expectExactRecord(value, path, [
+    "installationId",
+    "manifestSha256",
+    "sourceCommit",
+  ]);
+  const installationId = expectSafeNonEmptyString(
+    record.installationId,
+    `${path}.installationId`,
+  );
+  if (!/^[A-Za-z0-9_.:-]{1,128}$/u.test(installationId)) {
+    throw new Error(`${path}.installationId is malformed`);
+  }
+  return {
+    installationId,
+    manifestSha256: expectLowercaseHex(
+      record.manifestSha256,
+      `${path}.manifestSha256`,
+      64,
+    ),
+    sourceCommit: expectLowercaseHex(
+      record.sourceCommit,
+      `${path}.sourceCommit`,
+      40,
+    ),
+  };
+}
+
+function parseDistributionPlanRequest(
+  value: unknown,
+  path: string,
+): DistributionPlanRequest {
+  const record = expectExactRecord(value, path, ["selection", "rollbackReference"]);
+  return {
+    selection: parseDistributionPlanSelection(record.selection, `${path}.selection`),
+    rollbackReference: record.rollbackReference == null
+      ? null
+      : parseDistributionRollbackReference(
+          record.rollbackReference,
+          `${path}.rollbackReference`,
+        ),
+  };
+}
+
+function parseDistributionPlanValidation(
+  value: unknown,
+  request: DistributionPlanRequest,
+): DistributionPlanValidation {
+  const record = expectExactRecord(value, "response", [
+    "schemaVersion",
+    "kind",
+    "planVersion",
+    "productDisplayVersion",
+    "sourceCommit",
+    "sourceTreeClean",
+    "planSha256",
+    "selection",
+    "catalog",
+    "requiredModules",
+    "optionalModules",
+    "capabilities",
+    "rollback",
+    "blockers",
+    "canApply",
+    "executionAuthorized",
+  ]);
+  if (
+    record.schemaVersion !== 1
+    || record.kind !== "dronedream-distribution-plan-validation"
+    || record.planVersion !== "1.0.0"
+    || record.productDisplayVersion !== "1.0.0"
+  ) {
+    throw new Error("response distribution plan identity is unsupported");
+  }
+  const selection = parseDistributionPlanSelection(record.selection, "response.selection");
+  if (JSON.stringify(selection) !== JSON.stringify(request.selection)) {
+    throw new Error("response.selection must exactly match the requested selection");
+  }
+
+  const catalogRecord = expectExactRecord(record.catalog, "response.catalog", [
+    "registryManifestSha256",
+    "capabilityPolicySha256",
+    "editionManifestSha256",
+    "vehiclePackManifestSha256",
+    "vehiclePackPayloadSha256",
+    "vehiclePackSignatureState",
+    "validationTier",
+  ]);
+  const catalog = {
+    registryManifestSha256: expectLowercaseHex(
+      catalogRecord.registryManifestSha256,
+      "response.catalog.registryManifestSha256",
+      64,
+    ),
+    capabilityPolicySha256: expectLowercaseHex(
+      catalogRecord.capabilityPolicySha256,
+      "response.catalog.capabilityPolicySha256",
+      64,
+    ),
+    editionManifestSha256: expectLowercaseHex(
+      catalogRecord.editionManifestSha256,
+      "response.catalog.editionManifestSha256",
+      64,
+    ),
+    vehiclePackManifestSha256: expectLowercaseHex(
+      catalogRecord.vehiclePackManifestSha256,
+      "response.catalog.vehiclePackManifestSha256",
+      64,
+    ),
+    vehiclePackPayloadSha256: expectLowercaseHex(
+      catalogRecord.vehiclePackPayloadSha256,
+      "response.catalog.vehiclePackPayloadSha256",
+      64,
+    ),
+    vehiclePackSignatureState: expectSafeNonEmptyString(
+      catalogRecord.vehiclePackSignatureState,
+      "response.catalog.vehiclePackSignatureState",
+    ),
+    validationTier: expectSafeNonEmptyString(
+      catalogRecord.validationTier,
+      "response.catalog.validationTier",
+    ),
+  };
+
+  const capabilityRecord = expectExactRecord(
+    record.capabilities,
+    "response.capabilities",
+    ["defaultDecision", "frontendIsAuthority", "enabledOrConditioned", "denied"],
+  );
+  if (capabilityRecord.defaultDecision !== "deny" || capabilityRecord.frontendIsAuthority !== false) {
+    throw new Error("response capability decision must remain native deny-by-default");
+  }
+  const enabledOrConditioned = parseIdentifierArray(
+    capabilityRecord.enabledOrConditioned,
+    "response.capabilities.enabledOrConditioned",
+  );
+  const denied = parseIdentifierArray(
+    capabilityRecord.denied,
+    "response.capabilities.denied",
+  );
+  if (
+    selection.editionId === "sim"
+    && !["hardware.arm", "hardware.flight", "hardware.parameter.write"]
+      .every((capability) => denied.includes(capability))
+  ) {
+    throw new Error("response Sim plan must deny every physical flight authority");
+  }
+
+  const rollbackRecord = expectExactRecord(record.rollback, "response.rollback", [
+    "status",
+    "reference",
+  ]);
+  const rollbackReference = rollbackRecord.reference == null
+    ? null
+    : parseDistributionRollbackReference(
+        rollbackRecord.reference,
+        "response.rollback.reference",
+      );
+  if (
+    (request.rollbackReference === null
+      && (rollbackRecord.status !== "missing" || rollbackReference !== null))
+    || (request.rollbackReference !== null
+      && (
+        rollbackRecord.status !== "reference-only"
+        || JSON.stringify(rollbackReference) !== JSON.stringify(request.rollbackReference)
+      ))
+  ) {
+    throw new Error("response.rollback must preserve the structural rollback reference");
+  }
+
+  const requiredModules = parseIdentifierArray(record.requiredModules, "response.requiredModules");
+  const optionalModules = parseIdentifierArray(record.optionalModules, "response.optionalModules");
+  if (!optionalModules.every((moduleId) => selection.optionalModules.includes(moduleId))) {
+    throw new Error("response.optionalModules must be a validated subset of the request");
+  }
+  const blockers = parseIdentifierArray(record.blockers, "response.blockers");
+  if (!blockers.includes("native-apply-not-implemented")) {
+    throw new Error("response must preserve the native apply implementation blocker");
+  }
+  if (record.canApply !== false || record.executionAuthorized !== false) {
+    throw new Error("response must never authorize apply or execution in preview mode");
+  }
+  const sourceTreeClean = expectBoolean(record.sourceTreeClean, "response.sourceTreeClean");
+  if (blockers.includes("source-tree-dirty-at-build") === sourceTreeClean) {
+    throw new Error("response source tree state must agree with its dirty-build blocker");
+  }
+
+  return {
+    schemaVersion: 1,
+    kind: "dronedream-distribution-plan-validation",
+    planVersion: "1.0.0",
+    productDisplayVersion: "1.0.0",
+    sourceCommit: expectLowercaseHex(record.sourceCommit, "response.sourceCommit", 40),
+    sourceTreeClean,
+    planSha256: expectLowercaseHex(record.planSha256, "response.planSha256", 64),
+    selection,
+    catalog,
+    requiredModules,
+    optionalModules,
+    capabilities: {
+      defaultDecision: "deny",
+      frontendIsAuthority: false,
+      enabledOrConditioned,
+      denied,
+    },
+    rollback: {
+      status: rollbackRecord.status as "missing" | "reference-only",
+      reference: rollbackReference,
+    },
+    blockers,
+    canApply: false,
+    executionAuthorized: false,
   };
 }
 
@@ -1267,6 +1585,23 @@ function expectRecord(value: unknown, path: string): UnknownRecord {
   return value as UnknownRecord;
 }
 
+function expectExactRecord(
+  value: unknown,
+  path: string,
+  expectedKeys: string[],
+): UnknownRecord {
+  const record = expectRecord(value, path);
+  const actualKeys = Object.keys(record).sort();
+  const sortedExpectedKeys = [...expectedKeys].sort();
+  if (
+    actualKeys.length !== sortedExpectedKeys.length
+    || actualKeys.some((key, index) => key !== sortedExpectedKeys[index])
+  ) {
+    throw new Error(`${path} has unsupported or missing fields`);
+  }
+  return record;
+}
+
 function expectArray(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) throw new Error(`${path} must be an array`);
   return value;
@@ -1288,6 +1623,34 @@ function expectSafeNonEmptyString(value: unknown, path: string): string {
     throw new Error(`${path} contains unsafe control characters or is too long`);
   }
   return string;
+}
+
+function expectIdentifier(value: unknown, path: string): string {
+  const identifier = expectString(value, path);
+  if (!/^[a-z0-9][a-z0-9.-]{0,127}$/u.test(identifier)) {
+    throw new Error(`${path} must be a bounded lowercase identifier`);
+  }
+  return identifier;
+}
+
+function expectControllerKey(value: unknown, path: string): string {
+  const controllerKey = expectSafeNonEmptyString(value, path);
+  if (controllerKey.length > 160 || controllerKey.split("::").length !== 2) {
+    throw new Error(`${path} must contain exactly one controller namespace separator`);
+  }
+  return controllerKey;
+}
+
+function expectLowercaseHex(
+  value: unknown,
+  path: string,
+  length: number,
+): string {
+  const digest = expectString(value, path);
+  if (digest.length !== length || !/^[0-9a-f]+$/u.test(digest)) {
+    throw new Error(`${path} must be ${length} lowercase hexadecimal characters`);
+  }
+  return digest;
 }
 
 function normalizeRequestedTargetRoot(value: string): string {
@@ -1385,6 +1748,14 @@ function parseSafeNonEmptyStringArray(value: unknown, path: string): string[] {
   return expectArray(value, path).map((item, index) =>
     expectSafeNonEmptyString(item, `${path}[${index}]`),
   );
+}
+
+function parseIdentifierArray(value: unknown, path: string): string[] {
+  const identifiers = expectArray(value, path).map((item, index) =>
+    expectIdentifier(item, `${path}[${index}]`),
+  );
+  assertUnique(identifiers, path);
+  return identifiers;
 }
 
 function assertUnique(values: string[], path: string): void {

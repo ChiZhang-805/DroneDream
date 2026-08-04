@@ -116,10 +116,16 @@ fn build_engine_pack(manifest_dir: &std::path::Path) {
         "runtime/pins.env",
         "runtime/locks/python-requirements.lock",
         "engine-pack/tools/engine_pack.py",
+        "distribution",
     ] {
         emit_rerun_tree(&repository_root.join(relative));
     }
     let source_commit = git_output(&repository_root, &["rev-parse", "--verify", "HEAD"]);
+    let source_tree_clean = git_output(
+        &repository_root,
+        &["status", "--porcelain=v1", "--untracked-files=all"],
+    )
+    .is_empty();
     let source_date_epoch = git_output(
         &repository_root,
         &["show", "-s", "--format=%ct", &source_commit],
@@ -180,6 +186,7 @@ fn build_engine_pack(manifest_dir: &std::path::Path) {
         .expect("embedded Engine Pack descriptor has no packId");
     println!("cargo:rustc-env=DRONEDREAM_ENGINE_PACK_ID={pack_id}");
     println!("cargo:rustc-env=DRONEDREAM_SOURCE_COMMIT={source_commit}");
+    println!("cargo:rustc-env=DRONEDREAM_SOURCE_TREE_CLEAN={source_tree_clean}");
     println!("cargo:rustc-env=DRONEDREAM_BUILD_NUMBER={build_number}");
 }
 

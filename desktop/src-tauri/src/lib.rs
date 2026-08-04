@@ -1,6 +1,7 @@
 mod app_update;
 mod browser_auth;
 mod desktop_api_bridge;
+mod distribution_plan;
 mod engine_pack;
 mod installer_handoff;
 mod preferences;
@@ -83,6 +84,7 @@ pub fn run() {
             runtime_installer::cancel_runtime_install,
             runtime_installer::start_runtime,
             runtime_installer::repair_runtime,
+            distribution_plan::validate_distribution_plan,
             desktop_api_bridge::desktop_api_request,
             desktop_api_bridge::desktop_download_artifact,
             runtime_keepalive::stop_runtime_for_exit
