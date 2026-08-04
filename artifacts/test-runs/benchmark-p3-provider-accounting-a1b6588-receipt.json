@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "dronedream.benchmark-p3-provider-accounting.v1",
+  "generatedAt": "2026-08-05T00:44:34.3704356+08:00",
+  "subjectCommit": "a1b6588e8ede00f3ed0a97c6885ebf1b1daa3197",
+  "subjectTree": "bbb60de43c6a5c21c2aceb09c96b48d374b41948",
+  "branch": "codex/software",
+  "upstream": "origin/codex/software",
+  "scope": {
+    "phase": "P3 provider logical-turn and actual-network-request accounting",
+    "providerCallsExecuted": 0,
+    "px4GazeboRunsExecuted": 0,
+    "apiKeyRead": false,
+    "accountCredentialRead": false,
+    "productionDeployment": false,
+    "technicalReportModified": false
+  },
+  "sourceClosure": [
+    {
+      "commit": "28c077e8f5a981bdbc1c7d5e3336837d5af24132",
+      "summary": "Version provider request accounting schema and migration."
+    },
+    {
+      "commit": "08ff6424ed0f86cff97bd5b50e279cf6838e2e9f",
+      "summary": "Freeze provider retry policy and keep validation calls at zero retries."
+    },
+    {
+      "commit": "583a2ccb24b5e0cacc33d22827c41acde3e58a08",
+      "summary": "Persist append-only request attempts before network I/O and terminal outcomes after it."
+    },
+    {
+      "commit": "5729dda13648809a303870f3f6a42f961afde1fe",
+      "summary": "Bind actual requests to durable T1-T4 and direct cognitive-turn receipts."
+    },
+    {
+      "commit": "3486d61a8db0a05f71be2c461cb7e1db3b0cf270",
+      "summary": "Discard provider results that return after authoritative cancellation."
+    },
+    {
+      "commit": "9041b7e39eeaad0cb9e377ced8b92b62e5ab146d",
+      "summary": "Freeze attempted and succeeded actual-request counts in first-qualified receipts."
+    },
+    {
+      "commit": "e50dd54dcbd9c38ed30f6da3ad302dc0a6b63aeb",
+      "summary": "Normalize legacy nullable request counters without reducing consumed work."
+    },
+    {
+      "commit": "a1b6588e8ede00f3ed0a97c6885ebf1b1daa3197",
+      "summary": "Preserve one ORM/module identity while rebinding per-test databases, eliminating collection-order pollution."
+    }
+  ],
+  "accountingContract": {
+    "logicalTurns": "Counted independently from actual provider network requests.",
+    "actualRequests": "Attempt is persisted before I/O; succeeded, failed, or indeterminate outcome is append-only and consumes the cap.",
+    "retryPolicy": "Every physical retry or compatibility fallback is an explicit additional request; validation uses max_retries=0.",
+    "capturedMetadata": [
+      "provider and frozen model/configuration hashes",
+      "prompt/evidence/schema/tool hashes and UTF-8 byte counts",
+      "provider usage tokens when returned",
+      "latency and frozen price-snapshot cost when available"
+    ],
+    "excludedSensitiveFields": [
+      "API keys",
+      "passwords",
+      "provider request identifiers",
+      "raw prompts",
+      "raw chat history"
+    ]
+  },
+  "preservedFailure": {
+    "sourceCommit": "e50dd54dcbd9c38ed30f6da3ad302dc0a6b63aeb",
+    "command": "python -m pytest --last-failed -q",
+    "startedAt": "2026-08-04T23:28:53+08:00",
+    "finishedAt": "2026-08-04T23:56:55+08:00",
+    "durationSeconds": 1663.56,
+    "result": "31 failed, 1886 passed",
+    "classification": "test-process module identity pollution",
+    "evidence": "SQLAlchemy rejected same-named Artifact model classes from different module instances; pytest could not catch a same-named BenchmarkAdapterError class; authentication and router dependencies retained stale module objects.",
+    "disposition": "Expectations were not weakened. Test fixtures were changed to preserve module identities and rebind only the underlying test database."
+  },
+  "verification": [
+    {
+      "name": "polluter-before-failure-group focused order regression",
+      "command": "python -m pytest -q tests/test_phase8_llm_proposer.py::test_harness_dispatches_revised_budget_plan_without_mutating_job_mode tests/test_phase8_iterative_loop.py::test_gpt_loop_dispatches_generation_after_baseline tests/test_ece498_pipeline_modes.py tests/test_experimental_optimizer_orchestration.py tests/test_artifact_cleanup.py tests/test_artifacts_api.py tests/test_auth_api.py tests/test_benchmark_proposal_adapters.py tests/test_desktop_bridge.py",
+      "result": "139 passed",
+      "durationSeconds": 210.36
+    },
+    {
+      "name": "database migration and test-isolation contract",
+      "command": "python -m pytest -q tests/test_db_migrations.py",
+      "result": "17 passed",
+      "durationSeconds": 15.87
+    },
+    {
+      "name": "current-exact backend full suite",
+      "command": "python -m pytest --last-failed -q",
+      "startedAt": "2026-08-05T00:15:57+08:00",
+      "finishedAt": "2026-08-05T00:41:52.80+08:00",
+      "result": "1920 passed",
+      "durationSeconds": 1555.80,
+      "note": "The prior failure cache was cleared by passing reruns, so pytest correctly executed the complete collected backend suite. Output was observed in the interactive terminal; no standalone raw log file or log hash is claimed."
+    },
+    {
+      "name": "affected Ruff",
+      "command": "python -m ruff check <10 changed Python files>",
+      "result": "passed"
+    },
+    {
+      "name": "database module Mypy",
+      "command": "python -m mypy backend/app/db.py",
+      "result": "passed; 1 source file"
+    },
+    {
+      "name": "git diff check",
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "remainingBoundaries": [
+    "No real provider request, PX4/Gazebo experiment, publication-grade benchmark, installer rebuild, Runtime migration, or deployment was part of this closure.",
+    "Benchmark P4-P6 remains pending and is paused while the separately authorized unified Edition and Vehicle Pack work begins.",
+    "This receipt is post-source evidence and must not be treated as the execution subject."
+  ]
+}
