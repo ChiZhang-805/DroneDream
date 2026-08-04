@@ -180,6 +180,52 @@ VEHICLE_VALIDATION_TIERS = {
 }
 AUTOPILOT_FAMILIES = {"px4", "ardupilot", "crazyflie"}
 ADAPTER_STATUSES = {"integrated-contract", "contract-only", "planned"}
+VEHICLE_PACK_REGISTRY_KEYS = {
+    "schemaVersion",
+    "kind",
+    "registryId",
+    "registryVersion",
+    "auditDate",
+    "policy",
+    "packs",
+}
+VEHICLE_PACK_REGISTRY_POLICY_KEYS = {
+    "minimumPackCount",
+    "maximumPackCount",
+    "goldenCandidateCount",
+    "validatedRequiresSignedReceipt",
+    "stockDoesNotImplyCompatibility",
+    "hardwareActionsRequireValidatedTier",
+    "parameterBoundsAreProvisionalUntilValidated",
+    "mutableAvailabilityEvidenceRequiresObservedDate",
+}
+VEHICLE_PACK_REGISTRY_ENTRY_KEYS = {
+    "packId",
+    "manifestPath",
+    "manifestSha256",
+    "currentValidationStatus",
+    "currentValidationTier",
+    "segments",
+    "goldenCandidate",
+    "productAvailability",
+    "supportRegions",
+    "availabilityEvidence",
+}
+VEHICLE_PACK_AVAILABILITY_EVIDENCE_KEYS = {"url", "scope", "observedDate"}
+VEHICLE_PACK_SEGMENTS = {
+    "simulation-reference",
+    "student",
+    "teaching",
+    "research",
+    "racing",
+}
+VEHICLE_PRODUCT_AVAILABILITY = {
+    "simulation-only",
+    "listed-available",
+    "variant-limited",
+    "listed-sold-out",
+    "documentation-only",
+}
 COMPOSITE_INSTALLATION_KEYS = {
     "schemaVersion",
     "kind",
@@ -1159,6 +1205,206 @@ def load_vehicle_pack_manifests(
     return packs
 
 
+def validate_vehicle_pack_registry(
+    document: Any,
+    *,
+    vehicle_packs_by_path: dict[str, dict[str, Any]],
+    vehicle_pack_manifest_sha256: dict[str, str],
+) -> dict[str, Any]:
+    if not isinstance(document, dict):
+        raise DistributionContractError("Vehicle Pack registry must be an object")
+    _require_exact_keys(document, VEHICLE_PACK_REGISTRY_KEYS, "Vehicle Pack registry")
+    if document["schemaVersion"] != 1 or document["kind"] != "dronedream-vehicle-pack-registry":
+        raise DistributionContractError("Vehicle Pack registry identity is unsupported")
+    if not isinstance(document["registryId"], str) or not ID_RE.fullmatch(document["registryId"]):
+        raise DistributionContractError("Vehicle Pack registry id is invalid")
+    if not SEMVER_RE.fullmatch(str(document["registryVersion"])):
+        raise DistributionContractError("Vehicle Pack registry version is invalid")
+    audit_date = document["auditDate"]
+    if not isinstance(audit_date, str) or not DATE_RE.fullmatch(audit_date):
+        raise DistributionContractError("Vehicle Pack registry auditDate must be YYYY-MM-DD")
+
+    policy = document["policy"]
+    if not isinstance(policy, dict):
+        raise DistributionContractError("Vehicle Pack registry policy must be an object")
+    _require_exact_keys(
+        policy,
+        VEHICLE_PACK_REGISTRY_POLICY_KEYS,
+        "Vehicle Pack registry policy",
+    )
+    if (
+        policy["minimumPackCount"] != 6
+        or policy["maximumPackCount"] != 8
+        or policy["goldenCandidateCount"] != 3
+    ):
+        raise DistributionContractError("Vehicle Pack registry count policy drifted")
+    boolean_policy_keys = VEHICLE_PACK_REGISTRY_POLICY_KEYS - {
+        "minimumPackCount",
+        "maximumPackCount",
+        "goldenCandidateCount",
+    }
+    if any(policy[key] is not True for key in boolean_policy_keys):
+        raise DistributionContractError("Vehicle Pack registry safety policy must fail closed")
+
+    entries = document["packs"]
+    if not isinstance(entries, list) or not (
+        policy["minimumPackCount"] <= len(entries) <= policy["maximumPackCount"]
+    ):
+        raise DistributionContractError("Vehicle Pack registry must contain 6 to 8 packs")
+    expected_paths = set(vehicle_packs_by_path)
+    if set(vehicle_pack_manifest_sha256) != expected_paths:
+        raise DistributionContractError("Vehicle Pack registry verifier inputs disagree")
+
+    seen_pack_ids: set[str] = set()
+    seen_paths: set[str] = set()
+    golden_count = 0
+    for index, entry in enumerate(entries):
+        label = f"Vehicle Pack registry packs[{index}]"
+        if not isinstance(entry, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(entry, VEHICLE_PACK_REGISTRY_ENTRY_KEYS, label)
+        pack_id = entry["packId"]
+        if not isinstance(pack_id, str) or not ID_RE.fullmatch(pack_id) or pack_id in seen_pack_ids:
+            raise DistributionContractError(f"{label}.packId is invalid or duplicated")
+        seen_pack_ids.add(pack_id)
+
+        manifest_path = entry["manifestPath"]
+        if (
+            not isinstance(manifest_path, str)
+            or not SAFE_RELATIVE_PATH_RE.fullmatch(manifest_path)
+            or not manifest_path.startswith("distribution/vehicle-packs/")
+            or not manifest_path.endswith(".json")
+            or manifest_path.endswith("/registry.v1.json")
+            or manifest_path in seen_paths
+        ):
+            raise DistributionContractError(f"{label}.manifestPath is unsafe or duplicated")
+        seen_paths.add(manifest_path)
+        pack = vehicle_packs_by_path.get(manifest_path)
+        if pack is None:
+            raise DistributionContractError(f"{label}.manifestPath was not independently supplied")
+        if pack["packId"] != pack_id:
+            raise DistributionContractError(f"{label}.packId drifted from its manifest")
+
+        manifest_sha256 = entry["manifestSha256"]
+        if (
+            not isinstance(manifest_sha256, str)
+            or not SHA256_RE.fullmatch(manifest_sha256)
+            or manifest_sha256 != vehicle_pack_manifest_sha256[manifest_path]
+        ):
+            raise DistributionContractError(f"{label}.manifestSha256 drifted from file bytes")
+        if entry["currentValidationStatus"] != pack["validationStatus"]:
+            raise DistributionContractError(
+                f"{label}.currentValidationStatus drifted from manifest"
+            )
+        if entry["currentValidationTier"] != pack["validationTier"]:
+            raise DistributionContractError(f"{label}.currentValidationTier drifted from manifest")
+
+        segments = _validate_unique_text_list(entry["segments"], f"{label}.segments")
+        if not segments <= VEHICLE_PACK_SEGMENTS:
+            raise DistributionContractError(f"{label}.segments contains an unsupported segment")
+        if not isinstance(entry["goldenCandidate"], bool):
+            raise DistributionContractError(f"{label}.goldenCandidate must be boolean")
+        if entry["goldenCandidate"]:
+            golden_count += 1
+            if (
+                pack["validationStatus"] == "planned"
+                or pack["autopilot"]["family"] != "px4"
+                or pack["autopilot"]["adapterStatus"] == "planned"
+            ):
+                raise DistributionContractError(
+                    f"{label} cannot be a golden candidate before its PX4 contract exists"
+                )
+        if entry["productAvailability"] not in VEHICLE_PRODUCT_AVAILABILITY:
+            raise DistributionContractError(f"{label}.productAvailability is unsupported")
+        regions = _validate_unique_text_list(entry["supportRegions"], f"{label}.supportRegions")
+        if regions != set(pack["availabilityRegions"]):
+            raise DistributionContractError(f"{label}.supportRegions drifted from manifest")
+
+        evidence_items = entry["availabilityEvidence"]
+        if not isinstance(evidence_items, list) or not evidence_items:
+            raise DistributionContractError(f"{label}.availabilityEvidence must be non-empty")
+        evidence_urls: set[str] = set()
+        for evidence_index, evidence in enumerate(evidence_items):
+            evidence_label = f"{label}.availabilityEvidence[{evidence_index}]"
+            if not isinstance(evidence, dict):
+                raise DistributionContractError(f"{evidence_label} must be an object")
+            _require_exact_keys(
+                evidence,
+                VEHICLE_PACK_AVAILABILITY_EVIDENCE_KEYS,
+                evidence_label,
+            )
+            url = _validate_https_url(evidence["url"], f"{evidence_label}.url")
+            if url in evidence_urls:
+                raise DistributionContractError(f"{evidence_label}.url is duplicated")
+            evidence_urls.add(url)
+            _require_nonempty_string(evidence["scope"], f"{evidence_label}.scope")
+            observed_date = evidence["observedDate"]
+            if (
+                not isinstance(observed_date, str)
+                or not DATE_RE.fullmatch(observed_date)
+                or observed_date > audit_date
+            ):
+                raise DistributionContractError(
+                    f"{evidence_label}.observedDate must not follow registry auditDate"
+                )
+
+        if entry["productAvailability"] == "simulation-only" and (
+            pack["components"]["hardware"]["status"] != "unsupported" or pack["controllers"]
+        ):
+            raise DistributionContractError(
+                f"{label}.productAvailability disagrees with physical components"
+            )
+
+    if seen_paths != expected_paths:
+        raise DistributionContractError(
+            "Vehicle Pack registry does not exactly cover supplied manifests"
+        )
+    if golden_count != policy["goldenCandidateCount"]:
+        raise DistributionContractError("Vehicle Pack registry golden candidate count drifted")
+    return document
+
+
+def load_vehicle_pack_registry(
+    path: Path,
+    *,
+    vehicle_pack_paths: list[Path],
+    upstream_inventory_path: Path,
+    capability_policy_path: Path,
+    repository_root: Path,
+) -> dict[str, Any]:
+    packs_by_id = load_vehicle_pack_manifests(
+        vehicle_pack_paths,
+        upstream_inventory_path=upstream_inventory_path,
+        capability_policy_path=capability_policy_path,
+    )
+    packs_by_path: dict[str, dict[str, Any]] = {}
+    manifest_shas: dict[str, str] = {}
+    resolved_root = repository_root.resolve()
+    for vehicle_pack_path in vehicle_pack_paths:
+        try:
+            relative_path = vehicle_pack_path.resolve().relative_to(resolved_root).as_posix()
+        except ValueError as exc:
+            raise DistributionContractError(
+                f"Vehicle Pack manifest is outside repository root: {vehicle_pack_path}"
+            ) from exc
+        raw_document = _load_json_document(vehicle_pack_path, "Vehicle Pack manifest")
+        pack_id = raw_document.get("packId")
+        if not isinstance(pack_id, str):
+            raise DistributionContractError("Vehicle Pack registry input has no valid pack id")
+        pack = packs_by_id.get(pack_id)
+        if pack is None or relative_path in packs_by_path:
+            raise DistributionContractError(
+                "Vehicle Pack registry input path is duplicated or invalid"
+            )
+        packs_by_path[relative_path] = pack
+        manifest_shas[relative_path] = sha256_file(vehicle_pack_path)
+    return validate_vehicle_pack_registry(
+        _load_json_document(path, "Vehicle Pack registry"),
+        vehicle_packs_by_path=packs_by_path,
+        vehicle_pack_manifest_sha256=manifest_shas,
+    )
+
+
 def _validate_composite_component_ref(
     value: Any, label: str
 ) -> dict[str, Any]:
@@ -1696,6 +1942,19 @@ def main() -> int:
     vehicle_packs_parser.add_argument("--inventory", type=Path, required=True)
     vehicle_packs_parser.add_argument("--policy", type=Path, required=True)
     vehicle_packs_parser.add_argument("manifests", nargs="+", type=Path)
+    vehicle_pack_registry = subparsers.add_parser(
+        "vehicle-pack-registry",
+        help="validate the initial Vehicle Pack registry against independently supplied manifests",
+    )
+    vehicle_pack_registry.add_argument("--inventory", type=Path, required=True)
+    vehicle_pack_registry.add_argument("--policy", type=Path, required=True)
+    vehicle_pack_registry.add_argument(
+        "--vehicle-pack",
+        type=Path,
+        action="append",
+        required=True,
+    )
+    vehicle_pack_registry.add_argument("registry", type=Path)
     composite = subparsers.add_parser(
         "composite", help="validate a composite installation manifest"
     )
@@ -1728,6 +1987,14 @@ def main() -> int:
                 args.manifests,
                 upstream_inventory_path=args.inventory,
                 capability_policy_path=args.policy,
+            )
+        elif args.command == "vehicle-pack-registry":
+            load_vehicle_pack_registry(
+                args.registry,
+                vehicle_pack_paths=args.vehicle_pack,
+                upstream_inventory_path=args.inventory,
+                capability_policy_path=args.policy,
+                repository_root=Path(__file__).resolve().parents[2],
             )
         elif args.command in {"composite", "promotion"}:
             policy = load_capability_policy(args.policy)

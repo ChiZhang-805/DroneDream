@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-vehicle-pack",
+  "packId": "bitcraze-crazyflie-2-1-plus",
+  "packVersion": "1.0.0",
+  "displayName": {"en": "Bitcraze Crazyflie 2.1+", "zh-CN": "Bitcraze Crazyflie 2.1+ 教学微型机"},
+  "manufacturer": "Bitcraze",
+  "vehicleClass": "multicopter-small",
+  "availabilityRegions": ["global"],
+  "supportedEditions": ["lab", "field"],
+  "validationStatus": "planned",
+  "validationTier": "planned",
+  "autopilot": {
+    "family": "crazyflie",
+    "adapterStatus": "planned",
+    "supportedFirmwareVersions": ["audited-commit-5d287434b21b9b4fd3577c51e4d90bb4c54a5145"]
+  },
+  "controllers": [
+    {"vendor": "Bitcraze", "model": "Crazyflie 2.1+", "status": "planned", "regions": ["global"]}
+  ],
+  "components": {
+    "sim": {"status": "planned", "sourceIds": ["crazyflie-firmware"], "artifacts": []},
+    "hardware": {"status": "external", "sourceIds": ["crazyflie-firmware"], "artifacts": []},
+    "sensors": {"status": "planned", "sourceIds": ["crazyflie-firmware"], "artifacts": []},
+    "validation": {"status": "planned", "sourceIds": [], "artifacts": []}
+  },
+  "safety": {
+    "capabilityPolicySha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903",
+    "frontendIsAuthority": false,
+    "hardwareActionsRequireValidatedTier": true,
+    "parameterBounds": [
+      {"name": "PID_RATE_ROLL_KP", "minimum": 0.0, "maximum": 250.0, "unit": "ratio"}
+    ]
+  },
+  "sourceBindings": [
+    {"sourceId": "crazyflie-firmware", "pinSha256": "6e87a7d9582b840962939e10b942be8cf43d01952c831f2019670dcda3613958"}
+  ],
+  "licenses": [
+    {"id": "crazyflie-license-review", "spdxExpression": "NOASSERTION", "noticePath": "licenses/CRAZYFLIE-LICENSE-REVIEW.txt", "redistribution": "not-distributed"}
+  ],
+  "integrity": {
+    "canonicalization": "RFC8785-JCS",
+    "payloadSha256": "7161360d5ca264c780b2ebfc9b39222a99b3fd3b7555bec13ff736238ce8cc20",
+    "signature": {"state": "not-issued", "algorithm": "Ed25519", "keyId": null, "detachedSignatureSha256": null}
+  },
+  "knownGaps": [
+    "Crazyflie is a separate autopilot and radio transport family, not a PX4 pack.",
+    "The E0 license conclusion is unresolved, so no firmware or adapter is distributed.",
+    "No DroneDream simulator, transport, parameter mapping, or real-flight validation exists."
+  ]
+}

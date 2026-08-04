@@ -102,11 +102,43 @@ The JSON file under `tests/fixtures/` is deliberately synthetic, unsigned, and
 contract-only. It is not a distributable Vehicle Pack and must never appear in
 the download catalog.
 
+`vehicle-packs/registry.v1.json` is the first reviewed catalog of eight pack
+contracts. It binds every entry to the exact manifest-file SHA-256 and keeps
+mutable product availability separate from software validation. The official
+store or documentation URLs are observation evidence dated 2026-08-05; stock
+can change and never proves compatibility. Three entries are `goldenCandidate`
+only to define the next validation order: PX4 Gazebo X500 reference, Holybro
+X500 v2, and Holybro S500 v2. This label is not a validation tier.
+
+At this checkpoint there are zero validated packs. Five packs are
+`contract-only`; Amovlab P450, Amovlab MFP450, and Bitcraze Crazyflie 2.1+
+remain `planned`. The parameter bounds in every unsigned/unvalidated pack are
+provisional contract envelopes and cannot authorize hardware writes, arming,
+or flight. Existing X500 receipts predate this signed-pack contract and cannot
+be reused to upgrade the X500 reference pack.
+
+`tools/verify_vehicle_pack_jcs.mjs` independently recomputes each payload hash
+using the same RFC8785-JCS test vector as the Rust Runtime verifier. It excludes
+the complete `integrity` envelope from the signed payload. Signature issuance
+and native E4 verification are still pending; a correct payload hash alone is
+not a signature.
+
 ```powershell
 python distribution/tools/distribution_contract.py vehicle-packs `
   --inventory distribution/upstream-sources.v1.json `
   --policy distribution/capabilities/core-capabilities.v1.json `
   distribution/tests/fixtures/vehicle-pack-contract-only.v1.json
+
+$packs = Get-ChildItem distribution/vehicle-packs/*.json |
+  Where-Object Name -ne 'registry.v1.json'
+node distribution/tools/verify_vehicle_pack_jcs.mjs $packs.FullName
+
+$registryArgs = foreach ($pack in $packs) { '--vehicle-pack'; $pack.FullName }
+python distribution/tools/distribution_contract.py vehicle-pack-registry `
+  --inventory distribution/upstream-sources.v1.json `
+  --policy distribution/capabilities/core-capabilities.v1.json `
+  @registryArgs `
+  distribution/vehicle-packs/registry.v1.json
 ```
 
 ## E1 composite installation contract
