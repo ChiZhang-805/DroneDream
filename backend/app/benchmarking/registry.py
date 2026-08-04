@@ -7,8 +7,9 @@ after the common fake-provider/numerical-landscape contract passes.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal
 
 from app.benchmarking.contracts import BenchmarkProposalAdapter
 
@@ -59,7 +60,7 @@ _DESCRIPTORS = (
     BenchmarkAdapterDescriptor(
         "repo_constrained_mobo/v1",
         "traditional",
-        "contract_only",
+        "implemented",
         "native-matern52-ard-gp",
         "product_native",
     ),
@@ -76,7 +77,7 @@ _DESCRIPTORS = (
     BenchmarkAdapterDescriptor(
         "optimizer_portfolio/v1",
         "traditional",
-        "contract_only",
+        "implemented",
         "native-deterministic-portfolio",
         "product_native",
     ),
@@ -133,18 +134,28 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
     descriptor = require_registered_adapter(adapter_id)
     if descriptor.availability != "implemented":
         raise ValueError(f"benchmark proposal adapter is not implemented: {adapter_id}")
-    from app.benchmarking.adapters import RandomSearchAdapterV1, SeededHaltonAdapterV1
+    from app.benchmarking.adapters import (
+        ProductNativeOptimizerAdapterV1,
+        RandomSearchAdapterV1,
+        SeededHaltonAdapterV1,
+    )
 
-    implementations = {
+    implementations: dict[str, Callable[[], BenchmarkProposalAdapter]] = {
         "random_search/v1": RandomSearchAdapterV1,
         "seeded_halton/v1": SeededHaltonAdapterV1,
+        "repo_constrained_mobo/v1": lambda: ProductNativeOptimizerAdapterV1(
+            "repo_constrained_mobo/v1", "constrained_mobo"
+        ),
+        "optimizer_portfolio/v1": lambda: ProductNativeOptimizerAdapterV1(
+            "optimizer_portfolio/v1", "optimizer_portfolio"
+        ),
     }
     implementation = implementations.get(adapter_id)
     if implementation is None:
         raise RuntimeError(
             f"implemented benchmark adapter has no server factory binding: {adapter_id}"
         )
-    return cast(BenchmarkProposalAdapter, implementation())
+    return implementation()
 
 
 __all__ = [

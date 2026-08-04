@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, Literal, cast
 
 from app.benchmarking.contracts import (
     BenchmarkObservationV2,
@@ -21,6 +21,11 @@ from app.benchmarking.contracts import (
 )
 from app.optimization.design import halton_design
 from app.optimization.domain import ParameterDomain, SearchSpace
+from app.optimization.experimental_types import (
+    ExperimentalOptimizerStrategy,
+    OptimizerObservation,
+    OptimizerRequest,
+)
 
 _DOMAIN_KEYS: Final = {
     "name",
@@ -172,6 +177,7 @@ def _proposal(
     seed: bytes,
     selection_attempt: int,
     sequence_index: int | None = None,
+    extra_receipt: Mapping[str, Any] | None = None,
 ) -> BenchmarkProposalV1:
     parameter_sha256 = canonical_sha256(parameters)
     receipt: dict[str, Any] = {
@@ -184,6 +190,14 @@ def _proposal(
     }
     if sequence_index is not None:
         receipt["sequence_index"] = sequence_index
+    if extra_receipt:
+        collisions = set(receipt).intersection(extra_receipt)
+        if collisions:
+            raise BenchmarkAdapterError(
+                "extra proposal receipt overwrites reserved fields: "
+                + ", ".join(sorted(collisions))
+            )
+        receipt.update(extra_receipt)
     label = adapter_id.split("/", maxsplit=1)[0].replace("_", "-")
     return BenchmarkProposalV1(
         candidate_ref=(
@@ -274,9 +288,175 @@ class SeededHaltonAdapterV1:
         )
 
 
+def _positive_preference(
+    payload: Mapping[str, Any],
+    *,
+    field: str,
+    default: float,
+) -> float:
+    value = payload.get(field, default)
+    numeric = _strict_number(value, field=f"objectives.{field}")
+    if numeric <= 0.0:
+        raise BenchmarkAdapterError(f"objective {field} must be > 0")
+    return numeric
+
+
+def _objective_preferences(
+    observation: BenchmarkObservationV2,
+) -> tuple[tuple[tuple[str, float], ...], tuple[tuple[str, float], ...]]:
+    weights: list[tuple[str, float]] = []
+    normalizations: list[tuple[str, float]] = []
+    seen: set[str] = set()
+    for index, payload in enumerate(observation.objectives):
+        name = payload.get("name")
+        direction = payload.get("direction")
+        if not isinstance(name, str) or not name:
+            raise BenchmarkAdapterError(f"objectives[{index}].name must be a non-empty string")
+        if name in seen:
+            raise BenchmarkAdapterError(f"duplicate benchmark objective: {name}")
+        if direction not in {"minimize", "maximize"}:
+            raise BenchmarkAdapterError(
+                f"objectives[{index}].direction must be minimize or maximize"
+            )
+        seen.add(name)
+        weights.append((name, _positive_preference(payload, field="weight", default=1.0)))
+        normalizations.append(
+            (name, _positive_preference(payload, field="normalization", default=1.0))
+        )
+    return tuple(weights), tuple(normalizations)
+
+
+def native_optimizer_request_from_observation(
+    observation: BenchmarkObservationV2,
+    *,
+    strategy: Literal["constrained_mobo", "optimizer_portfolio"],
+) -> OptimizerRequest:
+    """Translate v2 history without fabricating learning signal for failures."""
+
+    space = search_space_from_observation(observation)
+    converted: list[OptimizerObservation] = []
+    for item in sorted(
+        observation.history,
+        key=lambda value: (value.generation_index, value.dispatch_ordinal),
+    ):
+        outcome = item.outcome
+        if outcome.role == "quarantined":
+            continue
+        try:
+            parameters = space.project(item.parameters)
+        except ValueError as exc:
+            raise BenchmarkAdapterError(
+                f"history candidate {item.candidate_ref!r} violates the frozen domain: {exc}"
+            ) from exc
+        proposal_context = item.proposal_context
+        optimizer_metadata = (
+            dict(proposal_context.optimizer_metadata) if proposal_context is not None else {}
+        )
+        optimizer_metadata.update(
+            {
+                "benchmark_candidate_ref": item.candidate_ref,
+                "benchmark_dispatch_ordinal": item.dispatch_ordinal,
+                "benchmark_screening_status": item.screening_status,
+            }
+        )
+        source_strategy = (
+            proposal_context.optimizer_strategy
+            if proposal_context is not None and proposal_context.optimizer_strategy is not None
+            else strategy
+        )
+        converted.append(
+            OptimizerObservation(
+                candidate_id=item.candidate_ref,
+                generation_index=item.generation_index,
+                parameters=parameters,
+                unit_vector=space.to_unit_vector(parameters),
+                loss=outcome.loss,
+                objectives=dict(outcome.objectives),
+                objective_directions=dict(outcome.objective_directions),
+                constraints=dict(outcome.constraint_violations),
+                feasible=outcome.feasible,
+                failure_rate=outcome.failure_rate,
+                fidelity=outcome.fidelity,
+                requested_fidelity=outcome.requested_fidelity,
+                optimizer_strategy=source_strategy,
+                optimizer_metadata=optimizer_metadata,
+                completed=outcome.completed,
+                role=outcome.role,
+            )
+        )
+    weights, normalizations = _objective_preferences(observation)
+    seed = _seed_material(observation, f"product-native/{strategy}")
+    return OptimizerRequest(
+        strategy=cast(ExperimentalOptimizerStrategy, strategy),
+        generation_index=observation.generation_index,
+        batch_size=1,
+        random_seed=int.from_bytes(seed[:8], byteorder="big", signed=False),
+        observations=tuple(converted),
+        objective_weights=weights,
+        objective_normalizations=normalizations,
+        fidelity_mapping=((1.0, 1.0),),
+        required_fidelity=1.0,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class ProductNativeOptimizerAdapterV1:
+    """Bridge one reviewed product-native optimizer into the benchmark contract."""
+
+    adapter_id: Literal["repo_constrained_mobo/v1", "optimizer_portfolio/v1"]
+    strategy: Literal["constrained_mobo", "optimizer_portfolio"]
+
+    def propose(self, observation: BenchmarkObservationV2) -> BenchmarkProposalV1:
+        _require_available_budget(observation)
+        space = search_space_from_observation(observation)
+        request = native_optimizer_request_from_observation(
+            observation,
+            strategy=self.strategy,
+        )
+        if self.strategy == "constrained_mobo":
+            from app.optimization.bayesian_optimizers import propose_bayesian_candidates
+
+            proposals = propose_bayesian_candidates(space, request)
+        else:
+            from app.optimization.cma_optimizers import propose_evolutionary_candidates
+
+            proposals = propose_evolutionary_candidates(space, request)
+        if len(proposals) != 1:
+            raise BenchmarkAdapterError(
+                f"{self.adapter_id} returned {len(proposals)} proposals for a one-candidate request"
+            )
+        native = proposals[0]
+        parameters = space.project(native.parameters)
+        if _candidate_key(parameters) in _seen_candidates(observation, space):
+            raise BenchmarkAdapterError(
+                f"{self.adapter_id} repeated a previously dispatched candidate"
+            )
+        seed = _seed_material(observation, f"product-native/{self.strategy}")
+        return _proposal(
+            adapter_id=self.adapter_id,
+            observation=observation,
+            parameters=parameters,
+            reason_code=f"product-native-{self.strategy.replace('_', '-')}",
+            seed=seed,
+            selection_attempt=0,
+            extra_receipt={
+                "method_classification": "product_native",
+                "native_label": native.label,
+                "native_metadata": dict(native.metadata),
+                "native_metadata_sha256": canonical_sha256(dict(native.metadata)),
+                "native_rationale_sha256": hashlib.sha256(
+                    native.rationale.encode("utf-8")
+                ).hexdigest(),
+                "native_strategy": self.strategy,
+            },
+        )
+
+
 __all__ = [
     "BenchmarkAdapterError",
+    "ProductNativeOptimizerAdapterV1",
     "RandomSearchAdapterV1",
     "SeededHaltonAdapterV1",
+    "native_optimizer_request_from_observation",
     "search_space_from_observation",
 ]

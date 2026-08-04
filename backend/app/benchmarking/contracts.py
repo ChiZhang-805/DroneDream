@@ -331,7 +331,11 @@ class BenchmarkEvaluationV1(_Strict):
 
 @runtime_checkable
 class BenchmarkProposalAdapter(Protocol):
-    adapter_id: str
+    @property
+    def adapter_id(self) -> str:
+        """Stable registry identifier for the immutable adapter implementation."""
+
+        ...
 
     def propose(self, observation: BenchmarkObservationV2) -> BenchmarkProposalV1:
         """Return one bounded proposal without reading sealed holdout outcomes."""
