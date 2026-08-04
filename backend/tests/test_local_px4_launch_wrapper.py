@@ -41,6 +41,52 @@ def test_wrapper_uses_monotonic_clock_for_elapsed_deadlines() -> None:
     assert "time.time()" not in source
 
 
+def test_nested_px4_process_streams_are_normalized_and_bounded(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitter = tmp_path / "terminal_emitter.py"
+    emitter.write_text(
+        "import sys\n"
+        "sys.stdout.buffer.write(b'\\x1b[2K\\rpxh> ' * 200)\n"
+        "sys.stdout.buffer.write(b'\\rPX4 ready\\n')\n"
+        "sys.stderr.buffer.write(b'ERROR actuator link failed\\n')\n"
+        "sys.stdout.buffer.flush()\n"
+        "sys.stderr.buffer.flush()\n",
+        encoding="utf-8",
+    )
+    stdout_log = tmp_path / "stdout.log"
+    stderr_log = tmp_path / "stderr.log"
+    monkeypatch.setattr(wrapper, "DEFAULT_SIMULATOR_STDOUT_CAP_BYTES", 128)
+    monkeypatch.setattr(wrapper, "DEFAULT_SIMULATOR_STDERR_CAP_BYTES", 128)
+    if os.name == "nt":
+        monkeypatch.setenv("PX4_WINDOWS_COMMAND_SHELL", "direct")
+        command = subprocess.list2cmdline([sys.executable, str(emitter)])
+    else:
+        command = shlex.join([sys.executable, str(emitter)])
+
+    proc = wrapper._launch_process(
+        command,
+        stdout_log=stdout_log,
+        stderr_log=stderr_log,
+        launch_env=os.environ.copy(),
+    )
+    assert proc.wait(timeout=10) == 0
+    wrapper._close_launch_handles(proc)
+
+    assert "pxh>" not in stdout_log.read_text(encoding="utf-8")
+    assert "PX4 ready" in stdout_log.read_text(encoding="utf-8")
+    assert "ERROR actuator link failed" in stderr_log.read_text(encoding="utf-8")
+    stdout_receipt = json.loads((tmp_path / "stdout.log.capture.json").read_text(encoding="utf-8"))
+    stderr_receipt = json.loads((tmp_path / "stderr.log.capture.json").read_text(encoding="utf-8"))
+    assert stdout_receipt["raw_observed_bytes"] > stdout_receipt["retained_bytes"]
+    assert stdout_receipt["prompt_redraws_collapsed"] == 200
+    assert stdout_receipt["truncated"] is False
+    assert any(
+        "ERROR actuator link failed" in line["line"] for line in stderr_receipt["critical_lines"]
+    )
+
+
 def _write_json(path: Path, payload: dict) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")

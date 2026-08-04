@@ -30,6 +30,7 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from threading import Thread
 from typing import Any
 
 # This wrapper is launched as a standalone script. Python consequently places
@@ -46,6 +47,13 @@ if _BACKEND_ROOT.is_dir():
         sys.path.remove(_backend_root_text)
     sys.path.insert(0, _backend_root_text)
 
+from app.simulator.bounded_log_capture import (  # noqa: E402
+    DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+    DEFAULT_SIMULATOR_STDERR_CAP_BYTES,
+    DEFAULT_SIMULATOR_STDOUT_CAP_BYTES,
+    StreamingBoundedLogCapture,
+    append_bounded_log_text,
+)
 from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
     ARTIFACT_NAME as ACTUATOR_LINK_HEALTH_NAME,
 )
@@ -365,10 +373,32 @@ def _write_launcher_failure(run_dir: Path, *, stage: str, exc: BaseException) ->
             temporary.unlink()
 
 
+_ACTIVE_LOG_CAPTURES: dict[Path, StreamingBoundedLogCapture] = {}
+
+
+def _log_stream_contract(path: Path) -> tuple[int, str]:
+    name = path.name.lower()
+    if "stderr" in name:
+        return DEFAULT_SIMULATOR_STDERR_CAP_BYTES, "simulator_stderr"
+    if "stdout" in name:
+        return DEFAULT_SIMULATOR_STDOUT_CAP_BYTES, "simulator_stdout"
+    return DEFAULT_AUXILIARY_LOG_CAP_BYTES, "simulator_auxiliary_log"
+
+
 def _append_log(path: Path, message: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(message.rstrip("\n") + "\n")
+    normalized = message.rstrip("\n") + "\n"
+    identity = path.resolve()
+    active = _ACTIVE_LOG_CAPTURES.get(identity)
+    if active is not None:
+        active.feed_text(normalized)
+        return
+    cap_bytes, stream_name = _log_stream_contract(path)
+    append_bounded_log_text(
+        path,
+        normalized,
+        cap_bytes=cap_bytes,
+        stream_name=stream_name,
+    )
 
 
 def _copy_used_inputs(run_dir: Path, params: Path, track: Path) -> tuple[Any, Any]:
@@ -2986,7 +3016,9 @@ def _split_command(command: str) -> list[str]:
     return argv
 
 
-def _terminate_process_group(proc: subprocess.Popen[str], stderr_log: Path, *, label: str) -> None:
+def _terminate_process_group(
+    proc: subprocess.Popen[bytes], stderr_log: Path, *, label: str
+) -> None:
     if os.name == "nt":
         if proc.poll() is not None:
             return
@@ -3067,12 +3099,30 @@ def _launch_process(
     stdout_log: Path,
     stderr_log: Path,
     launch_env: dict[str, str] | None = None,
-) -> subprocess.Popen[str]:
-    out_handle = None
-    err_handle = None
+) -> subprocess.Popen[bytes]:
+    stdout_cap, stdout_stream = _log_stream_contract(stdout_log)
+    stderr_cap, stderr_stream = _log_stream_contract(stderr_log)
+    stdout_capture = StreamingBoundedLogCapture(
+        stdout_log,
+        cap_bytes=stdout_cap,
+        stream_name=stdout_stream,
+        append=True,
+    )
     try:
-        out_handle = stdout_log.open("a", encoding="utf-8")
-        err_handle = stderr_log.open("a", encoding="utf-8")
+        stderr_capture = StreamingBoundedLogCapture(
+            stderr_log,
+            cap_bytes=stderr_cap,
+            stream_name=stderr_stream,
+            append=True,
+        )
+    except Exception:
+        stdout_capture.close(write_receipt=False)
+        raise
+    stdout_identity = stdout_log.resolve()
+    stderr_identity = stderr_log.resolve()
+    _ACTIVE_LOG_CAPTURES[stdout_identity] = stdout_capture
+    _ACTIVE_LOG_CAPTURES[stderr_identity] = stderr_capture
+    try:
         start_new_session = os.name != "nt"
         creationflags = 0
         if os.name == "nt":
@@ -3104,34 +3154,75 @@ def _launch_process(
             shell_argv = ["bash", "-lc", command]
         proc = subprocess.Popen(  # noqa: S603
             shell_argv,
-            stdout=out_handle,
-            stderr=err_handle,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             start_new_session=start_new_session,
             creationflags=creationflags,
             env=launch_env,
         )
     except Exception:
-        if out_handle is not None:
-            out_handle.close()
-        if err_handle is not None:
-            err_handle.close()
+        _ACTIVE_LOG_CAPTURES.pop(stdout_identity, None)
+        _ACTIVE_LOG_CAPTURES.pop(stderr_identity, None)
+        stdout_capture.close(write_receipt=False)
+        stderr_capture.close(write_receipt=False)
         raise
-    proc._stdout_handle = out_handle  # type: ignore[attr-defined]
-    proc._stderr_handle = err_handle  # type: ignore[attr-defined]
+    if proc.stdout is None or proc.stderr is None:  # pragma: no cover - PIPE contract.
+        raise RuntimeError("PX4 process pipes were not created")
+    stdout_thread = Thread(
+        target=stdout_capture.copy_from,
+        args=(proc.stdout,),
+        name="px4-stdout-capture",
+        daemon=True,
+    )
+    stderr_thread = Thread(
+        target=stderr_capture.copy_from,
+        args=(proc.stderr,),
+        name="px4-stderr-capture",
+        daemon=True,
+    )
+    stdout_thread.start()
+    stderr_thread.start()
+    proc._stdout_capture = stdout_capture  # type: ignore[attr-defined]
+    proc._stderr_capture = stderr_capture  # type: ignore[attr-defined]
+    proc._stdout_capture_thread = stdout_thread  # type: ignore[attr-defined]
+    proc._stderr_capture_thread = stderr_thread  # type: ignore[attr-defined]
+    proc._stdout_log_identity = stdout_identity  # type: ignore[attr-defined]
+    proc._stderr_log_identity = stderr_identity  # type: ignore[attr-defined]
     return proc
 
 
-def _close_launch_handles(proc: subprocess.Popen[str]) -> None:
-    out_handle = getattr(proc, "_stdout_handle", None)
-    err_handle = getattr(proc, "_stderr_handle", None)
-    if out_handle is not None:
-        out_handle.close()
-    if err_handle is not None:
-        err_handle.close()
+def _close_launch_handles(proc: subprocess.Popen[bytes]) -> None:
+    captures = (
+        (
+            getattr(proc, "_stdout_capture", None),
+            getattr(proc, "_stdout_capture_thread", None),
+            getattr(proc, "_stdout_log_identity", None),
+            proc.stdout,
+        ),
+        (
+            getattr(proc, "_stderr_capture", None),
+            getattr(proc, "_stderr_capture_thread", None),
+            getattr(proc, "_stderr_log_identity", None),
+            proc.stderr,
+        ),
+    )
+    for capture, thread, identity, pipe in captures:
+        if isinstance(thread, Thread):
+            thread.join(timeout=5.0)
+            if thread.is_alive():
+                if isinstance(capture, StreamingBoundedLogCapture):
+                    capture.mark_observation_incomplete("capture_thread_did_not_finish")
+                if pipe is not None:
+                    with contextlib.suppress(OSError):
+                        pipe.close()
+                thread.join(timeout=1.0)
+        if isinstance(identity, Path):
+            _ACTIVE_LOG_CAPTURES.pop(identity, None)
+        if isinstance(capture, StreamingBoundedLogCapture):
+            capture.close()
 
 
-def _cleanup_process(proc: subprocess.Popen[str] | None, stderr_log: Path, *, label: str) -> None:
+def _cleanup_process(proc: subprocess.Popen[bytes] | None, stderr_log: Path, *, label: str) -> None:
     if proc is None:
         return
     _terminate_process_group(proc, stderr_log, label=label)
@@ -4024,8 +4115,8 @@ def main() -> int:
         )
         return 2
 
-    px4_proc: subprocess.Popen[str] | None = None
-    gui_proc: subprocess.Popen[str] | None = None
+    px4_proc: subprocess.Popen[bytes] | None = None
+    gui_proc: subprocess.Popen[bytes] | None = None
     steady_wind_overlay: dict[str, Any] | None = None
     actuator_failure_observer: dict[str, Any] | None = None
     scenario_applied_by_id: dict[str, dict[str, Any]] = {}

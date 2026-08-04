@@ -37,13 +37,14 @@ from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 from typing import Any
 
 from app.config import get_settings
 from app.parameters import get_parameter
 from app.simulator.artifact_schema import (
     infer_mime_type,
+    validate_log_capture_receipt_payload,
     validate_reference_track_payload,
     validate_telemetry_payload,
 )
@@ -60,6 +61,10 @@ from app.simulator.base import (
     TrialFailure,
     TrialMetricsPayload,
     TrialResult,
+)
+from app.simulator.bounded_log_capture import (
+    DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+    StreamingBoundedLogCapture,
 )
 from app.simulator.px4_actuator_link_evidence import (
     DIAGNOSTIC_FAILURE_CODE as FAILURE_ACTUATOR_LINK_STALLED,
@@ -638,45 +643,77 @@ def _execute_command(
     creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
     windows_job = _WindowsKillOnCloseJob.create()
     proc: subprocess.Popen[bytes] | None = None
+    stdout_capture = StreamingBoundedLogCapture(
+        stdout_path,
+        cap_bytes=DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+        stream_name="real_cli_adapter_stdout",
+    )
     try:
-        with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
-            proc = subprocess.Popen(  # noqa: S603 - trusted operator command, no shell.
-                argv,
-                cwd=cwd,
-                env=env,
-                stdin=subprocess.DEVNULL,
-                stdout=stdout_file,
-                stderr=stderr_file,
-                start_new_session=os.name != "nt",
-                creationflags=creationflags,
-            )
-            if windows_job is not None and not windows_job.assign(proc):
-                windows_job.close()
-                windows_job = None
-            deadline = time.monotonic() + timeout_seconds
-            while True:
-                if cancellation_event is not None and cancellation_event.is_set():
-                    # Close the kernel-tracked job before invoking taskkill.
-                    # Besides eliminating the process-tree snapshot race, this
-                    # ensures a slow taskkill invocation cannot give a child
-                    # time to perform work after cancellation was observed.
-                    if windows_job is not None:
-                        windows_job.close()
-                        windows_job = None
-                    _terminate_process_tree(proc)
-                    raise _SimulatorCancelled
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    if windows_job is not None:
-                        windows_job.close()
-                        windows_job = None
-                    _terminate_process_tree(proc)
-                    raise subprocess.TimeoutExpired(argv, timeout_seconds)
-                try:
-                    returncode = proc.wait(timeout=min(_PROCESS_POLL_SECONDS, remaining))
-                    break
-                except subprocess.TimeoutExpired:
-                    continue
+        stderr_capture = StreamingBoundedLogCapture(
+            stderr_path,
+            cap_bytes=DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+            stream_name="real_cli_adapter_stderr",
+        )
+    except Exception:
+        stdout_capture.close(write_receipt=False)
+        raise
+    threads: tuple[Thread, Thread] | None = None
+    try:
+        proc = subprocess.Popen(  # noqa: S603 - trusted operator command, no shell.
+            argv,
+            cwd=cwd,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=os.name != "nt",
+            creationflags=creationflags,
+        )
+        if proc.stdout is None or proc.stderr is None:  # pragma: no cover - PIPE contract.
+            raise OSError("simulator process pipes were not created")
+        threads = (
+            Thread(
+                target=stdout_capture.copy_from,
+                args=(proc.stdout,),
+                name="real-cli-stdout-capture",
+                daemon=True,
+            ),
+            Thread(
+                target=stderr_capture.copy_from,
+                args=(proc.stderr,),
+                name="real-cli-stderr-capture",
+                daemon=True,
+            ),
+        )
+        for thread in threads:
+            thread.start()
+        if windows_job is not None and not windows_job.assign(proc):
+            windows_job.close()
+            windows_job = None
+        deadline = time.monotonic() + timeout_seconds
+        while True:
+            if cancellation_event is not None and cancellation_event.is_set():
+                # Close the kernel-tracked job before invoking taskkill.
+                # Besides eliminating the process-tree snapshot race, this
+                # ensures a slow taskkill invocation cannot give a child
+                # time to perform work after cancellation was observed.
+                if windows_job is not None:
+                    windows_job.close()
+                    windows_job = None
+                _terminate_process_tree(proc)
+                raise _SimulatorCancelled
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                if windows_job is not None:
+                    windows_job.close()
+                    windows_job = None
+                _terminate_process_tree(proc)
+                raise subprocess.TimeoutExpired(argv, timeout_seconds)
+            try:
+                returncode = proc.wait(timeout=min(_PROCESS_POLL_SECONDS, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                continue
     finally:
         # Closing a configured Job Object is also important after a nominal
         # parent exit: a buggy CLI must not detach a long-lived descendant from
@@ -685,6 +722,20 @@ def _execute_command(
             windows_job.close()
         elif os.name != "nt" and proc is not None:
             _terminate_posix_process_group(proc.pid)
+        if threads is not None:
+            for thread, capture, pipe in (
+                (threads[0], stdout_capture, proc.stdout if proc is not None else None),
+                (threads[1], stderr_capture, proc.stderr if proc is not None else None),
+            ):
+                thread.join(timeout=5.0)
+                if thread.is_alive():
+                    capture.mark_observation_incomplete("capture_thread_did_not_finish")
+                    if pipe is not None:
+                        with suppress(OSError):
+                            pipe.close()
+                    thread.join(timeout=1.0)
+        stdout_capture.close()
+        stderr_capture.close()
     return _ProcessOutcome(
         returncode=returncode,
         stdout=_read_log_tail(stdout_path),
@@ -969,7 +1020,11 @@ def _normalize_artifact_path(storage_path: str, run_dir: Path) -> Path:
 
 
 def _validate_known_artifact_payload(artifact: ArtifactMetadata) -> None:
-    if artifact.artifact_type not in {"telemetry_json", "reference_track_json"}:
+    if artifact.artifact_type not in {
+        "telemetry_json",
+        "reference_track_json",
+        "log_capture_receipt_json",
+    }:
         return
     if artifact.mime_type != "application/json":
         raise ValueError(f"{artifact.artifact_type} must declare mime_type=application/json")
@@ -990,11 +1045,12 @@ def _validate_known_artifact_payload(artifact: ArtifactMetadata) -> None:
             f"the {_MAX_KNOWN_JSON_ARTIFACT_BYTES} byte validation limit"
         )
     payload = json.loads(encoded.decode("utf-8"))
-    errors = (
-        validate_telemetry_payload(payload)
-        if artifact.artifact_type == "telemetry_json"
-        else validate_reference_track_payload(payload)
-    )
+    if artifact.artifact_type == "telemetry_json":
+        errors = validate_telemetry_payload(payload)
+    elif artifact.artifact_type == "reference_track_json":
+        errors = validate_reference_track_payload(payload)
+    else:
+        errors = validate_log_capture_receipt_payload(payload)
     if errors:
         raise ValueError("; ".join(errors))
 

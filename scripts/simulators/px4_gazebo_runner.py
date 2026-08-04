@@ -34,6 +34,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Thread
 from typing import Any
 
 # The runner is intentionally executable as a standalone REAL_SIMULATOR_COMMAND.
@@ -51,6 +52,16 @@ from app.parameters import (  # noqa: E402 - path bootstrap must precede backend
     get_parameter,
     normalize_px4_version,
     validate_parameter_values,
+)
+from app.simulator.bounded_log_capture import (  # noqa: E402
+    DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+    DEFAULT_SIMULATOR_STDERR_CAP_BYTES,
+    DEFAULT_SIMULATOR_STDOUT_CAP_BYTES,
+    LOG_CAPTURE_SCHEMA_VERSION,
+    StreamingBoundedLogCapture,
+    append_bounded_log_text,
+    receipt_path_for,
+    write_bounded_log_bytes,
 )
 from app.simulator.px4_actuator_link_evidence import (  # noqa: E402
     ARTIFACT_NAME as ACTUATOR_LINK_HEALTH_NAME,
@@ -129,11 +140,20 @@ _PROJECTION_GLOBAL_RESCAN_DISTANCE_M = 2.0
 _PROJECTION_LOCAL_ERROR_FALLBACK_M = 5.0
 _MAX_PROJECTION_SEGMENT_COMPARISONS = 10_000_000
 _MAX_COVERAGE_PROGRESS_STEP_FRACTION = 0.2
+_LAUNCHER_PROCESS_STDOUT_NAME = "launcher_process_stdout.log"
+_LAUNCHER_PROCESS_STDERR_NAME = "launcher_process_stderr.log"
 
 _RUN_OUTPUT_NAMES = (
     "runner.log",
+    "runner.log.capture.json",
     "stdout.log",
+    "stdout.log.capture.json",
     "stderr.log",
+    "stderr.log.capture.json",
+    _LAUNCHER_PROCESS_STDOUT_NAME,
+    f"{_LAUNCHER_PROCESS_STDOUT_NAME}.capture.json",
+    _LAUNCHER_PROCESS_STDERR_NAME,
+    f"{_LAUNCHER_PROCESS_STDERR_NAME}.capture.json",
     "telemetry.json",
     "telemetry.csv",
     "trajectory.json",
@@ -157,14 +177,20 @@ _RUN_OUTPUT_NAMES = (
     "actuator_link_transient_attempt_1.offboard_executor.log",
     "actuator_link_transient_attempt_1.launcher_failure.json",
     "actuator_link_transient_attempt_1.stdout.log",
+    "actuator_link_transient_attempt_1.stdout.log.capture.json",
     "actuator_link_transient_attempt_1.stderr.log",
+    "actuator_link_transient_attempt_1.stderr.log.capture.json",
     "actuator_link_transient_attempt_1.telemetry.json",
     "actuator_link_transient_attempt_1.px4_parameters.applied.json",
     "actuator_link_transient_attempt_1.scenario_effects.applied.json",
     "gui_stdout.log",
+    "gui_stdout.log.capture.json",
     "gui_stderr.log",
+    "gui_stderr.log.capture.json",
     "track_marker_stdout.log",
+    "track_marker_stdout.log.capture.json",
     "track_marker_stderr.log",
+    "track_marker_stderr.log.capture.json",
     REQUESTED_EVIDENCE_NAME,
     BEFORE_EVIDENCE_NAME,
     APPLIED_EVIDENCE_NAME,
@@ -2867,25 +2893,90 @@ def _run_lower_level_launcher(
     timeout_seconds: float,
     launch_env: dict[str, str] | None = None,
 ) -> int:
-    with (
-        stdout_log.open("w", encoding="utf-8") as out,
-        stderr_log.open("w", encoding="utf-8") as err,
-    ):
-        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
+    # The lower-level wrapper owns stdout.log/stderr.log because it also owns
+    # the nested PX4 process. Reset the pair and their receipts for each launch
+    # attempt; the retry path preserves attempt 1 before invoking us again.
+    for path in (stdout_log, stderr_log):
+        path.unlink(missing_ok=True)
+        receipt_path_for(path).unlink(missing_ok=True)
+
+    def _argv_contains_path(path: Path) -> bool:
+        rendered = str(path)
+        return any(item == rendered or item.endswith("=" + rendered) for item in launch_argv)
+
+    child_owns_main_logs = _argv_contains_path(stdout_log) and _argv_contains_path(stderr_log)
+    launcher_stdout = (
+        stdout_log.parent / _LAUNCHER_PROCESS_STDOUT_NAME if child_owns_main_logs else stdout_log
+    )
+    launcher_stderr = (
+        stderr_log.parent / _LAUNCHER_PROCESS_STDERR_NAME if child_owns_main_logs else stderr_log
+    )
+    if child_owns_main_logs:
+        for path in (launcher_stdout, launcher_stderr):
+            path.unlink(missing_ok=True)
+            receipt_path_for(path).unlink(missing_ok=True)
+
+    stdout_capture = StreamingBoundedLogCapture(
+        launcher_stdout,
+        cap_bytes=(
+            DEFAULT_AUXILIARY_LOG_CAP_BYTES
+            if child_owns_main_logs
+            else DEFAULT_SIMULATOR_STDOUT_CAP_BYTES
+        ),
+        stream_name=("lower_level_launcher_stdout" if child_owns_main_logs else "simulator_stdout"),
+    )
+    try:
+        stderr_capture = StreamingBoundedLogCapture(
+            launcher_stderr,
+            cap_bytes=(
+                DEFAULT_AUXILIARY_LOG_CAP_BYTES
+                if child_owns_main_logs
+                else DEFAULT_SIMULATOR_STDERR_CAP_BYTES
+            ),
+            stream_name=(
+                "lower_level_launcher_stderr" if child_owns_main_logs else "simulator_stderr"
+            ),
+        )
+    except Exception:
+        stdout_capture.close(write_receipt=False)
+        raise
+    creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
+    proc: subprocess.Popen[bytes] | None = None
+    threads: tuple[Thread, Thread] | None = None
+    previous_signal_handlers: dict[signal.Signals, Any] = {}
+    try:
         proc = subprocess.Popen(  # noqa: S603
             launch_argv,
             cwd=str(cwd),
-            stdout=out,
-            stderr=err,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             start_new_session=os.name != "nt",
             creationflags=creationflags,
             env=launch_env,
         )
-        previous_signal_handlers: dict[signal.Signals, Any] = {}
+        stdout_pipe = getattr(proc, "stdout", None)
+        stderr_pipe = getattr(proc, "stderr", None)
+        if stdout_pipe is not None and stderr_pipe is not None:
+            threads = (
+                Thread(
+                    target=stdout_capture.copy_from,
+                    args=(stdout_pipe,),
+                    name="launcher-stdout-capture",
+                    daemon=True,
+                ),
+                Thread(
+                    target=stderr_capture.copy_from,
+                    args=(stderr_pipe,),
+                    name="launcher-stderr-capture",
+                    daemon=True,
+                ),
+            )
+            for thread in threads:
+                thread.start()
 
         def _forward_shutdown(signum: int, _frame: Any) -> None:
-            _terminate_subprocess_tree(proc, force=True)
+            if proc is not None:
+                _terminate_subprocess_tree(proc, force=True)
             raise SystemExit(128 + signum)
 
         if os.name != "nt":
@@ -2901,11 +2992,25 @@ def _run_lower_level_launcher(
             raise TimeoutRunnerError(
                 f"lower-level launcher timed out after {timeout_seconds:g}s"
             ) from exc
-        finally:
-            for shutdown_signal, previous_handler in previous_signal_handlers.items():
-                signal.signal(shutdown_signal, previous_handler)
-            if os.name != "nt":
-                _terminate_posix_process_group(proc.pid)
+    finally:
+        for shutdown_signal, previous_handler in previous_signal_handlers.items():
+            signal.signal(shutdown_signal, previous_handler)
+        if os.name != "nt" and proc is not None:
+            _terminate_posix_process_group(proc.pid)
+        if threads is not None:
+            for thread, capture, pipe in (
+                (threads[0], stdout_capture, getattr(proc, "stdout", None)),
+                (threads[1], stderr_capture, getattr(proc, "stderr", None)),
+            ):
+                thread.join(timeout=5.0)
+                if thread.is_alive():
+                    capture.mark_observation_incomplete("capture_thread_did_not_finish")
+                    if pipe is not None:
+                        with contextlib.suppress(OSError):
+                            pipe.close()
+                    thread.join(timeout=1.0)
+        stdout_capture.close()
+        stderr_capture.close()
 
 
 def _terminate_posix_process_group(process_group_id: int) -> None:
@@ -2929,7 +3034,7 @@ def _terminate_posix_process_group(process_group_id: int) -> None:
         kill_process_group(process_group_id, getattr(signal, "SIGKILL", 9))
 
 
-def _terminate_subprocess_tree(proc: subprocess.Popen[str], *, force: bool) -> None:
+def _terminate_subprocess_tree(proc: subprocess.Popen[Any], *, force: bool) -> None:
     """Terminate a launcher safely on both POSIX and native Windows."""
 
     if proc.poll() is not None:
@@ -3040,10 +3145,52 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
         ),
         _artifact_record(run_dir / "runner.log", "worker_log", "Runner Log", "text/plain"),
         _artifact_record(
+            receipt_path_for(run_dir / "runner.log"),
+            "log_capture_receipt_json",
+            "Runner Log Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "stdout.log", "simulator_stdout", "Simulator stdout", "text/plain"
         ),
         _artifact_record(
+            receipt_path_for(run_dir / "stdout.log"),
+            "log_capture_receipt_json",
+            "Simulator stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "stderr.log", "simulator_stderr", "Simulator stderr", "text/plain"
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / "stderr.log"),
+            "log_capture_receipt_json",
+            "Simulator stderr Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / _LAUNCHER_PROCESS_STDOUT_NAME,
+            "launcher_process_stdout",
+            "Lower-level Launcher stdout",
+            "text/plain",
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / _LAUNCHER_PROCESS_STDOUT_NAME),
+            "log_capture_receipt_json",
+            "Lower-level Launcher stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
+            run_dir / _LAUNCHER_PROCESS_STDERR_NAME,
+            "launcher_process_stderr",
+            "Lower-level Launcher stderr",
+            "text/plain",
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / _LAUNCHER_PROCESS_STDERR_NAME),
+            "log_capture_receipt_json",
+            "Lower-level Launcher stderr Capture Receipt",
+            "application/json",
         ),
         _artifact_record(
             run_dir / "offboard_executor.log",
@@ -3112,10 +3259,22 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "text/plain",
         ),
         _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.stdout.log.capture.json",
+            "log_capture_receipt_json",
+            "Transient Failure Simulator stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "actuator_link_transient_attempt_1.stderr.log",
             "sim_transient_stderr",
             "Transient Failure Simulator stderr",
             "text/plain",
+        ),
+        _artifact_record(
+            run_dir / "actuator_link_transient_attempt_1.stderr.log.capture.json",
+            "log_capture_receipt_json",
+            "Transient Failure Simulator stderr Capture Receipt",
+            "application/json",
         ),
         _artifact_record(
             run_dir / "actuator_link_transient_attempt_1.telemetry.json",
@@ -3142,10 +3301,22 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "text/plain",
         ),
         _artifact_record(
+            receipt_path_for(run_dir / "gui_stdout.log"),
+            "log_capture_receipt_json",
+            "Gazebo GUI stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "gui_stderr.log",
             "gazebo_gui_stderr_log",
             "Gazebo GUI stderr",
             "text/plain",
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / "gui_stderr.log"),
+            "log_capture_receipt_json",
+            "Gazebo GUI stderr Capture Receipt",
+            "application/json",
         ),
         _artifact_record(
             run_dir / "track_marker_stdout.log",
@@ -3154,10 +3325,22 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "text/plain",
         ),
         _artifact_record(
+            receipt_path_for(run_dir / "track_marker_stdout.log"),
+            "log_capture_receipt_json",
+            "Gazebo Track Marker stdout Capture Receipt",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "track_marker_stderr.log",
             "gazebo_track_marker_stderr_log",
             "Gazebo Track Marker stderr",
             "text/plain",
+        ),
+        _artifact_record(
+            receipt_path_for(run_dir / "track_marker_stderr.log"),
+            "log_capture_receipt_json",
+            "Gazebo Track Marker stderr Capture Receipt",
+            "application/json",
         ),
         _artifact_record(
             run_dir / REQUESTED_EVIDENCE_NAME,
@@ -3250,7 +3433,9 @@ def _preserve_actuator_link_failure_for_retry(
         "offboard_executor.log": "actuator_link_transient_attempt_1.offboard_executor.log",
         "launcher_failure.json": "actuator_link_transient_attempt_1.launcher_failure.json",
         "stdout.log": "actuator_link_transient_attempt_1.stdout.log",
+        "stdout.log.capture.json": "actuator_link_transient_attempt_1.stdout.log.capture.json",
         "stderr.log": "actuator_link_transient_attempt_1.stderr.log",
+        "stderr.log.capture.json": "actuator_link_transient_attempt_1.stderr.log.capture.json",
         "telemetry.json": "actuator_link_transient_attempt_1.telemetry.json",
         APPLIED_EVIDENCE_NAME: ("actuator_link_transient_attempt_1.px4_parameters.applied.json"),
         EVIDENCE_ARTIFACT_NAME: ("actuator_link_transient_attempt_1.scenario_effects.applied.json"),
@@ -3313,6 +3498,8 @@ def _remove_success_raw_logs(run_dir: Path) -> None:
     for name in (
         "stdout.log",
         "stderr.log",
+        _LAUNCHER_PROCESS_STDOUT_NAME,
+        _LAUNCHER_PROCESS_STDERR_NAME,
         "gui_stdout.log",
         "gui_stderr.log",
         "track_marker_stdout.log",
@@ -3417,8 +3604,12 @@ def run_once(input_path: Path, output_path: Path) -> int:
         return 0
 
     def log(msg: str) -> None:
-        with runner_log.open("a", encoding="utf-8") as f:
-            f.write(msg + "\n")
+        append_bounded_log_text(
+            runner_log,
+            msg + "\n",
+            cap_bytes=DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+            stream_name="runner_log",
+        )
 
     def write_result(result: dict[str, Any]) -> None:
         payload = dict(result)
@@ -3471,6 +3662,30 @@ def run_once(input_path: Path, output_path: Path) -> int:
             dry_run=env.dry_run,
             allow_unverified_passthrough=env.allow_unverified_advanced_effects,
         )
+        log_capture_contract = {
+            "schema_version": LOG_CAPTURE_SCHEMA_VERSION,
+            "normalization": {
+                "ansi_control_sequences": "removed_streaming",
+                "pure_px4_prompt_redraws": "collapsed",
+                "utf8": "incremental_replace_invalid",
+            },
+            "caps_bytes": {
+                "simulator_stdout": DEFAULT_SIMULATOR_STDOUT_CAP_BYTES,
+                "simulator_stderr": DEFAULT_SIMULATOR_STDERR_CAP_BYTES,
+                "auxiliary_stream": DEFAULT_AUXILIARY_LOG_CAP_BYTES,
+            },
+            "receipts": {
+                "stdout": str(receipt_path_for(stdout_log)),
+                "stderr": str(receipt_path_for(stderr_log)),
+                "runner": str(receipt_path_for(runner_log)),
+                "lower_level_launcher_stdout": str(
+                    receipt_path_for(run_dir / _LAUNCHER_PROCESS_STDOUT_NAME)
+                ),
+                "lower_level_launcher_stderr": str(
+                    receipt_path_for(run_dir / _LAUNCHER_PROCESS_STDERR_NAME)
+                ),
+            },
+        }
         runner_launch_config = {
             "vehicle": meta["vehicle"],
             "airframe": meta["airframe"],
@@ -3501,6 +3716,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
             },
             "parameter_catalog_version": meta["parameter_catalog_version"],
             "px4_parameter_names": sorted(px4_params),
+            "log_capture": log_capture_contract,
         }
         write_effect_json_atomic(scenario_effect_request_json, scenario_effect_request)
         _json_dump(run_dir / "launch_config.json", runner_launch_config)
@@ -3528,6 +3744,7 @@ def run_once(input_path: Path, output_path: Path) -> int:
                     "path": str(scenario_effect_evidence_json),
                     "required": bool(scenario_effect_request["effects"]),
                 },
+                "log_capture": log_capture_contract,
                 "simulator": {
                     "airframe": meta["airframe"],
                     "simulator_model": meta["simulator_model"],
@@ -3597,8 +3814,18 @@ def run_once(input_path: Path, output_path: Path) -> int:
                 )
             telemetry = _make_dry_run_telemetry(reference_track, params, job_cfg, meta, env)
             _json_dump(telemetry_json, telemetry)
-            stdout_log.write_text("dry-run mode: no external launcher executed\n", encoding="utf-8")
-            stderr_log.write_text("", encoding="utf-8")
+            write_bounded_log_bytes(
+                stdout_log,
+                b"dry-run mode: no external launcher executed\n",
+                cap_bytes=DEFAULT_SIMULATOR_STDOUT_CAP_BYTES,
+                stream_name="simulator_stdout",
+            )
+            write_bounded_log_bytes(
+                stderr_log,
+                b"",
+                cap_bytes=DEFAULT_SIMULATOR_STDERR_CAP_BYTES,
+                stream_name="simulator_stderr",
+            )
             log("PX4_GAZEBO_DRY_RUN=true; generated deterministic fixture telemetry")
         else:
             if not env.launch_command:

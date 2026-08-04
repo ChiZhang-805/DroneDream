@@ -553,3 +553,35 @@ make px4_sitl gz_x500
 ```
 
 Do **not** commit PX4-Autopilot into DroneDream.
+
+## 14) Bounded simulator log evidence
+
+The real runner and local PX4 launcher normalize process streams before they
+reach persistent storage. The capture contract removes ANSI terminal control
+sequences, including sequences divided across read chunks, and collapses only
+pure `pxh>` carriage-return redraws. UTF-8 decoding is incremental, so a
+multi-byte character divided across chunks is not corrupted. Ordinary small
+UTF-8 logs, real diagnostic text, process exit codes, and launcher lifecycle
+lines retain their original byte semantics.
+
+Default retained-log limits are:
+
+- simulator stdout: 16 MiB;
+- simulator stderr: 8 MiB;
+- runner and lower-level launcher auxiliary streams: 2 MiB each.
+
+Every bounded log has a sibling `<name>.capture.json` using
+`dronedream.log_capture_receipt.v1`. The receipt records the raw bytes observed,
+normalized bytes observed, retained bytes, ANSI bytes/sequences removed, pure
+prompt redraws collapsed, UTF-8 replacement count, bytes dropped by the cap,
+the cap reason, observation completeness, retained-content SHA-256, and a
+bounded set of critical startup/error/exit lines. Collection continues after a
+cap is reached so counts and post-cap critical diagnostics remain visible; cap
+enforcement never changes a Trial exit code or converts a simulation failure
+into success.
+
+Receipts are additional optional artifacts. Evidence produced by earlier
+Engine Packs remains readable when no receipt exists; historical logs are not
+rewritten or retroactively normalized. The one permitted actuator-link launcher
+retry preserves both the first attempt's bounded logs and their matching
+receipts before starting attempt two.

@@ -26,6 +26,60 @@ sys.modules[RUNNER_SPEC.name] = runner_module
 RUNNER_SPEC.loader.exec_module(runner_module)
 
 
+def test_lower_level_launcher_unexpected_output_is_bounded_and_receipted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    emitter = tmp_path / "launcher_emitter.py"
+    emitter.write_text(
+        "import sys\n"
+        "sys.stdout.buffer.write(b'X' * 256)\n"
+        "sys.stderr.buffer.write(b'FATAL wrapper exception\\n')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(runner_module, "DEFAULT_AUXILIARY_LOG_CAP_BYTES", 64)
+
+    exit_code = runner_module._run_lower_level_launcher(
+        launch_argv=[
+            sys.executable,
+            str(emitter),
+            "--stdout-log",
+            str(tmp_path / "stdout.log"),
+            "--stderr-log",
+            str(tmp_path / "stderr.log"),
+        ],
+        cwd=tmp_path,
+        stdout_log=tmp_path / "stdout.log",
+        stderr_log=tmp_path / "stderr.log",
+        timeout_seconds=10,
+        launch_env=os.environ.copy(),
+    )
+
+    assert exit_code == 0
+    launcher_stdout = tmp_path / runner_module._LAUNCHER_PROCESS_STDOUT_NAME
+    assert launcher_stdout.stat().st_size == 64
+    stdout_receipt = json.loads(
+        (tmp_path / f"{runner_module._LAUNCHER_PROCESS_STDOUT_NAME}.capture.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    stderr_receipt = json.loads(
+        (tmp_path / f"{runner_module._LAUNCHER_PROCESS_STDERR_NAME}.capture.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert stdout_receipt["raw_observed_bytes"] == 256
+    assert stdout_receipt["retained_bytes"] == 64
+    assert stdout_receipt["truncated"] is True
+    assert any(
+        "FATAL wrapper exception" in item["line"] for item in stderr_receipt["critical_lines"]
+    )
+    artifact_types = {item["artifact_type"] for item in runner_module._collect_artifacts(tmp_path)}
+    assert "launcher_process_stdout" in artifact_types
+    assert "launcher_process_stderr" in artifact_types
+    assert "log_capture_receipt_json" in artifact_types
+
+
 def _write_engine_pack_identity_files(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
     source_commit = "1" * 40
     px4_commit = "2" * 40

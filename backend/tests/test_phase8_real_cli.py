@@ -31,6 +31,7 @@ from app.simulator.base import (
     TrialContext,
     TrialMetricsPayload,
 )
+from app.simulator.bounded_log_capture import receipt_path_for
 from app.simulator.px4_metric_evidence import (
     Px4CoreMetricEvidenceV1,
     compile_px4_core_metric_evidence,
@@ -1063,6 +1064,61 @@ out.write_text(json.dumps({{
     assert "validation limit" in caplog.text
 
 
+def test_real_cli_drops_malformed_log_capture_receipt(monkeypatch, tmp_path, caplog):
+    fake = tmp_path / "fake_sim_bad_log_receipt.py"
+    fake.write_text(
+        """
+import json, pathlib, sys
+out = pathlib.Path(sys.argv[sys.argv.index('--output') + 1])
+receipt = out.parent / 'stdout.log.capture.json'
+receipt.write_text(json.dumps({
+    'schema_version': 'dronedream.log_capture_receipt.v1',
+    'stream': 'simulator_stdout',
+    'captured_file_name': 'stdout.log',
+    'cap_bytes': 16,
+    'raw_observed_bytes': 4,
+    'normalized_observed_bytes': 4,
+    'retained_bytes': 4,
+    'dropped_bytes_due_to_cap': 0,
+    'ansi_sequence_count': 0,
+    'ansi_control_bytes_removed': 0,
+    'prompt_redraws_collapsed': 0,
+    'utf8_replacement_count': 0,
+    'truncated': True,
+    'truncation_reason': None,
+    'observation_complete': True,
+    'observation_error': None,
+    'prior_observation_exact': True,
+    'incomplete_ansi_sequence': False,
+    'critical_lines': [],
+    'retained_sha256': '0' * 64,
+}))
+out.write_text(json.dumps({
+    'success': True,
+    'metrics': {
+        'rmse': 1.0, 'max_error': 1.0, 'overshoot_count': 0,
+        'completion_time': 1.0, 'score': 1.0,
+    },
+    'artifacts': [{
+        'artifact_type': 'log_capture_receipt_json',
+        'storage_path': str(receipt),
+        'mime_type': 'application/json',
+    }],
+}))
+""".strip(),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("REAL_SIMULATOR_COMMAND", f'"{sys.executable}" "{fake}"')
+    monkeypatch.setenv("REAL_SIMULATOR_ARTIFACT_ROOT", str(tmp_path))
+
+    with caplog.at_level(logging.WARNING, logger="drone_dream.simulator.real_cli"):
+        result = RealCliSimulatorAdapter().run_trial(_ctx())
+
+    assert result.success is True
+    assert result.artifacts == []
+    assert "truncated must match" in caplog.text
+
+
 def test_real_cli_drops_cross_trial_artifact_inside_allowed_root(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -2027,6 +2083,64 @@ def test_process_start_failure_is_not_masked_by_posix_cleanup(monkeypatch, tmp_p
             stdout_path=tmp_path / "stdout.log",
             stderr_path=tmp_path / "stderr.log",
         )
+
+
+def test_execute_command_bounds_and_normalizes_real_process_output(
+    monkeypatch, tmp_path
+) -> None:
+    emitter = tmp_path / "emit_process_output.py"
+    emitter.write_text(
+        """\
+import sys
+
+stream = sys.stdout.buffer
+for chunk in (b"\\x1b[", b"2K\\rpx", b"h> "):
+    stream.write(chunk)
+    stream.flush()
+stream.write(b"\\r")
+stream.write("PX4 ready 起飞\\n".encode("utf-8"))
+stream.write(b"A" * 256)
+stream.write(b"\\nFATAL actuator link failed after cap\\n")
+stream.flush()
+sys.stderr.buffer.write(b"ERROR simulator stderr diagnostic\\n")
+sys.stderr.buffer.flush()
+""",
+        encoding="utf-8",
+    )
+    stdout_path = tmp_path / "stdout.log"
+    stderr_path = tmp_path / "stderr.log"
+    monkeypatch.setattr(real_cli_module, "DEFAULT_AUXILIARY_LOG_CAP_BYTES", 96)
+
+    outcome = real_cli_module._execute_command(
+        [sys.executable, str(emitter)],
+        cwd=None,
+        env=dict(real_cli_module.os.environ),
+        timeout_seconds=5.0,
+        cancellation_event=None,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+    )
+
+    stdout = stdout_path.read_bytes()
+    stderr = stderr_path.read_bytes()
+    stdout_receipt = json.loads(receipt_path_for(stdout_path).read_text(encoding="utf-8"))
+    stderr_receipt = json.loads(receipt_path_for(stderr_path).read_text(encoding="utf-8"))
+    assert outcome.returncode == 0
+    assert len(stdout) == 96
+    assert b"\\x1b" not in stdout
+    assert b"pxh>" not in stdout
+    assert "PX4 ready 起飞" in stdout.decode("utf-8")
+    assert stderr == b"ERROR simulator stderr diagnostic\n"
+    assert stdout_receipt["raw_observed_bytes"] > stdout_receipt["retained_bytes"]
+    assert stdout_receipt["truncated"] is True
+    assert stdout_receipt["prompt_redraws_collapsed"] == 1
+    assert stdout_receipt["retained_sha256"] == hashlib.sha256(stdout).hexdigest()
+    assert any(
+        "FATAL actuator link failed after cap" in item["line"]
+        for item in stdout_receipt["critical_lines"]
+    )
+    assert stderr_receipt["truncated"] is False
+    assert stderr_receipt["retained_sha256"] == hashlib.sha256(stderr).hexdigest()
 
 
 def test_pre_cancelled_real_cli_attempt_never_starts_a_process(monkeypatch, tmp_path) -> None:
