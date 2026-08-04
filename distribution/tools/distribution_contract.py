@@ -230,6 +230,68 @@ COMPOSITE_RESOURCE_KEYS = {
 COMPOSITE_INSTALLABILITY_KEYS = {"state", "blockers", "physicalCapabilityStatus"}
 COMPOSITE_LICENSE_NOTICE_KEYS = {"path", "sha256", "sizeBytes"}
 SIGNATURE_STATES = {"verified", "not-issued"}
+RELEASE_PROMOTION_KEYS = {
+    "schemaVersion",
+    "kind",
+    "promotionId",
+    "promotionVersion",
+    "state",
+    "blockers",
+    "sourceCommit",
+    "commonCoreHash",
+    "productDisplayVersion",
+    "edition",
+    "branchPolicy",
+    "artifact",
+    "runtimeBase",
+    "enginePack",
+    "vehiclePacks",
+    "capabilities",
+    "validationTier",
+    "licenseNotice",
+    "supersedes",
+    "rollback",
+}
+PROMOTION_EDITION_KEYS = {
+    "editionId",
+    "editionManifestSha256",
+    "compositeManifestSha256",
+}
+PROMOTION_BRANCH_POLICY_KEYS = {
+    "targetBranch",
+    "creationState",
+    "proposedHeadCommit",
+    "headClassification",
+    "metadataOnlyChangedPaths",
+    "prOnly",
+    "forcePushAllowed",
+}
+PROMOTION_ARTIFACT_KEYS = {
+    "fileName",
+    "sha256",
+    "bytes",
+    "authenticodeState",
+    "updaterSignatureState",
+}
+PROMOTION_COMPONENT_KEYS = {"manifestSha256", "artifactSha256", "buildId"}
+PROMOTION_VEHICLE_PACK_KEYS = {"packId", "manifestSha256", "artifactSha256"}
+PROMOTION_SUPERSEDES_KEYS = {"promotionId", "artifactSha256"}
+PROMOTION_ROLLBACK_KEYS = {
+    "policy",
+    "targetPromotionId",
+    "targetArtifactSha256",
+}
+PROMOTION_BRANCH_CREATION_STATES = {
+    "planned-not-created",
+    "creation-approved",
+    "existing-protected",
+}
+PROMOTION_METADATA_PREFIXES = (
+    "distribution/catalog/",
+    "distribution/editions/",
+    "distribution/promotions/",
+    "distribution/vehicle-packs/",
+)
 
 
 class DistributionContractError(ValueError):
@@ -1344,6 +1406,282 @@ def validate_composite_installation_manifest(
     return document
 
 
+def _validate_promotion_component_ref(
+    value: Any,
+    label: str,
+    *,
+    expected: dict[str, Any],
+) -> None:
+    if not isinstance(value, dict):
+        raise DistributionContractError(f"{label} must be an object")
+    _require_exact_keys(value, PROMOTION_COMPONENT_KEYS, label)
+    expected_ref = {
+        "manifestSha256": expected["manifestSha256"],
+        "artifactSha256": expected["artifactSha256"],
+        "buildId": expected["buildId"],
+    }
+    if value != expected_ref:
+        raise DistributionContractError(f"{label} drifted from composite installation")
+
+
+def validate_release_promotion_manifest(
+    document: Any,
+    *,
+    edition: dict[str, Any],
+    edition_manifest_sha256: str,
+    composite: dict[str, Any],
+    composite_manifest_sha256: str,
+    observed_branch_head: str | None = None,
+    observed_metadata_only_paths: list[str] | None = None,
+) -> dict[str, Any]:
+    """Validate a release-channel promotion without creating or mutating a branch."""
+
+    if not isinstance(document, dict):
+        raise DistributionContractError("release promotion manifest must be an object")
+    _require_exact_keys(document, RELEASE_PROMOTION_KEYS, "release promotion manifest")
+    if (
+        document["schemaVersion"] != 1
+        or document["kind"] != "dronedream-release-promotion"
+        or not SEMVER_RE.fullmatch(str(document["promotionVersion"]))
+    ):
+        raise DistributionContractError("release promotion identity is unsupported")
+    promotion_id = _require_nonempty_string(
+        document["promotionId"], "release promotion promotionId", maximum=128
+    )
+    if not DOTTED_ID_RE.fullmatch(promotion_id):
+        raise DistributionContractError("release promotion promotionId is invalid")
+    state = document["state"]
+    if state not in {"planned", "promotable"}:
+        raise DistributionContractError("release promotion state is unsupported")
+    blockers = _validate_unique_text_list(
+        document["blockers"], "release promotion blockers", allow_empty=True
+    )
+    source_commit = document["sourceCommit"]
+    if not isinstance(source_commit, str) or not COMMIT_RE.fullmatch(source_commit):
+        raise DistributionContractError("release promotion sourceCommit is invalid")
+    if source_commit != composite["sourceCommit"]:
+        raise DistributionContractError("release promotion source drifted from composite")
+    common_core_hash = document["commonCoreHash"]
+    if not isinstance(common_core_hash, str) or not SHA256_RE.fullmatch(common_core_hash):
+        raise DistributionContractError("release promotion commonCoreHash is invalid")
+    if common_core_hash != composite["commonCoreHash"]:
+        raise DistributionContractError("release promotion common core drifted from composite")
+    if document["productDisplayVersion"] != composite["productDisplayVersion"]:
+        raise DistributionContractError("release promotion product version drifted")
+
+    edition_ref = document["edition"]
+    if not isinstance(edition_ref, dict):
+        raise DistributionContractError("release promotion edition must be an object")
+    _require_exact_keys(edition_ref, PROMOTION_EDITION_KEYS, "release promotion edition")
+    expected_edition_ref = {
+        "editionId": edition["editionId"],
+        "editionManifestSha256": edition_manifest_sha256,
+        "compositeManifestSha256": composite_manifest_sha256,
+    }
+    if edition_ref != expected_edition_ref or composite["edition"]["editionId"] != edition[
+        "editionId"
+    ]:
+        raise DistributionContractError("release promotion edition binding drifted")
+
+    branch_policy = document["branchPolicy"]
+    if not isinstance(branch_policy, dict):
+        raise DistributionContractError("release promotion branchPolicy must be an object")
+    _require_exact_keys(
+        branch_policy, PROMOTION_BRANCH_POLICY_KEYS, "release promotion branchPolicy"
+    )
+    if branch_policy["targetBranch"] != edition["releaseChannel"]["branch"]:
+        raise DistributionContractError("release promotion target branch drifted from edition")
+    if branch_policy["creationState"] not in PROMOTION_BRANCH_CREATION_STATES:
+        raise DistributionContractError("release promotion branch creation state is unsupported")
+    if branch_policy["prOnly"] is not True or branch_policy["forcePushAllowed"] is not False:
+        raise DistributionContractError("release promotion must be PR-only and forbid force-push")
+    proposed_head = branch_policy["proposedHeadCommit"]
+    if not isinstance(proposed_head, str) or not COMMIT_RE.fullmatch(proposed_head):
+        raise DistributionContractError("release promotion proposed branch head is invalid")
+    head_classification = branch_policy["headClassification"]
+    declared_paths = branch_policy["metadataOnlyChangedPaths"]
+    _validate_unique_text_list(
+        declared_paths,
+        "release promotion metadataOnlyChangedPaths",
+        allow_empty=True,
+    )
+    for path in declared_paths:
+        if (
+            not SAFE_RELATIVE_PATH_RE.fullmatch(path)
+            or not path.startswith(PROMOTION_METADATA_PREFIXES)
+        ):
+            raise DistributionContractError(
+                "release promotion metadata-only path is outside the allowlist"
+            )
+    if head_classification == "exact-source":
+        if proposed_head != source_commit or declared_paths:
+            raise DistributionContractError(
+                "exact-source promotion must use sourceCommit with no changed paths"
+            )
+        if observed_metadata_only_paths not in (None, []):
+            raise DistributionContractError(
+                "exact-source promotion cannot have observed metadata-only changes"
+            )
+    elif head_classification == "edition-metadata-only":
+        if proposed_head == source_commit or not declared_paths:
+            raise DistributionContractError(
+                "metadata-only promotion requires a later head and changed paths"
+            )
+        if observed_metadata_only_paths is None:
+            raise DistributionContractError(
+                "metadata-only promotion requires observed Git changed paths"
+            )
+        observed_paths = sorted(observed_metadata_only_paths)
+        if observed_paths != sorted(declared_paths):
+            raise DistributionContractError(
+                "metadata-only promotion paths drifted from observed Git diff"
+            )
+    else:
+        raise DistributionContractError("release promotion head classification is unsupported")
+    if observed_branch_head is not None:
+        if not COMMIT_RE.fullmatch(observed_branch_head) or observed_branch_head != proposed_head:
+            raise DistributionContractError("release promotion branch head drifted")
+    elif branch_policy["creationState"] != "planned-not-created":
+        raise DistributionContractError(
+            "created release branch requires an independently observed branch head"
+        )
+
+    artifact = document["artifact"]
+    if not isinstance(artifact, dict):
+        raise DistributionContractError("release promotion artifact must be an object")
+    _require_exact_keys(artifact, PROMOTION_ARTIFACT_KEYS, "release promotion artifact")
+    if artifact["fileName"] != edition["artifactBaseName"]:
+        raise DistributionContractError("release promotion artifact filename drifted from edition")
+    if not isinstance(artifact["sha256"], str) or not SHA256_RE.fullmatch(
+        artifact["sha256"]
+    ):
+        raise DistributionContractError("release promotion artifact SHA-256 is invalid")
+    if not isinstance(artifact["bytes"], int) or artifact["bytes"] < 0:
+        raise DistributionContractError("release promotion artifact size is invalid")
+    if artifact["authenticodeState"] not in {"valid", "not-signed"}:
+        raise DistributionContractError("release promotion Authenticode state is unsupported")
+    if artifact["updaterSignatureState"] not in {"verified", "not-issued"}:
+        raise DistributionContractError("release promotion updater signature state is unsupported")
+
+    _validate_promotion_component_ref(
+        document["runtimeBase"],
+        "release promotion runtimeBase",
+        expected=composite["components"]["runtimeBase"],
+    )
+    _validate_promotion_component_ref(
+        document["enginePack"],
+        "release promotion enginePack",
+        expected=composite["components"]["enginePack"],
+    )
+
+    vehicle_refs = document["vehiclePacks"]
+    if not isinstance(vehicle_refs, list) or not vehicle_refs:
+        raise DistributionContractError("release promotion vehiclePacks must be non-empty")
+    expected_vehicle_refs = {
+        ref["packId"]: {
+            "packId": ref["packId"],
+            "manifestSha256": ref["manifestSha256"],
+            "artifactSha256": ref["artifactSha256"],
+        }
+        for ref in composite["vehiclePacks"]
+    }
+    actual_vehicle_refs: dict[str, dict[str, Any]] = {}
+    for index, ref in enumerate(vehicle_refs):
+        label = f"release promotion vehiclePacks[{index}]"
+        if not isinstance(ref, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(ref, PROMOTION_VEHICLE_PACK_KEYS, label)
+        pack_id = ref["packId"]
+        if pack_id in actual_vehicle_refs:
+            raise DistributionContractError("release promotion Vehicle Pack is duplicated")
+        actual_vehicle_refs[pack_id] = ref
+    if actual_vehicle_refs != expected_vehicle_refs:
+        raise DistributionContractError("release promotion Vehicle Packs drifted from composite")
+
+    capabilities = _validate_unique_text_list(
+        document["capabilities"], "release promotion capabilities"
+    )
+    if capabilities != set(composite["capabilities"]):
+        raise DistributionContractError("release promotion capabilities drifted from composite")
+    if document["validationTier"] != edition["validationTier"]:
+        raise DistributionContractError("release promotion validation tier drifted from edition")
+    if document["licenseNotice"] != composite["licenseNotice"]:
+        raise DistributionContractError("release promotion license notice drifted from composite")
+
+    supersedes = document["supersedes"]
+    if not isinstance(supersedes, list):
+        raise DistributionContractError("release promotion supersedes must be a list")
+    superseded: dict[str, str] = {}
+    for index, ref in enumerate(supersedes):
+        label = f"release promotion supersedes[{index}]"
+        if not isinstance(ref, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(ref, PROMOTION_SUPERSEDES_KEYS, label)
+        previous_id = _require_nonempty_string(ref["promotionId"], f"{label}.promotionId")
+        previous_sha = ref["artifactSha256"]
+        if (
+            not DOTTED_ID_RE.fullmatch(previous_id)
+            or not isinstance(previous_sha, str)
+            or not SHA256_RE.fullmatch(previous_sha)
+            or previous_id in superseded
+        ):
+            raise DistributionContractError(f"{label} is invalid or duplicated")
+        superseded[previous_id] = previous_sha
+    rollback = document["rollback"]
+    if not isinstance(rollback, dict):
+        raise DistributionContractError("release promotion rollback must be an object")
+    _require_exact_keys(rollback, PROMOTION_ROLLBACK_KEYS, "release promotion rollback")
+    if rollback["policy"] != "previous-verified-promotion":
+        raise DistributionContractError("release promotion rollback policy is unsupported")
+    rollback_id = rollback["targetPromotionId"]
+    rollback_sha = rollback["targetArtifactSha256"]
+    if not superseded:
+        if rollback_id is not None or rollback_sha is not None:
+            raise DistributionContractError("first promotion cannot name a rollback target")
+    elif (
+        not isinstance(rollback_id, str)
+        or rollback_id not in superseded
+        or rollback_sha != superseded[rollback_id]
+    ):
+        raise DistributionContractError("release promotion rollback target is not superseded")
+
+    if state == "planned":
+        if not blockers:
+            raise DistributionContractError("planned release promotion must explain blockers")
+    else:
+        if blockers:
+            raise DistributionContractError("promotable release promotion cannot retain blockers")
+        if composite["installability"]["state"] != "installable":
+            raise DistributionContractError("promotable release requires an installable composite")
+        if branch_policy["creationState"] == "planned-not-created":
+            raise DistributionContractError("promotable release branch cannot remain unapproved")
+        if artifact["bytes"] <= 0 or artifact["updaterSignatureState"] != "verified":
+            raise DistributionContractError(
+                "promotable release requires a non-empty updater-signed artifact"
+            )
+    return document
+
+
+def validate_release_promotion_set(
+    promotions: list[dict[str, Any]],
+) -> None:
+    """Enforce one-source/common-core parity across all three edition channels."""
+
+    if len(promotions) != len(EDITION_IDS):
+        raise DistributionContractError("release promotion set must contain all three editions")
+    by_edition = {promotion["edition"]["editionId"]: promotion for promotion in promotions}
+    if set(by_edition) != EDITION_IDS or len(by_edition) != len(promotions):
+        raise DistributionContractError(
+            "release promotion set editions are incomplete or duplicated"
+        )
+    if len({promotion["sourceCommit"] for promotion in promotions}) != 1:
+        raise DistributionContractError("release promotion set source commits diverged")
+    if len({promotion["commonCoreHash"] for promotion in promotions}) != 1:
+        raise DistributionContractError("release promotion set common core hashes diverged")
+    if len({promotion["productDisplayVersion"] for promotion in promotions}) != 1:
+        raise DistributionContractError("release promotion set product versions diverged")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1367,6 +1705,18 @@ def main() -> int:
     composite.add_argument("--vehicle-pack", type=Path, action="append", required=True)
     composite.add_argument("--expected-source", required=True)
     composite.add_argument("manifest", type=Path)
+    promotion = subparsers.add_parser(
+        "promotion", help="validate a release promotion manifest without changing branches"
+    )
+    promotion.add_argument("--edition", type=Path, required=True)
+    promotion.add_argument("--policy", type=Path, required=True)
+    promotion.add_argument("--inventory", type=Path, required=True)
+    promotion.add_argument("--vehicle-pack", type=Path, action="append", required=True)
+    promotion.add_argument("--composite", type=Path, required=True)
+    promotion.add_argument("--expected-source", required=True)
+    promotion.add_argument("--observed-branch-head")
+    promotion.add_argument("--observed-metadata-path", action="append")
+    promotion.add_argument("manifest", type=Path)
     args = parser.parse_args()
     try:
         if args.command == "upstream":
@@ -1379,7 +1729,7 @@ def main() -> int:
                 upstream_inventory_path=args.inventory,
                 capability_policy_path=args.policy,
             )
-        else:
+        elif args.command in {"composite", "promotion"}:
             policy = load_capability_policy(args.policy)
             edition = validate_edition_manifest(
                 _load_json_document(args.edition, "edition manifest"),
@@ -1402,14 +1752,27 @@ def main() -> int:
                     strict=True,
                 )
             }
-            validate_composite_installation_manifest(
-                _load_json_document(args.manifest, "composite installation manifest"),
+            composite_path = args.manifest if args.command == "composite" else args.composite
+            composite_document = validate_composite_installation_manifest(
+                _load_json_document(composite_path, "composite installation manifest"),
                 edition=edition,
                 edition_manifest_sha256=sha256_file(args.edition),
                 vehicle_packs=pack_manifests,
                 vehicle_pack_manifest_sha256=vehicle_pack_shas,
                 expected_source_commit=args.expected_source,
             )
+            if args.command == "promotion":
+                validate_release_promotion_manifest(
+                    _load_json_document(args.manifest, "release promotion manifest"),
+                    edition=edition,
+                    edition_manifest_sha256=sha256_file(args.edition),
+                    composite=composite_document,
+                    composite_manifest_sha256=sha256_file(args.composite),
+                    observed_branch_head=args.observed_branch_head,
+                    observed_metadata_only_paths=args.observed_metadata_path,
+                )
+        else:
+            raise DistributionContractError(f"unsupported command: {args.command}")
     except DistributionContractError as exc:
         parser.error(str(exc))
     return 0

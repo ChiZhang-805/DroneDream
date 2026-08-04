@@ -133,3 +133,39 @@ python distribution/tools/distribution_contract.py composite `
   --expected-source 6b50f86ed80c190b816f19d06de143a328bda7e2 `
   distribution/tests/fixtures/composite-sim-planned.v1.json
 ```
+
+## E1/E4 release promotion contract
+
+`schemas/release-promotion-manifest.schema.json` defines the evidence required
+before an edition may be promoted to `codex/release-sim`,
+`codex/release-lab`, or `codex/release-field`. A promotion binds the product
+source and common-core hash to one reviewed edition and composite installation,
+the exact Runtime Base, Engine Pack, Vehicle Packs, capabilities, NOTICE,
+installer bytes, validation tier, superseded assets, and rollback target.
+
+Release channels are PR-only and force-push is forbidden. A branch head may be
+the exact product source or a later commit containing only allowlisted edition
+metadata. The latter classification is not accepted from self-reported paths:
+the caller must supply the paths observed from the Git diff, and E4 will also
+compare the proposed head with the independently observed remote branch head.
+The three promotion manifests must share one `sourceCommit`, one
+`commonCoreHash`, and one displayed product version. A planned promotion must
+retain blockers; `promotable` requires an installable composite, an approved or
+existing protected branch, a non-empty artifact, and a verified updater
+signature. Authenticode may honestly remain `not-signed` for the current
+closed-beta policy.
+
+The fixture is synthetic, planned, and contains no installer. It does not
+authorize branch creation. The three release branches remain absent until E4
+adds the build planner, observed-Git checks, and governance approval.
+
+```powershell
+python distribution/tools/distribution_contract.py promotion `
+  --edition distribution/editions/sim.v1.json `
+  --policy distribution/capabilities/core-capabilities.v1.json `
+  --inventory distribution/upstream-sources.v1.json `
+  --vehicle-pack distribution/tests/fixtures/vehicle-pack-contract-only.v1.json `
+  --composite distribution/tests/fixtures/composite-sim-planned.v1.json `
+  --expected-source 6b50f86ed80c190b816f19d06de143a328bda7e2 `
+  distribution/tests/fixtures/release-promotion-sim-planned.v1.json
+```
