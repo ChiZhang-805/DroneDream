@@ -453,7 +453,22 @@ async function verifyFixedScenarios(page, testCase) {
             : false,
         };
       }),
-      cards: scenarioCards.map(bounds),
+      cards: scenarioCards.map((card) => {
+        const facts = card.querySelector(".fixed-scenario-facts");
+        const preview = card.querySelector(".experience-preview");
+        const action = card.querySelector(".fixed-scenario-use");
+        if (!(facts instanceof HTMLElement)
+          || !(preview instanceof HTMLElement)
+          || !(action instanceof HTMLElement)) {
+          throw new Error("Fixed-scenario card is missing an aligned content region");
+        }
+        return {
+          ...bounds(card),
+          facts: bounds(facts),
+          preview: bounds(preview),
+          action: bounds(action),
+        };
+      }),
       explanatoryElements: document.querySelectorAll([
         ".fixed-scenarios-header .page-eyebrow",
         ".fixed-scenarios-header .page-header-subtitle",
@@ -494,11 +509,28 @@ async function verifyFixedScenarios(page, testCase) {
     assert(closeEnough(metrics.cards[1].left, metrics.cards[3].left, 1));
     assert(metrics.cards.every((card) => closeEnough(card.width, metrics.cards[0].width, 1)));
     assert(metrics.cards.every((card) => closeEnough(card.height, metrics.cards[0].height, 1)));
+    for (const [leftIndex, rightIndex] of [[0, 1], [2, 3]]) {
+      const leftCard = metrics.cards[leftIndex];
+      const rightCard = metrics.cards[rightIndex];
+      assert(closeEnough(leftCard.facts.height, rightCard.facts.height, 1));
+      assert(closeEnough(leftCard.preview.top, rightCard.preview.top, 1));
+      assert(closeEnough(leftCard.preview.height, rightCard.preview.height, 1));
+      assert(closeEnough(leftCard.action.top, rightCard.action.top, 1));
+      assert(closeEnough(leftCard.action.height, rightCard.action.height, 1));
+    }
   }
   if (testCase.viewport.width >= 1000) {
     assert(
       Math.max(...metrics.cards.map((card) => card.bottom)) <= metrics.viewportHeight,
       `${testCase.id}: fixed scenarios do not fit within the desktop viewport`,
+    );
+    assert(
+      metrics.cards.every((card) => card.preview.height >= 180),
+      `${testCase.id}: fixed-scenario previews did not expand to use the desktop viewport`,
+    );
+    assert(
+      Math.max(...metrics.cards.map((card) => card.bottom)) >= metrics.viewportHeight - 60,
+      `${testCase.id}: fixed scenarios leave excessive unused space below the grid`,
     );
   } else if (testCase.viewport.width <= 620) {
     assert(

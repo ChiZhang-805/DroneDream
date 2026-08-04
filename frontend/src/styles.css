@@ -2814,6 +2814,7 @@ a {
 
 .fixed-scenario-facts > div {
   min-width: 0;
+  min-height: 4.5rem;
   padding: 0.42rem 0.48rem;
   border: 1px solid #eadfeb;
   border-radius: 9px;
@@ -2845,7 +2846,7 @@ a {
 }
 
 .fixed-scenario-card .experience-preview-compact .experience-preview-canvas {
-  height: 142px;
+  height: 176px;
   margin: 0;
 }
 
@@ -2863,6 +2864,10 @@ a {
 @media (max-width: 1100px) {
   .fixed-scenario-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fixed-scenario-card .experience-preview-compact .experience-preview-canvas {
+    height: 142px;
   }
 }
 
