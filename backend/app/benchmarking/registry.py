@@ -50,8 +50,8 @@ _DESCRIPTORS = (
     BenchmarkAdapterDescriptor(
         "true_lhs/v1",
         "traditional",
-        "contract_only",
-        "true-lhs-adapter-pending",
+        "implemented",
+        "native-seeded-lhs-v1",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
@@ -199,11 +199,13 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
         ProductNativeOptimizerAdapterV1,
         RandomSearchAdapterV1,
         SeededHaltonAdapterV1,
+        SeededLatinHypercubeAdapterV1,
     )
 
     implementations: dict[str, Callable[[], BenchmarkProposalAdapter]] = {
         "random_search/v1": RandomSearchAdapterV1,
         "seeded_halton/v1": SeededHaltonAdapterV1,
+        "true_lhs/v1": SeededLatinHypercubeAdapterV1,
         "repo_constrained_mobo/v1": lambda: ProductNativeOptimizerAdapterV1(
             "repo_constrained_mobo/v1", "constrained_mobo"
         ),

@@ -15,6 +15,7 @@ from app.optimization.domain import ParameterDomain, SearchSpace
 _OFFLINE_FIXTURE_ARMS = (
     "random_search/v1",
     "seeded_halton/v1",
+    "true_lhs/v1",
     "repo_constrained_mobo/v1",
     "optimizer_portfolio/v1",
     "llm_direct/v1",
@@ -135,7 +136,7 @@ def test_contract_only_external_arm_stays_a_visible_matrix_failure() -> None:
     observation = _observation()
     matrix = run_offline_structural_matrix(
         observation,
-        adapter_ids=("true_lhs/v1",),
+        adapter_ids=("bipop_cma_es/v1",),
         requested_generations=2,
         search_space=search_space_from_observation(observation),
     )

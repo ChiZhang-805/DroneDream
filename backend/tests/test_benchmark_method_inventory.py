@@ -31,6 +31,7 @@ def test_method_inventory_is_complete_and_matches_registry_provenance() -> None:
     (
         "random_search/v1",
         "seeded_halton/v1",
+        "true_lhs/v1",
         "repo_constrained_mobo/v1",
         "optimizer_portfolio/v1",
     ),
@@ -95,8 +96,9 @@ def test_seeded_halton_is_not_relabelled_as_true_lhs() -> None:
     lhs = BENCHMARK_METHOD_INVENTORY["true_lhs/v1"]
     assert halton.execution_readiness == "ready"
     assert "halton" in halton.implementation_label
-    assert lhs.execution_readiness == "blocked"
-    assert "adapter_not_implemented" in lhs.blocker_codes
+    assert lhs.execution_readiness == "ready"
+    assert "lhs" in lhs.implementation_label
+    assert lhs.implementation_label != halton.implementation_label
 
 
 def test_unverified_license_requires_a_fail_closed_blocker() -> None:

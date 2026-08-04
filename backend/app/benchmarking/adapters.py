@@ -40,6 +40,7 @@ _DOMAIN_KEYS: Final = {
     "locked",
 }
 _MAX_SELECTION_ATTEMPTS: Final = 4096
+_MAX_LHS_DESIGN_SIZE: Final = 4096
 _HALTON_SEED_OFFSET_MODULUS: Final = 1_000_003
 
 
@@ -159,6 +160,17 @@ def _seed_material(observation: BenchmarkObservationV2, adapter_id: str) -> byte
     return hashlib.sha256(canonical_json_bytes(payload)).digest()
 
 
+def _design_seed_material(observation: BenchmarkObservationV2, adapter_id: str) -> bytes:
+    """Return one stable seed for a run-wide design rather than one proposal."""
+
+    payload = {
+        "adapter_id": adapter_id,
+        "algorithm_seed": observation.algorithm_seed,
+        "schema_id": "dronedream.benchmark-run-design-seed/v1",
+    }
+    return hashlib.sha256(canonical_json_bytes(payload)).digest()
+
+
 def _sha_uniform(seed: bytes, *, attempt: int, dimension: int) -> float:
     digest = hashlib.sha256(
         seed
@@ -166,6 +178,20 @@ def _sha_uniform(seed: bytes, *, attempt: int, dimension: int) -> float:
         + dimension.to_bytes(4, byteorder="big", signed=False)
     ).digest()
     return int.from_bytes(digest[:8], byteorder="big", signed=False) / 2**64
+
+
+def _lhs_permutation(seed: bytes, *, dimension: int, design_size: int) -> tuple[int, ...]:
+    """Build a deterministic Fisher-Yates permutation for one LHS dimension."""
+
+    values = list(range(design_size))
+    dimension_seed = hashlib.sha256(
+        seed + b"lhs-permutation" + dimension.to_bytes(4, byteorder="big", signed=False)
+    ).digest()
+    for upper in range(design_size - 1, 0, -1):
+        uniform = _sha_uniform(dimension_seed, attempt=upper, dimension=dimension)
+        selected = min(upper, int(uniform * (upper + 1)))
+        values[upper], values[selected] = values[selected], values[upper]
+    return tuple(values)
 
 
 def _proposal(
@@ -285,6 +311,69 @@ class SeededHaltonAdapterV1:
             )
         raise BenchmarkAdapterError(
             f"seeded Halton exhausted {_MAX_SELECTION_ATTEMPTS} bounded unique attempts"
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SeededLatinHypercubeAdapterV1:
+    """Dependency-free seeded randomized Latin-hypercube reference adapter."""
+
+    adapter_id: str = "true_lhs/v1"
+
+    def propose(self, observation: BenchmarkObservationV2) -> BenchmarkProposalV1:
+        _require_available_budget(observation)
+        space = search_space_from_observation(observation)
+        seen = _seen_candidates(observation, space)
+        design_size = observation.next_dispatch_ordinal - 1 + observation.simulator_budget_remaining
+        if not 1 <= design_size <= _MAX_LHS_DESIGN_SIZE:
+            raise BenchmarkAdapterError(
+                f"seeded LHS design size must be in [1, {_MAX_LHS_DESIGN_SIZE}]"
+            )
+        seed = _design_seed_material(observation, self.adapter_id)
+        dimensions = len(space.tunable)
+        permutations = tuple(
+            _lhs_permutation(seed, dimension=dimension, design_size=design_size)
+            for dimension in range(dimensions)
+        )
+        jitter_seed = hashlib.sha256(seed + b"lhs-jitter").digest()
+        base_index = (observation.next_dispatch_ordinal - 1) % design_size
+        for attempt in range(design_size):
+            design_index = (base_index + attempt) % design_size
+            strata = tuple(permutations[dimension][design_index] for dimension in range(dimensions))
+            vector = tuple(
+                (
+                    stratum
+                    + _sha_uniform(
+                        jitter_seed,
+                        attempt=design_index,
+                        dimension=dimension,
+                    )
+                )
+                / design_size
+                for dimension, stratum in enumerate(strata)
+            )
+            try:
+                parameters = space.from_unit_vector(vector)
+            except ValueError:
+                continue
+            if _candidate_key(parameters) in seen:
+                continue
+            return _proposal(
+                adapter_id=self.adapter_id,
+                observation=observation,
+                parameters=parameters,
+                reason_code="seeded-lhs-proposal",
+                seed=seed,
+                selection_attempt=attempt,
+                sequence_index=design_index,
+                extra_receipt={
+                    "design_algorithm": "seeded-randomized-latin-hypercube-v1",
+                    "design_size": design_size,
+                    "pre_projection_stratum_indices": list(strata),
+                },
+            )
+        raise BenchmarkAdapterError(
+            f"seeded LHS exhausted {design_size} run-design points without a unique proposal"
         )
 
 
@@ -457,6 +546,7 @@ __all__ = [
     "ProductNativeOptimizerAdapterV1",
     "RandomSearchAdapterV1",
     "SeededHaltonAdapterV1",
+    "SeededLatinHypercubeAdapterV1",
     "native_optimizer_request_from_observation",
     "search_space_from_observation",
 ]

@@ -156,22 +156,11 @@ _ENTRIES = (
         "standard_reference",
         "backend/app/benchmarking/adapters.py",
     ),
-    BenchmarkMethodInventoryEntryV1(
-        adapter_id="true_lhs/v1",
-        method_classification="standard_reference",
-        implementation_label="true-lhs-adapter-pending",
-        execution_readiness="blocked",
-        environment_boundary="product_runtime",
-        sources=(
-            _project_source(
-                "true-lhs-contract",
-                "backend/app/benchmarking/registry.py",
-            ),
-        ),
-        blocker_codes=("adapter_not_implemented",),
-        reproducibility_notes=(
-            "Appendix candidate only; seeded Halton must never be relabeled as LHS.",
-        ),
+    _ready_project(
+        "true_lhs/v1",
+        "native-seeded-lhs-v1",
+        "standard_reference",
+        "backend/app/benchmarking/adapters.py",
     ),
     BenchmarkMethodInventoryEntryV1(
         adapter_id="bipop_cma_es/v1",

@@ -82,6 +82,7 @@ def _observation(
     adapter_id: str,
     ordinal: int = 1,
     history: list[BenchmarkHistoryItemV2] | None = None,
+    remaining: int = 32,
 ) -> BenchmarkObservationV2:
     return BenchmarkObservationV2(
         campaign_id="campaign-1",
@@ -99,12 +100,12 @@ def _observation(
             "unsafe": "constraint-only",
             "timeout": "terminal-failure",
         },
-        simulator_budget_remaining=32,
+        simulator_budget_remaining=remaining,
         wall_time_remaining_ms=60_000,
     )
 
 
-@pytest.mark.parametrize("adapter_id", ("random_search/v1", "seeded_halton/v1"))
+@pytest.mark.parametrize("adapter_id", ("random_search/v1", "seeded_halton/v1", "true_lhs/v1"))
 def test_implemented_adapters_are_deterministic_bounded_and_protocol_conformant(
     adapter_id: str,
 ) -> None:
@@ -125,7 +126,7 @@ def test_implemented_adapters_are_deterministic_bounded_and_protocol_conformant(
     assert first.parameters["mode"] in {0.0, 1.0, 2.0}
 
 
-@pytest.mark.parametrize("adapter_id", ("random_search/v1", "seeded_halton/v1"))
+@pytest.mark.parametrize("adapter_id", ("random_search/v1", "seeded_halton/v1", "true_lhs/v1"))
 def test_adapters_skip_a_previously_dispatched_candidate(adapter_id: str) -> None:
     adapter = create_benchmark_adapter(adapter_id)
     initial = _observation(adapter_id=adapter_id)
@@ -150,31 +151,81 @@ def test_adapters_skip_a_previously_dispatched_candidate(adapter_id: str) -> Non
         )
     ]
 
-    next_proposal = adapter.propose(_observation(adapter_id=adapter_id, ordinal=2, history=history))
+    next_proposal = adapter.propose(
+        _observation(adapter_id=adapter_id, ordinal=2, history=history, remaining=31)
+    )
 
     assert next_proposal.parameters != first.parameters
     assert next_proposal.candidate_ref != first.candidate_ref
 
 
-def test_random_and_halton_receive_identical_information_and_budget() -> None:
+@pytest.mark.parametrize("space_filling_id", ("seeded_halton/v1", "true_lhs/v1"))
+def test_random_and_space_filling_receive_identical_information_and_budget(
+    space_filling_id: str,
+) -> None:
     random_observation = _observation(adapter_id="random_search/v1")
-    halton_payload = random_observation.model_dump(mode="json")
-    halton_payload["benchmark_arm_id"] = "seeded-halton-v1"
-    halton_observation = BenchmarkObservationV2.model_validate(halton_payload)
+    comparison_payload = random_observation.model_dump(mode="json")
+    comparison_payload["benchmark_arm_id"] = space_filling_id.replace("/", "-")
+    comparison_observation = BenchmarkObservationV2.model_validate(comparison_payload)
 
     random = create_benchmark_adapter("random_search/v1").propose(random_observation)
-    halton = create_benchmark_adapter("seeded_halton/v1").propose(halton_observation)
+    comparison = create_benchmark_adapter(space_filling_id).propose(comparison_observation)
 
     random_view = random_observation.model_dump(mode="json")
-    halton_view = halton_observation.model_dump(mode="json")
+    comparison_view = comparison_observation.model_dump(mode="json")
     random_view.pop("benchmark_arm_id")
-    halton_view.pop("benchmark_arm_id")
-    assert random_view == halton_view
+    comparison_view.pop("benchmark_arm_id")
+    assert random_view == comparison_view
     assert "holdout" not in str(random_view).lower()
     assert (
         random.proposal_receipt["adapter_contract_id"]
-        == halton.proposal_receipt["adapter_contract_id"]
+        == comparison.proposal_receipt["adapter_contract_id"]
     )
+
+
+def test_seeded_lhs_covers_each_preprojection_stratum_once() -> None:
+    adapter = create_benchmark_adapter("true_lhs/v1")
+    history: list[BenchmarkHistoryItemV2] = []
+    strata_by_proposal: list[list[int]] = []
+    design_size = 8
+    for index in range(design_size):
+        proposal = adapter.propose(
+            _observation(
+                adapter_id="true_lhs/v1",
+                ordinal=index + 1,
+                history=history,
+                remaining=design_size - index,
+            )
+        )
+        assert proposal.proposal_receipt["design_size"] == design_size
+        strata_by_proposal.append(proposal.proposal_receipt["pre_projection_stratum_indices"])
+        history.append(
+            BenchmarkHistoryItemV2(
+                candidate_ref=proposal.candidate_ref,
+                generation_index=index,
+                dispatch_ordinal=index + 1,
+                parameters=proposal.parameters,
+                screening_status="passed",
+                outcome=BenchmarkOptimizerOutcomeV1(
+                    role="objective",
+                    loss=1.0,
+                    objectives={"tracking_error": 1.0},
+                    objective_directions={"tracking_error": "minimize"},
+                    constraint_violations={"safety": 0.0},
+                    feasible=True,
+                    failure_rate=0.0,
+                    completed=True,
+                ),
+            )
+        )
+    for dimension in range(len(_domain())):
+        assert sorted(row[dimension] for row in strata_by_proposal) == list(range(design_size))
+
+
+def test_seeded_lhs_rejects_an_unreasonably_large_run_design() -> None:
+    observation = _observation(adapter_id="true_lhs/v1", remaining=4097)
+    with pytest.raises(BenchmarkAdapterError, match="design size"):
+        create_benchmark_adapter("true_lhs/v1").propose(observation)
 
 
 def test_adapters_fail_closed_on_bad_domain_or_exhausted_budget() -> None:
@@ -194,6 +245,7 @@ def test_adapters_fail_closed_on_bad_domain_or_exhausted_budget() -> None:
 def test_registry_never_mislabels_product_inspired_code_as_a_reference() -> None:
     assert BENCHMARK_ADAPTER_REGISTRY["random_search/v1"].availability == "implemented"
     assert BENCHMARK_ADAPTER_REGISTRY["seeded_halton/v1"].availability == "implemented"
+    assert BENCHMARK_ADAPTER_REGISTRY["true_lhs/v1"].availability == "implemented"
     assert BENCHMARK_ADAPTER_REGISTRY["bipop_cma_es/v1"].availability == "contract_only"
     assert BENCHMARK_ADAPTER_REGISTRY["reference_scbo/v1"].availability == "contract_only"
     assert (
