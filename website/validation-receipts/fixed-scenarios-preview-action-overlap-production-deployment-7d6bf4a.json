@@ -1,0 +1,228 @@
+{
+  "schemaVersion": "dronedream.fixed-scenarios-preview-action-overlap-production-deployment.v1",
+  "generatedAt": "2026-08-04T16:01:46.5291361Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "7d6bf4a8802984fd363fd6e81b4a38992d85c51c",
+    "subjectTree": "09f6c6713724bb195445222b34f683e03a9f26ca",
+    "deployTag": "website-deploy-1.0.0-20260804-7d6bf4a",
+    "deploymentPerformed": true,
+    "githubPagesDeploymentPerformed": true,
+    "aliyunDeploymentPerformed": true,
+    "githubReleaseAssetReplacementPerformed": false,
+    "installerRebuiltForThisWebsiteOnlyLayoutChange": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "paymentOrModelProductionMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforced": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "change": {
+    "problem": "The fixed-scenario preview canvas could extend into and visually overlap the Use this scenario action.",
+    "resolution": "Each card now uses explicit grid rows, the preview is clipped to its own row, the canvas is constrained inside the preview, and the action occupies a separate following row.",
+    "minimumPreviewActionGapPx": 6,
+    "sourceFiles": [
+      "frontend/src/styles.css",
+      "frontend/scripts/verify-software-ui-layout.mjs"
+    ],
+    "manualDraftsExcluded": true,
+    "manualDraftPaths": [
+      "frontend/public/docs/downloads/DroneDream-Manual-en.md",
+      "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.md",
+      "website/manual-pdf/**",
+      "website/scripts/build_manual_pdf.py",
+      "website/scripts/audit_manual_pdf_layout.py",
+      "work/**"
+    ]
+  },
+  "validation": {
+    "focusedFixedScenarios": {
+      "files": 2,
+      "tests": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    "completeFrontendSuite": {
+      "files": 60,
+      "tests": 416,
+      "passed": 416,
+      "failed": 0,
+      "publicSitePricingAvailability": "passed"
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appProductionBuild": "passed with one non-failing Vite chunk-size advisory",
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed",
+    "edgeLayoutVerification": {
+      "cases": 9,
+      "passed": 9,
+      "failed": 0,
+      "receiptSha256": "f633442560c045d62ab6aeb8b060367d12543ded047382ac400b01bc3a793ed8"
+    },
+    "onlineVisualAudit": {
+      "origins": [
+        "http://getdronedream.com",
+        "http://47.93.180.216"
+      ],
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "viewport": "1440x1000",
+      "cases": 4,
+      "passed": 4,
+      "failed": 0,
+      "cardCountPerCase": 4,
+      "documentWidthParity": true,
+      "pageErrors": 0,
+      "unsafeApiRequests": 0,
+      "previewActionGapPx": 8.3125,
+      "minimumRequiredGapPx": 6,
+      "canvasContainedWithinPreview": true,
+      "rowOne": {
+        "topPx": 135.53125,
+        "bottomPx": 534.46875,
+        "heightPx": 398.9375
+      },
+      "rowTwo": {
+        "topPx": 544.859375,
+        "bottomPx": 943.8125,
+        "heightPx": 398.953125
+      },
+      "canonicalMeasurementsSha256": "9e0a58ed4aff3be403ff177e9d7d12d6be261ffe67d6336aae7ee631452cc352",
+      "rawAuditFileSha256": "cd81dadc1fd954c8fd7a1b50681f8078a4db0b2036ac981e881c0dc510bd42fc",
+      "englishScreenshotSha256": "f21571e79b5368b7c0fef12e8b25f79b0e08d4554adec4412d676677db0f3e43",
+      "chineseScreenshotSha256": "df1eff8dc8fa3bf7b30fc679588864cd642f17c644ef1ca7163c5e4a2a7e80fb",
+      "crossOriginScreenshotByteParityByLanguage": true,
+      "visualInspection": "passed; all four preview canvases are visibly separated from their actions in both languages"
+    }
+  },
+  "sharedArtifact": {
+    "buildCount": 1,
+    "sourceCommit": "7d6bf4a8802984fd363fd6e81b4a38992d85c51c",
+    "workflowRunId": 30922414209,
+    "workflowRunUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30922414209",
+    "buildJobId": 92036122883,
+    "deployJobId": 92036414035,
+    "artifactId": 8897661820,
+    "artifactName": "dronedream-site-7d6bf4a8802984fd363fd6e81b4a38992d85c51c",
+    "artifactBytes": 29717537,
+    "artifactDigest": "sha256:3f126c9ce4cb5c3c2ec2a4750ab722cbd16b773829759e563368fdb91f078802",
+    "pagesArtifactId": 8897663077,
+    "pagesArtifactBytes": 29712690,
+    "pagesArtifactDigest": "sha256:b4ad0d46c4c68b4c7724ccc165f83b832d44ecbf688fcc0004e3775098b77ab4",
+    "aliyunUploadedArchiveBytes": 29681139,
+    "deploymentRule": "The exact GitHub Actions shared artifact was downloaded, verified, and deployed to both GitHub Pages and Aliyun; neither endpoint rebuilt the site."
+  },
+  "deployments": {
+    "githubPages": {
+      "runId": 30922414209,
+      "status": "success",
+      "sourceCommit": "7d6bf4a8802984fd363fd6e81b4a38992d85c51c",
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredEnvironmentPolicy": {
+        "count": 1,
+        "id": 55186327,
+        "name": "main",
+        "type": "branch"
+      },
+      "nonFailingAdvisory": "GitHub-hosted action runtime Node 20 to Node 24 migration notice"
+    },
+    "aliyun": {
+      "server": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260804T155206Z",
+      "rollbackReleaseCandidatesRetained": [
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T125353Z",
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T114043Z",
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T104345Z",
+        "/www/wwwroot/dronedream/releases/1.0.0-20260804T095323Z"
+      ],
+      "exactPreviousSymlinkTargetReReadAfterDeployment": false,
+      "atomicSwitch": true,
+      "nginxConfigurationTest": "passed",
+      "publicHtmlJsCssFilesVerified": 43,
+      "forbiddenServerTouched": false,
+      "forbiddenServer": "124.221.220.60"
+    },
+    "supersededTransitionalPagesDeployment": {
+      "sourceCommit": "78518adf80d24d718a15c003a4df91abba6cf8fc",
+      "runId": 30920398993,
+      "artifactId": 8896842116,
+      "status": "superseded by the overlap-fix deployment before Aliyun publication",
+      "aliyunDeploymentPerformed": false,
+      "rollbackRequired": false
+    }
+  },
+  "publicParity": {
+    "origins": [
+      "http://getdronedream.com",
+      "http://47.93.180.216"
+    ],
+    "siteArtifact": {
+      "buildManifestBytes": 1153,
+      "buildManifestSha256": "04bd91ea51b229748cc6ed126ca530063abb4f4000f5aa3e45a5441b98f2df1d",
+      "sha256SumsBytes": 17183,
+      "sha256SumsSha256": "998e8c59f7b11b2f6a42ed0258fbc8465ea852931cfc16f0d963e0cce338509e",
+      "latestJsonBytes": 492,
+      "latestJsonSha256": "fd367b692f4785dd65a73bdc8bd2e0d3f64185f8303e1223b04d48dcfe7ff6e9",
+      "indexHtmlBytes": 1088,
+      "indexHtmlSha256": "35fad087cd8bedd9f3874cf612d4ecbb49e793b047688dc013868f686b5872e0",
+      "consoleIndexHtmlBytes": 735,
+      "consoleIndexHtmlSha256": "dc681941e1b968bb42f0077ffd3f596b592630b2657489aed6b4cca925eaee49",
+      "sourceCommit": "7d6bf4a8802984fd363fd6e81b4a38992d85c51c",
+      "byteParity": true
+    },
+    "installerThreeWay": {
+      "origins": [
+        "GitHub Release",
+        "GitHub Pages download endpoint",
+        "Aliyun download endpoint"
+      ],
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "exeBytes": 11115267,
+      "exeSha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "checksumFileBytes": 98,
+      "checksumFileSha256": "ed0c1f6c12360b9231e2c17ded3677ff658098126b159ab42726a93fd3f79cc8",
+      "signatureBytes": 420,
+      "signatureSha256": "24eda3efccc57e5c5e1dd5c29ea7a5692a5b607fc1adfb1adf81f77ff1b9aea7",
+      "tauriLatestJsonSha256": "deee3fd550b2fd4948ceff43b64fa8ee9941f7ffed477593e68ebaf28e73638a",
+      "byteParity": true,
+      "changedByThisWebsiteOnlyLayoutDeployment": false
+    }
+  },
+  "repositoryGovernance": {
+    "remoteBranches": [
+      "main",
+      "codex/software",
+      "codex/website",
+      "codex/technical-report"
+    ],
+    "remoteBranchCount": 4,
+    "unexpectedRemoteBranches": [],
+    "forcePushPerformed": false,
+    "rootWorktreeModified": false
+  },
+  "remainingExternalGates": {
+    "tls": {
+      "status": "not complete",
+      "curlExitCode": 60,
+      "curlError": "SEC_E_WRONG_PRINCIPAL",
+      "httpsEnforced": false,
+      "conclusion": "HTTP production is live, but HTTPS is not claimed as complete and certificate validation was not bypassed."
+    },
+    "supabase": "Supabase Functions, migrations, Secrets, and production database state were not changed by this release.",
+    "payments": "Production payment configuration was not changed.",
+    "codeSigning": "The 1.0.0 installer remains an explicitly disclosed unsigned internal-test preview.",
+    "runtime": "Runtime assets were not changed by this website-only layout deployment.",
+    "manualPdfWorkInProgress": "The pre-existing manual and PDF drafts remain unstaged and unchanged by this receipt commit."
+  }
+}
