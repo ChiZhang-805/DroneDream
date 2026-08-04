@@ -11189,10 +11189,13 @@ a {
   .app-mobile-menu-panel {
     position: absolute;
     top: calc(100% + 1px);
-    right: 0.55rem;
-    left: 0.55rem;
+    right: 0.9rem;
+    left: auto;
     z-index: 820;
     display: none;
+    width: max-content;
+    min-width: min(13rem, calc(100vw - 1.8rem));
+    max-width: calc(100vw - 1.8rem);
     max-height: calc(100dvh - 5rem);
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -11238,6 +11241,7 @@ a {
 
   .app-mobile-menu-panel .app-account-copy strong {
     font-size: 0.9rem;
+    white-space: nowrap;
   }
 
   .app-mobile-menu-panel .app-account-copy small {
@@ -11264,6 +11268,7 @@ a {
     border-bottom: 1px solid #f0e9f1;
     border-radius: 0;
     font-size: 0.9rem;
+    white-space: nowrap;
   }
 
   .app-mobile-menu-panel .app-nav-entry {
@@ -11292,6 +11297,7 @@ a {
     font: inherit;
     font-size: 0.9rem;
     text-align: left;
+    white-space: nowrap;
   }
 
   .app-mobile-settings-entry:hover,
