@@ -835,6 +835,7 @@ class JobCreateRequest(_Strict):
         int,
         Field(ge=0, le=MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB),
     ] = 128
+    provider_max_retries: Annotated[int, Field(ge=0, le=5)] = 1
     continue_exploration_after_qualified: bool = False
     exploration_budget: ContinueExplorationBudget | None = None
     acceptance_criteria: AcceptanceCriteria = Field(default_factory=AcceptanceCriteria)
@@ -909,7 +910,7 @@ class JobCreateRequest(_Strict):
                 )
             worst_case_provider_requests = min(
                 MAX_PROVIDER_NETWORK_REQUESTS_PER_JOB,
-                self.provider_turn_cap * 2,
+                self.provider_turn_cap * (self.provider_max_retries + 2),
             )
             if "provider_request_cap" not in self.model_fields_set:
                 self.provider_request_cap = min(
@@ -918,8 +919,8 @@ class JobCreateRequest(_Strict):
                 )
             elif self.provider_request_cap > worst_case_provider_requests:
                 raise ValueError(
-                    "provider_request_cap cannot exceed two actual requests "
-                    "per logical provider turn"
+                    "provider_request_cap exceeds the frozen retry and "
+                    "compatibility-fallback policy"
                 )
         scenario_trial_count = sum(
             len(case.seeds) for case in self.scenario_suite.cases if case.enabled
@@ -1001,6 +1002,7 @@ class Job(BaseModel):
     provider_turns_attempted: int = 0
     provider_turns_succeeded: int = 0
     provider_request_cap: int = 128
+    provider_max_retries: int = 1
     provider_requests_attempted: int = 0
     provider_requests_succeeded: int = 0
     first_qualified_candidate_id: str | None = None

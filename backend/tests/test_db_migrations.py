@@ -795,7 +795,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0028 (head)"]
+    assert heads == ["20260804_0029 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -896,6 +896,12 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             row[1]
             for row in connection.execute("PRAGMA table_info('jobs')").fetchall()
         }
+        provider_receipt_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info('provider_network_request_receipts')"
+            ).fetchall()
+        }
         continuation_parent_is_unique = any(
             row[2] == 1
             and [
@@ -914,7 +920,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             ).fetchall()
         }
 
-    assert version == ("20260804_0028",)
+    assert version == ("20260804_0029",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
@@ -947,12 +953,17 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
         "trg_provider_network_request_receipts_no_delete",
         "trg_provider_network_request_outcomes_no_update",
         "trg_provider_network_request_outcomes_no_delete",
+        "trg_provider_network_request_receipts_policy_check",
     }
     assert {
         "provider_request_cap",
+        "provider_max_retries",
         "provider_requests_attempted",
         "provider_requests_succeeded",
     }.issubset(provider_accounting_columns)
+    assert {"request_kind", "retry_policy_version"}.issubset(
+        provider_receipt_columns
+    )
     assert continuation_parent_is_unique is True
     assert {
         "qualification_policy_version",

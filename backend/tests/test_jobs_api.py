@@ -53,6 +53,7 @@ def test_create_job_returns_queued(client: TestClient) -> None:
     assert job["provider_turns_attempted"] == 0
     assert job["provider_turns_succeeded"] == 0
     assert job["provider_request_cap"] == 128
+    assert job["provider_max_retries"] == 1
     assert job["provider_requests_attempted"] == 0
     assert job["provider_requests_succeeded"] == 0
     assert job["first_qualified_candidate_id"] is None
@@ -68,6 +69,7 @@ def test_rerun_preserves_bounded_completion_contract(client: TestClient) -> None
             **HEURISTIC_JOB_PAYLOAD,
             "provider_turn_cap": 7,
             "provider_request_cap": 11,
+            "provider_max_retries": 0,
         },
     )
     assert created.status_code == 200, created.text
@@ -80,6 +82,7 @@ def test_rerun_preserves_bounded_completion_contract(client: TestClient) -> None
     assert child["completion_policy"] == "first_qualified_stop"
     assert child["provider_turn_cap"] == 7
     assert child["provider_request_cap"] == 11
+    assert child["provider_max_retries"] == 0
     assert child["job_kind"] == "primary"
     assert child["continuation_parent_job_id"] is None
 

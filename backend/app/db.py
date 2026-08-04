@@ -135,6 +135,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
             "provider_turns_attempted": "INTEGER NOT NULL DEFAULT 0",
             "provider_turns_succeeded": "INTEGER NOT NULL DEFAULT 0",
             "provider_request_cap": "INTEGER NOT NULL DEFAULT 128",
+            "provider_max_retries": "INTEGER NOT NULL DEFAULT 1",
             "provider_requests_attempted": "INTEGER NOT NULL DEFAULT 0",
             "provider_requests_succeeded": "INTEGER NOT NULL DEFAULT 0",
             "next_candidate_dispatch_ordinal": "BIGINT NOT NULL DEFAULT 1",

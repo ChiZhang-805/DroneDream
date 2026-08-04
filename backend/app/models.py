@@ -636,6 +636,10 @@ class Job(Base):
             name="ck_jobs_provider_request_cap",
         ),
         CheckConstraint(
+            "provider_max_retries >= 0 AND provider_max_retries <= 5",
+            name="ck_jobs_provider_max_retries",
+        ),
+        CheckConstraint(
             "provider_requests_attempted >= 0 "
             "AND provider_requests_succeeded >= 0 "
             "AND provider_requests_succeeded <= provider_requests_attempted",
@@ -755,6 +759,12 @@ class Job(Base):
         nullable=False,
         default=128,
         server_default="128",
+    )
+    provider_max_retries: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        server_default="1",
     )
     provider_requests_attempted: Mapped[int] = mapped_column(
         Integer,
@@ -1466,6 +1476,10 @@ class ProviderNetworkRequestReceipt(Base):
             name="ck_provider_request_index",
         ),
         CheckConstraint(
+            "request_kind IN ('primary', 'retry', 'compatibility_fallback')",
+            name="ck_provider_request_kind",
+        ),
+        CheckConstraint(
             "input_utf8_bytes >= 0",
             name="ck_provider_request_input_bytes",
         ),
@@ -1490,6 +1504,8 @@ class ProviderNetworkRequestReceipt(Base):
     )
     receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
     request_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    request_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    retry_policy_version: Mapped[str] = mapped_column(String(64), nullable=False)
     provider: Mapped[str] = mapped_column(String(64), nullable=False)
     model_snapshot: Mapped[str] = mapped_column(String(128), nullable=False)
     api_surface: Mapped[str] = mapped_column(String(64), nullable=False)
