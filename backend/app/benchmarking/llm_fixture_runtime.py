@@ -492,7 +492,8 @@ def _execute_react(state: _ExecutionState) -> BenchmarkOfflineLLMExecutionV1:
                 continue
             if decision == "abandon":
                 return _result(state, None)
-            assert selected is not None
+            if selected is None:
+                state.fail("react_selected_proposal_missing")
             source = _proposal_by_ref(proposals, selected)
             return _result(state, _finalize_proposal(state, source, trigger_decision=None))
         except (BenchmarkAdapterError, BenchmarkLLMContractError):

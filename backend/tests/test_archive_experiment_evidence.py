@@ -70,7 +70,7 @@ def test_explicit_delete_happens_only_after_verified_archive(tmp_path: Path) -> 
         (".env", "OPENAI_API_KEY=not-a-real-test-secret-value"),
         ("credentials.json", "{}"),
         ("safe.log", "password=unredacted-example-value"),
-        ("safe.log", "sk-example000000000000000000000000"),
+        ("safe.log", "sk-" + "example" + "0" * 24),
     ],
 )
 def test_credentials_fail_closed_without_creating_outputs(

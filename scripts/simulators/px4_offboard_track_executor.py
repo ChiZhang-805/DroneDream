@@ -1641,8 +1641,10 @@ async def _set_gps_availability_verified(
         samples.append(sample)
         num_satellites = sample["num_satellites"]
         fix_type = sample["fix_type"]
-        assert isinstance(num_satellites, int)
-        assert isinstance(fix_type, int)
+        if isinstance(num_satellites, bool) or not isinstance(num_satellites, int):
+            raise ValueError("PX4 GPS availability num_satellites must remain an integer")
+        if isinstance(fix_type, bool) or not isinstance(fix_type, int):
+            raise ValueError("PX4 GPS availability fix_type must remain an integer")
         observed = (
             num_satellites < 4 and fix_type <= 1
             if unavailable

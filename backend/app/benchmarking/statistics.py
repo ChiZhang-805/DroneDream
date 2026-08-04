@@ -195,7 +195,23 @@ class BenchmarkStatisticalRunV1(_FrozenStrict):
             self.provider_cost_to_first_qualified_microusd,
         )
         if self.terminal_state == FIRST_QUALIFIED:
-            if any(value is None for value in success_fields):
+            time_to_first_qualified_ms = self.time_to_first_qualified_ms
+            trials_to_first_qualified = self.trials_to_first_qualified
+            logical_turns_to_first_qualified = self.logical_turns_to_first_qualified
+            network_requests_to_first_qualified = self.network_requests_to_first_qualified
+            provider_tokens_to_first_qualified = self.provider_tokens_to_first_qualified
+            provider_cost_to_first_qualified_microusd = (
+                self.provider_cost_to_first_qualified_microusd
+            )
+            if (
+                self.first_qualified_receipt_sha256 is None
+                or time_to_first_qualified_ms is None
+                or trials_to_first_qualified is None
+                or logical_turns_to_first_qualified is None
+                or network_requests_to_first_qualified is None
+                or provider_tokens_to_first_qualified is None
+                or provider_cost_to_first_qualified_microusd is None
+            ):
                 raise ValueError("first-qualified run is missing frozen first-qualified accounting")
             if (
                 not self.artifact_complete
@@ -206,25 +222,19 @@ class BenchmarkStatisticalRunV1(_FrozenStrict):
                 raise ValueError("first-qualified requires complete valid holdout evidence")
             if self.engineering_failure_code is not None:
                 raise ValueError("first-qualified cannot carry an engineering failure code")
-            assert self.time_to_first_qualified_ms is not None
-            assert self.trials_to_first_qualified is not None
-            assert self.logical_turns_to_first_qualified is not None
-            assert self.network_requests_to_first_qualified is not None
-            assert self.provider_tokens_to_first_qualified is not None
-            assert self.provider_cost_to_first_qualified_microusd is not None
-            if self.time_to_first_qualified_ms > self.wall_time_ms:
+            if time_to_first_qualified_ms > self.wall_time_ms:
                 raise ValueError("time-to-first-qualified exceeds total run wall time")
-            if self.trials_to_first_qualified > self.trials_attempted:
+            if trials_to_first_qualified > self.trials_attempted:
                 raise ValueError("Trials-to-first-qualified exceeds attempted Trials")
-            if self.logical_turns_to_first_qualified > self.logical_turns_attempted:
+            if logical_turns_to_first_qualified > self.logical_turns_attempted:
                 raise ValueError("turns-to-first-qualified exceeds attempted turns")
-            if self.network_requests_to_first_qualified > self.network_requests_attempted:
+            if network_requests_to_first_qualified > self.network_requests_attempted:
                 raise ValueError("requests-to-first-qualified exceeds attempted requests")
-            if self.provider_tokens_to_first_qualified > (
+            if provider_tokens_to_first_qualified > (
                 self.provider_input_tokens + self.provider_output_tokens
             ):
                 raise ValueError("tokens-to-first-qualified exceeds total provider tokens")
-            if self.provider_cost_to_first_qualified_microusd > self.provider_cost_microusd:
+            if provider_cost_to_first_qualified_microusd > self.provider_cost_microusd:
                 raise ValueError("cost-to-first-qualified exceeds total provider cost")
         else:
             if any(value is not None for value in success_fields):
@@ -279,10 +289,12 @@ class BenchmarkStatisticalInputV1(_FrozenStrict):
             if len(self.expected_paired_seed_blocks) != PILOT_PAIRED_BLOCK_COUNT:
                 raise ValueError("pilot requires exactly four paired seed blocks")
         else:
-            assert self.preregistration.final_block_count is not None
+            final_block_count = self.preregistration.final_block_count
+            if final_block_count is None:
+                raise ValueError("final analysis requires a frozen paired block count")
             if len(self.expected_scenario_ids) != FINAL_SCENARIO_COUNT:
                 raise ValueError("final analysis requires exactly four frozen scenarios")
-            if len(self.expected_paired_seed_blocks) != self.preregistration.final_block_count:
+            if len(self.expected_paired_seed_blocks) != final_block_count:
                 raise ValueError("final paired block count differs from preregistration")
 
         expected_grid = set(
@@ -558,7 +570,8 @@ def _event_curve(
                 if run.terminal_state == FIRST_QUALIFIED
                 else run.wall_time_ms
             )
-        assert threshold is not None
+        if threshold is None:
+            raise ValueError("first-qualified event is missing its frozen threshold")
         if run.terminal_state == FIRST_QUALIFIED:
             events[threshold]["qualified"] += 1
         elif run.terminal_state == RIGHT_CENSORED:
@@ -602,8 +615,10 @@ def _event_curve(
 
 def _restricted_trials(run: BenchmarkStatisticalRunV1) -> int:
     if run.terminal_state == FIRST_QUALIFIED:
-        assert run.trials_to_first_qualified is not None
-        return run.trials_to_first_qualified
+        trials_to_first_qualified = run.trials_to_first_qualified
+        if trials_to_first_qualified is None:
+            raise ValueError("first-qualified run is missing trials-to-first-qualified")
+        return trials_to_first_qualified
     return run.trials_attempted
 
 
@@ -653,7 +668,7 @@ def _bootstrap_estimate(
 ) -> PairedBootstrapEstimateV1:
     if not values:
         raise ValueError("paired bootstrap requires at least one paired unit")
-    rng = random.Random(seed)
+    rng = random.Random(seed)  # noqa: S311 - deterministic statistical bootstrap, not security.
     bootstrapped = [
         statistics.fmean(values[rng.randrange(len(values))] for _ in values)
         for _ in range(replicates)

@@ -543,7 +543,8 @@ def _validate_telemetry(
     if origin_sha != ulog_sha256:
         raise ValueError("telemetry origin ULog SHA-256 does not match retained ULog")
     samples = payload.get("samples")
-    assert isinstance(samples, list)  # established by the semantic verifier
+    if not isinstance(samples, list):
+        raise ValueError("verified telemetry samples must remain an array")
     if any(sample.get("crashed") is True for sample in samples):
         raise ValueError("successful campaign telemetry cannot contain crashed=true")
     return {
