@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-e5-c-native-edition-safety-verification-receipt",
+  "generatedAt": "2026-08-04T21:37:49Z",
+  "subjectCommit": "7a374b289eb6978ebf7afa7ba4595f15f1b002a9",
+  "branch": "codex/software",
+  "resourceClass": "GREEN",
+  "scope": {
+    "phase": "E5-C",
+    "layer": "native-desktop",
+    "decisionOnly": true,
+    "tauriCommandRegistered": false,
+    "executionAuthorized": false,
+    "hardwareActionHandlersImplemented": false,
+    "validatedVehiclePackCount": 0,
+    "productionHardwareDecision": "deny"
+  },
+  "contracts": {
+    "executionGatePolicySha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456",
+    "authorizationSchemaSha256": "1feff6e1d3b0f9887156267622bd3ac6fe5bfff793996b95f605677d69df75b1",
+    "canonicalization": "RFC8785-JCS",
+    "hashAlgorithm": "SHA-256",
+    "requiredDecisionLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "nativeObservationIsAuthoritativeFor": [
+      "actor-and-account",
+      "device-and-hardware-identity",
+      "repository-and-composite-inventory",
+      "active-engine-pack-signature",
+      "vehicle-controller-and-firmware",
+      "parameter-candidate",
+      "actual-target",
+      "trusted-evidence-hashes",
+      "replay-and-sequence-state"
+    ],
+    "fakeValidatedCatalogAllowedOnlyWhen": "test build and APP_ENV=test and request.testOnly=true"
+  },
+  "sourceFiles": [
+    {
+      "path": "desktop/src-tauri/src/distribution_plan.rs",
+      "bytes": 32696,
+      "sha256": "41f72235584359c6415122bf8bc9cc1489b96a344cf0499bf6d1c1359ea35cfd"
+    },
+    {
+      "path": "desktop/src-tauri/src/edition_safety.rs",
+      "bytes": 43933,
+      "sha256": "e273774adcb65be330f1854ea2cab91a342fdc3ec2c8aecb8ba058b66b40d575"
+    },
+    {
+      "path": "desktop/src-tauri/src/lib.rs",
+      "bytes": 3462,
+      "sha256": "195adc696990d72a006fd760db46b008e11ea5b2fb1a42031909b5b722f219b5"
+    }
+  ],
+  "checks": [
+    {
+      "name": "native-focused",
+      "command": "cargo test --locked --manifest-path desktop/src-tauri/Cargo.toml --target x86_64-pc-windows-gnullvm edition_safety --no-fail-fast",
+      "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+      "result": "pass",
+      "passed": 8
+    },
+    {
+      "name": "native-full-library-regression",
+      "command": "cargo test --locked --manifest-path desktop/src-tauri/Cargo.toml --target x86_64-pc-windows-gnullvm --lib --no-fail-fast",
+      "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+      "result": "pass",
+      "passed": 137,
+      "ignored": 1,
+      "ignoredReason": "requires an installed, owned DroneDreamRuntime"
+    },
+    {
+      "name": "native-clippy-all-targets",
+      "command": "cargo clippy --locked --manifest-path desktop/src-tauri/Cargo.toml --target x86_64-pc-windows-gnullvm --all-targets -- -D warnings",
+      "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+      "result": "pass"
+    },
+    {
+      "name": "backend-runtime-contract-cross-check",
+      "command": "pytest -q backend/tests/test_distribution_safety.py runtime/tests/test_edition_safety_gate.py",
+      "result": "pass",
+      "passed": 23
+    },
+    {
+      "name": "cargo-fmt-check",
+      "result": "pass"
+    },
+    {
+      "name": "git-diff-check",
+      "result": "pass"
+    }
+  ],
+  "negativeCoverage": [
+    "current-zero-validated-pack-deny",
+    "sim-hardware-action-deny",
+    "actor-and-account-mismatch",
+    "cross-device-and-hardware-identity",
+    "source-and-composite-inventory-drift",
+    "active-engine-pack-signature-unverified",
+    "cross-vehicle-controller-firmware",
+    "cross-parameter-candidate",
+    "actual-target-mismatch",
+    "trusted-evidence-local-state-mismatch",
+    "authorization-id-and-nonce-replay",
+    "stale-sequence",
+    "unknown-schema-field",
+    "clock-before-issued-and-at-expiry",
+    "fake-issuer-production-reject",
+    "policy-id-and-version-tamper",
+    "qualification-extra-binding-reject",
+    "no-tauri-command-or-action-handler"
+  ],
+  "environmentResidues": [
+    {
+      "gate": "default-msvc-cargo-test",
+      "result": "fail-environment-before-test-execution",
+      "reason": "The host MSVC toolchain cannot find link.exe. The repository-fixed gnullvm toolchain completed the focused, full-library, and Clippy gates instead."
+    }
+  ],
+  "notExecuted": [
+    "Tauri or NSIS packaging",
+    "Engine Pack archive build",
+    "Runtime installation or migration",
+    "PX4 or Gazebo",
+    "HITL or real hardware",
+    "device discovery, parameter write, arm, flight, simulation, or installation action",
+    "OpenAI or any provider API"
+  ],
+  "nextPhase": "E5 safety/quorum integration remains decision-only until separately authorized; E6 physical validation is not started"
+}
