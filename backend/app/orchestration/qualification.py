@@ -10,11 +10,22 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.optimization.scenarios import ScenarioRun, holdout_matrix, training_matrix
+from app.schemas import ScenarioSuiteConfig
 
 QUALIFICATION_CONTRACT_SCHEMA = "dronedream.candidate-qualification/v1"
 QUALIFICATION_TRIAL_RECEIPT_SCHEMA = "dronedream.qualification-trial-receipt/v1"
-QUALIFICATION_RULE_VERSION = "screen-4-sealed-9of10-8to20-18of20/v1"
+QUALIFICATION_RULE_VERSION: Literal["screen-4-sealed-9of10-8to20-18of20/v1"] = (
+    "screen-4-sealed-9of10-8to20-18of20/v1"
+)
+SEALED_QUALIFICATION_POLICY_VERSION: Literal["sealed-two-stage-v1"] = "sealed-two-stage-v1"
+SEALED_QUALIFICATION_HOLDOUT_SCHEMA: Literal["dronedream.sealed-qualification-holdout/v1"] = (
+    "dronedream.sealed-qualification-holdout/v1"
+)
 
 QualificationPhase = Literal["screening", "qualification"]
 QualificationTerminalStatus = Literal[
@@ -47,6 +58,94 @@ QualificationAction = Literal[
 
 class QualificationContractError(ValueError):
     """Raised when receipts violate ordering, phase, or evidence contracts."""
+
+
+class _FrozenContract(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        allow_inf_nan=False,
+    )
+
+
+class QualificationScenarioRunV1(_FrozenContract):
+    """One exact scenario/seed dispatch in the sealed qualification contract."""
+
+    ordinal: int = Field(ge=1, le=20)
+    phase: QualificationPhase
+    case_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+    scenario_type: str = Field(min_length=1, max_length=64)
+    seed: int = Field(ge=0, le=2_147_483_647)
+    weight: float = Field(gt=0.0, le=1000.0)
+    holdout: bool
+    config_json: str = Field(min_length=2, max_length=65_536)
+
+    @field_validator("config_json")
+    @classmethod
+    def _validate_canonical_config_json(cls, value: str) -> str:
+        try:
+            parsed = json.loads(value)
+            canonical = _canonical_json(parsed)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("scenario config must be finite canonical JSON") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("scenario config must be a JSON object")
+        if value != canonical:
+            raise ValueError("scenario config JSON must use canonical encoding")
+        return value
+
+    def config_dict(self) -> dict[str, Any]:
+        parsed = json.loads(self.config_json)
+        if not isinstance(parsed, dict):  # pragma: no cover - guarded by validation
+            raise QualificationContractError("frozen scenario config is not an object")
+        return parsed
+
+    @model_validator(mode="after")
+    def _validate_phase_role(self) -> QualificationScenarioRunV1:
+        if self.holdout is not (self.phase == "qualification"):
+            raise ValueError("qualification scenario phase and holdout role diverged")
+        return self
+
+
+class SealedQualificationHoldoutContractV1(_FrozenContract):
+    """Exactly four visible screening and twenty hidden qualification runs."""
+
+    contract_schema: Literal["dronedream.sealed-qualification-holdout/v1"] = (
+        SEALED_QUALIFICATION_HOLDOUT_SCHEMA
+    )
+    policy_version: Literal["sealed-two-stage-v1"] = SEALED_QUALIFICATION_POLICY_VERSION
+    rule_version: Literal["screen-4-sealed-9of10-8to20-18of20/v1"] = QUALIFICATION_RULE_VERSION
+    rule_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    common_random_numbers: bool
+    screening: tuple[QualificationScenarioRunV1, ...]
+    qualification: tuple[QualificationScenarioRunV1, ...]
+    provider_visibility: Literal["screening_only_qualification_never_visible"] = (
+        "screening_only_qualification_never_visible"
+    )
+
+    @model_validator(mode="after")
+    def _validate_frozen_matrix(self) -> SealedQualificationHoldoutContractV1:
+        if len(self.screening) != RULE_V1.screening_required:
+            raise ValueError("sealed qualification requires exactly four screening runs")
+        if len(self.qualification) != RULE_V1.qualification_extended_required:
+            raise ValueError("sealed qualification requires exactly twenty holdout runs")
+        if [item.phase for item in self.screening] != ["screening"] * 4:
+            raise ValueError("screening matrix contains a qualification run")
+        if [item.ordinal for item in self.screening] != list(range(1, 5)):
+            raise ValueError("screening ordinals must be contiguous from one")
+        if [item.phase for item in self.qualification] != ["qualification"] * 20:
+            raise ValueError("qualification matrix contains a screening run")
+        if [item.ordinal for item in self.qualification] != list(range(1, 21)):
+            raise ValueError("qualification ordinals must be contiguous from one")
+        screening_keys = {(item.case_id, item.seed) for item in self.screening}
+        qualification_keys = {(item.case_id, item.seed) for item in self.qualification}
+        if len(screening_keys) != 4 or len(qualification_keys) != 20:
+            raise ValueError("qualification scenario/seed pairs must be unique")
+        screening_seeds = {item.seed for item in self.screening}
+        qualification_seeds = {item.seed for item in self.qualification}
+        if screening_seeds & qualification_seeds:
+            raise ValueError("screening and qualification seeds must be disjoint")
+        return self
 
 
 @dataclass(frozen=True)
@@ -95,6 +194,71 @@ def qualification_rule_sha256(rule: QualificationRuleV1 = RULE_V1) -> str:
 
 
 QUALIFICATION_RULE_SHA256 = qualification_rule_sha256()
+
+
+def compile_sealed_qualification_contract(
+    suite: ScenarioSuiteConfig,
+) -> SealedQualificationHoldoutContractV1:
+    """Compile a fail-closed 4+20 matrix without generating or guessing seeds."""
+
+    screening_runs = training_matrix(suite)
+    qualification_runs = holdout_matrix(suite)
+    if len(screening_runs) != RULE_V1.screening_required:
+        raise QualificationContractError(
+            "sealed qualification suite must preregister exactly four screening runs"
+        )
+    if len(qualification_runs) != RULE_V1.qualification_extended_required:
+        raise QualificationContractError(
+            "sealed qualification suite must preregister exactly twenty holdout runs"
+        )
+
+    def freeze_run(
+        *,
+        run: ScenarioRun,
+        phase: QualificationPhase,
+        ordinal: int,
+    ) -> QualificationScenarioRunV1:
+        try:
+            return QualificationScenarioRunV1(
+                ordinal=ordinal,
+                phase=phase,
+                case_id=run.case_id,
+                scenario_type=run.scenario_type,
+                seed=run.seed,
+                weight=run.weight,
+                holdout=run.holdout,
+                config_json=_canonical_json(run.config),
+            )
+        except (TypeError, ValueError) as exc:
+            raise QualificationContractError(
+                "scenario suite cannot be frozen as a qualification run"
+            ) from exc
+
+    try:
+        return SealedQualificationHoldoutContractV1(
+            rule_sha256=QUALIFICATION_RULE_SHA256,
+            common_random_numbers=suite.common_random_numbers,
+            screening=tuple(
+                freeze_run(run=run, phase="screening", ordinal=index)
+                for index, run in enumerate(screening_runs, start=1)
+            ),
+            qualification=tuple(
+                freeze_run(run=run, phase="qualification", ordinal=index)
+                for index, run in enumerate(qualification_runs, start=1)
+            ),
+        )
+    except (TypeError, ValueError) as exc:
+        raise QualificationContractError(
+            "scenario suite violates the sealed qualification contract"
+        ) from exc
+
+
+def sealed_qualification_contract_sha256(
+    contract: SealedQualificationHoldoutContractV1,
+) -> str:
+    return hashlib.sha256(
+        _canonical_json(contract.model_dump(mode="json")).encode("utf-8")
+    ).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -414,11 +578,17 @@ __all__ = [
     "QUALIFICATION_RULE_SHA256",
     "QUALIFICATION_RULE_VERSION",
     "QUALIFICATION_TRIAL_RECEIPT_SCHEMA",
+    "SEALED_QUALIFICATION_HOLDOUT_SCHEMA",
+    "SEALED_QUALIFICATION_POLICY_VERSION",
     "QualificationContractError",
     "QualificationProgress",
     "QualificationRuleV1",
+    "QualificationScenarioRunV1",
     "QualificationTrialObservation",
     "RULE_V1",
+    "SealedQualificationHoldoutContractV1",
+    "compile_sealed_qualification_contract",
     "evaluate_qualification_progress",
     "qualification_rule_sha256",
+    "sealed_qualification_contract_sha256",
 ]
