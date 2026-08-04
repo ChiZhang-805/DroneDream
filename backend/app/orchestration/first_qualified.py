@@ -188,10 +188,16 @@ def _accounting(
             ),
             max(0, int(job.current_generation or 0)),
         ),
-        "provider_turns_attempted": max(0, job.provider_turns_attempted),
-        "provider_turns_succeeded": max(0, job.provider_turns_succeeded),
-        "provider_requests_attempted": max(0, job.provider_requests_attempted),
-        "provider_requests_succeeded": max(0, job.provider_requests_succeeded),
+        "provider_turns_attempted": max(0, int(job.provider_turns_attempted or 0)),
+        "provider_turns_succeeded": max(0, int(job.provider_turns_succeeded or 0)),
+        "provider_requests_attempted": max(
+            0,
+            int(job.provider_requests_attempted or 0),
+        ),
+        "provider_requests_succeeded": max(
+            0,
+            int(job.provider_requests_succeeded or 0),
+        ),
     }
 
 
