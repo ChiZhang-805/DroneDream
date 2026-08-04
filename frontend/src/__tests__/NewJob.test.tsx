@@ -526,6 +526,46 @@ describe("NewJob experiment wizard", () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
+  it("rejects coercible non-numeric waypoint coordinates", () => {
+    const createSpy = vi.spyOn(apiClient, "createJob").mockResolvedValue({ id: "unused" } as Job);
+    renderPage();
+    openStep(/Flight Setup/i);
+
+    fireEvent.change(screen.getByLabelText(/Track Type/i), { target: { value: "custom" } });
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: /Edit custom track/i }));
+    fireEvent.click(screen.getByRole("button", { name: /JSON import \/ export/i }));
+    fireEvent.change(screen.getByLabelText(/Reference track \(JSON\)/i), {
+      target: { value: '[{"x":"0","y":0},{"x":1,"y":false,"z":null}]' },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Close JSON import \/ export/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Close track editor/i }));
+
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects custom tracks above the backend waypoint limit", () => {
+    const createSpy = vi.spyOn(apiClient, "createJob").mockResolvedValue({ id: "unused" } as Job);
+    renderPage();
+    openStep(/Flight Setup/i);
+
+    fireEvent.change(screen.getByLabelText(/Track Type/i), { target: { value: "custom" } });
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: /Edit custom track/i }));
+    fireEvent.click(screen.getByRole("button", { name: /JSON import \/ export/i }));
+    fireEvent.change(screen.getByLabelText(/Reference track \(JSON\)/i), {
+      target: {
+        value: JSON.stringify(Array.from({ length: 10_001 }, (_, index) => ({ x: index, y: 0 }))),
+      },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Close JSON import \/ export/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Close track editor/i }));
+
+    expect(screen.getByRole("button", { name: /^Next$/i })).toBeDisabled();
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
   it("lets advanced users choose real PX4 dimensions and validates ranges", async () => {
     const createSpy = vi.spyOn(apiClient, "createJob").mockResolvedValue({ id: "unused" } as Job);
     renderPage();

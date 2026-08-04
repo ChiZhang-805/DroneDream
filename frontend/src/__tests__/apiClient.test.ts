@@ -245,6 +245,38 @@ describe("apiClient envelope handling", () => {
     );
   });
 
+  it("preserves the oversized-response classification after a safe mutation retry", async () => {
+    const fetchSpy = vi.fn()
+      .mockRejectedValueOnce(new Error("response channel closed"))
+      .mockResolvedValueOnce(
+        new Response("{}", {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": String(64 * 1024 * 1024 + 1),
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(
+      apiClient.createJob({
+        track_type: "circle",
+        start_point: { x: 0, y: 0 },
+        altitude_m: 3,
+        wind: { north: 0, east: 0, south: 0, west: 0 },
+        sensor_noise_level: "medium",
+        objective_profile: "robust",
+      }),
+    ).rejects.toMatchObject({
+      name: "ApiClientError",
+      code: "RESPONSE_TOO_LARGE",
+      httpStatus: 200,
+      message: "Response exceeded the 64 MiB safety limit.",
+    });
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("fetchArtifactJson uses artifact download URL and parses JSON", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ samples: [{ t: 0, x: 0, y: 0, z: 1 }] }), {

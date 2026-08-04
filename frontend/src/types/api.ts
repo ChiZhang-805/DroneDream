@@ -804,6 +804,8 @@ export interface TrialSummary {
   candidate_is_baseline: boolean;
   candidate_is_best: boolean;
   candidate_generation_index: number;
+  failure_code?: string | null;
+  failure_reason?: string | null;
 }
 
 export interface Trial extends TrialSummary {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -139,6 +139,72 @@ describe("History compare selection", () => {
     expect(deleteSpy).not.toHaveBeenCalled();
     listSpy.mockRestore();
     deleteSpy.mockRestore();
+  });
+
+  it("coalesces duplicate name saves while one update is pending", async () => {
+    vi.spyOn(apiClient, "listJobs").mockResolvedValue({
+      items: [{
+        id: "job_rename",
+        display_name: "Original",
+        control_version: 4,
+        track_type: "circle",
+        objective_profile: "robust",
+        status: "COMPLETED",
+        created_at: "2026-01-01",
+        updated_at: "2026-01-01",
+      }],
+      page: 1,
+      page_size: 100,
+      total: 1,
+    } as never);
+    let resolveUpdate: ((value: unknown) => void) | null = null;
+    const updateSpy = vi.spyOn(apiClient, "updateJob").mockImplementation(
+      () => new Promise((resolve) => {
+        resolveUpdate = resolve;
+      }) as never,
+    );
+    renderPage();
+    expect(await screen.findByText("Original")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Name for job job_rename"), {
+      target: { value: "Renamed" },
+    });
+    const save = screen.getByRole("button", { name: "Save" });
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveUpdate?.({});
+    });
+  });
+
+  it("coalesces duplicate destructive confirmations", async () => {
+    vi.spyOn(apiClient, "listJobs").mockResolvedValue({
+      items: [{ id: "job_delete_once", control_version: 8, track_type: "circle", objective_profile: "robust", status: "COMPLETED", created_at: "2026-01-01", updated_at: "2026-01-01" }],
+      page: 1,
+      page_size: 100,
+      total: 1,
+    } as never);
+    let resolveDelete: ((value: unknown) => void) | null = null;
+    const deleteSpy = vi.spyOn(apiClient, "deleteJob").mockImplementation(
+      () => new Promise((resolve) => {
+        resolveDelete = resolve;
+      }) as never,
+    );
+    renderPage();
+    expect(await screen.findByText("job_delete_once")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    const confirm = screen.getByRole("button", { name: "Delete job" });
+    act(() => {
+      confirm.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      confirm.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(deleteSpy).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveDelete?.({ id: "job_delete_once", deleted: true });
+    });
   });
 
   it("confirms deletion and refetches jobs", async () => {

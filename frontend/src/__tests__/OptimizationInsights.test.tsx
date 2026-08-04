@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { OptimizationInsights } from "../components/OptimizationInsights";
-import type { OptimizationHistory } from "../types/api";
+import type { OptimizationHistory, TrialSummary } from "../types/api";
 
 const history: OptimizationHistory = {
   pareto_candidate_ids: ["candidate-balanced", "candidate-robust"],
@@ -93,6 +93,71 @@ describe("OptimizationInsights", () => {
     expect(screen.getAllByText(/balanced/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/robust/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Pareto")).toHaveLength(2);
+  });
+
+  it("uses the aggregated pass rate instead of treating feasibility as 100 percent", () => {
+    const rmseOnlyHistory: OptimizationHistory = {
+      ...history,
+      pareto_candidate_ids: ["candidate-balanced"],
+      recommendations: {},
+      objective_directions: { rmse: "minimize" },
+      items: [
+        {
+          ...history.items[1],
+          aggregated_metrics: { rmse: 0.7, pass_rate: 0.25 },
+          objective_values: { rmse: 0.7 },
+          feasible: true,
+        },
+      ],
+    };
+
+    render(<OptimizationInsights trials={[]} history={rmseOnlyHistory} />);
+
+    const row = screen.getAllByRole("row").find((candidateRow) =>
+      within(candidateRow).queryByText("Balanced"),
+    );
+    expect(row).toBeDefined();
+    expect(within(row!).getByText("25%")).toBeInTheDocument();
+    expect(within(row!).queryByText("100%")).not.toBeInTheDocument();
+  });
+
+  it("counts failed dispatched trials in the fallback pass-rate denominator", () => {
+    const passed: TrialSummary = {
+      id: "trial-partial-pass",
+      candidate_id: "candidate-partial",
+      seed: 1,
+      scenario_type: "nominal",
+      status: "COMPLETED",
+      score: 1,
+      pass_flag: true,
+      candidate_label: "Partial evidence",
+      candidate_source_type: "optimizer",
+      candidate_is_baseline: false,
+      candidate_is_best: false,
+      candidate_generation_index: 1,
+      failure_code: null,
+      failure_reason: null,
+    };
+    const failed: TrialSummary = {
+      ...passed,
+      id: "trial-partial-failure",
+      seed: 2,
+      status: "FAILED",
+      score: null,
+      pass_flag: null,
+      failure_code: "SIMULATOR_FAILED",
+      failure_reason: "PX4 exited before completing the scenario.",
+    };
+
+    render(<OptimizationInsights trials={[passed, failed]} />);
+
+    const row = screen.getAllByRole("row").find((candidateRow) =>
+      within(candidateRow).queryByText("Partial evidence"),
+    );
+    expect(row).toBeDefined();
+    expect(within(row!).getByText("50%")).toBeInTheDocument();
+    expect(within(row!).queryByText("100%")).not.toBeInTheDocument();
+    expect(within(row!).getByText(/1\/2 trials/i)).toBeInTheDocument();
   });
 
   it("shows an explicit empty state before completed evidence exists", () => {

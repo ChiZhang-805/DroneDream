@@ -101,6 +101,25 @@ describe("administration console", () => {
     expect(screen.queryByText("Total users")).not.toBeInTheDocument();
   });
 
+  it("does not expose controls outside the server-granted permission set", async () => {
+    renderAdmin({
+      status: "allowed",
+      access: {
+        authorized: true,
+        role: "admin",
+        permissions: ["users.read"],
+      },
+      error: null,
+      refresh: vi.fn(async () => undefined),
+    });
+
+    expect(await screen.findByRole("button", { name: "Users & usage" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Growth overview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Model availability" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Community & audit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Export user data" })).not.toBeInTheDocument();
+  });
+
   it("shows growth definitions, model controls, user usage, and audited moderation", async () => {
     renderAdmin();
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -163,6 +163,9 @@ export function JobDetail() {
   const queryClient = useQueryClient();
   const safeId = jobId ?? "";
   const [pdfDownloadError, setPdfDownloadError] = useState(false);
+  const terminalReconciledJobRef = useRef<string | null>(null);
+  const rerunInFlightRef = useRef(false);
+  const cancelInFlightRef = useRef(false);
 
   const rerunMutation = useMutation({
     mutationFn: ({
@@ -236,6 +239,37 @@ export function JobDetail() {
     retry: false,
   });
 
+  useEffect(() => {
+    if (
+      webPreview
+      || !safeId
+      || !jobStatus
+      || isActiveJobStatus(jobStatus)
+      || !trialsQuery.isFetched
+      || !candidatesQuery.isFetched
+      || terminalReconciledJobRef.current === safeId
+    ) {
+      return;
+    }
+
+    terminalReconciledJobRef.current = safeId;
+    void queryClient.invalidateQueries({
+      queryKey: ["job-trials", safeId],
+      exact: true,
+    });
+    void queryClient.invalidateQueries({
+      queryKey: ["job-candidates", safeId],
+      exact: true,
+    });
+  }, [
+    candidatesQuery.isFetched,
+    jobStatus,
+    queryClient,
+    safeId,
+    trialsQuery.isFetched,
+    webPreview,
+  ]);
+
   const job = jobQuery.data;
   // Phase 8: FAILED jobs (e.g. MAX_ITERATIONS_REACHED) may still have a
   // best-so-far READY report; the backend returns it if available and
@@ -302,20 +336,50 @@ export function JobDetail() {
     job.status === "FAILED" ||
     job.status === "CANCELLED";
 
+  const submitRerun = (args: {
+    id: string;
+    openaiApiKey?: string;
+    openaiModel?: string | null;
+  }) => {
+    if (rerunInFlightRef.current) return;
+    rerunInFlightRef.current = true;
+    rerunMutation.mutate(args, {
+      onSettled: () => {
+        rerunInFlightRef.current = false;
+      },
+    });
+  };
+
+  const submitCancel = () => {
+    if (cancelInFlightRef.current) return;
+    cancelInFlightRef.current = true;
+    cancelMutation.mutate(
+      {
+        id: job.id,
+        controlVersion: job.control_version,
+      },
+      {
+        onSettled: () => {
+          cancelInFlightRef.current = false;
+        },
+      },
+    );
+  };
+
   const handleRerun = () => {
     if (optimizerUsesModelAccess(job.optimizer_strategy)) {
       const freshKey = window.prompt(
         t("jobDetail.apiKeyPrompt"),
       );
       if (!freshKey || freshKey.trim() === "") return;
-      rerunMutation.mutate({
+      submitRerun({
         id: job.id,
         openaiApiKey: freshKey.trim(),
         openaiModel: job.openai_model,
       });
       return;
     }
-    rerunMutation.mutate({ id: job.id });
+    submitRerun({ id: job.id });
   };
 
   return (
@@ -323,10 +387,7 @@ export function JobDetail() {
       <JobHeader
         job={job}
         onRerun={handleRerun}
-        onCancel={() => cancelMutation.mutate({
-          id: job.id,
-          controlVersion: job.control_version,
-        })}
+        onCancel={submitCancel}
         rerunPending={rerunMutation.isPending}
         cancelPending={cancelMutation.isPending}
         canCancel={!isTerminal}

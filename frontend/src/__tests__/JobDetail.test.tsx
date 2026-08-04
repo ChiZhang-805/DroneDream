@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -474,6 +474,62 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     );
   });
 
+  it("coalesces duplicate rerun requests while the first request is pending", async () => {
+    const job = makeJob({
+      status: "COMPLETED",
+      optimizer_strategy: "heuristic",
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+    let resolveRerun: ((value: Job) => void) | null = null;
+    const rerunSpy = vi.spyOn(apiClient, "rerunJob").mockImplementation(
+      () => new Promise((resolve) => {
+        resolveRerun = resolve;
+      }),
+    );
+
+    renderWithJob(job.id);
+    const rerun = await screen.findByRole("button", { name: /Rerun/i });
+    act(() => {
+      rerun.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      rerun.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await waitFor(() => expect(rerunSpy).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      resolveRerun?.({ ...job, id: "job_rerun_once" });
+    });
+  });
+
+  it("coalesces duplicate cancel requests while the first request is pending", async () => {
+    const job = makeJob({
+      status: "RUNNING",
+      completed_at: null,
+    });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    let resolveCancel: ((value: Job) => void) | null = null;
+    const cancelSpy = vi.spyOn(apiClient, "cancelJob").mockImplementation(
+      () => new Promise((resolve) => {
+        resolveCancel = resolve;
+      }),
+    );
+
+    renderWithJob(job.id);
+    const cancel = await screen.findByRole("button", { name: /^Cancel$/i });
+    act(() => {
+      cancel.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      cancel.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await waitFor(() => expect(cancelSpy).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      resolveCancel?.({ ...job, status: "CANCELLED" });
+    });
+  });
+
   it("renders artifact cards for long paths with grouped sections", async () => {
     const job = makeJob({ status: "COMPLETED" });
     const artifacts: Artifact[] = [
@@ -541,5 +597,24 @@ describe("JobDetail — Phase 8 best-so-far rendering", () => {
     renderWithJob(job.id);
     await screen.findByText(/Baseline vs Optimized comparison/i);
     expect(screen.queryByRole("button", { name: /download pdf report/i })).toBeNull();
+  });
+
+  it("performs one final trials and candidates refresh for a terminal job", async () => {
+    const job = makeJob({ status: "COMPLETED" });
+    vi.spyOn(apiClient, "getJob").mockResolvedValue(job);
+    const trialsSpy = vi.spyOn(apiClient, "listJobTrials").mockResolvedValue([]);
+    const candidatesSpy = vi.spyOn(apiClient, "listJobCandidates").mockResolvedValue({
+      items: [],
+      pareto_candidate_ids: [],
+      recommendations: {},
+      objective_directions: {},
+    });
+    vi.spyOn(apiClient, "listJobArtifacts").mockResolvedValue([]);
+    vi.spyOn(apiClient, "getJobReport").mockResolvedValue(makeReport());
+
+    renderWithJob(job.id);
+
+    await waitFor(() => expect(trialsSpy).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(candidatesSpy).toHaveBeenCalledTimes(2));
   });
 });

@@ -139,6 +139,8 @@ export function History() {
   const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const savingNameIdsRef = useRef<Set<string>>(new Set());
+  const deletingRef = useRef(false);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const deleteDialogRef = useRef<HTMLDivElement>(null);
   const columns = useMemo(() => buildColumns(t), [t]);
@@ -184,6 +186,8 @@ export function History() {
   }, [deleteTarget, isDeleting]);
 
   async function saveName(job: Job, rawName: string) {
+    if (savingNameIdsRef.current.has(job.id)) return;
+    savingNameIdsRef.current.add(job.id);
     const nextName = rawName.trim();
     setSaveError(null);
     try {
@@ -196,6 +200,8 @@ export function History() {
       await query.refetch();
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : t("history.saveFailed"));
+    } finally {
+      savingNameIdsRef.current.delete(job.id);
     }
   }
 
@@ -222,7 +228,8 @@ export function History() {
   }, [allJobs, backendFilter, objectiveFilter, optimizerFilter, queryFilter, statusFilter, trackFilter]);
   const canCompare = selectedIds.length >= 2 && selectedIds.length <= 10;
   async function confirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deletingRef.current) return;
+    deletingRef.current = true;
     setDeleteError(null);
     setIsDeleting(true);
     try {
@@ -243,6 +250,7 @@ export function History() {
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : t("history.deleteFailed"));
     } finally {
+      deletingRef.current = false;
       setIsDeleting(false);
     }
   }

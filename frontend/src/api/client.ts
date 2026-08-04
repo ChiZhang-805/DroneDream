@@ -3,6 +3,11 @@
 
 import { desktopApiRequest, isDesktopRuntime } from "../desktop/bridge";
 import {
+  FetchDeadlineError,
+  FetchResponseSizeError,
+  fetchWithDeadline,
+} from "./fetchWithDeadline";
+import {
   ensureDesktopRuntimeLiveness,
   getDesktopReadinessSession,
 } from "../desktop/readiness";
@@ -64,6 +69,9 @@ const API_BASE_URL: string =
   "http://127.0.0.1:8000";
 const DEMO_AUTH_TOKEN: string | undefined =
   import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined;
+const BROWSER_REQUEST_TIMEOUT_MS = 120_000;
+const BROWSER_API_RESPONSE_MAX_BYTES = 64 * 1024 * 1024;
+const BROWSER_ARTIFACT_RESPONSE_MAX_BYTES = 256 * 1024 * 1024;
 
 function authHeaders(): Record<string, string> {
   const accessToken = currentAccessToken();
@@ -271,6 +279,14 @@ async function request<T>(
   try {
     response = await send();
   } catch (networkError) {
+    if (networkError instanceof FetchResponseSizeError) {
+      throw new ApiClientError(
+        "RESPONSE_TOO_LARGE",
+        networkError.message,
+        null,
+        networkError.httpStatus,
+      );
+    }
     // A transport failure can occur after the Runtime committed the action but
     // before its response reached the WebView. Retrying once is safe only for
     // endpoints whose durable backend receipt binds this exact key and body.
@@ -278,6 +294,14 @@ async function request<T>(
       try {
         response = await send();
       } catch (retryError) {
+        if (retryError instanceof FetchResponseSizeError) {
+          throw new ApiClientError(
+            "RESPONSE_TOO_LARGE",
+            retryError.message,
+            null,
+            retryError.httpStatus,
+          );
+        }
         throw new ApiClientError(
           "NETWORK_ERROR",
           retryError instanceof Error
@@ -302,7 +326,18 @@ async function request<T>(
   let envelope: ApiEnvelope<T>;
   try {
     envelope = (await response.json()) as ApiEnvelope<T>;
-  } catch {
+  } catch (error) {
+    if (error instanceof FetchDeadlineError) {
+      throw new ApiClientError("NETWORK_ERROR", error.message, null, 0);
+    }
+    if (error instanceof FetchResponseSizeError) {
+      throw new ApiClientError(
+        "RESPONSE_TOO_LARGE",
+        error.message,
+        null,
+        response.status,
+      );
+    }
     throw new ApiClientError(
       "INTERNAL_ERROR",
       `Unexpected non-JSON response (HTTP ${response.status})`,
@@ -347,18 +382,25 @@ async function transportRequest(
   idempotencyKey: string | null = null,
 ): Promise<Response> {
   if (!isDesktopRuntime()) {
-    return fetch(`${API_BASE_URL}/api/v1${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        Accept: accept,
-        ...authHeaders(),
-        ...(init?.headers ?? {}),
-        ...(idempotencyKey
-          ? { "Idempotency-Key": idempotencyKey }
-          : {}),
+    return fetchWithDeadline(
+      `${API_BASE_URL}/api/v1${path}`,
+      {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: accept,
+          ...authHeaders(),
+          ...(init?.headers ?? {}),
+          ...(idempotencyKey
+            ? { "Idempotency-Key": idempotencyKey }
+            : {}),
+        },
       },
-    });
+      BROWSER_REQUEST_TIMEOUT_MS,
+      accept === "application/octet-stream"
+        ? BROWSER_ARTIFACT_RESPONSE_MAX_BYTES
+        : BROWSER_API_RESPONSE_MAX_BYTES,
+    );
   }
 
   const method = (init?.method ?? "GET").toUpperCase();

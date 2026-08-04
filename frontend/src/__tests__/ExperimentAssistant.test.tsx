@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -160,6 +160,36 @@ describe("conversational experiment drafting", () => {
       "user",
       "assistant",
     ]);
+  });
+
+  it("preserves a follow-up typed while the previous turn is pending", async () => {
+    let resolveCompile:
+      | ((response: ExperimentAssistantTurnResponse) => void)
+      | null = null;
+    vi.spyOn(apiClient, "compileExperimentAssistantTurn").mockImplementation(
+      () => new Promise<ExperimentAssistantTurnResponse>((resolve) => {
+        resolveCompile = resolve;
+      }),
+    );
+    renderAssistant();
+    const composer = screen.getByLabelText("Describe your experiment…");
+    fireEvent.change(composer, {
+      target: { value: "Tune one safe circular-track experiment." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    fireEvent.change(composer, {
+      target: { value: "Also verify the result in a wind holdout." },
+    });
+    await act(async () => {
+      resolveCompile?.(assistantResponse());
+    });
+
+    expect(await screen.findByText(/Tune an x500 on a five metre circular track/))
+      .toBeVisible();
+    expect(composer).toHaveValue(
+      "Also verify the result in a wind holdout.",
+    );
   });
 
   it("does not request microphone permission until the user clicks the voice button", async () => {
