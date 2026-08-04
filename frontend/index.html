@@ -5,24 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/drone-favicon.png" />
     <title>DroneDream</title>
-    <script>
-      (() => {
-        const redirectKey = "dronedream:spa-redirect";
-        try {
-          const redirectTarget = window.sessionStorage.getItem(redirectKey);
-          window.sessionStorage.removeItem(redirectKey);
-          if (
-            redirectTarget &&
-            redirectTarget.startsWith("/") &&
-            !redirectTarget.startsWith("//")
-          ) {
-            window.history.replaceState(null, "", redirectTarget);
-          }
-        } catch {
-          // The base console remains usable when session storage is unavailable.
-        }
-      })();
-    </script>
+    <script src="/spa-redirect-restore.js" defer></script>
   </head>
   <body>
     <div id="root"></div>

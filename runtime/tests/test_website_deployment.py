@@ -208,22 +208,34 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         builder = self.read("website/scripts/build-pages-site.ps1")
         console_entry = self.read("frontend/index.html")
         site_entry = self.read("frontend/site.html")
+        not_found_bridge = self.read("frontend/public/spa-redirect-404.js")
+        restore_bridge = self.read("frontend/public/spa-redirect-restore.js")
 
         self.assertNotIn(
             'Copy-Item -LiteralPath $siteHtml -Destination '
             '(Join-Path $outputDirectory "404.html")',
             builder,
         )
-        self.assertIn('const redirectKey = "dronedream:spa-redirect";', builder)
-        self.assertIn('window.location.pathname === "/console"', builder)
-        self.assertIn('window.location.pathname.startsWith("/console/")', builder)
         self.assertIn(
-            'const entryPath = isConsolePath ? "/console/" : "/";', builder
+            '<script src="/spa-redirect-404.js" defer></script>', builder
+        )
+        self.assertNotIn("<script>", builder)
+        self.assertIn(
+            'const redirectKey = "dronedream:spa-redirect";', not_found_bridge
+        )
+        self.assertIn('window.location.pathname === "/console"', not_found_bridge)
+        self.assertIn(
+            'window.location.pathname.startsWith("/console/")', not_found_bridge
         )
         self.assertIn(
-            "window.sessionStorage.setItem(redirectKey, requestedPath)", builder
+            'const entryPath = isConsolePath ? "/console/" : "/";',
+            not_found_bridge,
         )
-        self.assertIn("window.location.replace(entryPath)", builder)
+        self.assertIn(
+            "window.sessionStorage.setItem(redirectKey, requestedPath)",
+            not_found_bridge,
+        )
+        self.assertIn("window.location.replace(entryPath)", not_found_bridge)
 
         for entry in (console_entry, site_entry):
             with self.subTest(entry=entry[:40]):
@@ -232,14 +244,23 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
                     entry,
                 )
                 self.assertIn(
-                    'const redirectKey = "dronedream:spa-redirect";', entry
+                    '<script src="/spa-redirect-restore.js" defer></script>', entry
                 )
-                self.assertIn("window.sessionStorage.getItem(redirectKey)", entry)
-                self.assertIn("window.sessionStorage.removeItem(redirectKey)", entry)
-                self.assertIn(
-                    "window.history.replaceState(null, \"\", redirectTarget)", entry
-                )
-                self.assertIn('!redirectTarget.startsWith("//")', entry)
+                self.assertNotIn("<script>", entry)
+
+        self.assertIn(
+            'const redirectKey = "dronedream:spa-redirect";', restore_bridge
+        )
+        self.assertIn(
+            "window.sessionStorage.getItem(redirectKey)", restore_bridge
+        )
+        self.assertIn(
+            "window.sessionStorage.removeItem(redirectKey)", restore_bridge
+        )
+        self.assertIn(
+            'window.history.replaceState(null, "", redirectTarget)', restore_bridge
+        )
+        self.assertIn('!redirectTarget.startsWith("//")', restore_bridge)
 
     def test_pages_build_publishes_real_fixed_console_route_entries(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")

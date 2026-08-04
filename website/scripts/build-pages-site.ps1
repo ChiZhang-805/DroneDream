@@ -202,23 +202,7 @@ $pagesNotFoundHtml = @'
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
     <title>DroneDream</title>
-    <script>
-      (() => {
-        const redirectKey = "dronedream:spa-redirect";
-        const requestedPath =
-          window.location.pathname + window.location.search + window.location.hash;
-        const isConsolePath =
-          window.location.pathname === "/console" ||
-          window.location.pathname.startsWith("/console/");
-        const entryPath = isConsolePath ? "/console/" : "/";
-        try {
-          window.sessionStorage.setItem(redirectKey, requestedPath);
-        } catch {
-          // Falling back to the correct application root is still safe.
-        }
-        window.location.replace(entryPath);
-      })();
-    </script>
+    <script src="/spa-redirect-404.js" defer></script>
   </head>
   <body></body>
 </html>
