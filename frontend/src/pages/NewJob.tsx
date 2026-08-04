@@ -2200,7 +2200,8 @@ export function NewJob() {
       <form onSubmit={handleSubmit} noValidate className="experiment-form">
         {submitError ? <Alert tone="danger" title={t("wizard.submissionFailed")}>{submitError}</Alert> : null}
 
-        <div hidden={step !== 0} className="wizard-panel">
+        {step === 0 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.flightSetup")}>
             <div className="wizard-flight-setup">
             <div className="form-field wizard-mode-field wizard-full-row">
@@ -2540,9 +2541,11 @@ export function NewJob() {
             </section>
             </div>
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
-        <div hidden={step !== 1} className="wizard-panel">
+        {step === 1 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.parameters")}>
             <ParameterSelector
               catalog={catalog.parameters}
@@ -2552,9 +2555,11 @@ export function NewJob() {
               onChange={setSelections}
             />
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
-        <div hidden={step !== 2} className="wizard-panel">
+        {step === 2 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.scenarios")}>
             <div className="scenario-case-selector" aria-describedby={errors.scenario_cases ? "scenario_cases_error" : undefined}>
               <h3>{t("wizard.caseMatrix")}</h3>
@@ -2674,9 +2679,11 @@ export function NewJob() {
               </div>
             ) : null}
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
-        <div hidden={step !== 3} className="wizard-panel">
+        {step === 3 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.constraints")}>
             <div className="constraint-strategy-layout">
               <div className="constraint-input-column">
@@ -2809,9 +2816,11 @@ export function NewJob() {
               ) : null}
             </section>
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
-        <div hidden={step !== 4} className="wizard-panel">
+        {step === 4 ? (
+          <div className="wizard-panel">
           <SectionCard title={t("wizard.section.review")}>
             {preflightSteps.length === 0 ? (
               <div className="preflight-status" role="status"><span aria-hidden="true">✓</span>{t("wizard.preflightReadyTitle")}</div>
@@ -2986,7 +2995,8 @@ export function NewJob() {
               </div>
             ) : null}
           </SectionCard>
-        </div>
+          </div>
+        ) : null}
 
         <div className="wizard-actions">
           {step > 0 ? <button type="button" className="btn btn-ghost" disabled={submitting} onClick={previousStep}>{t("wizard.back")}</button> : null}

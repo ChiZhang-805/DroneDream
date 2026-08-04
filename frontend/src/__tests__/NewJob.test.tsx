@@ -200,6 +200,7 @@ describe("NewJob experiment wizard", () => {
     expect(screen.getByRole("heading", { name: "Vehicle & PX4 Profile" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Optimization Objective" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Flight Track Configuration" })).toBeVisible();
+    expect(document.querySelectorAll(".wizard-panel")).toHaveLength(1);
     const modeSelector = screen.getByLabelText(/Tuning experience level/i);
     expect(modeSelector).toHaveValue("basic");
     expect(modeSelector.closest(".wizard-full-row")).not.toBeNull();
@@ -212,6 +213,7 @@ describe("NewJob experiment wizard", () => {
     expect(screen.queryByRole("button", { name: /Save draft|Reset defaults/i })).toBeNull();
 
     openStep(/Constraints & budget/i);
+    expect(document.querySelectorAll(".wizard-panel")).toHaveLength(1);
     expect(
       screen.getByRole("region", { name: "Evidence-guided optimization loop" }),
     ).toHaveTextContent("Allocate budget across engines");
@@ -315,6 +317,9 @@ describe("NewJob experiment wizard", () => {
     await waitFor(() => expect(trigger).toHaveFocus());
 
     openStep(/Parameters/i);
+    fireEvent.click(screen.getByRole("button", {
+      name: "Expand: Horizontal Motion Control",
+    }));
     const selectedCheckbox = screen.getAllByRole("checkbox")
       .find((checkbox) => (checkbox as HTMLInputElement).checked);
     if (!selectedCheckbox) throw new Error("No selected PX4 parameter was found.");
@@ -919,6 +924,7 @@ describe("NewJob experiment wizard", () => {
     fireEvent.click(within(nameDialog).getByRole("button", { name: "Continue" }));
     expect(activeStepIndex()).toBe(0);
     expect(screen.getByLabelText(/Tuning experience level/i)).toHaveValue("basic");
+    openStep(/Scenarios/i);
     expect(screen.getByLabelText(/Search seeds/i)).toHaveValue("101, 202, 303");
     expect(screen.queryByDisplayValue("recovered-study")).toBeNull();
     expect(window.sessionStorage.getItem(EXPERIMENT_DRAFT_KEY)).toContain(
@@ -949,6 +955,7 @@ describe("NewJob experiment wizard", () => {
     });
     fireEvent.submit(nameDialog);
     expect(activeStepIndex()).toBe(0);
+    openStep(/Constraints & budget/i);
     expect(screen.getByLabelText(/Optimizer Strategy/i))
       .toHaveValue("optimizer_portfolio");
   });
