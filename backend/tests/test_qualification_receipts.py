@@ -7,11 +7,14 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
+from app import models
 from app.orchestration.attempt_evidence import TrialAcceptedAttemptEvidenceV1
 from app.orchestration.qualification_receipts import (
     QualificationReceiptError,
     QualificationTrialEvidenceV1,
     compile_qualification_trial_evidence,
+    record_qualification_trial_receipt,
+    require_qualification_trial_receipt,
 )
 
 
@@ -168,3 +171,97 @@ def test_accepted_attempt_hash_divergence_fails_hard() -> None:
 
     with pytest.raises(QualificationReceiptError, match="artifact evidence diverged"):
         _compile(accepted_attempt=accepted, artifact_evidence=tampered)
+
+
+class _RecordingSession:
+    def __init__(self) -> None:
+        self.added: list[object] = []
+
+    def add(self, value: object) -> None:
+        self.added.append(value)
+
+
+def _bound_trial() -> models.Trial:
+    qualification = models.CandidateQualification(
+        id="qlf-1",
+        job_id="job-1",
+        candidate_id="cand-1",
+        contract_schema="dronedream.candidate-qualification/v1",
+        rule_version="screen-4-sealed-9of10-8to20-18of20/v1",
+        rule_sha256="a" * 64,
+        holdout_contract_sha256="f" * 64,
+        selection_snapshot_sha256="b" * 64,
+        state="screening",
+        state_revision=1,
+    )
+    trial = models.Trial(
+        id="tri-1",
+        job_id="job-1",
+        candidate_id="cand-1",
+        qualification_id="qlf-1",
+        evaluation_phase="screening",
+        qualification_ordinal=1,
+        seed=101,
+        scenario_type="nominal",
+        status="FAILED",
+        finished_at=datetime(2026, 8, 4, 1, 2, 3, tzinfo=timezone.utc),
+    )
+    trial.qualification = qualification
+    return trial
+
+
+def test_record_receipt_is_insert_once_and_revalidates_existing_binding() -> None:
+    trial = _bound_trial()
+    db = _RecordingSession()
+
+    first = record_qualification_trial_receipt(  # type: ignore[arg-type]
+        db,
+        trial=trial,
+        accepted_attempt=None,
+        artifact_evidence=None,
+    )
+    second = record_qualification_trial_receipt(  # type: ignore[arg-type]
+        db,
+        trial=trial,
+        accepted_attempt=None,
+        artifact_evidence=None,
+    )
+
+    assert first is second
+    assert db.added == [first]
+    assert require_qualification_trial_receipt(first, trial=trial).terminal_status == (
+        "INDETERMINATE"
+    )
+
+    first.passed = True
+    with pytest.raises(QualificationReceiptError, match="scalars diverged"):
+        require_qualification_trial_receipt(first, trial=trial)
+
+
+def test_record_receipt_rejects_nonterminal_or_mismatched_attempt() -> None:
+    trial = _bound_trial()
+    db = _RecordingSession()
+    trial.status = "RUNNING"
+    with pytest.raises(QualificationReceiptError, match="not a terminal"):
+        record_qualification_trial_receipt(  # type: ignore[arg-type]
+            db,
+            trial=trial,
+            accepted_attempt=None,
+            artifact_evidence=None,
+        )
+
+    trial.status = "FAILED"
+    artifacts = _artifact_evidence()
+    accepted = _accepted(
+        terminal_status="CANCELLED",
+        outcome_class="cancelled",
+        artifact_evidence=artifacts,
+        metric_sha256=None,
+    )
+    with pytest.raises(QualificationReceiptError, match="terminal status diverged"):
+        record_qualification_trial_receipt(  # type: ignore[arg-type]
+            db,
+            trial=trial,
+            accepted_attempt=accepted,
+            artifact_evidence=artifacts,
+        )

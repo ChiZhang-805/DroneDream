@@ -6,10 +6,13 @@ import hashlib
 import json
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, cast
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from sqlalchemy.orm import Session
 
+from app import models
 from app.orchestration.attempt_evidence import TrialAcceptedAttemptEvidenceV1
 from app.orchestration.qualification import (
     QUALIFICATION_TRIAL_RECEIPT_SCHEMA,
@@ -301,9 +304,153 @@ def compile_qualification_trial_evidence(
     )
 
 
+def _trial_metric_snapshot(trial: models.Trial) -> dict[str, Any] | None:
+    metric = trial.metric
+    if metric is None:
+        return None
+    return {
+        "rmse": metric.rmse,
+        "max_error": metric.max_error,
+        "overshoot_count": metric.overshoot_count,
+        "completion_time": metric.completion_time,
+        "crash_flag": metric.crash_flag,
+        "timeout_flag": metric.timeout_flag,
+        "score": metric.score,
+        "final_error": metric.final_error,
+        "pass_flag": metric.pass_flag,
+        "instability_flag": metric.instability_flag,
+        "raw_metric_json": metric.raw_metric_json,
+    }
+
+
+def require_qualification_trial_receipt(
+    receipt: models.QualificationTrialReceipt,
+    *,
+    trial: models.Trial | None = None,
+) -> QualificationTrialEvidenceV1:
+    """Verify one persisted receipt and, optionally, its current Trial binding."""
+
+    try:
+        evidence = QualificationTrialEvidenceV1.model_validate(receipt.evidence_json)
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise QualificationReceiptError("qualification Trial receipt evidence is invalid") from exc
+    scalar_match = (
+        receipt.receipt_schema == QUALIFICATION_TRIAL_RECEIPT_SCHEMA
+        and receipt.evidence_id == evidence.evidence_id
+        and receipt.qualification_id == evidence.qualification_id
+        and receipt.trial_id == evidence.trial_id
+        and receipt.phase == evidence.phase
+        and receipt.ordinal == evidence.ordinal
+        and receipt.terminal_status == evidence.terminal_status
+        and receipt.passed == evidence.passed
+        and receipt.safety_critical_failure == evidence.safety_critical_failure
+        and receipt.effect_readback_complete == evidence.effect_readback_complete
+        and receipt.evidence_complete == evidence.evidence_complete
+        and canonical_utc_iso(receipt.finalized_at) == evidence.finalized_at
+    )
+    if not scalar_match:
+        raise QualificationReceiptError("qualification Trial receipt scalars diverged")
+    if trial is not None:
+        qualification = trial.qualification
+        trial_match = (
+            receipt.trial_id == trial.id
+            and receipt.qualification_id == trial.qualification_id
+            and qualification is not None
+            and qualification.job_id == evidence.job_id
+            and qualification.candidate_id == evidence.candidate_id
+            and qualification.holdout_contract_sha256 == evidence.holdout_contract_sha256
+            and trial.job_id == evidence.job_id
+            and trial.candidate_id == evidence.candidate_id
+            and trial.evaluation_phase == evidence.phase
+            and trial.qualification_ordinal == evidence.ordinal
+            and trial.finished_at is not None
+            and canonical_utc_iso(trial.finished_at) == evidence.finalized_at
+        )
+        if not trial_match:
+            raise QualificationReceiptError("qualification Trial receipt binding diverged")
+    return evidence
+
+
+def record_qualification_trial_receipt(
+    db: Session,
+    *,
+    trial: models.Trial,
+    accepted_attempt: TrialAcceptedAttemptEvidenceV1 | None,
+    artifact_evidence: Mapping[str, Any] | None,
+) -> models.QualificationTrialReceipt:
+    """Insert one terminal receipt or verify the exact existing insert."""
+
+    qualification = trial.qualification
+    raw_phase = trial.evaluation_phase
+    ordinal = trial.qualification_ordinal
+    if (
+        qualification is None
+        or trial.qualification_id != qualification.id
+        or trial.job_id != qualification.job_id
+        or trial.candidate_id != qualification.candidate_id
+        or raw_phase not in {"screening", "qualification"}
+        or isinstance(ordinal, bool)
+        or not isinstance(ordinal, int)
+        or ordinal < 1
+        or (raw_phase == "screening" and ordinal > 4)
+        or (raw_phase == "qualification" and ordinal > 20)
+        or trial.status not in {"COMPLETED", "FAILED", "CANCELLED"}
+        or trial.finished_at is None
+    ):
+        raise QualificationReceiptError("Trial is not a terminal qualification dispatch")
+    if accepted_attempt is not None and accepted_attempt.terminal_status != trial.status:
+        raise QualificationReceiptError("accepted attempt terminal status diverged from Trial")
+    phase = cast(QualificationPhase, raw_phase)
+
+    evidence = compile_qualification_trial_evidence(
+        qualification_id=qualification.id,
+        trial_id=trial.id,
+        job_id=trial.job_id,
+        candidate_id=trial.candidate_id,
+        holdout_contract_sha256=qualification.holdout_contract_sha256,
+        phase=phase,
+        ordinal=ordinal,
+        accepted_attempt=accepted_attempt,
+        artifact_evidence=artifact_evidence,
+        metric_snapshot=_trial_metric_snapshot(trial),
+        failure_code=trial.failure_code,
+        finalized_at=trial.finished_at,
+    )
+
+    existing = trial.qualification_receipt
+    if existing is not None:
+        current = require_qualification_trial_receipt(existing, trial=trial)
+        if current != evidence:
+            raise QualificationReceiptError("qualification Trial receipt is insert-once")
+        return existing
+
+    receipt = models.QualificationTrialReceipt(
+        id=f"qtr_{uuid4().hex[:12]}",
+        qualification_id=qualification.id,
+        trial_id=trial.id,
+        receipt_schema=QUALIFICATION_TRIAL_RECEIPT_SCHEMA,
+        phase=phase,
+        ordinal=ordinal,
+        terminal_status=evidence.terminal_status,
+        passed=evidence.passed,
+        safety_critical_failure=evidence.safety_critical_failure,
+        effect_readback_complete=evidence.effect_readback_complete,
+        evidence_complete=evidence.evidence_complete,
+        evidence_id=evidence.evidence_id,
+        evidence_json=evidence.model_dump(mode="json"),
+        finalized_at=trial.finished_at,
+    )
+    receipt.trial = trial
+    receipt.qualification = qualification
+    db.add(receipt)
+    return receipt
+
+
 __all__ = [
     "QUALIFICATION_TRIAL_EVIDENCE_SCHEMA",
     "QualificationReceiptError",
     "QualificationTrialEvidenceV1",
     "compile_qualification_trial_evidence",
+    "record_qualification_trial_receipt",
+    "require_qualification_trial_receipt",
 ]
