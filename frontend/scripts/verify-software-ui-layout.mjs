@@ -426,8 +426,16 @@ async function verifyFixedScenarios(page, testCase) {
     mobileMenuImage = await screenshot(page, testCase.id, "mobile-navigation");
   }
   await activeEntry.waitFor();
+  const expectedPageSize = testCase.viewport.width >= 1800
+    ? 4
+    : testCase.viewport.width >= 1180
+      ? 3
+      : testCase.viewport.width >= 700
+        ? 2
+        : 1;
+  const expectedPageCount = Math.ceil(8 / expectedPageSize);
   assert.equal(await navEntries.count(), 5);
-  assert.equal(await cards.count(), 4);
+  assert.equal(await cards.count(), expectedPageSize);
   assert(await activeEntry.evaluate((element) => element.classList.contains("active")));
 
   const metrics = await page.evaluate(() => {
@@ -468,14 +476,17 @@ async function verifyFixedScenarios(page, testCase) {
         const title = heading?.querySelector("h2");
         const difficulty = heading?.querySelector(".fixed-scenario-difficulty");
         const facts = card.querySelector(".fixed-scenario-facts");
-        const preview = card.querySelector(".experience-preview");
-        const previewCanvas = preview?.querySelector(".experience-preview-canvas");
+        const factRows = Array.from(card.querySelectorAll(".fixed-scenario-facts > div"));
+        const preview = card.querySelector(".scenario-track-preview");
+        const viewSwitcher = preview?.querySelector(".scenario-track-view-switcher");
+        const previewCanvas = preview?.querySelector(".scenario-track-canvas");
         const action = card.querySelector(".fixed-scenario-use");
         if (!(heading instanceof HTMLElement)
           || !(title instanceof HTMLElement)
           || !(difficulty instanceof HTMLElement)
           || !(facts instanceof HTMLElement)
           || !(preview instanceof HTMLElement)
+          || !(viewSwitcher instanceof HTMLElement)
           || !(previewCanvas instanceof SVGElement)
           || !(action instanceof HTMLElement)) {
           throw new Error("Fixed-scenario card is missing an aligned content region");
@@ -486,7 +497,13 @@ async function verifyFixedScenarios(page, testCase) {
           title: bounds(title),
           difficulty: bounds(difficulty),
           facts: bounds(facts),
+          factRows: factRows.map((row) => ({
+            ...bounds(row),
+            background: getComputedStyle(row).backgroundColor,
+            borderRadius: getComputedStyle(row).borderRadius,
+          })),
           preview: bounds(preview),
+          viewSwitcher: bounds(viewSwitcher),
           previewCanvas: bounds(previewCanvas),
           action: bounds(action),
         };
@@ -524,15 +541,15 @@ async function verifyFixedScenarios(page, testCase) {
     `${testCase.id}: fixed scenarios caused horizontal document overflow`,
   );
   if (testCase.viewport.width > 620) {
-    assert(closeEnough(metrics.cards[0].top, metrics.cards[1].top, 1));
-    assert(closeEnough(metrics.cards[2].top, metrics.cards[3].top, 1));
-    assert(metrics.cards[2].top > metrics.cards[0].bottom);
-    assert(closeEnough(metrics.cards[0].left, metrics.cards[2].left, 1));
-    assert(closeEnough(metrics.cards[1].left, metrics.cards[3].left, 1));
+    assert(metrics.cards.every((card) => closeEnough(card.top, metrics.cards[0].top, 1)));
     assert(metrics.cards.every((card) => closeEnough(card.width, metrics.cards[0].width, 1)));
     assert(metrics.cards.every((card) => closeEnough(card.height, metrics.cards[0].height, 1)));
     assert(metrics.cards.every((card) => closeEnough(card.title.top, card.difficulty.top, 2)));
     assert(metrics.cards.every((card) => card.title.left < card.difficulty.left));
+    assert(metrics.cards.every((card) => card.factRows.length === 6));
+    assert(metrics.cards.every((card) => card.factRows.every((row) => (
+      row.background === "rgba(0, 0, 0, 0)" && row.borderRadius === "0px"
+    ))), `${testCase.id}: scenario facts still use individual rounded tiles`);
     assert(
       metrics.cards.every((card) => card.previewCanvas.bottom <= card.preview.bottom + 1),
       `${testCase.id}: a scenario preview canvas escapes its preview region`,
@@ -541,15 +558,26 @@ async function verifyFixedScenarios(page, testCase) {
       metrics.cards.every((card) => card.preview.bottom + 6 <= card.action.top),
       `${testCase.id}: a scenario preview overlaps its action`,
     );
-    for (const [leftIndex, rightIndex] of [[0, 1], [2, 3]]) {
-      const leftCard = metrics.cards[leftIndex];
-      const rightCard = metrics.cards[rightIndex];
-      assert(closeEnough(leftCard.facts.height, rightCard.facts.height, 1));
-      assert(closeEnough(leftCard.preview.top, rightCard.preview.top, 1));
-      assert(closeEnough(leftCard.preview.height, rightCard.preview.height, 1));
-      assert(closeEnough(leftCard.action.top, rightCard.action.top, 1));
-      assert(closeEnough(leftCard.action.height, rightCard.action.height, 1));
-    }
+    assert(
+      metrics.cards.every(
+        (card) =>
+          card.viewSwitcher.left >= card.preview.left - 1 &&
+          card.viewSwitcher.right <= card.preview.right + 1 &&
+          card.viewSwitcher.top >= card.preview.top - 1 &&
+          card.viewSwitcher.bottom <= card.preview.bottom + 1,
+      ),
+      `${testCase.id}: the view switcher escapes its preview`,
+    );
+    assert(metrics.cards.every((card) => closeEnough(card.facts.height, metrics.cards[0].facts.height, 1)));
+    assert(metrics.cards.every((card) => closeEnough(card.preview.top, metrics.cards[0].preview.top, 1)));
+    assert(metrics.cards.every((card) => closeEnough(card.preview.height, metrics.cards[0].preview.height, 1)));
+    assert(metrics.cards.every((card) => closeEnough(card.action.top, metrics.cards[0].action.top, 1)));
+    assert(metrics.cards.every((card) => closeEnough(card.action.height, metrics.cards[0].action.height, 1)));
+    assert(metrics.cards.every((card, index, entries) => (
+      index === 0 || card.left > entries[index - 1].right
+    )), `${testCase.id}: desktop scenario cards do not form one ordered row`);
+    assert(closeEnough(metrics.cards[0].left, metrics.page.left, 2));
+    assert(closeEnough(metrics.cards.at(-1).right, metrics.page.right, 2));
   }
   if (testCase.viewport.width >= 1000) {
     assert(
@@ -613,21 +641,35 @@ async function verifyFixedScenarios(page, testCase) {
   if (testCase.viewport.width <= 520) {
     await page.locator(".app-mobile-menu-button").click();
   }
+  const firstPreview = cards.first().locator(".scenario-track-preview");
+  for (const view of ["XZ", "YZ", "3D"]) {
+    await firstPreview.getByRole("button", { name: new RegExp(`^${view}`, "u") }).click();
+    assert.equal(await firstPreview.getAttribute("data-view"), view.toLowerCase());
+  }
+  const viewImage = await screenshot(page, testCase.id, "fixed-scenarios-3d");
+  await firstPreview.getByRole("button", { name: /^XY/u }).click();
   const image = await screenshot(page, testCase.id, "fixed-scenarios");
   const nextGroup = page.getByRole("button", {
     name: testCase.locale === "zh-CN" ? "查看下一组场景" : "Show next scenarios",
   });
   await nextGroup.click();
-  assert.equal(await cards.count(), 4);
+  assert.equal(await cards.count(), Math.min(expectedPageSize, 8 - expectedPageSize));
   assert.equal(
     await page.locator('.fixed-scenario-card[data-template-key="precision-hover@1"]').count(),
-    1,
+    expectedPageSize >= 3 ? 1 : 0,
   );
   const nextImage = await screenshot(page, testCase.id, "fixed-scenarios-group-2");
-  const previousGroup = page.getByRole("button", {
-    name: testCase.locale === "zh-CN" ? "查看上一组场景" : "Show previous scenarios",
-  });
-  await previousGroup.click();
+  assert.equal(
+    await page.locator(".fixed-scenarios-pagination span").textContent(),
+    `2 / ${expectedPageCount}`,
+  );
+  await page.goto(`${origin}/scenarios?docsPreview=1`, { waitUntil: "networkidle" });
+  const targetPage = Math.floor(3 / expectedPageSize);
+  for (let pageNumber = 0; pageNumber < targetPage; pageNumber += 1) {
+    await page.getByRole("button", {
+      name: testCase.locale === "zh-CN" ? "查看下一组场景" : "Show next scenarios",
+    }).click();
+  }
   let createRequests = 0;
   const countCreateRequest = (request) => {
     if (request.method() === "POST" && /\/api\/v1\/jobs(?:\?|$)/u.test(request.url())) {
@@ -658,6 +700,7 @@ async function verifyFixedScenarios(page, testCase) {
     mobileMenuImage,
     image,
     nextImage,
+    viewImage,
   };
 }
 

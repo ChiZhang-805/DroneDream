@@ -1,9 +1,9 @@
 import { ArrowRight, ChevronLeft, ChevronRight, Gauge, Wind } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { recordProductEvent } from "../features/analytics/productEvents";
-import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
+import { ScenarioTrackPreview } from "../features/experiment/ScenarioTrackPreview";
 import {
   STARTER_EXPERIENCE_TEMPLATES,
   type StarterExperienceId,
@@ -63,11 +63,25 @@ const FIXED_SCENARIO_DEFINITIONS: readonly FixedScenarioDefinition[] = Object.fr
   },
 ]);
 
-const SCENARIOS_PER_PAGE = 4;
+function scenarioPageSize(): number {
+  if (typeof window === "undefined") return 4;
+  if (window.innerWidth >= 1800) return 4;
+  if (window.innerWidth >= 1180) return 3;
+  if (window.innerWidth >= 700) return 2;
+  return 1;
+}
 
 function scenarioPreviewPoints(id: StarterExperienceId) {
   const template = STARTER_EXPERIENCE_TEMPLATES.find((candidate) => candidate.id === id);
   if (!template || template.patch.track_type === "custom") return [];
+  if (template.patch.track_type === "hover") {
+    const x = Number(template.patch.start_x);
+    const y = Number(template.patch.start_y);
+    return [
+      { x, y, z: 0 },
+      { x, y, z: Number(template.patch.altitude_m) },
+    ];
+  }
   return generateReferenceTrack(
     template.patch.track_type,
     Number(template.patch.start_x),
@@ -85,11 +99,33 @@ function scenarioPreviewPoints(id: StarterExperienceId) {
 export function FixedScenarios() {
   const { t } = useI18n();
   const [pageIndex, setPageIndex] = useState(0);
-  const pageCount = Math.ceil(FIXED_SCENARIO_DEFINITIONS.length / SCENARIOS_PER_PAGE);
+  const [pageSize, setPageSize] = useState(scenarioPageSize);
+  const pageSizeRef = useRef(pageSize);
+  const pageCount = Math.ceil(FIXED_SCENARIO_DEFINITIONS.length / pageSize);
   const visibleDefinitions = FIXED_SCENARIO_DEFINITIONS.slice(
-    pageIndex * SCENARIOS_PER_PAGE,
-    (pageIndex + 1) * SCENARIOS_PER_PAGE,
+    pageIndex * pageSize,
+    (pageIndex + 1) * pageSize,
   );
+
+  useEffect(() => {
+    let frame = 0;
+    const updatePageSize = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const nextSize = scenarioPageSize();
+        if (pageSizeRef.current !== nextSize) {
+          pageSizeRef.current = nextSize;
+          setPageSize(nextSize);
+          setPageIndex(0);
+        }
+      });
+    };
+    window.addEventListener("resize", updatePageSize);
+    return () => {
+      window.removeEventListener("resize", updatePageSize);
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   const changePage = (direction: -1 | 1) => {
     setPageIndex((current) => (current + direction + pageCount) % pageCount);
@@ -127,7 +163,7 @@ export function FixedScenarios() {
         </div>
       </header>
 
-      <div className="fixed-scenarios-grid">
+      <div className={`fixed-scenarios-grid fixed-scenarios-columns-${visibleDefinitions.length}`}>
         {visibleDefinitions.map((definition) => {
           const template = STARTER_EXPERIENCE_TEMPLATES.find(
             (candidate) => candidate.id === definition.id,
@@ -142,6 +178,35 @@ export function FixedScenarios() {
             || Number(template.patch.wind_south) > 0
             || Number(template.patch.wind_west) > 0;
           const hasSensorNoise = template.patch.noise_search_enabled;
+          const disturbance = isWindy && hasSensorNoise
+            ? t("scenarioLibrary.disturbance.windAndNoise", {
+              speed: Math.max(
+                Number(template.patch.wind_north),
+                Number(template.patch.wind_east),
+                Number(template.patch.wind_south),
+                Number(template.patch.wind_west),
+              ),
+            })
+            : isWindy
+              ? t("scenarioLibrary.disturbance.wind", {
+                speed: Math.max(
+                  Number(template.patch.wind_north),
+                  Number(template.patch.wind_east),
+                  Number(template.patch.wind_south),
+                  Number(template.patch.wind_west),
+                ),
+              })
+              : t("scenarioLibrary.disturbance.calm");
+          const track = template.patch.track_type === "hover"
+            ? t("scenarioLibrary.track.hover")
+            : template.patch.track_type === "circle"
+              ? t("scenarioLibrary.track.circle", {
+                radius: template.patch.circle_radius_m,
+              })
+              : t("scenarioLibrary.track.figureEight");
+          const sensor = template.patch.sensor_noise_level === "medium"
+            ? t("scenarioLibrary.sensor.medium")
+            : t("scenarioLibrary.sensor.low");
 
           return (
             <article
@@ -161,13 +226,7 @@ export function FixedScenarios() {
               <dl className="fixed-scenario-facts">
                 <div>
                   <dt>{t("scenarioLibrary.track")}</dt>
-                  <dd>{template.patch.track_type === "hover"
-                    ? t("scenarioLibrary.track.hover")
-                    : template.patch.track_type === "circle"
-                      ? t("scenarioLibrary.track.circle", {
-                        radius: template.patch.circle_radius_m,
-                      })
-                      : t("scenarioLibrary.track.figureEight")}</dd>
+                  <dd>{track}</dd>
                 </div>
                 <div>
                   <dt>{t("scenarioLibrary.altitude")}</dt>
@@ -175,41 +234,27 @@ export function FixedScenarios() {
                 </div>
                 <div>
                   <dt>{t("scenarioLibrary.disturbance")}</dt>
-                  <dd>{isWindy && hasSensorNoise
-                    ? t("scenarioLibrary.disturbance.windAndNoise", {
-                      speed: Math.max(
-                        Number(template.patch.wind_north),
-                        Number(template.patch.wind_east),
-                        Number(template.patch.wind_south),
-                        Number(template.patch.wind_west),
-                      ),
-                    })
-                    : isWindy
-                      ? t("scenarioLibrary.disturbance.wind", {
-                        speed: Math.max(
-                          Number(template.patch.wind_north),
-                          Number(template.patch.wind_east),
-                          Number(template.patch.wind_south),
-                          Number(template.patch.wind_west),
-                        ),
-                      })
-                    : t("scenarioLibrary.disturbance.calm")}</dd>
+                  <dd>{disturbance}</dd>
                 </div>
                 <div>
-                  <dt>{t("scenarioLibrary.simulator")}</dt>
-                  <dd>{t("scenarioLibrary.simulator.px4")}</dd>
+                  <dt>{t("scenarioLibrary.sensor")}</dt>
+                  <dd>{sensor}</dd>
+                </div>
+                <div>
+                  <dt>{t("scenarioLibrary.trialBudget")}</dt>
+                  <dd>{t("scenarioLibrary.trialBudget.value", {
+                    count: template.patch.max_total_trials,
+                  })}</dd>
+                </div>
+                <div>
+                  <dt>{t("scenarioLibrary.optimizer")}</dt>
+                  <dd>{t("scenarioLibrary.optimizer.portfolio")}</dd>
                 </div>
               </dl>
-              <ExperienceTrackPreview
-                trackType={template.patch.track_type}
+              <ScenarioTrackPreview
                 points={points}
-                altitudeM={Number(template.patch.altitude_m)}
+                defaultAltitude={Number(template.patch.altitude_m)}
                 title={t("scenarioLibrary.preview")}
-                hoverLabel={t("wizard.preview.hover")}
-                routeLabel={t("wizard.preview.route")}
-                pointCountLabel={t("wizard.preview.pointCount", { count: points.length })}
-                localOnlyLabel={t("scenarioLibrary.localPreview")}
-                compact
               />
               <Link
                 className="btn btn-primary fixed-scenario-use"
