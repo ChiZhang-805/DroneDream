@@ -39,16 +39,73 @@
     "desktop/scripts/build-lab-preview.ps1",
     "desktop/src-tauri/tauri.lab-preview.conf.json",
     "distribution/build-profiles/lab-preview.v1.json",
+    "distribution/schemas/lab-preview-artifact-receipt.schema.json",
     "distribution/tests/test_lab_preview_contract.py",
+    "distribution/tools/verify_lab_preview_artifact.py",
     "distribution/tools/verify_lab_preview_contract.py"
   ],
+  "workspaces": {
+    "simulation": {
+      "workspaceId": "simulation",
+      "displayName": "Simulation Workspace",
+      "authority": "ui-workflow-only",
+      "switchEffect": "changes interface and workflow only",
+      "countsTowardNativeBackendRuntimeAuthority": false,
+      "allowedActions": [
+        "qualification.simulation.issue",
+        "simulation.execute",
+        "simulation.parameter.write",
+        "simulation.vehicle.arm"
+      ],
+      "deniedHardwareActions": [
+        "hardware.parameter.write",
+        "hardware.arm",
+        "hardware.flight",
+        "hardware.hitl.execute"
+      ]
+    },
+    "hardwareLab": {
+      "workspaceId": "hardware-lab",
+      "displayName": "Hardware Lab Workspace",
+      "authority": "ui-workflow-only",
+      "switchEffect": "changes interface and workflow only",
+      "countsTowardNativeBackendRuntimeAuthority": false,
+      "allowedActions": [
+        "hardware.discover",
+        "hardware.parameter.read",
+        "hardware.preflight.execute",
+        "hardware.emergency-stop"
+      ],
+      "deniedHardwareActions": [
+        "hardware.parameter.write",
+        "hardware.arm",
+        "hardware.flight",
+        "hardware.hitl.execute"
+      ]
+    }
+  },
   "editionPayload": {
     "artifactFileName": "DroneDream-Lab-1.0.0.exe",
     "tauriConfigOverlay": "desktop/src-tauri/tauri.lab-preview.conf.json",
     "buildScript": "desktop/scripts/build-lab-preview.ps1",
+    "artifactReceiptSchema": "distribution/schemas/lab-preview-artifact-receipt.schema.json",
+    "artifactVerifier": "distribution/tools/verify_lab_preview_artifact.py",
     "selectedVehiclePack": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
     "selectedControllerModel": "Pixhawk 6C",
+    "firmwareFamily": "px4",
+    "qualificationReceiptRequired": true,
     "runtimeProfile": "full-lab",
+    "simulationPayload": [
+      "runtime-simulation",
+      "simulator-gazebo-harmonic",
+      "simulator-px4-sitl",
+      "vehicle-pack-sim"
+    ],
+    "gatedHardwareAdapter": [
+      "hardware-bridge",
+      "vehicle-pack-hardware",
+      "vehicle-pack-validation"
+    ],
     "modules": [
       "desktop-core",
       "engine-pack",
@@ -66,6 +123,8 @@
     "requiresExactCleanSource": true,
     "requiresUniversalCoreAncestor": true,
     "requiresOriginSoftwareAncestor": true,
+    "rejectFieldOnlyContent": true,
+    "rejectUniversalBootstrapperContent": true,
     "defaultCargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
     "forbidRepositoryTargetDirectory": true,
     "forbidReleaseBranchCreation": true,

@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/lab-preview-artifact-receipt.v1.json",
+  "title": "DroneDream Lab preview artifact receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "receiptVersion",
+    "testOnly",
+    "editionId",
+    "productDisplayVersion",
+    "sourceCommit",
+    "branch",
+    "commonCoreCommit",
+    "commonCoreHash",
+    "editionManifest",
+    "profile",
+    "workspaces",
+    "moduleGraph",
+    "payload",
+    "licenseNotice",
+    "rollback",
+    "upgrade",
+    "safety",
+    "artifact"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-lab-preview-artifact-receipt"},
+    "receiptVersion": {"const": "1.0.0"},
+    "testOnly": {"type": "boolean"},
+    "editionId": {"const": "lab"},
+    "productDisplayVersion": {"const": "1.0.0"},
+    "sourceCommit": {"$ref": "#/$defs/commit"},
+    "branch": {"const": "codex/software-lab"},
+    "commonCoreCommit": {"$ref": "#/$defs/commit"},
+    "commonCoreHash": {"$ref": "#/$defs/sha256"},
+    "editionManifest": {"$ref": "#/$defs/fileRef"},
+    "profile": {"$ref": "#/$defs/fileRef"},
+    "workspaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["simulation", "hardwareLab"],
+      "properties": {
+        "simulation": {"$ref": "#/$defs/workspace"},
+        "hardwareLab": {"$ref": "#/$defs/workspace"}
+      }
+    },
+    "moduleGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "simulationPayload",
+        "gatedHardwareAdapter",
+        "vehiclePack",
+        "controllerModel",
+        "firmwareFamily",
+        "qualificationReceiptRequired"
+      ],
+      "properties": {
+        "simulationPayload": {"$ref": "#/$defs/idArray"},
+        "gatedHardwareAdapter": {"$ref": "#/$defs/idArray"},
+        "vehiclePack": {"$ref": "#/$defs/fileRef"},
+        "controllerModel": {"const": "Pixhawk 6C"},
+        "firmwareFamily": {"const": "px4"},
+        "qualificationReceiptRequired": {"type": "boolean"}
+      }
+    },
+    "payload": {"$ref": "#/$defs/fileRef"},
+    "licenseNotice": {"$ref": "#/$defs/fileRef"},
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy", "targetArtifactSha256", "targetPromotionId"],
+      "properties": {
+        "policy": {"const": "previous-verified-promotion"},
+        "targetArtifactSha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "targetPromotionId": {"type": ["string", "null"], "minLength": 1, "maxLength": 128}
+      }
+    },
+    "upgrade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiresSameCommonCore", "requiresManifestMatch", "requiresRollback"],
+      "properties": {
+        "requiresSameCommonCore": {"type": "boolean"},
+        "requiresManifestMatch": {"type": "boolean"},
+        "requiresRollback": {"type": "boolean"}
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validatedVehiclePackCount",
+        "uiSwitchCountsAsAuthority",
+        "hardwareActionDecision",
+        "requiredDecisionLayers"
+      ],
+      "properties": {
+        "validatedVehiclePackCount": {"const": 0},
+        "uiSwitchCountsAsAuthority": {"const": false},
+        "hardwareActionDecision": {"const": "deny"},
+        "requiredDecisionLayers": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "native"},
+            {"const": "backend"},
+            {"const": "runtime"}
+          ],
+          "items": false
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileName", "path", "sha256", "bytes", "authenticode", "tauriUpdaterSignature"],
+      "properties": {
+        "fileName": {"const": "DroneDream-Lab-1.0.0.exe"},
+        "path": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 0},
+        "authenticode": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expected", "observedStatus"],
+          "properties": {
+            "expected": {"const": "not-signed"},
+            "observedStatus": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        },
+        "tauriUpdaterSignature": {"const": "not-issued"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "idArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspaceId", "authority", "allowedActions", "deniedHardwareActions"],
+      "properties": {
+        "workspaceId": {"enum": ["simulation", "hardware-lab"]},
+        "authority": {"const": "ui-workflow-only"},
+        "allowedActions": {"$ref": "#/$defs/idArray"},
+        "deniedHardwareActions": {"$ref": "#/$defs/idArray"}
+      }
+    }
+  }
+}

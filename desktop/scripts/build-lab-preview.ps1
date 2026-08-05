@@ -24,6 +24,21 @@ function Get-Sha256Text([string]$Text) {
     }
 }
 
+function Get-FileSha256Lower([string]$Path) {
+    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+}
+
+function New-RepoFileRef([string]$RelativePath) {
+    $path = Join-Path $repoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Required Lab receipt input is missing: $RelativePath"
+    }
+    return [ordered]@{
+        path = $RelativePath.Replace('\', '/')
+        sha256 = Get-FileSha256Lower $path
+    }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $sourceCommit = Invoke-GitText @("rev-parse", "--verify", "HEAD")
 if ($sourceCommit -cnotmatch "^[0-9a-f]{40}$") {
@@ -115,28 +130,96 @@ $signature = Get-AuthenticodeSignature -LiteralPath $artifactPath
 
 $receipt = [ordered]@{
     schemaVersion = 1
-    kind = "dronedream-lab-preview-build-receipt"
+    kind = "dronedream-lab-preview-artifact-receipt"
+    receiptVersion = "1.0.0"
+    testOnly = $false
     editionId = "lab"
     productDisplayVersion = "1.0.0"
     sourceCommit = $sourceCommit
     branch = $branch
     commonCoreCommit = $commonCoreCommit
     commonCoreHash = $commonCoreHash
+    editionManifest = New-RepoFileRef "distribution\editions\lab.v1.json"
+    profile = New-RepoFileRef "distribution\build-profiles\lab-preview.v1.json"
+    workspaces = [ordered]@{
+        simulation = [ordered]@{
+            workspaceId = "simulation"
+            authority = "ui-workflow-only"
+            allowedActions = @(
+                "qualification.simulation.issue",
+                "simulation.execute",
+                "simulation.parameter.write",
+                "simulation.vehicle.arm"
+            )
+            deniedHardwareActions = @(
+                "hardware.parameter.write",
+                "hardware.arm",
+                "hardware.flight",
+                "hardware.hitl.execute"
+            )
+        }
+        hardwareLab = [ordered]@{
+            workspaceId = "hardware-lab"
+            authority = "ui-workflow-only"
+            allowedActions = @(
+                "hardware.discover",
+                "hardware.parameter.read",
+                "hardware.preflight.execute",
+                "hardware.emergency-stop"
+            )
+            deniedHardwareActions = @(
+                "hardware.parameter.write",
+                "hardware.arm",
+                "hardware.flight",
+                "hardware.hitl.execute"
+            )
+        }
+    }
+    moduleGraph = [ordered]@{
+        simulationPayload = @(
+            "runtime-simulation",
+            "simulator-gazebo-harmonic",
+            "simulator-px4-sitl",
+            "vehicle-pack-sim"
+        )
+        gatedHardwareAdapter = @(
+            "hardware-bridge",
+            "vehicle-pack-hardware",
+            "vehicle-pack-validation"
+        )
+        vehiclePack = New-RepoFileRef "distribution\vehicle-packs\holybro-s500-v2-pixhawk6c.v1.json"
+        controllerModel = "Pixhawk 6C"
+        firmwareFamily = "px4"
+        qualificationReceiptRequired = $true
+    }
+    payload = New-RepoFileRef "desktop\src-tauri\tauri.lab-preview.conf.json"
+    licenseNotice = New-RepoFileRef "runtime\THIRD_PARTY_NOTICES.md"
+    rollback = [ordered]@{
+        policy = "previous-verified-promotion"
+        targetArtifactSha256 = $null
+        targetPromotionId = $null
+    }
+    upgrade = [ordered]@{
+        requiresSameCommonCore = $true
+        requiresManifestMatch = $true
+        requiresRollback = $true
+    }
+    safety = [ordered]@{
+        validatedVehiclePackCount = 0
+        uiSwitchCountsAsAuthority = $false
+        hardwareActionDecision = "deny"
+        requiredDecisionLayers = @("native", "backend", "runtime")
+    }
     artifact = [ordered]@{
         fileName = $artifactName
-        path = $artifactPath
-        sha256 = $hash.Hash.ToLowerInvariant()
+        path = $artifactPath.Replace($repoRoot, "").TrimStart('\', '/').Replace('\', '/')
+        sha256 = Get-FileSha256Lower $artifactPath
         bytes = (Get-Item -LiteralPath $artifactPath).Length
         authenticode = [ordered]@{
             expected = "not-signed"
             observedStatus = [string]$signature.Status
         }
         tauriUpdaterSignature = "not-issued"
-    }
-    safety = [ordered]@{
-        validatedVehiclePackCount = 0
-        hardwareActionsFailClosed = $true
-        requiredDecisionLayers = @("native", "backend", "runtime")
     }
 }
 $receipt | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath $receiptPath

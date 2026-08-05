@@ -62,10 +62,34 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "desktop/scripts/build-lab-preview.ps1",
         "desktop/src-tauri/tauri.lab-preview.conf.json",
         "distribution/build-profiles/lab-preview.v1.json",
+        "distribution/schemas/lab-preview-artifact-receipt.schema.json",
         "distribution/tests/test_lab_preview_contract.py",
+        "distribution/tools/verify_lab_preview_artifact.py",
         "distribution/tools/verify_lab_preview_contract.py",
     ):
         raise LabPreviewContractError("Lab preview delta paths drifted")
+
+    workspaces = profile.get("workspaces")
+    if not isinstance(workspaces, dict) or set(workspaces) != {"simulation", "hardwareLab"}:
+        raise LabPreviewContractError("Lab preview workspaces are missing")
+    for name, workspace_id in (("simulation", "simulation"), ("hardwareLab", "hardware-lab")):
+        workspace = workspaces[name]
+        if not isinstance(workspace, dict):
+            raise LabPreviewContractError(f"{name} workspace must be an object")
+        if (
+            workspace.get("workspaceId") != workspace_id
+            or workspace.get("authority") != "ui-workflow-only"
+            or workspace.get("switchEffect") != "changes interface and workflow only"
+            or workspace.get("countsTowardNativeBackendRuntimeAuthority") is not False
+        ):
+            raise LabPreviewContractError(f"{name} workspace authority drifted")
+        if tuple(workspace.get("deniedHardwareActions", ())) != (
+            "hardware.parameter.write",
+            "hardware.arm",
+            "hardware.flight",
+            "hardware.hitl.execute",
+        ):
+            raise LabPreviewContractError(f"{name} workspace must deny hardware actions")
 
     payload = profile.get("editionPayload")
     if not isinstance(payload, dict):
@@ -74,6 +98,23 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError("Lab preview artifact filename drifted")
     if payload.get("tauriConfigOverlay") != "desktop/src-tauri/tauri.lab-preview.conf.json":
         raise LabPreviewContractError("Lab preview Tauri overlay path drifted")
+    if (
+        payload.get("artifactReceiptSchema")
+        != "distribution/schemas/lab-preview-artifact-receipt.schema.json"
+        or payload.get("artifactVerifier") != "distribution/tools/verify_lab_preview_artifact.py"
+        or payload.get("firmwareFamily") != "px4"
+        or payload.get("qualificationReceiptRequired") is not True
+        or tuple(payload.get("simulationPayload", ()))
+        != (
+            "runtime-simulation",
+            "simulator-gazebo-harmonic",
+            "simulator-px4-sitl",
+            "vehicle-pack-sim",
+        )
+        or tuple(payload.get("gatedHardwareAdapter", ()))
+        != ("hardware-bridge", "vehicle-pack-hardware", "vehicle-pack-validation")
+    ):
+        raise LabPreviewContractError("Lab preview payload dependency graph drifted")
 
     guards = profile.get("buildGuards")
     signature = profile.get("signaturePolicy")
@@ -84,6 +125,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "requiresExactCleanSource",
         "requiresUniversalCoreAncestor",
         "requiresOriginSoftwareAncestor",
+        "rejectFieldOnlyContent",
+        "rejectUniversalBootstrapperContent",
         "forbidRepositoryTargetDirectory",
         "forbidReleaseBranchCreation",
         "forbidForcePush",
@@ -126,9 +169,11 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'Lab preview contract verified',
         'Pass -Build to create the unsigned internal preview',
         'commonCoreCommit = $commonCoreCommit',
+        'kind = "dronedream-lab-preview-artifact-receipt"',
+        'uiSwitchCountsAsAuthority = $false',
+        'hardwareActionDecision = "deny"',
         'authenticode',
         'tauriUpdaterSignature = "not-issued"',
-        'hardwareActionsFailClosed = $true',
     )
     for fragment in required_script_fragments:
         if fragment not in script:
