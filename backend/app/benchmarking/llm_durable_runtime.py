@@ -45,6 +45,12 @@ from app.benchmarking.llm_arm_contracts import (
     require_llm_arm_policy,
     validate_proposal_response,
 )
+from app.benchmarking.provider_usage_reconciliation import (
+    BENCHMARK_DIRECT_RESERVATION_REASON,
+    BenchmarkProviderUsageBlocked,
+    reconcile_direct_provider_run_usage,
+    validate_provider_run_reservation,
+)
 from app.orchestration.cognitive_budget import (
     begin_benchmark_direct_turn,
     cancel_cognitive_turn_if_job_terminal,
@@ -65,7 +71,6 @@ BENCHMARK_PROVIDER_EXECUTION_SCHEMA_ID: Literal[
 BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID = (
     "dronedream.benchmark-direct-proposal/v1"
 )
-BENCHMARK_DIRECT_RESERVATION_REASON = "benchmark-provider-execution"
 BENCHMARK_PROVIDER_BASE_URLS = MappingProxyType(
     {
         "deepseek": "https://api.deepseek.com/v1",
@@ -178,6 +183,22 @@ class BenchmarkDurableDirectExecutionV1(_StrictFrozen):
         ):
             raise ValueError("first-qualified stop must consume zero provider work")
         return self
+
+
+def _usage_is_complete(value: object) -> bool:
+    if not isinstance(value, ProviderUsage):
+        return False
+    input_tokens = value.input_tokens
+    output_tokens = value.output_tokens
+    total_tokens = value.total_tokens
+    if input_tokens is None or output_tokens is None or total_tokens is None:
+        return False
+    if any(
+        isinstance(item, bool) or not isinstance(item, int) or item < 0
+        for item in (input_tokens, output_tokens, total_tokens)
+    ):
+        return False
+    return total_tokens >= input_tokens + output_tokens
 
 
 @dataclass(frozen=True)
@@ -400,6 +421,14 @@ def _require_prereserved_budget(
     )
     if reservation is None or reservation.reason != BENCHMARK_DIRECT_RESERVATION_REASON:
         _blocked("benchmark_provider_budget_unreserved", "Run provider budget is not reserved.")
+    try:
+        validate_provider_run_reservation(
+            reservation,
+            campaign_id=context.campaign.id,
+            run_binding_id=context.binding.id,
+        )
+    except BenchmarkProviderUsageBlocked as exc:
+        raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
     config = context.provider
     request_bytes = len(canonical_json_bytes(request_body))
     worst_tokens = request_bytes + config.maximum_output_tokens
@@ -521,7 +550,8 @@ def execute_durable_direct_arm(
             "Provider transport failed; this attempted turn cannot be replayed.",
         ) from exc
     if (
-        not isinstance(result.response_text, str)
+        not isinstance(result, BenchmarkProviderTransportResult)
+        or not isinstance(result.response_text, str)
         or isinstance(result.latency_ms, bool)
         or not isinstance(result.latency_ms, int)
         or result.latency_ms < 0
@@ -539,6 +569,24 @@ def execute_durable_direct_arm(
             error_code="benchmark_transport_result_invalid",
         )
         _blocked("benchmark_transport_result_invalid", "Transport returned an invalid result.")
+    if not _usage_is_complete(result.usage):
+        accountant.succeed(
+            network_attempt,
+            response_content=result.response_text,
+            usage=ProviderUsage(),
+            latency_ms=result.latency_ms,
+        )
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="provider_failed",
+            error_code="benchmark_provider_usage_incomplete",
+        )
+        _blocked(
+            "benchmark_provider_usage_incomplete",
+            "Provider response omitted complete token usage required by the formal contract.",
+        )
     accountant.succeed(
         network_attempt,
         response_content=result.response_text,
@@ -573,6 +621,15 @@ def execute_durable_direct_arm(
         db,
         cognitive_turn_receipt_id=attempt.receipt_id,
     )
+    try:
+        usage_reconciliation = reconcile_direct_provider_run_usage(db, context.binding.id)
+    except BenchmarkProviderUsageBlocked as exc:
+        raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
+    if usage_reconciliation.status != "complete":
+        _blocked(
+            "benchmark_provider_usage_incomplete",
+            "Provider usage cannot be reconciled completely against the reservation.",
+        )
     parameter_sha256 = canonical_sha256(parameters)
     safe_receipt = {
         "schema_id": BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID,
@@ -588,6 +645,7 @@ def execute_durable_direct_arm(
         "provider_turns_succeeded": 1,
         "provider_requests_attempted": request_counts[0],
         "provider_requests_succeeded": request_counts[1],
+        "provider_usage_reconciliation_sha256": canonical_sha256(usage_reconciliation),
         "retry_cap": 0,
     }
     proposal = BenchmarkProposalV1(

@@ -15,9 +15,11 @@ from sqlalchemy.orm import Session
 from app.benchmarking.contracts import (
     BENCHMARK_OBSERVATION_CONTRACT_SHA256,
     BenchmarkArmManifestV1,
+    BenchmarkBudgetReservationRequestV1,
     BenchmarkCampaignManifestV1,
     BenchmarkObservationV2,
     BenchmarkRunBindingRequestV1,
+    BenchmarkUsageDeltaV1,
     canonical_sha256,
 )
 from app.benchmarking.coordinator import run_binding_sha256
@@ -30,6 +32,10 @@ from app.benchmarking.llm_durable_runtime import (
     execute_durable_direct_arm,
 )
 from app.benchmarking.method_inventory import BENCHMARK_METHOD_INVENTORY
+from app.benchmarking.provider_usage_reconciliation import (
+    BenchmarkProviderUsageBlocked,
+    reconcile_direct_provider_run_usage,
+)
 from app.benchmarking.registry import BENCHMARK_ADAPTER_REGISTRY, create_benchmark_adapter
 from app.orchestration.cognitive_budget import CognitiveTurnPending
 from app.orchestration.provider_request_accounting import (
@@ -301,20 +307,29 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
     )
     db.add(run)
     db.flush()
+    reservation_usage = BenchmarkUsageDeltaV1(
+        logical_turns=2,
+        network_requests=2,
+        input_utf8_bytes=10_000_000,
+        output_utf8_bytes=10_000_000,
+        provider_tokens=10_000_000,
+        provider_cost_microusd=10_000_000,
+        wall_time_seconds=1000,
+    )
+    reservation_request = BenchmarkBudgetReservationRequestV1(
+        reservation_key=f"provider-run/{run.id}",
+        lease_generation=1,
+        reason=BENCHMARK_DIRECT_RESERVATION_REASON,
+        usage=reservation_usage,
+    )
     db.add(
         models.BenchmarkBudgetReservation(
             campaign_id=campaign.id,
-            reservation_key=f"provider-run/{run.id}",
+            reservation_key=reservation_request.reservation_key,
             lease_generation=1,
             reason=BENCHMARK_DIRECT_RESERVATION_REASON,
-            reservation_sha256="7" * 64,
-            logical_turns=2,
-            network_requests=2,
-            input_utf8_bytes=10_000_000,
-            output_utf8_bytes=10_000_000,
-            provider_tokens=10_000_000,
-            provider_cost_microusd=10_000_000,
-            wall_time_seconds=1000,
+            reservation_sha256=canonical_sha256(reservation_request),
+            **reservation_usage.model_dump(),
         )
     )
     db.commit()
@@ -458,6 +473,16 @@ def test_direct_attempts_are_committed_before_transport_and_success_is_safe(
         assert result.proposal.parameters == {"kp": 1.2}
         assert result.provider_turns_attempted == result.provider_turns_succeeded == 1
         assert result.provider_requests_attempted == result.provider_requests_succeeded == 1
+        reconciliation = reconcile_direct_provider_run_usage(db, run.id)
+        assert reconciliation.status == "complete"
+        assert reconciliation.actual_observed.logical_turns == 1
+        assert reconciliation.actual_observed.network_requests == 1
+        assert reconciliation.actual_observed.provider_tokens == 120
+        assert reconciliation.actual_observed.provider_cost_microusd == 360
+        assert reconciliation.actual_observed.wall_time_seconds == 1
+        assert result.safe_receipt["provider_usage_reconciliation_sha256"] == canonical_sha256(
+            reconciliation
+        )
         serialized = json.dumps(result.safe_receipt, sort_keys=True)
         assert "messages" not in serialized
         assert "system" not in serialized
@@ -486,6 +511,12 @@ def test_provider_failure_is_fail_closed_and_does_not_persist_exception_text(
         request = db.scalar(select(models.ProviderNetworkRequestReceipt))
         assert turn is not None and turn.outcome.status == "provider_failed"
         assert request is not None and request.outcome.status == "failed"
+        reconciliation = reconcile_direct_provider_run_usage(db, run.id)
+        assert reconciliation.status == "usage_incomplete"
+        assert reconciliation.cognitive_turns.failed == 1
+        assert reconciliation.network_requests.failed == 1
+        assert reconciliation.actual_observed.logical_turns == 1
+        assert reconciliation.actual_observed.network_requests == 1
         persisted = " ".join(
             str(item.__dict__)
             for item in (turn, turn.outcome, request, request.outcome)
@@ -575,6 +606,132 @@ def test_process_crash_leaves_indeterminate_attempt_and_never_replays(
             )
         assert second_transport.calls == 0
         assert job.provider_requests_attempted == 1
+
+
+def test_missing_provider_usage_is_durable_but_cannot_produce_a_proposal(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+
+    @dataclass
+    class _MissingUsageTransport:
+        def complete(self, request: Any, config: Any) -> BenchmarkProviderTransportResult:
+            return BenchmarkProviderTransportResult(
+                response_text=_proposal_json(),
+                usage=ProviderUsage(),
+                latency_ms=25,
+            )
+
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_direct_arm(
+                db,
+                job,
+                _observation(job, run),
+                transport=_MissingUsageTransport(),
+            )
+        assert exc_info.value.code == "benchmark_provider_usage_incomplete"
+        request = db.scalar(select(models.ProviderNetworkRequestReceipt))
+        turn = db.scalar(select(models.HarnessCognitiveTurnReceipt))
+        assert request is not None and request.outcome.status == "succeeded"
+        assert request.outcome.total_tokens is None
+        assert turn is not None and turn.outcome.status == "provider_failed"
+        reconciliation = reconcile_direct_provider_run_usage(db, run.id)
+        assert reconciliation.status == "usage_incomplete"
+        assert reconciliation.network_requests.succeeded == 1
+        assert reconciliation.requests_with_incomplete_usage == 1
+
+
+def test_indeterminate_attempt_is_counted_and_never_presented_as_complete(
+    durable_db: SimpleNamespace,
+) -> None:
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        with pytest.raises(KeyboardInterrupt):
+            execute_durable_direct_arm(
+                db,
+                job,
+                _observation(job, run),
+                transport=_Transport(KeyboardInterrupt()),
+            )
+        reconciliation = reconcile_direct_provider_run_usage(db, run.id)
+        assert reconciliation.status == "indeterminate"
+        assert reconciliation.cognitive_turns.indeterminate == 1
+        assert reconciliation.network_requests.indeterminate == 1
+        assert reconciliation.actual_observed.logical_turns == 1
+        assert reconciliation.actual_observed.network_requests == 1
+
+
+def test_reservation_hash_drift_blocks_before_transport(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        reservation = db.scalar(
+            select(models.BenchmarkBudgetReservation).where(
+                models.BenchmarkBudgetReservation.reservation_key == f"provider-run/{run.id}"
+            )
+        )
+        assert reservation is not None
+        reservation.reservation_sha256 = "f" * 64
+        db.commit()
+        transport = _Transport(_proposal_json())
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_direct_arm(
+                db,
+                job,
+                _observation(job, run),
+                transport=transport,
+            )
+        assert exc_info.value.code == "benchmark_provider_reservation_hash_drift"
+        assert transport.calls == 0
+
+
+def test_reconciliation_rejects_actual_usage_beyond_rebound_capacity(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        execute_durable_direct_arm(
+            db,
+            job,
+            _observation(job, run),
+            transport=_Transport(_proposal_json()),
+        )
+        reservation = db.scalar(
+            select(models.BenchmarkBudgetReservation).where(
+                models.BenchmarkBudgetReservation.reservation_key == f"provider-run/{run.id}"
+            )
+        )
+        assert reservation is not None
+        reservation.output_utf8_bytes = 1
+        changed_usage = BenchmarkUsageDeltaV1(
+            jobs=reservation.jobs,
+            trials=reservation.trials,
+            logical_turns=reservation.logical_turns,
+            network_requests=reservation.network_requests,
+            input_utf8_bytes=reservation.input_utf8_bytes,
+            output_utf8_bytes=reservation.output_utf8_bytes,
+            provider_tokens=reservation.provider_tokens,
+            provider_cost_microusd=reservation.provider_cost_microusd,
+            wall_time_seconds=reservation.wall_time_seconds,
+            disk_bytes=reservation.disk_bytes,
+        )
+        reservation.reservation_sha256 = canonical_sha256(
+            BenchmarkBudgetReservationRequestV1(
+                reservation_key=reservation.reservation_key,
+                lease_generation=reservation.lease_generation,
+                reason=reservation.reason,
+                usage=changed_usage,
+            )
+        )
+        db.commit()
+        with pytest.raises(BenchmarkProviderUsageBlocked) as exc_info:
+            reconcile_direct_provider_run_usage(db, run.id)
+        assert exc_info.value.code == "benchmark_provider_usage_exceeds_reservation"
 
 
 @pytest.mark.parametrize(

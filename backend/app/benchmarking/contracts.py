@@ -568,6 +568,70 @@ class BenchmarkBudgetReservationRecordV1(_Strict):
     created_at: datetime
 
 
+class BenchmarkProviderAttemptCountsV1(_Strict):
+    attempted: Annotated[int, Field(ge=0)]
+    succeeded: Annotated[int, Field(ge=0)]
+    failed: Annotated[int, Field(ge=0)]
+    indeterminate: Annotated[int, Field(ge=0)]
+
+    @model_validator(mode="after")
+    def _require_partition(self) -> BenchmarkProviderAttemptCountsV1:
+        if self.attempted != self.succeeded + self.failed + self.indeterminate:
+            raise ValueError("attempt outcome counts must exactly partition attempted work")
+        return self
+
+
+class BenchmarkProviderRunUsageReconciliationV1(_Strict):
+    """Deterministic actual-usage view over append-only provider ledgers.
+
+    Campaign ``used`` counters reserve worst-case capacity before work starts.
+    This contract deliberately reports actual observed work separately so a
+    caller cannot double count it by adding it to the reservation ledger.
+    """
+
+    schema_id: Literal["dronedream.benchmark-provider-run-usage/v1"] = (
+        "dronedream.benchmark-provider-run-usage/v1"
+    )
+    status: Literal["complete", "usage_incomplete", "indeterminate"]
+    campaign_id: str
+    run_binding_id: str
+    job_id: str
+    benchmark_arm_id: Identifier
+    source_commit: GitCommit
+    composite_inventory_sha256: Sha256Hex
+    reservation_id: str
+    reservation_sha256: Sha256Hex
+    reserved_capacity: BenchmarkResourceVectorV1
+    actual_observed: BenchmarkResourceVectorV1
+    cognitive_turns: BenchmarkProviderAttemptCountsV1
+    network_requests: BenchmarkProviderAttemptCountsV1
+    requests_with_incomplete_usage: Annotated[int, Field(ge=0)]
+    cognitive_ledger_sha256: Sha256Hex
+    network_ledger_sha256: Sha256Hex
+
+    @model_validator(mode="after")
+    def _validate_reconciliation(self) -> BenchmarkProviderRunUsageReconciliationV1:
+        if self.actual_observed.logical_turns != self.cognitive_turns.attempted:
+            raise ValueError("actual logical turns must match the cognitive ledger")
+        if self.actual_observed.network_requests != self.network_requests.attempted:
+            raise ValueError("actual network requests must match the request ledger")
+        for field, observed in self.actual_observed.model_dump().items():
+            if int(observed) > int(getattr(self.reserved_capacity, field)):
+                raise ValueError(f"actual {field} exceeds preregistered capacity")
+        expected_status = (
+            "indeterminate"
+            if self.cognitive_turns.indeterminate or self.network_requests.indeterminate
+            else "usage_incomplete"
+            if self.requests_with_incomplete_usage
+            else "complete"
+        )
+        if self.status != expected_status:
+            raise ValueError("reconciliation status does not match ledger completeness")
+        if self.requests_with_incomplete_usage > self.network_requests.attempted:
+            raise ValueError("incomplete usage count exceeds attempted network requests")
+        return self
+
+
 class BenchmarkCampaignUsageV1(_Strict):
     campaign_id: str
     status: Literal["PREREGISTERED", "ACTIVE", "COMPLETED", "FAILED", "CANCELLED"]
@@ -707,6 +771,8 @@ __all__ = [
     "BenchmarkArmRecordV1",
     "BenchmarkBudgetReservationRecordV1",
     "BenchmarkBudgetReservationRequestV1",
+    "BenchmarkProviderAttemptCountsV1",
+    "BenchmarkProviderRunUsageReconciliationV1",
     "BenchmarkResourceVectorV1",
     "BenchmarkRunBindingRecordV1",
     "BenchmarkRunBindingRequestV1",
