@@ -14,6 +14,9 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.api_idempotency import begin_mutation
 from app.auth import get_current_user
+from app.benchmarking.physical_stability_job_evidence import (
+    compile_physical_stability_job_evidence,
+)
 from app.db import get_db
 from app.orchestration.experience_memory import (
     HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
@@ -185,6 +188,30 @@ def get_job(
     except job_service.JobServiceError as err:
         _raise(err)
     return ok(job_service.to_job_schema(job).model_dump(mode="json"))
+
+
+@router.get("/jobs/{job_id}/physical-stability-evidence")
+def get_physical_stability_evidence(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Return server-derived, byte-verified P5 terminal evidence only."""
+
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+        evidence = compile_physical_stability_job_evidence(job)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PHYSICAL_STABILITY_EVIDENCE_NOT_READY",
+                "message": "Physical stability evidence is incomplete or invalid.",
+            },
+        ) from err
+    return ok(evidence.model_dump(mode="json"))
 
 
 @router.patch("/jobs/{job_id}")

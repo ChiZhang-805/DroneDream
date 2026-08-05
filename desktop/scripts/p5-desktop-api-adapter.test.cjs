@@ -119,6 +119,7 @@ test("adapter creates one source-bound observation and exposes read-only evidenc
   await adapter.getTrial("trial-p5-unit");
   await adapter.getArtifacts("job-p5-unit");
   await adapter.getReport("job-p5-unit");
+  await adapter.getPhysicalStabilityEvidence("job-p5-unit");
   assert.deepEqual(
     page.calls.filter((call) => call?.pathValue).slice(1).map((call) => call.pathValue),
     [
@@ -127,6 +128,7 @@ test("adapter creates one source-bound observation and exposes read-only evidenc
       "/api/v1/trials/trial-p5-unit",
       "/api/v1/jobs/job-p5-unit/artifacts",
       "/api/v1/jobs/job-p5-unit/report",
+      "/api/v1/jobs/job-p5-unit/physical-stability-evidence",
     ],
   );
   await assert.rejects(

@@ -32,6 +32,9 @@ from app.benchmarking.physical_stability_execution import (
     record_physical_stability_job_observed,
     record_physical_stability_terminal_observation,
 )
+from app.benchmarking.physical_stability_job_evidence import (
+    PhysicalStabilityJobEvidenceSnapshotV1,
+)
 
 PHYSICAL_STABILITY_EXECUTION_BUNDLE_SCHEMA_ID: Final[
     Literal["dronedream.physical-stability-execution-bundle/v1"]
@@ -429,6 +432,70 @@ def close_physical_stability_job(
     return after, transition
 
 
+def build_physical_stability_terminal_observation(
+    bundle: PhysicalStabilityExecutionBundleV1,
+    *,
+    scenario_ordinal: int,
+    snapshot: PhysicalStabilityJobEvidenceSnapshotV1,
+) -> PhysicalStabilityTerminalObservationV1:
+    """Map one server-derived Job snapshot to its preregistered Trial identities."""
+
+    if not 1 <= scenario_ordinal <= len(bundle.jobs):
+        raise ValueError("P5 scenario ordinal is outside the execution bundle")
+    job = bundle.jobs[scenario_ordinal - 1]
+    request = schemas.JobCreateRequest.model_validate(job.request_payload)
+    expected_scenario_type = request.scenario_suite.cases[0].scenario_type
+    observed_by_seed = {item.seed: item for item in snapshot.trials}
+    expected_seeds = {item.seed for item in job.trials}
+    if set(observed_by_seed) != expected_seeds:
+        raise ValueError("P5 server snapshot seeds differ from the preregistered Job")
+    if any(item.scenario_type != expected_scenario_type for item in snapshot.trials):
+        raise ValueError("P5 server snapshot scenario type differs from the Job request")
+
+    trials: list[PhysicalStabilityTrialObservationV1] = []
+    for binding in job.trials:
+        observed = observed_by_seed[binding.seed]
+        trials.append(
+            PhysicalStabilityTrialObservationV1(
+                planned_trial_id=binding.planned_trial_id,
+                trial_ordinal=binding.trial_ordinal,
+                observed_trial_id=observed.observed_trial_id,
+                seed=observed.seed,
+                scenario_type=observed.scenario_type,
+                status=observed.terminal_status,
+                candidate_id=observed.candidate_id,
+                candidate_is_baseline=observed.candidate_is_baseline,
+                input_contract_sha256=binding.input_contract_sha256,
+                scenario_effect_request_sha256=(
+                    observed.scenario_effect_request_sha256
+                    or binding.scenario_effect_request_sha256
+                ),
+                effect_readback_receipt_sha256=observed.effect_readback_receipt_sha256,
+                parameter_readback_receipt_sha256=(
+                    observed.parameter_readback_receipt_sha256
+                ),
+                telemetry_sha256=observed.telemetry_sha256,
+                metric_evidence_sha256=observed.metric_evidence_sha256,
+                artifact_inventory_sha256=observed.artifact_inventory_sha256,
+                artifact_content_sha256=observed.artifact_content_sha256,
+                effect_ids_read_back=observed.effect_ids_read_back,
+                safety_critical_failure=observed.safety_critical_failure,
+                failure_code=observed.failure_code,
+            )
+        )
+    return PhysicalStabilityTerminalObservationV1(
+        repository_subject_commit=bundle.repository_subject_commit,
+        execution_bundle_sha256=canonical_sha256(bundle),
+        scenario_ordinal=scenario_ordinal,
+        scenario_id=job.scenario_id,
+        observed_job_id=snapshot.observed_job_id,
+        observed_baseline_candidate_id=snapshot.observed_baseline_candidate_id,
+        request_sha256=job.request_sha256,
+        job_status=snapshot.job_status,
+        trials=tuple(trials),
+    )
+
+
 def require_manual_reconciliation_after_unobserved_dispatch(
     ledger: PhysicalStabilityExecutionLedgerV1,
 ) -> None:
@@ -452,6 +519,7 @@ __all__ = [
     "PhysicalStabilityJobCreateObservationV1",
     "PhysicalStabilityTerminalObservationV1",
     "PhysicalStabilityTrialObservationV1",
+    "build_physical_stability_terminal_observation",
     "build_physical_stability_execution_bundle",
     "close_physical_stability_job",
     "dispatch_next_physical_stability_job",

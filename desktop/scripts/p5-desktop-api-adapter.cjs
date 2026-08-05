@@ -24,6 +24,10 @@ const ROUTES = [
   },
   { method: "GET", pattern: new RegExp(`^/api/v1/jobs/${IDENTIFIER}/artifacts$`) },
   { method: "GET", pattern: new RegExp(`^/api/v1/jobs/${IDENTIFIER}/report$`) },
+  {
+    method: "GET",
+    pattern: new RegExp(`^/api/v1/jobs/${IDENTIFIER}/physical-stability-evidence$`),
+  },
   { method: "GET", pattern: new RegExp(`^/api/v1/trials/${IDENTIFIER}$`) },
 ];
 const SENSITIVE_KEYS = new Set([
@@ -297,6 +301,13 @@ function createP5DesktopApiAdapter(page, expectedEnginePack) {
         page,
         "GET",
         `/api/v1/jobs/${encodeIdentifier(jobId, "Job ID")}/report`,
+      );
+    },
+    getPhysicalStabilityEvidence(jobId) {
+      return localApi(
+        page,
+        "GET",
+        `/api/v1/jobs/${encodeIdentifier(jobId, "Job ID")}/physical-stability-evidence`,
       );
     },
   });

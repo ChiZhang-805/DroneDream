@@ -13,12 +13,14 @@ from app.benchmarking.physical_stability import (
     build_physical_stability_manifest,
     compile_physical_stability_trial_plan,
 )
+from app.benchmarking.physical_stability_assessment import PhysicalStabilityMetricsV1
 from app.benchmarking.physical_stability_bridge import (
     PhysicalStabilityExecutionBundleV1,
     PhysicalStabilityJobCreateObservationV1,
     PhysicalStabilityTerminalObservationV1,
     PhysicalStabilityTrialObservationV1,
     build_physical_stability_execution_bundle,
+    build_physical_stability_terminal_observation,
     close_physical_stability_job,
     dispatch_next_physical_stability_job,
     require_manual_reconciliation_after_unobserved_dispatch,
@@ -31,6 +33,10 @@ from app.benchmarking.physical_stability_execution import (
     build_physical_stability_execution_ledger,
     record_physical_stability_dispatch_attempt,
     record_physical_stability_job_observed,
+)
+from app.benchmarking.physical_stability_job_evidence import (
+    PhysicalStabilityAcceptedTrialSnapshotV1,
+    PhysicalStabilityJobEvidenceSnapshotV1,
 )
 from app.services.jobs import _validate_real_cli_scenario_effect_contract
 
@@ -164,6 +170,46 @@ def _complete_observation(bundle, *, job_id: str) -> PhysicalStabilityTerminalOb
         request_sha256=job.request_sha256,
         job_status="completed",
         trials=trials,
+    )
+
+
+def _server_snapshot(bundle, *, job_id: str) -> PhysicalStabilityJobEvidenceSnapshotV1:
+    observation = _complete_observation(bundle, job_id=job_id)
+    return PhysicalStabilityJobEvidenceSnapshotV1(
+        observed_job_id=job_id,
+        observed_baseline_candidate_id=observation.observed_baseline_candidate_id,
+        job_status="completed",
+        trials=tuple(
+            PhysicalStabilityAcceptedTrialSnapshotV1(
+                observed_trial_id=item.observed_trial_id,
+                seed=item.seed,
+                scenario_type=item.scenario_type,
+                terminal_status=item.status,
+                candidate_id=item.candidate_id,
+                accepted_attempt_id=f"attempt-{item.trial_ordinal:03d}",
+                accepted_attempt_count=1,
+                claim_evidence_id="sha256:" + "1" * 64,
+                outcome_evidence_id="sha256:" + "2" * 64,
+                scenario_effect_request_sha256=item.scenario_effect_request_sha256,
+                effect_readback_receipt_sha256=item.effect_readback_receipt_sha256,
+                parameter_readback_receipt_sha256=(item.parameter_readback_receipt_sha256),
+                telemetry_sha256=item.telemetry_sha256,
+                metric_evidence_sha256=item.metric_evidence_sha256,
+                artifact_inventory_sha256=item.artifact_inventory_sha256,
+                artifact_content_sha256=item.artifact_content_sha256,
+                effect_ids_read_back=item.effect_ids_read_back,
+                metrics=PhysicalStabilityMetricsV1(
+                    rmse=0.4,
+                    max_error=0.8,
+                    completion_time_seconds=12.0,
+                    pass_flag=True,
+                    crash_flag=False,
+                    timeout_flag=False,
+                    instability_flag=False,
+                ),
+            )
+            for item in observation.trials
+        ),
     )
 
 
@@ -326,6 +372,39 @@ def test_closes_only_from_complete_content_addressed_terminal_evidence() -> None
     assert closed.terminal_trial_count == 10
     assert closed.next_scenario_ordinal == 2
     assert len(terminal_store.checkpoints) == 1
+
+
+def test_maps_server_snapshot_to_planned_trials_by_seed_not_database_id() -> None:
+    _manifest, _plan, bundle, _ledger = _contracts()
+    snapshot = _server_snapshot(bundle, job_id="job-server-generated")
+
+    observation = build_physical_stability_terminal_observation(
+        bundle,
+        scenario_ordinal=1,
+        snapshot=snapshot,
+    )
+
+    assert observation.observed_job_id == "job-server-generated"
+    assert observation.observed_baseline_candidate_id == "cand-server-generated-baseline"
+    assert tuple(item.planned_trial_id for item in observation.trials) == tuple(
+        item.planned_trial_id for item in bundle.jobs[0].trials
+    )
+    assert tuple(item.observed_trial_id for item in observation.trials) == tuple(
+        f"observed-{item.trial_ordinal:03d}" for item in bundle.jobs[0].trials
+    )
+
+    payload = snapshot.model_dump(mode="python")
+    trials = list(payload["trials"])
+    trials[0] = deepcopy(trials[0])
+    trials[0]["seed"] = 999_999
+    payload["trials"] = tuple(trials)
+    drifted = PhysicalStabilityJobEvidenceSnapshotV1.model_validate(payload)
+    with pytest.raises(ValueError, match="seeds differ"):
+        build_physical_stability_terminal_observation(
+            bundle,
+            scenario_ordinal=1,
+            snapshot=drifted,
+        )
 
 
 def test_terminal_evidence_rejects_missing_artifact_hash_and_effect_drift() -> None:
