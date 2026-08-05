@@ -68,7 +68,7 @@ const COPY = {
     subtitle:
       "One shared core, two distinct workflows. Hardware execution remains unavailable until a validated Vehicle Pack and native, backend, and runtime quorum exist.",
     edition: "Edition",
-    editionValue: "Lab preview",
+    editionValue: "DroneDream · LAB",
     packs: "Validated packs",
     packsValue: "0 of 8",
     authority: "Hardware authority",
@@ -145,7 +145,7 @@ const COPY = {
     subtitle:
       "同一公共核心承载两套清晰分离的工作流。在具备已验证 Vehicle Pack 以及 native、后端与 Runtime 三层一致授权前，真机执行始终不可用。",
     edition: "版本",
-    editionValue: "Lab 内测预览",
+    editionValue: "DroneDream · LAB",
     packs: "已验证机型包",
     packsValue: "0 / 8",
     authority: "真机权限",

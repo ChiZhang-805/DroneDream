@@ -5,8 +5,8 @@
   "editionVersion": "1.0.0",
   "productDisplayVersion": "1.0.0",
   "displayName": {
-    "en": "DroneDream Lab",
-    "zh-CN": "DroneDream 实验室版"
+    "en": "DroneDream · LAB",
+    "zh-CN": "DroneDream · LAB"
   },
   "description": {
     "en": "Unified simulation, HITL, and real-hardware laboratory workflows behind native, runtime, and backend safety fences.",

@@ -9,3 +9,9 @@ export const appEdition = resolveAppEdition(
 );
 
 export const labEditionEnabled = appEdition === "lab";
+
+export function resolveAppDisplayName(edition: AppEdition) {
+  return edition === "lab" ? "DroneDream · LAB" : "DroneDream";
+}
+
+export const appDisplayName = resolveAppDisplayName(appEdition);

@@ -101,7 +101,7 @@ import type {
   UserExperiencePreferences,
 } from "./types/api";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
-import { labEditionEnabled } from "./edition";
+import { appDisplayName, labEditionEnabled } from "./edition";
 
 type NavigationItem = {
   to: string;
@@ -2527,7 +2527,7 @@ function AppShellContent() {
           {t("app.skipToContent")}
         </a>
         <header className="launcher-chrome">
-          <Link to="/desktop/setup" className="launcher-brand" aria-label="DroneDream">
+          <Link to="/desktop/setup" className="launcher-brand" aria-label={appDisplayName}>
             <BrandLockup variant="compact" />
           </Link>
           <div className="launcher-chrome-actions">
@@ -2593,12 +2593,12 @@ function AppShellContent() {
           <Link
             to={labEditionEnabled ? "/lab/setup" : "/assistant"}
             className="app-title"
-            aria-label={labEditionEnabled ? "DroneDream Lab" : "DroneDream"}
+            aria-label={appDisplayName}
           >
             <BrandLockup variant="compact" />
           </Link>
         ) : (
-          <a href="/" className="app-title" aria-label="DroneDream">
+          <a href="/" className="app-title" aria-label={appDisplayName}>
             <BrandLockup variant="compact" />
           </a>
         )}
@@ -2786,7 +2786,7 @@ function AppShellContent() {
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">
-            {labEditionEnabled ? "DroneDream Lab" : "DroneDream"} — {t("app.platform")}
+            {appDisplayName} — {t("app.platform")}
           </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">

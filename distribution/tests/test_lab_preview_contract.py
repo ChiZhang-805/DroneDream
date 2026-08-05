@@ -111,12 +111,12 @@ class LabPreviewContractTests(unittest.TestCase):
 
     def test_lab_manifest_has_independent_chinese_copy(self) -> None:
         manifest = json.loads(LAB_EDITION.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["displayName"]["zh-CN"], "DroneDream 实验室版")
+        self.assertEqual(manifest["displayName"]["en"], "DroneDream · LAB")
+        self.assertEqual(manifest["displayName"]["zh-CN"], "DroneDream · LAB")
         self.assertEqual(
             manifest["description"]["zh-CN"],
             "统一提供仿真、HITL 与真机实验，但所有真机能力都必须通过 native、Runtime 与后端三层安全门。",
         )
-        self.assertNotEqual(manifest["displayName"]["zh-CN"], manifest["displayName"]["en"])
         self.assertNotEqual(manifest["description"]["zh-CN"], manifest["description"]["en"])
 
     def test_lab_ui_vehicle_adapter_matches_authoritative_registry(self) -> None:

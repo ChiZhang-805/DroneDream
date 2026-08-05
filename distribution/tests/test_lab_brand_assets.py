@@ -90,8 +90,16 @@ class LabBrandAssetTests(unittest.TestCase):
 
     def test_integration_state_does_not_overstate_application(self) -> None:
         self.assertEqual(
-            set(self.manifest["integration"].values()),
-            {"source-ready-not-applied"},
+            self.manifest["integration"]["application"],
+            "applied-compile-time-lab-only",
+        )
+        self.assertEqual(
+            self.manifest["integration"]["installer"],
+            "source-ready-not-applied",
+        )
+        self.assertEqual(
+            self.manifest["integration"]["shortcut"],
+            "source-ready-not-applied",
         )
 
 

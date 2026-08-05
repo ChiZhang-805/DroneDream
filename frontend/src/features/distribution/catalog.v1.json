@@ -11,7 +11,7 @@
       },
       "lab": {
         "path": "distribution/editions/lab.v1.json",
-        "sha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356"
+        "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
       },
       "field": {
         "path": "distribution/editions/field.v1.json",
@@ -58,7 +58,7 @@
     {
       "editionId": "lab",
       "editionVersion": "1.0.0",
-      "displayName": {"en": "DroneDream Lab", "zh-CN": "DroneDream 实验室版"},
+      "displayName": {"en": "DroneDream · LAB", "zh-CN": "DroneDream · LAB"},
       "description": {
         "en": "Unified simulation, HITL, and hardware workflows behind native, Runtime, and backend safety fences.",
         "zh-CN": "统一提供仿真、HITL 与真机实验，但真机能力必须通过 native、Runtime 与后端三层安全门。"

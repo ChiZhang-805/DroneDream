@@ -4,6 +4,9 @@
 }
 
 .lab-page {
+  --lab-lime: #a7e84a;
+  --lab-green: #20c77a;
+  --lab-deep-green: #087e69;
   width: 100%;
   color: #1c2024;
   background: #f6f7f8;
@@ -21,7 +24,7 @@
 
 .lab-eyebrow {
   margin: 0 0 0.45rem;
-  color: #8b2f72;
+  color: var(--lab-deep-green);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0;
@@ -129,21 +132,21 @@
 .lab-page input:focus-visible,
 .lab-page select:focus-visible,
 .lab-page summary:focus-visible {
-  outline: 3px solid rgba(139, 47, 114, 0.22);
+  outline: 3px solid rgba(32, 199, 122, 0.28);
   outline-offset: 2px;
 }
 
 .lab-workspace-switch button.is-active {
   position: relative;
   z-index: 1;
-  border-color: #277561;
+  border-color: var(--lab-deep-green);
   background: #edf8f4;
-  color: #155946;
-  box-shadow: inset 0 -3px 0 #277561;
+  color: var(--lab-deep-green);
+  box-shadow: inset 0 -3px 0 var(--lab-lime);
 }
 
 .lab-workspace-switch button.is-active + button {
-  border-left: 1px solid #277561;
+  border-left: 1px solid var(--lab-deep-green);
 }
 
 .lab-workspace-switch svg {
@@ -208,7 +211,7 @@
 }
 
 .lab-view-tabs button[aria-selected="true"] {
-  border-bottom-color: #8b2f72;
+  border-bottom-color: var(--lab-green);
   color: #24292d;
   font-weight: 650;
 }
@@ -244,7 +247,7 @@
   border: 1px solid #d7dce0;
   border-radius: 6px;
   background: #ffffff;
-  color: #277561;
+  color: var(--lab-deep-green);
 }
 
 .lab-tool-intro h2 {
@@ -312,7 +315,7 @@
   justify-content: center;
   gap: 0.25rem;
   padding: 0.7rem 0.85rem;
-  border-left: 3px solid #277561;
+  border-left: 3px solid var(--lab-green);
   background: #f2f8f6;
 }
 

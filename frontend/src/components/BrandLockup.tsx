@@ -1,5 +1,5 @@
-import compactLockup from "../assets/drone-dream-lockup-compact.png";
-import primaryLockup from "../assets/drone-dream-lockup-primary.png";
+import { appEdition } from "../edition";
+import { resolveBrandLockupSource } from "./brandAssets";
 
 type BrandLockupProps = {
   variant?: "primary" | "compact";
@@ -16,6 +16,6 @@ export function BrandLockup({
     className,
   ].filter(Boolean).join(" ");
 
-  const source = variant === "primary" ? primaryLockup : compactLockup;
+  const source = resolveBrandLockupSource(appEdition, variant);
   return <img className={classes} src={source} alt="" aria-hidden="true" />;
 }

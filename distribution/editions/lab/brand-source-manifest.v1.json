@@ -47,7 +47,7 @@
     }
   ],
   "integration": {
-    "application": "source-ready-not-applied",
+    "application": "applied-compile-time-lab-only",
     "installer": "source-ready-not-applied",
     "shortcut": "source-ready-not-applied"
   }
