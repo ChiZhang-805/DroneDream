@@ -3,7 +3,7 @@
   "kind": "dronedream-common-core-forward-port-proposal",
   "proposalId": "field-installer-shortcut-icon-hook-v1",
   "editionId": "field",
-  "status": "pending-universal-forward-port",
+  "status": "resolved-by-field-overlay-merge-patch",
   "fieldSourceCommit": "cf609d7012f4001be23c3c40b6376d1884cd8dc9",
   "commonCoreBaseCommit": "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
   "issue": {
@@ -25,20 +25,25 @@
     "historyRewriteAllowed": false,
     "forcePushAllowed": false
   },
-  "fieldFollowUpAfterForwardPort": {
+  "fieldResolution": {
     "paths": [
-      "desktop/src-tauri/nsis/field-webview2-health.nsh",
       "desktop/src-tauri/tauri.field.conf.json",
-      "distribution/tests/test_field_desktop_profile.py"
+      "distribution/tests/test_field_desktop_profile.py",
+      "distribution/tools/field_common_drift_readiness_audit.py"
     ],
     "requirements": [
-      "Create a thin Field wrapper that selects $INSTDIR\\icons\\DroneDream-Field.ico and includes the shared Universal hook.",
-      "Point only the Field Tauri overlay at the thin wrapper.",
-      "Re-run static installer structure verification before requesting a YELLOW preview build."
-    ]
+      "Keep the shared Universal hook unchanged at $INSTDIR\\icons\\DroneDream.ico.",
+      "Use the Tauri RFC 7396 overlay to remove icons/icon.ico and map the canonical Field ICO to icons/DroneDream.ico.",
+      "Re-run static effective-config verification before requesting a YELLOW preview build."
+    ],
+    "method": "field-overlay-rfc7396-resource-replacement",
+    "tauriVersion": "2.11.5",
+    "tauriBuildVersion": "2.6.3",
+    "jsonPatchVersion": "3.0.1",
+    "removedResourceSource": "icons/icon.ico",
+    "replacementResourceSource": "../../brand/generated/field/windows/icon.ico",
+    "installedShortcutIconPath": "icons/DroneDream.ico",
+    "sharedHookModified": false
   },
-  "blockedUntilAccepted": [
-    "field-installer-shortcut-brand-coverage",
-    "field-preview-build-request"
-  ]
+  "blockedUntilAccepted": []
 }

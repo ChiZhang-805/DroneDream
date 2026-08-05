@@ -105,7 +105,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
     def test_desktop_preview_structure_binds_exact_brand_and_installer_inputs(self) -> None:
         receipt = audit_tool.validate_field_preview_readiness_receipt(self.receipt)
         structure = receipt["desktopPreviewStructure"]
-        self.assertFalse(structure["verified"])
+        self.assertTrue(structure["verified"])
         self.assertEqual(structure["artifactBaseName"], "DroneDream-Field-1.0.0.exe")
         self.assertEqual(structure["frontendDist"], "../../frontend/field-dist")
         self.assertEqual(structure["updaterManifestFilename"], "field-latest.json")
@@ -114,18 +114,19 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
             "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
         )
         self.assertEqual(structure["simulatorReferences"], [])
-        self.assertIn(
-            "field.desktop-consumer.invalid:installerShortcutFieldIcon",
-            structure["verificationErrors"],
+        self.assertEqual(structure["verificationErrors"], [])
+        self.assertTrue(all(structure["consumerChecks"].values()))
+        self.assertLessEqual(
+            structure["effectiveResourceBytes"],
+            structure["resourceUpperBoundBytes"],
         )
-        self.assertFalse(structure["consumerChecks"]["installerShortcutFieldIcon"])
-        self.assertIn(
+        self.assertNotIn(
             "field.installer-shortcut-icon.common-core-hook-pending",
             receipt["blockers"],
         )
         self.assertEqual(
             structure["installerShortcutHook"]["proposalStatus"],
-            "pending-universal-forward-port",
+            "resolved-by-field-overlay-merge-patch",
         )
         self.assertEqual(
             {asset["assetId"]: asset["sha256"] for asset in structure["assets"]},
@@ -146,13 +147,18 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         ):
             audit_tool.validate_field_preview_readiness_receipt(drifted)
 
-    def test_shortcut_icon_common_core_proposal_is_minimal_and_pending(self) -> None:
+    def test_shortcut_icon_common_core_proposal_retains_resolved_history(self) -> None:
         path = ROOT / (
             "distribution/editions/field/"
             "installer-shortcut-icon-common-core-proposal.v1.json"
         )
         proposal = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual(proposal["status"], "pending-universal-forward-port")
+        self.assertEqual(
+            proposal["status"],
+            "resolved-by-field-overlay-merge-patch",
+        )
+        self.assertEqual(proposal["blockedUntilAccepted"], [])
+        self.assertFalse(proposal["fieldResolution"]["sharedHookModified"])
         self.assertEqual(proposal["commonCoreBaseCommit"], audit_tool._run_git(
             ROOT,
             "merge-base",
@@ -165,6 +171,23 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         ])
         self.assertFalse(proposal["minimumUniversalPatch"]["historyRewriteAllowed"])
         self.assertFalse(proposal["minimumUniversalPatch"]["forcePushAllowed"])
+
+    def test_tauri_json_merge_patch_removes_universal_icon_source(self) -> None:
+        effective = audit_tool.apply_json_merge_patch(
+            {"bundle": {"resources": {"icons/icon.ico": "icons/DroneDream.ico"}}},
+            {
+                "bundle": {
+                    "resources": {
+                        "icons/icon.ico": None,
+                        "field.ico": "icons/DroneDream.ico",
+                    }
+                }
+            },
+        )
+        self.assertEqual(
+            effective,
+            {"bundle": {"resources": {"field.ico": "icons/DroneDream.ico"}}},
+        )
 
     def test_release_field_branch_is_observed_but_not_created(self) -> None:
         receipt = audit_tool.validate_field_preview_readiness_receipt(self.receipt)

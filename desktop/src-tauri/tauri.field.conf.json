@@ -34,12 +34,13 @@
       "../../brand/generated/field/windows/icon.ico"
     ],
     "resources": {
+      "icons/icon.ico": null,
       "../../distribution/editions/field/branding/dronedream-field-mark.png": "branding/dronedream-field-mark.png",
       "../../distribution/editions/field/branding/dronedream-field-dot-lockup.png": "branding/dronedream-field-dot-lockup.png",
       "../../distribution/editions/field/branding/source-manifest.v1.json": "branding/source-manifest.v1.json",
       "../../brand/generated/brand-assets.v1.json": "branding/canonical-brand-assets.v1.json",
       "../../brand/generated/brand-visual-receipt.v1.json": "branding/canonical-brand-visual-receipt.v1.json",
-      "../../brand/generated/field/windows/icon.ico": "icons/DroneDream-Field.ico"
+      "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico"
     },
     "publisher": "DroneDream",
     "shortDescription": "Fail-closed field readiness for supported aircraft",

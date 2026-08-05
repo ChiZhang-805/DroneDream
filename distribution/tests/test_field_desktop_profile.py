@@ -46,6 +46,7 @@ class FieldDesktopProfileTests(unittest.TestCase):
             "../../brand/generated/field/windows/icon.ico",
         ])
         self.assertEqual(self.config["bundle"]["resources"], {
+            "icons/icon.ico": None,
             "../../distribution/editions/field/branding/dronedream-field-mark.png":
                 "branding/dronedream-field-mark.png",
             "../../distribution/editions/field/branding/dronedream-field-dot-lockup.png":
@@ -57,7 +58,7 @@ class FieldDesktopProfileTests(unittest.TestCase):
             "../../brand/generated/brand-visual-receipt.v1.json":
                 "branding/canonical-brand-visual-receipt.v1.json",
             "../../brand/generated/field/windows/icon.ico":
-                "icons/DroneDream-Field.ico",
+                "icons/DroneDream.ico",
         })
         self.assertNotIn("windows", self.config["bundle"])
 

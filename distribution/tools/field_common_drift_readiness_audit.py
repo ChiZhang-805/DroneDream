@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import subprocess
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ FIELD_BRANCH = "codex/software-field"
 FIELD_RELEASE_BRANCH = "codex/release-field"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+FIELD_RESOURCE_UPPER_BOUND_BYTES = 4 * 1024 * 1024
 
 EDITION_BUILD_BACKFLOW_PATHS = {
     "distribution/build-plans/software-1.0.0-065382b68bfa.v1.json",
@@ -105,6 +107,19 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise FieldDriftReadinessAuditError(f"expected JSON object: {path}")
     return document
+
+
+def apply_json_merge_patch(document: Any, patch: Any) -> Any:
+    """Apply the RFC 7396 merge semantics used by tauri-build."""
+    if not isinstance(patch, dict):
+        return deepcopy(patch)
+    target = deepcopy(document) if isinstance(document, dict) else {}
+    for key, value in patch.items():
+        if value is None:
+            target.pop(key, None)
+        else:
+            target[key] = apply_json_merge_patch(target.get(key), value)
+    return target
 
 
 def current_head(repo_root: Path) -> str:
@@ -230,12 +245,13 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
     manifest = load_json(manifest_path)
     tauri = load_json(repo_root / FIELD_TAURI_CONFIG)
     base_tauri = load_json(repo_root / BASE_TAURI_CONFIG)
+    effective_tauri = apply_json_merge_patch(base_tauri, tauri)
     edition = load_json(repo_root / "distribution" / "editions" / "field.v1.json")
     app_source = (repo_root / FIELD_FRONTEND_APP).read_text(encoding="utf-8")
     vite_source = (repo_root / FIELD_VITE_CONFIG).read_text(encoding="utf-8")
     proposal_path = repo_root / FIELD_SHORTCUT_PROPOSAL
     proposal = load_json(proposal_path)
-    hook_relative = base_tauri["bundle"]["windows"]["nsis"]["installerHooks"]
+    hook_relative = effective_tauri["bundle"]["windows"]["nsis"]["installerHooks"]
     hook_path = repo_root / "desktop" / "src-tauri" / hook_relative
     hook_source = hook_path.read_text(encoding="utf-8")
 
@@ -299,20 +315,57 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
             if asset["assetId"] == "field-dot-lockup"
         ),
     }
-    bundle = tauri.get("bundle", {})
+    overlay_bundle = tauri.get("bundle", {})
+    overlay_resources = overlay_bundle.get("resources", {})
+    bundle = effective_tauri.get("bundle", {})
     resources = bundle.get("resources", {})
-    endpoint = tauri.get("plugins", {}).get("updater", {}).get("endpoints", [""])[0]
+    endpoint = effective_tauri.get("plugins", {}).get("updater", {}).get("endpoints", [""])[0]
+    expected_effective_resources = {
+        "../../LICENSE": "licenses/DroneDream-LICENSE.txt",
+        "../../runtime/THIRD_PARTY_NOTICES.md": "licenses/THIRD_PARTY_NOTICES.md",
+        "../../runtime/licenses/valkey-COPYING": "licenses/Valkey-COPYING.txt",
+        expected_mark: "branding/dronedream-field-mark.png",
+        expected_lockup: "branding/dronedream-field-dot-lockup.png",
+        expected_manifest: "branding/source-manifest.v1.json",
+        "../../brand/generated/brand-assets.v1.json":
+            "branding/canonical-brand-assets.v1.json",
+        "../../brand/generated/brand-visual-receipt.v1.json":
+            "branding/canonical-brand-visual-receipt.v1.json",
+        "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico",
+    }
+    effective_resource_records = []
+    config_root = (repo_root / FIELD_TAURI_CONFIG).parent
+    for source, destination in sorted(resources.items()):
+        source_path = (config_root / source).resolve()
+        if not source_path.is_file():
+            verification_errors.append(f"field.desktop-resource.missing:{source}")
+            continue
+        effective_resource_records.append(
+            {
+                "source": source,
+                "destination": destination,
+                "sizeBytes": source_path.stat().st_size,
+                "sha256": sha256_file(source_path),
+            }
+        )
+    effective_resource_bytes = sum(
+        resource["sizeBytes"] for resource in effective_resource_records
+    )
+    windows = bundle.get("windows", {})
+    nsis = windows.get("nsis", {})
+    webview = windows.get("webviewInstallMode", {})
     consumer_checks = {
-        "displayName": tauri.get("productName") == manifest.get("displayName"),
-        "windowTitle": tauri.get("app", {}).get("windows", [{}])[0].get("title")
+        "displayName": effective_tauri.get("productName") == manifest.get("displayName"),
+        "windowTitle": effective_tauri.get("app", {}).get("windows", [{}])[0].get("title")
         == manifest.get("displayName"),
         "frontendCanonicalLockup": "BrandLockup" in app_source
         and 'edition="field"' in app_source,
         "frontendNoPrivateBrandingRoot": "../distribution/editions/field/branding"
         not in vite_source,
         "tauriIcon": bundle.get("icon") == expected_icons,
-        "tauriResources": resources
+        "tauriResources": overlay_resources
         == {
+            "icons/icon.ico": None,
             expected_mark: "branding/dronedream-field-mark.png",
             expected_lockup: "branding/dronedream-field-dot-lockup.png",
             expected_manifest: "branding/source-manifest.v1.json",
@@ -320,17 +373,40 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
                 "branding/canonical-brand-assets.v1.json",
             "../../brand/generated/brand-visual-receipt.v1.json":
                 "branding/canonical-brand-visual-receipt.v1.json",
-            "../../brand/generated/field/windows/icon.ico": "icons/DroneDream-Field.ico",
+            "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico",
         },
-        "fieldFrontendDist": tauri.get("build", {}).get("frontendDist")
+        "effectiveResourceSet": resources == expected_effective_resources,
+        "universalIconSourceRemoved": "icons/icon.ico" not in resources,
+        "licenseNoticeResources": all(
+            resource in resources
+            for resource in (
+                "../../LICENSE",
+                "../../runtime/THIRD_PARTY_NOTICES.md",
+                "../../runtime/licenses/valkey-COPYING",
+            )
+        ),
+        "resourceUpperBound": effective_resource_bytes <= FIELD_RESOURCE_UPPER_BOUND_BYTES,
+        "fieldFrontendDist": effective_tauri.get("build", {}).get("frontendDist")
         == "../../frontend/field-dist",
         "fieldUpdaterManifest": endpoint.endswith("/field-latest.json"),
         "fieldArtifactBaseName": edition.get("artifactBaseName")
         == "DroneDream-Field-1.0.0.exe",
         "authorityRemainsFalse": 'data-authority="false"' in app_source,
         "canonicalDonor": all(canonical_checks.values()),
-        "installerShortcutFieldIcon": "$INSTDIR\\icons\\DroneDream.ico"
-        not in hook_source,
+        "installerShortcutFieldIcon": (
+            '$INSTDIR\\icons\\DroneDream.ico' in hook_source
+            and resources.get("../../brand/generated/field/windows/icon.ico")
+            == "icons/DroneDream.ico"
+            and "icons/icon.ico" not in resources
+        ),
+        "nsisContract": (
+            nsis.get("installMode") == "currentUser"
+            and nsis.get("languages") == ["English", "SimpChinese"]
+            and nsis.get("displayLanguageSelector") is True
+            and nsis.get("template") == "nsis/installer.nsi"
+            and nsis.get("installerHooks") == "nsis/webview2-health.nsh"
+            and webview == {"type": "embedBootstrapper", "silent": True}
+        ),
     }
     for check, passed in consumer_checks.items():
         if not passed:
@@ -338,10 +414,10 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
 
     scanned_structure = json.dumps(
         {
-            "build": tauri.get("build", {}),
+            "build": effective_tauri.get("build", {}),
             "bundleIcon": bundle.get("icon", []),
             "bundleResources": resources,
-            "updaterEndpoints": tauri.get("plugins", {}).get("updater", {}).get(
+            "updaterEndpoints": effective_tauri.get("plugins", {}).get("updater", {}).get(
                 "endpoints", []
             ),
         },
@@ -355,7 +431,7 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
 
     return {
         "artifactBaseName": edition["artifactBaseName"],
-        "frontendDist": tauri["build"]["frontendDist"],
+        "frontendDist": effective_tauri["build"]["frontendDist"],
         "updaterManifestFilename": "field-latest.json",
         "brandManifestPath": FIELD_BRANDING_MANIFEST.as_posix(),
         "brandManifestSha256": sha256_file(manifest_path),
@@ -374,6 +450,23 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
             "commonCoreProposalPath": FIELD_SHORTCUT_PROPOSAL.as_posix(),
             "commonCoreProposalSha256": sha256_file(proposal_path),
             "proposalStatus": proposal["status"],
+        },
+        "effectiveResources": effective_resource_records,
+        "effectiveResourceBytes": effective_resource_bytes,
+        "resourceUpperBoundBytes": FIELD_RESOURCE_UPPER_BOUND_BYTES,
+        "nsisContract": {
+            "installMode": nsis.get("installMode"),
+            "languages": nsis.get("languages", []),
+            "displayLanguageSelector": nsis.get("displayLanguageSelector"),
+            "templatePath": f"desktop/src-tauri/{nsis.get('template', '')}",
+            "templateSha256": sha256_file(
+                repo_root / "desktop" / "src-tauri" / nsis["template"]
+            ),
+            "hookPath": hook_path.relative_to(repo_root).as_posix(),
+            "hookSha256": sha256_file(hook_path),
+            "webviewInstallMode": webview.get("type"),
+            "webviewSilent": webview.get("silent"),
+            "shortcutIconDestination": "icons/DroneDream.ico",
         },
         "assets": assets,
         "consumerChecks": consumer_checks,
