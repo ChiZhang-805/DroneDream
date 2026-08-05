@@ -20,6 +20,13 @@ APPROVED_SCHEMA_PATH = (
 APPROVED_MANIFEST_PATH = (
     ROOT / "distribution" / "sim" / "brand" / "approved-edition-assets.v1.json"
 )
+RECONCILIATION_PATH = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "brand"
+    / "canonical-reconciliation-candidate.v1.json"
+)
 TOOL_PATH = ROOT / "distribution" / "sim" / "tools" / "sim_brand_donor.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_brand_donor", TOOL_PATH)
@@ -240,6 +247,57 @@ class SimBrandDonorTests(unittest.TestCase):
                     sim_brand.SimBrandDonorError, "integration state overclaims"
                 ):
                     sim_brand.validate_approved_edition_assets(invalid, repo_root=ROOT)
+
+    def test_canonical_candidate_reconciles_hashes_without_adoption(self) -> None:
+        candidate = sim_brand.validate_canonical_reconciliation_candidate(
+            load_json(RECONCILIATION_PATH), repo_root=ROOT
+        )
+        self.assertEqual(
+            candidate["state"],
+            "observed-not-adopted-awaiting-authoritative-handoff",
+        )
+        self.assertFalse(candidate["observedSource"]["authoritativeHandoffReceived"])
+        self.assertIsNone(candidate["observedSource"]["sourceEvidenceHead"])
+        self.assertTrue(
+            all(value is False for value in candidate["adoptionGates"].values())
+        )
+        ico = next(
+            item
+            for item in candidate["generatedCandidates"]
+            if item["role"] == "sim-windows-ico"
+        )
+        self.assertEqual(
+            ico["sha256"],
+            "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+        )
+        self.assertFalse(candidate["adoptionGates"]["releaseAssetClaimed"])
+
+    def test_canonical_candidate_rejects_ref_core_or_exact_byte_drift(self) -> None:
+        invalid = load_json(RECONCILIATION_PATH)
+        invalid["canonicalRefs"]["assetManifest"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "assetManifest SHA-256"):
+            sim_brand.validate_canonical_reconciliation_candidate(invalid, repo_root=ROOT)
+
+        invalid = load_json(RECONCILIATION_PATH)
+        invalid["commonCoreCandidate"]["hash"] = "0" * 64
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "commonCoreHash"):
+            sim_brand.validate_canonical_reconciliation_candidate(invalid, repo_root=ROOT)
+
+        invalid = load_json(RECONCILIATION_PATH)
+        invalid["exactByteReconciliation"]["assets"][0]["canonicalSha256"] = "0" * 64
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "metadata drifted"):
+            sim_brand.validate_canonical_reconciliation_candidate(invalid, repo_root=ROOT)
+
+    def test_canonical_candidate_rejects_handoff_or_release_overclaim(self) -> None:
+        invalid = load_json(RECONCILIATION_PATH)
+        invalid["observedSource"]["authoritativeHandoffReceived"] = True
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "overclaims adoption"):
+            sim_brand.validate_canonical_reconciliation_candidate(invalid, repo_root=ROOT)
+
+        invalid = load_json(RECONCILIATION_PATH)
+        invalid["adoptionGates"]["releaseAssetClaimed"] = True
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "must remain false"):
+            sim_brand.validate_canonical_reconciliation_candidate(invalid, repo_root=ROOT)
 
 
 if __name__ == "__main__":

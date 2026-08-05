@@ -131,7 +131,7 @@ async function loadAndValidateContract() {
   assert.equal(contract.source.branch, "codex/software-sim");
   assert.equal(contract.source.commonCoreCommit, branchContract.syncBaseline.commonCoreCommit);
   assert.equal(contract.source.commonCoreHash, branchContract.syncBaseline.commonCoreHash);
-  assert.equal(contract.source.refs.length, 16);
+  assert.equal(contract.source.refs.length, 17);
   for (const ref of contract.source.refs) {
     assertExactKeys(ref, ["path", "sha256"], `source ref ${ref.path}`);
     assert.match(ref.sha256, /^[0-9a-f]{64}$/);

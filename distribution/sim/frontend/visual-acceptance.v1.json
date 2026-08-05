@@ -86,6 +86,10 @@
         "sha256": "e2e61b676dadd8f8f37e370aa14382e2bff2a52307a820f82e42381498814296"
       },
       {
+        "path": "distribution/sim/brand/canonical-reconciliation-candidate.v1.json",
+        "sha256": "3b8782e0a06c6528c52556d6d3d0fdd2964c6ee57fd7532555cc28190a8eb9fc"
+      },
+      {
         "path": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
         "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa"
       },
@@ -95,7 +99,7 @@
       },
       {
         "path": "distribution/sim/tools/sim_brand_donor.py",
-        "sha256": "1915b3f575c86a5fd9d707b114931d4ea4fdc33734a30959f7416335aa6aafd5"
+        "sha256": "c517e4d08f39eac65341f75ec8e3a9c8abb44589e0fa1d28c93aea2fe319cb8c"
       },
       {
         "path": "distribution/branch-contracts/software-sim.v1.json",

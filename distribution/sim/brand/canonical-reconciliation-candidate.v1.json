@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-canonical-brand-reconciliation-candidate",
+  "candidateVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "observed-not-adopted-awaiting-authoritative-handoff",
+  "observedSource": {
+    "branch": "origin/codex/software",
+    "donorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "parentCommit": "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
+    "candidateObservedBySim": true,
+    "authoritativeHandoffReceived": false,
+    "sourceEvidenceHead": null,
+    "baselineSyncAuthorized": false,
+    "artifactUseAuthorized": false
+  },
+  "canonicalRefs": {
+    "brandSchema": {
+      "path": "brand/brand-editions.schema.json",
+      "sha256": "e65369ad7be9a91853cc6c10163c8de27537f2bef4047de4e0fec8ebdbf41b20"
+    },
+    "brandContract": {
+      "path": "brand/brand-editions.v1.json",
+      "sha256": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc"
+    },
+    "assetManifest": {
+      "path": "brand/generated/brand-assets.v1.json",
+      "sha256": "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34"
+    },
+    "visualReceipt": {
+      "path": "brand/generated/brand-visual-receipt.v1.json",
+      "sha256": "2c980725b436beb887cdccc5bb3767967bf56efd3eb6d98057f9bef1b2d34ab3"
+    },
+    "generator": {
+      "path": "scripts/build-brand-assets.py",
+      "sha256": "b0f6401cdcad4d93af7ebe56f5526cac07978e491075ddf7cfe019b7b097be13"
+    }
+  },
+  "commonCoreCandidate": {
+    "commit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "hash": "e8f5be8bddcf69f7e80536a772b81dfd1e049fc508fe0cc9198212ebd28986ec",
+    "paths": ["backend", "desktop", "engine-pack", "frontend", "runtime", "worker"],
+    "recordedBaseline": {
+      "branchContractPath": "distribution/branch-contracts/software-sim.v1.json",
+      "branchContractSha256": "0d3bc89a162de8263fe8b08f7ea774e4f9ff45b1c2e9e5730cc7af676f4d83cd",
+      "commit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+      "hash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b"
+    },
+    "recordedBaselineRelabeled": false
+  },
+  "identity": {
+    "masterName": "DroneDream",
+    "displayName": "DroneDream · SIM",
+    "separator": "·"
+  },
+  "palette": {
+    "start": "#00D9FF",
+    "middle": "#2671FF",
+    "end": "#744CFF",
+    "lightSurface": "#F1FAFF",
+    "darkSurface": "#071B31"
+  },
+  "exactByteReconciliation": {
+    "editionAssetManifest": {
+      "path": "distribution/sim/brand/approved-edition-assets.v1.json",
+      "sha256": "e2e61b676dadd8f8f37e370aa14382e2bff2a52307a820f82e42381498814296"
+    },
+    "assets": [
+      {
+        "role": "sim-mark-png",
+        "canonicalPath": "brand/source/approved/sim-mark-1024.png",
+        "canonicalSha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+        "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
+        "editionSha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+        "bytes": 162699,
+        "width": 1024,
+        "height": 1024,
+        "hashMatch": true
+      },
+      {
+        "role": "sim-dot-lockup-png",
+        "canonicalPath": "brand/source/approved/sim-dot-lockup.png",
+        "canonicalSha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+        "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-dot-lockup.png",
+        "editionSha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+        "bytes": 77713,
+        "width": 1840,
+        "height": 340,
+        "hashMatch": true
+      }
+    ]
+  },
+  "generatedCandidates": [
+    {
+      "role": "sim-mark-png-256",
+      "path": "brand/generated/sim/mark-256.png",
+      "sha256": "5aa223d95bd9796c602b4d56c4380a35096f2cc80933ca784c1ef0a07bba5dcf",
+      "bytes": 25200,
+      "format": "PNG",
+      "width": 256,
+      "height": 256,
+      "frameSizesPx": null
+    },
+    {
+      "role": "sim-mark-png-512",
+      "path": "brand/generated/sim/mark-512.png",
+      "sha256": "403d232e28850ad6443f190a918e554ce5107e185ac0b9ec4b9eef1146f00032",
+      "bytes": 60385,
+      "format": "PNG",
+      "width": 512,
+      "height": 512,
+      "frameSizesPx": null
+    },
+    {
+      "role": "sim-favicon-png-64",
+      "path": "brand/generated/sim/favicon-64.png",
+      "sha256": "11594409f8a3d6b3a57576a2db4aeb489ffb080d9f3ce57abe0d0a21e11867ba",
+      "bytes": 4697,
+      "format": "PNG",
+      "width": 64,
+      "height": 64,
+      "frameSizesPx": null
+    },
+    {
+      "role": "sim-windows-png-32",
+      "path": "brand/generated/sim/windows/32x32.png",
+      "sha256": "250f5c821ae8af6a374afd0e050256bf097982c534781a03313c3b0df49ff50d",
+      "bytes": 1943,
+      "format": "PNG",
+      "width": 32,
+      "height": 32,
+      "frameSizesPx": null
+    },
+    {
+      "role": "sim-windows-png-128",
+      "path": "brand/generated/sim/windows/128x128.png",
+      "sha256": "1dec550c802b95eb0fa1b55ae7eb4a274fd9622abe067f42ae739d038ff4cc62",
+      "bytes": 10881,
+      "format": "PNG",
+      "width": 128,
+      "height": 128,
+      "frameSizesPx": null
+    },
+    {
+      "role": "sim-windows-png-256",
+      "path": "brand/generated/sim/windows/128x128@2x.png",
+      "sha256": "5aa223d95bd9796c602b4d56c4380a35096f2cc80933ca784c1ef0a07bba5dcf",
+      "bytes": 25200,
+      "format": "PNG",
+      "width": 256,
+      "height": 256,
+      "frameSizesPx": null
+    },
+    {
+      "role": "sim-windows-ico",
+      "path": "brand/generated/sim/windows/icon.ico",
+      "sha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+      "bytes": 54431,
+      "format": "ICO",
+      "width": null,
+      "height": null,
+      "frameSizesPx": [16, 20, 24, 32, 40, 48, 64, 128, 256]
+    }
+  ],
+  "adoptionGates": {
+    "authoritativeHandoffReceived": false,
+    "commonCoreSyncReviewed": false,
+    "canonicalManifestConsumed": false,
+    "installerIconOverrideWired": false,
+    "browserAcceptanceExecuted": false,
+    "productionBuildExecuted": false,
+    "installerBuilt": false,
+    "releaseAssetClaimed": false,
+    "promotionReady": false
+  }
+}

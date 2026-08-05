@@ -180,6 +180,121 @@ APPROVED_ASSET_REQUIREMENTS = {
     },
 }
 
+RECONCILIATION_KEYS = {
+    "schemaVersion",
+    "kind",
+    "candidateVersion",
+    "editionId",
+    "state",
+    "observedSource",
+    "canonicalRefs",
+    "commonCoreCandidate",
+    "identity",
+    "palette",
+    "exactByteReconciliation",
+    "generatedCandidates",
+    "adoptionGates",
+}
+RECONCILIATION_SOURCE_KEYS = {
+    "branch",
+    "donorCommit",
+    "parentCommit",
+    "candidateObservedBySim",
+    "authoritativeHandoffReceived",
+    "sourceEvidenceHead",
+    "baselineSyncAuthorized",
+    "artifactUseAuthorized",
+}
+RECONCILIATION_REF_KEYS = {
+    "brandSchema",
+    "brandContract",
+    "assetManifest",
+    "visualReceipt",
+    "generator",
+}
+RECONCILIATION_CORE_KEYS = {
+    "commit",
+    "hash",
+    "paths",
+    "recordedBaseline",
+    "recordedBaselineRelabeled",
+}
+RECONCILIATION_BASELINE_KEYS = {
+    "branchContractPath",
+    "branchContractSha256",
+    "commit",
+    "hash",
+}
+RECONCILIATION_EXACT_KEYS = {"editionAssetManifest", "assets"}
+RECONCILIATION_ASSET_KEYS = {
+    "role",
+    "canonicalPath",
+    "canonicalSha256",
+    "editionPath",
+    "editionSha256",
+    "bytes",
+    "width",
+    "height",
+    "hashMatch",
+}
+RECONCILIATION_GENERATED_KEYS = {
+    "role",
+    "path",
+    "sha256",
+    "bytes",
+    "format",
+    "width",
+    "height",
+    "frameSizesPx",
+}
+RECONCILIATION_GATE_KEYS = {
+    "authoritativeHandoffReceived",
+    "commonCoreSyncReviewed",
+    "canonicalManifestConsumed",
+    "installerIconOverrideWired",
+    "browserAcceptanceExecuted",
+    "productionBuildExecuted",
+    "installerBuilt",
+    "releaseAssetClaimed",
+    "promotionReady",
+}
+RECONCILIATION_DONOR_COMMIT = "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235"
+RECONCILIATION_PARENT_COMMIT = "26d69562c9cea6557f30b3b21b3d6d39ac89e294"
+RECONCILIATION_REF_PATHS = {
+    "brandSchema": "brand/brand-editions.schema.json",
+    "brandContract": "brand/brand-editions.v1.json",
+    "assetManifest": "brand/generated/brand-assets.v1.json",
+    "visualReceipt": "brand/generated/brand-visual-receipt.v1.json",
+    "generator": "scripts/build-brand-assets.py",
+}
+RECONCILIATION_EXACT_ASSETS = {
+    "sim-mark-png": {
+        "canonicalPath": "brand/source/approved/sim-mark-1024.png",
+        "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
+        "sha256": APPROVED_ASSET_REQUIREMENTS["sim-mark-png"]["sha256"],
+        "bytes": 162699,
+        "width": 1024,
+        "height": 1024,
+    },
+    "sim-dot-lockup-png": {
+        "canonicalPath": "brand/source/approved/sim-dot-lockup.png",
+        "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-dot-lockup.png",
+        "sha256": APPROVED_ASSET_REQUIREMENTS["sim-dot-lockup-png"]["sha256"],
+        "bytes": 77713,
+        "width": 1840,
+        "height": 340,
+    },
+}
+RECONCILIATION_GENERATED_PATHS = {
+    "sim-mark-png-256": "brand/generated/sim/mark-256.png",
+    "sim-mark-png-512": "brand/generated/sim/mark-512.png",
+    "sim-favicon-png-64": "brand/generated/sim/favicon-64.png",
+    "sim-windows-png-32": "brand/generated/sim/windows/32x32.png",
+    "sim-windows-png-128": "brand/generated/sim/windows/128x128.png",
+    "sim-windows-png-256": "brand/generated/sim/windows/128x128@2x.png",
+    "sim-windows-ico": "brand/generated/sim/windows/icon.ico",
+}
+
 
 class SimBrandDonorError(ValueError):
     """Raised when canonical donor evidence is incomplete or inconsistent."""
@@ -641,6 +756,300 @@ def validate_approved_edition_assets(
     return manifest
 
 
+def _json_payload(payload: bytes, label: str) -> dict[str, Any]:
+    try:
+        document = json.loads(payload.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise SimBrandDonorError(f"{label} is not valid UTF-8 JSON") from exc
+    if not isinstance(document, dict):
+        raise SimBrandDonorError(f"{label} must be a JSON object")
+    return document
+
+
+def validate_canonical_reconciliation_candidate(
+    document: Any,
+    *,
+    repo_root: Path,
+) -> dict[str, Any]:
+    candidate = _exact_keys(
+        document, RECONCILIATION_KEYS, "SIM canonical reconciliation candidate"
+    )
+    if (
+        candidate["schemaVersion"] != 1
+        or candidate["kind"]
+        != "dronedream-sim-canonical-brand-reconciliation-candidate"
+        or candidate["candidateVersion"] != "1.0.0"
+        or candidate["editionId"] != "sim"
+        or candidate["state"]
+        != "observed-not-adopted-awaiting-authoritative-handoff"
+    ):
+        raise SimBrandDonorError("SIM canonical reconciliation identity drifted")
+
+    observed = _exact_keys(
+        candidate["observedSource"], RECONCILIATION_SOURCE_KEYS, "reconciliation source"
+    )
+    donor_commit = _commit(observed["donorCommit"], "reconciliation donor commit")
+    if observed != {
+        "branch": "origin/codex/software",
+        "donorCommit": RECONCILIATION_DONOR_COMMIT,
+        "parentCommit": RECONCILIATION_PARENT_COMMIT,
+        "candidateObservedBySim": True,
+        "authoritativeHandoffReceived": False,
+        "sourceEvidenceHead": None,
+        "baselineSyncAuthorized": False,
+        "artifactUseAuthorized": False,
+    }:
+        raise SimBrandDonorError("SIM canonical reconciliation source overclaims adoption")
+    observed_parent = _run_git(repo_root, "rev-parse", f"{donor_commit}^")
+    if not isinstance(observed_parent, str) or observed_parent.strip() != observed["parentCommit"]:
+        raise SimBrandDonorError("SIM canonical reconciliation parent commit drifted")
+    if not _git_is_ancestor(repo_root, donor_commit, observed["branch"]):
+        raise SimBrandDonorError("SIM canonical candidate is not on origin/codex/software")
+
+    refs = _exact_keys(
+        candidate["canonicalRefs"], RECONCILIATION_REF_KEYS, "reconciliation refs"
+    )
+    canonical_payloads: dict[str, bytes] = {}
+    for role, expected_path in RECONCILIATION_REF_PATHS.items():
+        ref = _exact_keys(refs[role], FILE_REF_KEYS, f"reconciliation ref {role}")
+        if ref["path"] != expected_path:
+            raise SimBrandDonorError(f"reconciliation ref {role} path drifted")
+        payload = _git_asset_reader(repo_root, donor_commit, ref["path"])
+        if sha256_bytes(payload) != _sha(ref["sha256"], f"reconciliation ref {role} SHA"):
+            raise SimBrandDonorError(f"reconciliation ref {role} SHA-256 drifted")
+        canonical_payloads[role] = payload
+
+    core = _exact_keys(
+        candidate["commonCoreCandidate"],
+        RECONCILIATION_CORE_KEYS,
+        "reconciliation commonCore",
+    )
+    if (
+        core["commit"] != donor_commit
+        or core["paths"] != list(COMMON_CORE_PATHS)
+        or core["recordedBaselineRelabeled"] is not False
+    ):
+        raise SimBrandDonorError("reconciliation commonCore candidate drifted")
+    if _git_common_core_hash(repo_root, donor_commit, COMMON_CORE_PATHS) != _sha(
+        core["hash"], "reconciliation commonCore hash"
+    ):
+        raise SimBrandDonorError("reconciliation candidate commonCoreHash drifted")
+    baseline = _exact_keys(
+        core["recordedBaseline"],
+        RECONCILIATION_BASELINE_KEYS,
+        "reconciliation recorded baseline",
+    )
+    branch_path = _resolve(
+        repo_root, baseline["branchContractPath"], "reconciliation branch contract"
+    )
+    if sha256_file(branch_path) != _sha(
+        baseline["branchContractSha256"], "reconciliation branch contract SHA"
+    ):
+        raise SimBrandDonorError("reconciliation branch contract SHA-256 drifted")
+    branch_contract = load_json(branch_path)
+    branch_baseline = branch_contract.get("syncBaseline")
+    if not isinstance(branch_baseline, dict) or baseline != {
+        "branchContractPath": "distribution/branch-contracts/software-sim.v1.json",
+        "branchContractSha256": baseline["branchContractSha256"],
+        "commit": branch_baseline.get("commonCoreCommit"),
+        "hash": branch_baseline.get("commonCoreHash"),
+    }:
+        raise SimBrandDonorError("reconciliation recorded baseline was relabeled")
+    if not _git_is_ancestor(repo_root, baseline["commit"], donor_commit):
+        raise SimBrandDonorError("reconciliation donor does not descend from recorded baseline")
+
+    if candidate["identity"] != {
+        "masterName": "DroneDream",
+        "displayName": "DroneDream · SIM",
+        "separator": "·",
+    } or candidate["palette"] != {
+        "start": "#00D9FF",
+        "middle": "#2671FF",
+        "end": "#744CFF",
+        "lightSurface": "#F1FAFF",
+        "darkSurface": "#071B31",
+    }:
+        raise SimBrandDonorError("reconciliation SIM identity or palette drifted")
+
+    brand_contract = _json_payload(canonical_payloads["brandContract"], "brand contract")
+    sim_brand = brand_contract.get("editions", {}).get("sim")
+    approved_contract = brand_contract.get("approvedEditionAssets", {}).get("sim")
+    if (
+        brand_contract.get("masterName") != "DroneDream"
+        or brand_contract.get("separator") != "·"
+        or sim_brand
+        != {
+            "productName": "DroneDream · SIM",
+            "editionLabel": "SIM",
+            "gradientStops": ["#00D9FF", "#2671FF", "#744CFF"],
+            "lightSurface": "#F1FAFF",
+            "darkSurface": "#071B31",
+        }
+        or brand_contract.get("safety")
+        != {"presentationOnly": True, "grantsHardwareAuthority": False}
+        or not isinstance(approved_contract, dict)
+    ):
+        raise SimBrandDonorError("canonical SIM brand contract drifted")
+
+    canonical_manifest = _json_payload(
+        canonical_payloads["assetManifest"], "canonical brand asset manifest"
+    )
+    if (
+        canonical_manifest.get("kind") != "dronedream-canonical-brand-assets"
+        or canonical_manifest.get("contractSha256") != refs["brandContract"]["sha256"]
+        or canonical_manifest.get("schemaSha256") != refs["brandSchema"]["sha256"]
+        or canonical_manifest.get("generatorSha256") != refs["generator"]["sha256"]
+        or canonical_manifest.get("approvalHandoffSha256") != CONCEPT_HANDOFF_SHA256
+        or canonical_manifest.get("conceptAssetsAreReleaseAssets") is not False
+        or canonical_manifest.get("universalIsCanonical") is not True
+        or canonical_manifest.get("presentationOnly") is not True
+        or canonical_manifest.get("grantsHardwareAuthority") is not False
+    ):
+        raise SimBrandDonorError("canonical brand asset manifest claims drifted")
+    visual_receipt = _json_payload(
+        canonical_payloads["visualReceipt"], "canonical brand visual receipt"
+    )
+    if (
+        visual_receipt.get("releaseAsset") is not False
+        or visual_receipt.get("presentationOnly") is not True
+        or "sim" not in visual_receipt.get("verifiedEditions", [])
+        or "sim" not in visual_receipt.get("approvedExactByteEditions", [])
+        or visual_receipt.get("verifiedSurfaces") != ["light", "dark"]
+    ):
+        raise SimBrandDonorError("canonical visual receipt release boundary drifted")
+
+    exact = _exact_keys(
+        candidate["exactByteReconciliation"],
+        RECONCILIATION_EXACT_KEYS,
+        "exact-byte reconciliation",
+    )
+    edition_ref = _exact_keys(
+        exact["editionAssetManifest"], FILE_REF_KEYS, "edition asset manifest ref"
+    )
+    if edition_ref["path"] != "distribution/sim/brand/approved-edition-assets.v1.json":
+        raise SimBrandDonorError("edition asset manifest reconciliation path drifted")
+    edition_manifest_path = _resolve(
+        repo_root, edition_ref["path"], "edition asset reconciliation manifest"
+    )
+    if sha256_file(edition_manifest_path) != _sha(
+        edition_ref["sha256"], "edition asset reconciliation manifest SHA"
+    ):
+        raise SimBrandDonorError("edition asset reconciliation manifest SHA-256 drifted")
+    validate_approved_edition_assets(load_json(edition_manifest_path), repo_root=repo_root)
+
+    exact_assets = exact["assets"]
+    if not isinstance(exact_assets, list) or len(exact_assets) != 2:
+        raise SimBrandDonorError("exact-byte reconciliation inventory is incomplete")
+    approved_manifest_sim = canonical_manifest.get("approvedEditionAssets", {}).get("sim")
+    observed_exact_roles: list[str] = []
+    for index, raw_asset in enumerate(exact_assets):
+        asset = _exact_keys(
+            raw_asset, RECONCILIATION_ASSET_KEYS, f"exact-byte asset {index}"
+        )
+        role = asset["role"]
+        if role not in RECONCILIATION_EXACT_ASSETS or role in observed_exact_roles:
+            raise SimBrandDonorError("exact-byte reconciliation roles drifted")
+        expected = RECONCILIATION_EXACT_ASSETS[role]
+        if asset != {
+            "role": role,
+            "canonicalPath": expected["canonicalPath"],
+            "canonicalSha256": expected["sha256"],
+            "editionPath": expected["editionPath"],
+            "editionSha256": expected["sha256"],
+            "bytes": expected["bytes"],
+            "width": expected["width"],
+            "height": expected["height"],
+            "hashMatch": True,
+        }:
+            raise SimBrandDonorError(f"{role} reconciliation metadata drifted")
+        canonical_bytes = _git_asset_reader(repo_root, donor_commit, asset["canonicalPath"])
+        edition_path = _resolve(
+            repo_root, asset["editionPath"], f"{role} edition path"
+        )
+        edition_bytes = edition_path.read_bytes()
+        if canonical_bytes != edition_bytes or (
+            len(canonical_bytes),
+            sha256_bytes(canonical_bytes),
+            *_png_dimensions(canonical_bytes, role),
+        ) != (asset["bytes"], asset["canonicalSha256"], asset["width"], asset["height"]):
+            raise SimBrandDonorError(f"{role} canonical and edition bytes do not reconcile")
+        approved_key = "mark" if role == "sim-mark-png" else "dotLockup"
+        expected_approved = approved_manifest_sim.get(approved_key, {})
+        expected_contract_path_key = "markPath" if approved_key == "mark" else "dotLockupPath"
+        expected_contract_sha_key = "markSha256" if approved_key == "mark" else "dotLockupSha256"
+        if (
+            approved_contract.get(expected_contract_path_key) != asset["canonicalPath"]
+            or approved_contract.get(expected_contract_sha_key) != asset["canonicalSha256"]
+            or expected_approved.get("path") != asset["canonicalPath"]
+            or expected_approved.get("sha256") != asset["canonicalSha256"]
+            or expected_approved.get("bytes") != asset["bytes"]
+        ):
+            raise SimBrandDonorError(f"{role} canonical manifest binding drifted")
+        observed_exact_roles.append(role)
+    if tuple(observed_exact_roles) != tuple(RECONCILIATION_EXACT_ASSETS):
+        raise SimBrandDonorError("exact-byte reconciliation role ordering drifted")
+
+    manifest_assets = canonical_manifest.get("assets")
+    if not isinstance(manifest_assets, list):
+        raise SimBrandDonorError("canonical generated asset inventory is missing")
+    manifest_by_path = {
+        asset.get("path"): asset for asset in manifest_assets if isinstance(asset, dict)
+    }
+    generated = candidate["generatedCandidates"]
+    if not isinstance(generated, list) or len(generated) != len(RECONCILIATION_GENERATED_PATHS):
+        raise SimBrandDonorError("SIM generated candidate inventory is incomplete")
+    observed_generated_roles: list[str] = []
+    for index, raw_asset in enumerate(generated):
+        asset = _exact_keys(
+            raw_asset, RECONCILIATION_GENERATED_KEYS, f"generated candidate {index}"
+        )
+        role = asset["role"]
+        if role not in RECONCILIATION_GENERATED_PATHS or role in observed_generated_roles:
+            raise SimBrandDonorError("SIM generated candidate roles drifted")
+        if asset["path"] != RECONCILIATION_GENERATED_PATHS[role]:
+            raise SimBrandDonorError(f"{role} generated candidate path drifted")
+        canonical_record = manifest_by_path.get(asset["path"])
+        if not isinstance(canonical_record, dict):
+            raise SimBrandDonorError(f"{role} is absent from canonical manifest")
+        expected_record = {
+            "role": role,
+            "path": canonical_record.get("path"),
+            "sha256": canonical_record.get("sha256"),
+            "bytes": canonical_record.get("bytes"),
+            "format": canonical_record.get("format"),
+            "width": canonical_record.get("width"),
+            "height": canonical_record.get("height"),
+            "frameSizesPx": canonical_record.get("frameSizesPx"),
+        }
+        if asset != expected_record:
+            raise SimBrandDonorError(f"{role} generated candidate metadata drifted")
+        payload = _git_asset_reader(repo_root, donor_commit, asset["path"])
+        if len(payload) != asset["bytes"] or sha256_bytes(payload) != _sha(
+            asset["sha256"], f"{role} SHA-256"
+        ):
+            raise SimBrandDonorError(f"{role} canonical bytes or SHA-256 drifted")
+        if asset["format"] == "PNG":
+            if _png_dimensions(payload, role) != (asset["width"], asset["height"]):
+                raise SimBrandDonorError(f"{role} canonical dimensions drifted")
+        elif (
+            asset["format"] != "ICO"
+            or not payload.startswith(b"\x00\x00\x01\x00")
+            or asset["frameSizesPx"]
+            != canonical_manifest.get("artifactContract", {}).get("windowsIcoFrameSizesPx")
+        ):
+            raise SimBrandDonorError(f"{role} canonical ICO contract drifted")
+        observed_generated_roles.append(role)
+    if tuple(observed_generated_roles) != tuple(RECONCILIATION_GENERATED_PATHS):
+        raise SimBrandDonorError("SIM generated candidate role ordering drifted")
+
+    gates = _exact_keys(
+        candidate["adoptionGates"], RECONCILIATION_GATE_KEYS, "reconciliation adoption gates"
+    )
+    if any(value is not False for value in gates.values()):
+        raise SimBrandDonorError("reconciliation adoption gates must remain false")
+    return candidate
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -668,6 +1077,16 @@ def main() -> int:
         nargs="?",
         default=Path("distribution/sim/brand/approved-edition-assets.v1.json"),
     )
+    reconciliation_parser = subparsers.add_parser("verify-reconciliation")
+    reconciliation_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    reconciliation_parser.add_argument(
+        "candidate",
+        type=Path,
+        nargs="?",
+        default=Path(
+            "distribution/sim/brand/canonical-reconciliation-candidate.v1.json"
+        ),
+    )
     args = parser.parse_args()
     try:
         repo_root = args.repo_root.resolve()
@@ -686,6 +1105,10 @@ def main() -> int:
                 load_json(args.manifest),
                 repo_root=repo_root,
                 require_source_assets=args.require_source_assets,
+            )
+        elif args.command == "verify-reconciliation":
+            validate_canonical_reconciliation_candidate(
+                load_json(args.candidate), repo_root=repo_root
             )
         else:
             raise SimBrandDonorError(f"unsupported command: {args.command}")
