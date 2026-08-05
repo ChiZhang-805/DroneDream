@@ -35,7 +35,7 @@
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["commit", "treeState", "commonCorePaths", "commonCoreHash"],
+      "required": ["commit", "treeState", "commonCorePaths", "commonCoreCommit", "commonCoreHash"],
       "properties": {
         "commit": {"$ref": "#/$defs/commit"},
         "treeState": {"const": "clean"},
@@ -45,6 +45,7 @@
           "uniqueItems": true,
           "items": {"$ref": "#/$defs/safePath"}
         },
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
         "commonCoreHash": {"$ref": "#/$defs/sha256"}
       }
     },
@@ -252,6 +253,7 @@
         "creationState",
         "observedBranchHead",
         "sourceCommit",
+        "commonCoreCommit",
         "commonCoreHash",
         "promotionManifestState",
         "prOnly",
@@ -264,6 +266,7 @@
         "creationState": {"const": "planned-not-created"},
         "observedBranchHead": {"type": "null"},
         "sourceCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
         "commonCoreHash": {"$ref": "#/$defs/sha256"},
         "promotionManifestState": {"const": "planned-not-generated"},
         "prOnly": {"const": true},
@@ -287,6 +290,7 @@
       "required": [
         "editionId",
         "editionManifest",
+        "commonCoreCommit",
         "commonCoreHash",
         "componentIds",
         "vehiclePack",
@@ -301,6 +305,7 @@
       "properties": {
         "editionId": {"enum": ["sim", "lab", "field"]},
         "editionManifest": {"$ref": "#/$defs/fileRef"},
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
         "commonCoreHash": {"$ref": "#/$defs/sha256"},
         "componentIds": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
         "vehiclePack": {"$ref": "#/$defs/vehiclePackRef"},
