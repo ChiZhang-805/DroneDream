@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated, Any, Final, Literal, Protocol, runtime_checkable
 
@@ -320,7 +321,7 @@ def dispatch_next_physical_stability_job(
     transport: PhysicalStabilityCreateTransport,
     checkpoint_store: PhysicalStabilityCheckpointStore,
     attempted_at_utc: datetime,
-    observed_at_utc: datetime,
+    observed_at_utc: datetime | Callable[[], datetime],
 ) -> tuple[PhysicalStabilityExecutionLedgerV1, tuple[PhysicalStabilityLedgerTransitionV1, ...]]:
     """Persist the trial reservation before exactly one injected create call."""
 
@@ -348,11 +349,12 @@ def dispatch_next_physical_stability_job(
         or observation.request_sha256 != job.request_sha256
     ):
         raise ValueError("P5 create observation does not bind the dispatched request")
+    observed_at = observed_at_utc() if callable(observed_at_utc) else observed_at_utc
     after_observed, observed_transition = record_physical_stability_job_observed(
         after_attempt,
         scenario_ordinal=ordinal,
         observed_job_id=observation.observed_job_id,
-        observed_at_utc=observed_at_utc,
+        observed_at_utc=observed_at,
     )
     checkpoint_store.persist(after_observed, observed_transition)
     return after_observed, (attempt_transition, observed_transition)
