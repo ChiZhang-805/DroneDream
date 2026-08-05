@@ -258,7 +258,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         != "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target"
         or environment.get("cargoBuildJobsMaximum") != 4
         or environment.get("rustflags") != "-C target-feature=+crt-static"
-        or environment.get("additionalConfigTransport") != "TAURI_CONFIG"
+        or environment.get("additionalConfigTransport")
+        != "ordered-repeated-cli-config"
         or environment.get("preserveBundleHistory") is not True
         or environment.get("allowUnsignedUpdater") is not True
     ):
@@ -439,7 +440,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         '[string]$ExpectedProductName = "DroneDream"',
         '[switch]$AllowUnsignedUpdater',
         '[switch]$PreserveBundleHistory',
-        '$env:TAURI_CONFIG = $additionalConfigText',
+        '--config $additionalConfig',
+        '--config $llvmBundleConfig',
         '$env:CARGO_TARGET_DIR = $cargoTargetRoot',
         'invoke-tauri-updater-signer.ps1',
         'if (-not $AllowUnsignedUpdater)',
@@ -450,6 +452,19 @@ def verify_lab_preview_contract() -> dict[str, object]:
             raise LabPreviewContractError(
                 f"Shared LLVM build parameterization is missing: {fragment}"
             )
+    if "$env:TAURI_CONFIG" in shared_llvm_script:
+        raise LabPreviewContractError(
+            "Shared LLVM build must not transport edition config through TAURI_CONFIG"
+        )
+    edition_config_index = shared_llvm_script.index("--config $additionalConfig")
+    llvm_config_index = shared_llvm_script.index(
+        "--config $llvmBundleConfig",
+        edition_config_index,
+    )
+    if edition_config_index >= llvm_config_index:
+        raise LabPreviewContractError(
+            "Shared LLVM build must merge edition config before LLVM resources"
+        )
 
     return {
         "profile": PROFILE.relative_to(ROOT).as_posix(),

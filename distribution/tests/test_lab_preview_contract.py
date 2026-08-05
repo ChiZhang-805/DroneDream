@@ -93,6 +93,15 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertIn("$tauriProductName = [string]$tauriOverlay.productName", script)
         self.assertNotIn('"DroneDream · LAB"', script)
 
+    def test_shared_llvm_build_uses_ordered_cli_config_overlays(self) -> None:
+        script = (ROOT / "desktop/scripts/build-windows-llvm.ps1").read_text(
+            encoding="utf-8"
+        )
+        edition_index = script.index("--config $additionalConfig")
+        llvm_index = script.index("--config $llvmBundleConfig", edition_index)
+        self.assertLess(edition_index, llvm_index)
+        self.assertNotIn("$env:TAURI_CONFIG", script)
+
     def test_fake_lab_artifact_receipt_binds_workspace_module_and_artifact_contracts(self) -> None:
         receipt = lab_artifact.fake_lab_preview_receipt()
         validated = lab_artifact.validate_receipt(receipt)

@@ -158,9 +158,6 @@ if (-not (Test-Path -LiteralPath $llvmBundleConfig -PathType Leaf)) {
 }
 
 if ($AdditionalConfigPath) {
-    if ($env:TAURI_CONFIG) {
-        throw "Clear TAURI_CONFIG before supplying an additional edition config."
-    }
     $additionalConfig = (Resolve-Path -LiteralPath $AdditionalConfigPath -ErrorAction Stop).Path
     $additionalConfigText = Get-Content -LiteralPath $additionalConfig -Raw -Encoding UTF8
     try {
@@ -171,8 +168,6 @@ if ($AdditionalConfigPath) {
     if ($additionalConfigObject.productName -cne $ExpectedProductName) {
         throw "The additional edition config productName does not match $ExpectedProductName."
     }
-    # Tauri merges TAURI_CONFIG with the explicit LLVM resource config.
-    $env:TAURI_CONFIG = $additionalConfigText
 }
 
 & (Join-Path $PSScriptRoot "verify-desktop-version.ps1")
@@ -180,9 +175,18 @@ if ($AdditionalConfigPath) {
 
 Write-Host "Building DroneDream Desktop with $toolchain"
 $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-& npm.cmd --prefix $desktopRoot run build -- `
-    --target x86_64-pc-windows-gnullvm `
-    --config $llvmBundleConfig
+if ($additionalConfig) {
+    # Tauri merges repeated --config values in order. Keep the edition overlay
+    # first and add the LLVM resource overlay without replacing edition fields.
+    & npm.cmd --prefix $desktopRoot run build -- `
+        --target x86_64-pc-windows-gnullvm `
+        --config $additionalConfig `
+        --config $llvmBundleConfig
+} else {
+    & npm.cmd --prefix $desktopRoot run build -- `
+        --target x86_64-pc-windows-gnullvm `
+        --config $llvmBundleConfig
+}
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

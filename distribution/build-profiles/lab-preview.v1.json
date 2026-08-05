@@ -248,7 +248,7 @@
       "cargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
       "cargoBuildJobsMaximum": 4,
       "rustflags": "-C target-feature=+crt-static",
-      "additionalConfigTransport": "TAURI_CONFIG",
+      "additionalConfigTransport": "ordered-repeated-cli-config",
       "preserveBundleHistory": true,
       "allowUnsignedUpdater": true
     }
