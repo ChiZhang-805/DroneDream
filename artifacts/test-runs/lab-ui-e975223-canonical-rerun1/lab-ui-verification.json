@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-ui-green-verification",
+  "sourceCommit": "e9752238cee9123705f896a6e4ebc519c50135dc",
+  "sourceStatus": "clean",
+  "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+  "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+  "editionId": "lab",
+  "executionAuthority": false,
+  "validatedVehiclePackCount": 0,
+  "hardwareActionDecision": "deny",
+  "brand": {
+    "displayName": "DroneDream · LAB",
+    "palette": [
+      "#A7E84A",
+      "#20C77A",
+      "#087E69"
+    ],
+    "grantsHardwareAuthority": false,
+    "sourceManifest": {
+      "path": "distribution/editions/lab/brand-source-manifest.v1.json",
+      "sha256": "31e844c46973c0784f892829002c0d3672074bfd291884ed90d39d3d227a3415"
+    },
+    "canonicalDonor": {
+      "commit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+      "contract": {
+        "path": "brand/brand-editions.v1.json",
+        "bytes": 2964,
+        "sha256": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc"
+      },
+      "assetManifest": {
+        "path": "brand/generated/brand-assets.v1.json",
+        "bytes": 15574,
+        "sha256": "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34"
+      },
+      "visualReceipt": {
+        "path": "brand/generated/brand-visual-receipt.v1.json",
+        "bytes": 538,
+        "sha256": "2c980725b436beb887cdccc5bb3767967bf56efd3eb6d98057f9bef1b2d34ab3"
+      }
+    },
+    "exactByteAssets": [
+      {
+        "role": "mark",
+        "path": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
+        "sha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806"
+      },
+      {
+        "role": "dot-lockup",
+        "path": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+        "sha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+      }
+    ],
+    "applicationLockupLoaded": true,
+    "installerOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "sha256": "53d62bc0584d10b1d64d8b96549206c592302d20c586ae51a58650905eed768c",
+      "productName": "DroneDream · LAB",
+      "icons": [
+        {
+          "path": "brand/generated/lab/windows/32x32.png",
+          "sha256": "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc"
+        },
+        {
+          "path": "brand/generated/lab/windows/128x128.png",
+          "sha256": "4dc38efa82202dc8674b1e4ed782447a041e2e8793c7615ff164501248a3b485"
+        },
+        {
+          "path": "brand/generated/lab/windows/128x128@2x.png",
+          "sha256": "b0a38390f2f58f6f873847e6a52ab07fe26945705a9940957a746970faabb0b1"
+        },
+        {
+          "path": "brand/generated/lab/windows/icon.ico",
+          "sha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
+        }
+      ],
+      "generatedNsiVerified": false
+    }
+  },
+  "cases": [
+    {
+      "id": "1440-en",
+      "locale": "en",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "1440-zh",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "760-en",
+      "locale": "en",
+      "viewport": {
+        "width": 760,
+        "height": 900
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "760-zh",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 760,
+        "height": 900
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "390-en",
+      "locale": "en",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "390-zh",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/1440-en-simulation.png",
+      "sha256": "707543183410eeddf3a2f91fa2547dcf697de62cc1ca52f5cf0810402e90fe0e"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/1440-en-hardware.png",
+      "sha256": "60460a344c82d4bdac281762cd90fc66494a272dbcebc0ab1c4a9d1b09849edf"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/1440-en-evidence.png",
+      "sha256": "565f33327dd84615178c6414299006a4fd5f271728f66cabecd625a04e0fba42"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/1440-en-safety.png",
+      "sha256": "24afcc39661af274cd458a04a71a09625edefbc7a4d6c1cd3fc7564bb6cf82e9"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/1440-zh-simulation.png",
+      "sha256": "b7d824793849608650e9ec9679f702f499c324daaa5c0375847bb7135b62e990"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/1440-zh-hardware.png",
+      "sha256": "25ba7429f737f2202e2c6d470eabc934a8de51a91b931af5312f563f9053c2bf"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/1440-zh-evidence.png",
+      "sha256": "fb94e8a825b753cd855bc884f40beae96fa3bd1d619c8fcc867d1c0d1ab11f1f"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/1440-zh-safety.png",
+      "sha256": "5067e5aecdeaa3995aac7950213f129a5a69bedf532685b31634e6f405f3bb7e"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/760-en-simulation.png",
+      "sha256": "0a46da941215d60a784f38886eb3619a9826cbb029d21f9a5d38dbf12a9a94f4"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/760-en-hardware.png",
+      "sha256": "dc583c0223bab8890d42033ee35440f719550b7aa8a38d31f377b29735f8709d"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/760-en-evidence.png",
+      "sha256": "8f77ea05bc60867c5743ad831c0bb9037d7decc3d95485cc8d0ee807f810112a"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/760-en-safety.png",
+      "sha256": "397b569a7b671b5ba6ab42c1fc745d54e3f04cba3627867f5acb440f9fde29ed"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/760-zh-simulation.png",
+      "sha256": "a8659fe067bda2ec7197906c6bcdc7d8a10e0bba8caa0c0638334b2e16546bf1"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/760-zh-hardware.png",
+      "sha256": "68746b9b663e76225a9f61ee66830c99ee126e46371698f1be09e2f6e1cb1904"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/760-zh-evidence.png",
+      "sha256": "c9f117c210371e4632abbfaacffef72ef57725a43a762ee1aa73d9dd2f09b449"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/760-zh-safety.png",
+      "sha256": "c95275026990f6ff07a383ef185fb73df8a6f0e5fbc2049eea4f6cf2bfcbd3e5"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/390-en-simulation.png",
+      "sha256": "b4fd7e39c32500502b3c7b7031241ece1498d07b70cccfd392aba7bef3b8d474"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/390-en-hardware.png",
+      "sha256": "f8fb2c4cd0b9fd055ca1cd83344d3004c20365b0ad3b6ecfc52175f5bc9f94dc"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/390-en-evidence.png",
+      "sha256": "6b6fef555ec322ad4cda3aa90ff1e8ceeebe30c1640deaca8565d2bb2550710d"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/390-en-safety.png",
+      "sha256": "f03427c1b142fde09259a5974565c14d9599d550e4765fe5bd876d1d107979d5"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/390-zh-simulation.png",
+      "sha256": "32a796887520c07c2cc5389bc36b971a98ee309ad5dbac12cc8a24937fbb68bf"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/390-zh-hardware.png",
+      "sha256": "033f884086b0b9bea4f37c085eeec0ec5f10285012c4f771f0227eb84e2ec156"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/390-zh-evidence.png",
+      "sha256": "4682dbbd086a422cadd56a93d7f2c8736207bc7290662325487c3bd712794b76"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-e975223-canonical-rerun1/390-zh-safety.png",
+      "sha256": "58ddfa953e537c21db349358990d3e8b2b5d77c30821b20ec93fd5b79f1d3806"
+    }
+  ],
+  "sideEffects": {
+    "installed": false,
+    "runtimeMigrated": false,
+    "simulationStarted": false,
+    "hardwareConnected": false,
+    "providerCalled": false,
+    "tauriBuilt": false,
+    "nsisBuilt": false
+  }
+}

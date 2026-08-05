@@ -15,6 +15,12 @@ TAURI_OVERLAY_PATH = ROOT / "desktop" / "src-tauri" / "tauri.lab-preview.conf.js
 GREEN_RECEIPT_PATH = (
     ROOT / "distribution" / "build-receipts" / "lab-brand-1.0.0-f33af86.green.json"
 )
+CANONICAL_GREEN_RECEIPT_PATH = (
+    ROOT
+    / "distribution"
+    / "build-receipts"
+    / "lab-brand-1.0.0-e975223.canonical-green.json"
+)
 
 EXPECTED_ASSETS = {
     "mark": {
@@ -250,6 +256,54 @@ class LabBrandAssetTests(unittest.TestCase):
         self.assertFalse(receipt["safety"]["frontendIsAuthority"])
         self.assertFalse(receipt["safety"]["visualThemeIsAuthority"])
         self.assertEqual(receipt["safety"]["hardwareActionDecision"], "deny")
+        self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
+
+    def test_canonical_green_receipt_keeps_product_and_brand_sources_distinct(self) -> None:
+        receipt = json.loads(CANONICAL_GREEN_RECEIPT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(
+            receipt["source"]["commit"],
+            "e9752238cee9123705f896a6e4ebc519c50135dc",
+        )
+        self.assertEqual(
+            receipt["commonCore"]["productSourceCommit"],
+            "e374d3f8d96b1265fcdb06864208b676566e94d9",
+        )
+        self.assertEqual(
+            receipt["canonicalBrandDonor"]["commit"],
+            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+        )
+        self.assertFalse(receipt["commonCore"]["brandDonorIsProductSource"])
+        self.assertFalse(receipt["canonicalBrandDonor"]["grantsHardwareAuthority"])
+
+        for key, expected_path in (
+            ("contract", "brand/brand-editions.v1.json"),
+            ("assetManifest", "brand/generated/brand-assets.v1.json"),
+            ("visualReceipt", "brand/generated/brand-visual-receipt.v1.json"),
+        ):
+            reference = receipt["canonicalBrandDonor"][key]
+            self.assertEqual(reference["path"], expected_path)
+            payload = (ROOT / expected_path).read_bytes()
+            self.assertEqual(len(payload), reference["bytes"])
+            self.assertEqual(hashlib.sha256(payload).hexdigest(), reference["sha256"])
+
+        report_reference = receipt["visualVerification"]["acceptedReport"]
+        report_payload = (ROOT / report_reference["path"]).read_bytes()
+        self.assertEqual(len(report_payload), report_reference["bytes"])
+        self.assertEqual(
+            hashlib.sha256(report_payload).hexdigest(),
+            report_reference["sha256"],
+        )
+        report = json.loads(report_payload.decode("utf-8"))
+        self.assertEqual(report["sourceCommit"], receipt["source"]["commit"])
+        self.assertEqual(report["sourceStatus"], "clean")
+        self.assertEqual(report["brand"]["canonicalDonor"]["commit"], receipt["canonicalBrandDonor"]["commit"])
+        self.assertEqual(len(report["screenshots"]), receipt["visualVerification"]["screenshotCount"])
+
+        self.assertEqual(receipt["safety"]["validatedVehiclePackCount"], 0)
+        self.assertEqual(receipt["safety"]["hardwareActionDecision"], "deny")
+        self.assertFalse(receipt["installerStructure"]["generatedNsiVerified"])
+        self.assertFalse(receipt["installerStructure"]["executableExists"])
+        self.assertFalse(receipt["installerStructure"]["updaterSignatureExists"])
         self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
 
 
