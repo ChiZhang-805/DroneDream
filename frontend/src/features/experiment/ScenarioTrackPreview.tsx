@@ -1,8 +1,7 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
-  WheelEvent as ReactWheelEvent,
 } from "react";
 
 import type { TrackPoint } from "../../types/api";
@@ -116,6 +115,7 @@ export function ScenarioTrackPreview({
 }: ScenarioTrackPreviewProps) {
   const { t } = useI18n();
   const instanceId = useId().replace(/:/gu, "");
+  const previewRef = useRef<SVGSVGElement | null>(null);
   const rotationDrag = useRef<{
     pointerId: number;
     clientX: number;
@@ -293,14 +293,21 @@ export function ScenarioTrackPreview({
     }));
   }
 
-  function handleWheel(event: ReactWheelEvent<SVGSVGElement>): void {
-    if (view !== "3d") return;
-    event.preventDefault();
-    setCamera((current) => ({
-      ...current,
-      zoom: Math.max(0.65, Math.min(2.2, current.zoom * (event.deltaY > 0 ? 0.9 : 1.1))),
-    }));
-  }
+  useEffect(() => {
+    const preview = previewRef.current;
+    if (!preview || view !== "3d") return undefined;
+
+    const handleWheel = (event: WheelEvent): void => {
+      event.preventDefault();
+      setCamera((current) => ({
+        ...current,
+        zoom: Math.max(0.65, Math.min(2.2, current.zoom * (event.deltaY > 0 ? 0.9 : 1.1))),
+      }));
+    };
+
+    preview.addEventListener("wheel", handleWheel, { passive: false });
+    return () => preview.removeEventListener("wheel", handleWheel);
+  }, [view]);
 
   function handleKeyDown(event: ReactKeyboardEvent<SVGSVGElement>): void {
     if (view !== "3d") return;
@@ -352,6 +359,7 @@ export function ScenarioTrackPreview({
         ))}
       </div>
       <svg
+        ref={previewRef}
         className={`scenario-track-canvas ${view === "3d" ? "scenario-track-canvas-3d" : ""} ${isRotating ? "is-rotating" : ""}`}
         viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
         role="group"
@@ -361,7 +369,6 @@ export function ScenarioTrackPreview({
         onPointerMove={handlePointerMove}
         onPointerUp={stopRotation}
         onPointerCancel={stopRotation}
-        onWheel={handleWheel}
         onKeyDown={handleKeyDown}
       >
         <title>{`${title} - ${t(`track.view.${view}`)}`}</title>
