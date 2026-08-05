@@ -41,6 +41,7 @@
     "distribution/build-profiles/lab-preview.v1.json",
     "distribution/schemas/lab-preview-artifact-receipt.schema.json",
     "distribution/tests/test_lab_preview_contract.py",
+    "distribution/tools/lab_preinstall_acceptance.py",
     "distribution/tools/verify_lab_preview_artifact.py",
     "distribution/tools/verify_lab_preview_contract.py"
   ],
@@ -90,6 +91,7 @@
     "buildScript": "desktop/scripts/build-lab-preview.ps1",
     "artifactReceiptSchema": "distribution/schemas/lab-preview-artifact-receipt.schema.json",
     "artifactVerifier": "distribution/tools/verify_lab_preview_artifact.py",
+    "preinstallAcceptanceTool": "distribution/tools/lab_preinstall_acceptance.py",
     "selectedVehiclePack": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
     "selectedControllerModel": "Pixhawk 6C",
     "firmwareFamily": "px4",

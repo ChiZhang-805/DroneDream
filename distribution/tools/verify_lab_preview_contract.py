@@ -64,6 +64,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "distribution/build-profiles/lab-preview.v1.json",
         "distribution/schemas/lab-preview-artifact-receipt.schema.json",
         "distribution/tests/test_lab_preview_contract.py",
+        "distribution/tools/lab_preinstall_acceptance.py",
         "distribution/tools/verify_lab_preview_artifact.py",
         "distribution/tools/verify_lab_preview_contract.py",
     ):
@@ -102,6 +103,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         payload.get("artifactReceiptSchema")
         != "distribution/schemas/lab-preview-artifact-receipt.schema.json"
         or payload.get("artifactVerifier") != "distribution/tools/verify_lab_preview_artifact.py"
+        or payload.get("preinstallAcceptanceTool")
+        != "distribution/tools/lab_preinstall_acceptance.py"
         or payload.get("firmwareFamily") != "px4"
         or payload.get("qualificationReceiptRequired") is not True
         or tuple(payload.get("simulationPayload", ()))

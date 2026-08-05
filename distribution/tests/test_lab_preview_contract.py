@@ -11,6 +11,7 @@ if str(TOOLS) not in sys.path:
 
 import verify_lab_preview_contract as lab_preview  # noqa: E402
 import verify_lab_preview_artifact as lab_artifact  # noqa: E402
+import lab_preinstall_acceptance as lab_preinstall  # noqa: E402
 
 
 class LabPreviewContractTests(unittest.TestCase):
@@ -76,6 +77,17 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
         self.assertFalse(schema["additionalProperties"])
         self.assertEqual(schema["properties"]["kind"]["const"], "dronedream-lab-preview-artifact-receipt")
+
+    def test_lab_preinstall_acceptance_is_read_only_and_blocked_without_real_receipt(self) -> None:
+        result = lab_preinstall.evaluate_preinstall()
+        self.assertEqual(result["decision"], "blocked")
+        self.assertIn("No Lab artifact receipt was supplied.", result["blockers"])
+        self.assertTrue(all(value is False for value in result["sideEffects"].values()))
+
+        result = lab_preinstall.evaluate_preinstall(lab_artifact.fake_lab_preview_receipt())
+        self.assertEqual(result["decision"], "blocked")
+        self.assertIn("Only a fake test fixture receipt was supplied.", result["blockers"])
+        self.assertTrue(all(value is False for value in result["sideEffects"].values()))
 
 
 if __name__ == "__main__":
