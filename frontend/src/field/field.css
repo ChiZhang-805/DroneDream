@@ -420,6 +420,30 @@ select:focus-visible {
   border-radius: 6px;
 }
 
+.field-observation-result {
+  display: grid;
+  align-items: center;
+  grid-template-columns: 17px auto minmax(0, 1fr);
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  color: #74382e;
+  background: #fff4ef;
+  border: 1px solid #efc7bd;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.field-observation-result svg {
+  width: 16px;
+  height: 16px;
+  color: var(--field-danger);
+}
+
+.field-observation-result span {
+  color: var(--field-muted);
+}
+
 .field-device-grid div {
   min-width: 0;
   padding: 15px;
@@ -751,6 +775,15 @@ select:focus-visible {
   .field-gate-grid,
   .field-action-matrix {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-observation-result {
+    align-items: start;
+    grid-template-columns: 17px minmax(0, 1fr);
+  }
+
+  .field-observation-result span {
+    grid-column: 2;
   }
 
   .field-device-grid div:nth-child(3) {

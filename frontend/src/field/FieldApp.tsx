@@ -56,6 +56,13 @@ const COPY = {
       "firmware-drift": "Firmware drift",
       "recognized-unvalidated": "Recognized, unvalidated",
     },
+    stateDetail: {
+      offline: "Offline mode has no cached device observation.",
+      "device-missing": "No device is present in the read-only observation.",
+      "unknown-device": "The observed identity is absent from the source-bound registry.",
+      "firmware-drift": "The observed firmware is outside the compatibility contract.",
+      "recognized-unvalidated": "Identity and firmware matches do not satisfy the validation tier.",
+    },
     deviceTitle: "Device observation",
     deviceBody: "Observation is informational and never grants authority.",
     deviceId: "Device ID",
@@ -136,6 +143,13 @@ const COPY = {
       "unknown-device": "未知设备",
       "firmware-drift": "固件漂移",
       "recognized-unvalidated": "已识别，未验证",
+    },
+    stateDetail: {
+      offline: "离线模式下没有可用的设备观察缓存。",
+      "device-missing": "只读观察中没有设备。",
+      "unknown-device": "观察到的设备身份不在源绑定注册表中。",
+      "firmware-drift": "观察到的固件超出兼容性合同范围。",
+      "recognized-unvalidated": "设备身份与固件匹配仍未达到验证层级。",
     },
     deviceTitle: "设备观察",
     deviceBody: "观察结果仅供查看，永远不授予控制权限。",
@@ -339,6 +353,11 @@ export function FieldApp({
                 </select>
               </label>
             </div>
+            <p className="field-observation-result" role="status">
+              <CircleOff aria-hidden="true" />
+              <strong>{copy.states[observationState]}</strong>
+              <span>{copy.stateDetail[observationState]}</span>
+            </p>
             <dl className="field-device-grid">
               <div><dt>{copy.deviceId}</dt><dd>{observation.deviceId ?? copy.unavailable}</dd></div>
               <div><dt>{copy.controller}</dt><dd>{observation.controller ?? copy.unavailable}</dd></div>

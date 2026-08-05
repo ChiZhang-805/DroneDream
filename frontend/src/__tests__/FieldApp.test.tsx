@@ -51,6 +51,8 @@ describe("FieldApp", () => {
 
     expect(screen.getByText("demo:unknown-controller")).toBeInTheDocument();
     expect(screen.getByText("Unknown controller")).toBeInTheDocument();
+    expect(screen.getByText("The observed identity is absent from the source-bound registry."))
+      .toBeInTheDocument();
     for (const name of [
       "Create snapshot",
       "Apply rollback",
@@ -59,6 +61,21 @@ describe("FieldApp", () => {
     ]) {
       expect(screen.getByRole("button", { name })).toBeDisabled();
     }
+  });
+
+  it.each([
+    ["offline", "Offline mode has no cached device observation."],
+    ["device-missing", "No device is present in the read-only observation."],
+    ["firmware-drift", "The observed firmware is outside the compatibility contract."],
+    [
+      "recognized-unvalidated",
+      "Identity and firmware matches do not satisfy the validation tier.",
+    ],
+  ] as const)("renders the %s negative observation reason", (state, reason) => {
+    render(<FieldApp initialLocale="en" initialObservationState={state} />);
+
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Emergency stop" })).toBeDisabled();
   });
 
   it("renders all seven Field-compatible packs and no authority action", () => {
@@ -106,7 +123,8 @@ describe("FieldApp", () => {
     render(<FieldApp initialLocale="zh-CN" initialObservationState="firmware-drift" />);
 
     expect(screen.getByRole("heading", { name: "真机就绪状态" })).toBeInTheDocument();
-    expect(screen.getByText("固件漂移")).toBeInTheDocument();
+    expect(within(screen.getByRole("status")).getByText("固件漂移"))
+      .toBeInTheDocument();
     expect(screen.getByText("当前没有达到硬件验证层级的机型包。设备观察结果不能解锁控制权限。"))
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "应用回滚" })).toBeDisabled();
