@@ -1,0 +1,198 @@
+{
+  "schema_id": "dronedream.benchmark-p5-terminal-runner-receipt/v1",
+  "receipt_id": "benchmark-p5-terminal-runner-2c0371b",
+  "generated_at_utc": "2026-08-05T03:39:34.5831951Z",
+  "execution_subject": {
+    "repository_commit": "2c0371b26e87c1d30b5a8cf3cb9bf16e56b85196",
+    "repository_tree": "c39fd380fe0ed99dfab7c857489f4eb33e88a6e1",
+    "branch": "codex/software",
+    "upstream": "origin/codex/software",
+    "upstream_commit_before_evidence": "2c0371b26e87c1d30b5a8cf3cb9bf16e56b85196",
+    "worktree_clean_before_evidence": true,
+    "ahead": 0,
+    "behind": 0,
+    "evidence_commit": null,
+    "evidence_commit_semantics": "This receipt is committed after the execution subject and must not be treated as tested source."
+  },
+  "protocol": {
+    "path": "Z:\\DroneDream\\work\\DRONEDREAM_MODEL_HARNESS_BENCHMARK_PROTOCOL.md",
+    "sha256": "734bb6b42ec25ffc92bd9f15bb6fa27bc3482b4ce0841ce9aa3b080eafb8caee"
+  },
+  "resource_class": "YELLOW",
+  "source_closure": {
+    "subject_commit": "2c0371b26e87c1d30b5a8cf3cb9bf16e56b85196",
+    "component_commits": [
+      {
+        "commit": "2e354ab64bcac68e925c17804da730d64a5f7886",
+        "summary": "Retain applied PX4 parameter evidence and bind the P5 baseline to the server-created baseline Candidate identity."
+      },
+      {
+        "commit": "9a1bc0ed4cde8e4d0fbab1660904cd7ca11ba9d2",
+        "summary": "Derive terminal P5 Job evidence from authenticated ORM state, accepted-attempt receipts, and byte-verified artifacts, then expose one read-only authenticated route."
+      },
+      {
+        "commit": "2c0371b26e87c1d30b5a8cf3cb9bf16e56b85196",
+        "summary": "Advance the P5 campaign one bounded action at a time through immutable checkpoints and forbid automatic POST replay after an unobserved dispatch."
+      }
+    ],
+    "files": [
+      {
+        "path": "backend/app/benchmarking/physical_stability_bridge.py",
+        "sha256": "de0489dae46eee4f40873cb4c14187203dd548c340360244dc93e1097b5cdb91"
+      },
+      {
+        "path": "backend/app/benchmarking/physical_stability_job_evidence.py",
+        "sha256": "acc887ed2f0723989a389404f20f342f563604d1b797aa5a763f5e9bde870c8b"
+      },
+      {
+        "path": "backend/app/benchmarking/physical_stability_runner.py",
+        "sha256": "825d31f31174c0d959baa71ba5d1436bfd57a2b632d017fb40f2fe5429fcb2ef"
+      },
+      {
+        "path": "backend/app/routers/jobs.py",
+        "sha256": "0c849b383179114e050d7f960e0f92fe3fc9ac8244b84fa3dbbc9504001ca7b1"
+      },
+      {
+        "path": "backend/tests/test_benchmark_physical_stability_bridge.py",
+        "sha256": "971c511af3c78cdb80d399721f240b5729558d73b8b2dd2ff6dd288438676ac6"
+      },
+      {
+        "path": "backend/tests/test_benchmark_physical_stability_job_evidence.py",
+        "sha256": "0e349617b23728f7594857a31a4d63559aecc311d87f495bdfa4319dfa3417aa"
+      },
+      {
+        "path": "backend/tests/test_benchmark_physical_stability_runner.py",
+        "sha256": "136975202b290245938093ec6a2c9cf247f3aac10b44a894c41337279d723568"
+      },
+      {
+        "path": "desktop/scripts/p5-desktop-api-adapter.cjs",
+        "sha256": "d1fc27681540b3ebde057ad89c3e8a4fffe60c08433189a54e4d833404b736a8"
+      },
+      {
+        "path": "desktop/scripts/p5-desktop-api-adapter.test.cjs",
+        "sha256": "1e2dd03760527ba8272ceb3dc10e3639638efcbac0e4ca10e29f130a7eb0131c"
+      },
+      {
+        "path": "scripts/simulators/px4_gazebo_runner.py",
+        "sha256": "a34e0cf98555aae4abecaa15e46757c45006734bc6939634f2135d3e48b1563c"
+      },
+      {
+        "path": "backend/tests/test_px4_gazebo_runner.py",
+        "sha256": "77cc135b534ce9db0ce61f0b722c66bddb0c90aa712fa0bfbeebc230f837f87e"
+      }
+    ]
+  },
+  "terminal_evidence_contract": {
+    "schema_id": "dronedream.physical-stability-job-evidence/v1",
+    "properties": [
+      "The authenticated server derives the baseline Candidate and ten Trial identities from ORM state; the desktop cannot submit these identities or verdicts.",
+      "Every completed Trial requires one accepted attempt, sealed artifact receipts, and byte re-verification for telemetry, scenario request/readback, PX4 parameter input/readback, and metrics.",
+      "The server validates exact scenario-effect application, exact PX4 parameter context and numeric values, and retains crash, timeout, instability, failure, cancelled, and indeterminate states.",
+      "The bridge maps server Trial rows to preregistered Trial identities by exact seed and scenario contract, never by random database UUID or response order.",
+      "The read-only route returns no storage paths, access tokens, API keys, passwords, raw prompts, raw chats, or provider request identifiers."
+    ]
+  },
+  "runner_contract": {
+    "schema_id": "dronedream.physical-stability-advance-result/v1",
+    "properties": [
+      "One invocation performs at most one external action: one Job create, one terminal evidence read, or no-op closed reporting; it never sleeps or polls internally.",
+      "dispatch_attempted is durably checkpointed before the create call, while job_observed time is sampled only after the create response returns.",
+      "A crash or exception after the durable dispatch reservation but before Job observation cannot automatically replay POST and requires manual read-only reconciliation.",
+      "A repeatable not-ready GET writes no checkpoint, while a verified terminal snapshot appends exactly one terminal checkpoint.",
+      "New dispatch requires the exact unexpired RED authorization; an already running Job may still be read and closed after authorization expiry so consumed work is not lost.",
+      "A complete six-scenario campaign produces exactly eighteen append-only checkpoints: dispatch attempted, Job observed, and terminal observed for each scenario."
+    ]
+  },
+  "preserved_failures": [
+    {
+      "stage": "terminal mapping fixture construction",
+      "result": "The first uncommitted helper insertion placed the original terminal-observation return after the new snapshot helper.",
+      "root_cause": "Patch context selected the end of the Trial tuple instead of the end of the helper function.",
+      "fix": "Restore the return before the new helper and rerun focused and expanded tests.",
+      "expectations_weakened": false
+    },
+    {
+      "stage": "runner checkpoint regression command",
+      "result": "Pytest collected no tests because a nonexistent checkpoint test filename was supplied.",
+      "root_cause": "Checkpoint coverage lives in test_benchmark_physical_stability_bridge.py rather than a standalone checkpoint file.",
+      "fix": "List the actual test files and rerun the correct bridge plus runner suite; no product timeout or expectation changed.",
+      "expectations_weakened": false
+    }
+  ],
+  "verification": [
+    {
+      "name": "Current-exact P5, Job API, artifact, and accepted-attempt regression",
+      "command": "python -m pytest backend/tests/test_benchmark_physical_stability.py backend/tests/test_benchmark_physical_stability_assessment.py backend/tests/test_benchmark_physical_stability_execution.py backend/tests/test_benchmark_physical_stability_bridge.py backend/tests/test_benchmark_physical_stability_job_evidence.py backend/tests/test_benchmark_physical_stability_runner.py backend/tests/test_jobs_api.py backend/tests/test_artifacts_api.py backend/tests/test_outcome_artifact_evidence.py -q",
+      "result": "passed",
+      "passed": 130,
+      "failed": 0,
+      "duration_seconds": 196.35
+    },
+    {
+      "name": "P5 desktop local-API adapter",
+      "command": "node --test desktop/scripts/p5-desktop-api-adapter.test.cjs",
+      "result": "passed",
+      "passed": 6,
+      "failed": 0,
+      "duration_seconds": 0.1006379
+    },
+    {
+      "name": "P5 runner and bridge focused suite",
+      "command": "python -m pytest backend/tests/test_benchmark_physical_stability_runner.py backend/tests/test_benchmark_physical_stability_bridge.py -q",
+      "result": "passed",
+      "passed": 16,
+      "failed": 0,
+      "duration_seconds": 5.62
+    },
+    {
+      "name": "changed-source Ruff",
+      "result": "passed",
+      "summary": "All checks passed!"
+    },
+    {
+      "name": "changed-source Mypy",
+      "result": "passed",
+      "summary": "Success: no issues found in 2 source files"
+    },
+    {
+      "name": "git diff check",
+      "result": "passed"
+    },
+    {
+      "name": "changed-scope sensitive-value scan",
+      "result": "passed",
+      "sensitive_values_found": 0
+    }
+  ],
+  "execution_boundaries": {
+    "physical_trials_attempted": 0,
+    "desktop_connections": 0,
+    "desktop_or_job_api_requests": 0,
+    "px4_runs": 0,
+    "gazebo_runs": 0,
+    "provider_logical_turns": 0,
+    "provider_network_requests": 0,
+    "api_keys_read": false,
+    "account_credentials_read": false,
+    "headed_browser_runs": 0,
+    "global_mouse_moved": false,
+    "runtime_installations_or_migrations": 0,
+    "engine_pack_builds_or_activations": 0,
+    "production_deployments": 0,
+    "website_or_technical_report_writes": 0
+  },
+  "remaining_boundaries": {
+    "manual_unobserved_dispatch_reconciliation": "automatic replay is blocked; a reviewed read-only reconciliation procedure is still required for an actual indeterminate POST",
+    "red_window_entrypoint": "domain runner and desktop adapter are independently implemented; no authorized live process was assembled or connected in this closure",
+    "actual_composite_inventory_binding": "not generated for this source",
+    "installed_desktop_alignment": "not reverified",
+    "active_runtime_base_alignment": "not reverified",
+    "active_engine_pack_alignment": "not reverified",
+    "red_window_authorization": "not issued",
+    "physical_stability_execution": "not run",
+    "pilot_scenario_selection": "not frozen from real baseline stability",
+    "p6_provider_approval_request": "not ready until P5 physical stability and current-exact gates close",
+    "technical_report": "frozen and unchanged"
+  },
+  "scope_claim": "This receipt proves the source-bound P5 terminal evidence projection and crash-safe one-step campaign runner under offline fake transport and authenticated API tests. It does not prove an installed desktop connection, active Runtime or Engine Pack alignment, a RED-window authorization, or any real PX4/Gazebo Trial."
+}
