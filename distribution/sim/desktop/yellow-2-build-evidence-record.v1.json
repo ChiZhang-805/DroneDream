@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow2-build-evidence-record",
+  "recordVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "build-succeeded-payload-contract-failed-not-preview-ready",
+  "source": {
+    "branch": "codex/software-sim",
+    "productSourceCommit": "ee6b69536e54432d2496e09da58fe703056847ca",
+    "evidenceCommitPolicy": "commit-containing-this-record",
+    "evidenceCommitExpectedParent": "ee6b69536e54432d2496e09da58fe703056847ca",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
+    "brandDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "sourceTreeWasClean": true
+  },
+  "attempt": {
+    "runId": "sim-y2-20260805T155356Z-ee6b6953",
+    "buildAttemptCount": 1,
+    "cargoBuildCount": 1,
+    "nsisInvocationCount": 1,
+    "preExecutionPolicyRejectionCount": 1,
+    "preExecutionPolicyRejectionStartedProcess": false,
+    "secondBuildAttempted": false,
+    "cargoBuildJobs": 2,
+    "durationSeconds": 459.377,
+    "resourceThresholdBreached": false,
+    "maximumMemoryUsedPercent": 71.1,
+    "minimumMemoryFreeBytes": 4886552576
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260805T155356Z-ee6b6953/bundle/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "originalGeneratedFileName": "DroneDream \u00b7 SIM_1.0.0_x64-setup.exe",
+    "productName": "DroneDream \u00b7 SIM",
+    "version": "1.0.0",
+    "bytes": 11602688,
+    "sha256": "f04422eb06d9a29d2c563bf9687894d7477e36d893bc3a6203a0fe17793858d2",
+    "authenticodeState": "NotSigned",
+    "peCertificateTableOffset": 0,
+    "peCertificateTableSize": 0,
+    "updaterSignaturePath": null,
+    "updaterSignatureSha256": null,
+    "checksumSidecarPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260805T155356Z-ee6b6953/bundle/DroneDream-Sim-1.0.0.exe.sha256",
+    "checksumSidecarSha256": "4bd1d5ebee6a57da221acac58fed7886ae0b9dffe734fec2b8f81555cdf4fc48"
+  },
+  "evidence": {
+    "root": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260805T155356Z-ee6b6953",
+    "buildReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260805T155356Z-ee6b6953/receipt/build-receipt.json",
+    "buildReceiptSha256": "fa2ca6ac73d5ccbbb5e104f4caaa878f139497b592db8cf39090a049d6422b02",
+    "artifactManifestPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260805T155356Z-ee6b6953/receipt/artifact-manifest.json",
+    "artifactManifestSha256": "07edc0bd96a50ea089e947bbb99ab72ac0324c835f6793ba2beeabd1e0747fee",
+    "payloadAuditPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260805T155356Z-ee6b6953/receipt/payload-audit.json",
+    "payloadAuditSha256": "d72f5cb5386093e820e1fa6941e3c8ca12a0537872daf845e8c351df96209d0a",
+    "payloadInventorySha256": "9102c571c40f15f6f54d019dfe4792af55b61fcad4fe3dd31db203098cdce2de",
+    "evidenceChecksumsSha256": "8f503006c3e79d1a30a6e6a31b2cb9147de23f2a57e26b19e34d5b5f389df201",
+    "stdoutLogSha256": "b51491611995b239da35c146344b26878cbee912ba23dcadcfe9f7ab0ceaa8c6",
+    "stderrLogSha256": "1dbee0d6143224df4892e6e327cfc995fac0e4b54b0cbfc8928bf6e7b45579f0",
+    "attemptExitReconciliationSha256": "f40e2e818fb7f1adc358a10c8236651ef72c528dcb5aadc22522ce816d963299",
+    "runnerSha256": "ded4e735d506c8f5efe7ef0ca7a48cd0381cc7955fc64a0fe9afb8ea74a0592d",
+    "generatorSha256": "2a0da3463bc0bbaaf5f09bf0b83e912fac7dfc511cc625e285a270ca1112b16e",
+    "publicClientValuesRecorded": false
+  },
+  "payloadAudit": {
+    "enginePackProfileId": "unified-sim-lab",
+    "enginePackSourceCommit": "ee6b69536e54432d2496e09da58fe703056847ca",
+    "enginePackPackId": "sha256:4c50c7594a94724a53e25f9d1ce0e972ebc79f5e8a42e7096813601e153aa0e6",
+    "enginePackVerified": true,
+    "enginePackFileCount": 226,
+    "simulatorScriptCount": 6,
+    "runtimeBaseEmbedded": false,
+    "validatedVehiclePackCount": 0,
+    "forbiddenFindings": [
+      "sim.engine-pack.profile-not-sim-only",
+      "sim.engine-pack.cross-edition-manifests",
+      "sim.engine-pack.disallowed-vehicle-pack-metadata"
+    ],
+    "crossEditionManifestPaths": [
+      "distribution/editions/field.v1.json",
+      "distribution/editions/lab.v1.json"
+    ],
+    "disallowedVehiclePackMetadataCount": 7,
+    "simPayloadContractPassed": false
+  },
+  "staticInstallerVerification": {
+    "singleMakeNsisInvocation": true,
+    "singleBundle": true,
+    "webView2MicrosoftSignedBootstrapper": true,
+    "webView2LoaderBundled": true,
+    "englishAndSimplifiedChineseFiles": true,
+    "licenseNoticeAndValkeyFiles": true,
+    "startMenuAndDesktopShortcutStructure": true,
+    "installMode": "currentUser",
+    "llvmRuntimeDependencyAudit": "pass",
+    "generatedNsiSha256": "b2b5fd842a54d894273ade53f220d36d52bc7ad70817e556c0df4c3b925fe18e"
+  },
+  "nonClaims": {
+    "previewReady": false,
+    "releaseReady": false,
+    "installerExecuted": false,
+    "freshInstallValidated": false,
+    "overlayValidated": false,
+    "uninstallValidated": false,
+    "shortcutObservedOnInstalledSystem": false,
+    "runtimeStarted": false,
+    "px4Started": false,
+    "gazeboStarted": false,
+    "uploaded": false,
+    "releaseBranchCreated": false
+  },
+  "websiteHandoff": {
+    "state": "blocked-payload-contract",
+    "exactExeReceived": false,
+    "previewSubstitutionAllowed": false,
+    "releaseReady": false
+  },
+  "remainingGates": [
+    "Universal/common-core must provide a true sim-only Engine Pack profile.",
+    "A new exact product source and separate YELLOW build authorization are required.",
+    "This unique attempt must not be rerun or substituted.",
+    "YELLOW-3 lifecycle validation remains unstarted.",
+    "Runtime/PX4/Gazebo execution remains RED and unstarted."
+  ]
+}
