@@ -11,12 +11,13 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { sensitiveCloudActionsAllowed } from "../security/sensitiveOrigin";
 import { CommunityPage } from "./CommunityPage";
-import { EditionChooser } from "./EditionChooser";
 import { ManualPage } from "./ManualPage";
 import { PricingPage } from "./PricingPage";
+import { ProductPage } from "./ProductPage";
 import {
   fallbackEditionAvailability,
   isEditionAvailabilityDocument,
+  isEditionDownloadReady,
   type EditionAvailabilityDocument,
 } from "./editionAvailability";
 import {
@@ -26,7 +27,6 @@ import {
   isWebsiteRelease,
   type WebsiteRelease,
 } from "./release";
-import { useModalFocus } from "./useModalFocus";
 import {
   type WebsiteAuthMode,
   websiteAuthReturnPath,
@@ -50,8 +50,8 @@ const content = {
     metaDescription: "Configure, optimize, simulate, and compare PX4 control parameters in one local Windows workflow.",
     navLabel: "Primary navigation",
     nav: [
-      ["Product", "/pricing/"],
-      ["Workflow", "/"],
+      ["Product", "/product/"],
+      ["Price", "/pricing/"],
       ["Manual", "/manual/"],
       ["Community", "/community/"],
     ],
@@ -240,8 +240,8 @@ const content = {
     metaDescription: "在 Windows 本地完成 PX4 控制参数选择、自动优化、可复现仿真与结果对比。",
     navLabel: "主导航",
     nav: [
-      ["产品", "/pricing/"],
-      ["工作流", "/"],
+      ["产品", "/product/"],
+      ["价格", "/pricing/"],
       ["说明书", "/manual/"],
       ["社区", "/community/"],
     ],
@@ -779,7 +779,6 @@ export function SiteApp({
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
   const [editionAvailability, setEditionAvailability] =
     useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
-  const [editionChooserOpen, setEditionChooserOpen] = useState(false);
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -803,12 +802,12 @@ export function SiteApp({
   const [authError, setAuthError] = useState<string | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const editionDialogRef = useRef<HTMLElement | null>(null);
-  const editionCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
   const path = currentSiteUrl.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
+    : path === "/product"
+      ? "product"
     : path === "/pricing"
       ? "pricing"
       : path === "/community"
@@ -955,6 +954,13 @@ export function SiteApp({
 
   const currentPhase = copy.demoPhases[activePhase];
   const displaySize = useMemo(() => formatBinarySize(release.sizeBytes), [release.sizeBytes]);
+  const universalEdition = editionAvailability.editions.find((edition) => edition.id === "universal");
+  const universalDownloadReady = Boolean(
+    universalEdition && isEditionDownloadReady(universalEdition) && universalEdition.downloadUrl,
+  );
+  const universalPendingLabel = locale === "zh-CN"
+    ? "DroneDream Universal 正在准备"
+    : "DroneDream Universal is coming soon";
 
   const selectPhaseFromKeyboard = (
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -979,18 +985,6 @@ export function SiteApp({
   };
 
   const closeMenu = () => setMenuOpen(false);
-  const closeEditionChooser = () => setEditionChooserOpen(false);
-  const captureEditionChooserTrigger = useModalFocus({
-    open: editionChooserOpen,
-    dialogRef: editionDialogRef,
-    initialFocusRef: editionCloseButtonRef,
-    onClose: closeEditionChooser,
-  });
-  const openEditionChooser = () => {
-    captureEditionChooserTrigger();
-    setMenuOpen(false);
-    setEditionChooserOpen(true);
-  };
   const navigateWithinSite = (target: string, replace = false) => {
     if (replace) window.history.replaceState(null, "", target);
     else window.history.pushState(null, "", target);
@@ -1352,14 +1346,28 @@ export function SiteApp({
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z" /></svg>
             {copy.language}
           </button>
-          <button
-            type="button"
-            className="site-header-download"
-            onClick={openEditionChooser}
-          >
-            <DownloadIcon />
-            {copy.downloadShort}
-          </button>
+          {universalDownloadReady && universalEdition?.downloadUrl ? (
+            <a
+              className="site-header-download"
+              href={universalEdition.downloadUrl}
+              download={universalEdition.fileName}
+              aria-label={`DroneDream Universal — ${copy.downloadShort}`}
+            >
+              <DownloadIcon />
+              {copy.downloadShort}
+            </a>
+          ) : (
+            <button
+              type="button"
+              className="site-header-download"
+              disabled
+              title={universalPendingLabel}
+              aria-label={universalPendingLabel}
+            >
+              <DownloadIcon />
+              {copy.downloadShort}
+            </button>
+          )}
           <button
             ref={menuButtonRef}
             type="button"
@@ -1380,6 +1388,12 @@ export function SiteApp({
           authPage
         ) : sitePage === "manual" ? (
           <ManualPage locale={locale} />
+        ) : sitePage === "product" ? (
+          <ProductPage
+            availability={editionAvailability}
+            currentRelease={release}
+            locale={locale}
+          />
         ) : sitePage === "pricing" ? (
           <PricingPage
             locale={locale}
@@ -1411,14 +1425,14 @@ export function SiteApp({
                 <span className="site-hero-line site-hero-line-accent">{copy.heroAccent}</span>
               </h1>
               <div className="site-hero-actions">
-                <button
-                  type="button"
+                <a
                   className="site-button site-button-primary"
-                  onClick={openEditionChooser}
+                  href={release.downloadUrl}
+                  download={release.fileName}
                 >
                   <DownloadIcon />
                   {copy.downloadWindows}
-                </button>
+                </a>
                 <a className="site-button site-button-ghost" href="#product">
                   <ArrowRightIcon />
                   {copy.explore}
@@ -1611,14 +1625,14 @@ export function SiteApp({
                 <p className="site-eyebrow">{copy.downloadEyebrow}</p>
                 <h2>{copy.downloadTitle}</h2>
                 <p data-copy-block data-copy-id="download-body">{copy.downloadBody}</p>
-                <button
-                  type="button"
+                <a
                   className="site-button site-button-primary"
-                  onClick={openEditionChooser}
+                  href={release.downloadUrl}
+                  download={release.fileName}
                 >
                   <DownloadIcon />
                   {copy.downloadAgain}
-                </button>
+                </a>
               </div>
               <div className="site-release-card">
                 <dl>
@@ -1660,19 +1674,6 @@ export function SiteApp({
           </div>
         </footer>
       ) : null}
-      <EditionChooser
-        availability={editionAvailability}
-        currentRelease={release}
-        locale={locale}
-        onClose={closeEditionChooser}
-        open={editionChooserOpen}
-        setCloseButtonRef={(node) => {
-          editionCloseButtonRef.current = node;
-        }}
-        setDialogRef={(node) => {
-          editionDialogRef.current = node;
-        }}
-      />
     </div>
   );
 }
