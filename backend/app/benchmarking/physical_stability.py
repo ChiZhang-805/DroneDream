@@ -375,6 +375,15 @@ def build_physical_stability_manifest(
             "uses_optimizer": False,
             "fixed_baseline_controller_only": True,
             "minimum_seed_repeats_per_scenario": 10,
+            "required_completed_trials_per_scenario": 10,
+            "required_effect_readbacks_per_scenario": 10,
+            "required_parameter_readbacks_per_scenario": 10,
+            "required_complete_evidence_receipts_per_scenario": 10,
+            "maximum_safety_critical_failures_per_scenario": 0,
+            "maximum_rmse_normalized_mad": 0.35,
+            "maximum_max_error_normalized_mad": 0.35,
+            "graded_baseline_pass_count_minimum": 2,
+            "graded_baseline_pass_count_maximum": 8,
             "criteria": [
                 "effect_request_applied_and_read_back",
                 "complete_telemetry_and_metric_evidence",
@@ -384,6 +393,7 @@ def build_physical_stability_manifest(
             "comparative_rank_or_direction_must_not_be_observed": True,
             "failures_and_indeterminate_trials_remain_in_denominator": True,
             "replacement_requires_new_manifest_version_and_audit_reason": True,
+            "final_freeze_requires_separate_content_addressed_selection_manifest": True,
         },
     )
 

@@ -68,6 +68,14 @@ def test_p5_manifest_freezes_six_scenarios_and_sixty_zero_provider_trials() -> N
     }
     assert all(len(item.input_contract_sha256) == 64 for item in plan.trials)
     assert all(len(item.scenario_effect_request_sha256) == 64 for item in plan.trials)
+    assert manifest.selection_policy["required_completed_trials_per_scenario"] == 10
+    assert manifest.selection_policy["maximum_rmse_normalized_mad"] == 0.35
+    assert (
+        manifest.selection_policy[
+            "final_freeze_requires_separate_content_addressed_selection_manifest"
+        ]
+        is True
+    )
 
 
 def test_p5_derivations_are_bounded_and_keep_gps_prearm_injection_disabled() -> None:
