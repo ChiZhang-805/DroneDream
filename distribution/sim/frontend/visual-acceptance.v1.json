@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-frontend-visual-acceptance",
+  "contractVersion": "1.0.0",
+  "editionId": "sim",
+  "executionClass": "YELLOW-offline-browser",
+  "requiredAcknowledgement": "--ack-yellow",
+  "networkPolicy": "local-vite-with-offline-503-api-fixture",
+  "apiKeyUseAllowed": false,
+  "productIdentity": {
+    "displayName": "DroneDream · SIM",
+    "artifactFileName": "DroneDream-Sim-1.0.0.exe",
+    "releaseState": "internal-preview",
+    "validationState": "planned-not-validated"
+  },
+  "brandDonor": {
+    "approvedConceptHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
+    "canonicalDonorState": "pending-universal-common-core",
+    "canonicalDonorCommit": null,
+    "approvedPalette": ["#00D9FF", "#2671FF", "#744CFF"],
+    "paletteApplied": false,
+    "iconIntegrated": false
+  },
+  "source": {
+    "branch": "codex/software-sim",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
+    "refs": [
+      {
+        "path": "frontend/src/AppShell.tsx",
+        "sha256": "d6d9610747465f0e7118a52804b867a4de14dd770846a00989ebc6da5cd22a8d"
+      },
+      {
+        "path": "frontend/src/components/DistributionSetupPanel.tsx",
+        "sha256": "8a434605bd424489ccd11e8133509308b912e91263039b22e71332824a23d421"
+      },
+      {
+        "path": "frontend/src/editions/sim/SimEditionExperience.tsx",
+        "sha256": "5682838ceb5fab87404ea0d5965b99be4050f233d07f42e7c378a9dd26a7e20c"
+      },
+      {
+        "path": "frontend/src/editions/sim/profile.ts",
+        "sha256": "f8af55c1f7f41bb7a86c5c4f3f0d27d7b3da6601486bf8f5db099ec0570694e2"
+      },
+      {
+        "path": "frontend/src/editions/sim/sim.css",
+        "sha256": "b4a0bf7035b300f9088e565df33dc0aae1b2811ad95f36386cb549da52e7cb27"
+      },
+      {
+        "path": "frontend/src/router.tsx",
+        "sha256": "d0d6c12015db20fcebc00e5e918070995ca0505fc399c67ec94e7e6549869f80"
+      },
+      {
+        "path": "distribution/sim/desktop/tauri.sim.conf.json",
+        "sha256": "35c4cdb9a8543fc3375dc245610a1fa2a6b577b12aad95540128e0100599da16"
+      },
+      {
+        "path": "distribution/sim/desktop/installer-surface-contract.v1.json",
+        "sha256": "c1f8b4a293f85983c6d997ec25917f213d1832c870b59af3a30e4118027ac9da"
+      },
+      {
+        "path": "distribution/branch-contracts/software-sim.v1.json",
+        "sha256": "5b277ef1d60b86f2a41edf74c3ec4a38623664cb3f7183b5dad4af3ae624707a"
+      }
+    ]
+  },
+  "viewports": [
+    {"id": "desktop", "width": 1440, "height": 900},
+    {"id": "tablet", "width": 760, "height": 900},
+    {"id": "mobile", "width": 390, "height": 844}
+  ],
+  "locales": [
+    {
+      "id": "en",
+      "overviewTitle": "DroneDream · SIM",
+      "previewStatus": "Internal preview · not validated for promotion",
+      "capabilityList": "Simulation workspace",
+      "dependencyList": "External dependencies",
+      "setupLink": "Open setup preview"
+    },
+    {
+      "id": "zh-CN",
+      "overviewTitle": "DroneDream · SIM",
+      "previewStatus": "内测预览 · 尚未达到发布验证条件",
+      "capabilityList": "仿真工作区",
+      "dependencyList": "外置依赖",
+      "setupLink": "打开设置预览"
+    }
+  ],
+  "routes": {
+    "overview": "/sim",
+    "setup": "/desktop/setup",
+    "forbiddenPrefixes": ["/lab", "/field", "/hitl", "/hardware"],
+    "blockedDestination": "/sim"
+  },
+  "requiredAssertions": [
+    "no-horizontal-document-overflow",
+    "exact-sim-identity",
+    "four-simulation-capabilities",
+    "two-external-dependencies",
+    "preview-state-visible",
+    "no-hardware-hitl-lab-field-interactive-authority",
+    "keyboard-setup-navigation",
+    "setup-selection-locked-to-sim",
+    "no-controller-or-optional-module-control",
+    "forbidden-routes-fail-closed"
+  ],
+  "screenshots": ["overview", "setup", "blocked-route"],
+  "receipt": {
+    "kind": "dronedream-sim-frontend-visual-acceptance-receipt",
+    "sourceTreeRequired": "clean",
+    "browser": "Microsoft Edge via Playwright",
+    "requiredCaseCount": 6
+  },
+  "nonClaims": {
+    "productionBuildExecuted": false,
+    "installerExecuted": false,
+    "runtimeStarted": false,
+    "px4Started": false,
+    "gazeboStarted": false,
+    "canonicalBrandIntegrated": false,
+    "validatedVehiclePackCountAboveZero": false,
+    "promotionReady": false
+  }
+}
