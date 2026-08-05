@@ -6,9 +6,11 @@
     "distribution/schemas/edition-execution-gate-policy.schema.json",
     "distribution/schemas/field-lifecycle-contract.schema.json",
     "distribution/schemas/field-prerelease-audit.schema.json",
+    "distribution/schemas/field-yellow-readiness.schema.json",
     "distribution/tools/distribution_contract.py",
     "distribution/tools/edition_safety_contract.py",
     "distribution/tools/field_lifecycle_contract.py",
-    "distribution/tools/field_prerelease_audit.py"
+    "distribution/tools/field_prerelease_audit.py",
+    "distribution/tools/field_yellow_readiness.py"
   ]
 }

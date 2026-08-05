@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://getdronedream.com/schemas/field-yellow-readiness.schema.json",
+  "title": "DroneDream Field YELLOW build request readiness receipt",
+  "unevaluatedProperties": false,
+  "$ref": "#/$defs/receipt",
+  "$defs": {
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "path": {"type": "string", "minLength": 1, "maxLength": 512},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch", "headCommit", "clean", "upstreamAhead", "upstreamBehind",
+        "commonCoreRef", "commonCoreCommit", "commonCoreHash", "commonCoreAncestor"
+      ],
+      "properties": {
+        "branch": {"const": "codex/software-field"},
+        "headCommit": {"$ref": "#/$defs/commit"},
+        "clean": {"type": "boolean"},
+        "upstreamAhead": {"type": "integer", "minimum": 0},
+        "upstreamBehind": {"type": "integer", "minimum": 0},
+        "commonCoreRef": {"type": "string", "minLength": 1},
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreHash": {"$ref": "#/$defs/sha256"},
+        "commonCoreAncestor": {"type": "boolean"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filename", "packaging", "updaterManifest", "signatureState", "artifactBuilt",
+        "artifactSha256", "artifactBytes", "installerUpperBoundBytes"
+      ],
+      "properties": {
+        "filename": {"const": "DroneDream-Field-1.0.0.exe"},
+        "packaging": {"const": "tauri-nsis"},
+        "updaterManifest": {"const": "field-latest.json"},
+        "signatureState": {"const": "not-issued-unsigned-preview"},
+        "artifactBuilt": {"const": false},
+        "artifactSha256": {"type": "null"},
+        "artifactBytes": {"type": "null"},
+        "installerUpperBoundBytes": {"const": 268435456}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId", "includesLargeSimulator", "excludedSourcePaths", "fileCount",
+        "sourceBytes", "sourceUpperBoundBytes", "requiredResources", "missingRequiredResources",
+        "controlPlaneSimulatorMetadata", "forbiddenSimulatorPayloads", "artifactBuilt",
+        "artifactPayloadScanPending"
+      ],
+      "properties": {
+        "profileId": {"const": "field-lightweight"},
+        "includesLargeSimulator": {"const": false},
+        "excludedSourcePaths": {"const": ["backend/app/simulator", "scripts/simulators"]},
+        "fileCount": {"type": "integer", "minimum": 1},
+        "sourceBytes": {"type": "integer", "minimum": 1},
+        "sourceUpperBoundBytes": {"const": 16777216},
+        "requiredResources": {"type": "array", "items": {"$ref": "#/$defs/path"}},
+        "missingRequiredResources": {"type": "array", "items": {"$ref": "#/$defs/path"}},
+        "controlPlaneSimulatorMetadata": {"type": "array", "items": {"$ref": "#/$defs/path"}},
+        "forbiddenSimulatorPayloads": {"type": "array", "items": {"$ref": "#/$defs/path"}},
+        "artifactBuilt": {"const": false},
+        "artifactPayloadScanPending": {"const": true}
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "destination", "sizeBytes", "sha256"],
+      "properties": {
+        "source": {"$ref": "#/$defs/path"},
+        "destination": {"$ref": "#/$defs/path"},
+        "sizeBytes": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "desktop": {
+      "type": "object",
+      "required": [
+        "artifactBaseName", "frontendDist", "updaterManifestFilename", "brandManifestPath",
+        "brandManifestSha256", "brandCommonCoreCommit", "brandCopyPolicy", "canonicalDonor",
+        "installerShortcutHook", "effectiveResources", "effectiveResourceBytes",
+        "resourceUpperBoundBytes", "nsisContract", "assets", "consumerChecks",
+        "simulatorReferences", "verificationErrors", "verified"
+      ],
+      "properties": {
+        "artifactBaseName": {"const": "DroneDream-Field-1.0.0.exe"},
+        "frontendDist": {"const": "../../frontend/field-dist"},
+        "updaterManifestFilename": {"const": "field-latest.json"},
+        "brandManifestPath": {"$ref": "#/$defs/path"},
+        "brandManifestSha256": {"$ref": "#/$defs/sha256"},
+        "brandCommonCoreCommit": {"$ref": "#/$defs/commit"},
+        "brandCopyPolicy": {"const": "byte-for-byte-no-transcode"},
+        "canonicalDonor": {"type": "object"},
+        "installerShortcutHook": {"type": "object"},
+        "effectiveResources": {"type": "array", "items": {"$ref": "#/$defs/resource"}},
+        "effectiveResourceBytes": {"type": "integer", "minimum": 1, "maximum": 4194304},
+        "resourceUpperBoundBytes": {"const": 4194304},
+        "nsisContract": {"type": "object"},
+        "assets": {"type": "array", "minItems": 2, "maxItems": 2},
+        "consumerChecks": {"type": "object"},
+        "simulatorReferences": {"type": "array", "maxItems": 0},
+        "verificationErrors": {"type": "array"},
+        "verified": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layer", "decisionWithCurrentCatalog", "denyReasonCode", "sourcePath", "sourceSha256",
+        "testPath", "testSha256", "denyTest", "noHandlerTest", "sourceContractPresent",
+        "testContractPresent", "testExecutedByGenerator"
+      ],
+      "properties": {
+        "layer": {"enum": ["native", "backend", "runtime"]},
+        "decisionWithCurrentCatalog": {"const": "deny"},
+        "denyReasonCode": {"type": "string", "minLength": 1},
+        "sourcePath": {"$ref": "#/$defs/path"},
+        "sourceSha256": {"$ref": "#/$defs/sha256"},
+        "testPath": {"$ref": "#/$defs/path"},
+        "testSha256": {"$ref": "#/$defs/sha256"},
+        "denyTest": {"type": "string", "minLength": 1},
+        "noHandlerTest": {"type": "string", "minLength": 1},
+        "sourceContractPresent": {"const": true},
+        "testContractPresent": {"const": true},
+        "testExecutedByGenerator": {"const": false}
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionGatePath", "executionGateSha256", "frontendIsAuthority",
+        "hardwareActionHandlersImplemented", "zeroValidatedPackDecision",
+        "validatedHardwarePackCount", "requiredLayers", "layers", "actionDecisions",
+        "readonlyDiscovery"
+      ],
+      "properties": {
+        "executionGatePath": {"$ref": "#/$defs/path"},
+        "executionGateSha256": {"$ref": "#/$defs/sha256"},
+        "frontendIsAuthority": {"const": false},
+        "hardwareActionHandlersImplemented": {"const": false},
+        "zeroValidatedPackDecision": {"const": "deny"},
+        "validatedHardwarePackCount": {"const": 0},
+        "requiredLayers": {"const": ["native", "backend", "runtime"]},
+        "layers": {"type": "array", "minItems": 3, "maxItems": 3, "items": {"$ref": "#/$defs/layer"}},
+        "actionDecisions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hardware.parameter.write", "hardware.unlock", "hardware.arm", "hardware.flight"],
+          "properties": {
+            "hardware.parameter.write": {"const": "deny"},
+            "hardware.unlock": {"const": "deny"},
+            "hardware.arm": {"const": "deny"},
+            "hardware.flight": {"const": "deny"}
+          }
+        },
+        "readonlyDiscovery": {"type": "object"}
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "artifact", "payload", "desktop", "safety", "lifecycle", "releaseBranch", "staticPolicy"],
+      "properties": {
+        "source": {"$ref": "#/$defs/source"},
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "payload": {"$ref": "#/$defs/payload"},
+        "desktop": {"$ref": "#/$defs/desktop"},
+        "safety": {"$ref": "#/$defs/safety"},
+        "lifecycle": {"type": "object"},
+        "releaseBranch": {"type": "object"},
+        "staticPolicy": {"type": "object"}
+      }
+    },
+    "negativeCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "decision", "expectedBlocker", "observedBlockers", "verified"],
+      "properties": {
+        "caseId": {"type": "string", "minLength": 1},
+        "decision": {"const": "deny"},
+        "expectedBlocker": {"type": "string", "minLength": 1},
+        "observedBlockers": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "verified": {"const": true}
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "kind", "editionId", "candidate", "decision",
+        "yellowBuildAuthorized", "buildExecuted", "installExecuted",
+        "deviceEnumerationExecuted", "hardwareActionsAllowed", "simulationExecuted",
+        "apiKeyRead", "releaseBranchCreated", "blockers", "negativePackageCases",
+        "yellowResourceRequest", "finalWebsiteHandoff", "remainingGates", "receiptSha256"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-yellow-build-request-readiness-receipt"},
+        "editionId": {"const": "field"},
+        "candidate": {"$ref": "#/$defs/candidate"},
+        "decision": {"enum": ["ready-to-request-yellow", "deny"]},
+        "yellowBuildAuthorized": {"const": false},
+        "buildExecuted": {"const": false},
+        "installExecuted": {"const": false},
+        "deviceEnumerationExecuted": {"const": false},
+        "hardwareActionsAllowed": {"const": false},
+        "simulationExecuted": {"const": false},
+        "apiKeyRead": {"const": false},
+        "releaseBranchCreated": {"const": false},
+        "blockers": {"type": "array", "items": {"type": "string"}},
+        "negativePackageCases": {"type": "array", "minItems": 7, "items": {"$ref": "#/$defs/negativeCase"}},
+        "yellowResourceRequest": {"type": "object"},
+        "finalWebsiteHandoff": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "websiteSourceCommit", "websiteEvidenceCommit", "state", "productSourceCommit",
+            "uniqueExeAbsolutePath", "filename", "version", "bytes", "sha256", "signatureState",
+            "updaterSignaturePath", "updaterSignatureSha256", "receiptPath", "receiptSha256",
+            "manifestPath", "manifestSha256", "buildCount", "validationBoundary",
+            "singleEditionUrlFamilyVerified", "previewSubstitutionAllowed",
+            "crossEditionAttachmentAllowed", "duplicateShaUrlOrTagAllowed", "releaseReady"
+          ],
+          "properties": {
+            "websiteSourceCommit": {"const": "afdcdee5b60883290c9d1cc0c036141920066659"},
+            "websiteEvidenceCommit": {"const": "1a82e36b362c95983473c4a0d0d967d8c7415f92"},
+            "state": {"const": "awaiting-exact-handoff"},
+            "productSourceCommit": {"$ref": "#/$defs/commit"},
+            "uniqueExeAbsolutePath": {"type": "null"},
+            "filename": {"const": "DroneDream-Field-1.0.0.exe"},
+            "version": {"const": "1.0.0"},
+            "bytes": {"type": "null"},
+            "sha256": {"type": "null"},
+            "signatureState": {"const": "not-issued"},
+            "updaterSignaturePath": {"type": "null"},
+            "updaterSignatureSha256": {"type": "null"},
+            "receiptPath": {"type": "null"},
+            "receiptSha256": {"type": "null"},
+            "manifestPath": {"type": "null"},
+            "manifestSha256": {"type": "null"},
+            "buildCount": {"const": 0},
+            "validationBoundary": {"type": "object"},
+            "singleEditionUrlFamilyVerified": {"const": false},
+            "previewSubstitutionAllowed": {"const": false},
+            "crossEditionAttachmentAllowed": {"const": false},
+            "duplicateShaUrlOrTagAllowed": {"const": false},
+            "releaseReady": {"const": false}
+          }
+        },
+        "remainingGates": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
