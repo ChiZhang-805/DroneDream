@@ -128,6 +128,17 @@ class SimInstallerContractTests(unittest.TestCase):
         self.assertFalse(self.profile["resourceProtocol"]["buildAllowed"])
         self.assertFalse(self.profile["resourceProtocol"]["apiKeyUseAllowed"])
 
+    def test_build_profile_rejects_sim_manifest_drift(self) -> None:
+        invalid = deepcopy(load_json(PROFILE_PATH))
+        invalid["deterministicPayload"]["allowedModules"].remove("simulator-px4-sitl")
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "allowed modules"):
+            sim_contract.validate_build_profile(invalid, repo_root=ROOT)
+
+        invalid = deepcopy(load_json(PROFILE_PATH))
+        invalid["artifact"]["fileName"] = "DroneDream-Field-1.0.0.exe"
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "artifact identity"):
+            sim_contract.validate_build_profile(invalid, repo_root=ROOT)
+
     def test_valid_receipt_binds_exact_artifact_bytes_and_source(self) -> None:
         artifact = b"MZ DroneDream Sim fixture\n"
         validated = self.validate(self.receipt(artifact), artifact)

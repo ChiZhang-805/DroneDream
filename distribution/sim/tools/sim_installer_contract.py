@@ -244,7 +244,16 @@ def validate_build_profile(document: Any, *, repo_root: Path) -> dict[str, Any]:
     _sha(source["commonCoreHash"], "profile.source.commonCoreHash")
 
     manifests = _exact_keys(profile["manifests"], PROFILE_MANIFEST_KEYS, "profile.manifests")
-    _validate_file_ref(manifests["edition"], repo_root, "profile.manifests.edition")
+    edition_ref = _validate_file_ref(
+        manifests["edition"], repo_root, "profile.manifests.edition"
+    )
+    edition_doc = load_json(_resolve(repo_root, edition_ref["path"], "profile edition path"))
+    if (
+        edition_doc.get("editionId") != "sim"
+        or edition_doc.get("artifactBaseName") != artifact["fileName"]
+        or edition_doc.get("productDisplayVersion") != artifact["productVersion"]
+    ):
+        raise SimInstallerContractError("profile drifted from Sim edition manifest identity")
     _validate_file_ref(
         manifests["capabilityPolicy"], repo_root, "profile.manifests.capabilityPolicy"
     )
@@ -292,6 +301,14 @@ def validate_build_profile(document: Any, *, repo_root: Path) -> dict[str, Any]:
         raise SimInstallerContractError("module allow/deny lists overlap")
     if set(allowed_caps) & set(forbidden_caps):
         raise SimInstallerContractError("capability allow/deny lists overlap")
+    if allowed_modules != edition_doc.get("modules", {}).get("required"):
+        raise SimInstallerContractError("profile allowed modules drifted from Sim manifest")
+    if forbidden_modules != edition_doc.get("modules", {}).get("forbidden"):
+        raise SimInstallerContractError("profile forbidden modules drifted from Sim manifest")
+    if allowed_caps != edition_doc.get("capabilities", {}).get("enabledOrConditioned"):
+        raise SimInstallerContractError("profile allowed capabilities drifted from Sim manifest")
+    if forbidden_caps != edition_doc.get("capabilities", {}).get("forbidden"):
+        raise SimInstallerContractError("profile forbidden capabilities drifted from Sim manifest")
     if payload["allowedVehiclePacks"] != ["px4-gazebo-x500-reference"]:
         raise SimInstallerContractError("allowed Vehicle Pack list drifted")
     if set(forbidden_editions) != {"lab", "field"}:
