@@ -141,8 +141,8 @@ _DESCRIPTORS = (
     BenchmarkAdapterDescriptor(
         "llambo_uav/v1",
         "llm_harness",
-        "contract_only",
-        "noisy-uav-adaptation-pending",
+        "implemented",
+        "durable-noisy-constrained-uav-llambo-adaptation-v1",
         "adapted_reference",
     ),
     BenchmarkAdapterDescriptor(
@@ -195,7 +195,7 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
     if descriptor.availability != "implemented":
         raise ValueError(f"benchmark proposal adapter is not implemented: {adapter_id}")
     require_execution_ready_method(adapter_id)
-    if adapter_id in {"llm_direct/v1", "llm_react/v1"}:
+    if adapter_id in {"llm_direct/v1", "llm_react/v1", "llambo_uav/v1"}:
         raise ValueError(
             "benchmark proposal adapter is server-managed by a durable provider runtime: "
             f"{adapter_id}"

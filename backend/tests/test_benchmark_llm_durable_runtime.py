@@ -35,6 +35,7 @@ from app.benchmarking.llm_durable_runtime import (
     BenchmarkProviderExecutionConfigV1,
     BenchmarkProviderTransportResult,
     execute_durable_direct_arm,
+    execute_durable_llambo_arm,
     execute_durable_react_arm,
 )
 from app.benchmarking.method_inventory import BENCHMARK_METHOD_INVENTORY
@@ -140,7 +141,11 @@ def _inventory() -> dict[str, Any]:
 
 
 def _arm_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkArmManifestV1:
-    arm_id = "llm-direct" if adapter_id == "llm_direct/v1" else "llm-react"
+    arm_id = {
+        "llm_direct/v1": "llm-direct",
+        "llm_react/v1": "llm-react",
+        "llambo_uav/v1": "llambo-uav",
+    }[adapter_id]
     return BenchmarkArmManifestV1(
         benchmark_arm_id=arm_id,
         arm_version="v1",
@@ -153,7 +158,7 @@ def _arm_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkArmManifestV1:
 
 
 def _campaign_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkCampaignManifestV1:
-    turn_cap = 2 if adapter_id == "llm_direct/v1" else 8
+    turn_cap = 8 if adapter_id == "llm_react/v1" else 2
     return BenchmarkCampaignManifestV1.model_validate(
         {
             "campaign_key": f"durable-{adapter_id.split('/')[0]}-test",
@@ -209,7 +214,7 @@ def _create_bound_run(
     )
     db.add(batch)
     db.flush()
-    turns_per_generation = 1 if adapter_id == "llm_direct/v1" else 4
+    turns_per_generation = 4 if adapter_id == "llm_react/v1" else 1
     job = models.Job(
         user_id=user.id,
         batch_id=batch.id,
@@ -794,6 +799,21 @@ def test_direct_arm_is_promoted_only_to_server_managed_durable_execution() -> No
         create_benchmark_adapter("llm_direct/v1")
 
 
+def test_llambo_arm_is_promoted_as_an_adaptation_not_a_standard_reproduction() -> None:
+    descriptor = BENCHMARK_ADAPTER_REGISTRY["llambo_uav/v1"]
+    inventory = BENCHMARK_METHOD_INVENTORY["llambo_uav/v1"]
+    assert descriptor.availability == "implemented"
+    assert descriptor.method_classification == "adapted_reference"
+    assert inventory.execution_readiness == "ready"
+    assert inventory.blocker_codes == ()
+    assert any(
+        "not claimed as a standard LLAMBO reproduction" in note
+        for note in inventory.reproducibility_notes
+    )
+    with pytest.raises(ValueError, match="server-managed"):
+        create_benchmark_adapter("llambo_uav/v1")
+
+
 def _production_observation(job: Any, run: Any) -> BenchmarkObservationV2:
     return _observation(job, run).model_copy(
         update={
@@ -890,6 +910,54 @@ def test_production_dispatch_routes_direct_handoff_to_candidate_and_trials(
         )
         context_payload = candidate.optimizer_metadata_json["benchmark_proposal_context"]
         assert context_payload["proposal_adapter_id"] == "llm_direct/v1"
+        assert "messages" not in json.dumps(candidate.optimizer_metadata_json)
+
+
+def test_production_dispatch_routes_llambo_handoff_to_candidate_and_trials(
+    durable_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import job_manager
+
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llambo_uav/v1")
+        _prepare_production_job(job)
+        db.commit()
+        observation = _production_observation(job, run)
+        context = SimpleNamespace(
+            arm=SimpleNamespace(
+                proposal_adapter_id="llambo_uav/v1",
+                benchmark_arm_id="llambo-uav",
+            ),
+            binding=run,
+        )
+        transport = _Transport(_production_proposal_json(1.15))
+        monkeypatch.setattr(
+            job_manager,
+            "build_benchmark_job_observation",
+            lambda _db, _job: (context, observation),
+        )
+        monkeypatch.setattr(
+            job_manager,
+            "build_job_secret_benchmark_transport",
+            lambda _db, _job, _provider: transport,
+        )
+
+        result = job_manager.dispatch_next_benchmark_generation(db, job)
+
+        assert result.status == "dispatched"
+        assert transport.calls == 1
+        candidate = db.scalar(
+            select(durable_db.models.CandidateParameterSet).where(
+                durable_db.models.CandidateParameterSet.job_id == job.id,
+                durable_db.models.CandidateParameterSet.is_baseline.is_(False),
+            )
+        )
+        assert candidate is not None
+        assert candidate.parameter_json["MPC_XY_P"] == pytest.approx(1.15)
+        assert candidate.proposal_reason == "benchmark:llambo_uav/v1"
+        payload = candidate.optimizer_metadata_json["benchmark_proposal_context"]
+        assert payload["proposal_adapter_id"] == "llambo_uav/v1"
         assert "messages" not in json.dumps(candidate.optimizer_metadata_json)
 
 
@@ -1214,6 +1282,88 @@ def test_successful_direct_proposal_recovers_without_replaying_provider(
         assert len(list(db.scalars(select(models.BenchmarkDirectProposalHandoff)))) == 1
 
 
+def test_llambo_attempt_is_durable_and_recovers_without_provider_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llambo_uav/v1")
+        observation = _observation(job, run)
+
+        def assert_attempts_are_durable() -> None:
+            turn = db.scalar(select(models.HarnessCognitiveTurnReceipt))
+            request = db.scalar(select(models.ProviderNetworkRequestReceipt))
+            assert turn is not None and turn.outcome is None
+            assert turn.turn_role == "llambo_proposal"
+            assert turn.trigger_policy_version == "benchmark-llambo-uav-v1"
+            assert turn.trigger_reasons_json == ["preregistered-llambo-uav-turn"]
+            assert request is not None and request.outcome is None
+
+        first_transport = _Transport(_proposal_json(1.35), assert_attempts_are_durable)
+        first = execute_durable_llambo_arm(
+            db,
+            job,
+            observation,
+            transport=first_transport,
+        )
+        assert first.status == "proposal"
+        assert first_transport.calls == 1
+        assert first.proposal is not None
+        assert first.proposal.reason_code == "benchmark-llambo-uav"
+        assert first.safe_receipt["adaptation_policy_sha256"] == canonical_sha256(
+            require_llm_arm_policy("llambo_uav/v1")
+        )
+        handoff = db.scalar(select(models.BenchmarkLLAMBOProposalHandoff))
+        assert handoff is not None
+        assert db.scalar(select(models.BenchmarkDirectProposalHandoff)) is None
+
+        replay_transport = _Transport(RuntimeError("must not replay"))
+        recovered = execute_durable_llambo_arm(
+            db,
+            job,
+            observation,
+            transport=replay_transport,
+        )
+        assert recovered.status == "proposal_recovered"
+        assert recovered.recovered_from_handoff is True
+        assert recovered.proposal == first.proposal
+        assert replay_transport.calls == 0
+        assert len(list(db.scalars(select(models.ProviderNetworkRequestReceipt)))) == 1
+
+
+def test_llambo_adaptation_policy_tamper_blocks_without_provider_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llambo_uav/v1")
+        observation = _observation(job, run)
+        execute_durable_llambo_arm(
+            db,
+            job,
+            observation,
+            transport=_Transport(_proposal_json()),
+        )
+        handoff = db.scalar(select(models.BenchmarkLLAMBOProposalHandoff))
+        assert handoff is not None
+        tampered = dict(handoff.proposal_receipt_json)
+        tampered["adaptation_policy_sha256"] = "0" * 64
+        handoff.proposal_receipt_json = tampered
+        handoff.proposal_receipt_sha256 = canonical_sha256(tampered)
+        db.commit()
+
+        transport = _Transport(RuntimeError("must not replay"))
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_llambo_arm(
+                db,
+                job,
+                observation,
+                transport=transport,
+            )
+        assert exc_info.value.code == "benchmark_llambo_handoff_receipt_drift"
+        assert transport.calls == 0
+
+
 def test_direct_handoff_persists_only_validated_safe_material(
     durable_db: SimpleNamespace,
 ) -> None:
@@ -1366,7 +1516,10 @@ def test_response_byte_cap_records_consumed_request_but_rejects_model_result(
         assert job.provider_requests_succeeded == 1
 
 
-@pytest.mark.parametrize("adapter_id", ("llm_direct/v1", "llm_react/v1"))
+@pytest.mark.parametrize(
+    "adapter_id",
+    ("llm_direct/v1", "llm_react/v1", "llambo_uav/v1"),
+)
 def test_first_qualified_stop_consumes_zero_provider_work(
     durable_db: SimpleNamespace,
     adapter_id: str,
@@ -1377,11 +1530,11 @@ def test_first_qualified_stop_consumes_zero_provider_work(
         job.first_qualified_candidate_id = "frozen-candidate"
         db.commit()
         transport = _Transport(RuntimeError("must not run"))
-        executor = (
-            execute_durable_direct_arm
-            if adapter_id == "llm_direct/v1"
-            else execute_durable_react_arm
-        )
+        executor = {
+            "llm_direct/v1": execute_durable_direct_arm,
+            "llm_react/v1": execute_durable_react_arm,
+            "llambo_uav/v1": execute_durable_llambo_arm,
+        }[adapter_id]
         result = executor(db, job, _observation(job, run), transport=transport)
         assert result.status == "first_qualified_stop"
         assert transport.calls == 0

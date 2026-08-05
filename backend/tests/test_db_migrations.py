@@ -825,7 +825,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260805_0032 (head)"]
+    assert heads == ["20260805_0033 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -869,7 +869,8 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "'provider_network_request_receipts', "
                 "'provider_network_request_outcomes', "
                 "'benchmark_direct_proposal_handoffs', "
-                "'benchmark_llm_react_checkpoints'"
+                "'benchmark_llm_react_checkpoints', "
+                "'benchmark_llambo_proposal_handoffs'"
                 ")"
             ).fetchall()
         }
@@ -946,6 +947,14 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "AND tbl_name='benchmark_llm_react_checkpoints'"
             ).fetchall()
         }
+        llambo_handoff_triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='trigger' "
+                "AND tbl_name='benchmark_llambo_proposal_handoffs'"
+            ).fetchall()
+        }
         provider_accounting_columns = {
             row[1] for row in connection.execute("PRAGMA table_info('jobs')").fetchall()
         }
@@ -971,7 +980,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             ).fetchall()
         }
 
-    assert version == ("20260805_0032",)
+    assert version == ("20260805_0033",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
@@ -980,6 +989,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
         "provider_network_request_outcomes",
         "benchmark_direct_proposal_handoffs",
         "benchmark_llm_react_checkpoints",
+        "benchmark_llambo_proposal_handoffs",
     }
     assert {
         "trg_candidate_evidence_required_no_downgrade",
@@ -1016,6 +1026,10 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
     assert react_checkpoint_triggers == {
         "trg_benchmark_react_checkpoint_no_update",
         "trg_benchmark_react_checkpoint_no_delete",
+    }
+    assert llambo_handoff_triggers == {
+        "trg_benchmark_llambo_handoff_no_update",
+        "trg_benchmark_llambo_handoff_no_delete",
     }
     assert {
         "provider_request_cap",
@@ -1207,6 +1221,36 @@ def test_postgresql_react_checkpoint_migration_emits_immutable_guard(
     assert "BEFORE UPDATE OR DELETE ON benchmark_llm_react_checkpoints" in sql
     assert "harness_cognitive_turn_delete_authorizations" in sql
     assert "benchmark ReAct checkpoints are append-only" in sql
+
+
+def test_postgresql_llambo_handoff_migration_emits_immutable_guard(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260805_0033_benchmark_llambo_proposal_handoff.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "benchmark_llambo_handoff_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+    monkeypatch.setattr(migration.op, "execute", emitted.append)
+
+    migration._install_postgres_guards()
+
+    sql = "\n".join(emitted)
+    assert "CREATE FUNCTION dronedream_reject_benchmark_llambo_handoff_mutation()" in sql
+    assert "BEFORE UPDATE OR DELETE ON benchmark_llambo_proposal_handoffs" in sql
+    assert "harness_cognitive_turn_delete_authorizations" in sql
+    assert "benchmark LLAMBO proposal handoffs are append-only" in sql
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

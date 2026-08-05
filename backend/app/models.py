@@ -853,6 +853,9 @@ class Job(Base):
     benchmark_direct_proposal_handoffs: Mapped[list[BenchmarkDirectProposalHandoff]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
+    benchmark_llambo_proposal_handoffs: Mapped[list[BenchmarkLLAMBOProposalHandoff]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
     benchmark_llm_react_checkpoints: Mapped[list[BenchmarkLLMReactCheckpoint]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
@@ -1462,6 +1465,71 @@ class BenchmarkDirectProposalHandoff(Base):
     )
 
     job: Mapped[Job] = relationship(back_populates="benchmark_direct_proposal_handoffs")
+
+
+class BenchmarkLLAMBOProposalHandoff(Base):
+    """Durable, secret-free handoff for the UAV-constrained LLAMBO adaptation.
+
+    This stays separate from the direct-arm handoff so a recovered proposal
+    cannot silently change method identity. Only validated numeric parameters
+    and provenance hashes are stored; provider text, prompts, credentials, and
+    provider request identifiers are excluded.
+    """
+
+    __tablename__ = "benchmark_llambo_proposal_handoffs"
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "generation_index",
+            name="uq_benchmark_llambo_handoff_job_generation",
+        ),
+        UniqueConstraint(
+            "cognitive_turn_receipt_id",
+            name="uq_benchmark_llambo_handoff_turn",
+        ),
+        CheckConstraint(
+            "generation_index >= 1 AND dispatch_ordinal >= 1",
+            name="ck_benchmark_llambo_handoff_ordinals",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("blph"))
+    job_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    run_binding_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaign_run_bindings.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    cognitive_turn_receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("harness_cognitive_turn_receipts.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    handoff_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    generation_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    dispatch_ordinal: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_commit: Mapped[str] = mapped_column(String(40), nullable=False)
+    observation_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    turn_binding_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    candidate_ref: Mapped[str] = mapped_column(String(255), nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    parameters_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    parameter_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    proposal_receipt_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    proposal_receipt_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(back_populates="benchmark_llambo_proposal_handoffs")
 
 
 class BenchmarkLLMReactCheckpoint(Base):

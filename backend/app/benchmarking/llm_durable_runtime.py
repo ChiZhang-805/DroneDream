@@ -1,11 +1,9 @@
-"""Durable, fail-closed execution boundary for the direct LLM benchmark arm.
+"""Durable, fail-closed execution boundaries for provider benchmark arms.
 
-This module deliberately stops short of registering the arm as executable.  It
-proves the production-shaped boundary with fake transports: campaign/run/source
-provenance is revalidated, one logical turn and one actual request are committed
-before provider I/O, and no retry or compatibility fallback is permitted.
-Credentials remain an implementation detail of the injected transport and are
-never accepted by these contracts.
+Campaign/run/source provenance is revalidated, logical turns and actual requests
+are committed before provider I/O, and no retry or compatibility fallback is
+permitted. Credentials remain an implementation detail of the injected transport
+and are never accepted by these contracts.
 """
 
 from __future__ import annotations
@@ -53,14 +51,12 @@ from app.benchmarking.provider_execution_contract import (
 )
 from app.benchmarking.provider_usage_reconciliation import (
     BenchmarkProviderUsageBlocked,
-    reconcile_direct_provider_run_usage,
     reconcile_provider_run_usage,
     validate_provider_run_reservation,
 )
 from app.benchmarking.registry import create_benchmark_adapter
 from app.orchestration.cognitive_budget import (
     CognitiveTurnAttempt,
-    begin_benchmark_direct_turn,
     begin_benchmark_llm_turn,
     cancel_cognitive_turn_if_job_terminal,
     finish_cognitive_turn,
@@ -74,6 +70,8 @@ from app.orchestration.provider_request_accounting import (
 
 BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID = "dronedream.benchmark-direct-proposal/v1"
 BENCHMARK_DIRECT_PROPOSAL_HANDOFF_SCHEMA_ID = "dronedream.benchmark-direct-proposal-handoff/v1"
+BENCHMARK_LLAMBO_PROPOSAL_RECEIPT_SCHEMA_ID = "dronedream.benchmark-llambo-uav-proposal/v1"
+BENCHMARK_LLAMBO_PROPOSAL_HANDOFF_SCHEMA_ID = "dronedream.benchmark-llambo-uav-proposal-handoff/v1"
 BENCHMARK_REACT_CHECKPOINT_SCHEMA_ID = "dronedream.benchmark-llm-react-checkpoint/v1"
 BENCHMARK_REACT_PROPOSAL_RECEIPT_SCHEMA_ID = "dronedream.benchmark-llm-react-proposal/v1"
 
@@ -132,6 +130,40 @@ class BenchmarkDurableDirectExecutionV1(_StrictFrozen):
                 raise ValueError("proposal result requires one successful durable turn")
             if self.recovered_from_handoff != (self.status == "proposal_recovered"):
                 raise ValueError("proposal recovery status and flag disagree")
+        elif self.proposal is not None or any(
+            (
+                self.provider_turns_attempted,
+                self.provider_turns_succeeded,
+                self.provider_requests_attempted,
+                self.provider_requests_succeeded,
+            )
+        ):
+            raise ValueError("first-qualified stop must consume zero provider work")
+        elif self.recovered_from_handoff:
+            raise ValueError("first-qualified stop cannot be a recovered proposal")
+        return self
+
+
+class BenchmarkDurableLLAMBOExecutionV1(_StrictFrozen):
+    schema_id: Literal["dronedream.benchmark-durable-llambo-uav-execution/v1"] = (
+        "dronedream.benchmark-durable-llambo-uav-execution/v1"
+    )
+    status: Literal["proposal", "proposal_recovered", "first_qualified_stop"]
+    proposal: BenchmarkProposalV1 | None
+    provider_turns_attempted: Annotated[int, Field(ge=0, le=1)]
+    provider_turns_succeeded: Annotated[int, Field(ge=0, le=1)]
+    provider_requests_attempted: Annotated[int, Field(ge=0, le=1)]
+    provider_requests_succeeded: Annotated[int, Field(ge=0, le=1)]
+    recovered_from_handoff: bool = False
+    safe_receipt: dict[str, Any]
+
+    @model_validator(mode="after")
+    def _validate_result(self) -> BenchmarkDurableLLAMBOExecutionV1:
+        if self.status in {"proposal", "proposal_recovered"}:
+            if self.proposal is None or self.provider_turns_succeeded != 1:
+                raise ValueError("LLAMBO proposal result requires one successful durable turn")
+            if self.recovered_from_handoff != (self.status == "proposal_recovered"):
+                raise ValueError("LLAMBO proposal recovery status and flag disagree")
         elif self.proposal is not None or any(
             (
                 self.provider_turns_attempted,
@@ -255,7 +287,9 @@ def _load_context(
     job: models.Job,
     observation: BenchmarkObservationV2,
     *,
-    expected_adapter_id: Literal["llm_direct/v1", "llm_react/v1"] = "llm_direct/v1",
+    expected_adapter_id: Literal["llm_direct/v1", "llm_react/v1", "llambo_uav/v1"] = (
+        "llm_direct/v1"
+    ),
 ) -> _BoundDirectContext:
     binding = db.scalar(
         select(models.BenchmarkCampaignRunBinding).where(
@@ -477,15 +511,34 @@ def _require_prereserved_budget(
         )
 
 
-def _recover_direct_proposal_handoff(
+def _recover_single_turn_proposal_handoff(
     db: Session,
     job: models.Job,
     context: _BoundDirectContext,
     observation: BenchmarkObservationV2,
     request: BenchmarkLLMTurnRequestV1,
-) -> BenchmarkDurableDirectExecutionV1 | None:
+    *,
+    adapter_id: Literal["llm_direct/v1", "llambo_uav/v1"],
+) -> BenchmarkDurableDirectExecutionV1 | BenchmarkDurableLLAMBOExecutionV1 | None:
     """Recover one validated proposal without replaying provider I/O."""
 
+    is_direct = adapter_id == "llm_direct/v1"
+    error_namespace = "direct" if is_direct else "llambo"
+    handoff_schema = (
+        BENCHMARK_DIRECT_PROPOSAL_HANDOFF_SCHEMA_ID
+        if is_direct
+        else BENCHMARK_LLAMBO_PROPOSAL_HANDOFF_SCHEMA_ID
+    )
+    receipt_schema = (
+        BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID
+        if is_direct
+        else BENCHMARK_LLAMBO_PROPOSAL_RECEIPT_SCHEMA_ID
+    )
+    candidate_prefix = "llm-direct" if is_direct else "llambo-uav"
+    reason_code = "benchmark-llm-direct" if is_direct else "benchmark-llambo-uav"
+    result_type = (
+        BenchmarkDurableDirectExecutionV1 if is_direct else BenchmarkDurableLLAMBOExecutionV1
+    )
     turn = db.scalar(
         select(models.HarnessCognitiveTurnReceipt).where(
             models.HarnessCognitiveTurnReceipt.job_id == job.id,
@@ -495,12 +548,23 @@ def _recover_direct_proposal_handoff(
     )
     if turn is None:
         return None
-    handoff = db.scalar(
-        select(models.BenchmarkDirectProposalHandoff).where(
-            models.BenchmarkDirectProposalHandoff.job_id == job.id,
-            models.BenchmarkDirectProposalHandoff.generation_index == observation.generation_index,
+    handoff: models.BenchmarkDirectProposalHandoff | models.BenchmarkLLAMBOProposalHandoff | None
+    if is_direct:
+        handoff = db.scalar(
+            select(models.BenchmarkDirectProposalHandoff).where(
+                models.BenchmarkDirectProposalHandoff.job_id == job.id,
+                models.BenchmarkDirectProposalHandoff.generation_index
+                == observation.generation_index,
+            )
         )
-    )
+    else:
+        handoff = db.scalar(
+            select(models.BenchmarkLLAMBOProposalHandoff).where(
+                models.BenchmarkLLAMBOProposalHandoff.job_id == job.id,
+                models.BenchmarkLLAMBOProposalHandoff.generation_index
+                == observation.generation_index,
+            )
+        )
     if handoff is None:
         # The ordinary begin path preserves the existing pending/consumed
         # classification.  In neither case may provider I/O be replayed.
@@ -508,12 +572,12 @@ def _recover_direct_proposal_handoff(
     outcome = turn.outcome
     if outcome is None or outcome.status != "succeeded":
         _blocked(
-            "benchmark_direct_handoff_outcome_mismatch",
-            "Direct proposal handoff is not paired with a successful turn.",
+            f"benchmark_{error_namespace}_handoff_outcome_mismatch",
+            "Single-turn proposal handoff is not paired with a successful turn.",
         )
     observation_sha256 = canonical_sha256(observation)
     if (
-        handoff.handoff_schema != BENCHMARK_DIRECT_PROPOSAL_HANDOFF_SCHEMA_ID
+        handoff.handoff_schema != handoff_schema
         or handoff.job_id != job.id
         or handoff.run_binding_id != context.binding.id
         or handoff.cognitive_turn_receipt_id != turn.id
@@ -533,16 +597,16 @@ def _recover_direct_proposal_handoff(
         or outcome.response_sha256 != handoff.parameter_sha256
     ):
         _blocked(
-            "benchmark_direct_handoff_drift",
-            "Recovered direct proposal no longer matches its frozen provenance.",
+            f"benchmark_{error_namespace}_handoff_drift",
+            "Recovered single-turn proposal no longer matches its frozen provenance.",
         )
     receipt = handoff.proposal_receipt_json
     expected_candidate_ref = (
-        f"llm-direct-g{observation.generation_index:06d}-"
+        f"{candidate_prefix}-g{observation.generation_index:06d}-"
         f"d{observation.next_dispatch_ordinal:06d}-{handoff.parameter_sha256[:12]}"
     )
     if (
-        receipt.get("schema_id") != BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID
+        receipt.get("schema_id") != receipt_schema
         or receipt.get("campaign_id") != context.campaign.id
         or receipt.get("run_binding_id") != context.binding.id
         or receipt.get("arm_manifest_sha256") != context.arm.manifest_sha256
@@ -558,11 +622,16 @@ def _recover_direct_proposal_handoff(
         or receipt.get("provider_requests_succeeded") != 1
         or receipt.get("retry_cap") != 0
         or handoff.candidate_ref != expected_candidate_ref
-        or handoff.reason_code != "benchmark-llm-direct"
+        or handoff.reason_code != reason_code
+        or (
+            not is_direct
+            and receipt.get("adaptation_policy_sha256")
+            != canonical_sha256(require_llm_arm_policy("llambo_uav/v1"))
+        )
     ):
         _blocked(
-            "benchmark_direct_handoff_receipt_drift",
-            "Recovered direct proposal receipt fields disagree with provenance.",
+            f"benchmark_{error_namespace}_handoff_receipt_drift",
+            "Recovered single-turn proposal receipt fields disagree with provenance.",
         )
     usage_sha256 = receipt.get("provider_usage_reconciliation_sha256")
     if (
@@ -571,8 +640,8 @@ def _recover_direct_proposal_handoff(
         or any(character not in "0123456789abcdef" for character in usage_sha256)
     ):
         _blocked(
-            "benchmark_direct_handoff_receipt_drift",
-            "Recovered direct proposal receipt lacks a usage reconciliation hash.",
+            f"benchmark_{error_namespace}_handoff_receipt_drift",
+            "Recovered single-turn proposal receipt lacks a usage reconciliation hash.",
         )
     try:
         parameters = validate_proposal_response(
@@ -591,8 +660,8 @@ def _recover_direct_proposal_handoff(
         )
     except (BenchmarkLLMContractError, ValueError) as exc:
         raise BenchmarkDurableLLMBlocked(
-            "benchmark_direct_handoff_invalid",
-            "Recovered direct proposal fails the current frozen schema.",
+            f"benchmark_{error_namespace}_handoff_invalid",
+            "Recovered single-turn proposal fails the current frozen schema.",
         ) from exc
     request_counts = provider_request_counts_for_turn(
         db,
@@ -600,10 +669,10 @@ def _recover_direct_proposal_handoff(
     )
     if request_counts != (1, 1):
         _blocked(
-            "benchmark_direct_handoff_request_mismatch",
-            "Recovered direct proposal does not bind one successful request.",
+            f"benchmark_{error_namespace}_handoff_request_mismatch",
+            "Recovered single-turn proposal does not bind one successful request.",
         )
-    return BenchmarkDurableDirectExecutionV1(
+    return result_type(
         status="proposal_recovered",
         proposal=proposal,
         provider_turns_attempted=1,
@@ -615,20 +684,41 @@ def _recover_direct_proposal_handoff(
     )
 
 
-def execute_durable_direct_arm(
+def _execute_durable_single_turn_arm(
     db: Session,
     job: models.Job,
     observation: BenchmarkObservationV2,
     *,
+    adapter_id: Literal["llm_direct/v1", "llambo_uav/v1"],
     transport: BenchmarkDirectTransport | None = None,
     transport_factory: BenchmarkDirectTransportFactory | None = None,
-) -> BenchmarkDurableDirectExecutionV1:
-    """Execute exactly one direct proposal after durable attempts are committed."""
+) -> BenchmarkDurableDirectExecutionV1 | BenchmarkDurableLLAMBOExecutionV1:
+    """Execute one frozen single-turn provider arm with durable accounting."""
 
-    context = _load_context(db, job, observation)
-    policy = require_llm_arm_policy("llm_direct/v1")
+    is_direct = adapter_id == "llm_direct/v1"
+    turn_role: Literal["direct_proposal", "llambo_proposal"] = (
+        "direct_proposal" if is_direct else "llambo_proposal"
+    )
+    error_namespace = "direct" if is_direct else "llambo"
+    candidate_prefix = "llm-direct" if is_direct else "llambo-uav"
+    reason_code = "benchmark-llm-direct" if is_direct else "benchmark-llambo-uav"
+    receipt_schema = (
+        BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID
+        if is_direct
+        else BENCHMARK_LLAMBO_PROPOSAL_RECEIPT_SCHEMA_ID
+    )
+    handoff_schema = (
+        BENCHMARK_DIRECT_PROPOSAL_HANDOFF_SCHEMA_ID
+        if is_direct
+        else BENCHMARK_LLAMBO_PROPOSAL_HANDOFF_SCHEMA_ID
+    )
+    result_type = (
+        BenchmarkDurableDirectExecutionV1 if is_direct else BenchmarkDurableLLAMBOExecutionV1
+    )
+    context = _load_context(db, job, observation, expected_adapter_id=adapter_id)
+    policy = require_llm_arm_policy(adapter_id)
     if job.first_qualified_candidate_id is not None:
-        return BenchmarkDurableDirectExecutionV1(
+        return result_type(
             status="first_qualified_stop",
             proposal=None,
             provider_turns_attempted=0,
@@ -647,24 +737,25 @@ def execute_durable_direct_arm(
         observation=observation,
         model_snapshot=context.provider.model_snapshot,
         turn_index=1,
-        turn_role="direct_proposal",
+        turn_role=turn_role,
         response_schema=proposal_response_schema(observation),
     )
     body = _request_body(request, context.provider, context.binding.provider_seed)
     _require_prereserved_budget(db, context, body)
-    recovered = _recover_direct_proposal_handoff(
+    recovered = _recover_single_turn_proposal_handoff(
         db,
         job,
         context,
         observation,
         request,
+        adapter_id=adapter_id,
     )
     if recovered is not None:
         return recovered
     if (transport is None) == (transport_factory is None):
         _blocked(
             "benchmark_provider_transport_binding_invalid",
-            "Direct execution requires exactly one transport binding.",
+            "Single-turn execution requires exactly one transport binding.",
         )
     if transport is None:
         try:
@@ -677,11 +768,14 @@ def execute_durable_direct_arm(
                 "The Job-bound provider credential is unavailable.",
             ) from exc
     request_envelope = BenchmarkProviderRequestEnvelope.from_request_body(body)
-    attempt = begin_benchmark_direct_turn(
+    attempt = begin_benchmark_llm_turn(
         db,
         job,
         generation_index=observation.generation_index,
-        turn_role="direct_proposal",
+        turn_index=1,
+        turn_role=turn_role,
+        adapter_id=adapter_id,
+        maximum_turns_per_generation=1,
         model_snapshot=request.model_snapshot,
         prompt_sha256=request.prompt_sha256,
         evidence_sha256=request.evidence_sha256,
@@ -800,11 +894,11 @@ def execute_durable_direct_arm(
             job,
             attempt,
             status="invalid_schema",
-            error_code="benchmark_direct_response_invalid",
+            error_code=f"benchmark_{error_namespace}_response_invalid",
         )
         raise BenchmarkDurableLLMBlocked(
-            "benchmark_direct_response_invalid",
-            "Provider response failed the frozen direct-proposal schema.",
+            f"benchmark_{error_namespace}_response_invalid",
+            "Provider response failed the frozen single-turn proposal schema.",
         ) from exc
     request_counts = provider_request_counts_for_turn(
         db,
@@ -823,7 +917,7 @@ def execute_durable_direct_arm(
         db.refresh(job)
         _blocked("benchmark_source_drift", "Source changed before cognitive finalization.")
     try:
-        usage_reconciliation = reconcile_direct_provider_run_usage(db, context.binding.id)
+        usage_reconciliation = reconcile_provider_run_usage(db, context.binding.id)
     except BenchmarkProviderUsageBlocked as exc:
         db.rollback()
         db.refresh(job)
@@ -852,7 +946,7 @@ def execute_durable_direct_arm(
     parameter_sha256 = canonical_sha256(parameters)
     observation_sha256 = canonical_sha256(observation)
     safe_receipt = {
-        "schema_id": BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID,
+        "schema_id": receipt_schema,
         "campaign_id": context.campaign.id,
         "run_binding_id": context.binding.id,
         "arm_manifest_sha256": context.arm.manifest_sha256,
@@ -869,29 +963,36 @@ def execute_durable_direct_arm(
         "provider_usage_reconciliation_sha256": canonical_sha256(usage_reconciliation),
         "retry_cap": 0,
     }
+    if not is_direct:
+        safe_receipt["adaptation_policy_sha256"] = canonical_sha256(policy)
     candidate_ref = (
-        f"llm-direct-g{observation.generation_index:06d}-"
+        f"{candidate_prefix}-g{observation.generation_index:06d}-"
         f"d{observation.next_dispatch_ordinal:06d}-{parameter_sha256[:12]}"
     )
     proposal = BenchmarkProposalV1(
         candidate_ref=candidate_ref,
         parameters=parameters,
-        reason_code="benchmark-llm-direct",
+        reason_code=reason_code,
         proposal_receipt=safe_receipt,
     )
+    handoff_type = (
+        models.BenchmarkDirectProposalHandoff
+        if is_direct
+        else models.BenchmarkLLAMBOProposalHandoff
+    )
     db.add(
-        models.BenchmarkDirectProposalHandoff(
+        handoff_type(
             job_id=job.id,
             run_binding_id=context.binding.id,
             cognitive_turn_receipt_id=attempt.receipt_id,
-            handoff_schema=BENCHMARK_DIRECT_PROPOSAL_HANDOFF_SCHEMA_ID,
+            handoff_schema=handoff_schema,
             generation_index=observation.generation_index,
             dispatch_ordinal=observation.next_dispatch_ordinal,
             source_commit=context.source_commit,
             observation_sha256=observation_sha256,
             turn_binding_sha256=request.binding_sha256,
             candidate_ref=candidate_ref,
-            reason_code="benchmark-llm-direct",
+            reason_code=reason_code,
             parameters_json=parameters,
             parameter_sha256=parameter_sha256,
             proposal_receipt_json=safe_receipt,
@@ -900,7 +1001,7 @@ def execute_durable_direct_arm(
     )
     db.commit()
     db.refresh(job)
-    return BenchmarkDurableDirectExecutionV1(
+    return result_type(
         status="proposal",
         proposal=proposal,
         provider_turns_attempted=1,
@@ -909,6 +1010,52 @@ def execute_durable_direct_arm(
         provider_requests_succeeded=request_counts[1],
         safe_receipt=safe_receipt,
     )
+
+
+def execute_durable_direct_arm(
+    db: Session,
+    job: models.Job,
+    observation: BenchmarkObservationV2,
+    *,
+    transport: BenchmarkDirectTransport | None = None,
+    transport_factory: BenchmarkDirectTransportFactory | None = None,
+) -> BenchmarkDurableDirectExecutionV1:
+    """Execute the preregistered one-turn direct proposal arm."""
+
+    result = _execute_durable_single_turn_arm(
+        db,
+        job,
+        observation,
+        adapter_id="llm_direct/v1",
+        transport=transport,
+        transport_factory=transport_factory,
+    )
+    if not isinstance(result, BenchmarkDurableDirectExecutionV1):  # pragma: no cover
+        raise RuntimeError("direct runtime returned the wrong result contract")
+    return result
+
+
+def execute_durable_llambo_arm(
+    db: Session,
+    job: models.Job,
+    observation: BenchmarkObservationV2,
+    *,
+    transport: BenchmarkDirectTransport | None = None,
+    transport_factory: BenchmarkDirectTransportFactory | None = None,
+) -> BenchmarkDurableLLAMBOExecutionV1:
+    """Execute the one-turn noisy constrained UAV LLAMBO adaptation."""
+
+    result = _execute_durable_single_turn_arm(
+        db,
+        job,
+        observation,
+        adapter_id="llambo_uav/v1",
+        transport=transport,
+        transport_factory=transport_factory,
+    )
+    if not isinstance(result, BenchmarkDurableLLAMBOExecutionV1):  # pragma: no cover
+        raise RuntimeError("LLAMBO runtime returned the wrong result contract")
+    return result
 
 
 def _safe_react_proposal_record(proposal: BenchmarkProposalV1) -> dict[str, Any]:
@@ -1627,10 +1774,12 @@ __all__ = [
     "BenchmarkDirectTransport",
     "BenchmarkDirectTransportFactory",
     "BenchmarkDurableDirectExecutionV1",
+    "BenchmarkDurableLLAMBOExecutionV1",
     "BenchmarkDurableReactExecutionV1",
     "BenchmarkDurableLLMBlocked",
     "BenchmarkProviderExecutionConfigV1",
     "BenchmarkProviderTransportResult",
     "execute_durable_direct_arm",
+    "execute_durable_llambo_arm",
     "execute_durable_react_arm",
 ]
