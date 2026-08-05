@@ -14,6 +14,7 @@ if str(TOOLS) not in sys.path:
 import verify_lab_preview_contract as lab_preview  # noqa: E402
 import verify_lab_preview_artifact as lab_artifact  # noqa: E402
 import lab_preinstall_acceptance as lab_preinstall  # noqa: E402
+import lab_yellow_readiness_audit as lab_readiness  # noqa: E402
 
 
 class LabPreviewContractTests(unittest.TestCase):
@@ -66,13 +67,23 @@ class LabPreviewContractTests(unittest.TestCase):
         with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "licenseNotice"):
             lab_artifact.validate_receipt(receipt)
 
-        common_core_commit = lab_artifact._git("rev-parse", "--verify", "origin/codex/software")
+        common_core_commit = lab_artifact.COMMON_CORE_PRODUCT_SOURCE_COMMIT
         receipt = lab_artifact.fake_lab_preview_receipt()
         receipt["commonCoreCommit"] = common_core_commit
         receipt["commonCoreHash"] = lab_artifact.common_core_hash(common_core_commit)
         receipt["testOnly"] = False
         with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "artifact file is missing"):
             lab_artifact.validate_receipt(receipt)
+
+    def test_lab_artifact_receipt_rejects_sim_preview_evidence_as_product_source(self) -> None:
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["testOnly"] = False
+        receipt["commonCoreCommit"] = lab_artifact.EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT
+        receipt["commonCoreHash"] = lab_artifact.common_core_hash(
+            lab_artifact.EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT,
+        )
+        with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "product source"):
+            lab_artifact.validate_receipt(receipt, verify_artifact_file=False)
 
     def test_lab_artifact_receipt_schema_is_closed_and_versioned(self) -> None:
         schema = lab_artifact._load_json(lab_artifact.SCHEMA_PATH)
@@ -99,6 +110,27 @@ class LabPreviewContractTests(unittest.TestCase):
         result = lab_preinstall.evaluate_preinstall(lab_artifact.fake_lab_preview_receipt())
         self.assertEqual(result["decision"], "blocked")
         self.assertIn("Only a fake test fixture receipt was supplied.", result["blockers"])
+        self.assertTrue(all(value is False for value in result["sideEffects"].values()))
+
+    def test_lab_yellow_readiness_audit_is_read_only_and_requestable(self) -> None:
+        result = lab_readiness.evaluate_readiness(require_clean=False)
+        self.assertEqual(result["kind"], "dronedream-lab-yellow-readiness-audit")
+        self.assertTrue(result["yellowBuildRequest"]["requestable"])
+        self.assertEqual(
+            result["commonCore"]["productSourceCommit"],
+            lab_artifact.COMMON_CORE_PRODUCT_SOURCE_COMMIT,
+        )
+        self.assertEqual(
+            result["commonCore"]["excludedSimPreviewEvidenceCommit"],
+            lab_artifact.EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT,
+        )
+        self.assertFalse(result["commonCore"]["observedOriginHeadIsProductSource"])
+        self.assertTrue(result["publicSupabaseClientConfigSource"]["sourceUsesVitePublicEnv"])
+        self.assertTrue(result["publicSupabaseClientConfigSource"]["desktopVerifierRejectsServiceRole"])
+        self.assertFalse(result["publicSupabaseClientConfigSource"]["actualEnvironmentRead"])
+        self.assertEqual(result["vehiclePacks"]["validatedPackCount"], 0)
+        self.assertEqual(result["safety"]["hardwareActionDecisionAtZeroValidatedPacks"], "deny")
+        self.assertFalse(result["postBuildAcceptance"]["installableNow"])
         self.assertTrue(all(value is False for value in result["sideEffects"].values()))
 
 

@@ -41,7 +41,11 @@ def verify_lab_preview_contract() -> dict[str, object]:
         common_core.get("authorityName") != "Universal/Core"
         or common_core.get("authorityBranch") != "codex/software"
         or common_core.get("simIsCommonAuthority") is not False
-        or common_core.get("hashSource") != "observed origin/codex/software commit, not Lab branch HEAD"
+        or common_core.get("productSourceCommit") != "2aec69e88ee8844cff759a025f109e5b938d18c0"
+        or common_core.get("excludedPreviewEvidenceCommit")
+        != "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
+        or common_core.get("hashSource")
+        != "fixed Universal/Core product source commit, not origin/codex/software moving head"
     ):
         raise LabPreviewContractError("Lab preview common-core authority drifted")
     if common_core.get("reuseOnly") is not True or common_core.get("forkOrCopyAllowed") is not False:
@@ -64,6 +68,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "distribution/build-profiles/lab-preview.v1.json",
         "distribution/schemas/lab-preview-artifact-receipt.schema.json",
         "distribution/tests/test_lab_preview_contract.py",
+        "distribution/tools/lab_yellow_readiness_audit.py",
         "distribution/tools/lab_preinstall_acceptance.py",
         "distribution/tools/verify_lab_preview_artifact.py",
         "distribution/tools/verify_lab_preview_contract.py",
@@ -105,6 +110,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         or payload.get("artifactVerifier") != "distribution/tools/verify_lab_preview_artifact.py"
         or payload.get("preinstallAcceptanceTool")
         != "distribution/tools/lab_preinstall_acceptance.py"
+        or payload.get("yellowReadinessAuditTool")
+        != "distribution/tools/lab_yellow_readiness_audit.py"
         or payload.get("firmwareFamily") != "px4"
         or payload.get("qualificationReceiptRequired") is not True
         or tuple(payload.get("simulationPayload", ()))
@@ -163,7 +170,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'param(',
         '[switch]$Build',
         'status", "--porcelain=v1", "--untracked-files=all',
-        '$commonCoreCommit = Invoke-GitText @("rev-parse", "--verify", "origin/codex/software")',
+        '$commonCoreCommit = "2aec69e88ee8844cff759a025f109e5b938d18c0"',
+        '$excludedPreviewEvidenceCommit = "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"',
         'merge-base --is-ancestor $commonCoreCommit HEAD',
         'TAURI_SIGNING_PRIVATE_KEY_PATH',
         'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',

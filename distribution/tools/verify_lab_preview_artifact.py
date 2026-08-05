@@ -51,6 +51,8 @@ UNIVERSAL_BOOTSTRAPPER_MODULES = (
     "universal-bootstrapper",
     "mode-switch-bootstrapper",
 )
+COMMON_CORE_PRODUCT_SOURCE_COMMIT = "2aec69e88ee8844cff759a025f109e5b938d18c0"
+EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT = "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
 
 
 class LabPreviewArtifactError(ValueError):
@@ -273,6 +275,11 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
     for label in ("sourceCommit", "commonCoreCommit"):
         if not isinstance(document[label], str) or not COMMIT_RE.fullmatch(document[label]):
             raise LabPreviewArtifactError(f"{label} must be a full commit")
+    if not document["testOnly"]:
+        if document["commonCoreCommit"] != COMMON_CORE_PRODUCT_SOURCE_COMMIT:
+            raise LabPreviewArtifactError("commonCoreCommit must bind the Universal/Core product source")
+        if document["commonCoreCommit"] == EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT:
+            raise LabPreviewArtifactError("Sim preview evidence commit cannot be the common-core product source")
     if not isinstance(document["commonCoreHash"], str) or not SHA256_RE.fullmatch(
         document["commonCoreHash"]
     ):

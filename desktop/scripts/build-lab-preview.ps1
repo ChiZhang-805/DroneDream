@@ -55,14 +55,20 @@ if ($sourceStatus) {
     throw "Lab preview builds require an exact clean source tree."
 }
 
-$commonCoreCommit = Invoke-GitText @("rev-parse", "--verify", "origin/codex/software")
+$commonCoreCommit = "2aec69e88ee8844cff759a025f109e5b938d18c0"
+$excludedPreviewEvidenceCommit = "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
+Invoke-GitText @("cat-file", "-e", "$commonCoreCommit^{commit}") | Out-Null
+Invoke-GitText @("cat-file", "-e", "$excludedPreviewEvidenceCommit^{commit}") | Out-Null
 if ($commonCoreCommit -cnotmatch "^[0-9a-f]{40}$") {
-    throw "Unable to freeze the observed Universal/Core commit."
+    throw "Unable to freeze the Universal/Core product source commit."
+}
+if ($commonCoreCommit -ceq $excludedPreviewEvidenceCommit) {
+    throw "Lab preview common-core product source must not use the Sim preview evidence commit."
 }
 
 & git -C $repoRoot merge-base --is-ancestor $commonCoreCommit HEAD
 if ($LASTEXITCODE -ne 0) {
-    throw "Lab preview source must descend from the observed Universal/Core baseline."
+    throw "Lab preview source must descend from the Universal/Core product source baseline."
 }
 
 if ($env:TAURI_SIGNING_PRIVATE_KEY_PATH -or $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {

@@ -18,7 +18,9 @@
     "authorityName": "Universal/Core",
     "authorityBranch": "codex/software",
     "simIsCommonAuthority": false,
-    "hashSource": "observed origin/codex/software commit, not Lab branch HEAD",
+    "productSourceCommit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+    "excludedPreviewEvidenceCommit": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571",
+    "hashSource": "fixed Universal/Core product source commit, not origin/codex/software moving head",
     "reuseOnly": true,
     "forkOrCopyAllowed": false,
     "paths": [
@@ -41,6 +43,7 @@
     "distribution/build-profiles/lab-preview.v1.json",
     "distribution/schemas/lab-preview-artifact-receipt.schema.json",
     "distribution/tests/test_lab_preview_contract.py",
+    "distribution/tools/lab_yellow_readiness_audit.py",
     "distribution/tools/lab_preinstall_acceptance.py",
     "distribution/tools/verify_lab_preview_artifact.py",
     "distribution/tools/verify_lab_preview_contract.py"
@@ -92,6 +95,7 @@
     "artifactReceiptSchema": "distribution/schemas/lab-preview-artifact-receipt.schema.json",
     "artifactVerifier": "distribution/tools/verify_lab_preview_artifact.py",
     "preinstallAcceptanceTool": "distribution/tools/lab_preinstall_acceptance.py",
+    "yellowReadinessAuditTool": "distribution/tools/lab_yellow_readiness_audit.py",
     "selectedVehiclePack": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
     "selectedControllerModel": "Pixhawk 6C",
     "firmwareFamily": "px4",
