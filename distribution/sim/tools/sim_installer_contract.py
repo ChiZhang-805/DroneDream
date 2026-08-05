@@ -174,6 +174,116 @@ READINESS_FENCE_KEYS = {
 }
 READINESS_NEXT_AUTH_KEYS = {"yellowRequiresApproval", "yellowScope", "redRequiresApproval", "redScope"}
 
+SURFACE_KEYS = {
+    "schemaVersion",
+    "kind",
+    "contractVersion",
+    "editionId",
+    "executionClass",
+    "identity",
+    "overlay",
+    "brandDonor",
+    "staticSourceRefs",
+    "installerUi",
+    "shortcuts",
+    "lifecycleReadiness",
+    "capabilityFence",
+    "nonClaims",
+}
+SURFACE_IDENTITY_KEYS = {
+    "displayName",
+    "separator",
+    "artifactFileName",
+    "productVersion",
+    "bundleIdentifier",
+}
+SURFACE_OVERLAY_KEYS = {
+    "path",
+    "baseConfigPath",
+    "baseConfigSha256",
+    "baseConfigMustRemainUniversal",
+    "artifactRenameRequired",
+}
+SURFACE_BRAND_KEYS = {
+    "approvedConceptHandoffSha256",
+    "canonicalDonorState",
+    "canonicalDonorCommit",
+    "iconOverridePresent",
+    "masterRedrawAllowed",
+}
+SURFACE_SOURCE_REF_KEYS = {"path", "sha256", "requiredText"}
+SURFACE_UI_KEYS = {
+    "locales",
+    "requiredSurfaces",
+    "editionStateDisclosure",
+    "unsignedDisclosureRequired",
+    "externalDependencies",
+    "forbiddenSurfaceTerms",
+}
+SURFACE_SHORTCUT_KEYS = {
+    "startMenuName",
+    "desktopShortcutName",
+    "desktopShortcutDefault",
+    "uninstallMustRemoveOwnedShortcuts",
+}
+SURFACE_LIFECYCLE_KEYS = {"path", "sha256", "requiredPlannedScenarios"}
+SURFACE_FENCE_KEYS = {
+    "validatedVehiclePackCount",
+    "allowedTargetKinds",
+    "forbiddenTargetKinds",
+    "frontendIsAuthority",
+}
+SURFACE_NONCLAIM_KEYS = {
+    "installerBuiltFromOverlay",
+    "installerExecuted",
+    "shortcutsObserved",
+    "uninstallObserved",
+    "rollbackObserved",
+    "canonicalIconIntegrated",
+    "validated",
+    "promotionReady",
+}
+
+SIM_DISPLAY_NAME = "DroneDream \u00b7 SIM"
+SURFACE_SOURCE_REQUIREMENTS = {
+    "desktop/src-tauri/nsis/installer.nsi": (
+        '!define PRODUCTNAME "{{product_name}}"',
+        'Name "${PRODUCTNAME}"',
+        'OutFile "${OUTFILE}"',
+        'CreateShortcut "$SMPROGRAMS\\$AppStartMenuFolder\\${PRODUCTNAME}.lnk"',
+        'CreateShortcut "$DESKTOP\\${PRODUCTNAME}.lnk"',
+        'Delete "$DESKTOP\\${PRODUCTNAME}.lnk"',
+        'WriteUninstaller "$INSTDIR\\uninstall.exe"',
+    ),
+    "desktop/src-tauri/nsis/languages/English.nsh": (
+        "LangString createDesktop ${LANG_ENGLISH}",
+    ),
+    "desktop/src-tauri/nsis/languages/SimpChinese.nsh": (
+        "LangString createDesktop ${LANG_SIMPCHINESE}",
+    ),
+}
+SURFACE_UI_SURFACES = (
+    "welcome",
+    "license",
+    "maintenance-choice",
+    "install-directory",
+    "start-menu",
+    "external-runtime-choice",
+    "progress",
+    "finish",
+    "uninstall-confirmation",
+    "uninstall-result",
+)
+SURFACE_LIFECYCLE_SCENARIOS = (
+    "freshInstall",
+    "overlayUpgrade",
+    "uninstall",
+    "rollback",
+    "shortcuts",
+    "locales",
+    "webView2",
+)
+
 COMMON_CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
 
 
@@ -712,6 +822,200 @@ def validate_install_readiness_audit(
     return audit
 
 
+def _contains_icon_override(value: Any) -> bool:
+    if isinstance(value, dict):
+        return any(
+            str(key).casefold() == "icon" or _contains_icon_override(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_icon_override(item) for item in value)
+    return False
+
+
+def _validate_surface_source_refs(value: Any, *, repo_root: Path) -> None:
+    if not isinstance(value, list) or len(value) != len(SURFACE_SOURCE_REQUIREMENTS):
+        raise SimInstallerContractError("installer surface source refs are incomplete")
+    paths: list[str] = []
+    for index, raw_ref in enumerate(value):
+        label = f"staticSourceRefs[{index}]"
+        ref = _exact_keys(raw_ref, SURFACE_SOURCE_REF_KEYS, label)
+        path_value = _safe_path(ref["path"], f"{label}.path")
+        paths.append(path_value)
+        expected_text = SURFACE_SOURCE_REQUIREMENTS.get(path_value)
+        if expected_text is None or tuple(ref["requiredText"]) != expected_text:
+            raise SimInstallerContractError(f"{label} required text contract drifted")
+        path = _resolve(repo_root, path_value, f"{label}.path")
+        if sha256_file(path) != _sha(ref["sha256"], f"{label}.sha256"):
+            raise SimInstallerContractError(f"{label} SHA-256 drifted")
+        try:
+            source = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise SimInstallerContractError(f"could not read installer source: {path_value}") from exc
+        if any(required not in source for required in expected_text):
+            raise SimInstallerContractError(f"{label} required installer behavior is absent")
+    if tuple(paths) != tuple(SURFACE_SOURCE_REQUIREMENTS):
+        raise SimInstallerContractError("installer surface source ref ordering drifted")
+
+
+def validate_installer_surface_contract(
+    document: Any,
+    *,
+    profile: dict[str, Any],
+    profile_path: Path,
+    repo_root: Path,
+) -> dict[str, Any]:
+    contract = _exact_keys(document, SURFACE_KEYS, "Sim installer surface contract")
+    if (
+        contract["schemaVersion"] != 1
+        or contract["kind"] != "dronedream-sim-installer-surface-contract"
+        or contract["contractVersion"] != "1.0.0"
+        or contract["editionId"] != "sim"
+        or contract["executionClass"] != "GREEN-static-only"
+    ):
+        raise SimInstallerContractError("Sim installer surface contract identity is unsupported")
+
+    identity = _exact_keys(contract["identity"], SURFACE_IDENTITY_KEYS, "surface.identity")
+    if identity != {
+        "displayName": SIM_DISPLAY_NAME,
+        "separator": " \u00b7 ",
+        "artifactFileName": profile["artifact"]["fileName"],
+        "productVersion": profile["artifact"]["productVersion"],
+        "bundleIdentifier": "io.dronedream.sim",
+    }:
+        raise SimInstallerContractError("Sim installer surface identity drifted")
+
+    overlay = _exact_keys(contract["overlay"], SURFACE_OVERLAY_KEYS, "surface.overlay")
+    if (
+        overlay["path"] != "distribution/sim/desktop/tauri.sim.conf.json"
+        or overlay["baseConfigPath"] != "desktop/src-tauri/tauri.conf.json"
+        or overlay["baseConfigMustRemainUniversal"] is not True
+        or overlay["artifactRenameRequired"] is not True
+    ):
+        raise SimInstallerContractError("Sim desktop overlay policy drifted")
+    base_path = _resolve(repo_root, overlay["baseConfigPath"], "surface.overlay.baseConfigPath")
+    if sha256_file(base_path) != _sha(
+        overlay["baseConfigSha256"], "surface.overlay.baseConfigSha256"
+    ):
+        raise SimInstallerContractError("Universal desktop base config SHA-256 drifted")
+    base_config = load_json(base_path)
+    if (
+        base_config.get("productName") != "DroneDream"
+        or base_config.get("identifier") != "io.dronedream.desktop"
+    ):
+        raise SimInstallerContractError("desktop base config is no longer Universal")
+
+    overlay_config = load_json(_resolve(repo_root, overlay["path"], "surface.overlay.path"))
+    expected_overlay_config = {
+        "$schema": "https://schema.tauri.app/config/2",
+        "productName": SIM_DISPLAY_NAME,
+        "identifier": identity["bundleIdentifier"],
+        "app": {
+            "windows": [
+                {
+                    "label": "main",
+                    "title": SIM_DISPLAY_NAME,
+                    "width": 1440,
+                    "height": 900,
+                    "minWidth": 1100,
+                    "minHeight": 700,
+                    "resizable": True,
+                    "fullscreen": False,
+                }
+            ]
+        },
+        "bundle": {
+            "shortDescription": "PX4 SITL and Gazebo simulation workspace",
+            "longDescription": (
+                f"{SIM_DISPLAY_NAME} provides simulation-only PX4 SITL and Gazebo workflows. "
+                "Runtime Base and Engine Pack remain external dependencies. Hardware and HITL "
+                "capabilities are not included or authorized."
+            ),
+        },
+    }
+    if overlay_config != expected_overlay_config:
+        raise SimInstallerContractError("Sim desktop overlay identity drifted")
+    if _contains_icon_override(overlay_config):
+        raise SimInstallerContractError("Sim icon override must wait for the canonical donor")
+
+    brand = _exact_keys(contract["brandDonor"], SURFACE_BRAND_KEYS, "surface.brandDonor")
+    if brand != {
+        "approvedConceptHandoffSha256": (
+            "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
+        ),
+        "canonicalDonorState": "pending-universal-common-core",
+        "canonicalDonorCommit": None,
+        "iconOverridePresent": False,
+        "masterRedrawAllowed": False,
+    }:
+        raise SimInstallerContractError("Sim canonical brand donor state drifted")
+
+    _validate_surface_source_refs(contract["staticSourceRefs"], repo_root=repo_root)
+
+    installer_ui = _exact_keys(contract["installerUi"], SURFACE_UI_KEYS, "surface.installerUi")
+    if (
+        installer_ui["locales"] != ["en", "zh-CN"]
+        or tuple(installer_ui["requiredSurfaces"]) != SURFACE_UI_SURFACES
+        or installer_ui["editionStateDisclosure"]
+        != "internal-preview-not-promotion-ready"
+        or installer_ui["unsignedDisclosureRequired"] is not True
+        or installer_ui["externalDependencies"] != ["runtime-base", "engine-pack"]
+        or installer_ui["forbiddenSurfaceTerms"]
+        != [
+            SIM_DISPLAY_NAME.replace("SIM", "LAB"),
+            SIM_DISPLAY_NAME.replace("SIM", "FIELD"),
+            "HITL mode",
+            "hardware control",
+        ]
+    ):
+        raise SimInstallerContractError("Sim installer UI contract drifted")
+
+    shortcuts = _exact_keys(contract["shortcuts"], SURFACE_SHORTCUT_KEYS, "surface.shortcuts")
+    if shortcuts != {
+        "startMenuName": SIM_DISPLAY_NAME,
+        "desktopShortcutName": SIM_DISPLAY_NAME,
+        "desktopShortcutDefault": "interactive-opt-in",
+        "uninstallMustRemoveOwnedShortcuts": True,
+    }:
+        raise SimInstallerContractError("Sim shortcut contract drifted")
+
+    lifecycle_ref = _exact_keys(
+        contract["lifecycleReadiness"], SURFACE_LIFECYCLE_KEYS, "surface.lifecycleReadiness"
+    )
+    if tuple(lifecycle_ref["requiredPlannedScenarios"]) != SURFACE_LIFECYCLE_SCENARIOS:
+        raise SimInstallerContractError("Sim lifecycle scenario contract drifted")
+    lifecycle_path = _resolve(repo_root, lifecycle_ref["path"], "surface.lifecycleReadiness.path")
+    if sha256_file(lifecycle_path) != _sha(
+        lifecycle_ref["sha256"], "surface.lifecycleReadiness.sha256"
+    ):
+        raise SimInstallerContractError("Sim lifecycle readiness SHA-256 drifted")
+    lifecycle = validate_install_readiness_audit(
+        load_json(lifecycle_path),
+        profile=profile,
+        profile_path=profile_path,
+        repo_root=repo_root,
+    )["lifecyclePlan"]
+    if any(
+        lifecycle[name]["status"] != "planned-not-executed"
+        for name in SURFACE_LIFECYCLE_SCENARIOS
+    ):
+        raise SimInstallerContractError("Sim lifecycle scenarios must remain planned-not-executed")
+
+    fence = _exact_keys(contract["capabilityFence"], SURFACE_FENCE_KEYS, "surface.capabilityFence")
+    if fence != {
+        "validatedVehiclePackCount": 0,
+        "allowedTargetKinds": ["simulation"],
+        "forbiddenTargetKinds": ["hitl", "real-hardware"],
+        "frontendIsAuthority": False,
+    }:
+        raise SimInstallerContractError("Sim installer capability fence drifted")
+
+    non_claims = _exact_keys(contract["nonClaims"], SURFACE_NONCLAIM_KEYS, "surface.nonClaims")
+    if any(value is not False for value in non_claims.values()):
+        raise SimInstallerContractError("Sim installer surface non-claims must remain false")
+    return contract
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -735,6 +1039,17 @@ def main() -> int:
     )
     readiness_parser.add_argument("--artifact", type=Path)
     readiness_parser.add_argument("audit", type=Path)
+    surface_parser = subparsers.add_parser("verify-surface")
+    surface_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    surface_parser.add_argument(
+        "--profile", type=Path, default=Path("distribution/sim/build-profile.v1.json")
+    )
+    surface_parser.add_argument(
+        "contract",
+        type=Path,
+        nargs="?",
+        default=Path("distribution/sim/desktop/installer-surface-contract.v1.json"),
+    )
     args = parser.parse_args()
     try:
         if args.command == "verify-profile":
@@ -760,6 +1075,16 @@ def main() -> int:
                 profile_path=args.profile,
                 repo_root=args.repo_root.resolve(),
                 artifact_path=args.artifact,
+            )
+        elif args.command == "verify-surface":
+            profile = validate_build_profile(
+                load_json(args.profile), repo_root=args.repo_root.resolve()
+            )
+            validate_installer_surface_contract(
+                load_json(args.contract),
+                profile=profile,
+                profile_path=args.profile,
+                repo_root=args.repo_root.resolve(),
             )
         else:
             raise SimInstallerContractError(f"unsupported command: {args.command}")

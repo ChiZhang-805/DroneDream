@@ -23,6 +23,9 @@ READINESS_AUDIT_PATH = (
     / "lifecycle"
     / "sim-preview-1.0.0-2aec69e.install-readiness-audit.v1.json"
 )
+SURFACE_CONTRACT_PATH = (
+    ROOT / "distribution" / "sim" / "desktop" / "installer-surface-contract.v1.json"
+)
 TOOL_PATH = ROOT / "distribution" / "sim" / "tools" / "sim_installer_contract.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_installer_contract", TOOL_PATH)
@@ -124,6 +127,17 @@ class SimInstallerContractTests(unittest.TestCase):
     def validate_readiness(self, audit: object) -> dict[str, Any]:
         return sim_contract.validate_install_readiness_audit(
             audit,
+            profile=self.profile,
+            profile_path=PROFILE_PATH,
+            repo_root=ROOT,
+        )
+
+    def installer_surface(self) -> dict[str, Any]:
+        return load_json(SURFACE_CONTRACT_PATH)
+
+    def validate_surface(self, contract: object) -> dict[str, Any]:
+        return sim_contract.validate_installer_surface_contract(
+            contract,
             profile=self.profile,
             profile_path=PROFILE_PATH,
             repo_root=ROOT,
@@ -304,6 +318,45 @@ class SimInstallerContractTests(unittest.TestCase):
         invalid["negativeAssertions"]["promotionReady"] = True
         with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "must all remain false"):
             self.validate_readiness(invalid)
+
+    def test_valid_installer_surface_binds_sim_identity_and_planned_lifecycle(self) -> None:
+        validated = self.validate_surface(self.installer_surface())
+        self.assertEqual(validated["identity"]["displayName"], "DroneDream \u00b7 SIM")
+        self.assertEqual(validated["installerUi"]["locales"], ["en", "zh-CN"])
+        self.assertFalse(validated["brandDonor"]["iconOverridePresent"])
+        self.assertEqual(validated["capabilityFence"]["validatedVehiclePackCount"], 0)
+        self.assertTrue(sim_contract._contains_icon_override({"bundle": {"icon": []}}))
+
+    def test_installer_surface_rejects_lab_or_field_identity(self) -> None:
+        for display_name in ("DroneDream \u00b7 LAB", "DroneDream \u00b7 FIELD"):
+            with self.subTest(display_name=display_name):
+                invalid = self.installer_surface()
+                invalid["identity"]["displayName"] = display_name
+                with self.assertRaisesRegex(
+                    sim_contract.SimInstallerContractError, "surface identity"
+                ):
+                    self.validate_surface(invalid)
+
+    def test_installer_surface_rejects_canonical_icon_claim_before_donor(self) -> None:
+        invalid = self.installer_surface()
+        invalid["brandDonor"]["canonicalDonorCommit"] = "e374d3f8d96b1265fcdb06864208b676566e94d9"
+        invalid["brandDonor"]["iconOverridePresent"] = True
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "brand donor state"):
+            self.validate_surface(invalid)
+
+    def test_installer_surface_rejects_source_hash_drift(self) -> None:
+        invalid = self.installer_surface()
+        invalid["staticSourceRefs"][0]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "SHA-256 drifted"):
+            self.validate_surface(invalid)
+
+    def test_installer_surface_rejects_observed_or_promotion_claims(self) -> None:
+        for claim in ("installerExecuted", "rollbackObserved", "promotionReady"):
+            with self.subTest(claim=claim):
+                invalid = self.installer_surface()
+                invalid["nonClaims"][claim] = True
+                with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "non-claims"):
+                    self.validate_surface(invalid)
 
 
 if __name__ == "__main__":

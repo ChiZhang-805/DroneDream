@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-installer-surface-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "sim",
+  "executionClass": "GREEN-static-only",
+  "identity": {
+    "displayName": "DroneDream · SIM",
+    "separator": " · ",
+    "artifactFileName": "DroneDream-Sim-1.0.0.exe",
+    "productVersion": "1.0.0",
+    "bundleIdentifier": "io.dronedream.sim"
+  },
+  "overlay": {
+    "path": "distribution/sim/desktop/tauri.sim.conf.json",
+    "baseConfigPath": "desktop/src-tauri/tauri.conf.json",
+    "baseConfigSha256": "cbcd45f68670e61c9e221ee292baeb4cefd26c492fb8511a20e9d41c34145cd5",
+    "baseConfigMustRemainUniversal": true,
+    "artifactRenameRequired": true
+  },
+  "brandDonor": {
+    "approvedConceptHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
+    "canonicalDonorState": "pending-universal-common-core",
+    "canonicalDonorCommit": null,
+    "iconOverridePresent": false,
+    "masterRedrawAllowed": false
+  },
+  "staticSourceRefs": [
+    {
+      "path": "desktop/src-tauri/nsis/installer.nsi",
+      "sha256": "29ea70929025661177107c1c0e072e2ac7d9ecc46e188a1ddf4c5de11642e45e",
+      "requiredText": [
+        "!define PRODUCTNAME \"{{product_name}}\"",
+        "Name \"${PRODUCTNAME}\"",
+        "OutFile \"${OUTFILE}\"",
+        "CreateShortcut \"$SMPROGRAMS\\$AppStartMenuFolder\\${PRODUCTNAME}.lnk\"",
+        "CreateShortcut \"$DESKTOP\\${PRODUCTNAME}.lnk\"",
+        "Delete \"$DESKTOP\\${PRODUCTNAME}.lnk\"",
+        "WriteUninstaller \"$INSTDIR\\uninstall.exe\""
+      ]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/languages/English.nsh",
+      "sha256": "dc692a717843afeda05a28fb5b572d86e60f2ca337ba1032ed6aa579e9d2f7b8",
+      "requiredText": ["LangString createDesktop ${LANG_ENGLISH}"]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/languages/SimpChinese.nsh",
+      "sha256": "b9adb274559b81253176e7fe77fb979b933f88240998a2720fb0e477df7f1e05",
+      "requiredText": ["LangString createDesktop ${LANG_SIMPCHINESE}"]
+    }
+  ],
+  "installerUi": {
+    "locales": ["en", "zh-CN"],
+    "requiredSurfaces": [
+      "welcome",
+      "license",
+      "maintenance-choice",
+      "install-directory",
+      "start-menu",
+      "external-runtime-choice",
+      "progress",
+      "finish",
+      "uninstall-confirmation",
+      "uninstall-result"
+    ],
+    "editionStateDisclosure": "internal-preview-not-promotion-ready",
+    "unsignedDisclosureRequired": true,
+    "externalDependencies": ["runtime-base", "engine-pack"],
+    "forbiddenSurfaceTerms": ["DroneDream · LAB", "DroneDream · FIELD", "HITL mode", "hardware control"]
+  },
+  "shortcuts": {
+    "startMenuName": "DroneDream · SIM",
+    "desktopShortcutName": "DroneDream · SIM",
+    "desktopShortcutDefault": "interactive-opt-in",
+    "uninstallMustRemoveOwnedShortcuts": true
+  },
+  "lifecycleReadiness": {
+    "path": "distribution/sim/lifecycle/sim-preview-1.0.0-2aec69e.install-readiness-audit.v1.json",
+    "sha256": "3f20369156c00ec4942feb4d42d1dcdc8573e8daaa5b8b66d272b1e29dddad71",
+    "requiredPlannedScenarios": [
+      "freshInstall",
+      "overlayUpgrade",
+      "uninstall",
+      "rollback",
+      "shortcuts",
+      "locales",
+      "webView2"
+    ]
+  },
+  "capabilityFence": {
+    "validatedVehiclePackCount": 0,
+    "allowedTargetKinds": ["simulation"],
+    "forbiddenTargetKinds": ["hitl", "real-hardware"],
+    "frontendIsAuthority": false
+  },
+  "nonClaims": {
+    "installerBuiltFromOverlay": false,
+    "installerExecuted": false,
+    "shortcutsObserved": false,
+    "uninstallObserved": false,
+    "rollbackObserved": false,
+    "canonicalIconIntegrated": false,
+    "validated": false,
+    "promotionReady": false
+  }
+}

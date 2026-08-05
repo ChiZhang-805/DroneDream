@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream · SIM",
+  "identifier": "io.dronedream.sim",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream · SIM",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "shortDescription": "PX4 SITL and Gazebo simulation workspace",
+    "longDescription": "DroneDream · SIM provides simulation-only PX4 SITL and Gazebo workflows. Runtime Base and Engine Pack remain external dependencies. Hardware and HITL capabilities are not included or authorized."
+  }
+}
