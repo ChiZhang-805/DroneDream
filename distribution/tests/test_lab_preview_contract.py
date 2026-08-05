@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import unittest
@@ -9,6 +10,12 @@ ROOT = Path(__file__).resolve().parents[2]
 LAB_EDITION = ROOT / "distribution" / "editions" / "lab.v1.json"
 VEHICLE_PACK_REGISTRY = ROOT / "distribution" / "vehicle-packs" / "registry.v1.json"
 LAB_UI_ADAPTER = ROOT / "frontend" / "src" / "lab" / "vehicle-pack-adapter.v1.json"
+LAB_UI_RECEIPT = (
+    ROOT
+    / "distribution"
+    / "build-receipts"
+    / "lab-ui-1.0.0-19f6185.functional-prebrand.json"
+)
 TOOLS = ROOT / "distribution" / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
@@ -150,6 +157,46 @@ class LabPreviewContractTests(unittest.TestCase):
                 adapted["firmwareVersions"],
                 manifest["autopilot"]["supportedFirmwareVersions"],
             )
+
+    def test_lab_functional_ui_receipt_does_not_overstate_brand_or_hardware(self) -> None:
+        receipt = json.loads(LAB_UI_RECEIPT.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["state"], "functional-prebrand")
+        self.assertEqual(receipt["source"]["commit"], "19f61854631319b475eec8649d59f205a41432cc")
+        self.assertEqual(
+            receipt["commonCore"]["productSourceCommit"],
+            lab_artifact.COMMON_CORE_PRODUCT_SOURCE_COMMIT,
+        )
+        self.assertEqual(
+            receipt["commonCore"]["commonCoreHash"],
+            lab_artifact.common_core_hash(lab_artifact.COMMON_CORE_PRODUCT_SOURCE_COMMIT),
+        )
+        self.assertEqual(receipt["visualVerification"]["screenshotCount"], 24)
+        report_path = ROOT / receipt["visualVerification"]["report"]["path"]
+        report_bytes = report_path.read_bytes()
+        self.assertEqual(len(report_bytes), receipt["visualVerification"]["report"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(report_bytes).hexdigest(),
+            receipt["visualVerification"]["report"]["sha256"],
+        )
+        report = json.loads(report_bytes.decode("utf-8"))
+        self.assertEqual(report["sourceCommit"], receipt["source"]["commit"])
+        self.assertEqual(len(report["screenshots"]), 24)
+        self.assertFalse(receipt["visualVerification"]["brandAcceptance"])
+        self.assertEqual(
+            receipt["brand"]["status"],
+            "blocked-awaiting-canonical-universal-donor",
+        )
+        self.assertEqual(receipt["brand"]["requiredName"], "DroneDream · LAB")
+        self.assertEqual(
+            receipt["brand"]["requiredPalette"],
+            ["#A7E84A", "#20C77A", "#087E69"],
+        )
+        self.assertIsNone(receipt["brand"]["canonicalDonorCommit"])
+        self.assertFalse(receipt["installerStructure"]["editionBrandApplied"])
+        self.assertEqual(receipt["safety"]["validatedVehiclePackCount"], 0)
+        self.assertFalse(receipt["safety"]["frontendIsAuthority"])
+        self.assertEqual(receipt["safety"]["hardwareActionDecision"], "deny")
+        self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
 
     def test_lab_preinstall_acceptance_is_read_only_and_blocked_without_real_receipt(self) -> None:
         result = lab_preinstall.evaluate_preinstall()

@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-ui-green-verification",
+  "sourceCommit": "19f61854631319b475eec8649d59f205a41432cc",
+  "sourceStatus": "clean",
+  "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+  "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+  "editionId": "lab",
+  "executionAuthority": false,
+  "validatedVehiclePackCount": 0,
+  "hardwareActionDecision": "deny",
+  "cases": [
+    {
+      "id": "1440-en",
+      "locale": "en",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "1440-zh",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "760-en",
+      "locale": "en",
+      "viewport": {
+        "width": 760,
+        "height": 900
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "760-zh",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 760,
+        "height": 900
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "390-en",
+      "locale": "en",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    },
+    {
+      "id": "390-zh",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "surfaces": [
+        "simulation",
+        "hardware",
+        "evidence",
+        "safety"
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/1440-en-simulation.png",
+      "sha256": "1954fc62c1b43ce04919453eb6a2a360aa3b3a8f006183f1b3bf066c445bb53b"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/1440-en-hardware.png",
+      "sha256": "8e3dae74a11f522cec8798e84af3f0658da57233bc7183afe892e77e07aeb4b2"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/1440-en-evidence.png",
+      "sha256": "c4dab9b627ed984cc1cc49a18c246e4a95410680761ef519599bc5a0365f4977"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/1440-en-safety.png",
+      "sha256": "e9caa20f8f1e9f4912499cda10430ab8cf404ae914eaea9b1013dd608edc0777"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/1440-zh-simulation.png",
+      "sha256": "a94d800db26541c1b625228a657c12af7dc46ef25acb898045e65e6e8887b54a"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/1440-zh-hardware.png",
+      "sha256": "93d2ed3356143fcdda2a3afa2a47fcb9e586a28cde911cd916fa086f877eba43"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/1440-zh-evidence.png",
+      "sha256": "3208ee019288349ad145a180ad174f9489457da4a746c30b6bec02c3de02afb1"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/1440-zh-safety.png",
+      "sha256": "315af3adf2a901423804fc3df13d43499ca5d24085e2b99dd4cc22fd3469c192"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/760-en-simulation.png",
+      "sha256": "ee91798cc5cadf5f4f79e1e564e85b80c9a7a39f73bec6f0eee4321495109a61"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/760-en-hardware.png",
+      "sha256": "a4cec7735e781a0561aef0f611ca4fef1749bdfc2cb5735bbcff399af5d9be4e"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/760-en-evidence.png",
+      "sha256": "83e26b7b0bb3023c873f36baf1376ff7ac3379bcef1cf724e98dcfce1d45f0dc"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/760-en-safety.png",
+      "sha256": "ff0d963a2b8d0f902e54632f51e6c5db3705e35be440cf223a03cb765b195598"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/760-zh-simulation.png",
+      "sha256": "7c4c63ae2599f7a88aa440e1912b43210473be696882b29a407d769a51568ae0"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/760-zh-hardware.png",
+      "sha256": "23a02b4af49e5d907727e9a7f6f6a0a1fd7c06cadc195082a4902a945349c9f6"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/760-zh-evidence.png",
+      "sha256": "ebb3756283dbe90536378e8d3685eabdc0d1ca3cebd952298c88f0c3681ca913"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/760-zh-safety.png",
+      "sha256": "db371348d826919e017279ccf41519176b978e01618bc8cab269bdbe0e124241"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/390-en-simulation.png",
+      "sha256": "bf40b0a2d6c6efb26da30ee35703832ae8580e0168e9c90e6fdd8eb1358b4411"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/390-en-hardware.png",
+      "sha256": "12c5ccf363b188ee09c47c87b24d542715334dbf291196da79ffbca623aea405"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/390-en-evidence.png",
+      "sha256": "afc915eb50d1154d994eca7c1a32fcc34534cf463328de369a94f3f2a578ac08"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/390-en-safety.png",
+      "sha256": "a001003bc2650d2b2a7569daac7f18a588edaf33daef16ea8e2a598ed5aa0e8d"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/390-zh-simulation.png",
+      "sha256": "986c0f2e33ae4c21e8d5b3fe9885a6f5ed255327396f5fa063e8756509e66290"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/390-zh-hardware.png",
+      "sha256": "495c75c292d94036aa1b37721aaa3135005564cbfecb1ab682b548bfc5e75f03"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/390-zh-evidence.png",
+      "sha256": "348f22419876647c753f0f608115fce540dd6dffeb6bae521673e73a36a93a21"
+    },
+    {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/390-zh-safety.png",
+      "sha256": "3f8460888461ce2e1b5dc474205358d4f2ee2eb933cd1dfa10583944092be965"
+    }
+  ],
+  "sideEffects": {
+    "installed": false,
+    "runtimeMigrated": false,
+    "simulationStarted": false,
+    "hardwareConnected": false,
+    "providerCalled": false
+  }
+}

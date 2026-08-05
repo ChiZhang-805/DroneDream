@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-ui-functional-receipt",
+  "classification": "GREEN",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "state": "functional-prebrand",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "19f61854631319b475eec8649d59f205a41432cc",
+    "clean": true
+  },
+  "commonCore": {
+    "authority": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "verificationReceiptCommit": "d4a01f40676014d7a31f46a3f89afafdcdf4b45f",
+    "verificationReceiptSha256": "6f2dd3f0331475074c39c28648905bd441c6afcfd341900a543374dbe28c9bf9"
+  },
+  "frontend": {
+    "productionBuild": {
+      "command": "VITE_DRONEDREAM_EDITION=lab npm --prefix frontend run build",
+      "result": "passed",
+      "transformedModules": 1989,
+      "distFileCount": 54,
+      "distBytes": 7093250,
+      "distInventorySha256": "f17a66ca403b1067c5cc554022abe2e0fef08853655539376e2430f755f9f870",
+      "warning": "The existing main index chunk remains above the configured 510 kB warning threshold."
+    },
+    "workspaces": [
+      {
+        "workspaceId": "simulation",
+        "display": "Simulation workspace",
+        "switchCountsAsAuthority": false
+      },
+      {
+        "workspaceId": "hardware-lab",
+        "display": "Hardware laboratory",
+        "switchCountsAsAuthority": false
+      }
+    ],
+    "implementedViews": [
+      "setup",
+      "sim-to-lab-evidence-preview",
+      "vehicle-pack-controller-firmware-selection",
+      "native-backend-runtime-quorum",
+      "operator-challenge"
+    ],
+    "evidenceImport": {
+      "localPreviewOnly": true,
+      "maximumBytes": 262144,
+      "persistsReceipt": false,
+      "consumesReceipt": false,
+      "authorizesHardware": false
+    }
+  },
+  "visualVerification": {
+    "report": {
+      "path": "artifacts/test-runs/lab-ui-19f6185-functional-prebrand/lab-ui-verification.json",
+      "bytes": 6608,
+      "sha256": "d3d9bbf5e83c8de73df4d79e359cf57afb2ec3e765bce584ceb05532882116e4"
+    },
+    "locales": ["en", "zh-CN"],
+    "viewports": [
+      {"width": 1440, "height": 1000},
+      {"width": 760, "height": 900},
+      {"width": 390, "height": 844}
+    ],
+    "surfacesPerCase": ["simulation", "hardware", "evidence", "safety"],
+    "caseCount": 6,
+    "screenshotCount": 24,
+    "screenshotBytes": 1723005,
+    "screenshotInventorySha256": "db60beed684c158fd4f657bd2935ba8eb71a138b9013acb1f3c4c80d7f021f18",
+    "horizontalOverflow": false,
+    "visibleTextClipping": false,
+    "keyboardArrowTabsPassed": true,
+    "ariaRolesPassed": true,
+    "manualRepresentativeReviewPassed": true,
+    "brandAcceptance": false
+  },
+  "installerStructure": {
+    "staticTemplateVerification": "passed",
+    "tauriCliVersion": "2.11.4",
+    "baseTauriConfigSha256": "cbcd45f68670e61c9e221ee292baeb4cefd26c492fb8511a20e9d41c34145cd5",
+    "labOverlaySha256": "70951e969e4a992ab34a48a22446eaec40d84fbcaf65d61b367ade8023f16fe1",
+    "nsisTemplateSha256": "29ea70929025661177107c1c0e072e2ac7d9ecc46e188a1ddf4c5de11642e45e",
+    "currentInheritedIconSha256": "e2b4f1ac3e48f6e49e78c86e4a805ed4cfdb15f9f0bfff458c41e5fbe2c26a53",
+    "installerIconInjectionPointPresent": true,
+    "startMenuShortcutUsesProductNameAndExecutableIcon": true,
+    "desktopShortcutUsesProductNameAndExecutableIcon": true,
+    "generatedNsiLocaleVerification": "not-run-no-generated-nsi",
+    "editionBrandApplied": false
+  },
+  "brand": {
+    "status": "blocked-awaiting-canonical-universal-donor",
+    "designHandoff": {
+      "path": "Z:/DroneDream/work/brand-edition-concepts-v1/BRAND_EDITION_HANDOFF_V2.md",
+      "bytes": 2958,
+      "sha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
+    },
+    "requiredName": "DroneDream · LAB",
+    "requiredPalette": ["#A7E84A", "#20C77A", "#087E69"],
+    "supersededPalette": ["#16D6A3", "#19BBD3", "#5268F2"],
+    "canonicalDonorCommit": null,
+    "canonicalDonorHash": null,
+    "observedUniversalHead": "d4a01f40676014d7a31f46a3f89afafdcdf4b45f",
+    "conceptPngTreatedAsReleaseAsset": false,
+    "logoOrIconReplaced": false,
+    "currentOverlayProductName": "DroneDream Lab",
+    "applicationAccepted": false,
+    "installerAccepted": false,
+    "shortcutAccepted": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "frontendIsAuthority": false,
+    "requiredQuorum": ["native", "backend", "runtime"],
+    "operatorBooleanConfirmationAccepted": false,
+    "hardwareActionDecision": "deny",
+    "deniedHardwareActions": [
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl.execute"
+    ]
+  },
+  "tests": {
+    "labFrontendFocused": {"files": 4, "tests": 18, "result": "passed"},
+    "distribution": {"tests": 131, "result": "passed"},
+    "enginePackAndRuntime": {"tests": 41, "subtests": 4, "result": "passed"},
+    "backendCommonCore": {"tests": 75, "result": "passed"},
+    "frontendTypecheck": "passed",
+    "frontendLint": "passed",
+    "fullFrontend": {
+      "passed": 470,
+      "failed": 1,
+      "failure": "Existing PublicSite billing availability mock observed only /downloads/latest.json; no Lab-owned patch was applied."
+    }
+  },
+  "sideEffects": {
+    "tauriBuild": false,
+    "nsisBuild": false,
+    "install": false,
+    "runtimeMigration": false,
+    "px4Gazebo": false,
+    "hardwareProbe": false,
+    "providerCall": false,
+    "apiKeyRead": false,
+    "releaseBranchCreated": false,
+    "uploadOrDeploy": false
+  },
+  "remainingGates": [
+    "Canonical Universal edition-brand donor commit and hash are not available.",
+    "Application, installer, executable, Start Menu, and desktop shortcut branding are not accepted.",
+    "No DroneDream-Lab-1.0.0.exe exists; the one authorized build attempt failed before NSIS.",
+    "A second Tauri/NSIS build requires a new YELLOW authorization and a resolved Rust linker target.",
+    "Generated NSIS locale, install, uninstall, overlay, rollback, PX4/Gazebo, and real-hardware acceptance remain unexecuted.",
+    "All eight Vehicle Packs remain planned or contract-only; hardware execution remains denied."
+  ]
+}
