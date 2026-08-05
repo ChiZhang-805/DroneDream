@@ -13,6 +13,13 @@ $deploymentTargets = Get-Content -LiteralPath $deploymentTargetsPath -Raw |
 $tauriConfig = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
 $codeSigningPolicy = Get-Content -LiteralPath $codeSigningPolicyPath -Raw
 
+& node --experimental-strip-types (
+    Join-Path $repositoryRoot "website\scripts\verify-edition-availability.mjs"
+)
+if ($LASTEXITCODE -ne 0) {
+    throw "Edition availability metadata verification failed."
+}
+
 $version = [string]$release.version
 $fileName = [string]$release.fileName
 $releaseTag = [string]$release.releaseTag

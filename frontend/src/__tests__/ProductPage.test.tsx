@@ -12,9 +12,12 @@ function publishedSimAvailability(): EditionAvailabilityDocument {
   const sim = document.editions.find(({ id }) => id === "sim");
   if (!sim) throw new Error("Missing Sim edition fixture");
   sim.releaseStatus = "published";
+  sim.availability = "downloadable";
+  sim.signatureState = "signed";
   sim.downloadUrl = "/downloads/DroneDream-Sim-1.0.0.exe";
   sim.checksumUrl = "/downloads/DroneDream-Sim-1.0.0.exe.sha256";
   sim.signatureUrl = "/downloads/DroneDream-Sim-1.0.0.exe.sig";
+  sim.receiptUrl = "/downloads/DroneDream-Sim-1.0.0.exe.receipt.json";
   sim.sizeBytes = 12_345_678;
   sim.sha256 = "a".repeat(64);
   sim.sourceCommit = "b".repeat(40);

@@ -4,15 +4,20 @@ export const editionIds = [...primaryEditionIds, "universal"] as const;
 export type EditionId = (typeof editionIds)[number];
 export type PrimaryEditionId = (typeof primaryEditionIds)[number];
 export type EditionReleaseStatus = "planned-not-built" | "published";
+export type EditionAvailability = "unavailable" | "downloadable";
+export type EditionSignatureState = "not-provided" | "signed";
 
 export type EditionArtifact = {
   id: EditionId;
   releaseStatus: EditionReleaseStatus;
+  availability: EditionAvailability;
+  signatureState: EditionSignatureState;
   version: string;
   fileName: string;
   downloadUrl: string | null;
   checksumUrl: string | null;
   signatureUrl: string | null;
+  receiptUrl: string | null;
   sizeBytes: number | null;
   sha256: string | null;
   sourceCommit: string | null;
@@ -20,7 +25,7 @@ export type EditionArtifact = {
 };
 
 export type EditionAvailabilityDocument = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   generatedAt: string;
   vehiclePacks: {
     total: number;
@@ -37,11 +42,14 @@ function plannedEdition(id: EditionId): EditionArtifact {
   return {
     id,
     releaseStatus: "planned-not-built",
+    availability: "unavailable",
+    signatureState: "not-provided",
     version: "1.0.0",
     fileName: `DroneDream-${displayId}-1.0.0.exe`,
     downloadUrl: null,
     checksumUrl: null,
     signatureUrl: null,
+    receiptUrl: null,
     sizeBytes: null,
     sha256: null,
     sourceCommit: null,
@@ -50,7 +58,7 @@ function plannedEdition(id: EditionId): EditionArtifact {
 }
 
 export const fallbackEditionAvailability: EditionAvailabilityDocument = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: "2026-08-05",
   vehiclePacks: {
     total: 8,
@@ -68,8 +76,8 @@ function isIsoCalendarDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-function isAllowedArtifactUrl(value: string, expectedFileName: string) {
-  if (value === `/downloads/${expectedFileName}`) return true;
+function artifactUrlFamily(value: string, expectedFileName: string) {
+  if (value === `/downloads/${expectedFileName}`) return "/downloads";
   try {
     const url = new URL(value);
     if (
@@ -80,16 +88,20 @@ function isAllowedArtifactUrl(value: string, expectedFileName: string) {
       url.password ||
       url.search ||
       url.hash
-    ) return false;
+    ) return null;
     const prefix = "/ChiZhang-805/DroneDream/releases/download/";
-    if (!url.pathname.startsWith(prefix)) return false;
+    if (!url.pathname.startsWith(prefix)) return null;
     const remainder = url.pathname.slice(prefix.length);
     const separator = remainder.indexOf("/");
-    return separator > 0 &&
-      /^[A-Za-z0-9._-]+$/u.test(remainder.slice(0, separator)) &&
-      remainder.slice(separator + 1) === expectedFileName;
+    const releaseTag = remainder.slice(0, separator);
+    if (
+      separator <= 0 ||
+      !/^[A-Za-z0-9._-]+$/u.test(releaseTag) ||
+      remainder.slice(separator + 1) !== expectedFileName
+    ) return null;
+    return `${url.origin}${prefix}${releaseTag}`;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -103,9 +115,9 @@ function isEditionArtifact(value: unknown, expectedId: EditionId): value is Edit
   if (!value || typeof value !== "object") return false;
   const edition = value as Record<string, unknown>;
   if (!hasExactKeys(edition, [
-    "id", "releaseStatus", "version", "fileName", "downloadUrl",
-    "checksumUrl", "signatureUrl", "sizeBytes", "sha256", "sourceCommit",
-    "publishedAt",
+    "id", "releaseStatus", "availability", "signatureState", "version",
+    "fileName", "downloadUrl", "checksumUrl", "signatureUrl", "receiptUrl",
+    "sizeBytes", "sha256", "sourceCommit", "publishedAt",
   ])) return false;
   if (
     edition.id !== expectedId ||
@@ -117,34 +129,44 @@ function isEditionArtifact(value: unknown, expectedId: EditionId): value is Edit
     edition.downloadUrl,
     edition.checksumUrl,
     edition.signatureUrl,
+    edition.receiptUrl,
     edition.sizeBytes,
     edition.sha256,
     edition.sourceCommit,
     edition.publishedAt,
   ];
   if (edition.releaseStatus === "planned-not-built") {
-    return nullableFields.every((field) => field === null);
+    return edition.availability === "unavailable" &&
+      edition.signatureState === "not-provided" &&
+      nullableFields.every((field) => field === null);
   }
   if (edition.releaseStatus !== "published") return false;
   if (
+    edition.availability !== "downloadable" ||
+    edition.signatureState !== "signed" ||
     typeof edition.downloadUrl !== "string" ||
     typeof edition.checksumUrl !== "string" ||
     typeof edition.signatureUrl !== "string" ||
+    typeof edition.receiptUrl !== "string" ||
     typeof edition.sizeBytes !== "number" ||
     !Number.isSafeInteger(edition.sizeBytes) ||
     edition.sizeBytes <= 0 ||
     typeof edition.sha256 !== "string" ||
-    !/^[a-f\d]{64}$/iu.test(edition.sha256) ||
+    !/^[a-f\d]{64}$/u.test(edition.sha256) ||
     typeof edition.sourceCommit !== "string" ||
-    !/^[a-f\d]{40}$/iu.test(edition.sourceCommit) ||
+    !/^[a-f\d]{40}$/u.test(edition.sourceCommit) ||
     typeof edition.publishedAt !== "string" ||
     !isIsoCalendarDate(edition.publishedAt)
   ) return false;
 
   const fileName = edition.fileName as string;
-  return isAllowedArtifactUrl(edition.downloadUrl, fileName) &&
-    isAllowedArtifactUrl(edition.checksumUrl, `${fileName}.sha256`) &&
-    isAllowedArtifactUrl(edition.signatureUrl, `${fileName}.sig`);
+  const families = [
+    artifactUrlFamily(edition.downloadUrl, fileName),
+    artifactUrlFamily(edition.checksumUrl, `${fileName}.sha256`),
+    artifactUrlFamily(edition.signatureUrl, `${fileName}.sig`),
+    artifactUrlFamily(edition.receiptUrl, `${fileName}.receipt.json`),
+  ];
+  return families.every((family) => family !== null) && new Set(families).size === 1;
 }
 
 export function isEditionAvailabilityDocument(
@@ -156,7 +178,7 @@ export function isEditionAvailabilityDocument(
     return false;
   }
   if (
-    document.schemaVersion !== 1 ||
+    document.schemaVersion !== 2 ||
     typeof document.generatedAt !== "string" ||
     !isIsoCalendarDate(document.generatedAt) ||
     !document.vehiclePacks ||
@@ -177,7 +199,18 @@ export function isEditionAvailabilityDocument(
   ) return false;
 
   const editions = document.editions as unknown[];
-  return editionIds.every((id, index) => isEditionArtifact(editions[index], id));
+  if (!editionIds.every((id, index) => isEditionArtifact(editions[index], id))) return false;
+
+  const generatedAt = document.generatedAt as string;
+  const published = editions.filter((edition) => (
+    (edition as EditionArtifact).releaseStatus === "published"
+  )) as EditionArtifact[];
+  if (published.some((edition) => edition.publishedAt! > generatedAt)) return false;
+  for (const field of ["downloadUrl", "checksumUrl", "signatureUrl", "receiptUrl", "sha256"] as const) {
+    const values = published.map((edition) => edition[field]);
+    if (new Set(values).size !== values.length) return false;
+  }
+  return true;
 }
 
 export function isEditionDownloadReady(edition: EditionArtifact) {
