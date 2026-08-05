@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 from app import models
 from app.benchmarking import service
 from app.benchmarking.contracts import (
+    BenchmarkArmManifestV1,
     BenchmarkBatchBindingRecordV1,
     BenchmarkBatchBindingRequestV1,
     BenchmarkBudgetCapsV1,
@@ -25,7 +26,15 @@ from app.benchmarking.contracts import (
     BenchmarkRunBindingRecordV1,
     BenchmarkRunBindingRequestV1,
     BenchmarkUsageDeltaV1,
+    canonical_json_bytes,
     canonical_sha256,
+)
+from app.benchmarking.llm_arm_contracts import BENCHMARK_LLM_ARM_POLICIES_SHA256
+from app.benchmarking.provider_execution_contract import (
+    BENCHMARK_DIRECT_RESERVATION_REASON,
+    BENCHMARK_PROVIDER_BASE_URLS,
+    BenchmarkProviderExecutionConfigV1,
+    direct_provider_run_capacity,
 )
 from app.orchestration.qualification import (
     SEALED_QUALIFICATION_POLICY_VERSION,
@@ -80,6 +89,74 @@ def _batch_binding_request_sha256(request: BenchmarkBatchBindingRequestV1) -> st
     payload = request.model_dump(mode="json", exclude_none=False)
     payload["runs"] = sorted(payload["runs"], key=lambda item: item["run_key"])
     return canonical_sha256(payload)
+
+
+def _direct_provider_capacity(
+    arm: models.BenchmarkArm,
+    run: BenchmarkRunBindingRequestV1,
+    job: models.Job,
+) -> BenchmarkUsageDeltaV1 | None:
+    if arm.proposal_adapter_id != "llm_direct/v1":
+        return None
+    try:
+        arm_manifest = BenchmarkArmManifestV1.model_validate(arm.manifest_json)
+        provider = BenchmarkProviderExecutionConfigV1.model_validate_json(
+            canonical_json_bytes(arm_manifest.intervention.get("provider_execution"))
+        )
+    except ValueError as exc:
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_PROVIDER_CONTRACT_INVALID",
+            "The direct-arm provider execution contract is invalid.",
+            http_status=422,
+        ) from exc
+    if canonical_sha256(arm_manifest) != arm.manifest_sha256:
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_ARM_MANIFEST_DRIFT",
+            "The direct-arm manifest hash no longer matches.",
+            http_status=409,
+        )
+    if (
+        not arm.execution_enabled
+        or arm.arm_family != "llm_harness"
+        or not arm_manifest.execution_enabled
+        or arm_manifest.arm_family != "llm_harness"
+        or arm_manifest.proposal_adapter_id != "llm_direct/v1"
+        or arm_manifest.provider_contract_sha256
+        != BENCHMARK_LLM_ARM_POLICIES_SHA256
+    ):
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_DIRECT_CONTRACT_MISMATCH",
+            "The arm is not the reviewed executable direct-provider contract.",
+            http_status=422,
+        )
+    if (
+        run.provider_randomness_policy != provider.randomness_policy
+        or (provider.randomness_policy == "fixed_seed") != (run.provider_seed is not None)
+    ):
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_PROVIDER_RANDOMNESS_MISMATCH",
+            "Run randomness differs from the direct-arm provider contract.",
+            http_status=422,
+        )
+    job_base_url = job.llm_base_url
+    if job_base_url is None and job.llm_provider == "openai":
+        job_base_url = BENCHMARK_PROVIDER_BASE_URLS["openai"]
+    if (
+        job.llm_access_mode != "byok"
+        or job.llm_provider != provider.provider
+        or job_base_url != provider.base_url
+        or job.openai_model != provider.model_snapshot
+        or job.provider_max_retries != 0
+        or job.provider_turn_cap != provider.maximum_generations
+        or job.provider_request_cap != provider.maximum_generations
+        or job.max_iterations != provider.maximum_generations
+    ):
+        raise BenchmarkCoordinatorError(
+            "BENCHMARK_PROVIDER_JOB_MISMATCH",
+            "Job provider identity or hard caps differ from the direct-arm contract.",
+            http_status=422,
+        )
+    return direct_provider_run_capacity(provider)
 
 
 def _sealed_job_contract(
@@ -619,31 +696,59 @@ def bind_batch(
     db.add(batch_binding)
     db.flush()
     sorted_runs = sorted(request.runs, key=lambda item: item.run_key)
+    persisted_runs: list[
+        tuple[
+            models.BenchmarkCampaignRunBinding,
+            models.BenchmarkArm,
+            BenchmarkRunBindingRequestV1,
+        ]
+    ] = []
     for offset, run in enumerate(sorted_runs):
         arm = arm_by_semantic_id[(run.benchmark_arm_id, run.arm_version)]
         _, scenario_sha256, qualification_sha256 = sealed_by_job[run.job_id]
-        db.add(
-            models.BenchmarkCampaignRunBinding(
-                campaign_id=campaign.id,
-                batch_binding_id=batch_binding.id,
-                benchmark_arm_id=arm.id,
-                job_id=run.job_id,
-                run_key=run.run_key,
-                run_ordinal=first_run_ordinal + offset,
-                batch_run_ordinal=offset + 1,
-                algorithm_seed=run.algorithm_seed,
-                simulator_seed_block=run.simulator_seed_block,
-                provider_randomness_policy=run.provider_randomness_policy,
-                provider_seed=run.provider_seed,
-                qualification_policy_version=SEALED_QUALIFICATION_POLICY_VERSION,
+        persisted_run = models.BenchmarkCampaignRunBinding(
+            campaign_id=campaign.id,
+            batch_binding_id=batch_binding.id,
+            benchmark_arm_id=arm.id,
+            job_id=run.job_id,
+            run_key=run.run_key,
+            run_ordinal=first_run_ordinal + offset,
+            batch_run_ordinal=offset + 1,
+            algorithm_seed=run.algorithm_seed,
+            simulator_seed_block=run.simulator_seed_block,
+            provider_randomness_policy=run.provider_randomness_policy,
+            provider_seed=run.provider_seed,
+            qualification_policy_version=SEALED_QUALIFICATION_POLICY_VERSION,
+            scenario_suite_sha256=scenario_sha256,
+            qualification_contract_sha256=qualification_sha256,
+            binding_sha256=run_binding_sha256(
+                run,
                 scenario_suite_sha256=scenario_sha256,
                 qualification_contract_sha256=qualification_sha256,
-                binding_sha256=run_binding_sha256(
-                    run,
-                    scenario_suite_sha256=scenario_sha256,
-                    qualification_contract_sha256=qualification_sha256,
-                ),
-            )
+            ),
+        )
+        db.add(persisted_run)
+        persisted_runs.append((persisted_run, arm, run))
+    db.flush()
+    for persisted_run, arm, run in persisted_runs:
+        provider_capacity = _direct_provider_capacity(
+            arm,
+            run,
+            child_by_id[run.job_id],
+        )
+        if provider_capacity is None:
+            continue
+        reserve_budget(
+            db,
+            campaign_id,
+            BenchmarkBudgetReservationRequestV1(
+                reservation_key=f"provider-run/{persisted_run.id}",
+                lease_generation=request.lease_generation,
+                reason=BENCHMARK_DIRECT_RESERVATION_REASON,
+                usage=provider_capacity,
+            ),
+            user=user,
+            lease_token=lease_token,
         )
     try:
         db.flush()

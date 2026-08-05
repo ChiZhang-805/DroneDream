@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.exc import DatabaseError
 
 from app.benchmarking.contracts import (
@@ -21,6 +21,7 @@ from app.benchmarking.contracts import (
     BenchmarkProposalV1,
     canonical_sha256,
 )
+from app.benchmarking.llm_arm_contracts import BENCHMARK_LLM_ARM_POLICIES_SHA256
 from app.orchestration.qualification import (
     QUALIFICATION_RULE_SHA256,
     compile_sealed_qualification_contract,
@@ -185,6 +186,69 @@ def _executable_pair_manifest(*, version: str) -> dict[str, object]:
         "execution_enabled": True,
     }
     return manifest
+
+
+def _executable_direct_manifest(*, version: str) -> dict[str, object]:
+    manifest = _manifest()
+    manifest["campaign_version"] = version
+    manifest["arms"] = [
+        {
+            "schema_id": "dronedream.benchmark-arm/v1",
+            "benchmark_arm_id": "llm-direct",
+            "arm_version": "v1",
+            "arm_family": "llm_harness",
+            "proposal_adapter_id": "llm_direct/v1",
+            "evaluator_contract_id": "dronedream.candidate-evaluator/v1",
+            "intervention": {
+                "provider_execution": {
+                    "schema_id": "dronedream.benchmark-provider-execution/v1",
+                    "provider": "openai",
+                    "model_snapshot": "gpt-4.1-2025-04-14",
+                    "api_surface": "chat_completions",
+                    "base_url": "https://api.openai.com/v1",
+                    "region": "global",
+                    "temperature": 0.0,
+                    "top_p": 1.0,
+                    "randomness_policy": "fixed_seed",
+                    "response_format": "json_schema",
+                    "maximum_generations": 2,
+                    "maximum_request_utf8_bytes": 65_536,
+                    "maximum_response_utf8_bytes": 8_192,
+                    "maximum_output_tokens": 128,
+                    "request_timeout_ms": 10_000,
+                    "provider_retry_cap": 0,
+                    "llm_policy_registry_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
+                    "model_matrix_sha256": "6" * 64,
+                    "price_snapshot": {
+                        "schema_version": "dronedream.provider-price-snapshot/v1",
+                        "source": "preregistered",
+                        "input_microusd_per_million_tokens": 2_000_000,
+                        "output_microusd_per_million_tokens": 8_000_000,
+                        "effective_at": "2026-08-05T00:00:00Z",
+                    },
+                }
+            },
+            "provider_contract_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
+            "dependencies": [],
+            "execution_enabled": True,
+        }
+    ]
+    return manifest
+
+
+def _direct_job_payload() -> dict[str, object]:
+    return {
+        **_BENCHMARK_JOB_PAYLOAD,
+        "optimizer_strategy": "gpt",
+        "max_iterations": 2,
+        "provider_turn_cap": 2,
+        "provider_request_cap": 2,
+        "provider_max_retries": 0,
+        "openai": {
+            "api_key": "unit-test-provider-key",
+            "model": "gpt-4.1-2025-04-14",
+        },
+    }
 
 
 def test_unified_observation_excludes_holdout_and_sensitive_payloads() -> None:
@@ -756,6 +820,186 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
             )
             db.commit()
         db.rollback()
+
+
+def test_direct_batch_binding_atomically_reserves_frozen_provider_capacity(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.benchmarking import registry
+
+    monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
+    descriptor = registry.BENCHMARK_ADAPTER_REGISTRY["llm_direct/v1"]
+    monkeypatch.setitem(
+        registry.BENCHMARK_ADAPTER_REGISTRY,
+        "llm_direct/v1",
+        registry.BenchmarkAdapterDescriptor(
+            adapter_id=descriptor.adapter_id,
+            family=descriptor.family,
+            availability="implemented",
+            implementation_label=descriptor.implementation_label,
+            method_classification=descriptor.method_classification,
+        ),
+    )
+    created_response = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _executable_direct_manifest(version="direct-reserve-v1")},
+    )
+    assert created_response.status_code == 200, created_response.text
+    created = created_response.json()["data"]
+    batch_response = client.post(
+        "/api/v1/batches",
+        json={"name": "direct-block-01", "jobs": [_direct_job_payload()]},
+    )
+    assert batch_response.status_code == 200, batch_response.text
+    batch = batch_response.json()["data"]
+    job = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"][0]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "direct-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    response = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings",
+        json={
+            "binding_key": "direct-block-01",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [
+                {
+                    "run_key": "direct-run-01",
+                    "job_id": job["id"],
+                    "benchmark_arm_id": "llm-direct",
+                    "arm_version": "v1",
+                    "algorithm_seed": 101,
+                    "simulator_seed_block": "crn-direct-01",
+                    "provider_randomness_policy": "fixed_seed",
+                    "provider_seed": 20260805,
+                }
+            ],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert response.status_code == 200, response.text
+    run_id = response.json()["data"]["runs"][0]["id"]
+
+    with SessionLocal() as db:
+        reservation = db.scalar(
+            select(models.BenchmarkBudgetReservation).where(
+                models.BenchmarkBudgetReservation.reservation_key
+                == f"provider-run/{run_id}"
+            )
+        )
+        assert reservation is not None
+        assert reservation.reason == "benchmark-provider-execution"
+        assert reservation.logical_turns == 2
+        assert reservation.network_requests == 2
+        assert reservation.input_utf8_bytes == 65_536 * 2
+        assert reservation.output_utf8_bytes == 8_192 * 2
+        assert reservation.provider_tokens == (65_536 + 128) * 2
+        assert reservation.provider_cost_microusd == 264_192
+        assert reservation.wall_time_seconds == 20
+
+
+def test_direct_batch_binding_rolls_back_when_provider_capacity_exceeds_campaign(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.benchmarking import registry
+
+    monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
+    descriptor = registry.BENCHMARK_ADAPTER_REGISTRY["llm_direct/v1"]
+    monkeypatch.setitem(
+        registry.BENCHMARK_ADAPTER_REGISTRY,
+        "llm_direct/v1",
+        registry.BenchmarkAdapterDescriptor(
+            adapter_id=descriptor.adapter_id,
+            family=descriptor.family,
+            availability="implemented",
+            implementation_label=descriptor.implementation_label,
+            method_classification=descriptor.method_classification,
+        ),
+    )
+    manifest = _executable_direct_manifest(version="direct-cap-rollback-v1")
+    manifest["budget_caps"]["logical_turns"] = 1
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": manifest},
+    ).json()["data"]
+    batch = client.post(
+        "/api/v1/batches",
+        json={"name": "direct-cap-block", "jobs": [_direct_job_payload()]},
+    ).json()["data"]
+    job = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"][0]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "direct-cap-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    response = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings",
+        json={
+            "binding_key": "direct-cap-block",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [
+                {
+                    "run_key": "direct-cap-run",
+                    "job_id": job["id"],
+                    "benchmark_arm_id": "llm-direct",
+                    "arm_version": "v1",
+                    "algorithm_seed": 101,
+                    "simulator_seed_block": "crn-direct-cap",
+                    "provider_randomness_policy": "fixed_seed",
+                    "provider_seed": 20260805,
+                }
+            ],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "BENCHMARK_CAMPAIGN_CAP_EXCEEDED"
+
+    with SessionLocal() as db:
+        assert db.scalar(
+            select(models.BenchmarkCampaignBatchBinding).where(
+                models.BenchmarkCampaignBatchBinding.campaign_id == created["id"]
+            )
+        ) is None
+        assert db.scalar(
+            select(models.BenchmarkCampaignRunBinding).where(
+                models.BenchmarkCampaignRunBinding.campaign_id == created["id"]
+            )
+        ) is None
+        assert db.scalar(
+            select(models.BenchmarkBudgetReservation).where(
+                models.BenchmarkBudgetReservation.campaign_id == created["id"]
+            )
+        ) is None
+        state = db.get(models.BenchmarkCampaignCoordinatorState, created["id"])
+        assert state is not None
+        assert state.next_batch_ordinal == 1
+        assert state.next_run_ordinal == 1
 
 
 def test_campaign_batch_binding_rejects_partial_started_or_unknown_arm(

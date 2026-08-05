@@ -10,18 +10,15 @@ never accepted by these contracts.
 
 from __future__ import annotations
 
-import math
 import time
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Annotated, Any, Literal, NoReturn, Protocol
-from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app import models
 from app.benchmarking.contracts import (
     BenchmarkArmManifestV1,
     BenchmarkCampaignManifestV1,
@@ -29,14 +26,12 @@ from app.benchmarking.contracts import (
     BenchmarkProposalV1,
     BenchmarkRunBindingRequestV1,
     CompositeExecutionInventoryV1,
-    Sha256Hex,
     canonical_json_bytes,
     canonical_sha256,
 )
 from app.benchmarking.coordinator import run_binding_sha256
 from app.benchmarking.llm_arm_contracts import (
     BENCHMARK_LLM_ARM_POLICIES_SHA256,
-    BENCHMARK_LLM_MAX_RESPONSE_BYTES,
     BenchmarkLLMContractError,
     BenchmarkLLMTurnRequestV1,
     build_llm_turn_request,
@@ -45,8 +40,13 @@ from app.benchmarking.llm_arm_contracts import (
     require_llm_arm_policy,
     validate_proposal_response,
 )
-from app.benchmarking.provider_usage_reconciliation import (
+from app.benchmarking.provider_execution_contract import (
     BENCHMARK_DIRECT_RESERVATION_REASON,
+    BENCHMARK_PROVIDER_BASE_URLS,
+    BenchmarkProviderExecutionConfigV1,
+    direct_provider_run_capacity,
+)
+from app.benchmarking.provider_usage_reconciliation import (
     BenchmarkProviderUsageBlocked,
     reconcile_direct_provider_run_usage,
     validate_provider_run_reservation,
@@ -63,19 +63,8 @@ from app.orchestration.provider_request_accounting import (
     provider_request_counts_for_turn,
 )
 
-BENCHMARK_PROVIDER_EXECUTION_SCHEMA_ID: Literal[
-    "dronedream.benchmark-provider-execution/v1"
-] = (
-    "dronedream.benchmark-provider-execution/v1"
-)
 BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID = (
     "dronedream.benchmark-direct-proposal/v1"
-)
-BENCHMARK_PROVIDER_BASE_URLS = MappingProxyType(
-    {
-        "deepseek": "https://api.deepseek.com/v1",
-        "openai": "https://api.openai.com/v1",
-    }
 )
 
 
@@ -89,54 +78,6 @@ class BenchmarkDurableLLMBlocked(RuntimeError):
 
 class _StrictFrozen(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
-
-
-class BenchmarkProviderExecutionConfigV1(_StrictFrozen):
-    """Secret-free provider and budget contract frozen inside one arm manifest."""
-
-    schema_id: Literal["dronedream.benchmark-provider-execution/v1"] = (
-        BENCHMARK_PROVIDER_EXECUTION_SCHEMA_ID
-    )
-    provider: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")]
-    model_snapshot: Annotated[str, Field(min_length=1, max_length=128)]
-    api_surface: Literal["chat_completions"] = "chat_completions"
-    base_url: Annotated[str, Field(min_length=8, max_length=2048)]
-    region: Annotated[str, Field(min_length=1, max_length=64)] | None = None
-    temperature: Annotated[float, Field(ge=0, le=2)]
-    top_p: Annotated[float, Field(gt=0, le=1)]
-    randomness_policy: Literal["fixed_seed", "provider_managed"]
-    response_format: Literal["json_schema"] = "json_schema"
-    maximum_generations: Annotated[int, Field(ge=1, le=128)]
-    maximum_output_tokens: Annotated[int, Field(ge=1, le=8192)]
-    request_timeout_ms: Annotated[int, Field(ge=1000, le=600_000)]
-    provider_retry_cap: Literal[0] = 0
-    llm_policy_registry_sha256: Sha256Hex
-    model_matrix_sha256: Sha256Hex
-    price_snapshot: schemas.ProviderPriceSnapshot
-
-    @model_validator(mode="after")
-    def _require_current_llm_policy(self) -> BenchmarkProviderExecutionConfigV1:
-        if self.llm_policy_registry_sha256 != BENCHMARK_LLM_ARM_POLICIES_SHA256:
-            raise ValueError("provider execution uses a different LLM policy registry")
-        if self.price_snapshot.source != "preregistered":
-            raise ValueError("formal provider execution requires preregistered prices")
-        expected_base_url = BENCHMARK_PROVIDER_BASE_URLS.get(self.provider)
-        parsed_base_url = urlsplit(self.base_url)
-        if (
-            expected_base_url is None
-            or self.base_url != expected_base_url
-            or parsed_base_url.scheme != "https"
-            or parsed_base_url.username is not None
-            or parsed_base_url.password is not None
-            or parsed_base_url.query
-            or parsed_base_url.fragment
-            or parsed_base_url.port not in {None, 443}
-        ):
-            raise ValueError(
-                "formal provider execution requires an exact approved "
-                "credential-free HTTPS base URL"
-            )
-        return self
 
 
 @dataclass(frozen=True)
@@ -450,35 +391,20 @@ def _require_prereserved_budget(
         )
     except BenchmarkProviderUsageBlocked as exc:
         raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
-    config = context.provider
     request_bytes = len(canonical_json_bytes(request_body))
-    worst_tokens = request_bytes + config.maximum_output_tokens
-    input_rate = config.price_snapshot.input_microusd_per_million_tokens
-    output_rate = config.price_snapshot.output_microusd_per_million_tokens
-    if input_rate is None or output_rate is None:  # pragma: no cover - config validator guards.
-        _blocked("benchmark_provider_price_missing", "Provider price snapshot is incomplete.")
-    assert input_rate is not None and output_rate is not None
-    per_generation_cost = math.ceil(
-        (
-            request_bytes * input_rate
-            + config.maximum_output_tokens * output_rate
-        )
-        / 1_000_000
-    )
-    generations = config.maximum_generations
-    required = {
-        "logical_turns": generations,
-        "network_requests": generations,
-        "input_utf8_bytes": request_bytes * generations,
-        "output_utf8_bytes": BENCHMARK_LLM_MAX_RESPONSE_BYTES * generations,
-        "provider_tokens": worst_tokens * generations,
-        "provider_cost_microusd": per_generation_cost * generations,
-        "wall_time_seconds": math.ceil(config.request_timeout_ms / 1000) * generations,
-    }
-    if any(int(getattr(reservation, field)) < amount for field, amount in required.items()):
+    if request_bytes > context.provider.maximum_request_utf8_bytes:
         _blocked(
-            "benchmark_provider_budget_insufficient",
-            "Reserved provider budget is insufficient.",
+            "benchmark_provider_request_too_large",
+            "Serialized provider request exceeds the frozen per-turn byte cap.",
+        )
+    required = direct_provider_run_capacity(context.provider)
+    if any(
+        int(getattr(reservation, field)) != amount
+        for field, amount in required.model_dump().items()
+    ):
+        _blocked(
+            "benchmark_provider_budget_drift",
+            "Reserved provider budget differs from the frozen run capacity.",
         )
 
 
@@ -614,6 +540,18 @@ def execute_durable_direct_arm(
         usage=result.usage,
         latency_ms=result.latency_ms,
     )
+    if len(result.response_text.encode("utf-8")) > context.provider.maximum_response_utf8_bytes:
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="invalid_schema",
+            error_code="benchmark_provider_response_too_large",
+        )
+        _blocked(
+            "benchmark_provider_response_too_large",
+            "Provider response exceeds the frozen per-turn byte cap.",
+        )
     terminal_status = cancel_cognitive_turn_if_job_terminal(db, job, attempt)
     if terminal_status is not None:
         _blocked(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ from app.benchmarking.llm_durable_runtime import (
     execute_durable_direct_arm,
 )
 from app.benchmarking.method_inventory import BENCHMARK_METHOD_INVENTORY
+from app.benchmarking.provider_execution_contract import direct_provider_run_capacity
 from app.benchmarking.provider_usage_reconciliation import (
     BenchmarkProviderUsageBlocked,
     reconcile_direct_provider_run_usage,
@@ -88,6 +90,8 @@ def _provider_config() -> BenchmarkProviderExecutionConfigV1:
         top_p=1.0,
         randomness_policy="fixed_seed",
         maximum_generations=2,
+        maximum_request_utf8_bytes=65_536,
+        maximum_response_utf8_bytes=8_192,
         maximum_output_tokens=128,
         request_timeout_ms=10_000,
         llm_policy_registry_sha256=BENCHMARK_LLM_ARM_POLICIES_SHA256,
@@ -310,15 +314,7 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
     )
     db.add(run)
     db.flush()
-    reservation_usage = BenchmarkUsageDeltaV1(
-        logical_turns=2,
-        network_requests=2,
-        input_utf8_bytes=10_000_000,
-        output_utf8_bytes=10_000_000,
-        provider_tokens=10_000_000,
-        provider_cost_microusd=10_000_000,
-        wall_time_seconds=1000,
-    )
+    reservation_usage = direct_provider_run_capacity(_provider_config())
     reservation_request = BenchmarkBudgetReservationRequestV1(
         reservation_key=f"provider-run/{run.id}",
         lease_generation=1,
@@ -439,6 +435,18 @@ def test_provider_execution_contract_accepts_exact_deepseek_origin() -> None:
     assert parsed.base_url == "https://api.deepseek.com/v1"
 
 
+def test_direct_provider_capacity_is_deterministic_and_worst_case() -> None:
+    capacity = direct_provider_run_capacity(_provider_config())
+
+    assert capacity.logical_turns == 2
+    assert capacity.network_requests == 2
+    assert capacity.input_utf8_bytes == 65_536 * 2
+    assert capacity.output_utf8_bytes == 8_192 * 2
+    assert capacity.provider_tokens == (65_536 + 128) * 2
+    assert capacity.provider_cost_microusd == 264_192
+    assert capacity.wall_time_seconds == 20
+
+
 def test_durable_bridge_does_not_promote_direct_arm_before_campaign_reconciliation() -> None:
     descriptor = BENCHMARK_ADAPTER_REGISTRY["llm_direct/v1"]
     inventory = BENCHMARK_METHOD_INVENTORY["llm_direct/v1"]
@@ -545,6 +553,36 @@ def test_schema_failure_records_network_success_but_not_model_success(
         request = db.scalar(select(models.ProviderNetworkRequestReceipt))
         assert turn is not None and turn.outcome.status == "invalid_schema"
         assert request is not None and request.outcome.status == "succeeded"
+        db.refresh(job)
+        assert job.provider_turns_succeeded == 0
+        assert job.provider_requests_succeeded == 1
+
+
+def test_response_byte_cap_records_consumed_request_but_rejects_model_result(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    oversized_response = "x" * 8_193
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_direct_arm(
+                db,
+                job,
+                _observation(job, run),
+                transport=_Transport(oversized_response),
+            )
+        assert exc_info.value.code == "benchmark_provider_response_too_large"
+        turn = db.scalar(select(models.HarnessCognitiveTurnReceipt))
+        request = db.scalar(select(models.ProviderNetworkRequestReceipt))
+        assert turn is not None and turn.outcome.status == "invalid_schema"
+        assert turn.outcome.error_code == "benchmark_provider_response_too_large"
+        assert request is not None and request.outcome.status == "succeeded"
+        assert request.outcome.output_utf8_bytes == 8_193
+        assert request.outcome.response_sha256 == hashlib.sha256(
+            oversized_response.encode("utf-8")
+        ).hexdigest()
+        assert oversized_response not in str(request.outcome.__dict__)
         db.refresh(job)
         assert job.provider_turns_succeeded == 0
         assert job.provider_requests_succeeded == 1
@@ -689,6 +727,51 @@ def test_reservation_hash_drift_blocks_before_transport(
                 transport=transport,
             )
         assert exc_info.value.code == "benchmark_provider_reservation_hash_drift"
+        assert transport.calls == 0
+
+
+@pytest.mark.parametrize("delta", [-1, 1])
+def test_reservation_capacity_drift_blocks_before_transport(
+    durable_db: SimpleNamespace,
+    delta: int,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        reservation = db.scalar(
+            select(models.BenchmarkBudgetReservation).where(
+                models.BenchmarkBudgetReservation.reservation_key
+                == f"provider-run/{run.id}"
+            )
+        )
+        assert reservation is not None
+        reservation.input_utf8_bytes += delta
+        changed_usage = BenchmarkUsageDeltaV1(
+            **{
+                field: getattr(reservation, field)
+                for field in BenchmarkUsageDeltaV1.model_fields
+            }
+        )
+        reservation.reservation_sha256 = canonical_sha256(
+            BenchmarkBudgetReservationRequestV1(
+                reservation_key=reservation.reservation_key,
+                lease_generation=reservation.lease_generation,
+                reason=reservation.reason,
+                usage=changed_usage,
+            )
+        )
+        db.commit()
+        transport = _Transport(_proposal_json())
+
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_direct_arm(
+                db,
+                job,
+                _observation(job, run),
+                transport=transport,
+            )
+
+        assert exc_info.value.code == "benchmark_provider_budget_drift"
         assert transport.calls == 0
 
 
