@@ -630,6 +630,45 @@ select:focus-visible {
   font-size: 11px;
 }
 
+.field-gate-grid div[data-local-only="true"] svg,
+.field-gate-grid div[data-local-only="true"] strong {
+  color: #9a5a14;
+}
+
+.field-operator-acknowledgement {
+  display: grid;
+  align-items: start;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--field-surface);
+  border: 1px solid #efd8bf;
+  border-radius: 6px;
+}
+
+.field-operator-acknowledgement input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--field-coral);
+}
+
+.field-operator-acknowledgement span {
+  display: grid;
+  gap: 4px;
+}
+
+.field-operator-acknowledgement strong {
+  font-size: 13px;
+}
+
+.field-operator-acknowledgement small {
+  color: var(--field-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .field-control-buttons {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

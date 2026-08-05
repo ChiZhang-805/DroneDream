@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArchiveRestore,
+  CheckCircle2,
   ChevronRight,
   CircleOff,
   ClipboardCheck,
@@ -89,6 +90,9 @@ const COPY = {
     nativeGate: "Native safety gate",
     runtimeGate: "Runtime gate",
     missing: "Missing",
+    localOnly: "Local only",
+    operatorAcknowledgement: "I acknowledge the Field preview safety boundary.",
+    operatorBoundary: "This local acknowledgement is not signed evidence and cannot authorize hardware.",
     controlTitle: "Takeover & emergency",
     controlBody: "Control commands remain unavailable while the hardware safety contract is incomplete.",
     takeover: "Request takeover",
@@ -167,6 +171,9 @@ const COPY = {
     nativeGate: "原生安全门",
     runtimeGate: "运行时安全门",
     missing: "缺失",
+    localOnly: "仅本地",
+    operatorAcknowledgement: "我已知悉 Field 预览版的安全边界。",
+    operatorBoundary: "此本地确认不是签名证据，不能授权任何真机动作。",
     controlTitle: "接管与紧急操作",
     controlBody: "真机安全合同未闭合时，所有控制命令保持不可用。",
     takeover: "请求接管",
@@ -231,6 +238,7 @@ export function FieldApp({
       FIRST_FIELD_PACK.controllers[0]?.model ?? "missing",
     ),
   );
+  const [operatorAcknowledged, setOperatorAcknowledged] = useState(false);
   const copy = COPY[locale];
   const observation = FIELD_OBSERVATION_FIXTURES[observationState];
   const decision = useMemo(() => evaluateFieldSafety(observation), [observation]);
@@ -417,10 +425,30 @@ export function FieldApp({
           <section id="preflight" className="field-section" aria-labelledby="field-preflight-title">
             <header><div><h2 id="field-preflight-title">{copy.preflightTitle}</h2><p>{copy.preflightBody}</p></div><ClipboardCheck /></header>
             <div className="field-gate-grid">
-              {[copy.pack, copy.controller, copy.firmware, copy.zone, copy.confirmation, copy.nativeGate, copy.runtimeGate].map((label) => (
-                <div key={label}><CircleOff /><span>{label}</span><strong>{copy.missing}</strong></div>
+              {[
+                [copy.pack, copy.missing, false],
+                [copy.controller, copy.missing, false],
+                [copy.firmware, copy.missing, false],
+                [copy.zone, copy.missing, false],
+                [copy.confirmation, operatorAcknowledged ? copy.localOnly : copy.missing, operatorAcknowledged],
+                [copy.nativeGate, copy.missing, false],
+                [copy.runtimeGate, copy.missing, false],
+              ].map(([label, status, locallyRecorded]) => (
+                <div key={String(label)} data-local-only={locallyRecorded ? "true" : undefined}>
+                  {locallyRecorded ? <CheckCircle2 /> : <CircleOff />}
+                  <span>{label}</span>
+                  <strong>{status}</strong>
+                </div>
               ))}
             </div>
+            <label className="field-operator-acknowledgement">
+              <input
+                type="checkbox"
+                checked={operatorAcknowledged}
+                onChange={(event) => setOperatorAcknowledged(event.target.checked)}
+              />
+              <span><strong>{copy.operatorAcknowledgement}</strong><small>{copy.operatorBoundary}</small></span>
+            </label>
           </section>
 
           <section id="control" className="field-section" aria-labelledby="field-control-title">

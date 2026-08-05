@@ -87,6 +87,21 @@ describe("FieldApp", () => {
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
   });
 
+  it("keeps local operator acknowledgement outside the authority path", () => {
+    const { container } = render(<FieldApp initialLocale="en" />);
+
+    fireEvent.click(screen.getByRole("checkbox", {
+      name: /I acknowledge the Field preview safety boundary/,
+    }));
+
+    expect(screen.getByText("Local only")).toBeInTheDocument();
+    expect(screen.getByText(/not signed evidence/)).toBeInTheDocument();
+    expect(container.querySelector("[data-authority='false']")).toBeTruthy();
+    expect(container.querySelector("[data-quorum='missing']")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Emergency stop" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Apply rollback" })).toBeDisabled();
+  });
+
   it("provides independent Simplified Chinese safety copy", () => {
     render(<FieldApp initialLocale="zh-CN" initialObservationState="firmware-drift" />);
 
