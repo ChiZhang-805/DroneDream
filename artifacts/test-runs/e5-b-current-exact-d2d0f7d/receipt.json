@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-e5-b-current-exact-verification-receipt",
+  "generatedAt": "2026-08-05T05:46:37Z",
+  "subjectCommit": "d2d0f7d65097d82d6f6a88484e280e46b3a7626d",
+  "subjectTree": "fe83eee8c061479900674ab2694af363362239fb",
+  "branch": "codex/software",
+  "resourceClass": "GREEN",
+  "scope": {
+    "phase": "E5-B current-exact revalidation",
+    "decisionOnly": true,
+    "executionAuthorized": false,
+    "hardwareActionHandlersImplemented": false,
+    "validatedVehiclePackCount": 0,
+    "productionHardwareDecision": "deny",
+    "providerCalls": 0,
+    "physicalTrials": 0
+  },
+  "ancestry": {
+    "e5AContractCommit": "b6b3659",
+    "e5BSourceCommit": "31bac42",
+    "e5BReceiptCommit": "7fdc3eb",
+    "e5CSourceCommit": "7a374b2",
+    "e5CReceiptCommit": "bd5cac6",
+    "previousE5BReceipt": {
+      "path": "artifacts/test-runs/e5-b-edition-safety-31bac42/receipt.json",
+      "bytes": 4436,
+      "sha256": "136a768787cae7cd8c22ae8baadbba210d9671deffc5d8df253d6c515fcbdf8b"
+    }
+  },
+  "currentExactAudit": {
+    "backendAndRuntimeParseIndependently": true,
+    "sharedFinalAllowBoolean": false,
+    "canonicalRequestAndContextHashesRequired": true,
+    "backendIdentityDerivedFromTrustedContext": true,
+    "runtimeRechecksActiveEnginePackManifestSignatureSourceAndActualTarget": true,
+    "threeLayerCanonicalDecisionHashesRequired": true,
+    "denyFailedIndeterminateMissingPrecedeAllow": true,
+    "reverseLayerDisagreementNowQuorumTested": true,
+    "fakeIssuerProductionDenied": true,
+    "enginePackDistributionWhitelistExactAndPerFileHashed": true,
+    "buildPlansTestsAndPlannedArtifactDirectoriesExcluded": true,
+    "routesOrDeviceHandlersAdded": false
+  },
+  "sourceFiles": [
+    {
+      "path": "backend/app/distribution_safety.py",
+      "bytes": 20101,
+      "sha256": "5fc6b9cc49dcf6faf4d49bdfd7732f6b553cadeb005c49d628a95fd6076ab6e6"
+    },
+    {
+      "path": "backend/tests/test_distribution_safety.py",
+      "bytes": 6857,
+      "sha256": "847b0d34a2491d9b6c264e16686fb1d9948f0fb1979b381ef5236f726c7d77bf"
+    },
+    {
+      "path": "runtime/scripts/edition-safety-gate.py",
+      "bytes": 21748,
+      "sha256": "8e27834a38a8f76e3ce0cfb6eae651e7787688f927738ddfd3cf2afc74c385ab"
+    },
+    {
+      "path": "runtime/tests/test_edition_safety_gate.py",
+      "bytes": 16590,
+      "sha256": "5d14c6a6cf007dfa9de4e916172e6c54ed9f8a9b2b7e01f8228e041c1430a248"
+    },
+    {
+      "path": "engine-pack/tools/engine_pack.py",
+      "bytes": 23961,
+      "sha256": "5694ef5aafdbcbe2d4f0f88cb0172a8bdbefb42dd90e0db9c83e2cdd822c7a29"
+    },
+    {
+      "path": "engine-pack/tests/test_engine_pack.py",
+      "bytes": 10535,
+      "sha256": "44a10b75aa187a55a6a7558908b40fb5f520c7660349b268aefd81ca2c8a48c5"
+    },
+    {
+      "path": "distribution/tools/edition_safety_contract.py",
+      "bytes": 33591,
+      "sha256": "4c2aa96065b5672b7bf886ab86e0389d557df417e3d63adbe87657fa996aa8d8"
+    },
+    {
+      "path": "distribution/tests/test_edition_safety_contract.py",
+      "bytes": 14084,
+      "sha256": "4c05f0708dfdb9ec52bf966fe9bd1346ff74189a1bead4fe2369071d75244a19"
+    }
+  ],
+  "checks": [
+    {
+      "name": "backend-focused",
+      "command": "python -m pytest backend/tests/test_distribution_safety.py -q",
+      "result": "pass",
+      "passed": 10,
+      "durationSeconds": 0.22
+    },
+    {
+      "name": "runtime-safety-and-contract",
+      "command": "python -m pytest runtime/tests/test_edition_safety_gate.py runtime/tests/test_runtime_contract.py -q",
+      "result": "pass",
+      "passed": 46,
+      "skipped": 5,
+      "subtestsPassed": 7,
+      "durationSeconds": 1.21
+    },
+    {
+      "name": "distribution-contracts",
+      "command": "python -m pytest distribution/tests -q",
+      "result": "pass",
+      "passed": 120,
+      "subtestsPassed": 14,
+      "durationSeconds": 1.17
+    },
+    {
+      "name": "engine-pack-tests",
+      "command": "python -m pytest engine-pack/tests/test_engine_pack.py -q",
+      "result": "pass",
+      "passed": 12,
+      "durationSeconds": 5.44
+    },
+    {
+      "name": "ruff-focused",
+      "result": "pass"
+    },
+    {
+      "name": "mypy-product-modules",
+      "command": "python -m mypy --config-file backend/pyproject.toml backend/app/distribution_safety.py runtime/scripts/edition-safety-gate.py",
+      "result": "pass",
+      "checkedSourceFiles": 2
+    },
+    {
+      "name": "python-py-compile",
+      "result": "pass"
+    },
+    {
+      "name": "git-diff-check",
+      "result": "pass"
+    }
+  ],
+  "negativeCoverage": [
+    "catalog-tamper",
+    "engine-pack-signature-unverified",
+    "request-replay",
+    "nonce-replay",
+    "clock-before-issued",
+    "clock-at-expiry",
+    "fake-issuer-production-reject",
+    "unknown-schema-field",
+    "cross-device-id",
+    "cross-device-hardware-identity",
+    "cross-parameter-candidate",
+    "actual-target-mismatch",
+    "trusted-evidence-mismatch",
+    "backend-allow-runtime-deny-quorum-deny",
+    "backend-deny-runtime-allow-quorum-deny"
+  ],
+  "diagnosticsOutsideHistoricalGate": [
+    {
+      "commandScope": "strict mypy over dynamically loaded pytest modules",
+      "result": "failed",
+      "backendExistingErrors": 7,
+      "runtimeExistingErrors": 17,
+      "introducedByThisChange": false,
+      "reason": "The tests intentionally load modules dynamically and were not part of the historical E5-B strict mypy source-module gate. Pytest and Ruff cover them."
+    },
+    {
+      "commandScope": "strict mypy over engine-pack/tools/engine_pack.py",
+      "result": "failed",
+      "existingErrors": 1,
+      "introducedByThisChange": false,
+      "reason": "A pre-existing no-any-return diagnostic at engine-pack/tools/engine_pack.py:574 is outside this test-only E5-B change and historical E5-B mypy scope."
+    }
+  ],
+  "notExecuted": [
+    "Engine Pack archive build",
+    "Runtime installation or migration",
+    "NSIS or Tauri packaging",
+    "PX4 or Gazebo",
+    "HITL or real hardware",
+    "device discovery, parameter write, arm, flight, or installation action",
+    "OpenAI or any provider API"
+  ]
+}
