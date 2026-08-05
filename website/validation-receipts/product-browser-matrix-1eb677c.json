@@ -1,0 +1,405 @@
+{
+  "receiptType": "product-price-universal-browser-visual-validation",
+  "generatedAt": "2026-08-05T11:06:23.675Z",
+  "baselineCommit": "13998304fbc7c284e0e483f9c2fe6bd79401d03c",
+  "sourceCommit": "1eb677c6b89e7c70673c5244715abdefce30873a",
+  "branch": "codex/website",
+  "deploymentPerformed": false,
+  "productionTouched": false,
+  "boundaries": [
+    "No Pages deployment",
+    "No Aliyun deployment",
+    "No Supabase, Secrets, DNS, TLS, or Release changes",
+    "Manual/PDF/work dirty paths preserved and excluded from commits"
+  ],
+  "validation": {
+    "targetedFrontendTests": "npm.cmd --prefix frontend test -- ProductPage.test.tsx PublicSite.test.tsx EditionAvailability.test.ts => 3 files, 26 passed",
+    "typecheck": "npm.cmd --prefix frontend run typecheck => passed",
+    "lint": "npm.cmd --prefix frontend run lint => passed",
+    "deploymentContract": "python -m unittest runtime.tests.test_website_deployment => 13 passed",
+    "build": "website/scripts/build-pages-site.ps1 with public local placeholder env => passed; source commit 1eb677c6b89e7c70673c5244715abdefce30873a",
+    "browserMatrix": "node website/scripts/audit-product-page.mjs http://127.0.0.1:4174/ website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-audit.json edge,chrome,firefox frontend/site-dist => 16 passed, 0 failed"
+  },
+  "browserAudit": {
+    "generatedAt": "2026-08-05T11:06:07.405Z",
+    "baseUrl": "http://127.0.0.1:4174/",
+    "browsersRequested": [
+      "edge",
+      "chrome",
+      "firefox"
+    ],
+    "unavailable": [],
+    "checks": 16,
+    "passed": 16,
+    "failed": 0,
+    "profiles": [
+      "desktop-1440",
+      "wide-2048",
+      "tablet-760",
+      "mobile-390"
+    ],
+    "locales": [
+      "en",
+      "zh-CN"
+    ]
+  },
+  "screenshots": [
+    {
+      "browser": "edge",
+      "profile": "desktop-1440",
+      "locale": "en",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/edge-desktop-1440-en.png",
+      "sha256": "202d6f8f3dc571ac5699512861264ef2efa0482ddca728e473904188f76cfe05",
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "headings": [
+        "DroneDream Sim",
+        "DroneDream Lab",
+        "DroneDream Field"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "profile": "desktop-1440",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/edge-desktop-1440-zh-CN.png",
+      "sha256": "46e83c74082b18b12ab9c2cd2387cc64edcc1bf8ac4cc0bb4f55bbcd9b5d9966",
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "headings": [
+        "DroneDream 仿真版",
+        "DroneDream 实验室版",
+        "DroneDream 真机版"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "profile": "wide-2048",
+      "locale": "en",
+      "viewport": {
+        "width": 2048,
+        "height": 1280
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/edge-wide-2048-en.png",
+      "sha256": "f16530e24e6b13cb0736e1bc913b6c221d366d00866f8701d70bdc2b792752b2",
+      "documentWidth": 2048,
+      "viewportWidth": 2048,
+      "headings": [
+        "DroneDream Sim",
+        "DroneDream Lab",
+        "DroneDream Field"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "profile": "wide-2048",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 2048,
+        "height": 1280
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/edge-wide-2048-zh-CN.png",
+      "sha256": "ce65460021041990dbdea2e0423435dbc5c3ac961859653bcf73d54d64e5b31e",
+      "documentWidth": 2048,
+      "viewportWidth": 2048,
+      "headings": [
+        "DroneDream 仿真版",
+        "DroneDream 实验室版",
+        "DroneDream 真机版"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "profile": "tablet-760",
+      "locale": "en",
+      "viewport": {
+        "width": 760,
+        "height": 1000
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/edge-tablet-760-en.png",
+      "sha256": "0e318f4c5030967d715eb2735dc9cfa0b9b25f2e28c6ace5abe87d446ba818ca",
+      "documentWidth": 760,
+      "viewportWidth": 760,
+      "headings": [
+        "DroneDream Sim",
+        "DroneDream Lab",
+        "DroneDream Field"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "profile": "tablet-760",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 760,
+        "height": 1000
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/edge-tablet-760-zh-CN.png",
+      "sha256": "0e8f6cc715b6ae971f723650d7225b153fd9449c43541c3b8b8486f671b60a64",
+      "documentWidth": 760,
+      "viewportWidth": 760,
+      "headings": [
+        "DroneDream 仿真版",
+        "DroneDream 实验室版",
+        "DroneDream 真机版"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "profile": "mobile-390",
+      "locale": "en",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/edge-mobile-390-en.png",
+      "sha256": "d8aee5237f96d4b3f2e8e8d8544268ca7980ef8259ec9fcaf3e35e80a45d053f",
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "headings": [
+        "DroneDream Sim",
+        "DroneDream Lab",
+        "DroneDream Field"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "profile": "mobile-390",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/edge-mobile-390-zh-CN.png",
+      "sha256": "be2a3a3bdd643c8e63f5ad9533d586856288ba84bc7da79757e3c6c671a48be7",
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "headings": [
+        "DroneDream 仿真版",
+        "DroneDream 实验室版",
+        "DroneDream 真机版"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "chrome",
+      "profile": "desktop-1440",
+      "locale": "en",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/chrome-desktop-1440-en.png",
+      "sha256": "5f739bb7df5997b9e15c7aa8b93f87275715aee83ddd1aa8c70e31c19d5d73f4",
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "headings": [
+        "DroneDream Sim",
+        "DroneDream Lab",
+        "DroneDream Field"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "chrome",
+      "profile": "desktop-1440",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/chrome-desktop-1440-zh-CN.png",
+      "sha256": "c43e9486c8b8ca2cd1e9b7a7440054e339428e33c4da703e3e2724cc02023bee",
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "headings": [
+        "DroneDream 仿真版",
+        "DroneDream 实验室版",
+        "DroneDream 真机版"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "chrome",
+      "profile": "mobile-390",
+      "locale": "en",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/chrome-mobile-390-en.png",
+      "sha256": "697ee92d7059200c9ec59496a4e55ed513ac0f3eb6dda0dd2ccb97179052d08f",
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "headings": [
+        "DroneDream Sim",
+        "DroneDream Lab",
+        "DroneDream Field"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "chrome",
+      "profile": "mobile-390",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/chrome-mobile-390-zh-CN.png",
+      "sha256": "64ca91c96a842eb16832a35a0ecf756237f7b60aadb733a0c77e3f6f67619669",
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "headings": [
+        "DroneDream 仿真版",
+        "DroneDream 实验室版",
+        "DroneDream 真机版"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "firefox",
+      "profile": "desktop-1440",
+      "locale": "en",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/firefox-desktop-1440-en.png",
+      "sha256": "c6dd0a111f4af1d9508c0ec5af167332222dcbf618a60995b6bee2c4282fa784",
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "headings": [
+        "DroneDream Sim",
+        "DroneDream Lab",
+        "DroneDream Field"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "firefox",
+      "profile": "desktop-1440",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/firefox-desktop-1440-zh-CN.png",
+      "sha256": "90c0560542e266739810bfe4f0793886c2b295c34327a625341799a1f387fb19",
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "headings": [
+        "DroneDream 仿真版",
+        "DroneDream 实验室版",
+        "DroneDream 真机版"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "firefox",
+      "profile": "mobile-390",
+      "locale": "en",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/firefox-mobile-390-en.png",
+      "sha256": "80f87140339104ef4f07ba49d27f5172c6b6bbc48c98950bb706f92219258985",
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "headings": [
+        "DroneDream Sim",
+        "DroneDream Lab",
+        "DroneDream Field"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    },
+    {
+      "browser": "firefox",
+      "profile": "mobile-390",
+      "locale": "zh-CN",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "website/validation-receipts/assets/product-browser-matrix-1eb677c/product-page-screenshots/firefox-mobile-390-zh-CN.png",
+      "sha256": "3c3c96ffc63fc9f712ea11557316d0e538aeaa02d89caf83ab30666c581f6702",
+      "documentWidth": 390,
+      "viewportWidth": 390,
+      "headings": [
+        "DroneDream 仿真版",
+        "DroneDream 实验室版",
+        "DroneDream 真机版"
+      ],
+      "disabledProductActions": 3,
+      "universalDisabledPresent": true,
+      "currentPreviewHref": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "errors": []
+    }
+  ],
+  "residuals": [
+    "Build retains existing Vite chunk-size warnings only",
+    "Production deployment remains intentionally not performed",
+    "Historical manual/PDF/work dirty paths remain outside these commits"
+  ]
+}
