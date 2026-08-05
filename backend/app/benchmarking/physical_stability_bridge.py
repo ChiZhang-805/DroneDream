@@ -256,6 +256,7 @@ class PhysicalStabilityTerminalObservationV1(_StrictFrozen):
     scenario_ordinal: Annotated[int, Field(ge=1, le=6)]
     scenario_id: Identifier
     observed_job_id: Identifier
+    observed_baseline_candidate_id: Identifier
     request_sha256: Sha256Hex
     job_status: JobTerminalStatus
     provider_events_observed: Literal[0] = 0
@@ -391,8 +392,13 @@ def close_physical_stability_job(
             raise ValueError("P5 observed Trial input contract differs from the plan")
         if trial.scenario_type != expected_scenario_type:
             raise ValueError("P5 observed Trial scenario type differs from the Job request")
-        if trial.candidate_id != "p5-fixed-baseline" or not trial.candidate_is_baseline:
-            raise ValueError("P5 observed Trial does not bind the fixed baseline candidate")
+        if (
+            trial.candidate_id != observation.observed_baseline_candidate_id
+            or not trial.candidate_is_baseline
+        ):
+            raise ValueError(
+                "P5 observed Trial does not bind the server-observed baseline candidate"
+            )
         if trial.scenario_effect_request_sha256 != binding.scenario_effect_request_sha256:
             raise ValueError("P5 observed Trial effect request differs from the plan")
         if trial.status == "completed" and not set(binding.expected_effect_ids).issubset(

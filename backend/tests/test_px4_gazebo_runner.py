@@ -1242,11 +1242,13 @@ def test_px4_runner_extracts_real_candidate_parameters_and_writes_evidence(
     }
     assert applied["verification"]["verified"] is True
     artifact_names = {Path(item["storage_path"]).name for item in result["artifacts"]}
+    artifact_types = {item["artifact_type"] for item in result["artifacts"]}
     assert {
         "px4_parameters.requested.json",
         "px4_parameters.before.json",
         "px4_parameters.applied.json",
     }.issubset(artifact_names)
+    assert "px4_parameter_evidence_json" in artifact_types
 
 
 def test_px4_runner_rejects_real_parameter_outside_safe_bounds(tmp_path: Path):

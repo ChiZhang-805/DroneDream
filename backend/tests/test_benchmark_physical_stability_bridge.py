@@ -131,6 +131,7 @@ class _Transport:
 def _complete_observation(bundle, *, job_id: str) -> PhysicalStabilityTerminalObservationV1:
     job = bundle.jobs[0]
     case = job.request_payload["scenario_suite"]["cases"][0]
+    observed_baseline_id = "cand-server-generated-baseline"
     trials = tuple(
         PhysicalStabilityTrialObservationV1(
             planned_trial_id=item.planned_trial_id,
@@ -139,7 +140,7 @@ def _complete_observation(bundle, *, job_id: str) -> PhysicalStabilityTerminalOb
             seed=item.seed,
             scenario_type=case["scenario_type"],
             status="completed",
-            candidate_id="p5-fixed-baseline",
+            candidate_id=observed_baseline_id,
             candidate_is_baseline=True,
             input_contract_sha256=item.input_contract_sha256,
             scenario_effect_request_sha256=item.scenario_effect_request_sha256,
@@ -159,6 +160,7 @@ def _complete_observation(bundle, *, job_id: str) -> PhysicalStabilityTerminalOb
         scenario_ordinal=1,
         scenario_id=job.scenario_id,
         observed_job_id=job_id,
+        observed_baseline_candidate_id=observed_baseline_id,
         request_sha256=job.request_sha256,
         job_status="completed",
         trials=trials,
@@ -366,7 +368,7 @@ def test_terminal_evidence_rejects_missing_artifact_hash_and_effect_drift() -> N
     for field, value, message in (
         ("input_contract_sha256", "e" * 64, "input contract"),
         ("scenario_type", "turbulence", "scenario type"),
-        ("candidate_id", "other-baseline", "fixed baseline"),
+        ("candidate_id", "other-baseline", "server-observed baseline"),
     ):
         payload = observation.model_dump(mode="python")
         trials = list(payload["trials"])

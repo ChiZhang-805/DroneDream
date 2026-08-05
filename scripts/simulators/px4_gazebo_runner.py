@@ -3120,6 +3120,12 @@ def _collect_artifacts(run_dir: Path) -> list[dict[str, Any]]:
             "application/json",
         ),
         _artifact_record(
+            run_dir / "px4_parameters.applied.json",
+            "px4_parameter_evidence_json",
+            "Verified PX4 Parameter Readback",
+            "application/json",
+        ),
+        _artifact_record(
             run_dir / "launch_config.json",
             "simulator_launch_config_json",
             "Simulator Launch Configuration",
