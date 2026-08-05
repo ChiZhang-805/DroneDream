@@ -1,0 +1,175 @@
+{
+  "schemaVersion": "dronedream.product-production-deployment.v1",
+  "generatedAt": "2026-08-05T12:09:02.9456019Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "b36b394e3ec753c5a6ac999b622bc9b76aa2bcd4",
+    "subjectTree": "b119850e90c0e5063de1cbdb6294ee518a30936c",
+    "deployTag": "website-deploy-1.0.0-20260805-b36b394",
+    "deploymentPerformed": true,
+    "githubPagesDeploymentPerformed": true,
+    "aliyunDeploymentPerformed": true,
+    "githubReleaseAssetMutationPerformed": false,
+    "supabaseDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "paymentOrModelProductionMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "change": {
+    "productRoute": "/product/",
+    "priceRoute": "/pricing/",
+    "productEditions": [
+      "Sim",
+      "Lab",
+      "Field"
+    ],
+    "topDownloadContract": "Universal only and disabled until an exact release-ready Universal handoff exists",
+    "currentPreviewContract": "The existing unsigned 1.0.0 preview remains a separate explicitly labelled entry"
+  },
+  "preDeploymentValidation": {
+    "focusedProductTests": {
+      "files": 3,
+      "tests": 26,
+      "passed": 26,
+      "failed": 0
+    },
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed"
+  },
+  "sharedArtifact": {
+    "buildCount": 1,
+    "sourceCommit": "b36b394e3ec753c5a6ac999b622bc9b76aa2bcd4",
+    "workflowRunId": 31001469939,
+    "workflowRunUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/31001469939",
+    "buildJobId": 92291123744,
+    "deployJobId": 92291368447,
+    "artifactId": 8928453370,
+    "artifactName": "dronedream-site-b36b394e3ec753c5a6ac999b622bc9b76aa2bcd4",
+    "artifactBytes": 29727875,
+    "artifactDigest": "sha256:1d25e603f82d281b632b5f5dc75949681062c6cfd12c88a77c86b7c42912578d",
+    "pagesArtifactId": 8928454834,
+    "pagesArtifactBytes": 29724345,
+    "pagesArtifactDigest": "sha256:bb01942123c21cae0bd433716eae0fdd85cb8b71ee0572fb0858ed5f7845d98c",
+    "buildManifestSha256": "89fd3afc5f4d899e3e24ffeb9046b06cbf5c9d6f016ff80138c14169f6ec76f7",
+    "sha256SumsSha256": "14b4c812df40604453f5fa290544371bdb476ed9e4370d81465d01451631b152",
+    "deploymentRule": "GitHub Actions built the artifact once; the exact downloaded and verified artifact was deployed to Aliyun without rebuilding"
+  },
+  "deployments": {
+    "githubPages": {
+      "runId": 31001469939,
+      "status": "success",
+      "sourceCommit": "b36b394e3ec753c5a6ac999b622bc9b76aa2bcd4",
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredEnvironmentPolicy": {
+        "count": 1,
+        "id": 55186327,
+        "name": "main",
+        "type": "branch"
+      }
+    },
+    "aliyun": {
+      "server": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260805T120156Z",
+      "previousRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260805T045722Z",
+      "atomicSwitch": true,
+      "rollbackRetained": true,
+      "candidateCleared": true,
+      "remoteStagingCleared": true,
+      "nginxConfigTest": "passed"
+    }
+  },
+  "publicParity": {
+    "origins": [
+      "http://getdronedream.com",
+      "http://47.93.180.216"
+    ],
+    "sourceCommit": "b36b394e3ec753c5a6ac999b622bc9b76aa2bcd4",
+    "buildManifestSha256": "89fd3afc5f4d899e3e24ffeb9046b06cbf5c9d6f016ff80138c14169f6ec76f7",
+    "sha256SumsSha256": "14b4c812df40604453f5fa290544371bdb476ed9e4370d81465d01451631b152",
+    "verifiedHtmlJsCssAndReleaseMetadataPaths": 44,
+    "byteParity": true
+  },
+  "onlineBrowserAudit": {
+    "browser": "Microsoft Edge 151.0.4129.59",
+    "viewports": [
+      "1440x1000",
+      "2048x1280",
+      "760x1000",
+      "390x844"
+    ],
+    "locales": [
+      "en",
+      "zh-CN"
+    ],
+    "githubPages": {
+      "checks": 8,
+      "passed": 8,
+      "failed": 0,
+      "auditSha256": "68fffe1271a365f7d32a5bd1c5bee9c09149dccb164d63df13bc7b993ceb5f4c"
+    },
+    "aliyun": {
+      "checks": 8,
+      "passed": 8,
+      "failed": 0,
+      "auditSha256": "201148347523f26ddcf726c5c63cf8b07b11efe2a2b58a1fd434c9c264411a47"
+    },
+    "assertions": {
+      "productAndPriceNavigation": "passed",
+      "threeEditionCards": "passed",
+      "desktopCardAlignment": "passed",
+      "universalDisabled": "passed",
+      "editionDownloadsDisabled": "passed",
+      "currentPreviewSeparate": "passed",
+      "dialogs": 0,
+      "horizontalOverflow": 0,
+      "keyboardAndAria": "passed"
+    },
+    "representativeScreenshots": {
+      "pagesEnglishDesktopSha256": "202d6f8f3dc571ac5699512861264ef2efa0482ddca728e473904188f76cfe05",
+      "pagesChineseMobileSha256": "be2a3a3bdd643c8e63f5ad9533d586856288ba84bc7da79757e3c6c671a48be7",
+      "aliyunEnglishDesktopSha256": "202d6f8f3dc571ac5699512861264ef2efa0482ddca728e473904188f76cfe05",
+      "aliyunChineseMobileSha256": "be2a3a3bdd643c8e63f5ad9533d586856288ba84bc7da79757e3c6c671a48be7"
+    },
+    "visualInspection": "passed; cards are aligned and concise on desktop, mobile headings and actions are not clipped, and the disabled edition state remains clear"
+  },
+  "downloadAvailability": {
+    "universal": "disabled-no-exact-handoff",
+    "sim": "disabled-no-release-ready-handoff",
+    "lab": "disabled-no-exact-handoff",
+    "field": "disabled-no-exact-handoff",
+    "currentUnsignedPreview": {
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "sha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "separateFromEditionReleases": true
+    }
+  },
+  "remainingExternalGates": {
+    "tls": {
+      "status": "not complete",
+      "pagesProtectedDomainState": "verified",
+      "certificateState": "authorization_created",
+      "curlExitCode": 60,
+      "curlError": "SEC_E_WRONG_PRINCIPAL",
+      "httpsEnforced": false,
+      "conclusion": "HTTP production is live and byte-identical; HTTPS is not claimed complete"
+    },
+    "supabase": "Functions, migrations, Secrets, and production database state were not changed",
+    "payments": "Production payment configuration was not changed",
+    "editionAssets": "Universal, Sim, Lab, and Field remain fail-closed until separate exact handoffs pass the website verifier",
+    "brandAssets": "No edition icon was created or consumed from the concept work directory"
+  },
+  "repositoryGovernance": {
+    "forcePushPerformed": false,
+    "mainMergePerformed": false,
+    "manualAndPdfDraftsExcluded": true,
+    "workDirectoryExcluded": true
+  }
+}
