@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+LAB_EDITION = ROOT / "distribution" / "editions" / "lab.v1.json"
 TOOLS = ROOT / "distribution" / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
@@ -77,6 +79,16 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
         self.assertFalse(schema["additionalProperties"])
         self.assertEqual(schema["properties"]["kind"]["const"], "dronedream-lab-preview-artifact-receipt")
+
+    def test_lab_manifest_has_independent_chinese_copy(self) -> None:
+        manifest = json.loads(LAB_EDITION.read_text(encoding="utf-8"))
+        self.assertEqual(manifest["displayName"]["zh-CN"], "DroneDream 实验室版")
+        self.assertEqual(
+            manifest["description"]["zh-CN"],
+            "统一提供仿真、HITL 与真机实验，但所有真机能力都必须通过 native、Runtime 与后端三层安全门。",
+        )
+        self.assertNotEqual(manifest["displayName"]["zh-CN"], manifest["displayName"]["en"])
+        self.assertNotEqual(manifest["description"]["zh-CN"], manifest["description"]["en"])
 
     def test_lab_preinstall_acceptance_is_read_only_and_blocked_without_real_receipt(self) -> None:
         result = lab_preinstall.evaluate_preinstall()
