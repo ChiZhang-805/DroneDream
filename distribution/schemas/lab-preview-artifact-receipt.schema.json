@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dronedream.local/schemas/lab-preview-artifact-receipt.v1.json",
-  "title": "DroneDream Lab preview artifact receipt",
+  "title": "DroneDream · LAB preview artifact receipt",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -17,6 +17,7 @@
     "commonCoreHash",
     "editionManifest",
     "profile",
+    "brand",
     "workspaces",
     "moduleGraph",
     "payload",
@@ -39,6 +40,26 @@
     "commonCoreHash": {"$ref": "#/$defs/sha256"},
     "editionManifest": {"$ref": "#/$defs/fileRef"},
     "profile": {"$ref": "#/$defs/fileRef"},
+    "brand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "displayName",
+        "sourceManifest",
+        "mark",
+        "dotLockup",
+        "installerIcon",
+        "grantsHardwareAuthority"
+      ],
+      "properties": {
+        "displayName": {"const": "DroneDream · LAB"},
+        "sourceManifest": {"$ref": "#/$defs/fileRef"},
+        "mark": {"$ref": "#/$defs/fileRef"},
+        "dotLockup": {"$ref": "#/$defs/fileRef"},
+        "installerIcon": {"$ref": "#/$defs/fileRef"},
+        "grantsHardwareAuthority": {"const": false}
+      }
+    },
     "workspaces": {
       "type": "object",
       "additionalProperties": false,

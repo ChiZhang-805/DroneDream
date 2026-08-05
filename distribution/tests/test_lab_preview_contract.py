@@ -68,6 +68,17 @@ class LabPreviewContractTests(unittest.TestCase):
         with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "authority"):
             lab_artifact.validate_receipt(receipt)
 
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["brand"]["grantsHardwareAuthority"] = True
+        with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "visual brand"):
+            lab_artifact.validate_receipt(receipt)
+
+    def test_lab_artifact_receipt_rejects_brand_asset_drift(self) -> None:
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["brand"]["installerIcon"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "installerIcon"):
+            lab_artifact.validate_receipt(receipt)
+
     def test_lab_artifact_receipt_rejects_field_or_universal_bootstrapper_mixing(self) -> None:
         receipt = lab_artifact.fake_lab_preview_receipt()
         receipt["moduleGraph"]["gatedHardwareAdapter"].append("runtime-base-field-lightweight")

@@ -33,6 +33,13 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError("Lab preview profile identity is unsupported")
     if profile.get("editionId") != "lab" or profile.get("state") != "source-contract-only":
         raise LabPreviewContractError("Lab preview profile overstates implementation state")
+    authority = profile.get("authority")
+    if (
+        not isinstance(authority, dict)
+        or authority.get("brandSourceManifest")
+        != "distribution/editions/lab/brand-source-manifest.v1.json"
+    ):
+        raise LabPreviewContractError("Lab preview brand source authority is missing")
 
     common_core = profile.get("commonCore")
     if not isinstance(common_core, dict):
@@ -123,6 +130,19 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError("Lab preview artifact filename drifted")
     if payload.get("tauriConfigOverlay") != "desktop/src-tauri/tauri.lab-preview.conf.json":
         raise LabPreviewContractError("Lab preview Tauri overlay path drifted")
+    brand = payload.get("brand")
+    if (
+        not isinstance(brand, dict)
+        or brand.get("displayName") != "DroneDream · LAB"
+        or brand.get("sourceManifest")
+        != "distribution/editions/lab/brand-source-manifest.v1.json"
+        or brand.get("applicationLockup")
+        != "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png"
+        or brand.get("windowsIcon")
+        != "distribution/editions/lab/assets/desktop/icon.ico"
+        or brand.get("grantsHardwareAuthority") is not False
+    ):
+        raise LabPreviewContractError("Lab preview brand payload drifted or grants authority")
     if (
         payload.get("artifactReceiptSchema")
         != "distribution/schemas/lab-preview-artifact-receipt.schema.json"
@@ -193,13 +213,31 @@ def verify_lab_preview_contract() -> dict[str, object]:
     ):
         raise LabPreviewContractError("Lab preview frontend boundary drifted")
 
-    if overlay.get("productName") != "DroneDream Lab":
+    if overlay.get("productName") != "DroneDream · LAB":
         raise LabPreviewContractError("Lab Tauri overlay must create a distinct product name")
     if overlay.get("identifier") == "io.dronedream.desktop":
         raise LabPreviewContractError("Lab Tauri overlay must not reuse the base app identifier")
     resources = overlay.get("bundle", {}).get("resources", {}) if isinstance(overlay.get("bundle"), dict) else {}
     if not isinstance(resources, dict) or "../../distribution/build-profiles/lab-preview.v1.json" not in resources:
         raise LabPreviewContractError("Lab Tauri overlay must bundle the source Lab profile")
+    bundle = overlay.get("bundle")
+    if not isinstance(bundle, dict) or tuple(bundle.get("icon", ())) != (
+        "../../distribution/editions/lab/assets/desktop/32x32.png",
+        "../../distribution/editions/lab/assets/desktop/128x128.png",
+        "../../distribution/editions/lab/assets/desktop/128x128@2x.png",
+        "../../distribution/editions/lab/assets/desktop/icon.ico",
+    ):
+        raise LabPreviewContractError("Lab Tauri overlay icon set drifted")
+    for required_brand_resource in (
+        "../../distribution/editions/lab/brand-source-manifest.v1.json",
+        "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
+        "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+    ):
+        if required_brand_resource not in resources:
+            raise LabPreviewContractError("Lab Tauri overlay brand resources are incomplete")
+    windows = overlay.get("app", {}).get("windows", []) if isinstance(overlay.get("app"), dict) else []
+    if not isinstance(windows, list) or not windows or windows[0].get("title") != "DroneDream · LAB":
+        raise LabPreviewContractError("Lab Tauri window title drifted")
 
     required_script_fragments = (
         'param(',
@@ -222,6 +260,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'tauriUpdaterSignature = "not-issued"',
         'VITE_DRONEDREAM_EDITION = "lab"',
         'Get-Sha256Text $coreListing.Trim()',
+        '$tauriProductName = "DroneDream · LAB"',
+        'brand-source-manifest.v1.json',
+        'grantsHardwareAuthority = $false',
     )
     for fragment in required_script_fragments:
         if fragment not in script:

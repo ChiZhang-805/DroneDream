@@ -46,9 +46,43 @@
       "copyMode": "exact-bytes"
     }
   ],
+  "derivation": {
+    "sourceRole": "mark",
+    "sourceSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+    "operation": "rgba-lanczos-resize-and-ico-container-only",
+    "designChanges": false,
+    "generatorPath": "distribution/editions/lab/build-brand-derivatives.py",
+    "generatorSha256": "52a03c8fbd775cb841b127503143eeebaa61f13b2c7144780c55a506110cc9a3",
+    "assets": [
+      {
+        "role": "desktop-32",
+        "repositoryPath": "distribution/editions/lab/assets/desktop/32x32.png",
+        "bytes": 2046,
+        "sha256": "fca69d87a8f7a68618eae06a791158ce47a2abc665b34be3d2ab111e1001ddd5"
+      },
+      {
+        "role": "desktop-128",
+        "repositoryPath": "distribution/editions/lab/assets/desktop/128x128.png",
+        "bytes": 11316,
+        "sha256": "0dcf0ae7449d21dcd27c5985a279ac17abd359aaa204b113e6ab45e6a02ad4f7"
+      },
+      {
+        "role": "desktop-256",
+        "repositoryPath": "distribution/editions/lab/assets/desktop/128x128@2x.png",
+        "bytes": 25495,
+        "sha256": "ebede2b419aff90be66ab607f3de52f8e98b7c2c37986408035b38f4aee3a36b"
+      },
+      {
+        "role": "windows-ico",
+        "repositoryPath": "distribution/editions/lab/assets/desktop/icon.ico",
+        "bytes": 52067,
+        "sha256": "4dcdd9792a810226cf898a0f85a67ee4d45dd2a1424eb46d8b1c5caae007424d"
+      }
+    ]
+  },
   "integration": {
     "application": "applied-compile-time-lab-only",
-    "installer": "source-ready-not-applied",
-    "shortcut": "source-ready-not-applied"
+    "installer": "applied-lab-overlay-not-built",
+    "shortcut": "applied-through-lab-executable-icon-not-built"
   }
 }

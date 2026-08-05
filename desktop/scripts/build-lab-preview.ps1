@@ -89,6 +89,7 @@ if (-not $OutputRoot) {
 }
 $outputRootFull = [IO.Path]::GetFullPath($OutputRoot)
 $artifactName = "DroneDream-Lab-1.0.0.exe"
+$tauriProductName = "DroneDream · LAB"
 $artifactPath = Join-Path $outputRootFull $artifactName
 $receiptPath = Join-Path $outputRootFull "lab-preview-receipt.json"
 
@@ -123,7 +124,7 @@ if ($postBuildCommit -cne $sourceCommit -or $postBuildStatus) {
 
 $bundleDirectory = Join-Path $repoRoot "desktop\src-tauri\target\release\bundle\nsis"
 $candidate = Get-ChildItem -LiteralPath $bundleDirectory -File -Filter "*.exe" |
-    Where-Object { $_.Name -match "^DroneDream Lab_1\.0\.0_.*setup\.exe$" } |
+    Where-Object { $_.Name -match ("^{0}_1\.0\.0_.*setup\.exe$" -f [regex]::Escape($tauriProductName)) } |
     Sort-Object LastWriteTimeUtc -Descending |
     Select-Object -First 1
 if (-not $candidate) {
@@ -148,6 +149,14 @@ $receipt = [ordered]@{
     commonCoreHash = $commonCoreHash
     editionManifest = New-RepoFileRef "distribution\editions\lab.v1.json"
     profile = New-RepoFileRef "distribution\build-profiles\lab-preview.v1.json"
+    brand = [ordered]@{
+        displayName = $tauriProductName
+        sourceManifest = New-RepoFileRef "distribution\editions\lab\brand-source-manifest.v1.json"
+        mark = New-RepoFileRef "distribution\editions\lab\assets\dronedream-lab-mark-v2.png"
+        dotLockup = New-RepoFileRef "distribution\editions\lab\assets\dronedream-lab-dot-lockup-v2.png"
+        installerIcon = New-RepoFileRef "distribution\editions\lab\assets\desktop\icon.ico"
+        grantsHardwareAuthority = $false
+    }
     workspaces = [ordered]@{
         simulation = [ordered]@{
             workspaceId = "simulation"

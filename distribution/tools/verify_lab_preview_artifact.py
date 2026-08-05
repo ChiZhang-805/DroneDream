@@ -16,6 +16,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 EDITION_PATH = ROOT / "distribution/editions/lab.v1.json"
+BRAND_MANIFEST_PATH = ROOT / "distribution/editions/lab/brand-source-manifest.v1.json"
+BRAND_MARK_PATH = ROOT / "distribution/editions/lab/assets/dronedream-lab-mark-v2.png"
+BRAND_LOCKUP_PATH = ROOT / "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png"
+BRAND_ICON_PATH = ROOT / "distribution/editions/lab/assets/desktop/icon.ico"
 VEHICLE_PACK_PATH = ROOT / "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json"
 LICENSE_NOTICE_PATH = ROOT / "runtime/THIRD_PARTY_NOTICES.md"
 PAYLOAD_PATH = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
@@ -170,6 +174,14 @@ def fake_lab_preview_receipt(
         "commonCoreHash": common_core_hash_value,
         "editionManifest": _file_ref(EDITION_PATH),
         "profile": _file_ref(PROFILE_PATH),
+        "brand": {
+            "displayName": "DroneDream · LAB",
+            "sourceManifest": _file_ref(BRAND_MANIFEST_PATH),
+            "mark": _file_ref(BRAND_MARK_PATH),
+            "dotLockup": _file_ref(BRAND_LOCKUP_PATH),
+            "installerIcon": _file_ref(BRAND_ICON_PATH),
+            "grantsHardwareAuthority": False,
+        },
         "workspaces": {
             "simulation": {
                 "workspaceId": "simulation",
@@ -250,6 +262,7 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
             "commonCoreHash",
             "editionManifest",
             "profile",
+            "brand",
             "workspaces",
             "moduleGraph",
             "payload",
@@ -294,6 +307,32 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
         ref = _exact_keys(document[label], {"path", "sha256"}, label)
         if ref["path"] != _repo_path(path) or ref["sha256"] != _sha256_file(path):
             raise LabPreviewArtifactError(f"{label} does not match the active Lab contract")
+
+    brand = _exact_keys(
+        document["brand"],
+        {
+            "displayName",
+            "sourceManifest",
+            "mark",
+            "dotLockup",
+            "installerIcon",
+            "grantsHardwareAuthority",
+        },
+        "brand",
+    )
+    if brand["displayName"] != "DroneDream · LAB":
+        raise LabPreviewArtifactError("Lab brand display name drifted")
+    if brand["grantsHardwareAuthority"] is not False:
+        raise LabPreviewArtifactError("Lab visual brand cannot grant hardware authority")
+    for label, path in (
+        ("sourceManifest", BRAND_MANIFEST_PATH),
+        ("mark", BRAND_MARK_PATH),
+        ("dotLockup", BRAND_LOCKUP_PATH),
+        ("installerIcon", BRAND_ICON_PATH),
+    ):
+        ref = _exact_keys(brand[label], {"path", "sha256"}, f"brand.{label}")
+        if ref != _file_ref(path):
+            raise LabPreviewArtifactError(f"brand.{label} does not match approved Lab assets")
 
     try:
         computed_core_hash = common_core_hash(document["commonCoreCommit"])

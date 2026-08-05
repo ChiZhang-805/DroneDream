@@ -7,6 +7,7 @@
   "state": "source-contract-only",
   "authority": {
     "editionManifest": "distribution/editions/lab.v1.json",
+    "brandSourceManifest": "distribution/editions/lab/brand-source-manifest.v1.json",
     "buildRequest": "distribution/build-planning/e4-request.v1.json",
     "buildPlan": "distribution/build-plans/software-1.0.0-065382b68bfa.v1.json",
     "capabilityPolicy": "distribution/capabilities/core-capabilities.v1.json",
@@ -119,6 +120,13 @@
     "firmwareFamily": "px4",
     "qualificationReceiptRequired": true,
     "runtimeProfile": "full-lab",
+    "brand": {
+      "displayName": "DroneDream · LAB",
+      "sourceManifest": "distribution/editions/lab/brand-source-manifest.v1.json",
+      "applicationLockup": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+      "windowsIcon": "distribution/editions/lab/assets/desktop/icon.ico",
+      "grantsHardwareAuthority": false
+    },
     "simulationPayload": [
       "runtime-simulation",
       "simulator-gazebo-harmonic",
