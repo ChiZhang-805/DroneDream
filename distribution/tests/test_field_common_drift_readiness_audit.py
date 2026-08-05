@@ -4,6 +4,7 @@ import importlib.util
 import json
 import sys
 import unittest
+from copy import deepcopy
 from pathlib import Path
 from types import ModuleType
 
@@ -100,6 +101,38 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertNotIn("field.common-core-backflow.pending", receipt["blockers"])
         self.assertIn("build DroneDream-Field-1.0.0.exe", receipt["prohibitedOperations"])
         self.assertIn("read OPENAI_API_KEY or provider credentials", receipt["prohibitedOperations"])
+
+    def test_desktop_preview_structure_binds_exact_brand_and_installer_inputs(self) -> None:
+        receipt = audit_tool.validate_field_preview_readiness_receipt(self.receipt)
+        structure = receipt["desktopPreviewStructure"]
+        self.assertTrue(structure["verified"])
+        self.assertEqual(structure["artifactBaseName"], "DroneDream-Field-1.0.0.exe")
+        self.assertEqual(structure["frontendDist"], "../../frontend/field-dist")
+        self.assertEqual(structure["updaterManifestFilename"], "field-latest.json")
+        self.assertEqual(structure["simulatorReferences"], [])
+        self.assertEqual(structure["verificationErrors"], [])
+        self.assertTrue(all(structure["consumerChecks"].values()))
+        self.assertEqual(
+            {asset["assetId"]: asset["sha256"] for asset in structure["assets"]},
+            {
+                "field-mark":
+                    "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
+                "field-dot-lockup":
+                    "def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192",
+            },
+        )
+
+    def test_desktop_preview_structure_drift_is_rejected(self) -> None:
+        drifted = deepcopy(self.receipt)
+        drifted["desktopPreviewStructure"]["verified"] = False
+        drifted["desktopPreviewStructure"]["verificationErrors"] = [
+            "field.branding.hash-drift:fixture",
+        ]
+        with self.assertRaisesRegex(
+            audit_tool.FieldDriftReadinessAuditError,
+            "structure is not verified",
+        ):
+            audit_tool.validate_field_preview_readiness_receipt(drifted)
 
     def test_release_field_branch_is_observed_but_not_created(self) -> None:
         receipt = audit_tool.validate_field_preview_readiness_receipt(self.receipt)

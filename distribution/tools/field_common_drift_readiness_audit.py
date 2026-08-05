@@ -35,14 +35,29 @@ ENGINE_PROFILE_BACKFLOW_PATHS = {
     "runtime/scripts/edition-safety-gate.py",
 }
 FIELD_CONTRACT_PREFIXES = (
+    "desktop/scripts/verify-field-",
+    "desktop/src-tauri/tauri.field.",
+    "distribution/editions/field/",
     "distribution/schemas/field-",
     "distribution/tests/test_field_",
     "distribution/tools/field_",
+    "frontend/field.html",
+    "frontend/src/__tests__/Field",
     "frontend/src/__tests__/field",
     "frontend/src/field/",
+    "frontend/vite.field.",
 )
-FIELD_EDITION_PATHS = {"distribution/runtime-contract-registry.v1.json"}
+FIELD_EDITION_PATHS = {
+    "desktop/package.json",
+    "distribution/editions/field.v1.json",
+    "distribution/runtime-contract-registry.v1.json",
+    "frontend/package.json",
+}
 PROTECTED_EVIDENCE_PREFIXES = ("artifacts/test-runs/",)
+FIELD_BRANDING_MANIFEST = Path("distribution/editions/field/branding/source-manifest.v1.json")
+FIELD_TAURI_CONFIG = Path("desktop/src-tauri/tauri.field.conf.json")
+FIELD_FRONTEND_APP = Path("frontend/src/field/FieldApp.tsx")
+FIELD_VITE_CONFIG = Path("frontend/vite.field.config.ts")
 
 
 class FieldDriftReadinessAuditError(ValueError):
@@ -206,6 +221,111 @@ def registry_summary(repo_root: Path) -> dict[str, Any]:
     }
 
 
+def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
+    manifest_path = repo_root / FIELD_BRANDING_MANIFEST
+    manifest = load_json(manifest_path)
+    tauri = load_json(repo_root / FIELD_TAURI_CONFIG)
+    edition = load_json(repo_root / "distribution" / "editions" / "field.v1.json")
+    app_source = (repo_root / FIELD_FRONTEND_APP).read_text(encoding="utf-8")
+    vite_source = (repo_root / FIELD_VITE_CONFIG).read_text(encoding="utf-8")
+
+    verification_errors: list[str] = []
+    assets = []
+    for asset in manifest.get("assets", []):
+        target_path = Path(asset["targetPath"])
+        target = repo_root / target_path
+        actual_sha256 = sha256_file(target) if target.is_file() else ""
+        hash_matches_source = (
+            actual_sha256 == asset.get("sourceSha256") == asset.get("targetSha256")
+        )
+        size_matches = target.is_file() and target.stat().st_size == asset.get("sizeBytes")
+        transformations_empty = asset.get("transformations") == []
+        if not hash_matches_source:
+            verification_errors.append(f"field.branding.hash-drift:{target_path.as_posix()}")
+        if not size_matches:
+            verification_errors.append(f"field.branding.size-drift:{target_path.as_posix()}")
+        if not transformations_empty:
+            verification_errors.append(
+                f"field.branding.transformation-declared:{target_path.as_posix()}"
+            )
+        assets.append(
+            {
+                "assetId": asset["assetId"],
+                "path": target_path.as_posix(),
+                "sha256": actual_sha256,
+                "sizeBytes": target.stat().st_size if target.is_file() else 0,
+                "hashMatchesSource": hash_matches_source,
+                "transformationsEmpty": transformations_empty,
+            }
+        )
+
+    expected_mark = "../../distribution/editions/field/branding/dronedream-field-mark.png"
+    expected_lockup = (
+        "../../distribution/editions/field/branding/dronedream-field-dot-lockup.png"
+    )
+    expected_manifest = (
+        "../../distribution/editions/field/branding/source-manifest.v1.json"
+    )
+    bundle = tauri.get("bundle", {})
+    resources = bundle.get("resources", {})
+    endpoint = tauri.get("plugins", {}).get("updater", {}).get("endpoints", [""])[0]
+    consumer_checks = {
+        "displayName": tauri.get("productName") == manifest.get("displayName"),
+        "windowTitle": tauri.get("app", {}).get("windows", [{}])[0].get("title")
+        == manifest.get("displayName"),
+        "frontendDotLockup": 'src="/dronedream-field-dot-lockup.png"' in app_source,
+        "frontendBrandingRoot": "../distribution/editions/field/branding" in vite_source,
+        "tauriIcon": bundle.get("icon") == [expected_mark],
+        "tauriResources": resources
+        == {
+            expected_mark: "branding/dronedream-field-mark.png",
+            expected_lockup: "branding/dronedream-field-dot-lockup.png",
+            expected_manifest: "branding/source-manifest.v1.json",
+        },
+        "fieldFrontendDist": tauri.get("build", {}).get("frontendDist")
+        == "../../frontend/field-dist",
+        "fieldUpdaterManifest": endpoint.endswith("/field-latest.json"),
+        "fieldArtifactBaseName": edition.get("artifactBaseName")
+        == "DroneDream-Field-1.0.0.exe",
+        "authorityRemainsFalse": 'data-authority="false"' in app_source,
+    }
+    for check, passed in consumer_checks.items():
+        if not passed:
+            verification_errors.append(f"field.desktop-consumer.invalid:{check}")
+
+    scanned_structure = json.dumps(
+        {
+            "build": tauri.get("build", {}),
+            "bundleIcon": bundle.get("icon", []),
+            "bundleResources": resources,
+            "updaterEndpoints": tauri.get("plugins", {}).get("updater", {}).get(
+                "endpoints", []
+            ),
+        },
+        sort_keys=True,
+    ).lower()
+    simulator_references = sorted(
+        token for token in ("gazebo", "hitl", "sitl", "simulator") if token in scanned_structure
+    )
+    if simulator_references:
+        verification_errors.append("field.desktop-structure.simulator-reference")
+
+    return {
+        "artifactBaseName": edition["artifactBaseName"],
+        "frontendDist": tauri["build"]["frontendDist"],
+        "updaterManifestFilename": "field-latest.json",
+        "brandManifestPath": FIELD_BRANDING_MANIFEST.as_posix(),
+        "brandManifestSha256": sha256_file(manifest_path),
+        "brandCommonCoreCommit": manifest["commonCoreCommit"],
+        "brandCopyPolicy": manifest["copyPolicy"],
+        "assets": assets,
+        "consumerChecks": consumer_checks,
+        "simulatorReferences": simulator_references,
+        "verificationErrors": verification_errors,
+        "verified": not verification_errors,
+    }
+
+
 def common_core_drift_audit(
     *,
     repo_root: Path = ROOT,
@@ -335,6 +455,7 @@ def field_preview_readiness_receipt(
     drift = common_core_drift_audit(repo_root=repo_root, base_ref=base_ref)
     registry = registry_summary(repo_root)
     release_branch = release_branch_state(repo_root)
+    desktop_structure = field_desktop_preview_structure(repo_root)
     blockers = [
         "field.preview-build.disabled-by-request",
         "field.exe-build.prohibited-in-this-audit",
@@ -350,6 +471,8 @@ def field_preview_readiness_receipt(
         blockers.append("field.source-tree.not-clean")
     if release_branch["localPresent"] or release_branch["originPresent"]:
         blockers.append("field.release-branch.present")
+    if not desktop_structure["verified"]:
+        blockers.append("field.desktop-preview-structure.invalid")
     receipt = {
         "schemaVersion": 1,
         "kind": RECEIPT_KIND,
@@ -368,6 +491,7 @@ def field_preview_readiness_receipt(
         "deviceEnumerationAllowed": False,
         "simulationAllowed": False,
         "registry": registry,
+        "desktopPreviewStructure": desktop_structure,
         "releaseBranch": release_branch,
         "prohibitedOperations": [
             "build DroneDream-Field-1.0.0.exe",
@@ -425,6 +549,18 @@ def validate_field_preview_readiness_receipt(document: dict[str, Any]) -> dict[s
             raise FieldDriftReadinessAuditError(f"Field preview readiness allowed {key}")
     if document["registry"]["validatedHardwarePackCount"] != 0:
         raise FieldDriftReadinessAuditError("Field preview readiness overstated validated packs")
+    structure = document["desktopPreviewStructure"]
+    if not structure["verified"] or structure["verificationErrors"]:
+        raise FieldDriftReadinessAuditError("Field desktop preview structure is not verified")
+    if structure["simulatorReferences"]:
+        raise FieldDriftReadinessAuditError("Field desktop preview structure references simulation")
+    if not all(structure["consumerChecks"].values()):
+        raise FieldDriftReadinessAuditError("Field desktop preview consumers drifted")
+    if len(structure["assets"]) != 2 or not all(
+        asset["hashMatchesSource"] and asset["transformationsEmpty"]
+        for asset in structure["assets"]
+    ):
+        raise FieldDriftReadinessAuditError("Field brand assets are not exact donor bytes")
     if "field.registry.zero-validated-packs" not in document["blockers"]:
         raise FieldDriftReadinessAuditError("Field preview readiness lost zero-pack blocker")
     if SHA256_RE.fullmatch(document["receiptSha256"]) is None:

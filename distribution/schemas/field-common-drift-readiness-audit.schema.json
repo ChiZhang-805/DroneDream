@@ -186,6 +186,69 @@
         }
       }
     },
+    "desktopBrandAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetId",
+        "path",
+        "sha256",
+        "sizeBytes",
+        "hashMatchesSource",
+        "transformationsEmpty"
+      ],
+      "properties": {
+        "assetId": {"enum": ["field-mark", "field-dot-lockup"]},
+        "path": {"type": "string", "minLength": 1, "maxLength": 256},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "sizeBytes": {"type": "integer", "minimum": 1},
+        "hashMatchesSource": {"const": true},
+        "transformationsEmpty": {"const": true}
+      }
+    },
+    "desktopPreviewStructure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactBaseName",
+        "frontendDist",
+        "updaterManifestFilename",
+        "brandManifestPath",
+        "brandManifestSha256",
+        "brandCommonCoreCommit",
+        "brandCopyPolicy",
+        "assets",
+        "consumerChecks",
+        "simulatorReferences",
+        "verificationErrors",
+        "verified"
+      ],
+      "properties": {
+        "artifactBaseName": {"const": "DroneDream-Field-1.0.0.exe"},
+        "frontendDist": {"const": "../../frontend/field-dist"},
+        "updaterManifestFilename": {"const": "field-latest.json"},
+        "brandManifestPath": {
+          "const": "distribution/editions/field/branding/source-manifest.v1.json"
+        },
+        "brandManifestSha256": {"$ref": "#/$defs/sha256"},
+        "brandCommonCoreCommit": {"$ref": "#/$defs/commit"},
+        "brandCopyPolicy": {"const": "byte-for-byte-no-transcode"},
+        "assets": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"$ref": "#/$defs/desktopBrandAsset"}
+        },
+        "consumerChecks": {
+          "type": "object",
+          "additionalProperties": {"const": true},
+          "minProperties": 1
+        },
+        "simulatorReferences": {"type": "array", "maxItems": 0, "items": false},
+        "verificationErrors": {"type": "array", "maxItems": 0, "items": false},
+        "verified": {"const": true}
+      }
+    },
     "fieldPreviewReadinessReceipt": {
       "type": "object",
       "additionalProperties": false,
@@ -202,6 +265,7 @@
         "deviceEnumerationAllowed",
         "simulationAllowed",
         "registry",
+        "desktopPreviewStructure",
         "releaseBranch",
         "prohibitedOperations",
         "blockers",
@@ -230,6 +294,7 @@
         "deviceEnumerationAllowed": {"const": false},
         "simulationAllowed": {"const": false},
         "registry": {"$ref": "#/$defs/registrySummary"},
+        "desktopPreviewStructure": {"$ref": "#/$defs/desktopPreviewStructure"},
         "releaseBranch": {
           "type": "object",
           "additionalProperties": false,
