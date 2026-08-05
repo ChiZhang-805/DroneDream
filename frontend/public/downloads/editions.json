@@ -47,6 +47,19 @@
       "sha256": null,
       "sourceCommit": null,
       "publishedAt": null
+    },
+    {
+      "id": "universal",
+      "releaseStatus": "planned-not-built",
+      "version": "1.0.0",
+      "fileName": "DroneDream-Universal-1.0.0.exe",
+      "downloadUrl": null,
+      "checksumUrl": null,
+      "signatureUrl": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "sourceCommit": null,
+      "publishedAt": null
     }
   ]
 }

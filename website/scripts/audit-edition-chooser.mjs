@@ -100,7 +100,7 @@ try {
         const actionRects = rects(".site-edition-action");
         const audienceLines = query(".site-edition-audience").map(lineCount);
         const editionLinks = query("a").filter((node) =>
-          /DroneDream-(Sim|Lab|Field)-1\.0\.0\.exe/u.test(node.getAttribute("href") ?? "")
+          /DroneDream-(Sim|Lab|Field|Universal)-1\.0\.0\.exe/u.test(node.getAttribute("href") ?? "")
         ).length;
         const currentPreviewLinks = query(".site-edition-current a").length;
         const documentWidth = Math.max(
@@ -135,7 +135,9 @@ try {
           audienceLines,
           editionLinks,
           currentPreviewLinks,
-          disabledActions: query(".site-edition-action:disabled").length,
+          disabledPrimaryActions: query(".site-edition-action:disabled").length,
+          universalRows: query(".site-edition-universal").length,
+          disabledUniversalActions: query(".site-edition-universal button:disabled").length,
         };
       }, { profileName: profile.name });
 
@@ -148,7 +150,9 @@ try {
         threeCards: metrics.cardCount === 3,
         noPlannedDownloadLinks: metrics.editionLinks === 0,
         currentPreviewDiscoverable: metrics.currentPreviewLinks === 1,
-        plannedActionsDisabled: metrics.disabledActions === 3,
+        plannedPrimaryActionsDisabled: metrics.disabledPrimaryActions === 3,
+        oneUniversalRow: metrics.universalRows === 1,
+        plannedUniversalActionDisabled: metrics.disabledUniversalActions === 1,
         audienceSingleLine: metrics.audienceLines.every((count) => count === 1),
         desktopWidth: profile.name !== "desktop"
           || (metrics.dialog.width >= 760 && metrics.dialog.width <= 860),

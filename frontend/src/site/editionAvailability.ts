@@ -1,6 +1,8 @@
-export const editionIds = ["sim", "lab", "field"] as const;
+export const primaryEditionIds = ["sim", "lab", "field"] as const;
+export const editionIds = [...primaryEditionIds, "universal"] as const;
 
 export type EditionId = (typeof editionIds)[number];
+export type PrimaryEditionId = (typeof primaryEditionIds)[number];
 export type EditionReleaseStatus = "planned-not-built" | "published";
 
 export type EditionArtifact = {

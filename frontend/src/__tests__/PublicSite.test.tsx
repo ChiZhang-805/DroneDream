@@ -98,7 +98,10 @@ describe("DroneDream public website", () => {
     const editionDialog = screen.getByRole("dialog", { name: "Choose your edition" });
     expect(editionDialog).toBeVisible();
     expect(within(editionDialog).getAllByRole("radio")).toHaveLength(3);
-    expect(within(editionDialog).getAllByRole("button", { name: "Coming soon" })).toHaveLength(3);
+    expect(within(editionDialog).getAllByRole("button", { name: "Coming soon" })).toHaveLength(4);
+    expect(within(editionDialog).getByText(
+      "Not sure which fits? DroneDream Universal lets you switch workspaces later.",
+    )).toBeVisible();
     expect(within(editionDialog).getByRole("link", { name: "Download current preview" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
     fireEvent.keyDown(window, { key: "Escape" });
@@ -562,7 +565,10 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(screen.getByRole("button", { name: "下载 Windows 预览版" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "下载" }));
     const editionDialog = screen.getByRole("dialog", { name: "选择使用版本" });
-    expect(within(editionDialog).getAllByRole("button", { name: "准备中" })).toHaveLength(3);
+    expect(within(editionDialog).getAllByRole("button", { name: "准备中" })).toHaveLength(4);
+    expect(within(editionDialog).getByText(
+      "不确定选哪个？下载 DroneDream Universal，可稍后切换模式",
+    )).toBeVisible();
     expect(within(editionDialog).getByRole("link", { name: "下载当前内测版" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
     expect(screen.getByRole("link", { name: "代码签名政策" })).toBeVisible();

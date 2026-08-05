@@ -48,12 +48,16 @@ describe("EditionChooser", () => {
     const dialog = screen.getByRole("dialog", { name: "Choose your edition" });
 
     expect(within(dialog).getAllByRole("radio")).toHaveLength(3);
-    expect(within(dialog).getAllByRole("button", { name: "Coming soon" })).toHaveLength(3);
+    expect(within(dialog).getAllByRole("button", { name: "Coming soon" })).toHaveLength(4);
+    expect(within(dialog).getByText(
+      "Not sure which fits? DroneDream Universal lets you switch workspaces later.",
+    )).toBeVisible();
     expect(within(dialog).getByRole("link", { name: "Download current preview" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
     expect(container.querySelector(`a[href*="DroneDream-Sim-1.0.0.exe"]`)).toBeNull();
     expect(container.querySelector(`a[href*="DroneDream-Lab-1.0.0.exe"]`)).toBeNull();
     expect(container.querySelector(`a[href*="DroneDream-Field-1.0.0.exe"]`)).toBeNull();
+    expect(container.querySelector(`a[href*="DroneDream-Universal-1.0.0.exe"]`)).toBeNull();
   });
 
   it("supports roving arrow, Home, and End keyboard selection", () => {
@@ -84,6 +88,30 @@ describe("EditionChooser", () => {
       .toHaveAttribute("href", "/downloads/DroneDream-Sim-1.0.0.exe");
     expect(within(dialog).getByRole("link", { name: "Confirm download" }))
       .toHaveAttribute("download", "DroneDream-Sim-1.0.0.exe");
+  });
+
+  it("keeps Universal outside the three-card grid and requires explicit confirmation", () => {
+    const document = structuredClone(fallbackEditionAvailability);
+    const universal = document.editions.find(({ id }) => id === "universal")!;
+    universal.releaseStatus = "published";
+    universal.downloadUrl = "/downloads/DroneDream-Universal-1.0.0.exe";
+    universal.checksumUrl = "/downloads/DroneDream-Universal-1.0.0.exe.sha256";
+    universal.signatureUrl = "/downloads/DroneDream-Universal-1.0.0.exe.sig";
+    universal.sizeBytes = 12_345_678;
+    universal.sha256 = "c".repeat(64);
+    universal.sourceCommit = "d".repeat(40);
+    universal.publishedAt = "2026-08-05";
+
+    renderChooser(document);
+    const dialog = screen.getByRole("dialog", { name: "Choose your edition" });
+    expect(within(dialog).getAllByRole("radio")).toHaveLength(3);
+    expect(within(dialog).queryByRole("link", { name: "Confirm download" })).toBeNull();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Choose Universal" }));
+    expect(within(dialog).getByRole("link", { name: "Confirm download" }))
+      .toHaveAttribute("href", "/downloads/DroneDream-Universal-1.0.0.exe");
+    expect(within(dialog).getByRole("link", { name: "Confirm download" }))
+      .toHaveAttribute("download", "DroneDream-Universal-1.0.0.exe");
   });
 
   it("closes only when the backdrop itself is clicked", () => {

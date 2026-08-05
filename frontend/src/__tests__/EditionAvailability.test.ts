@@ -23,17 +23,19 @@ function publishedAvailability(): EditionAvailabilityDocument {
 }
 
 describe("edition availability metadata", () => {
-  it("keeps the three planned editions ordered and unavailable", () => {
+  it("keeps the three primary editions plus Universal ordered and unavailable", () => {
     expect(isEditionAvailabilityDocument(fallbackEditionAvailability)).toBe(true);
     expect(fallbackEditionAvailability.editions.map(({ id }) => id)).toEqual([
       "sim",
       "lab",
       "field",
+      "universal",
     ]);
     expect(fallbackEditionAvailability.editions.map(({ fileName }) => fileName)).toEqual([
       "DroneDream-Sim-1.0.0.exe",
       "DroneDream-Lab-1.0.0.exe",
       "DroneDream-Field-1.0.0.exe",
+      "DroneDream-Universal-1.0.0.exe",
     ]);
     expect(fallbackEditionAvailability.editions.every((edition) => (
       edition.downloadUrl === null && !isEditionDownloadReady(edition)

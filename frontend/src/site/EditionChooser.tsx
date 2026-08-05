@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 import {
   isEditionDownloadReady,
+  primaryEditionIds,
   type EditionAvailabilityDocument,
   type EditionId,
+  type PrimaryEditionId,
 } from "./editionAvailability";
 import type { WebsiteRelease } from "./release";
 
@@ -27,6 +29,8 @@ const chooserCopy = {
     confirm: "Confirm download",
     soon: "Coming soon",
     vehiclePacks: "Vehicle packs are configured later; none are validated yet.",
+    universal: "Not sure which fits? DroneDream Universal lets you switch workspaces later.",
+    chooseUniversal: "Choose Universal",
     currentTitle: "Current preview",
     currentBody: "The existing unsigned 1.0.0 preview remains available.",
     currentAction: "Download current preview",
@@ -57,6 +61,8 @@ const chooserCopy = {
     confirm: "确认下载",
     soon: "准备中",
     vehiclePacks: "机型包稍后配置，目前尚无通过验证的版本",
+    universal: "不确定选哪个？下载 DroneDream Universal，可稍后切换模式",
+    chooseUniversal: "选择 Universal",
     currentTitle: "当前内测版",
     currentBody: "现有未签名 1.0.0 内测版仍可下载",
     currentAction: "下载当前内测版",
@@ -106,8 +112,17 @@ export function EditionChooser({
   open,
 }: EditionChooserProps) {
   const [selectedId, setSelectedId] = useState<EditionId | null>(null);
-  const choiceRefs = useRef(new Map<EditionId, HTMLButtonElement>());
+  const choiceRefs = useRef(new Map<PrimaryEditionId, HTMLButtonElement>());
   const copy = chooserCopy[locale];
+  const primaryEditions = availability.editions.filter(
+    (edition): edition is typeof edition & { id: PrimaryEditionId } => (
+      primaryEditionIds.includes(edition.id as PrimaryEditionId)
+    ),
+  );
+  const universalEdition = availability.editions.find(({ id }) => id === "universal");
+  const selectedPrimaryId = selectedId && primaryEditionIds.includes(selectedId as PrimaryEditionId)
+    ? selectedId as PrimaryEditionId
+    : null;
 
   useEffect(() => {
     if (open) setSelectedId(null);
@@ -117,24 +132,24 @@ export function EditionChooser({
 
   const moveSelection = (
     event: KeyboardEvent<HTMLButtonElement>,
-    currentId: EditionId,
+    currentId: PrimaryEditionId,
   ) => {
-    const currentIndex = availability.editions.findIndex(({ id }) => id === currentId);
+    const currentIndex = primaryEditions.findIndex(({ id }) => id === currentId);
     if (currentIndex < 0) return;
     let nextIndex: number;
     if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-      nextIndex = (currentIndex + 1) % availability.editions.length;
+      nextIndex = (currentIndex + 1) % primaryEditions.length;
     } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-      nextIndex = (currentIndex - 1 + availability.editions.length) % availability.editions.length;
+      nextIndex = (currentIndex - 1 + primaryEditions.length) % primaryEditions.length;
     } else if (event.key === "Home") {
       nextIndex = 0;
     } else if (event.key === "End") {
-      nextIndex = availability.editions.length - 1;
+      nextIndex = primaryEditions.length - 1;
     } else {
       return;
     }
     event.preventDefault();
-    const nextId = availability.editions[nextIndex]?.id;
+    const nextId = primaryEditions[nextIndex]?.id;
     if (!nextId) return;
     setSelectedId(nextId);
     choiceRefs.current.get(nextId)?.focus();
@@ -174,7 +189,7 @@ export function EditionChooser({
         </header>
 
         <div className="site-edition-grid" role="radiogroup" aria-label={copy.title}>
-          {availability.editions.map((edition) => {
+          {primaryEditions.map((edition) => {
             const editionCopy = copy.editions[edition.id];
             const selected = selectedId === edition.id;
             const ready = isEditionDownloadReady(edition);
@@ -194,8 +209,8 @@ export function EditionChooser({
                   className="site-edition-choice"
                   role="radio"
                   aria-checked={selected}
-                  tabIndex={selectedId === null
-                    ? (edition.id === availability.editions[0]?.id ? 0 : -1)
+                  tabIndex={selectedPrimaryId === null
+                    ? (edition.id === primaryEditions[0]?.id ? 0 : -1)
                     : (selected ? 0 : -1)}
                   onClick={() => setSelectedId(edition.id)}
                   onKeyDown={(event) => moveSelection(event, edition.id)}
@@ -234,6 +249,33 @@ export function EditionChooser({
             );
           })}
         </div>
+
+        {universalEdition ? (
+          <div
+            className="site-edition-universal"
+            data-ready={isEditionDownloadReady(universalEdition) || undefined}
+            data-selected={selectedId === universalEdition.id || undefined}
+          >
+            <span>{copy.universal}</span>
+            {isEditionDownloadReady(universalEdition) && selectedId === universalEdition.id ? (
+              <a
+                href={universalEdition.downloadUrl ?? undefined}
+                download={universalEdition.fileName}
+              >
+                <DownloadIcon />
+                {copy.confirm}
+              </a>
+            ) : (
+              <button
+                type="button"
+                disabled={!isEditionDownloadReady(universalEdition)}
+                onClick={() => setSelectedId(universalEdition.id)}
+              >
+                {isEditionDownloadReady(universalEdition) ? copy.chooseUniversal : copy.soon}
+              </button>
+            )}
+          </div>
+        ) : null}
 
         <p className="site-edition-pack-note">{copy.vehiclePacks}</p>
 

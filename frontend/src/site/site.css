@@ -484,6 +484,7 @@ html[lang="zh-CN"] .site-hero h1 {
 
 .site-edition-close svg,
 .site-edition-action svg,
+.site-edition-universal a svg,
 .site-edition-current a svg {
   width: 19px;
   height: 19px;
@@ -620,6 +621,55 @@ html[lang="zh-CN"] .site-hero h1 {
   cursor: not-allowed;
 }
 
+.site-edition-universal {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.85rem;
+  padding: 0.6rem 0.7rem 0.6rem 0.95rem;
+  border: 1px solid rgba(165, 70, 216, 0.16);
+  border-radius: 15px;
+  color: #555b70;
+  background: linear-gradient(105deg, rgba(101, 218, 247, 0.08), rgba(218, 78, 199, 0.075));
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.site-edition-universal > span {
+  min-width: 0;
+}
+
+.site-edition-universal button,
+.site-edition-universal a {
+  display: inline-flex;
+  min-height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.38rem;
+  padding: 0.48rem 0.72rem;
+  border: 0;
+  border-radius: 10px;
+  color: #7432a0;
+  background: rgba(255, 255, 255, 0.82);
+  font: 740 0.74rem/1.2 inherit;
+  text-decoration: none;
+}
+
+.site-edition-universal button:disabled {
+  color: #817886;
+  background: rgba(235, 231, 237, 0.9);
+  cursor: not-allowed;
+}
+
+.site-edition-universal button:focus-visible,
+.site-edition-universal a:focus-visible {
+  outline: 3px solid rgba(71, 190, 255, 0.72);
+  outline-offset: 2px;
+}
+
 .site-edition-pack-note {
   margin: 0.9rem 0 0;
   color: #777b8d;
@@ -735,6 +785,18 @@ html[lang="zh-CN"] .site-hero h1 {
 
   .site-edition-pack-note {
     margin-top: 0.72rem;
+  }
+
+  .site-edition-universal {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.72rem;
+  }
+
+  .site-edition-universal button,
+  .site-edition-universal a {
+    width: 100%;
   }
 
   .site-edition-current {
