@@ -40,9 +40,14 @@ if ($sourceStatus) {
     throw "Lab preview builds require an exact clean source tree."
 }
 
-& git -C $repoRoot merge-base --is-ancestor origin/codex/software HEAD
+$commonCoreCommit = Invoke-GitText @("rev-parse", "--verify", "origin/codex/software")
+if ($commonCoreCommit -cnotmatch "^[0-9a-f]{40}$") {
+    throw "Unable to freeze the observed Universal/Core commit."
+}
+
+& git -C $repoRoot merge-base --is-ancestor $commonCoreCommit HEAD
 if ($LASTEXITCODE -ne 0) {
-    throw "Lab preview source must descend from the observed origin/codex/software baseline."
+    throw "Lab preview source must descend from the observed Universal/Core baseline."
 }
 
 if ($env:TAURI_SIGNING_PRIVATE_KEY_PATH -or $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
@@ -67,7 +72,7 @@ $artifactPath = Join-Path $outputRootFull $artifactName
 $receiptPath = Join-Path $outputRootFull "lab-preview-receipt.json"
 
 $corePaths = @("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
-$coreListing = (& git -C $repoRoot ls-tree -r --full-tree $sourceCommit -- @corePaths | Out-String)
+$coreListing = (& git -C $repoRoot ls-tree -r --full-tree $commonCoreCommit -- @corePaths | Out-String)
 if ($LASTEXITCODE -ne 0 -or -not $coreListing.Trim()) {
     throw "Unable to compute the Lab preview common-core hash."
 }
@@ -115,6 +120,7 @@ $receipt = [ordered]@{
     productDisplayVersion = "1.0.0"
     sourceCommit = $sourceCommit
     branch = $branch
+    commonCoreCommit = $commonCoreCommit
     commonCoreHash = $commonCoreHash
     artifact = [ordered]@{
         fileName = $artifactName

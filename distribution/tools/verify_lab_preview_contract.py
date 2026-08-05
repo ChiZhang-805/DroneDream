@@ -37,6 +37,13 @@ def verify_lab_preview_contract() -> dict[str, object]:
     common_core = profile.get("commonCore")
     if not isinstance(common_core, dict):
         raise LabPreviewContractError("Lab preview common-core contract is missing")
+    if (
+        common_core.get("authorityName") != "Universal/Core"
+        or common_core.get("authorityBranch") != "codex/software"
+        or common_core.get("simIsCommonAuthority") is not False
+        or common_core.get("hashSource") != "observed origin/codex/software commit, not Lab branch HEAD"
+    ):
+        raise LabPreviewContractError("Lab preview common-core authority drifted")
     if common_core.get("reuseOnly") is not True or common_core.get("forkOrCopyAllowed") is not False:
         raise LabPreviewContractError("Lab preview must reuse the common core without source forks")
     if tuple(common_core.get("paths", ())) != (
@@ -48,6 +55,17 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "worker",
     ):
         raise LabPreviewContractError("Lab preview common-core path set drifted")
+    if tuple(common_core.get("receiptFields", ())) != ("commonCoreCommit", "commonCoreHash"):
+        raise LabPreviewContractError("Lab preview receipts must bind the common core commit and hash")
+
+    if tuple(profile.get("labDeltaPaths", ())) != (
+        "desktop/scripts/build-lab-preview.ps1",
+        "desktop/src-tauri/tauri.lab-preview.conf.json",
+        "distribution/build-profiles/lab-preview.v1.json",
+        "distribution/tests/test_lab_preview_contract.py",
+        "distribution/tools/verify_lab_preview_contract.py",
+    ):
+        raise LabPreviewContractError("Lab preview delta paths drifted")
 
     payload = profile.get("editionPayload")
     if not isinstance(payload, dict):
@@ -64,6 +82,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError("Lab preview guard, signature, or safety policy is missing")
     for key in (
         "requiresExactCleanSource",
+        "requiresUniversalCoreAncestor",
         "requiresOriginSoftwareAncestor",
         "forbidRepositoryTargetDirectory",
         "forbidReleaseBranchCreation",
@@ -98,13 +117,15 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'param(',
         '[switch]$Build',
         'status", "--porcelain=v1", "--untracked-files=all',
-        'merge-base --is-ancestor origin/codex/software HEAD',
+        '$commonCoreCommit = Invoke-GitText @("rev-parse", "--verify", "origin/codex/software")',
+        'merge-base --is-ancestor $commonCoreCommit HEAD',
         'TAURI_SIGNING_PRIVATE_KEY_PATH',
         'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',
         'DroneDream\\codex-cache\\lab-cargo-target',
         'desktop\\src-tauri\\target',
         'Lab preview contract verified',
         'Pass -Build to create the unsigned internal preview',
+        'commonCoreCommit = $commonCoreCommit',
         'authenticode',
         'tauriUpdaterSignature = "not-issued"',
         'hardwareActionsFailClosed = $true',

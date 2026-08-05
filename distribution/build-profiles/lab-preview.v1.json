@@ -15,6 +15,10 @@
     "licenseNotice": "runtime/THIRD_PARTY_NOTICES.md"
   },
   "commonCore": {
+    "authorityName": "Universal/Core",
+    "authorityBranch": "codex/software",
+    "simIsCommonAuthority": false,
+    "hashSource": "observed origin/codex/software commit, not Lab branch HEAD",
     "reuseOnly": true,
     "forkOrCopyAllowed": false,
     "paths": [
@@ -25,8 +29,19 @@
       "runtime",
       "worker"
     ],
-    "publicFixesMustReturnToCore": true
+    "publicFixesMustReturnToCore": true,
+    "receiptFields": [
+      "commonCoreCommit",
+      "commonCoreHash"
+    ]
   },
+  "labDeltaPaths": [
+    "desktop/scripts/build-lab-preview.ps1",
+    "desktop/src-tauri/tauri.lab-preview.conf.json",
+    "distribution/build-profiles/lab-preview.v1.json",
+    "distribution/tests/test_lab_preview_contract.py",
+    "distribution/tools/verify_lab_preview_contract.py"
+  ],
   "editionPayload": {
     "artifactFileName": "DroneDream-Lab-1.0.0.exe",
     "tauriConfigOverlay": "desktop/src-tauri/tauri.lab-preview.conf.json",
@@ -49,6 +64,7 @@
   },
   "buildGuards": {
     "requiresExactCleanSource": true,
+    "requiresUniversalCoreAncestor": true,
     "requiresOriginSoftwareAncestor": true,
     "defaultCargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
     "forbidRepositoryTargetDirectory": true,
@@ -84,7 +100,7 @@
     "overlayInstall": "must preserve and verify existing owned runtime handoff before replacement",
     "uninstall": "must preserve separately owned DroneDreamRuntime and user data",
     "rollback": "must target a recorded previous verified promotion before production use",
-    "upgrade": "must bind source commit, common core hash, artifact hash, and receipt"
+    "upgrade": "must bind source commit, common core commit, common core hash, artifact hash, and receipt"
   },
   "previewBlockers": [
     "No real EXE has been built by this profile.",
