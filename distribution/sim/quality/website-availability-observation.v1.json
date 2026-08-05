@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-cross-line-test-observation",
+  "observationVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "observed-nonblocking-not-adopted",
+  "source": {
+    "simObservationCommit": "1a7f1dce1f4e8ebf2872ebf1b0e2307498465f20",
+    "websiteBranch": "origin/codex/website",
+    "websiteProductSourceCommit": "e3135fb482bc8dec60e45c91a5f2b4d94bf773c9",
+    "websiteEvidenceHead": "ad4bb392482094bdbee29ace3ec1bf8cc83ccd29",
+    "evidenceHeadIsProductSource": false,
+    "sourceAncestorOfEvidenceHead": true
+  },
+  "pathObservation": {
+    "simToWebsiteSourceChangedPathCount": 5,
+    "simToWebsiteSourceChangedPaths": [
+      "frontend/src/__tests__/PublicSite.test.tsx",
+      "frontend/src/site/CommunityPage.tsx",
+      "frontend/src/site/PricingPage.tsx",
+      "frontend/src/site/SiteApp.tsx",
+      "frontend/src/site/site.css"
+    ],
+    "relevantPathEvidence": [
+      {
+        "path": "frontend/src/__tests__/PublicSite.test.tsx",
+        "simBlob": "e92228af6ce22d8df0bb57f1d6f7ffe2cc2db458",
+        "websiteProductSourceBlob": "dbc39c13e48d372aad38ab16162fec4bfff8bc0b",
+        "websiteEvidenceBlob": "8ef84fe75180b9602f286e3dc98a8802b5523002",
+        "simToWebsiteSourcePatch": {
+          "sha256": "a611ef18ae1a34346dcf4c9353673ffe35673c48e6dfe656cf3d8c408fb193f6",
+          "bytes": 4590
+        },
+        "websiteSourceToEvidencePatch": {
+          "sha256": "2f64b3a6a3d8d299aa7abe03ac2c9c0561b3fdf013714ff1b8e4c110e74a0a04",
+          "bytes": 25833
+        }
+      },
+      {
+        "path": "frontend/src/site/PricingPage.tsx",
+        "simBlob": "857068cb44d587bd996b2fb6739b110a0e281a4b",
+        "websiteProductSourceBlob": "ca493e5060fae2c88622dd7a8b5fe657bc8fdb9c",
+        "websiteEvidenceBlob": "816805583595044453d0e36f427294dd88fde2d3",
+        "simToWebsiteSourcePatch": {
+          "sha256": "4f07463575bab251d51e9263050e0d21646d60faa56dc11eff3171400d7d3dc4",
+          "bytes": 14254
+        },
+        "websiteSourceToEvidencePatch": {
+          "sha256": "0e1c269e18669811ac274a0d9929136cb2149dc35fb4465527daaf17efd23e4a",
+          "bytes": 20728
+        }
+      }
+    ],
+    "websiteEvidenceStaticRefs": [
+      {
+        "path": "frontend/src/site/SiteApp.tsx",
+        "blob": "d6a59101629784f4877adbd20d10c9146fc088be"
+      },
+      {
+        "path": "frontend/src/features/settings/cloudModelAccess.ts",
+        "blob": "b6929d6369bab8518ff7dd6e4b49278423f64ecd"
+      }
+    ]
+  },
+  "testObservation": {
+    "simLocalPublicSite": {
+      "command": "npx --no-install vitest run src/__tests__/PublicSite.test.tsx",
+      "sourceCommit": "1a7f1dce1f4e8ebf2872ebf1b0e2307498465f20",
+      "testFiles": 1,
+      "tests": 13,
+      "passed": 12,
+      "failed": 1,
+      "failure": "expected-billing-availability-fetch-observed-download-manifest-only",
+      "executedBySim": true
+    },
+    "simLocalOwnedGate": {
+      "command": "npx --no-install vitest run src/__tests__/DistributionSetupPanel.test.tsx src/__tests__/SimEditionExperience.test.tsx src/__tests__/SimEditionProfile.test.ts",
+      "sourceCommit": "1a7f1dce1f4e8ebf2872ebf1b0e2307498465f20",
+      "testFiles": 3,
+      "tests": 13,
+      "passed": 13,
+      "failed": 0,
+      "executedBySim": true
+    },
+    "websiteHandoffPublicSite": {
+      "command": "npx vitest run src/__tests__/PublicSite.test.tsx",
+      "productSourceCommit": "e3135fb482bc8dec60e45c91a5f2b4d94bf773c9",
+      "evidenceHead": "ad4bb392482094bdbee29ace3ec1bf8cc83ccd29",
+      "tests": 20,
+      "passed": 20,
+      "failed": 0,
+      "handedOffByChiefControl": true,
+      "locallyReexecutedBySim": false
+    }
+  },
+  "ownershipClassification": {
+    "classification": "website-owned-newer-site-evolution-absent-from-sim-snapshot",
+    "ownerBranch": "codex/website",
+    "blocksSimOwnedGates": false,
+    "commonCoreFixRequiredOnSim": false,
+    "allowedDisposition": "observe-and-defer-to-website-or-formal-common-core-sync",
+    "forbiddenActions": [
+      "modify-frontend-src-site",
+      "modify-public-site-test",
+      "copy-website-evolution-into-sim",
+      "relabel-website-evidence-head-as-product-source",
+      "fail-sim-owned-gate-from-cross-line-observation"
+    ]
+  },
+  "execution": {
+    "websiteFilesModified": false,
+    "websiteChangesCopied": false,
+    "commonCoreBaselineUpdated": false,
+    "mergeExecuted": false,
+    "cherryPickExecuted": false,
+    "browserStarted": false,
+    "productionBuildExecuted": false,
+    "installerBuilt": false,
+    "releaseAssetClaimed": false
+  }
+}

@@ -12,6 +12,13 @@ ROOT = Path(__file__).resolve().parents[2]
 PLAN_PATH = (
     ROOT / "distribution" / "sim" / "lifecycle" / "yellow-execution-plan.v1.json"
 )
+WEBSITE_OBSERVATION_PATH = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "quality"
+    / "website-availability-observation.v1.json"
+)
 TOOL_PATH = ROOT / "distribution" / "sim" / "tools" / "sim_yellow_lifecycle.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_yellow_lifecycle", TOOL_PATH)
@@ -32,6 +39,11 @@ class SimYellowLifecycleTests(unittest.TestCase):
 
     def validate(self, document: object) -> dict[str, Any]:
         return sim_yellow.validate_execution_plan(document, repo_root=ROOT)
+
+    def validate_observation(self, document: object) -> dict[str, Any]:
+        return sim_yellow.validate_cross_line_test_observation(
+            document, repo_root=ROOT
+        )
 
     def inventory(self, *, stage: str = "yellow-3") -> dict[str, Any]:
         if stage == "yellow-2":
@@ -295,6 +307,76 @@ class SimYellowLifecycleTests(unittest.TestCase):
         registry["path"] = "HKCU/Software/DroneDream/DroneDream · FIELD"
         with self.assertRaisesRegex(sim_yellow.SimYellowLifecycleError, "registry"):
             sim_yellow.validate_owned_inventory(invalid, contract=self.contract)
+
+    def test_website_availability_failure_is_nonblocking_cross_line_observation(self) -> None:
+        observation = self.validate_observation(load_json(WEBSITE_OBSERVATION_PATH))
+        self.assertEqual(
+            observation["ownershipClassification"]["classification"],
+            "website-owned-newer-site-evolution-absent-from-sim-snapshot",
+        )
+        self.assertFalse(
+            observation["ownershipClassification"]["blocksSimOwnedGates"]
+        )
+        self.assertEqual(
+            observation["testObservation"]["simLocalOwnedGate"]["passed"], 13
+        )
+        self.assertEqual(
+            observation["testObservation"]["websiteHandoffPublicSite"]["passed"],
+            20,
+        )
+        self.assertFalse(
+            observation["testObservation"]["websiteHandoffPublicSite"][
+                "locallyReexecutedBySim"
+            ]
+        )
+
+    def test_rejects_cross_line_blob_patch_or_source_relabel(self) -> None:
+        invalid = deepcopy(load_json(WEBSITE_OBSERVATION_PATH))
+        invalid["pathObservation"]["relevantPathEvidence"][0]["simBlob"] = "0" * 40
+        with self.assertRaisesRegex(
+            sim_yellow.SimYellowLifecycleError, "blob or patch evidence"
+        ):
+            self.validate_observation(invalid)
+
+        invalid = deepcopy(load_json(WEBSITE_OBSERVATION_PATH))
+        invalid["pathObservation"]["relevantPathEvidence"][1][
+            "websiteSourceToEvidencePatch"
+        ]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(
+            sim_yellow.SimYellowLifecycleError, "blob or patch evidence"
+        ):
+            self.validate_observation(invalid)
+
+        invalid = deepcopy(load_json(WEBSITE_OBSERVATION_PATH))
+        invalid["source"]["evidenceHeadIsProductSource"] = True
+        with self.assertRaisesRegex(
+            sim_yellow.SimYellowLifecycleError, "source/evidence classification"
+        ):
+            self.validate_observation(invalid)
+
+    def test_rejects_cross_line_gate_block_or_copy_claim(self) -> None:
+        invalid = deepcopy(load_json(WEBSITE_OBSERVATION_PATH))
+        invalid["ownershipClassification"]["blocksSimOwnedGates"] = True
+        with self.assertRaisesRegex(
+            sim_yellow.SimYellowLifecycleError, "ownership classification"
+        ):
+            self.validate_observation(invalid)
+
+        invalid = deepcopy(load_json(WEBSITE_OBSERVATION_PATH))
+        invalid["testObservation"]["websiteHandoffPublicSite"][
+            "locallyReexecutedBySim"
+        ] = True
+        with self.assertRaisesRegex(
+            sim_yellow.SimYellowLifecycleError, "test result classification"
+        ):
+            self.validate_observation(invalid)
+
+        invalid = deepcopy(load_json(WEBSITE_OBSERVATION_PATH))
+        invalid["execution"]["websiteChangesCopied"] = True
+        with self.assertRaisesRegex(
+            sim_yellow.SimYellowLifecycleError, "must remain false"
+        ):
+            self.validate_observation(invalid)
 
 
 if __name__ == "__main__":

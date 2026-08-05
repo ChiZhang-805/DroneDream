@@ -7,10 +7,12 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
 RUN_ID_RE = re.compile(r"^sim-y(?P<stage>[23])-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$")
 RUN_ID_CONTRACT_PATTERN = r"^sim-y(?:2|3)-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"
 RUNTIME_ROOT_RE = re.compile(r"^[A-Za-z]:/DroneDream(?:$|\.download-cache(?:/|$))")
@@ -175,6 +177,84 @@ INVENTORY_ENTRY_KEYS = {
     "expectedRegistryValues",
     "disposition",
 }
+CROSS_LINE_KEYS = {
+    "schemaVersion",
+    "kind",
+    "observationVersion",
+    "editionId",
+    "state",
+    "source",
+    "pathObservation",
+    "testObservation",
+    "ownershipClassification",
+    "execution",
+}
+CROSS_LINE_SOURCE_KEYS = {
+    "simObservationCommit",
+    "websiteBranch",
+    "websiteProductSourceCommit",
+    "websiteEvidenceHead",
+    "evidenceHeadIsProductSource",
+    "sourceAncestorOfEvidenceHead",
+}
+CROSS_LINE_PATH_KEYS = {
+    "simToWebsiteSourceChangedPathCount",
+    "simToWebsiteSourceChangedPaths",
+    "relevantPathEvidence",
+    "websiteEvidenceStaticRefs",
+}
+CROSS_LINE_EVIDENCE_KEYS = {
+    "path",
+    "simBlob",
+    "websiteProductSourceBlob",
+    "websiteEvidenceBlob",
+    "simToWebsiteSourcePatch",
+    "websiteSourceToEvidencePatch",
+}
+CROSS_LINE_PATCH_KEYS = {"sha256", "bytes"}
+CROSS_LINE_REF_KEYS = {"path", "blob"}
+CROSS_LINE_TEST_KEYS = {
+    "simLocalPublicSite",
+    "simLocalOwnedGate",
+    "websiteHandoffPublicSite",
+}
+CROSS_LINE_CLASSIFICATION_KEYS = {
+    "classification",
+    "ownerBranch",
+    "blocksSimOwnedGates",
+    "commonCoreFixRequiredOnSim",
+    "allowedDisposition",
+    "forbiddenActions",
+}
+CROSS_LINE_EXECUTION_KEYS = {
+    "websiteFilesModified",
+    "websiteChangesCopied",
+    "commonCoreBaselineUpdated",
+    "mergeExecuted",
+    "cherryPickExecuted",
+    "browserStarted",
+    "productionBuildExecuted",
+    "installerBuilt",
+    "releaseAssetClaimed",
+}
+CROSS_LINE_SIM_COMMIT = "1a7f1dce1f4e8ebf2872ebf1b0e2307498465f20"
+CROSS_LINE_WEBSITE_SOURCE = "e3135fb482bc8dec60e45c91a5f2b4d94bf773c9"
+CROSS_LINE_WEBSITE_EVIDENCE = "ad4bb392482094bdbee29ace3ec1bf8cc83ccd29"
+CROSS_LINE_CHANGED_PATHS = (
+    "frontend/src/__tests__/PublicSite.test.tsx",
+    "frontend/src/site/CommunityPage.tsx",
+    "frontend/src/site/PricingPage.tsx",
+    "frontend/src/site/SiteApp.tsx",
+    "frontend/src/site/site.css",
+)
+CROSS_LINE_RELEVANT_PATHS = (
+    "frontend/src/__tests__/PublicSite.test.tsx",
+    "frontend/src/site/PricingPage.tsx",
+)
+CROSS_LINE_STATIC_REFS = (
+    "frontend/src/site/SiteApp.tsx",
+    "frontend/src/features/settings/cloudModelAccess.ts",
+)
 
 
 class SimYellowLifecycleError(ValueError):
@@ -235,6 +315,68 @@ def _repo_file(repo_root: Path, relative: Any, label: str) -> Path:
     if not target.is_file():
         raise SimYellowLifecycleError(f"{label} does not exist: {relative}")
     return target
+
+
+def _run_git(repo_root: Path, *args: str, binary: bool = False) -> str | bytes:
+    completed = subprocess.run(
+        ["git", "-C", str(repo_root), *args],
+        check=False,
+        capture_output=True,
+        text=not binary,
+        encoding=None if binary else "utf-8",
+    )
+    if completed.returncode != 0:
+        error = completed.stderr
+        if isinstance(error, bytes):
+            detail = error.decode("utf-8", errors="replace").strip()
+        else:
+            detail = error.strip()
+        raise SimYellowLifecycleError(detail or f"git {' '.join(args)} failed")
+    return completed.stdout
+
+
+def _git_is_ancestor(repo_root: Path, ancestor: str, descendant: str) -> bool:
+    completed = subprocess.run(
+        ["git", "-C", str(repo_root), "merge-base", "--is-ancestor", ancestor, descendant],
+        check=False,
+        capture_output=True,
+    )
+    if completed.returncode not in {0, 1}:
+        raise SimYellowLifecycleError("could not verify cross-line Git ancestry")
+    return completed.returncode == 0
+
+
+def _git_blob(repo_root: Path, commit: str, relative_path: str) -> str:
+    output = _run_git(repo_root, "rev-parse", f"{commit}:{relative_path}")
+    if not isinstance(output, str) or not GIT_OBJECT_RE.fullmatch(output.strip()):
+        raise SimYellowLifecycleError(f"could not resolve cross-line blob: {relative_path}")
+    return output.strip()
+
+
+def _git_patch(
+    repo_root: Path, base: str, target: str, relative_path: str
+) -> dict[str, Any]:
+    output = _run_git(
+        repo_root,
+        "diff",
+        "--no-ext-diff",
+        "--binary",
+        base,
+        target,
+        "--",
+        relative_path,
+        binary=True,
+    )
+    if not isinstance(output, bytes) or not output:
+        raise SimYellowLifecycleError(f"cross-line patch is empty: {relative_path}")
+    return {"sha256": hashlib.sha256(output).hexdigest(), "bytes": len(output)}
+
+
+def _git_file(repo_root: Path, commit: str, relative_path: str) -> bytes:
+    output = _run_git(repo_root, "show", f"{commit}:{relative_path}", binary=True)
+    if not isinstance(output, bytes):
+        raise SimYellowLifecycleError("cross-line Git file reader returned text")
+    return output
 
 
 def _normalize(value: str) -> str:
@@ -696,6 +838,251 @@ def validate_owned_inventory(
     return inventory, operations
 
 
+def validate_cross_line_test_observation(
+    document: Any, *, repo_root: Path
+) -> dict[str, Any]:
+    observation = _exact_keys(
+        document, CROSS_LINE_KEYS, "Sim cross-line test observation"
+    )
+    if (
+        observation["schemaVersion"] != 1
+        or observation["kind"] != "dronedream-sim-cross-line-test-observation"
+        or observation["observationVersion"] != "1.0.0"
+        or observation["editionId"] != "sim"
+        or observation["state"] != "observed-nonblocking-not-adopted"
+    ):
+        raise SimYellowLifecycleError("cross-line observation identity drifted")
+
+    source = _exact_keys(
+        observation["source"], CROSS_LINE_SOURCE_KEYS, "cross-line source"
+    )
+    if source != {
+        "simObservationCommit": CROSS_LINE_SIM_COMMIT,
+        "websiteBranch": "origin/codex/website",
+        "websiteProductSourceCommit": CROSS_LINE_WEBSITE_SOURCE,
+        "websiteEvidenceHead": CROSS_LINE_WEBSITE_EVIDENCE,
+        "evidenceHeadIsProductSource": False,
+        "sourceAncestorOfEvidenceHead": True,
+    }:
+        raise SimYellowLifecycleError("cross-line source/evidence classification drifted")
+    if (
+        not _git_is_ancestor(repo_root, CROSS_LINE_SIM_COMMIT, "HEAD")
+        or not _git_is_ancestor(
+            repo_root, CROSS_LINE_WEBSITE_SOURCE, CROSS_LINE_WEBSITE_EVIDENCE
+        )
+        or not _git_is_ancestor(
+            repo_root, CROSS_LINE_WEBSITE_EVIDENCE, source["websiteBranch"]
+        )
+    ):
+        raise SimYellowLifecycleError("cross-line source/evidence ancestry is unproven")
+
+    path_observation = _exact_keys(
+        observation["pathObservation"],
+        CROSS_LINE_PATH_KEYS,
+        "cross-line path observation",
+    )
+    changed_output = _run_git(
+        repo_root,
+        "diff",
+        "--name-only",
+        CROSS_LINE_SIM_COMMIT,
+        CROSS_LINE_WEBSITE_SOURCE,
+        "--",
+        "frontend/src/site",
+        "frontend/src/__tests__/PublicSite.test.tsx",
+    )
+    if not isinstance(changed_output, str):
+        raise SimYellowLifecycleError("cross-line changed-path observer returned bytes")
+    changed_paths = tuple(path for path in changed_output.splitlines() if path)
+    if (
+        changed_paths != CROSS_LINE_CHANGED_PATHS
+        or path_observation["simToWebsiteSourceChangedPathCount"] != len(changed_paths)
+        or path_observation["simToWebsiteSourceChangedPaths"] != list(changed_paths)
+    ):
+        raise SimYellowLifecycleError("cross-line changed-path inventory drifted")
+
+    raw_evidence = path_observation["relevantPathEvidence"]
+    if not isinstance(raw_evidence, list) or len(raw_evidence) != len(
+        CROSS_LINE_RELEVANT_PATHS
+    ):
+        raise SimYellowLifecycleError("cross-line relevant evidence is incomplete")
+    observed_paths: list[str] = []
+    for index, raw_entry in enumerate(raw_evidence):
+        entry = _exact_keys(
+            raw_entry, CROSS_LINE_EVIDENCE_KEYS, f"cross-line path evidence {index}"
+        )
+        relative_path = entry["path"]
+        if (
+            relative_path not in CROSS_LINE_RELEVANT_PATHS
+            or relative_path in observed_paths
+        ):
+            raise SimYellowLifecycleError("cross-line relevant paths drifted")
+        _exact_keys(
+            entry["simToWebsiteSourcePatch"],
+            CROSS_LINE_PATCH_KEYS,
+            f"Sim-to-Website patch {relative_path}",
+        )
+        _exact_keys(
+            entry["websiteSourceToEvidencePatch"],
+            CROSS_LINE_PATCH_KEYS,
+            f"Website source-to-evidence patch {relative_path}",
+        )
+        expected_entry = {
+            "path": relative_path,
+            "simBlob": _git_blob(repo_root, CROSS_LINE_SIM_COMMIT, relative_path),
+            "websiteProductSourceBlob": _git_blob(
+                repo_root, CROSS_LINE_WEBSITE_SOURCE, relative_path
+            ),
+            "websiteEvidenceBlob": _git_blob(
+                repo_root, CROSS_LINE_WEBSITE_EVIDENCE, relative_path
+            ),
+            "simToWebsiteSourcePatch": _git_patch(
+                repo_root,
+                CROSS_LINE_SIM_COMMIT,
+                CROSS_LINE_WEBSITE_SOURCE,
+                relative_path,
+            ),
+            "websiteSourceToEvidencePatch": _git_patch(
+                repo_root,
+                CROSS_LINE_WEBSITE_SOURCE,
+                CROSS_LINE_WEBSITE_EVIDENCE,
+                relative_path,
+            ),
+        }
+        if entry != expected_entry:
+            raise SimYellowLifecycleError(
+                f"cross-line blob or patch evidence drifted: {relative_path}"
+            )
+        observed_paths.append(relative_path)
+    if tuple(observed_paths) != CROSS_LINE_RELEVANT_PATHS:
+        raise SimYellowLifecycleError("cross-line relevant evidence ordering drifted")
+
+    raw_refs = path_observation["websiteEvidenceStaticRefs"]
+    if not isinstance(raw_refs, list) or len(raw_refs) != len(CROSS_LINE_STATIC_REFS):
+        raise SimYellowLifecycleError("Website static refs are incomplete")
+    static_payloads: dict[str, bytes] = {}
+    for index, raw_ref in enumerate(raw_refs):
+        ref = _exact_keys(raw_ref, CROSS_LINE_REF_KEYS, f"Website static ref {index}")
+        relative_path = ref["path"]
+        if relative_path != CROSS_LINE_STATIC_REFS[index]:
+            raise SimYellowLifecycleError("Website static ref ordering drifted")
+        if ref["blob"] != _git_blob(
+            repo_root, CROSS_LINE_WEBSITE_EVIDENCE, relative_path
+        ):
+            raise SimYellowLifecycleError("Website static ref blob drifted")
+        static_payloads[relative_path] = _git_file(
+            repo_root, CROSS_LINE_WEBSITE_EVIDENCE, relative_path
+        )
+    public_test = _git_file(
+        repo_root,
+        CROSS_LINE_WEBSITE_EVIDENCE,
+        "frontend/src/__tests__/PublicSite.test.tsx",
+    )
+    pricing = _git_file(
+        repo_root,
+        CROSS_LINE_WEBSITE_EVIDENCE,
+        "frontend/src/site/PricingPage.tsx",
+    )
+    site_app = static_payloads["frontend/src/site/SiteApp.tsx"]
+    cloud_access = static_payloads[
+        "frontend/src/features/settings/cloudModelAccess.ts"
+    ]
+    if (
+        b"/billing-checkout/availability" not in public_test
+        or b"getBillingAvailability" not in pricing
+        or b"sensitiveCloudActionsEnabled" not in pricing
+        or b"sensitiveCloudActionsEnabled" not in site_app
+        or b"getBillingAvailability" not in cloud_access
+        or b'"billing-checkout"' not in cloud_access
+        or b'"/availability"' not in cloud_access
+    ):
+        raise SimYellowLifecycleError("Website availability static contract drifted")
+
+    branch_contract = load_json(
+        _repo_file(
+            repo_root,
+            "distribution/branch-contracts/software-sim.v1.json",
+            "Sim branch contract",
+        )
+    )
+    sim_prefixes = branch_contract.get("editionSpecificPathPrefixes")
+    if not isinstance(sim_prefixes, list) or any(
+        changed_path.startswith(prefix)
+        for changed_path in changed_paths
+        for prefix in sim_prefixes
+        if isinstance(prefix, str)
+    ):
+        raise SimYellowLifecycleError("Website observation overlaps Sim-owned paths")
+
+    tests = _exact_keys(
+        observation["testObservation"], CROSS_LINE_TEST_KEYS, "cross-line tests"
+    )
+    if tests != {
+        "simLocalPublicSite": {
+            "command": "npx --no-install vitest run src/__tests__/PublicSite.test.tsx",
+            "sourceCommit": CROSS_LINE_SIM_COMMIT,
+            "testFiles": 1,
+            "tests": 13,
+            "passed": 12,
+            "failed": 1,
+            "failure": "expected-billing-availability-fetch-observed-download-manifest-only",
+            "executedBySim": True,
+        },
+        "simLocalOwnedGate": {
+            "command": (
+                "npx --no-install vitest run "
+                "src/__tests__/DistributionSetupPanel.test.tsx "
+                "src/__tests__/SimEditionExperience.test.tsx "
+                "src/__tests__/SimEditionProfile.test.ts"
+            ),
+            "sourceCommit": CROSS_LINE_SIM_COMMIT,
+            "testFiles": 3,
+            "tests": 13,
+            "passed": 13,
+            "failed": 0,
+            "executedBySim": True,
+        },
+        "websiteHandoffPublicSite": {
+            "command": "npx vitest run src/__tests__/PublicSite.test.tsx",
+            "productSourceCommit": CROSS_LINE_WEBSITE_SOURCE,
+            "evidenceHead": CROSS_LINE_WEBSITE_EVIDENCE,
+            "tests": 20,
+            "passed": 20,
+            "failed": 0,
+            "handedOffByChiefControl": True,
+            "locallyReexecutedBySim": False,
+        },
+    }:
+        raise SimYellowLifecycleError("cross-line test result classification drifted")
+
+    classification = _exact_keys(
+        observation["ownershipClassification"],
+        CROSS_LINE_CLASSIFICATION_KEYS,
+        "cross-line ownership classification",
+    )
+    if classification != {
+        "classification": "website-owned-newer-site-evolution-absent-from-sim-snapshot",
+        "ownerBranch": "codex/website",
+        "blocksSimOwnedGates": False,
+        "commonCoreFixRequiredOnSim": False,
+        "allowedDisposition": "observe-and-defer-to-website-or-formal-common-core-sync",
+        "forbiddenActions": [
+            "modify-frontend-src-site",
+            "modify-public-site-test",
+            "copy-website-evolution-into-sim",
+            "relabel-website-evidence-head-as-product-source",
+            "fail-sim-owned-gate-from-cross-line-observation",
+        ],
+    }:
+        raise SimYellowLifecycleError("cross-line ownership classification drifted")
+    execution = _exact_keys(
+        observation["execution"], CROSS_LINE_EXECUTION_KEYS, "cross-line execution"
+    )
+    if any(value is not False for value in execution.values()):
+        raise SimYellowLifecycleError("cross-line adoption or execution claims must remain false")
+    return observation
+
+
 def _write_or_print(document: dict[str, Any], output: Path | None) -> None:
     encoded = json.dumps(document, ensure_ascii=False, indent=2) + "\n"
     if output is None:
@@ -720,6 +1107,15 @@ def main() -> int:
     rollback_parser = subparsers.add_parser("plan-rollback")
     rollback_parser.add_argument("inventory", type=Path)
     rollback_parser.add_argument("--output", type=Path)
+    cross_line_parser = subparsers.add_parser("verify-cross-line-observation")
+    cross_line_parser.add_argument(
+        "observation",
+        type=Path,
+        nargs="?",
+        default=Path(
+            "distribution/sim/quality/website-availability-observation.v1.json"
+        ),
+    )
     args = parser.parse_args()
     try:
         repo_root = args.repo_root.resolve()
@@ -749,6 +1145,11 @@ def main() -> int:
                     "historicalEvidenceTouched": False,
                 },
                 args.output,
+            )
+            return 0
+        if args.command == "verify-cross-line-observation":
+            validate_cross_line_test_observation(
+                load_json(args.observation), repo_root=repo_root
             )
             return 0
         raise SimYellowLifecycleError(f"unsupported command: {args.command}")
