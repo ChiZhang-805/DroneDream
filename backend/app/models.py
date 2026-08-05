@@ -856,6 +856,9 @@ class Job(Base):
     benchmark_llambo_proposal_handoffs: Mapped[list[BenchmarkLLAMBOProposalHandoff]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
+    benchmark_llm_plan_revision_checkpoints: Mapped[list[BenchmarkLLMPlanRevisionCheckpoint]] = (
+        relationship(back_populates="job", cascade="all, delete-orphan")
+    )
     benchmark_llm_react_checkpoints: Mapped[list[BenchmarkLLMReactCheckpoint]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
@@ -1530,6 +1533,74 @@ class BenchmarkLLAMBOProposalHandoff(Base):
     )
 
     job: Mapped[Job] = relationship(back_populates="benchmark_llambo_proposal_handoffs")
+
+
+class BenchmarkLLMPlanRevisionCheckpoint(Base):
+    """Append-only state for fixed/adaptive plan, revision, and review turns."""
+
+    __tablename__ = "benchmark_llm_plan_revision_checkpoints"
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "generation_index",
+            "turn_index",
+            name="uq_benchmark_plan_checkpoint_job_generation_turn",
+        ),
+        UniqueConstraint(
+            "cognitive_turn_receipt_id",
+            name="uq_benchmark_plan_checkpoint_turn",
+        ),
+        CheckConstraint(
+            "generation_index >= 1 AND turn_index >= 1 AND turn_index <= 4",
+            name="ck_benchmark_plan_checkpoint_ordinals",
+        ),
+        CheckConstraint(
+            "turn_role IN ('plan', 'revision', 'diagnosis', 'critic')",
+            name="ck_benchmark_plan_checkpoint_role",
+        ),
+        CheckConstraint(
+            "decision IN ('act', 'stop', 'dispatch', 'abandon', "
+            "'keep', 'replace', 'approve', 'veto')",
+            name="ck_benchmark_plan_checkpoint_decision",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("bpcp"))
+    job_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    run_binding_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaign_run_bindings.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    cognitive_turn_receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("harness_cognitive_turn_receipts.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    checkpoint_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    adapter_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    generation_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    turn_role: Mapped[str] = mapped_column(String(16), nullable=False)
+    source_commit: Mapped[str] = mapped_column(String(40), nullable=False)
+    observation_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    turn_binding_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    state_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    state_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(back_populates="benchmark_llm_plan_revision_checkpoints")
 
 
 class BenchmarkLLMReactCheckpoint(Base):

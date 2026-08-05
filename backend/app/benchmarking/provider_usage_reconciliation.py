@@ -121,7 +121,12 @@ def _validate_run_graph(
             "benchmark_provider_run_graph_drift",
             "Provider run binding graph is inconsistent.",
         )
-    if arm.proposal_adapter_id not in {"llm_direct/v1", "llm_react/v1", "llambo_uav/v1"}:
+    if arm.proposal_adapter_id not in {
+        "llm_direct/v1",
+        "llm_react/v1",
+        "llambo_uav/v1",
+        "dronedream_fixed_two_turn/v1",
+    }:
         _blocked(
             "benchmark_provider_reconciliation_arm_unsupported",
             "This reconciliation contract does not support the bound provider arm.",
@@ -313,30 +318,46 @@ def reconcile_provider_run_usage(
         )
     )
     policy = require_llm_arm_policy(arm.proposal_adapter_id)
-    expected_role = {
+    static_expected_role: str | None = {
         "llm_direct/v1": "direct_proposal",
         "llm_react/v1": "react_action",
         "llambo_uav/v1": "llambo_proposal",
+        "dronedream_fixed_two_turn/v1": None,
     }[arm.proposal_adapter_id]
     expected_trigger = {
         "llm_direct/v1": "benchmark-llm-direct-v1",
         "llm_react/v1": "benchmark-llm-react-v1",
         "llambo_uav/v1": "benchmark-llambo-uav-v1",
+        "dronedream_fixed_two_turn/v1": "benchmark-fixed-two-turn-v1",
     }[arm.proposal_adapter_id]
-    expected_reason = {
+    static_expected_reason: list[str] | None = {
         "llm_direct/v1": ["preregistered-direct-turn"],
         "llm_react/v1": ["bounded-react-turn"],
         "llambo_uav/v1": ["preregistered-llambo-uav-turn"],
+        "dronedream_fixed_two_turn/v1": None,
     }[arm.proposal_adapter_id]
-    if any(
-        turn.turn_role != expected_role
-        or not 1 <= turn.turn_index <= policy.maximum_turns_per_generation
-        or turn.trigger_policy_version != expected_trigger
-        or turn.trigger_reasons_json != expected_reason
-        or turn.source_commit != source_commit
-        or turn.model_snapshot != run.job.openai_model
-        for turn in turns
-    ):
+
+    def _turn_contract_matches(turn: models.HarnessCognitiveTurnReceipt) -> bool:
+        turn_expected_role: str | None
+        turn_expected_reason: list[str] | None
+        if arm.proposal_adapter_id == "dronedream_fixed_two_turn/v1":
+            turn_expected_role = "plan" if turn.turn_index == 1 else "revision"
+            turn_expected_reason = [
+                "fixed-plan-turn" if turn.turn_index == 1 else "fixed-revision-turn"
+            ]
+        else:
+            turn_expected_role = static_expected_role
+            turn_expected_reason = static_expected_reason
+        return bool(
+            turn.turn_role == turn_expected_role
+            and 1 <= turn.turn_index <= policy.maximum_turns_per_generation
+            and turn.trigger_policy_version == expected_trigger
+            and turn.trigger_reasons_json == turn_expected_reason
+            and turn.source_commit == source_commit
+            and turn.model_snapshot == run.job.openai_model
+        )
+
+    if any(not _turn_contract_matches(turn) for turn in turns):
         _blocked(
             "benchmark_provider_turn_contract_drift",
             "Cognitive ledger contains work outside the bound LLM arm contract.",

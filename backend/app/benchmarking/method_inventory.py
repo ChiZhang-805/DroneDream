@@ -421,6 +421,33 @@ _ENTRIES = (
             "The transport uses one same-Job encrypted BYOK slot with zero provider retries.",
         ),
     ),
+    BenchmarkMethodInventoryEntryV1(
+        adapter_id="dronedream_fixed_two_turn/v1",
+        method_classification="product_native",
+        implementation_label="durable-fixed-plan-revision-v1",
+        execution_readiness="ready",
+        environment_boundary="provider_contract",
+        sources=(
+            _project_source(
+                "fixed-two-turn-durable-runtime",
+                "backend/app/benchmarking/llm_durable_runtime.py",
+            ),
+            _project_source(
+                "fixed-two-turn-closed-contract",
+                "backend/app/benchmarking/llm_arm_contracts.py",
+            ),
+            _project_source(
+                "fixed-two-turn-job-secret-transport",
+                "backend/app/benchmarking/provider_transport.py",
+            ),
+        ),
+        reproducibility_notes=(
+            "Exactly two durable provider turns per generation: plan, then revision.",
+            "The plan invokes one or two allowlisted deterministic local proposal tools.",
+            "Revision may dispatch only an existing proposal reference or abandon.",
+            "Local tools add no provider requests; provider retries remain zero.",
+        ),
+    ),
     *(
         BenchmarkMethodInventoryEntryV1(
             adapter_id=adapter_id,
@@ -437,11 +464,6 @@ _ENTRIES = (
             blocker_codes=("adapter_not_implemented", "provider_contract_pending"),
         )
         for adapter_id, classification, label in (
-            (
-                "dronedream_fixed_two_turn/v1",
-                "product_native",
-                "fixed-two-turn-pending",
-            ),
             (
                 "dronedream_adaptive_1_4/v1",
                 "product_native",

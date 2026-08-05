@@ -39,8 +39,12 @@ from app.benchmarking.llm_arm_contracts import (
     proposal_response_schema,
     react_response_schema,
     require_llm_arm_policy,
+    selection_response_schema,
+    tool_action_response_schema,
     validate_proposal_response,
     validate_react_response,
+    validate_selection_response,
+    validate_tool_action_response,
 )
 from app.benchmarking.provider_execution_contract import (
     BENCHMARK_DIRECT_RESERVATION_REASON,
@@ -74,6 +78,12 @@ BENCHMARK_LLAMBO_PROPOSAL_RECEIPT_SCHEMA_ID = "dronedream.benchmark-llambo-uav-p
 BENCHMARK_LLAMBO_PROPOSAL_HANDOFF_SCHEMA_ID = "dronedream.benchmark-llambo-uav-proposal-handoff/v1"
 BENCHMARK_REACT_CHECKPOINT_SCHEMA_ID = "dronedream.benchmark-llm-react-checkpoint/v1"
 BENCHMARK_REACT_PROPOSAL_RECEIPT_SCHEMA_ID = "dronedream.benchmark-llm-react-proposal/v1"
+BENCHMARK_PLAN_REVISION_CHECKPOINT_SCHEMA_ID = (
+    "dronedream.benchmark-llm-plan-revision-checkpoint/v1"
+)
+BENCHMARK_FIXED_TWO_TURN_PROPOSAL_RECEIPT_SCHEMA_ID = (
+    "dronedream.benchmark-fixed-two-turn-proposal/v1"
+)
 
 
 class BenchmarkDurableLLMBlocked(RuntimeError):
@@ -221,6 +231,52 @@ class BenchmarkDurableReactExecutionV1(_StrictFrozen):
         return self
 
 
+class BenchmarkDurableFixedTwoTurnExecutionV1(_StrictFrozen):
+    schema_id: Literal["dronedream.benchmark-durable-fixed-two-turn-execution/v1"] = (
+        "dronedream.benchmark-durable-fixed-two-turn-execution/v1"
+    )
+    status: Literal[
+        "proposal",
+        "proposal_recovered",
+        "abandoned",
+        "abandoned_recovered",
+        "first_qualified_stop",
+    ]
+    proposal: BenchmarkProposalV1 | None
+    provider_turns_attempted: Annotated[int, Field(ge=0, le=2)]
+    provider_turns_succeeded: Annotated[int, Field(ge=0, le=2)]
+    provider_requests_attempted: Annotated[int, Field(ge=0, le=2)]
+    provider_requests_succeeded: Annotated[int, Field(ge=0, le=2)]
+    recovered_from_checkpoint: bool = False
+    safe_receipt: dict[str, Any]
+
+    @model_validator(mode="after")
+    def _validate_result(self) -> BenchmarkDurableFixedTwoTurnExecutionV1:
+        if self.provider_turns_succeeded > self.provider_turns_attempted:
+            raise ValueError("successful turns cannot exceed attempted turns")
+        if self.provider_requests_succeeded > self.provider_requests_attempted:
+            raise ValueError("successful requests cannot exceed attempted requests")
+        if self.provider_requests_attempted != self.provider_turns_attempted:
+            raise ValueError("fixed two-turn permits one request per attempted turn")
+        if self.status == "first_qualified_stop":
+            if self.proposal is not None or any(
+                (
+                    self.provider_turns_attempted,
+                    self.provider_turns_succeeded,
+                    self.provider_requests_attempted,
+                    self.provider_requests_succeeded,
+                )
+            ):
+                raise ValueError("first-qualified stop must consume zero provider work")
+        elif self.provider_turns_attempted != 2 or self.provider_turns_succeeded != 2:
+            raise ValueError("fixed plan/revision completion requires exactly two successful turns")
+        if self.status.startswith("proposal") != (self.proposal is not None):
+            raise ValueError("fixed two-turn proposal status and payload disagree")
+        if self.recovered_from_checkpoint != self.status.endswith("_recovered"):
+            raise ValueError("fixed two-turn recovery status and flag disagree")
+        return self
+
+
 def _usage_is_complete(value: object) -> bool:
     if not isinstance(value, ProviderUsage):
         return False
@@ -287,9 +343,12 @@ def _load_context(
     job: models.Job,
     observation: BenchmarkObservationV2,
     *,
-    expected_adapter_id: Literal["llm_direct/v1", "llm_react/v1", "llambo_uav/v1"] = (
-        "llm_direct/v1"
-    ),
+    expected_adapter_id: Literal[
+        "llm_direct/v1",
+        "llm_react/v1",
+        "llambo_uav/v1",
+        "dronedream_fixed_two_turn/v1",
+    ] = ("llm_direct/v1"),
 ) -> _BoundDirectContext:
     binding = db.scalar(
         select(models.BenchmarkCampaignRunBinding).where(
@@ -1155,22 +1214,27 @@ def _react_terminal_receipt(
     )
 
 
-def _call_durable_react_turn(
+def _call_durable_provider_turn(
     db: Session,
     job: models.Job,
     context: _BoundDirectContext,
     request: BenchmarkLLMTurnRequestV1,
     body: dict[str, Any],
     transport: BenchmarkDirectTransport,
+    *,
+    adapter_id: Literal["llm_react/v1", "dronedream_fixed_two_turn/v1"],
+    turn_role: Literal["react_action", "plan", "revision"],
+    maximum_turns_per_generation: int,
+    error_namespace: str,
 ) -> tuple[object, CognitiveTurnAttempt]:
     attempt = begin_benchmark_llm_turn(
         db,
         job,
         generation_index=request.generation_index,
         turn_index=request.turn_index,
-        turn_role="react_action",
-        adapter_id="llm_react/v1",
-        maximum_turns_per_generation=4,
+        turn_role=turn_role,
+        adapter_id=adapter_id,
+        maximum_turns_per_generation=maximum_turns_per_generation,
         model_snapshot=request.model_snapshot,
         prompt_sha256=request.prompt_sha256,
         evidence_sha256=request.evidence_sha256,
@@ -1219,7 +1283,7 @@ def _call_durable_react_turn(
         )
         raise BenchmarkDurableLLMBlocked(
             "benchmark_provider_transport_failed",
-            "Provider transport failed; this attempted ReAct turn cannot be replayed.",
+            f"Provider transport failed; this attempted {error_namespace} turn cannot be replayed.",
         ) from exc
     if (
         not isinstance(result, BenchmarkProviderTransportResult)
@@ -1291,11 +1355,11 @@ def _call_durable_react_turn(
             job,
             attempt,
             status="invalid_schema",
-            error_code="benchmark_react_response_invalid",
+            error_code=f"benchmark_{error_namespace}_response_invalid",
         )
         raise BenchmarkDurableLLMBlocked(
-            "benchmark_react_response_invalid",
-            "Provider response failed the bounded ReAct JSON contract.",
+            f"benchmark_{error_namespace}_response_invalid",
+            f"Provider response failed the bounded {error_namespace} JSON contract.",
         ) from exc
     return raw, attempt
 
@@ -1606,13 +1670,17 @@ def execute_durable_react_arm(
                     "benchmark_provider_credential_unavailable",
                     "The Job-bound provider credential is unavailable.",
                 ) from exc
-        raw, attempt = _call_durable_react_turn(
+        raw, attempt = _call_durable_provider_turn(
             db,
             job,
             context,
             request,
             body,
             transport,
+            adapter_id="llm_react/v1",
+            turn_role="react_action",
+            maximum_turns_per_generation=policy.maximum_turns_per_generation,
+            error_namespace="react",
         )
         proposal_refs = tuple(proposal.candidate_ref for proposal in proposals)
         try:
@@ -1768,18 +1836,557 @@ def execute_durable_react_arm(
     _blocked("benchmark_react_turn_cap_exhausted", "Bounded ReAct exhausted its turn cap.")
 
 
+def _fixed_terminal_receipt(
+    *,
+    context: _BoundDirectContext,
+    observation: BenchmarkObservationV2,
+    selected: BenchmarkProposalV1 | None,
+    turn_bindings: Sequence[str],
+    usage_reconciliation_sha256: str,
+) -> tuple[BenchmarkProposalV1 | None, dict[str, Any]]:
+    observation_sha256 = canonical_sha256(observation)
+    common = {
+        "campaign_id": context.campaign.id,
+        "run_binding_id": context.binding.id,
+        "arm_manifest_sha256": context.arm.manifest_sha256,
+        "composite_inventory_sha256": context.campaign.composite_inventory_sha256,
+        "source_commit": context.source_commit,
+        "llm_policy_registry_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
+        "observation_sha256": observation_sha256,
+        "turn_binding_sha256": list(turn_bindings),
+        "provider_turns_attempted": 2,
+        "provider_turns_succeeded": 2,
+        "provider_requests_attempted": 2,
+        "provider_requests_succeeded": 2,
+        "provider_usage_reconciliation_sha256": usage_reconciliation_sha256,
+        "retry_cap": 0,
+    }
+    if selected is None:
+        return None, {
+            "schema_id": "dronedream.benchmark-fixed-two-turn-abandon/v1",
+            **common,
+        }
+    parameter_sha256 = canonical_sha256(selected.parameters)
+    safe_receipt = {
+        "schema_id": BENCHMARK_FIXED_TWO_TURN_PROPOSAL_RECEIPT_SCHEMA_ID,
+        **common,
+        "selected_local_proposal_ref": selected.candidate_ref,
+        "selected_local_proposal_receipt_sha256": canonical_sha256(selected.proposal_receipt),
+        "parameter_sha256": parameter_sha256,
+    }
+    candidate_ref = (
+        f"dronedream-fixed-two-turn-g{observation.generation_index:06d}-"
+        f"d{observation.next_dispatch_ordinal:06d}-{parameter_sha256[:12]}"
+    )
+    return (
+        BenchmarkProposalV1(
+            candidate_ref=candidate_ref,
+            parameters=dict(selected.parameters),
+            reason_code="benchmark-dronedream-fixed-two-turn",
+            proposal_receipt=safe_receipt,
+        ),
+        safe_receipt,
+    )
+
+
+def _recover_fixed_checkpoint(
+    db: Session,
+    job: models.Job,
+    context: _BoundDirectContext,
+    observation: BenchmarkObservationV2,
+    request: BenchmarkLLMTurnRequestV1,
+    *,
+    proposals_before: Sequence[BenchmarkProposalV1],
+    used_tools_before: Sequence[str],
+    prior_state_sha256: str | None,
+    turn_bindings: Sequence[str],
+) -> (
+    tuple[
+        Literal["act", "dispatch", "abandon"],
+        list[BenchmarkProposalV1],
+        list[str],
+        BenchmarkProposalV1 | None,
+        dict[str, Any],
+        str,
+    ]
+    | None
+):
+    checkpoint = db.scalar(
+        select(models.BenchmarkLLMPlanRevisionCheckpoint).where(
+            models.BenchmarkLLMPlanRevisionCheckpoint.job_id == job.id,
+            models.BenchmarkLLMPlanRevisionCheckpoint.generation_index
+            == observation.generation_index,
+            models.BenchmarkLLMPlanRevisionCheckpoint.turn_index == request.turn_index,
+        )
+    )
+    if checkpoint is None:
+        return None
+    turn = db.get(models.HarnessCognitiveTurnReceipt, checkpoint.cognitive_turn_receipt_id)
+    state = checkpoint.state_json
+    expected_role = "plan" if request.turn_index == 1 else "revision"
+    observation_sha256 = canonical_sha256(observation)
+    if (
+        turn is None
+        or turn.outcome is None
+        or turn.outcome.status != "succeeded"
+        or checkpoint.checkpoint_schema != BENCHMARK_PLAN_REVISION_CHECKPOINT_SCHEMA_ID
+        or checkpoint.adapter_id != "dronedream_fixed_two_turn/v1"
+        or checkpoint.job_id != job.id
+        or checkpoint.run_binding_id != context.binding.id
+        or checkpoint.generation_index != observation.generation_index
+        or checkpoint.turn_index != request.turn_index
+        or checkpoint.turn_role != expected_role
+        or checkpoint.source_commit != context.source_commit
+        or checkpoint.observation_sha256 != observation_sha256
+        or checkpoint.turn_binding_sha256 != request.binding_sha256
+        or canonical_sha256(state) != checkpoint.state_sha256
+        or turn.source_commit != context.source_commit
+        or turn.turn_role != expected_role
+        or turn.model_snapshot != request.model_snapshot
+        or turn.prompt_sha256 != request.prompt_sha256
+        or turn.evidence_sha256 != request.evidence_sha256
+        or turn.schema_sha256 != request.response_schema_sha256
+        or turn.tool_outputs_sha256 != request.tool_outputs_sha256
+    ):
+        _blocked("benchmark_fixed_checkpoint_drift", "Recovered fixed-turn checkpoint drifted.")
+    if (
+        not isinstance(state, dict)
+        or state.get("schema_id") != BENCHMARK_PLAN_REVISION_CHECKPOINT_SCHEMA_ID
+    ):
+        _blocked("benchmark_fixed_checkpoint_invalid", "Recovered fixed-turn state is invalid.")
+    if set(state) != {
+        "schema_id",
+        "campaign_id",
+        "run_binding_id",
+        "arm_manifest_sha256",
+        "composite_inventory_sha256",
+        "source_commit",
+        "llm_policy_registry_sha256",
+        "observation_sha256",
+        "generation_index",
+        "turn_index",
+        "turn_role",
+        "turn_binding_sha256",
+        "prior_state_sha256",
+        "decision",
+        "validated_response",
+        "used_tool_adapter_ids",
+        "proposals",
+        "selected_proposal_ref",
+        "final_proposal",
+        "terminal_receipt",
+    }:
+        _blocked("benchmark_fixed_checkpoint_invalid", "Recovered fixed-turn state is not closed.")
+    expected_base = {
+        "campaign_id": context.campaign.id,
+        "run_binding_id": context.binding.id,
+        "arm_manifest_sha256": context.arm.manifest_sha256,
+        "composite_inventory_sha256": context.campaign.composite_inventory_sha256,
+        "source_commit": context.source_commit,
+        "llm_policy_registry_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
+        "observation_sha256": observation_sha256,
+        "generation_index": observation.generation_index,
+        "turn_index": request.turn_index,
+        "turn_role": expected_role,
+        "turn_binding_sha256": request.binding_sha256,
+        "prior_state_sha256": prior_state_sha256,
+    }
+    if any(state.get(key) != value for key, value in expected_base.items()):
+        _blocked("benchmark_fixed_checkpoint_drift", "Recovered fixed-turn context drifted.")
+    validated_response = state.get("validated_response")
+    if not isinstance(validated_response, dict):
+        _blocked("benchmark_fixed_checkpoint_invalid", "Recovered response is not an object.")
+    if turn.outcome.response_sha256 != canonical_sha256(validated_response):
+        _blocked("benchmark_fixed_checkpoint_drift", "Recovered response hash drifted.")
+    if provider_request_counts_for_turn(db, cognitive_turn_receipt_id=turn.id) != (1, 1):
+        _blocked("benchmark_fixed_checkpoint_drift", "Recovered turn request count drifted.")
+    policy = require_llm_arm_policy("dronedream_fixed_two_turn/v1")
+    if request.turn_index == 1:
+        try:
+            plan_decision, tools = validate_tool_action_response(
+                validated_response, policy, allow_stop=False
+            )
+            proposals_after = _run_react_local_tools(
+                tools, observation, already_used=set(used_tools_before)
+            )
+        except (BenchmarkAdapterError, BenchmarkLLMContractError) as exc:
+            raise BenchmarkDurableLLMBlocked(
+                "benchmark_fixed_checkpoint_invalid",
+                "Recovered fixed plan fails its frozen schema or local-tool contract.",
+            ) from exc
+        stored_proposals = _react_proposals_from_state(state.get("proposals"))
+        if (
+            plan_decision != "act"
+            or checkpoint.decision != "act"
+            or state.get("decision") != "act"
+            or state.get("used_tool_adapter_ids") != list(tools)
+            or [_safe_react_proposal_record(item) for item in proposals_after]
+            != [_safe_react_proposal_record(item) for item in stored_proposals]
+            or state.get("selected_proposal_ref") is not None
+            or state.get("final_proposal") is not None
+            or state.get("terminal_receipt") != {}
+        ):
+            _blocked("benchmark_fixed_checkpoint_drift", "Recovered fixed plan is inconsistent.")
+        return "act", stored_proposals, list(tools), None, {}, checkpoint.state_sha256
+
+    stored_proposals = _react_proposals_from_state(state.get("proposals"))
+    proposal_refs = tuple(proposal.candidate_ref for proposal in proposals_before)
+    try:
+        selected_ref = validate_selection_response(validated_response, proposal_refs)
+    except BenchmarkLLMContractError as exc:
+        raise BenchmarkDurableLLMBlocked(
+            "benchmark_fixed_checkpoint_invalid",
+            "Recovered fixed revision fails its frozen selection schema.",
+        ) from exc
+    revision_decision: Literal["dispatch", "abandon"] = (
+        "dispatch" if selected_ref is not None else "abandon"
+    )
+    if (
+        checkpoint.decision != revision_decision
+        or state.get("decision") != revision_decision
+        or state.get("used_tool_adapter_ids") != list(used_tools_before)
+        or [_safe_react_proposal_record(item) for item in stored_proposals]
+        != [_safe_react_proposal_record(item) for item in proposals_before]
+        or state.get("selected_proposal_ref") != selected_ref
+    ):
+        _blocked("benchmark_fixed_checkpoint_drift", "Recovered fixed revision is inconsistent.")
+    try:
+        usage = reconcile_provider_run_usage(db, context.binding.id)
+    except BenchmarkProviderUsageBlocked as exc:
+        raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
+    if usage.status != "complete":
+        _blocked(
+            "benchmark_provider_usage_incomplete",
+            "Recovered fixed-turn usage cannot be reconciled completely.",
+        )
+    selected = (
+        _proposal_by_ref(proposals_before, selected_ref) if selected_ref is not None else None
+    )
+    proposal, receipt = _fixed_terminal_receipt(
+        context=context,
+        observation=observation,
+        selected=selected,
+        turn_bindings=turn_bindings,
+        usage_reconciliation_sha256=canonical_sha256(usage),
+    )
+    if state.get("terminal_receipt") != receipt or state.get("final_proposal") != (
+        None if proposal is None else proposal.model_dump(mode="json")
+    ):
+        _blocked("benchmark_fixed_checkpoint_drift", "Recovered fixed terminal state drifted.")
+    return (
+        revision_decision,
+        stored_proposals,
+        list(used_tools_before),
+        proposal,
+        receipt,
+        checkpoint.state_sha256,
+    )
+
+
+def execute_durable_fixed_two_turn_arm(
+    db: Session,
+    job: models.Job,
+    observation: BenchmarkObservationV2,
+    *,
+    transport: BenchmarkDirectTransport | None = None,
+    transport_factory: BenchmarkDirectTransportFactory | None = None,
+) -> BenchmarkDurableFixedTwoTurnExecutionV1:
+    """Execute or recover one fixed plan -> local tools -> revision generation."""
+
+    context = _load_context(
+        db,
+        job,
+        observation,
+        expected_adapter_id="dronedream_fixed_two_turn/v1",
+    )
+    policy = require_llm_arm_policy("dronedream_fixed_two_turn/v1")
+    if job.first_qualified_candidate_id is not None:
+        return BenchmarkDurableFixedTwoTurnExecutionV1(
+            status="first_qualified_stop",
+            proposal=None,
+            provider_turns_attempted=0,
+            provider_turns_succeeded=0,
+            provider_requests_attempted=0,
+            provider_requests_succeeded=0,
+            safe_receipt={
+                "schema_id": "dronedream.benchmark-first-qualified-stop/v1",
+                "campaign_id": context.campaign.id,
+                "run_binding_id": context.binding.id,
+                "source_commit": context.source_commit,
+            },
+        )
+    if (transport is None) == (transport_factory is None):
+        _blocked(
+            "benchmark_provider_transport_binding_invalid",
+            "Fixed plan/revision execution requires exactly one transport binding.",
+        )
+
+    proposals: list[BenchmarkProposalV1] = []
+    used_tools: list[str] = []
+    prior_state_sha256: str | None = None
+    turn_bindings: list[str] = []
+    any_recovered = False
+    fixed_turns: tuple[
+        tuple[int, Literal["plan", "revision"]],
+        tuple[int, Literal["plan", "revision"]],
+    ] = ((1, "plan"), (2, "revision"))
+    for turn_index, turn_role in fixed_turns:
+        response_schema = (
+            tool_action_response_schema(policy, allow_stop=False)
+            if turn_index == 1
+            else selection_response_schema(tuple(proposal.candidate_ref for proposal in proposals))
+        )
+        request = build_llm_turn_request(
+            policy=policy,
+            observation=observation,
+            model_snapshot=context.provider.model_snapshot,
+            turn_index=turn_index,
+            turn_role=turn_role,
+            response_schema=response_schema,
+            tool_outputs=(
+                []
+                if turn_index == 1
+                else [
+                    {
+                        "proposal_ref": proposal.candidate_ref,
+                        "parameters": dict(proposal.parameters),
+                        "proposal_reason_code": proposal.reason_code,
+                        "proposal_receipt_sha256": canonical_sha256(proposal.proposal_receipt),
+                    }
+                    for proposal in proposals
+                ]
+            ),
+        )
+        turn_bindings.append(request.binding_sha256)
+        recovered = _recover_fixed_checkpoint(
+            db,
+            job,
+            context,
+            observation,
+            request,
+            proposals_before=proposals,
+            used_tools_before=used_tools,
+            prior_state_sha256=prior_state_sha256,
+            turn_bindings=turn_bindings,
+        )
+        if recovered is not None:
+            any_recovered = True
+            (
+                recovered_decision,
+                proposals,
+                used_tools,
+                recovered_proposal,
+                safe_receipt,
+                prior_state_sha256,
+            ) = recovered
+            if recovered_decision == "act":
+                continue
+            return BenchmarkDurableFixedTwoTurnExecutionV1(
+                status=(
+                    "proposal_recovered"
+                    if recovered_decision == "dispatch"
+                    else "abandoned_recovered"
+                ),
+                proposal=recovered_proposal,
+                provider_turns_attempted=2,
+                provider_turns_succeeded=2,
+                provider_requests_attempted=2,
+                provider_requests_succeeded=2,
+                recovered_from_checkpoint=True,
+                safe_receipt=safe_receipt,
+            )
+
+        body = _request_body(request, context.provider, context.binding.provider_seed)
+        _require_prereserved_budget(db, context, body)
+        if transport is None:
+            try:
+                transport = transport_factory(context.provider)  # type: ignore[misc]
+            except BenchmarkDurableLLMBlocked:
+                raise
+            except Exception as exc:  # noqa: BLE001 - credentials remain private.
+                raise BenchmarkDurableLLMBlocked(
+                    "benchmark_provider_credential_unavailable",
+                    "The Job-bound provider credential is unavailable.",
+                ) from exc
+        raw, attempt = _call_durable_provider_turn(
+            db,
+            job,
+            context,
+            request,
+            body,
+            transport,
+            adapter_id="dronedream_fixed_two_turn/v1",
+            turn_role=turn_role,
+            maximum_turns_per_generation=2,
+            error_namespace="fixed_two_turn",
+        )
+        try:
+            if turn_index == 1:
+                plan_decision, tools = validate_tool_action_response(raw, policy, allow_stop=False)
+                proposals = _run_react_local_tools(tools, observation, already_used=set(used_tools))
+                used_tools = list(tools)
+                selected_ref = None
+                decision: Literal["act", "dispatch", "abandon"] = "act"
+                validated_response: dict[str, Any] = {
+                    "schema_version": "1.0",
+                    "decision": plan_decision,
+                    "tool_adapter_ids": list(tools),
+                }
+            else:
+                selected_ref = validate_selection_response(
+                    raw, tuple(proposal.candidate_ref for proposal in proposals)
+                )
+                decision = "dispatch" if selected_ref is not None else "abandon"
+                validated_response = {
+                    "schema_version": "1.0",
+                    "decision": decision,
+                    "selected_proposal_ref": selected_ref,
+                }
+        except (BenchmarkAdapterError, BenchmarkLLMContractError) as exc:
+            finish_cognitive_turn(
+                db,
+                job,
+                attempt,
+                status="invalid_schema",
+                error_code="benchmark_fixed_two_turn_state_rejected",
+            )
+            raise BenchmarkDurableLLMBlocked(
+                "benchmark_fixed_two_turn_state_rejected",
+                "Fixed plan/revision decision or local-tool state failed closed.",
+            ) from exc
+        status = finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="succeeded",
+            response=validated_response,
+            commit=False,
+        )
+        if status != "succeeded":
+            db.commit()
+            db.refresh(job)
+            _blocked("benchmark_source_drift", "Source changed before fixed-turn finalization.")
+        proposal: BenchmarkProposalV1 | None = None
+        terminal_receipt: dict[str, Any] = {}
+        if turn_index == 2:
+            try:
+                usage = reconcile_provider_run_usage(db, context.binding.id)
+            except BenchmarkProviderUsageBlocked as exc:
+                db.rollback()
+                db.refresh(job)
+                finish_cognitive_turn(
+                    db,
+                    job,
+                    attempt,
+                    status="provider_failed",
+                    error_code=exc.code,
+                )
+                raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
+            if usage.status != "complete":
+                db.rollback()
+                db.refresh(job)
+                finish_cognitive_turn(
+                    db,
+                    job,
+                    attempt,
+                    status="provider_failed",
+                    error_code="benchmark_provider_usage_incomplete",
+                )
+                _blocked(
+                    "benchmark_provider_usage_incomplete",
+                    "Provider usage cannot be reconciled against the frozen reservation.",
+                )
+            selected = (
+                _proposal_by_ref(proposals, selected_ref) if selected_ref is not None else None
+            )
+            proposal, terminal_receipt = _fixed_terminal_receipt(
+                context=context,
+                observation=observation,
+                selected=selected,
+                turn_bindings=turn_bindings,
+                usage_reconciliation_sha256=canonical_sha256(usage),
+            )
+        state = {
+            "schema_id": BENCHMARK_PLAN_REVISION_CHECKPOINT_SCHEMA_ID,
+            "campaign_id": context.campaign.id,
+            "run_binding_id": context.binding.id,
+            "arm_manifest_sha256": context.arm.manifest_sha256,
+            "composite_inventory_sha256": context.campaign.composite_inventory_sha256,
+            "source_commit": context.source_commit,
+            "llm_policy_registry_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
+            "observation_sha256": canonical_sha256(observation),
+            "generation_index": observation.generation_index,
+            "turn_index": turn_index,
+            "turn_role": turn_role,
+            "turn_binding_sha256": request.binding_sha256,
+            "prior_state_sha256": prior_state_sha256,
+            "decision": decision,
+            "validated_response": validated_response,
+            "used_tool_adapter_ids": list(used_tools),
+            "proposals": [_safe_react_proposal_record(item) for item in proposals],
+            "selected_proposal_ref": selected_ref,
+            "final_proposal": None if proposal is None else proposal.model_dump(mode="json"),
+            "terminal_receipt": terminal_receipt,
+        }
+        state_sha256 = canonical_sha256(state)
+        db.add(
+            models.BenchmarkLLMPlanRevisionCheckpoint(
+                job_id=job.id,
+                run_binding_id=context.binding.id,
+                cognitive_turn_receipt_id=attempt.receipt_id,
+                checkpoint_schema=BENCHMARK_PLAN_REVISION_CHECKPOINT_SCHEMA_ID,
+                adapter_id="dronedream_fixed_two_turn/v1",
+                generation_index=observation.generation_index,
+                turn_index=turn_index,
+                turn_role=turn_role,
+                source_commit=context.source_commit,
+                observation_sha256=canonical_sha256(observation),
+                turn_binding_sha256=request.binding_sha256,
+                decision=decision,
+                state_json=state,
+                state_sha256=state_sha256,
+            )
+        )
+        db.commit()
+        db.refresh(job)
+        prior_state_sha256 = state_sha256
+        if turn_index == 1:
+            continue
+        return BenchmarkDurableFixedTwoTurnExecutionV1(
+            status=(
+                "proposal_recovered"
+                if decision == "dispatch" and any_recovered
+                else "abandoned_recovered"
+                if decision == "abandon" and any_recovered
+                else "proposal"
+                if decision == "dispatch"
+                else "abandoned"
+            ),
+            proposal=proposal,
+            provider_turns_attempted=2,
+            provider_turns_succeeded=2,
+            provider_requests_attempted=2,
+            provider_requests_succeeded=2,
+            recovered_from_checkpoint=any_recovered,
+            safe_receipt=terminal_receipt,
+        )
+    _blocked("benchmark_fixed_turn_sequence_incomplete", "Fixed two-turn sequence is incomplete.")
+
+
 __all__ = [
     "BENCHMARK_DIRECT_RESERVATION_REASON",
     "BENCHMARK_PROVIDER_BASE_URLS",
     "BenchmarkDirectTransport",
     "BenchmarkDirectTransportFactory",
     "BenchmarkDurableDirectExecutionV1",
+    "BenchmarkDurableFixedTwoTurnExecutionV1",
     "BenchmarkDurableLLAMBOExecutionV1",
     "BenchmarkDurableReactExecutionV1",
     "BenchmarkDurableLLMBlocked",
     "BenchmarkProviderExecutionConfigV1",
     "BenchmarkProviderTransportResult",
     "execute_durable_direct_arm",
+    "execute_durable_fixed_two_turn_arm",
     "execute_durable_llambo_arm",
     "execute_durable_react_arm",
 ]

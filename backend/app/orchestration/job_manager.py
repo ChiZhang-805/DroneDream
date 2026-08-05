@@ -32,6 +32,7 @@ from app.benchmarking.job_runtime import (
 from app.benchmarking.llm_durable_runtime import (
     BenchmarkDurableLLMBlocked,
     execute_durable_direct_arm,
+    execute_durable_fixed_two_turn_arm,
     execute_durable_llambo_arm,
     execute_durable_react_arm,
 )
@@ -1136,7 +1137,13 @@ def dispatch_next_benchmark_generation(
         require_execution_ready_method(adapter_id)
         adapter = (
             None
-            if adapter_id in {"llm_direct/v1", "llm_react/v1", "llambo_uav/v1"}
+            if adapter_id
+            in {
+                "llm_direct/v1",
+                "llm_react/v1",
+                "llambo_uav/v1",
+                "dronedream_fixed_two_turn/v1",
+            }
             else create_benchmark_adapter(adapter_id)
         )
     except BenchmarkJobRuntimeBlocked as exc:
@@ -1206,6 +1213,26 @@ def dispatch_next_benchmark_generation(
             if react.proposal is None:  # pragma: no cover - strict result contract.
                 raise RuntimeError("durable ReAct execution returned no proposal")
             proposal = react.proposal
+        elif adapter_id == "dronedream_fixed_two_turn/v1":
+            fixed = execute_durable_fixed_two_turn_arm(
+                db,
+                job,
+                observation,
+                transport_factory=lambda provider: build_job_secret_benchmark_transport(
+                    db, job, provider
+                ),
+            )
+            if fixed.status == "first_qualified_stop":
+                return BenchmarkDispatchResult(status="first_qualified_stop")
+            if fixed.status.startswith("abandoned"):
+                return BenchmarkDispatchResult(
+                    status="proposal_failed",
+                    error_code="benchmark_fixed_two_turn_abandoned",
+                    error="The fixed plan/revision arm abandoned this generation.",
+                )
+            if fixed.proposal is None:  # pragma: no cover - strict result contract.
+                raise RuntimeError("durable fixed two-turn execution returned no proposal")
+            proposal = fixed.proposal
         else:
             if adapter is None:  # pragma: no cover - exhaustive registry routing.
                 raise RuntimeError("benchmark adapter routing is incomplete")

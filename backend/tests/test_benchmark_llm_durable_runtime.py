@@ -35,6 +35,7 @@ from app.benchmarking.llm_durable_runtime import (
     BenchmarkProviderExecutionConfigV1,
     BenchmarkProviderTransportResult,
     execute_durable_direct_arm,
+    execute_durable_fixed_two_turn_arm,
     execute_durable_llambo_arm,
     execute_durable_react_arm,
 )
@@ -145,6 +146,7 @@ def _arm_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkArmManifestV1:
         "llm_direct/v1": "llm-direct",
         "llm_react/v1": "llm-react",
         "llambo_uav/v1": "llambo-uav",
+        "dronedream_fixed_two_turn/v1": "dronedream-fixed-two-turn",
     }[adapter_id]
     return BenchmarkArmManifestV1(
         benchmark_arm_id=arm_id,
@@ -158,7 +160,11 @@ def _arm_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkArmManifestV1:
 
 
 def _campaign_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkCampaignManifestV1:
-    turn_cap = 8 if adapter_id == "llm_react/v1" else 2
+    turns_per_generation = {
+        "llm_react/v1": 4,
+        "dronedream_fixed_two_turn/v1": 2,
+    }.get(adapter_id, 1)
+    turn_cap = 2 * turns_per_generation
     return BenchmarkCampaignManifestV1.model_validate(
         {
             "campaign_key": f"durable-{adapter_id.split('/')[0]}-test",
@@ -214,7 +220,10 @@ def _create_bound_run(
     )
     db.add(batch)
     db.flush()
-    turns_per_generation = 4 if adapter_id == "llm_react/v1" else 1
+    turns_per_generation = {
+        "llm_react/v1": 4,
+        "dronedream_fixed_two_turn/v1": 2,
+    }.get(adapter_id, 1)
     job = models.Job(
         user_id=user.id,
         batch_id=batch.id,
@@ -453,6 +462,197 @@ def _react_json(
             "selected_proposal_ref": selected,
         }
     )
+
+
+def _fixed_plan_json(*tools: str, decision: str = "act") -> str:
+    return json.dumps(
+        {
+            "schema_version": "1.0",
+            "decision": decision,
+            "tool_adapter_ids": list(tools),
+        }
+    )
+
+
+def _fixed_revision_json(selected: str | None) -> str:
+    return json.dumps(
+        {
+            "schema_version": "1.0",
+            "decision": "dispatch" if selected is not None else "abandon",
+            "selected_proposal_ref": selected,
+        }
+    )
+
+
+def test_fixed_two_turn_arm_is_promoted_to_durable_server_managed_execution() -> None:
+    descriptor = BENCHMARK_ADAPTER_REGISTRY["dronedream_fixed_two_turn/v1"]
+    inventory = BENCHMARK_METHOD_INVENTORY["dronedream_fixed_two_turn/v1"]
+
+    assert descriptor.availability == "implemented"
+    assert descriptor.implementation_label == "durable-fixed-plan-revision-v1"
+    assert inventory.execution_readiness == "ready"
+    assert inventory.blocker_codes == ()
+    with pytest.raises(ValueError, match="server-managed"):
+        create_benchmark_adapter("dronedream_fixed_two_turn/v1")
+
+
+def test_durable_fixed_two_turn_plans_revises_and_recovers_without_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_fixed_two_turn/v1")
+        observation = _observation(job, run)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        transport = _SequenceTransport(
+            [
+                _fixed_plan_json("random_search/v1"),
+                _fixed_revision_json(local.candidate_ref),
+            ]
+        )
+
+        result = execute_durable_fixed_two_turn_arm(db, job, observation, transport=transport)
+
+        assert result.status == "proposal"
+        assert result.proposal is not None
+        assert result.proposal.parameters == local.parameters
+        assert result.provider_turns_attempted == result.provider_turns_succeeded == 2
+        assert transport.calls == 2
+        checkpoints = list(
+            db.scalars(
+                select(models.BenchmarkLLMPlanRevisionCheckpoint).order_by(
+                    models.BenchmarkLLMPlanRevisionCheckpoint.turn_index
+                )
+            )
+        )
+        assert [(item.turn_role, item.decision) for item in checkpoints] == [
+            ("plan", "act"),
+            ("revision", "dispatch"),
+        ]
+        assert checkpoints[0].state_json["terminal_receipt"] == {}
+        assert checkpoints[1].state_json["final_proposal"]["candidate_ref"] == (
+            result.proposal.candidate_ref
+        )
+
+        replay = _SequenceTransport([AssertionError("provider replayed")])
+        recovered = execute_durable_fixed_two_turn_arm(db, job, observation, transport=replay)
+        assert recovered.status == "proposal_recovered"
+        assert recovered.proposal == result.proposal
+        assert replay.calls == 0
+
+
+def test_durable_fixed_two_turn_recovers_plan_then_calls_only_revision(
+    durable_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.benchmarking import llm_durable_runtime
+
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_fixed_two_turn/v1")
+        observation = _observation(job, run)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        original = llm_durable_runtime.selection_response_schema
+
+        def _interrupt_after_plan(proposal_refs: tuple[str, ...]) -> dict[str, Any]:
+            raise RuntimeError("simulated process exit after durable plan")
+
+        monkeypatch.setattr(llm_durable_runtime, "selection_response_schema", _interrupt_after_plan)
+        first = _SequenceTransport([_fixed_plan_json("random_search/v1")])
+        with pytest.raises(RuntimeError, match="simulated process exit"):
+            execute_durable_fixed_two_turn_arm(db, job, observation, transport=first)
+        assert first.calls == 1
+        assert db.scalar(select(models.BenchmarkLLMPlanRevisionCheckpoint.id)) is not None
+
+        monkeypatch.setattr(llm_durable_runtime, "selection_response_schema", original)
+        revision = _SequenceTransport([_fixed_revision_json(local.candidate_ref)])
+        recovered = execute_durable_fixed_two_turn_arm(db, job, observation, transport=revision)
+        assert recovered.status == "proposal_recovered"
+        assert recovered.proposal is not None
+        assert revision.calls == 1
+
+
+def test_durable_fixed_two_turn_rejects_early_stop(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_fixed_two_turn/v1")
+        observation = _observation(job, run)
+        with pytest.raises(BenchmarkDurableLLMBlocked) as plan_error:
+            execute_durable_fixed_two_turn_arm(
+                db,
+                job,
+                observation,
+                transport=_SequenceTransport([_fixed_plan_json(decision="stop")]),
+            )
+        assert plan_error.value.code == "benchmark_fixed_two_turn_state_rejected"
+        turn = db.scalar(select(models.HarnessCognitiveTurnReceipt))
+        assert turn is not None and turn.outcome.status == "invalid_schema"
+
+
+def test_durable_fixed_two_turn_rejects_unknown_revision_ref(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_fixed_two_turn/v1")
+        observation = _observation(job, run)
+        transport = _SequenceTransport(
+            [
+                _fixed_plan_json("random_search/v1"),
+                _fixed_revision_json("unknown-proposal-ref"),
+            ]
+        )
+        with pytest.raises(BenchmarkDurableLLMBlocked) as revision_error:
+            execute_durable_fixed_two_turn_arm(db, job, observation, transport=transport)
+        assert revision_error.value.code == "benchmark_fixed_two_turn_state_rejected"
+        second = db.scalar(
+            select(models.HarnessCognitiveTurnReceipt).where(
+                models.HarnessCognitiveTurnReceipt.turn_index == 2
+            )
+        )
+        assert second is not None and second.outcome.status == "invalid_schema"
+
+
+def test_durable_fixed_two_turn_terminal_tamper_blocks_without_provider_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_fixed_two_turn/v1")
+        observation = _observation(job, run)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        execute_durable_fixed_two_turn_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport(
+                [
+                    _fixed_plan_json("random_search/v1"),
+                    _fixed_revision_json(local.candidate_ref),
+                ]
+            ),
+        )
+        terminal = db.scalar(
+            select(models.BenchmarkLLMPlanRevisionCheckpoint).where(
+                models.BenchmarkLLMPlanRevisionCheckpoint.turn_index == 2
+            )
+        )
+        assert terminal is not None
+        state = dict(terminal.state_json)
+        receipt = dict(state["terminal_receipt"])
+        receipt["provider_turns_attempted"] = 1
+        state["terminal_receipt"] = receipt
+        terminal.state_json = state
+        terminal.state_sha256 = canonical_sha256(state)
+        db.commit()
+
+        replay = _SequenceTransport([AssertionError("provider replayed")])
+        with pytest.raises(BenchmarkDurableLLMBlocked) as error:
+            execute_durable_fixed_two_turn_arm(db, job, observation, transport=replay)
+        assert error.value.code == "benchmark_fixed_checkpoint_drift"
+        assert replay.calls == 0
 
 
 def test_react_arm_is_promoted_to_durable_server_managed_execution() -> None:
@@ -1152,7 +1352,11 @@ def test_production_dispatch_recovers_handoff_without_secret_or_provider_replay(
 
 @pytest.mark.parametrize(
     ("adapter_id", "arm_id"),
-    (("llm_direct/v1", "llm-direct"), ("llm_react/v1", "llm-react")),
+    (
+        ("llm_direct/v1", "llm-direct"),
+        ("llm_react/v1", "llm-react"),
+        ("dronedream_fixed_two_turn/v1", "dronedream-fixed-two-turn"),
+    ),
 )
 def test_production_dispatch_without_job_secret_fails_before_attempt(
     durable_db: SimpleNamespace,
@@ -1518,7 +1722,12 @@ def test_response_byte_cap_records_consumed_request_but_rejects_model_result(
 
 @pytest.mark.parametrize(
     "adapter_id",
-    ("llm_direct/v1", "llm_react/v1", "llambo_uav/v1"),
+    (
+        "llm_direct/v1",
+        "llm_react/v1",
+        "llambo_uav/v1",
+        "dronedream_fixed_two_turn/v1",
+    ),
 )
 def test_first_qualified_stop_consumes_zero_provider_work(
     durable_db: SimpleNamespace,
@@ -1534,6 +1743,7 @@ def test_first_qualified_stop_consumes_zero_provider_work(
             "llm_direct/v1": execute_durable_direct_arm,
             "llm_react/v1": execute_durable_react_arm,
             "llambo_uav/v1": execute_durable_llambo_arm,
+            "dronedream_fixed_two_turn/v1": execute_durable_fixed_two_turn_arm,
         }[adapter_id]
         result = executor(db, job, _observation(job, run), transport=transport)
         assert result.status == "first_qualified_stop"

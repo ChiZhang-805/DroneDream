@@ -50,7 +50,13 @@ MAX_PROVIDER_TURNS_PER_GENERATION = 4
 MAX_PROVIDER_TURNS_PER_JOB = 128
 
 TurnRole = Literal["plan", "revision", "diagnosis", "critic"]
-BenchmarkTurnRole = Literal["direct_proposal", "react_action", "llambo_proposal"]
+BenchmarkTurnRole = Literal[
+    "direct_proposal",
+    "react_action",
+    "llambo_proposal",
+    "plan",
+    "revision",
+]
 TurnOutcomeStatus = Literal[
     "succeeded",
     "provider_failed",
@@ -531,7 +537,12 @@ def begin_benchmark_llm_turn(
     generation_index: int,
     turn_index: int,
     turn_role: BenchmarkTurnRole,
-    adapter_id: Literal["llm_direct/v1", "llm_react/v1", "llambo_uav/v1"],
+    adapter_id: Literal[
+        "llm_direct/v1",
+        "llm_react/v1",
+        "llambo_uav/v1",
+        "dronedream_fixed_two_turn/v1",
+    ],
     maximum_turns_per_generation: int,
     model_snapshot: str,
     prompt_sha256: str,
@@ -555,6 +566,7 @@ def begin_benchmark_llm_turn(
         "llm_direct/v1": "direct_proposal",
         "llm_react/v1": "react_action",
         "llambo_uav/v1": "llambo_proposal",
+        "dronedream_fixed_two_turn/v1": "plan" if turn_index == 1 else "revision",
     }[adapter_id]
     if turn_role != expected_role:
         raise CognitiveTurnBlocked(
@@ -597,6 +609,34 @@ def begin_benchmark_llm_turn(
                 "cognitive_predecessor_missing",
                 "The prior bounded ReAct turn has no successful durable checkpoint.",
             )
+    if adapter_id == "dronedream_fixed_two_turn/v1":
+        if maximum_turns_per_generation != 2 or turn_index not in {1, 2}:
+            raise CognitiveTurnBlocked(
+                "benchmark_turn_policy_invalid",
+                "The fixed plan/revision arm requires exactly two turns per generation.",
+            )
+        if turn_index == 2:
+            predecessor = db.scalar(
+                select(models.BenchmarkLLMPlanRevisionCheckpoint.id)
+                .join(
+                    models.HarnessCognitiveTurnOutcome,
+                    models.HarnessCognitiveTurnOutcome.turn_receipt_id
+                    == models.BenchmarkLLMPlanRevisionCheckpoint.cognitive_turn_receipt_id,
+                )
+                .where(
+                    models.BenchmarkLLMPlanRevisionCheckpoint.job_id == job.id,
+                    models.BenchmarkLLMPlanRevisionCheckpoint.adapter_id == adapter_id,
+                    models.BenchmarkLLMPlanRevisionCheckpoint.generation_index == generation_index,
+                    models.BenchmarkLLMPlanRevisionCheckpoint.turn_index == 1,
+                    models.BenchmarkLLMPlanRevisionCheckpoint.turn_role == "plan",
+                    models.HarnessCognitiveTurnOutcome.status == "succeeded",
+                )
+            )
+            if predecessor is None:
+                raise CognitiveTurnBlocked(
+                    "cognitive_predecessor_missing",
+                    "The fixed plan turn has no successful durable checkpoint.",
+                )
     if job.provider_max_retries != 0:
         raise CognitiveTurnBlocked(
             "benchmark_retry_policy_drift",
@@ -606,6 +646,9 @@ def begin_benchmark_llm_turn(
         "llm_direct/v1": "preregistered-direct-turn",
         "llm_react/v1": "bounded-react-turn",
         "llambo_uav/v1": "preregistered-llambo-uav-turn",
+        "dronedream_fixed_two_turn/v1": (
+            "fixed-plan-turn" if turn_index == 1 else "fixed-revision-turn"
+        ),
     }[adapter_id]
     return _commit_cognitive_turn(
         db,
@@ -617,6 +660,7 @@ def begin_benchmark_llm_turn(
             "llm_direct/v1": "benchmark-llm-direct-v1",
             "llm_react/v1": "benchmark-llm-react-v1",
             "llambo_uav/v1": "benchmark-llambo-uav-v1",
+            "dronedream_fixed_two_turn/v1": "benchmark-fixed-two-turn-v1",
         }[adapter_id],
         trigger_reasons=(trigger_reason,),
         model_snapshot=model_snapshot,
