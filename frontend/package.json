@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "field:dev": "vite --config vite.field.config.ts",
+    "field:build": "tsc -b && vite build --config vite.field.config.ts",
+    "field:preview": "vite preview --config vite.field.config.ts",
     "audit:dependencies": "node scripts/audit-dependencies.mjs",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
