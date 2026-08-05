@@ -235,12 +235,23 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
   for (const heading of expected.headings) {
     if (!headings.includes(heading)) violations.push(`missing product heading: ${heading}`);
   }
-  const pendingIconSlots = cards.map((card) => card.querySelector('[data-icon-donor="pending"]'));
-  if (pendingIconSlots.some((slot) => !slot)) violations.push("canonical icon donor pending contract is missing");
-  if (pendingIconSlots.some(visible)) violations.push("temporary icon placeholder is visible");
-  if (cards.some((card) => card.querySelector(".site-product-edition-icon img"))) {
-    violations.push("an icon is rendered before the canonical donor is available");
+  const editionMarks = cards.map((card) => card.querySelector("img.site-product-edition-icon"));
+  if (editionMarks.some((mark) => !mark)) violations.push("approved edition mark is missing");
+  if (editionMarks.some((mark) => !visible(mark))) violations.push("approved edition mark is not visible");
+  if (editionMarks.some((mark) => mark?.dataset.brandHandoff !== "commander-approved-brand-handoff-v2")) {
+    violations.push("edition mark does not declare the approved brand handoff");
   }
+  if (editionMarks.some((mark) => !mark?.complete || mark.naturalWidth !== 1024 || mark.naturalHeight !== 1024)) {
+    violations.push("edition mark source dimensions are not 1024x1024");
+  }
+  if (editionMarks.some((mark) => {
+    if (!mark) return true;
+    const rect = mark.getBoundingClientRect();
+    return Math.abs(rect.width - rect.height) > tolerance || mark.naturalWidth / rect.width < 4;
+  })) {
+    violations.push("edition mark is cropped or undersampled at the rendered size");
+  }
+  if (document.querySelector('[data-icon-donor="pending"]')) violations.push("icon donor remains pending");
   if (document.querySelector(".site-product-edition-visual")) {
     violations.push("legacy rounded product visual remains");
   }
@@ -298,7 +309,11 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
     nav,
     headings,
     productCardHeights: heights,
-    iconDonorState: "pending",
+    iconHandoff: editionMarks.map((mark) => ({
+      source: mark?.getAttribute("src") ?? null,
+      width: mark ? Math.round(mark.getBoundingClientRect().width) : 0,
+      naturalWidth: mark?.naturalWidth ?? 0,
+    })),
     uniqueThemeCount: new Set(themeTokens).size,
     universalDisabledPresent: Boolean(universalButton),
     currentPreviewPresent: Boolean(document.querySelector(".site-product-current")),

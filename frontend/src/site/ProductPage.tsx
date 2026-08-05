@@ -4,6 +4,7 @@ import {
   type EditionAvailabilityDocument,
   type PrimaryEditionId,
 } from "./editionAvailability";
+import { editionBrandAssets } from "./editionBrandAssets";
 
 type Locale = "en" | "zh-CN";
 
@@ -78,7 +79,7 @@ export function ProductPage({
   const editions = primaryEditionIds.map((id) => {
     const edition = availability.editions.find((candidate) => candidate.id === id);
     if (!edition) throw new Error(`Missing required edition metadata: ${id}`);
-    return { edition, text: text.editions[id] };
+    return { id, edition, text: text.editions[id] };
   });
 
   return (
@@ -89,8 +90,9 @@ export function ProductPage({
         </header>
 
         <div className="site-product-page-grid">
-          {editions.map(({ edition, text: editionText }) => {
+          {editions.map(({ id, edition, text: editionText }) => {
             const ready = isEditionDownloadReady(edition);
+            const brandAssets = editionBrandAssets[id];
             const titleId = `site-product-${edition.id}-title`;
             return (
               <article
@@ -101,10 +103,14 @@ export function ProductPage({
                 key={edition.id}
               >
                 <div className="site-product-edition-brand">
-                  <div
+                  <img
+                    alt=""
                     aria-hidden="true"
                     className="site-product-edition-icon"
-                    data-icon-donor="pending"
+                    data-brand-handoff="commander-approved-brand-handoff-v2"
+                    height="1024"
+                    src={brandAssets.mark}
+                    width="1024"
                   />
                   <h2 id={titleId}>{editionText.title}</h2>
                 </div>

@@ -37,8 +37,16 @@ describe("ProductPage", () => {
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
-    expect(container.querySelectorAll('[data-icon-donor="pending"]')).toHaveLength(3);
-    expect(container.querySelectorAll(".site-product-edition-icon img")).toHaveLength(0);
+    const editionMarks = container.querySelectorAll(
+      'img.site-product-edition-icon[data-brand-handoff="commander-approved-brand-handoff-v2"]',
+    );
+    expect(editionMarks).toHaveLength(3);
+    expect([...editionMarks].map((image) => image.getAttribute("src"))).toEqual([
+      expect.stringContaining("dronedream-sim-mark.png"),
+      expect.stringContaining("dronedream-lab-mark.png"),
+      expect.stringContaining("dronedream-field-mark.png"),
+    ]);
+    expect(container.querySelector('[data-icon-donor="pending"]')).toBeNull();
     expect(container.querySelector(".site-product-edition-visual")).toBeNull();
     expect(container.querySelector(".site-product-current")).toBeNull();
     expect(screen.queryByText("In preparation")).toBeNull();
