@@ -9,11 +9,11 @@ import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
+  Box,
   BotMessageSquare,
   Camera,
   CircleUserRound,
   Download,
-  GraduationCap,
   History,
   ImagePlus,
   LayoutDashboard,
@@ -99,7 +99,11 @@ import type {
   UserDefaultTrackType,
   UserExperiencePreferences,
 } from "./types/api";
-import { ECE498BH_COURSE_URL } from "./externalLinks";
+import {
+  SimEditionBadge,
+  SimEditionSettingsPanel,
+} from "./editions/sim/SimEditionExperience";
+import { simCopy } from "./editions/sim/profile";
 
 const NAV_ITEMS: {
   to: string;
@@ -109,8 +113,15 @@ const NAV_ITEMS: {
   desktopTo?: string;
   requiresRuntime?: boolean;
   externalUrl?: string;
+  simLabel?: boolean;
   icon: LucideIcon;
 }[] = [
+  {
+    to: "/sim",
+    simLabel: true,
+    end: true,
+    icon: Box,
+  },
   {
     to: "/assistant",
     labelKey: "app.conversation",
@@ -129,12 +140,6 @@ const NAV_ITEMS: {
     to: "/scenarios",
     labelKey: "app.fixedScenarios",
     icon: MapPinned,
-  },
-  {
-    to: ECE498BH_COURSE_URL,
-    label: "ECE498BH",
-    externalUrl: ECE498BH_COURSE_URL,
-    icon: GraduationCap,
   },
 ];
 
@@ -706,6 +711,7 @@ function SettingsDialog({
           <i aria-hidden="true">✓</i>
         </button>
       </fieldset>
+      <SimEditionSettingsPanel />
       <DistributionSetupPanel variant="settings" />
       <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
         <div className="settings-memory-heading">
@@ -2013,6 +2019,7 @@ function AppShellContent() {
   const adminAccess = useAdminAccess();
   const updater = useAppUpdaterState();
   const { locale, t } = useI18n();
+  const simUi = simCopy(locale);
   const accountCopy = ACCOUNT_COPY[locale];
   const mobileNavigationEnabled = useSyncExternalStore(
     subscribeToMobileNavigation,
@@ -2511,8 +2518,13 @@ function AppShellContent() {
           {t("app.skipToContent")}
         </a>
         <header className="launcher-chrome">
-          <Link to="/desktop/setup" className="launcher-brand" aria-label="DroneDream">
+          <Link
+            to="/desktop/setup"
+            className="launcher-brand launcher-brand-edition"
+            aria-label="DroneDream Sim"
+          >
             <BrandLockup variant="compact" />
+            <SimEditionBadge compact />
           </Link>
           <div className="launcher-chrome-actions">
             <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
@@ -2574,7 +2586,7 @@ function AppShellContent() {
       </a>
       <aside className="app-sidebar">
         {desktopRuntime ? (
-          <Link to="/assistant" className="app-title" aria-label="DroneDream">
+          <Link to="/sim" className="app-title" aria-label="DroneDream Sim">
             <BrandLockup variant="compact" />
           </Link>
         ) : (
@@ -2619,7 +2631,13 @@ function AppShellContent() {
               <>
                 <span className="app-nav-entry">
                   <ItemIcon aria-hidden="true" strokeWidth={1.75} />
-                  <span>{item.labelKey ? t(item.labelKey) : item.label}</span>
+                  <span>
+                    {item.simLabel
+                      ? simUi.navOverview
+                      : item.labelKey
+                        ? t(item.labelKey)
+                        : item.label}
+                  </span>
                 </span>
                 {runtimeLocked ? (
                   <span className="nav-runtime-badge" aria-hidden="true">
@@ -2765,7 +2783,9 @@ function AppShellContent() {
       </aside>
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
-          <div className="app-header-title">DroneDream — {t("app.platform")}</div>
+          <div className="app-header-title">
+            DroneDream Sim — {simUi.workspaceTitle}
+          </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">
               <button

@@ -15,7 +15,6 @@ import {
 } from "../features/distribution/catalog";
 import {
   buildDistributionInstallationPreview,
-  createDefaultDistributionSelection,
   DISTRIBUTION_SELECTION_STORAGE_KEY,
   normalizeDistributionSelection,
   parseDistributionSelectionDraft,
@@ -23,13 +22,18 @@ import {
   type DistributionSelectionIssueCode,
 } from "../features/distribution/installationSelection";
 import { useI18n } from "../i18n/I18nProvider";
+import {
+  SIM_EDITION,
+  defaultSimDistributionSelection,
+  lockDistributionSelectionToSim,
+} from "../editions/sim/profile";
 
 type DistributionSetupVariant = "settings" | "setup";
 
 const COPY = {
   en: {
-    title: "Edition & Vehicle Pack",
-    description: "Choose one shared DroneDream core, a region, and a versioned vehicle profile.",
+    title: "Simulation & Vehicle Pack",
+    description: "Choose a region and a versioned simulation vehicle profile for DroneDream Sim.",
     previewOnly: "Selection preview",
     edition: "Edition",
     region: "Region",
@@ -66,8 +70,8 @@ const COPY = {
     },
   },
   "zh-CN": {
-    title: "版本与机型包",
-    description: "选择同一套 DroneDream 核心、使用地区和版本化机型配置。",
+    title: "仿真与机型包",
+    description: "为 DroneDream Sim 选择使用地区和版本化仿真机型配置。",
     previewOnly: "仅选择预览",
     edition: "产品版本",
     region: "使用地区",
@@ -106,11 +110,13 @@ const COPY = {
 } as const;
 
 function initialSelection(locale: DistributionLocale): DistributionSelectionDraft {
-  const fallback = createDefaultDistributionSelection(locale === "zh-CN" ? "cn" : "global");
+  const fallback = defaultSimDistributionSelection(locale === "zh-CN" ? "cn" : "global");
   try {
     const saved = window.localStorage.getItem(DISTRIBUTION_SELECTION_STORAGE_KEY);
     if (!saved) return fallback;
-    return parseDistributionSelectionDraft(JSON.parse(saved));
+    return lockDistributionSelectionToSim(
+      parseDistributionSelectionDraft(JSON.parse(saved)),
+    );
   } catch {
     return fallback;
   }
@@ -140,7 +146,7 @@ export function DistributionSetupPanel({
   >({ status: isDesktopRuntime() ? "checking" : "browser" });
   const preview = buildDistributionInstallationPreview(selection);
   const updateSelection = (next: DistributionSelectionDraft) => {
-    setSelection(normalizeDistributionSelection(next));
+    setSelection(lockDistributionSelectionToSim(normalizeDistributionSelection(next)));
   };
 
   useEffect(() => {
@@ -186,6 +192,7 @@ export function DistributionSetupPanel({
       aria-labelledby={`${id}-title`}
       data-can-apply="false"
       data-edition={selection.editionId}
+      data-capability-boundary="simulation-only"
       data-native-plan-status={nativePlanState.status}
     >
       <header className="distribution-setup-heading">
@@ -202,24 +209,17 @@ export function DistributionSetupPanel({
         </span>
       </header>
 
-      <fieldset className="distribution-edition-options">
-        <legend>{copy.edition}</legend>
-        {DISTRIBUTION_CATALOG.editions.map((edition) => (
-          <label key={edition.editionId}>
-            <input
-              type="radio"
-              name={`${id}-edition`}
-              value={edition.editionId}
-              checked={selection.editionId === edition.editionId}
-              onChange={() => updateSelection({ ...selection, editionId: edition.editionId })}
-            />
-            <span>
-              <strong>{localizedDistributionText(edition.displayName, localeKey)}</strong>
-              <small>{localizedDistributionText(edition.description, localeKey)}</small>
-            </span>
-          </label>
-        ))}
-      </fieldset>
+      <div className="distribution-sim-locked-edition" aria-label={copy.edition}>
+        <span>
+          <strong>
+            {localizedDistributionText(preview.edition.displayName, localeKey)}
+          </strong>
+          <small>
+            {localizedDistributionText(preview.edition.description, localeKey)}
+          </small>
+        </span>
+        <span>{SIM_EDITION.releaseState}</span>
+      </div>
 
       <div className="distribution-selection-grid">
         <label htmlFor={`${id}-region`}>

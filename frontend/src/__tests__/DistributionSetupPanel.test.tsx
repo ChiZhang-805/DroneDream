@@ -77,7 +77,9 @@ describe("DistributionSetupPanel", () => {
   it("starts with the simulation reference and exposes no install action", () => {
     const { container } = renderPanel();
 
-    expect(screen.getByRole("radio", { name: /DroneDream Sim/ })).toBeChecked();
+    expect(screen.getByText("DroneDream Sim")).toBeInTheDocument();
+    expect(screen.queryByText(/DroneDream Lab/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/DroneDream Field/)).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Vehicle Pack/ })).toHaveValue(
       "px4-gazebo-x500-reference",
     );
@@ -87,32 +89,41 @@ describe("DistributionSetupPanel", () => {
     expect(container.querySelector("[data-can-apply='false']")).toBeTruthy();
   });
 
-  it("normalizes edition and region changes and persists only the versioned draft", () => {
-    renderPanel("settings");
-
-    fireEvent.click(screen.getByRole("radio", { name: /DroneDream Field/ }));
-    fireEvent.change(screen.getByRole("combobox", { name: /Region/ }), {
-      target: { value: "cn" },
-    });
-
-    expect(screen.getByRole("combobox", { name: /Vehicle Pack/ })).toHaveValue(
-      "amovlab-mfp450-pixhawk6c",
-    );
-    expect(screen.getByRole("combobox", { name: /Flight controller/ })).toHaveValue(
-      "Holybro::Pixhawk 6C",
-    );
-    fireEvent.click(screen.getByRole("checkbox", { name: "qgroundcontrol external" }));
-
-    const saved = JSON.parse(
-      window.localStorage.getItem(DISTRIBUTION_SELECTION_STORAGE_KEY) ?? "null",
-    );
-    expect(parseDistributionSelectionDraft(saved)).toEqual({
+  it("rejects a stored Field selection and persists only the locked Sim draft", async () => {
+    window.localStorage.setItem(DISTRIBUTION_SELECTION_STORAGE_KEY, JSON.stringify({
       schemaVersion: 1,
       editionId: "field",
       region: "cn",
       vehiclePackId: "amovlab-mfp450-pixhawk6c",
       controllerKey: "Holybro::Pixhawk 6C",
       optionalModules: ["qgroundcontrol-external"],
+    }));
+    renderPanel("settings");
+
+    fireEvent.change(screen.getByRole("combobox", { name: /Region/ }), {
+      target: { value: "cn" },
+    });
+
+    expect(screen.getByRole("combobox", { name: /Vehicle Pack/ })).toHaveValue(
+      "px4-gazebo-x500-reference",
+    );
+    expect(screen.queryByRole("combobox", { name: /Flight controller/ }))
+      .not.toBeInTheDocument();
+    expect(screen.queryByText(/qgroundcontrol/i)).not.toBeInTheDocument();
+
+    await waitFor(() => expect(
+      window.localStorage.getItem(DISTRIBUTION_SELECTION_STORAGE_KEY),
+    ).toContain('"editionId":"sim"'));
+    const saved = JSON.parse(window.localStorage.getItem(
+      DISTRIBUTION_SELECTION_STORAGE_KEY,
+    ) ?? "null");
+    expect(parseDistributionSelectionDraft(saved)).toEqual({
+      schemaVersion: 1,
+      editionId: "sim",
+      region: "cn",
+      vehiclePackId: "px4-gazebo-x500-reference",
+      controllerKey: null,
+      optionalModules: [],
     });
     expect(JSON.stringify(saved)).not.toMatch(/password|api.?key|secret/i);
   });
@@ -130,7 +141,7 @@ describe("DistributionSetupPanel", () => {
 
     renderPanel();
 
-    expect(screen.getByRole("radio", { name: /DroneDream Sim/ })).toBeChecked();
+    expect(screen.getByText("DroneDream Sim")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Vehicle Pack/ })).toHaveValue(
       "px4-gazebo-x500-reference",
     );
@@ -140,7 +151,7 @@ describe("DistributionSetupPanel", () => {
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
     renderPanel();
 
-    expect(screen.getByRole("heading", { name: "版本与机型包" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "仿真与机型包" })).toBeInTheDocument();
     expect(screen.getByText("网页只保存选择草稿，不能安装模块或控制真机。"))
       .toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /机型包/ })).toHaveValue(

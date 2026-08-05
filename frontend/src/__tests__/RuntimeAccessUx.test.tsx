@@ -188,28 +188,12 @@ afterEach(() => {
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Fixed Scenarios" }))
       .toHaveAttribute("href", "/scenarios");
-    const courseLink = screen.getByRole("link", { name: "ECE498BH" });
-    expect(courseLink)
+    const simOverviewLink = screen.getByRole("link", { name: "Sim Overview" });
+    expect(simOverviewLink)
       .not.toHaveClass("runtime-locked");
-    expect(courseLink)
-      .toHaveAttribute(
-        "href",
-        "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
-      );
-    expect(courseLink)
-      .toHaveAttribute("target", "_blank");
-    fireEvent.click(courseLink);
-    await waitFor(() => {
-      expect(openerMocks.openUrl).toHaveBeenCalledWith(
-        "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
-      );
-    });
-    openerMocks.openUrl.mockRejectedValueOnce(new Error("browser unavailable"));
-    fireEvent.click(courseLink);
-    expect(await screen.findByRole("alert"))
-      .toHaveTextContent(/course page could not be opened/i);
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(simOverviewLink).toHaveAttribute("href", "/sim");
+    expect(screen.queryByRole("link", { name: "ECE498BH" }))
+      .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Experiment" }))
       .not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New Batch" })).not.toBeInTheDocument();

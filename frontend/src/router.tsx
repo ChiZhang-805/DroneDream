@@ -17,7 +17,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         ? null
         : redirect(`/dashboard?settings=runtime&required=${feature}`)
       : undefined;
-  const fallbackPath = "/assistant";
+  const fallbackPath = "/sim";
 
   return [
     {
@@ -28,7 +28,14 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           index: true,
           element: desktopRuntime
             ? <Navigate to="/desktop/setup" replace />
-            : <Navigate to="/assistant" replace />,
+            : <Navigate to="/sim" replace />,
+        },
+        {
+          path: "sim",
+          lazy: async () => {
+            const { SimOverview } = await import("./pages/SimOverview");
+            return { Component: SimOverview };
+          },
         },
         {
           path: "assistant",
@@ -106,6 +113,22 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             const { DesktopSetup } = await import("./pages/DesktopSetup");
             return { Component: DesktopSetup };
           },
+        },
+        {
+          path: "lab/*",
+          loader: () => redirect("/sim?blocked=lab"),
+        },
+        {
+          path: "field/*",
+          loader: () => redirect("/sim?blocked=field"),
+        },
+        {
+          path: "hitl/*",
+          loader: () => redirect("/sim?blocked=hitl"),
+        },
+        {
+          path: "hardware/*",
+          loader: () => redirect("/sim?blocked=hardware"),
         },
         { path: "*", loader: () => redirect(fallbackPath) },
       ],

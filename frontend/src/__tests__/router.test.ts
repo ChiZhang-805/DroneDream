@@ -243,7 +243,7 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const desktop = await import("../router");
     await desktop.router.navigate("/removed-route");
-    expect(desktop.router.state.location.pathname).toBe("/dashboard");
+    expect(desktop.router.state.location.pathname).toBe("/sim");
     desktop.router.dispose();
 
     delete window.__TAURI__;
@@ -251,7 +251,7 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const browser = await import("../router");
     await browser.router.navigate("/removed-route");
-    expect(browser.router.state.location.pathname).toBe("/assistant");
+    expect(browser.router.state.location.pathname).toBe("/sim");
     expect(window.location.hash).toBe("");
     browser.router.dispose();
   });
@@ -267,4 +267,20 @@ describe("environment-aware routing", () => {
 
     router.dispose();
   });
+
+  it.each(["lab", "field", "hitl", "hardware"])(
+    "fails closed when navigating to the %s route family",
+    async (routeFamily) => {
+      delete window.__TAURI__;
+      window.history.replaceState(null, "", "/sim");
+      vi.resetModules();
+      const { router } = await import("../router");
+
+      await router.navigate(`/${routeFamily}/preview`);
+      expect(router.state.location.pathname).toBe("/sim");
+      expect(router.state.location.search).toBe(`?blocked=${routeFamily}`);
+
+      router.dispose();
+    },
+  );
 });

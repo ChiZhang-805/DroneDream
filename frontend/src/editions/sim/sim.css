@@ -1,0 +1,316 @@
+.sim-edition-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-height: 30px;
+  padding: 0.35rem 0.58rem;
+  border: 1px solid color-mix(in srgb, var(--primary, #c642ad) 42%, var(--border, #ded5e2));
+  border-radius: 6px;
+  color: var(--primary-strong, #8d43cc);
+  background: color-mix(in srgb, var(--primary, #c642ad) 7%, white);
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1;
+}
+
+.sim-edition-badge svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sim-edition-badge-compact {
+  flex: 0 0 auto;
+  min-height: 27px;
+  padding: 0.28rem 0.48rem;
+}
+
+.app-shell-launcher .sim-edition-badge {
+  border-color: rgba(208, 177, 255, 0.36);
+  color: #ead9ff;
+  background: rgba(128, 76, 192, 0.16);
+}
+
+.launcher-brand-edition {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.75rem;
+}
+
+.sim-settings-panel {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.sim-settings-panel h3,
+.sim-settings-panel p {
+  margin: 0;
+}
+
+.sim-settings-panel h3 {
+  margin-top: 0.12rem;
+  font-size: 1rem;
+}
+
+.sim-settings-panel p {
+  max-width: 58ch;
+  margin-top: 0.28rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.sim-settings-kicker,
+.sim-overview-eyebrow,
+.sim-setup-preview > div > span {
+  color: var(--primary-strong, #8d43cc);
+  font-size: 0.68rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.sim-overview-page {
+  display: grid;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  gap: 0;
+}
+
+.sim-overview-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(260px, 0.65fr);
+  align-items: end;
+  gap: clamp(1.5rem, 4vw, 4rem);
+  padding: clamp(1.25rem, 3vw, 2.5rem) 0 2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.sim-overview-header h1 {
+  margin: 0.32rem 0 0;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+  line-height: 1.05;
+}
+
+.sim-overview-header p {
+  max-width: 68ch;
+  margin: 0.75rem 0 0;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.sim-overview-state {
+  display: grid;
+  justify-items: start;
+  gap: 0.58rem;
+  padding-left: 1rem;
+  border-left: 3px solid var(--primary);
+}
+
+.sim-overview-state > span {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.sim-overview-state code {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+}
+
+.sim-overview-band {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.36fr) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  padding: 1.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sim-band-heading h2,
+.sim-band-heading p,
+.sim-boundary-band h2,
+.sim-boundary-band p,
+.sim-setup-preview h2,
+.sim-setup-preview p,
+.sim-route-blocked h2,
+.sim-route-blocked p {
+  margin: 0;
+}
+
+.sim-band-heading h2,
+.sim-boundary-band h2,
+.sim-setup-preview h2 {
+  font-size: 1.05rem;
+}
+
+.sim-band-heading p,
+.sim-boundary-band p,
+.sim-setup-preview p,
+.sim-route-blocked p {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.sim-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.sim-capability-item {
+  display: grid;
+  align-content: space-between;
+  min-height: 94px;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elev);
+}
+
+.sim-capability-item svg,
+.sim-dependency-list svg {
+  width: 20px;
+  height: 20px;
+  color: var(--primary-strong);
+}
+
+.sim-capability-item strong {
+  font-size: 0.82rem;
+}
+
+.sim-dependency-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.sim-dependency-list > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 52px;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.sim-dependency-list strong {
+  font-size: 0.82rem;
+}
+
+.sim-dependency-list span {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.sim-boundary-band {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+}
+
+.sim-boundary-band > svg,
+.sim-route-blocked > svg {
+  width: 22px;
+  height: 22px;
+  color: #16785c;
+}
+
+.sim-setup-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.7rem 0;
+}
+
+.sim-setup-preview .btn {
+  white-space: nowrap;
+}
+
+.sim-setup-preview .btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.sim-route-blocked {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #b9ded2;
+  border-radius: 6px;
+  background: #f4fbf8;
+}
+
+.sim-route-blocked h2 {
+  font-size: 0.92rem;
+}
+
+.distribution-sim-locked-edition {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.distribution-sim-locked-edition > span:first-child {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.distribution-sim-locked-edition small {
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .sim-overview-header,
+  .sim-overview-band {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .sim-capability-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .launcher-brand-edition .sim-edition-badge {
+    display: none;
+  }
+
+  .sim-overview-header {
+    padding-top: 0.7rem;
+  }
+
+  .sim-overview-header h1 {
+    font-size: 2.15rem;
+  }
+
+  .sim-capability-grid,
+  .sim-dependency-list,
+  .sim-setup-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .sim-setup-preview .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sim-settings-panel {
+    display: grid;
+  }
+}

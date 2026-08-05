@@ -14,6 +14,7 @@ import { Alert } from "../components/Alert";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
 import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
+import { SimEditionBadge } from "../editions/sim/SimEditionExperience";
 import {
   autoStartInstallerRuntime,
   beginBrowserAuth,
@@ -1637,6 +1638,7 @@ export function DesktopSetup() {
     >
       <header className="page-header desktop-setup-header">
         <div>
+          <SimEditionBadge compact />
           <div className="desktop-eyebrow">{t("desktop.eyebrow")}</div>
           <h1>{t("desktop.title")}</h1>
           <p className="page-header-subtitle">{t("desktop.subtitle")}</p>

@@ -30,7 +30,17 @@
     "distribution/build-planning/",
     "distribution/build-plans/",
     "distribution/composite-installations/sim/",
-    "distribution/release-promotions/sim/"
+    "distribution/release-promotions/sim/",
+    "frontend/src/editions/sim/",
+    "frontend/src/pages/SimOverview.tsx",
+    "frontend/src/AppShell.tsx",
+    "frontend/src/router.tsx",
+    "frontend/src/components/DistributionSetupPanel.tsx",
+    "frontend/src/pages/DesktopSetup.tsx",
+    "frontend/src/__tests__/SimEdition",
+    "frontend/src/__tests__/DistributionSetupPanel.test.tsx",
+    "frontend/src/__tests__/RuntimeAccessUx.test.tsx",
+    "frontend/src/__tests__/router.test.ts"
   ],
   "commonCoreChangePolicy": {
     "commonFixesReturnToBranch": "codex/software",
