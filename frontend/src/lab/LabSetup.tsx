@@ -135,7 +135,7 @@ const COPY = {
     operatorBody:
       "Confirmation requires a short-lived one-time challenge bound to an authorization request. A checkbox or workspace switch is not accepted.",
     challenge: "Operator challenge",
-    challengeUnavailable: "Unavailable until the three authority layers allow",
+    challengeUnavailable: "Unavailable: authority quorum denied",
     confirm: "Confirm hardware action",
     deniedCapabilities: "Denied capability IDs",
   },
@@ -212,7 +212,7 @@ const COPY = {
     operatorBody:
       "人工确认必须使用绑定授权请求的短时一次性 challenge；复选框或工作区切换不被接受。",
     challenge: "操作员 challenge",
-    challengeUnavailable: "三层权限全部允许后才可签发",
+    challengeUnavailable: "不可用：权限法定人数为拒绝",
     confirm: "确认真机动作",
     deniedCapabilities: "被拒绝的能力 ID",
   },

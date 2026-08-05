@@ -132,6 +132,7 @@ try {
     const disabledActions = page.locator(".lab-hardware-actions button:disabled");
     assert.equal(await disabledActions.count(), 4, `${testCase.id}: hardware actions were exposed`);
     assert.equal(await page.locator('.lab-workspace-switch button[aria-pressed="true"]').count(), 1);
+    await page.locator("#lab-panel-setup").scrollIntoViewIfNeeded();
     await assertViewportFits(page, testCase, "hardware");
     evidence.push(await screenshot(page, testCase, "hardware"));
 
@@ -147,8 +148,12 @@ try {
       mimeType: "application/json",
       buffer: fixture,
     });
-    await page.getByText(testCase.locale === "en" ? "PREVIEW ONLY" : "仅预览").waitFor();
+    await page.getByText(
+      testCase.locale === "en" ? "PREVIEW ONLY" : "仅预览",
+      { exact: true },
+    ).waitFor();
     assert.equal(await page.getByText("MPC_XY_P").count(), 1);
+    await page.locator(".lab-evidence-preview").scrollIntoViewIfNeeded();
     await assertViewportFits(page, testCase, "evidence");
     evidence.push(await screenshot(page, testCase, "evidence"));
 
@@ -157,6 +162,7 @@ try {
     assert(await page.getByRole("button", { name: confirmLabel }).isDisabled());
     assert(await page.locator(".lab-operator-confirmation input").isDisabled());
     assert.equal(await page.locator(".lab-quorum > div > strong").count(), 4);
+    await page.locator(".lab-quorum").scrollIntoViewIfNeeded();
     await assertViewportFits(page, testCase, "safety");
     evidence.push(await screenshot(page, testCase, "safety"));
 
