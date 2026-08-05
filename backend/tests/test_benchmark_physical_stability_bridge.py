@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -22,9 +23,14 @@ from app.benchmarking.physical_stability_bridge import (
     dispatch_next_physical_stability_job,
     require_manual_reconciliation_after_unobserved_dispatch,
 )
+from app.benchmarking.physical_stability_checkpoint import (
+    AtomicPhysicalStabilityCheckpointStore,
+)
 from app.benchmarking.physical_stability_execution import (
     PhysicalStabilityExecutionAuthorizationV1,
     build_physical_stability_execution_ledger,
+    record_physical_stability_dispatch_attempt,
+    record_physical_stability_job_observed,
 )
 from app.services.jobs import _validate_real_cli_scenario_effect_contract
 
@@ -376,3 +382,128 @@ def test_terminal_evidence_rejects_missing_artifact_hash_and_effect_drift() -> N
                 checkpoint_store=_Store(),
                 terminal_at_utc=_NOW + timedelta(seconds=2),
             )
+
+
+def _durable_transitions():
+    _manifest, _plan, _bundle, ledger = _contracts()
+    attempted, attempt_transition = record_physical_stability_dispatch_attempt(
+        ledger,
+        scenario_ordinal=1,
+        attempted_at_utc=_NOW,
+    )
+    running, observed_transition = record_physical_stability_job_observed(
+        attempted,
+        scenario_ordinal=1,
+        observed_job_id="job-p5-checkpoint-unit",
+        observed_at_utc=_NOW + timedelta(seconds=1),
+    )
+    return ledger, attempted, attempt_transition, running, observed_transition
+
+
+def _checkpoint_store(
+    tmp_path: Path,
+    *,
+    initial_ledger_sha256: str,
+    authorization_id: str,
+) -> AtomicPhysicalStabilityCheckpointStore:
+    return AtomicPhysicalStabilityCheckpointStore(
+        tmp_path / "p5-checkpoint-unit",
+        allowed_evidence_root=tmp_path,
+        initial_ledger_sha256=initial_ledger_sha256,
+        authorization_id=authorization_id,
+    )
+
+
+def test_atomic_checkpoint_store_publishes_and_resumes_verified_chain(tmp_path: Path) -> None:
+    ledger, attempted, attempt_transition, running, observed_transition = _durable_transitions()
+    store = _checkpoint_store(
+        tmp_path,
+        initial_ledger_sha256=canonical_sha256(ledger),
+        authorization_id=ledger.authorization_id,
+    )
+
+    store.persist(attempted, attempt_transition)
+    store.persist(running, observed_transition)
+
+    chain = store.load_chain()
+    assert tuple(item.sequence for item in chain) == (1, 2)
+    assert chain[0].previous_checkpoint_sha256 is None
+    assert chain[1].previous_checkpoint_sha256 == chain[0].checkpoint_sha256
+    assert chain[1].transition.before_ledger_sha256 == chain[0].ledger_sha256
+    assert chain[1].ledger == running
+    assert not tuple(store.directory.glob(".*.tmp"))
+    resumed = AtomicPhysicalStabilityCheckpointStore(
+        store.directory,
+        allowed_evidence_root=tmp_path,
+        initial_ledger_sha256=canonical_sha256(ledger),
+        authorization_id=ledger.authorization_id,
+    )
+    assert resumed.load_latest() == chain[-1]
+
+
+def test_atomic_checkpoint_store_rejects_replay_gap_tamper_and_path_escape(
+    tmp_path: Path,
+) -> None:
+    ledger, attempted, attempt_transition, running, observed_transition = _durable_transitions()
+    store = _checkpoint_store(
+        tmp_path,
+        initial_ledger_sha256=canonical_sha256(ledger),
+        authorization_id=ledger.authorization_id,
+    )
+    store.persist(attempted, attempt_transition)
+    with pytest.raises(ValueError, match="continue the durable ledger"):
+        store.persist(attempted, attempt_transition)
+    store.persist(running, observed_transition)
+
+    second = sorted(store.directory.glob("*.json"))[1]
+    original = second.read_bytes()
+    second.write_bytes(original.replace(b'"status":"active"', b'"status":"closed"', 1))
+    with pytest.raises(ValueError, match="SHA|ledger|canonical|valid"):
+        store.load_chain()
+    second.write_bytes(original)
+
+    renamed = second.with_name(second.name.replace("0002-", "0003-", 1))
+    second.rename(renamed)
+    with pytest.raises(ValueError, match="gap"):
+        store.load_chain()
+
+    with pytest.raises(ValueError, match="direct child"):
+        AtomicPhysicalStabilityCheckpointStore(
+            tmp_path / "nested" / "escape",
+            allowed_evidence_root=tmp_path,
+            initial_ledger_sha256=canonical_sha256(ledger),
+            authorization_id=ledger.authorization_id,
+        )
+
+    wrong_root = tmp_path / "wrong-root"
+    wrong_root.mkdir()
+    wrong_store = AtomicPhysicalStabilityCheckpointStore(
+        wrong_root / "p5-checkpoint-unit",
+        allowed_evidence_root=wrong_root,
+        initial_ledger_sha256="f" * 64,
+        authorization_id=ledger.authorization_id,
+    )
+    with pytest.raises(ValueError, match="authorized initial ledger"):
+        wrong_store.persist(attempted, attempt_transition)
+
+
+def test_atomic_checkpoint_store_fsync_failure_leaves_no_published_partial(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ledger, attempted, attempt_transition, _running, _observed_transition = (
+        _durable_transitions()
+    )
+    store = _checkpoint_store(
+        tmp_path,
+        initial_ledger_sha256=canonical_sha256(ledger),
+        authorization_id=ledger.authorization_id,
+    )
+
+    def fail_fsync(_descriptor: int) -> None:
+        raise OSError("injected checkpoint fsync failure")
+
+    monkeypatch.setattr("app.benchmarking.physical_stability_checkpoint.os.fsync", fail_fsync)
+    with pytest.raises(OSError, match="injected checkpoint fsync failure"):
+        store.persist(attempted, attempt_transition)
+    assert not tuple(store.directory.iterdir())
