@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/sim-install-readiness-audit.v1.json",
+  "title": "DroneDream Sim install lifecycle readiness audit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "auditVersion",
+    "editionId",
+    "readinessState",
+    "executionClass",
+    "artifact",
+    "adoption",
+    "staticContracts",
+    "lifecyclePlan",
+    "externalDependencies",
+    "securityAndSigning",
+    "vehiclePackAndCapabilityFence",
+    "negativeAssertions",
+    "nextAuthorization"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-sim-install-lifecycle-readiness-audit"},
+    "auditVersion": {"const": "1.0.0"},
+    "editionId": {"const": "sim"},
+    "readinessState": {"const": "ready-for-yellow-install-lifecycle-validation"},
+    "executionClass": {"const": "GREEN-static-only"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "fileName",
+        "bytes",
+        "sha256",
+        "productSubjectCommit",
+        "postAdoptionEvidenceHead"
+      ],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "fileName": {"const": "DroneDream-Sim-1.0.0.exe"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "productSubjectCommit": {"$ref": "#/$defs/commit"},
+        "postAdoptionEvidenceHead": {"$ref": "#/$defs/commit"}
+      }
+    },
+    "adoption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receiptPath", "receiptSha256", "sidecarPath", "sidecarSha256"],
+      "properties": {
+        "receiptPath": {"$ref": "#/$defs/safePath"},
+        "receiptSha256": {"$ref": "#/$defs/sha256"},
+        "sidecarPath": {"$ref": "#/$defs/safePath"},
+        "sidecarSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "staticContracts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "coverage"],
+        "properties": {
+          "path": {"$ref": "#/$defs/safePath"},
+          "sha256": {"$ref": "#/$defs/sha256"},
+          "coverage": {"$ref": "#/$defs/textArray"}
+        }
+      }
+    },
+    "lifecyclePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "freshInstall",
+        "overlayUpgrade",
+        "uninstall",
+        "rollback",
+        "shortcuts",
+        "locales",
+        "webView2"
+      ],
+      "properties": {
+        "freshInstall": {"$ref": "#/$defs/lifecycleStep"},
+        "overlayUpgrade": {"$ref": "#/$defs/lifecycleStep"},
+        "uninstall": {"$ref": "#/$defs/lifecycleStep"},
+        "rollback": {"$ref": "#/$defs/lifecycleStep"},
+        "shortcuts": {"$ref": "#/$defs/lifecycleStep"},
+        "locales": {"$ref": "#/$defs/lifecycleStep"},
+        "webView2": {"$ref": "#/$defs/lifecycleStep"}
+      }
+    },
+    "externalDependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtimeBase", "enginePack"],
+      "properties": {
+        "runtimeBase": {"$ref": "#/$defs/externalDependency"},
+        "enginePack": {"$ref": "#/$defs/externalDependency"}
+      }
+    },
+    "securityAndSigning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authenticodeStatus",
+        "peCertificateTableEmpty",
+        "sigSidecarPathExists",
+        "updaterSignatureState",
+        "unsignedDisclosureRequired",
+        "unsignedDisclosurePresent"
+      ],
+      "properties": {
+        "authenticodeStatus": {"const": "NotSigned"},
+        "peCertificateTableEmpty": {"const": true},
+        "sigSidecarPathExists": {"const": false},
+        "updaterSignatureState": {"const": "not-issued"},
+        "unsignedDisclosureRequired": {"const": true},
+        "unsignedDisclosurePresent": {"const": true}
+      }
+    },
+    "vehiclePackAndCapabilityFence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validatedVehiclePackCount",
+        "allowedCapabilities",
+        "forbiddenCapabilities",
+        "forbiddenEditionIds"
+      ],
+      "properties": {
+        "validatedVehiclePackCount": {"const": 0},
+        "allowedCapabilities": {"$ref": "#/$defs/idArray"},
+        "forbiddenCapabilities": {"$ref": "#/$defs/idArray"},
+        "forbiddenEditionIds": {"$ref": "#/$defs/idArray"}
+      }
+    },
+    "negativeAssertions": {"type": "object"},
+    "nextAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["yellowRequiresApproval", "yellowScope", "redRequiresApproval", "redScope"],
+      "properties": {
+        "yellowRequiresApproval": {"const": true},
+        "yellowScope": {"$ref": "#/$defs/textArray"},
+        "redRequiresApproval": {"const": true},
+        "redScope": {"$ref": "#/$defs/textArray"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "idArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "textArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 512}
+    },
+    "lifecycleStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "nextValidationClass", "checks", "blockers"],
+      "properties": {
+        "status": {"const": "planned-not-executed"},
+        "nextValidationClass": {"enum": ["YELLOW", "RED"]},
+        "checks": {"$ref": "#/$defs/textArray"},
+        "blockers": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 512}
+        }
+      }
+    },
+    "externalDependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "embedded", "requiredForFullStack", "evidence"],
+      "properties": {
+        "mode": {"const": "external-dependency"},
+        "embedded": {"const": false},
+        "requiredForFullStack": {"const": true},
+        "evidence": {"type": "object"}
+      }
+    }
+  }
+}

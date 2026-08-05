@@ -13,6 +13,16 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = ROOT / "distribution" / "sim" / "build-profile.v1.json"
 SCHEMA_PATH = ROOT / "distribution" / "sim" / "schemas" / "sim-installer-receipt.schema.json"
+READINESS_SCHEMA_PATH = (
+    ROOT / "distribution" / "sim" / "schemas" / "sim-install-readiness-audit.schema.json"
+)
+READINESS_AUDIT_PATH = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "sim-preview-1.0.0-2aec69e.install-readiness-audit.v1.json"
+)
 TOOL_PATH = ROOT / "distribution" / "sim" / "tools" / "sim_installer_contract.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_installer_contract", TOOL_PATH)
@@ -108,6 +118,17 @@ class SimInstallerContractTests(unittest.TestCase):
                 artifact_path=artifact,
             )
 
+    def readiness_audit(self) -> dict[str, Any]:
+        return load_json(READINESS_AUDIT_PATH)
+
+    def validate_readiness(self, audit: object) -> dict[str, Any]:
+        return sim_contract.validate_install_readiness_audit(
+            audit,
+            profile=self.profile,
+            profile_path=PROFILE_PATH,
+            repo_root=ROOT,
+        )
+
     def test_receipt_schema_is_closed_and_sim_only(self) -> None:
         schema = load_json(SCHEMA_PATH)
         self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
@@ -116,6 +137,23 @@ class SimInstallerContractTests(unittest.TestCase):
         self.assertEqual(
             schema["properties"]["artifact"]["properties"]["fileName"]["const"],
             "DroneDream-Sim-1.0.0.exe",
+        )
+
+    def test_readiness_schema_is_closed_and_sim_only(self) -> None:
+        schema = load_json(READINESS_SCHEMA_PATH)
+        self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
+        self.assertFalse(schema["additionalProperties"])
+        self.assertEqual(schema["properties"]["editionId"]["const"], "sim")
+        self.assertEqual(schema["properties"]["executionClass"]["const"], "GREEN-static-only")
+        self.assertEqual(
+            schema["properties"]["artifact"]["properties"]["fileName"]["const"],
+            "DroneDream-Sim-1.0.0.exe",
+        )
+        self.assertEqual(
+            schema["properties"]["vehiclePackAndCapabilityFence"]["properties"][
+                "validatedVehiclePackCount"
+            ]["const"],
+            0,
         )
 
     def test_build_profile_is_deterministic_sim_only_and_read_only(self) -> None:
@@ -208,6 +246,64 @@ class SimInstallerContractTests(unittest.TestCase):
         invalid["installLifecycle"]["rollbackPlan"] = "none"
         with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "lifecycle"):
             self.validate(invalid)
+
+    def test_valid_readiness_audit_stays_green_static_and_planned(self) -> None:
+        validated = self.validate_readiness(self.readiness_audit())
+        self.assertEqual(validated["executionClass"], "GREEN-static-only")
+        self.assertFalse(validated["negativeAssertions"]["installed"])
+        self.assertFalse(validated["negativeAssertions"]["rebuilt"])
+        self.assertFalse(validated["negativeAssertions"]["releaseBranchCreated"])
+        self.assertEqual(
+            validated["artifact"]["productSubjectCommit"],
+            "2aec69e88ee8844cff759a025f109e5b938d18c0",
+        )
+        self.assertEqual(
+            validated["artifact"]["postAdoptionEvidenceHead"],
+            "e097b9ea057468bf1602ad1f1c4c5c5e88a65571",
+        )
+        self.assertEqual(
+            validated["vehiclePackAndCapabilityFence"]["validatedVehiclePackCount"],
+            0,
+        )
+
+    def test_readiness_rejects_claimed_lifecycle_execution(self) -> None:
+        invalid = self.readiness_audit()
+        invalid["lifecyclePlan"]["freshInstall"]["status"] = "passed"
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "planned-not-executed"):
+            self.validate_readiness(invalid)
+
+    def test_readiness_rejects_embedded_runtime_or_engine_pack(self) -> None:
+        invalid = self.readiness_audit()
+        invalid["externalDependencies"]["runtimeBase"]["embedded"] = True
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "runtimeBase"):
+            self.validate_readiness(invalid)
+
+        invalid = self.readiness_audit()
+        invalid["externalDependencies"]["enginePack"]["mode"] = "embedded"
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "enginePack"):
+            self.validate_readiness(invalid)
+
+    def test_readiness_rejects_hardware_hitl_or_lab_field_authority(self) -> None:
+        invalid = self.readiness_audit()
+        invalid["vehiclePackAndCapabilityFence"]["allowedCapabilities"].append("hardware.arm")
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "allowed capabilities"):
+            self.validate_readiness(invalid)
+
+        invalid = self.readiness_audit()
+        invalid["vehiclePackAndCapabilityFence"]["forbiddenEditionIds"] = ["lab"]
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "Lab and Field"):
+            self.validate_readiness(invalid)
+
+    def test_readiness_rejects_validation_or_promotion_claims(self) -> None:
+        invalid = self.readiness_audit()
+        invalid["vehiclePackAndCapabilityFence"]["validatedVehiclePackCount"] = 1
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "zero validated packs"):
+            self.validate_readiness(invalid)
+
+        invalid = self.readiness_audit()
+        invalid["negativeAssertions"]["promotionReady"] = True
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "must all remain false"):
+            self.validate_readiness(invalid)
 
 
 if __name__ == "__main__":

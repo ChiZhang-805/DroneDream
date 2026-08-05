@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-install-lifecycle-readiness-audit",
+  "auditVersion": "1.0.0",
+  "editionId": "sim",
+  "readinessState": "ready-for-yellow-install-lifecycle-validation",
+  "executionClass": "GREEN-static-only",
+  "artifact": {
+    "path": "Z:/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/sim-preview-1.0.0-2aec69e/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11347564,
+    "sha256": "b7d8481a6bf79678b7ca80ead7c4bf01a7a65bbeb81e93e6e4f28d0cea205863",
+    "productSubjectCommit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+    "postAdoptionEvidenceHead": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
+  },
+  "adoption": {
+    "receiptPath": "distribution/sim/adoptions/sim-preview-1.0.0-2aec69e.adoption-receipt.v1.json",
+    "receiptSha256": "dcc8ed669aa16cd995d247df6c2e2abf9b2a97e2795a721d3a6999ecc42bd412",
+    "sidecarPath": "distribution/sim/adoptions/sim-preview-1.0.0-2aec69e.sidecar.v1.json",
+    "sidecarSha256": "6719105650041a46348779c38ea7e3859f0abec826f13b1064b8b7c53a525c5b"
+  },
+  "staticContracts": [
+    {
+      "path": "desktop/src-tauri/nsis/installer.nsi",
+      "sha256": "29ea70929025661177107c1c0e072e2ac7d9ecc46e188a1ddf4c5de11642e45e",
+      "coverage": ["fresh-install", "overlay-upgrade", "uninstall", "shortcut", "license-notice"]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
+      "sha256": "c6f99b0b6627703030aef0637e68a045ccda7fd4aa28ccb0c2c4b3d430c4dfaa",
+      "coverage": ["runtime-external", "rollback", "fresh-install", "overlay-upgrade", "uninstall"]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/webview2-health.nsh",
+      "sha256": "30ac4b811b69038344e0b2be5563d2d01911a78b0efb60937fd09cfac1efda46",
+      "coverage": ["webview2"]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/installer-languages.nsh",
+      "sha256": "fc648accb1b26a2e0e1638d6dca63328ffa7a35f0b2fc9d1feb02cf909a09314",
+      "coverage": ["en-locale", "zh-locale"]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/languages/English.nsh",
+      "sha256": "dc692a717843afeda05a28fb5b572d86e60f2ca337ba1032ed6aa579e9d2f7b8",
+      "coverage": ["en-locale"]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/languages/SimpChinese.nsh",
+      "sha256": "b9adb274559b81253176e7fe77fb979b933f88240998a2720fb0e477df7f1e05",
+      "coverage": ["zh-locale"]
+    },
+    {
+      "path": "desktop/scripts/verify-installer-ui.ps1",
+      "sha256": "49a9cc7e965528392b33ea6326fca5d5d5535555874ae85cfedb5120d86bef6d",
+      "coverage": ["fresh-install", "overlay-upgrade", "shortcut", "en-locale", "zh-locale"]
+    },
+    {
+      "path": "desktop/scripts/verify-installer-locales.ps1",
+      "sha256": "a1834a5824f67b590d6060ca3d846aaaddb40141b6ea8792d25bd05687d59740",
+      "coverage": ["en-locale", "zh-locale"]
+    },
+    {
+      "path": "desktop/scripts/verify-webview2-installer.ps1",
+      "sha256": "ea8bc30249dcb7d9a9e4350f9c4c840a9e75c8daf2f990ec21ed5130adcb2df6",
+      "coverage": ["webview2"]
+    },
+    {
+      "path": "desktop/scripts/verify-installer-path-guard.ps1",
+      "sha256": "8303b978fe1d0e0abe4512caf8ce07428604155f3839eae55a73971bfe7217c2",
+      "coverage": ["runtime-external", "fresh-install"]
+    }
+  ],
+  "lifecyclePlan": {
+    "freshInstall": {
+      "status": "planned-not-executed",
+      "nextValidationClass": "YELLOW",
+      "checks": [
+        "run installer in isolated disposable Windows target",
+        "verify app-only fallback and full Runtime option remain visible",
+        "verify exact EXE bytes match adoption receipt before execution",
+        "capture installer diagnostics without starting PX4 or Gazebo"
+      ],
+      "blockers": ["requires installer execution on host"]
+    },
+    "overlayUpgrade": {
+      "status": "planned-not-executed",
+      "nextValidationClass": "YELLOW",
+      "checks": [
+        "stage prior same-version preview in disposable target",
+        "verify non-destructive maintenance option",
+        "verify adopted EXE replaces only bundle-owned files",
+        "verify source-bound receipt remains unchanged"
+      ],
+      "blockers": ["requires controlled overlay install"]
+    },
+    "uninstall": {
+      "status": "planned-not-executed",
+      "nextValidationClass": "YELLOW",
+      "checks": [
+        "silent uninstall removes bundle-owned install directory",
+        "ordinary uninstall preserves app diagnostics unless delete-app-data is selected",
+        "no Runtime root migration or deletion occurs"
+      ],
+      "blockers": ["requires real uninstaller execution"]
+    },
+    "rollback": {
+      "status": "planned-not-executed",
+      "nextValidationClass": "YELLOW",
+      "checks": [
+        "verify same-version replacement requires identical source-bound receipt",
+        "verify rollback target is previous verified Sim promotion or explicit no-prior-release",
+        "verify interrupted maintenance marker can be recovered without Runtime start"
+      ],
+      "blockers": ["requires controlled install interruption or prior release fixture"]
+    },
+    "shortcuts": {
+      "status": "planned-not-executed",
+      "nextValidationClass": "YELLOW",
+      "checks": [
+        "verify Start Menu shortcut points to DroneDream-Sim-1.0.0.exe",
+        "verify optional desktop shortcut target and working directory",
+        "verify uninstall removes shortcut artifacts"
+      ],
+      "blockers": ["requires installer-created shell entries"]
+    },
+    "locales": {
+      "status": "planned-not-executed",
+      "nextValidationClass": "YELLOW",
+      "checks": [
+        "verify English installer flow contains no Simplified Chinese page text",
+        "verify Simplified Chinese installer flow contains no English fallback text",
+        "verify language selector and stored override do not corrupt maintenance flow"
+      ],
+      "blockers": ["requires headed or UI-automation installer run"]
+    },
+    "webView2": {
+      "status": "planned-not-executed",
+      "nextValidationClass": "YELLOW",
+      "checks": [
+        "verify WebView2 bootstrapper is present and Microsoft-signed",
+        "verify WebView2 file-health hook probes before and after prerequisite install",
+        "verify missing WebView2 fails with localized action text"
+      ],
+      "blockers": ["requires generated NSIS or installer execution evidence"]
+    }
+  },
+  "externalDependencies": {
+    "runtimeBase": {
+      "mode": "external-dependency",
+      "embedded": false,
+      "requiredForFullStack": true,
+      "evidence": {
+        "artifactBytes": 11347564,
+        "runtimeBaseReferenceBytes": 6141118464,
+        "artifactSmallerThanRuntimeBaseReference": true,
+        "binaryNeedleFindings": {
+          "runtime-base-full-simulation": false,
+          "rootfs.tar": false,
+          "rootfs.tar.gz": false,
+          "dronedream-runtime-init": false
+        }
+      }
+    },
+    "enginePack": {
+      "mode": "external-dependency",
+      "embedded": false,
+      "requiredForFullStack": true,
+      "evidence": {
+        "profileModule": "engine-pack",
+        "artifactClass": "Sim-default unified-core preview",
+        "notValidatedAsBundledEnginePack": true
+      }
+    }
+  },
+  "securityAndSigning": {
+    "authenticodeStatus": "NotSigned",
+    "peCertificateTableEmpty": true,
+    "sigSidecarPathExists": false,
+    "updaterSignatureState": "not-issued",
+    "unsignedDisclosureRequired": true,
+    "unsignedDisclosurePresent": true
+  },
+  "vehiclePackAndCapabilityFence": {
+    "validatedVehiclePackCount": 0,
+    "allowedCapabilities": [
+      "qualification.simulation.issue",
+      "simulation.execute",
+      "simulation.parameter.write",
+      "simulation.vehicle.arm",
+      "updater.module.apply",
+      "vehicle-pack.install"
+    ],
+    "forbiddenCapabilities": [
+      "external.qgroundcontrol.launch",
+      "hardware.arm",
+      "hardware.discover",
+      "hardware.emergency-stop",
+      "hardware.flight",
+      "hardware.hitl.execute",
+      "hardware.parameter.read",
+      "hardware.parameter.write",
+      "hardware.preflight.execute",
+      "qualification.trusted.consume"
+    ],
+    "forbiddenEditionIds": ["lab", "field"]
+  },
+  "negativeAssertions": {
+    "installed": false,
+    "rebuilt": false,
+    "uploaded": false,
+    "releaseBranchCreated": false,
+    "runtimeStarted": false,
+    "px4Started": false,
+    "gazeboStarted": false,
+    "validated": false,
+    "promotionReady": false,
+    "fullStackValidated": false,
+    "runtimeEmbedded": false,
+    "hardwareOrHitlAuthorized": false
+  },
+  "nextAuthorization": {
+    "yellowRequiresApproval": true,
+    "yellowScope": [
+      "fresh install in disposable target",
+      "overlay upgrade against prior preview",
+      "uninstall and rollback lifecycle run",
+      "headed or automated EN/ZH installer UI checks",
+      "WebView2 prerequisite behavior"
+    ],
+    "redRequiresApproval": true,
+    "redScope": [
+      "Runtime Base migration",
+      "PX4 SITL or Gazebo execution",
+      "full-stack simulation stability testing",
+      "visible Gazebo GUI or long-running resource tests"
+    ]
+  }
+}

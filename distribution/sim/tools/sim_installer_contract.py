@@ -119,6 +119,60 @@ HANDOFF_KEYS = {
     "universalSourceCommit",
     "acceptedBy",
 }
+READINESS_KEYS = {
+    "schemaVersion",
+    "kind",
+    "auditVersion",
+    "editionId",
+    "readinessState",
+    "executionClass",
+    "artifact",
+    "adoption",
+    "staticContracts",
+    "lifecyclePlan",
+    "externalDependencies",
+    "securityAndSigning",
+    "vehiclePackAndCapabilityFence",
+    "negativeAssertions",
+    "nextAuthorization",
+}
+READINESS_ARTIFACT_KEYS = {
+    "path",
+    "fileName",
+    "bytes",
+    "sha256",
+    "productSubjectCommit",
+    "postAdoptionEvidenceHead",
+}
+READINESS_ADOPTION_KEYS = {"receiptPath", "receiptSha256", "sidecarPath", "sidecarSha256"}
+READINESS_CONTRACT_REF_KEYS = {"path", "sha256", "coverage"}
+READINESS_LIFECYCLE_KEYS = {
+    "freshInstall",
+    "overlayUpgrade",
+    "uninstall",
+    "rollback",
+    "shortcuts",
+    "locales",
+    "webView2",
+}
+READINESS_STEP_KEYS = {"status", "nextValidationClass", "checks", "blockers"}
+READINESS_DEPS_KEYS = {"runtimeBase", "enginePack"}
+READINESS_DEP_KEYS = {"mode", "embedded", "requiredForFullStack", "evidence"}
+READINESS_SIGNING_KEYS = {
+    "authenticodeStatus",
+    "peCertificateTableEmpty",
+    "sigSidecarPathExists",
+    "updaterSignatureState",
+    "unsignedDisclosureRequired",
+    "unsignedDisclosurePresent",
+}
+READINESS_FENCE_KEYS = {
+    "validatedVehiclePackCount",
+    "allowedCapabilities",
+    "forbiddenCapabilities",
+    "forbiddenEditionIds",
+}
+READINESS_NEXT_AUTH_KEYS = {"yellowRequiresApproval", "yellowScope", "redRequiresApproval", "redScope"}
 
 COMMON_CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
 
@@ -468,6 +522,196 @@ def validate_adoption_receipt(
     return receipt
 
 
+def _validate_audit_contract_refs(
+    refs: Any, *, repo_root: Path
+) -> list[dict[str, Any]]:
+    if not isinstance(refs, list) or not refs:
+        raise SimInstallerContractError("readiness staticContracts must be non-empty")
+    validated: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, ref in enumerate(refs):
+        label = f"readiness.staticContracts[{index}]"
+        item = _exact_keys(ref, READINESS_CONTRACT_REF_KEYS, label)
+        if item["path"] in seen:
+            raise SimInstallerContractError("readiness static contract path is duplicated")
+        seen.add(item["path"])
+        path = _resolve(repo_root, item["path"], f"{label}.path")
+        if sha256_file(path) != _sha(item["sha256"], f"{label}.sha256"):
+            raise SimInstallerContractError(f"{label} SHA-256 drifted")
+        _nonempty_string_list(item["coverage"], f"{label}.coverage")
+        validated.append(item)
+    return validated
+
+
+def _validate_readiness_step(value: Any, label: str) -> dict[str, Any]:
+    step = _exact_keys(value, READINESS_STEP_KEYS, label)
+    if step["status"] != "planned-not-executed":
+        raise SimInstallerContractError(f"{label} must remain planned-not-executed")
+    if step["nextValidationClass"] not in {"YELLOW", "RED"}:
+        raise SimInstallerContractError(f"{label} next validation class is unsupported")
+    _nonempty_string_list(step["checks"], f"{label}.checks")
+    if not isinstance(step["blockers"], list) or any(
+        not isinstance(item, str) or not item for item in step["blockers"]
+    ):
+        raise SimInstallerContractError(f"{label}.blockers must be a text list")
+    return step
+
+
+def validate_install_readiness_audit(
+    document: Any,
+    *,
+    profile: dict[str, Any],
+    profile_path: Path,
+    repo_root: Path,
+    artifact_path: Path | None = None,
+) -> dict[str, Any]:
+    audit = _exact_keys(document, READINESS_KEYS, "Sim install readiness audit")
+    if (
+        audit["schemaVersion"] != 1
+        or audit["kind"] != "dronedream-sim-install-lifecycle-readiness-audit"
+        or audit["auditVersion"] != "1.0.0"
+        or audit["editionId"] != "sim"
+        or audit["readinessState"] != "ready-for-yellow-install-lifecycle-validation"
+        or audit["executionClass"] != "GREEN-static-only"
+    ):
+        raise SimInstallerContractError("Sim install readiness audit identity is unsupported")
+
+    artifact = _exact_keys(audit["artifact"], READINESS_ARTIFACT_KEYS, "readiness.artifact")
+    if artifact["fileName"] != profile["artifact"]["fileName"]:
+        raise SimInstallerContractError("readiness artifact filename drifted")
+    _commit(artifact["productSubjectCommit"], "readiness.artifact.productSubjectCommit")
+    _commit(artifact["postAdoptionEvidenceHead"], "readiness.artifact.postAdoptionEvidenceHead")
+    if artifact["productSubjectCommit"] == artifact["postAdoptionEvidenceHead"]:
+        raise SimInstallerContractError("readiness evidence head must not masquerade as source")
+    if not isinstance(artifact["bytes"], int) or artifact["bytes"] <= 0:
+        raise SimInstallerContractError("readiness artifact bytes are invalid")
+    artifact_sha = _sha(artifact["sha256"], "readiness.artifact.sha256")
+    if artifact_path is not None:
+        if artifact_path.name != artifact["fileName"]:
+            raise SimInstallerContractError("readiness artifact path filename drifted")
+        if artifact_path.stat().st_size != artifact["bytes"] or sha256_file(artifact_path) != artifact_sha:
+            raise SimInstallerContractError("readiness artifact bytes or SHA-256 mismatch")
+
+    adoption = _exact_keys(audit["adoption"], READINESS_ADOPTION_KEYS, "readiness.adoption")
+    receipt_path = _resolve(repo_root, adoption["receiptPath"], "readiness adoption receipt")
+    sidecar_path = _resolve(repo_root, adoption["sidecarPath"], "readiness adoption sidecar")
+    if sha256_file(receipt_path) != _sha(adoption["receiptSha256"], "readiness receipt sha256"):
+        raise SimInstallerContractError("readiness adoption receipt SHA-256 drifted")
+    if sha256_file(sidecar_path) != _sha(adoption["sidecarSha256"], "readiness sidecar sha256"):
+        raise SimInstallerContractError("readiness adoption sidecar SHA-256 drifted")
+    receipt = validate_adoption_receipt(
+        load_json(receipt_path),
+        profile=profile,
+        profile_path=profile_path,
+        artifact_path=artifact_path,
+        expected_source_commit=artifact["productSubjectCommit"],
+    )
+    sidecar = load_json(sidecar_path)
+    if sidecar.get("sourceSeparation", {}).get("postAdoptionEvidenceHead") != artifact[
+        "postAdoptionEvidenceHead"
+    ]:
+        raise SimInstallerContractError("readiness evidence head drifted from sidecar")
+    if sidecar.get("classification", {}).get("notValidated") is not True:
+        raise SimInstallerContractError("readiness must not claim validation")
+
+    coverage = {
+        item
+        for ref in _validate_audit_contract_refs(audit["staticContracts"], repo_root=repo_root)
+        for item in ref["coverage"]
+    }
+    required_coverage = {
+        "fresh-install",
+        "overlay-upgrade",
+        "uninstall",
+        "rollback",
+        "shortcut",
+        "en-locale",
+        "zh-locale",
+        "webview2",
+        "runtime-external",
+        "license-notice",
+    }
+    if not required_coverage <= coverage:
+        raise SimInstallerContractError("readiness static contract coverage is incomplete")
+
+    lifecycle = _exact_keys(audit["lifecyclePlan"], READINESS_LIFECYCLE_KEYS, "lifecyclePlan")
+    for key in sorted(READINESS_LIFECYCLE_KEYS):
+        step = _validate_readiness_step(lifecycle[key], f"lifecyclePlan.{key}")
+        if key != "webView2" and step["nextValidationClass"] != "YELLOW":
+            raise SimInstallerContractError(f"lifecyclePlan.{key} must require YELLOW")
+
+    dependencies = _exact_keys(audit["externalDependencies"], READINESS_DEPS_KEYS, "externalDependencies")
+    for key in ("runtimeBase", "enginePack"):
+        dep = _exact_keys(dependencies[key], READINESS_DEP_KEYS, f"externalDependencies.{key}")
+        if dep["mode"] != "external-dependency" or dep["embedded"] is not False:
+            raise SimInstallerContractError(f"externalDependencies.{key} must remain external")
+        if dep["requiredForFullStack"] is not True:
+            raise SimInstallerContractError(f"externalDependencies.{key} must be required for full stack")
+        if not isinstance(dep["evidence"], dict):
+            raise SimInstallerContractError(f"externalDependencies.{key}.evidence must be an object")
+
+    signing = _exact_keys(audit["securityAndSigning"], READINESS_SIGNING_KEYS, "securityAndSigning")
+    expected_signing = {
+        "authenticodeStatus": "NotSigned",
+        "peCertificateTableEmpty": True,
+        "sigSidecarPathExists": False,
+        "updaterSignatureState": "not-issued",
+        "unsignedDisclosureRequired": True,
+        "unsignedDisclosurePresent": True,
+    }
+    if signing != expected_signing:
+        raise SimInstallerContractError("readiness signing facts drifted")
+    if receipt["artifact"]["authenticodeState"] != "not-signed":
+        raise SimInstallerContractError("readiness receipt signing state drifted")
+
+    fence = _exact_keys(
+        audit["vehiclePackAndCapabilityFence"],
+        READINESS_FENCE_KEYS,
+        "vehiclePackAndCapabilityFence",
+    )
+    if fence["validatedVehiclePackCount"] != 0:
+        raise SimInstallerContractError("readiness must preserve zero validated packs")
+    payload = profile["deterministicPayload"]
+    if fence["allowedCapabilities"] != payload["allowedCapabilities"]:
+        raise SimInstallerContractError("readiness allowed capabilities drifted")
+    if fence["forbiddenCapabilities"] != payload["forbiddenCapabilities"]:
+        raise SimInstallerContractError("readiness forbidden capabilities drifted")
+    if set(fence["forbiddenEditionIds"]) != {"lab", "field"}:
+        raise SimInstallerContractError("readiness must forbid Lab and Field")
+    if any(item.startswith("hardware.") or "hitl" in item for item in fence["allowedCapabilities"]):
+        raise SimInstallerContractError("readiness allowed hardware or HITL capability")
+
+    assertions = audit["negativeAssertions"]
+    if not isinstance(assertions, dict):
+        raise SimInstallerContractError("negativeAssertions must be an object")
+    required_false = {
+        "installed",
+        "rebuilt",
+        "uploaded",
+        "releaseBranchCreated",
+        "runtimeStarted",
+        "px4Started",
+        "gazeboStarted",
+        "validated",
+        "promotionReady",
+        "fullStackValidated",
+        "runtimeEmbedded",
+        "hardwareOrHitlAuthorized",
+    }
+    missing = sorted(required_false - set(assertions))
+    if missing:
+        raise SimInstallerContractError(f"negativeAssertions missing {missing}")
+    if any(assertions[key] is not False for key in required_false):
+        raise SimInstallerContractError("negativeAssertions must all remain false")
+
+    next_auth = _exact_keys(audit["nextAuthorization"], READINESS_NEXT_AUTH_KEYS, "nextAuthorization")
+    if next_auth["yellowRequiresApproval"] is not True or next_auth["redRequiresApproval"] is not True:
+        raise SimInstallerContractError("next authorization gates must require approval")
+    _nonempty_string_list(next_auth["yellowScope"], "nextAuthorization.yellowScope")
+    _nonempty_string_list(next_auth["redScope"], "nextAuthorization.redScope")
+    return audit
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -484,6 +728,13 @@ def main() -> int:
     receipt_parser.add_argument("--artifact", type=Path)
     receipt_parser.add_argument("--expected-source-commit")
     receipt_parser.add_argument("receipt", type=Path)
+    readiness_parser = subparsers.add_parser("verify-readiness")
+    readiness_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    readiness_parser.add_argument(
+        "--profile", type=Path, default=Path("distribution/sim/build-profile.v1.json")
+    )
+    readiness_parser.add_argument("--artifact", type=Path)
+    readiness_parser.add_argument("audit", type=Path)
     args = parser.parse_args()
     try:
         if args.command == "verify-profile":
@@ -498,6 +749,17 @@ def main() -> int:
                 profile_path=args.profile,
                 artifact_path=args.artifact,
                 expected_source_commit=args.expected_source_commit,
+            )
+        elif args.command == "verify-readiness":
+            profile = validate_build_profile(
+                load_json(args.profile), repo_root=args.repo_root.resolve()
+            )
+            validate_install_readiness_audit(
+                load_json(args.audit),
+                profile=profile,
+                profile_path=args.profile,
+                repo_root=args.repo_root.resolve(),
+                artifact_path=args.artifact,
             )
         else:
             raise SimInstallerContractError(f"unsupported command: {args.command}")
