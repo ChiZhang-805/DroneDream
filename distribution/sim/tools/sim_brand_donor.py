@@ -295,6 +295,113 @@ RECONCILIATION_GENERATED_PATHS = {
     "sim-windows-ico": "brand/generated/sim/windows/icon.ico",
 }
 
+SYNC_AUDIT_KEYS = {
+    "schemaVersion",
+    "kind",
+    "auditVersion",
+    "editionId",
+    "state",
+    "source",
+    "pathObservation",
+    "conflictResolution",
+    "syncPolicy",
+    "execution",
+}
+SYNC_AUDIT_SOURCE_KEYS = {
+    "baseCommit",
+    "simOverlayCheckpoint",
+    "donorCommit",
+    "reconciliationCandidate",
+}
+SYNC_AUDIT_PATH_KEYS = {
+    "simChangedPathCount",
+    "donorChangedPathCount",
+    "overlapPathCount",
+    "overlapPaths",
+    "donorOnlyPathPrefixes",
+    "donorOnlyCommonPaths",
+    "backendOverlapPathCount",
+}
+SYNC_AUDIT_CONFLICT_KEYS = {
+    "path",
+    "classification",
+    "evidence",
+    "preserveFromSim",
+    "eligibleFromDonorAfterHandoff",
+    "forbiddenResolution",
+}
+SYNC_AUDIT_EVIDENCE_KEYS = {
+    "baseBlob",
+    "simBlob",
+    "donorBlob",
+    "simPatch",
+    "donorPatch",
+}
+SYNC_AUDIT_PATCH_KEYS = {"sha256", "bytes"}
+SYNC_AUDIT_POLICY_KEYS = {
+    "minimumStrategy",
+    "wholeCommitCherryPickAllowed",
+    "baselineRelabelAllowed",
+    "manualPublicCodeCopyAllowed",
+    "brandAssetByteCopyBeforeHandoffAllowed",
+    "simSafetyBoundaryMustWinEditionConflicts",
+    "commonFixesRemainUniversalOwned",
+    "brandAssetsRequireCanonicalManifestSha256",
+    "donorStylesSemanticImportAfterSourceBindingAllowed",
+    "backendCommonCoreAutoAdoptionAllowed",
+    "authoritativeProductSourceEvidenceHandoffRequired",
+}
+SYNC_AUDIT_EXECUTION_KEYS = {
+    "mergeExecuted",
+    "cherryPickExecuted",
+    "commonCoreBaselineUpdated",
+    "canonicalAssetsCopied",
+    "icoCopied",
+    "browserStarted",
+    "productionBuildExecuted",
+    "installerBuilt",
+    "installerExecuted",
+    "runtimeStarted",
+    "px4Started",
+    "gazeboStarted",
+    "releaseAssetClaimed",
+    "promotionReady",
+}
+SYNC_AUDIT_BASE_COMMIT = MINIMUM_COMMON_CORE_ANCESTOR
+SYNC_AUDIT_SIM_CHECKPOINT = "4086ff3134847b5bbe049cc1f43b17141e984f8c"
+SYNC_AUDIT_DONOR_COMMIT = RECONCILIATION_DONOR_COMMIT
+SYNC_AUDIT_OVERLAP_PATHS = (
+    "frontend/src/__tests__/DistributionSetupPanel.test.tsx",
+    "frontend/src/components/DistributionSetupPanel.tsx",
+)
+SYNC_AUDIT_RESOLUTIONS = {
+    "frontend/src/components/DistributionSetupPanel.tsx": {
+        "classification": "edition-safety-boundary-conflict",
+        "preserveFromSim": [
+            "fixed-sim-selection",
+            "simulation-only-capability-boundary",
+            "no-edition-radio-controls",
+            "no-lab-field-navigation-or-authority",
+        ],
+        "eligibleFromDonorAfterHandoff": [
+            "canonical-brand-lockup-component",
+            "data-brand-edition-sim-presentation-token",
+        ],
+        "forbiddenResolution": "take-donor-panel-wholesale",
+    },
+    "frontend/src/__tests__/DistributionSetupPanel.test.tsx": {
+        "classification": "edition-negative-test-conflict",
+        "preserveFromSim": [
+            "reject-stored-lab-selection",
+            "reject-stored-field-selection",
+            "no-controller-control",
+            "no-optional-module-control",
+        ],
+        "eligibleFromDonorAfterHandoff": ["assert-data-brand-edition-sim"],
+        "forbiddenResolution": "remove-sim-fail-closed-coverage",
+    },
+}
+
 
 class SimBrandDonorError(ValueError):
     """Raised when canonical donor evidence is incomplete or inconsistent."""
@@ -409,6 +516,39 @@ def _git_is_ancestor(repo_root: Path, ancestor: str, descendant: str) -> bool:
     if completed.returncode not in {0, 1}:
         raise SimBrandDonorError("could not verify donor Git ancestry")
     return completed.returncode == 0
+
+
+def _git_changed_paths(repo_root: Path, base: str, target: str) -> set[str]:
+    output = _run_git(repo_root, "diff", "--name-only", base, target, "--")
+    if not isinstance(output, str):
+        raise SimBrandDonorError("git changed-path observer returned bytes unexpectedly")
+    return {path for path in output.splitlines() if path}
+
+
+def _git_blob_id(repo_root: Path, commit: str, relative_path: str) -> str:
+    output = _run_git(repo_root, "rev-parse", f"{commit}:{relative_path}")
+    if not isinstance(output, str) or not COMMIT_RE.fullmatch(output.strip()):
+        raise SimBrandDonorError(f"could not resolve Git blob for {relative_path}")
+    return output.strip()
+
+
+def _git_patch_evidence(
+    repo_root: Path, base: str, target: str, relative_path: str
+) -> dict[str, Any]:
+    output = _run_git(
+        repo_root,
+        "diff",
+        "--no-ext-diff",
+        "--binary",
+        base,
+        target,
+        "--",
+        relative_path,
+        binary=True,
+    )
+    if not isinstance(output, bytes) or not output:
+        raise SimBrandDonorError(f"Git patch evidence is empty for {relative_path}")
+    return {"sha256": sha256_bytes(output), "bytes": len(output)}
 
 
 def _validate_asset_signature(payload: bytes, mime_type: str, label: str) -> None:
@@ -1050,6 +1190,175 @@ def validate_canonical_reconciliation_candidate(
     return candidate
 
 
+def validate_canonical_sync_conflict_audit(
+    document: Any,
+    *,
+    repo_root: Path,
+) -> dict[str, Any]:
+    audit = _exact_keys(document, SYNC_AUDIT_KEYS, "SIM canonical sync conflict audit")
+    if (
+        audit["schemaVersion"] != 1
+        or audit["kind"] != "dronedream-sim-canonical-sync-conflict-audit"
+        or audit["auditVersion"] != "1.0.0"
+        or audit["editionId"] != "sim"
+        or audit["state"] != "observed-not-merged-awaiting-authoritative-handoff"
+    ):
+        raise SimBrandDonorError("SIM canonical sync audit identity drifted")
+
+    source = _exact_keys(audit["source"], SYNC_AUDIT_SOURCE_KEYS, "sync audit source")
+    base_commit = _commit(source["baseCommit"], "sync audit base commit")
+    sim_checkpoint = _commit(
+        source["simOverlayCheckpoint"], "sync audit Sim overlay checkpoint"
+    )
+    donor_commit = _commit(source["donorCommit"], "sync audit donor commit")
+    if (
+        base_commit != SYNC_AUDIT_BASE_COMMIT
+        or sim_checkpoint != SYNC_AUDIT_SIM_CHECKPOINT
+        or donor_commit != SYNC_AUDIT_DONOR_COMMIT
+    ):
+        raise SimBrandDonorError("SIM canonical sync audit source commits drifted")
+    if not _git_is_ancestor(repo_root, base_commit, sim_checkpoint) or not _git_is_ancestor(
+        repo_root, base_commit, donor_commit
+    ):
+        raise SimBrandDonorError("SIM canonical sync audit ancestry is unproven")
+
+    candidate_ref = _exact_keys(
+        source["reconciliationCandidate"],
+        FILE_REF_KEYS,
+        "sync audit reconciliation candidate",
+    )
+    if (
+        candidate_ref["path"]
+        != "distribution/sim/brand/canonical-reconciliation-candidate.v1.json"
+    ):
+        raise SimBrandDonorError("sync audit reconciliation candidate path drifted")
+    candidate_path = _resolve(
+        repo_root,
+        candidate_ref["path"],
+        "sync audit reconciliation candidate path",
+    )
+    if sha256_file(candidate_path) != _sha(
+        candidate_ref["sha256"], "sync audit reconciliation candidate SHA"
+    ):
+        raise SimBrandDonorError("sync audit reconciliation candidate SHA-256 drifted")
+    validate_canonical_reconciliation_candidate(
+        load_json(candidate_path), repo_root=repo_root
+    )
+
+    sim_paths = _git_changed_paths(repo_root, base_commit, sim_checkpoint)
+    donor_paths = _git_changed_paths(repo_root, base_commit, donor_commit)
+    overlap_paths = sorted(sim_paths & donor_paths)
+    observation = _exact_keys(
+        audit["pathObservation"], SYNC_AUDIT_PATH_KEYS, "sync audit path observation"
+    )
+    expected_observation = {
+        "simChangedPathCount": len(sim_paths),
+        "donorChangedPathCount": len(donor_paths),
+        "overlapPathCount": len(overlap_paths),
+        "overlapPaths": overlap_paths,
+        "donorOnlyPathPrefixes": [
+            "brand/",
+            "frontend/src/assets/brand/",
+            "frontend/src/brand/",
+        ],
+        "donorOnlyCommonPaths": [
+            "frontend/src/components/BrandLockup.tsx",
+            "frontend/src/styles.css",
+        ],
+        "backendOverlapPathCount": len(
+            [path for path in overlap_paths if path.startswith("backend/")]
+        ),
+    }
+    if observation != expected_observation or tuple(overlap_paths) != SYNC_AUDIT_OVERLAP_PATHS:
+        raise SimBrandDonorError("SIM canonical sync changed-path statistics drifted")
+
+    donor_only_paths = donor_paths - sim_paths
+    for prefix in observation["donorOnlyPathPrefixes"]:
+        if not any(path.startswith(prefix) for path in donor_only_paths):
+            raise SimBrandDonorError(f"sync audit donor-only prefix is unproven: {prefix}")
+    if any(path not in donor_only_paths for path in observation["donorOnlyCommonPaths"]):
+        raise SimBrandDonorError("sync audit donor-only common paths drifted")
+
+    conflicts = audit["conflictResolution"]
+    if not isinstance(conflicts, list) or len(conflicts) != len(SYNC_AUDIT_RESOLUTIONS):
+        raise SimBrandDonorError("sync audit conflict inventory is incomplete")
+    observed_conflicts: list[str] = []
+    for index, raw_conflict in enumerate(conflicts):
+        conflict = _exact_keys(
+            raw_conflict, SYNC_AUDIT_CONFLICT_KEYS, f"sync audit conflict {index}"
+        )
+        relative_path = conflict["path"]
+        if (
+            not isinstance(relative_path, str)
+            or relative_path not in SYNC_AUDIT_RESOLUTIONS
+            or relative_path in observed_conflicts
+        ):
+            raise SimBrandDonorError("sync audit conflict paths drifted")
+        expected_resolution = SYNC_AUDIT_RESOLUTIONS[relative_path]
+        evidence = _exact_keys(
+            conflict["evidence"],
+            SYNC_AUDIT_EVIDENCE_KEYS,
+            f"sync audit evidence for {relative_path}",
+        )
+        sim_patch = _exact_keys(
+            evidence["simPatch"],
+            SYNC_AUDIT_PATCH_KEYS,
+            f"sync audit Sim patch for {relative_path}",
+        )
+        donor_patch = _exact_keys(
+            evidence["donorPatch"],
+            SYNC_AUDIT_PATCH_KEYS,
+            f"sync audit donor patch for {relative_path}",
+        )
+        expected_evidence = {
+            "baseBlob": _git_blob_id(repo_root, base_commit, relative_path),
+            "simBlob": _git_blob_id(repo_root, sim_checkpoint, relative_path),
+            "donorBlob": _git_blob_id(repo_root, donor_commit, relative_path),
+            "simPatch": _git_patch_evidence(
+                repo_root, base_commit, sim_checkpoint, relative_path
+            ),
+            "donorPatch": _git_patch_evidence(
+                repo_root, base_commit, donor_commit, relative_path
+            ),
+        }
+        _sha(sim_patch["sha256"], f"sync audit Sim patch SHA for {relative_path}")
+        _sha(donor_patch["sha256"], f"sync audit donor patch SHA for {relative_path}")
+        if evidence != expected_evidence:
+            raise SimBrandDonorError(f"sync audit blob or patch evidence drifted: {relative_path}")
+        if {key: conflict[key] for key in expected_resolution} != expected_resolution:
+            raise SimBrandDonorError(f"sync audit semantic resolution drifted: {relative_path}")
+        observed_conflicts.append(relative_path)
+    if set(observed_conflicts) != set(SYNC_AUDIT_OVERLAP_PATHS):
+        raise SimBrandDonorError("sync audit conflict coverage drifted")
+
+    policy = _exact_keys(
+        audit["syncPolicy"], SYNC_AUDIT_POLICY_KEYS, "sync audit policy"
+    )
+    if policy != {
+        "minimumStrategy": (
+            "forward-integrate-authoritative-common-core-with-explicit-conflict-resolution"
+        ),
+        "wholeCommitCherryPickAllowed": False,
+        "baselineRelabelAllowed": False,
+        "manualPublicCodeCopyAllowed": False,
+        "brandAssetByteCopyBeforeHandoffAllowed": False,
+        "simSafetyBoundaryMustWinEditionConflicts": True,
+        "commonFixesRemainUniversalOwned": True,
+        "brandAssetsRequireCanonicalManifestSha256": True,
+        "donorStylesSemanticImportAfterSourceBindingAllowed": True,
+        "backendCommonCoreAutoAdoptionAllowed": False,
+        "authoritativeProductSourceEvidenceHandoffRequired": True,
+    }:
+        raise SimBrandDonorError("sync audit semantic policy drifted")
+
+    execution = _exact_keys(
+        audit["execution"], SYNC_AUDIT_EXECUTION_KEYS, "sync audit execution"
+    )
+    if any(value is not False for value in execution.values()):
+        raise SimBrandDonorError("sync audit execution and release claims must remain false")
+    return audit
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -1087,6 +1396,16 @@ def main() -> int:
             "distribution/sim/brand/canonical-reconciliation-candidate.v1.json"
         ),
     )
+    sync_audit_parser = subparsers.add_parser("verify-sync-audit")
+    sync_audit_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    sync_audit_parser.add_argument(
+        "audit",
+        type=Path,
+        nargs="?",
+        default=Path(
+            "distribution/sim/brand/canonical-sync-conflict-audit.v1.json"
+        ),
+    )
     args = parser.parse_args()
     try:
         repo_root = args.repo_root.resolve()
@@ -1109,6 +1428,10 @@ def main() -> int:
         elif args.command == "verify-reconciliation":
             validate_canonical_reconciliation_candidate(
                 load_json(args.candidate), repo_root=repo_root
+            )
+        elif args.command == "verify-sync-audit":
+            validate_canonical_sync_conflict_audit(
+                load_json(args.audit), repo_root=repo_root
             )
         else:
             raise SimBrandDonorError(f"unsupported command: {args.command}")

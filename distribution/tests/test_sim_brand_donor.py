@@ -27,6 +27,13 @@ RECONCILIATION_PATH = (
     / "brand"
     / "canonical-reconciliation-candidate.v1.json"
 )
+SYNC_AUDIT_PATH = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "brand"
+    / "canonical-sync-conflict-audit.v1.json"
+)
 TOOL_PATH = ROOT / "distribution" / "sim" / "tools" / "sim_brand_donor.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_brand_donor", TOOL_PATH)
@@ -298,6 +305,64 @@ class SimBrandDonorTests(unittest.TestCase):
         invalid["adoptionGates"]["releaseAssetClaimed"] = True
         with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "must remain false"):
             sim_brand.validate_canonical_reconciliation_candidate(invalid, repo_root=ROOT)
+
+    def test_sync_audit_recomputes_paths_blobs_and_patches_without_merge(self) -> None:
+        audit = sim_brand.validate_canonical_sync_conflict_audit(
+            load_json(SYNC_AUDIT_PATH), repo_root=ROOT
+        )
+        self.assertEqual(
+            (
+                audit["pathObservation"]["simChangedPathCount"],
+                audit["pathObservation"]["donorChangedPathCount"],
+                audit["pathObservation"]["overlapPathCount"],
+            ),
+            (39, 104, 2),
+        )
+        self.assertEqual(
+            audit["conflictResolution"][0]["evidence"]["simPatch"]["sha256"],
+            "d073563b082578e52ba1ccafd393be4dfe5746576cc6a3a11087768834333533",
+        )
+        self.assertTrue(all(value is False for value in audit["execution"].values()))
+
+    def test_sync_audit_rejects_path_blob_or_patch_drift(self) -> None:
+        invalid = load_json(SYNC_AUDIT_PATH)
+        invalid["pathObservation"]["simChangedPathCount"] = 40
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "statistics drifted"):
+            sim_brand.validate_canonical_sync_conflict_audit(invalid, repo_root=ROOT)
+
+        invalid = load_json(SYNC_AUDIT_PATH)
+        invalid["conflictResolution"][0]["evidence"]["baseBlob"] = "0" * 40
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "blob or patch evidence"):
+            sim_brand.validate_canonical_sync_conflict_audit(invalid, repo_root=ROOT)
+
+        invalid = load_json(SYNC_AUDIT_PATH)
+        invalid["conflictResolution"][1]["evidence"]["donorPatch"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "blob or patch evidence"):
+            sim_brand.validate_canonical_sync_conflict_audit(invalid, repo_root=ROOT)
+
+    def test_sync_audit_rejects_semantic_or_execution_overclaim(self) -> None:
+        invalid = load_json(SYNC_AUDIT_PATH)
+        invalid["conflictResolution"][0]["eligibleFromDonorAfterHandoff"] = [
+            "canonical-brand-lockup-component"
+        ]
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "semantic resolution"):
+            sim_brand.validate_canonical_sync_conflict_audit(invalid, repo_root=ROOT)
+
+        for key in (
+            "mergeExecuted",
+            "commonCoreBaselineUpdated",
+            "icoCopied",
+            "releaseAssetClaimed",
+        ):
+            with self.subTest(key=key):
+                invalid = load_json(SYNC_AUDIT_PATH)
+                invalid["execution"][key] = True
+                with self.assertRaisesRegex(
+                    sim_brand.SimBrandDonorError, "must remain false"
+                ):
+                    sim_brand.validate_canonical_sync_conflict_audit(
+                        invalid, repo_root=ROOT
+                    )
 
 
 if __name__ == "__main__":

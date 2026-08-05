@@ -14,7 +14,7 @@
   },
   "yellow1VisualBinding": {
     "path": "distribution/sim/frontend/visual-acceptance.v1.json",
-    "sha256": "3370180b3a198f02ce20c14b4e69641e9b8d163738e9615301b3d44aa31319db",
+    "sha256": "6cb6bd065079112d2accc7b3a54a93dc7a6430ad3767af32f8068924e97ce2d7",
     "requiredCaseIds": [
       "desktop-en",
       "desktop-zh-CN",

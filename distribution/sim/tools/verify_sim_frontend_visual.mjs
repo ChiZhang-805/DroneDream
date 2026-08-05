@@ -131,7 +131,7 @@ async function loadAndValidateContract() {
   assert.equal(contract.source.branch, "codex/software-sim");
   assert.equal(contract.source.commonCoreCommit, branchContract.syncBaseline.commonCoreCommit);
   assert.equal(contract.source.commonCoreHash, branchContract.syncBaseline.commonCoreHash);
-  assert.equal(contract.source.refs.length, 17);
+  assert.equal(contract.source.refs.length, 18);
   for (const ref of contract.source.refs) {
     assertExactKeys(ref, ["path", "sha256"], `source ref ${ref.path}`);
     assert.match(ref.sha256, /^[0-9a-f]{64}$/);
@@ -159,6 +159,20 @@ async function loadAndValidateContract() {
     "--repo-root",
     repoRoot,
     resolveRepoFile(contract.brandDonor.approvedEditionAssetManifestPath),
+  ], { cwd: repoRoot, stdio: "pipe" });
+  execFileSync(python, [
+    donorTool,
+    "verify-reconciliation",
+    "--repo-root",
+    repoRoot,
+    resolveRepoFile("distribution/sim/brand/canonical-reconciliation-candidate.v1.json"),
+  ], { cwd: repoRoot, stdio: "pipe" });
+  execFileSync(python, [
+    donorTool,
+    "verify-sync-audit",
+    "--repo-root",
+    repoRoot,
+    resolveRepoFile("distribution/sim/brand/canonical-sync-conflict-audit.v1.json"),
   ], { cwd: repoRoot, stdio: "pipe" });
   if (donorManifestArgument) {
     assert.equal(typeof donorManifestArgument, "string", "--donor-manifest requires a path");

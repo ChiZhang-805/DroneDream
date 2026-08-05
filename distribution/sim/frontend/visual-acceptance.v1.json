@@ -90,6 +90,10 @@
         "sha256": "3b8782e0a06c6528c52556d6d3d0fdd2964c6ee57fd7532555cc28190a8eb9fc"
       },
       {
+        "path": "distribution/sim/brand/canonical-sync-conflict-audit.v1.json",
+        "sha256": "9e38977b9f29bcc32ccb4ae399784462771954ad50dfb1eaef52e35661fbcd2d"
+      },
+      {
         "path": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
         "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa"
       },
@@ -99,7 +103,7 @@
       },
       {
         "path": "distribution/sim/tools/sim_brand_donor.py",
-        "sha256": "c517e4d08f39eac65341f75ec8e3a9c8abb44589e0fa1d28c93aea2fe319cb8c"
+        "sha256": "b1b0dd9492f6ca5876573a95ec2be6d2c8520845945a8d867c54513b663229db"
       },
       {
         "path": "distribution/branch-contracts/software-sim.v1.json",

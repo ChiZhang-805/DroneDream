@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-canonical-sync-conflict-audit",
+  "auditVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "observed-not-merged-awaiting-authoritative-handoff",
+  "source": {
+    "baseCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "simOverlayCheckpoint": "4086ff3134847b5bbe049cc1f43b17141e984f8c",
+    "donorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "reconciliationCandidate": {
+      "path": "distribution/sim/brand/canonical-reconciliation-candidate.v1.json",
+      "sha256": "3b8782e0a06c6528c52556d6d3d0fdd2964c6ee57fd7532555cc28190a8eb9fc"
+    }
+  },
+  "pathObservation": {
+    "simChangedPathCount": 39,
+    "donorChangedPathCount": 104,
+    "overlapPathCount": 2,
+    "overlapPaths": [
+      "frontend/src/__tests__/DistributionSetupPanel.test.tsx",
+      "frontend/src/components/DistributionSetupPanel.tsx"
+    ],
+    "donorOnlyPathPrefixes": [
+      "brand/",
+      "frontend/src/assets/brand/",
+      "frontend/src/brand/"
+    ],
+    "donorOnlyCommonPaths": [
+      "frontend/src/components/BrandLockup.tsx",
+      "frontend/src/styles.css"
+    ],
+    "backendOverlapPathCount": 0
+  },
+  "conflictResolution": [
+    {
+      "path": "frontend/src/components/DistributionSetupPanel.tsx",
+      "classification": "edition-safety-boundary-conflict",
+      "evidence": {
+        "baseBlob": "32d0782b88c41a8cec180180b474e45a840c57e6",
+        "simBlob": "112f543c046843f1513256d496475e627323e994",
+        "donorBlob": "e5001a38ac81de69992512ed3712c0dc29842297",
+        "simPatch": {
+          "sha256": "d073563b082578e52ba1ccafd393be4dfe5746576cc6a3a11087768834333533",
+          "bytes": 4505
+        },
+        "donorPatch": {
+          "sha256": "bb505cefe193ecac253e32c7eacf8f387c37c3b883b4a14b3debdce6c3e1c8ac",
+          "bytes": 1900
+        }
+      },
+      "preserveFromSim": [
+        "fixed-sim-selection",
+        "simulation-only-capability-boundary",
+        "no-edition-radio-controls",
+        "no-lab-field-navigation-or-authority"
+      ],
+      "eligibleFromDonorAfterHandoff": [
+        "canonical-brand-lockup-component",
+        "data-brand-edition-sim-presentation-token"
+      ],
+      "forbiddenResolution": "take-donor-panel-wholesale"
+    },
+    {
+      "path": "frontend/src/__tests__/DistributionSetupPanel.test.tsx",
+      "classification": "edition-negative-test-conflict",
+      "evidence": {
+        "baseBlob": "7777c75ad4c3f9005dd0f52b998e0da51a27c306",
+        "simBlob": "ffbcf60912f25a6f93ff8cd52d69c512dfe5cfca",
+        "donorBlob": "f1380ab9209e6abac9442acec93d707ed1d3b2ab",
+        "simPatch": {
+          "sha256": "556562f4a8ca625e54e6fae2f6f31c6a79152ad0ffd3d183fd2d8a16f5b38335",
+          "bytes": 4148
+        },
+        "donorPatch": {
+          "sha256": "ddae1f39e874880622092ff01b8f0c7493b15e0bf7055a2688a2a05dc1ef17c5",
+          "bytes": 1220
+        }
+      },
+      "preserveFromSim": [
+        "reject-stored-lab-selection",
+        "reject-stored-field-selection",
+        "no-controller-control",
+        "no-optional-module-control"
+      ],
+      "eligibleFromDonorAfterHandoff": [
+        "assert-data-brand-edition-sim"
+      ],
+      "forbiddenResolution": "remove-sim-fail-closed-coverage"
+    }
+  ],
+  "syncPolicy": {
+    "minimumStrategy": "forward-integrate-authoritative-common-core-with-explicit-conflict-resolution",
+    "wholeCommitCherryPickAllowed": false,
+    "baselineRelabelAllowed": false,
+    "manualPublicCodeCopyAllowed": false,
+    "brandAssetByteCopyBeforeHandoffAllowed": false,
+    "simSafetyBoundaryMustWinEditionConflicts": true,
+    "commonFixesRemainUniversalOwned": true,
+    "brandAssetsRequireCanonicalManifestSha256": true,
+    "donorStylesSemanticImportAfterSourceBindingAllowed": true,
+    "backendCommonCoreAutoAdoptionAllowed": false,
+    "authoritativeProductSourceEvidenceHandoffRequired": true
+  },
+  "execution": {
+    "mergeExecuted": false,
+    "cherryPickExecuted": false,
+    "commonCoreBaselineUpdated": false,
+    "canonicalAssetsCopied": false,
+    "icoCopied": false,
+    "browserStarted": false,
+    "productionBuildExecuted": false,
+    "installerBuilt": false,
+    "installerExecuted": false,
+    "runtimeStarted": false,
+    "px4Started": false,
+    "gazeboStarted": false,
+    "releaseAssetClaimed": false,
+    "promotionReady": false
+  }
+}
