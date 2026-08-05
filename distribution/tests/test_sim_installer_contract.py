@@ -324,6 +324,8 @@ class SimInstallerContractTests(unittest.TestCase):
         self.assertEqual(validated["identity"]["displayName"], "DroneDream \u00b7 SIM")
         self.assertEqual(validated["installerUi"]["locales"], ["en", "zh-CN"])
         self.assertFalse(validated["brandDonor"]["iconOverridePresent"])
+        self.assertFalse(validated["brandDonor"]["commonCoreBindingVerified"])
+        self.assertFalse(validated["brandDonor"]["assetHashesVerified"])
         self.assertEqual(validated["capabilityFence"]["validatedVehiclePackCount"], 0)
         self.assertTrue(sim_contract._contains_icon_override({"bundle": {"icon": []}}))
 
@@ -343,6 +345,18 @@ class SimInstallerContractTests(unittest.TestCase):
         invalid["brandDonor"]["iconOverridePresent"] = True
         with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "brand donor state"):
             self.validate_surface(invalid)
+
+    def test_installer_surface_rejects_invalid_donor_input_while_pending(self) -> None:
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError, "brand donor verification failed"
+        ):
+            sim_contract.validate_installer_surface_contract(
+                self.installer_surface(),
+                profile=self.profile,
+                profile_path=PROFILE_PATH,
+                repo_root=ROOT,
+                donor_manifest={},
+            )
 
     def test_installer_surface_rejects_source_hash_drift(self) -> None:
         invalid = self.installer_surface()

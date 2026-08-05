@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-brand-donor-intake-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "awaiting-canonical-donor",
+  "approvedConceptHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
+  "expectedSource": {
+    "branch": "codex/software",
+    "minimumCommonCoreAncestor": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCorePaths": ["backend", "desktop", "engine-pack", "frontend", "runtime", "worker"],
+    "donorAndCommonCoreCommitMustMatch": true,
+    "sourceAndEvidenceCommitMustDiffer": true
+  },
+  "expectedIdentity": {
+    "masterName": "DroneDream",
+    "displayName": "DroneDream · SIM",
+    "separator": " · "
+  },
+  "expectedPalette": {
+    "start": "#00D9FF",
+    "middle": "#2671FF",
+    "end": "#744CFF"
+  },
+  "requiredAssetRoles": [
+    "master-mark-svg",
+    "sim-mark-svg",
+    "sim-lockup-svg",
+    "sim-icon-png-32",
+    "sim-icon-png-128",
+    "sim-icon-png-256",
+    "sim-icon-png-512",
+    "sim-windows-ico"
+  ],
+  "manifestSchema": {
+    "path": "distribution/sim/brand/canonical-donor-manifest.schema.json",
+    "sha256": "f47b023ec8ba1b536fb66308adc60315b788483192a382ab7bbbb74b12c6406d"
+  },
+  "integrationRequirements": [
+    "verify-donor-commit-exists",
+    "verify-donor-is-descendant-of-minimum-common-core",
+    "verify-evidence-descends-from-donor",
+    "recompute-common-core-hash-at-donor-commit",
+    "read-assets-from-donor-git-tree",
+    "verify-each-asset-sha256-and-bytes",
+    "verify-current-working-tree-bytes-after-sync",
+    "verify-no-concept-only-assets",
+    "verify-no-master-redraw",
+    "verify-no-capability-change-from-theme"
+  ],
+  "nonClaims": {
+    "donorManifestReceived": false,
+    "donorCommitVerified": false,
+    "commonCoreBindingVerified": false,
+    "assetHashesVerified": false,
+    "workingTreeAssetsIntegrated": false,
+    "paletteApplied": false,
+    "iconIntegrated": false,
+    "installerIconIntegrated": false,
+    "shortcutIconIntegrated": false,
+    "canonical": false
+  }
+}

@@ -15,8 +15,14 @@
   },
   "brandDonor": {
     "approvedConceptHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
+    "intakePath": "distribution/sim/brand/donor-intake.v1.json",
+    "intakeSha256": "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297",
     "canonicalDonorState": "pending-universal-common-core",
+    "canonicalDonorManifestPath": null,
+    "canonicalDonorManifestSha256": null,
     "canonicalDonorCommit": null,
+    "commonCoreBindingVerified": false,
+    "assetHashesVerified": false,
     "approvedPalette": ["#00D9FF", "#2671FF", "#744CFF"],
     "paletteApplied": false,
     "iconIntegrated": false
@@ -56,11 +62,23 @@
       },
       {
         "path": "distribution/sim/desktop/installer-surface-contract.v1.json",
-        "sha256": "c1f8b4a293f85983c6d997ec25917f213d1832c870b59af3a30e4118027ac9da"
+        "sha256": "aa49da54da02d4895802f5c0fa1fcc4d99faab56257a4eb620c6e9a389b58a72"
+      },
+      {
+        "path": "distribution/sim/brand/canonical-donor-manifest.schema.json",
+        "sha256": "f47b023ec8ba1b536fb66308adc60315b788483192a382ab7bbbb74b12c6406d"
+      },
+      {
+        "path": "distribution/sim/brand/donor-intake.v1.json",
+        "sha256": "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297"
+      },
+      {
+        "path": "distribution/sim/tools/sim_brand_donor.py",
+        "sha256": "430df515de163178f00639b15d3c574a90927fc98890f48086b7a9980cd5c6a6"
       },
       {
         "path": "distribution/branch-contracts/software-sim.v1.json",
-        "sha256": "5b277ef1d60b86f2a41edf74c3ec4a38623664cb3f7183b5dad4af3ae624707a"
+        "sha256": "9e8aa8388ce0917a1cbe39acfb8dd1c686f851f0ea507bd644cae98b217b7190"
       }
     ]
   },

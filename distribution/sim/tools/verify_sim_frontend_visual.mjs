@@ -22,6 +22,7 @@ const args = new Map(
 );
 const contractOnly = args.has("--contract-only");
 const yellowAcknowledged = args.has("--ack-yellow");
+const donorManifestArgument = args.get("--donor-manifest");
 
 if (contractOnly === yellowAcknowledged) {
   throw new Error("Choose exactly one mode: --contract-only or --ack-yellow");
@@ -92,8 +93,14 @@ async function loadAndValidateContract() {
   });
   assert.deepEqual(contract.brandDonor, {
     approvedConceptHandoffSha256: "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
+    intakePath: "distribution/sim/brand/donor-intake.v1.json",
+    intakeSha256: "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297",
     canonicalDonorState: "pending-universal-common-core",
+    canonicalDonorManifestPath: null,
+    canonicalDonorManifestSha256: null,
     canonicalDonorCommit: null,
+    commonCoreBindingVerified: false,
+    assetHashesVerified: false,
     approvedPalette: ["#00D9FF", "#2671FF", "#744CFF"],
     paletteApplied: false,
     iconIntegrated: false,
@@ -119,7 +126,7 @@ async function loadAndValidateContract() {
   assert.equal(contract.source.branch, "codex/software-sim");
   assert.equal(contract.source.commonCoreCommit, branchContract.syncBaseline.commonCoreCommit);
   assert.equal(contract.source.commonCoreHash, branchContract.syncBaseline.commonCoreHash);
-  assert.equal(contract.source.refs.length, 9);
+  assert.equal(contract.source.refs.length, 12);
   for (const ref of contract.source.refs) {
     assertExactKeys(ref, ["path", "sha256"], `source ref ${ref.path}`);
     assert.match(ref.sha256, /^[0-9a-f]{64}$/);
@@ -131,6 +138,35 @@ async function loadAndValidateContract() {
   );
   assert.equal(overlay.productName, contract.productIdentity.displayName);
   assert.equal(overlay.app.windows[0].minWidth, 390);
+
+  const python = process.env.PYTHON || "python";
+  const donorTool = resolveRepoFile("distribution/sim/tools/sim_brand_donor.py");
+  execFileSync(python, [
+    donorTool,
+    "verify-intake",
+    "--repo-root",
+    repoRoot,
+    resolveRepoFile(contract.brandDonor.intakePath),
+  ], { cwd: repoRoot, stdio: "pipe" });
+  if (donorManifestArgument) {
+    assert.equal(typeof donorManifestArgument, "string", "--donor-manifest requires a path");
+    const donorManifestPath = path.resolve(repoRoot, donorManifestArgument);
+    assert(
+      donorManifestPath.startsWith(`${repoRoot}${path.sep}`),
+      "donor manifest path must stay inside repository",
+    );
+    execFileSync(python, [
+      donorTool,
+      "verify-donor",
+      "--repo-root",
+      repoRoot,
+      "--intake",
+      resolveRepoFile(contract.brandDonor.intakePath),
+      "--require-working-tree-assets",
+      donorManifestPath,
+    ], { cwd: repoRoot, stdio: "pipe" });
+    throw new Error("canonical donor verified but visual contract remains pending integration");
+  }
   return contract;
 }
 

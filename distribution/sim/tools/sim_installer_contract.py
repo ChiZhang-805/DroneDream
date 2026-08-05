@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import re
 import sys
@@ -206,8 +207,14 @@ SURFACE_OVERLAY_KEYS = {
 }
 SURFACE_BRAND_KEYS = {
     "approvedConceptHandoffSha256",
+    "intakePath",
+    "intakeSha256",
     "canonicalDonorState",
+    "canonicalDonorManifestPath",
+    "canonicalDonorManifestSha256",
     "canonicalDonorCommit",
+    "commonCoreBindingVerified",
+    "assetHashesVerified",
     "iconOverridePresent",
     "masterRedrawAllowed",
 }
@@ -833,6 +840,16 @@ def _contains_icon_override(value: Any) -> bool:
     return False
 
 
+def _load_brand_donor_module() -> Any:
+    tool_path = Path(__file__).with_name("sim_brand_donor.py")
+    spec = importlib.util.spec_from_file_location("sim_brand_donor_for_installer", tool_path)
+    if spec is None or spec.loader is None:
+        raise SimInstallerContractError("could not load Sim brand donor verifier")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _validate_surface_source_refs(value: Any, *, repo_root: Path) -> None:
     if not isinstance(value, list) or len(value) != len(SURFACE_SOURCE_REQUIREMENTS):
         raise SimInstallerContractError("installer surface source refs are incomplete")
@@ -864,6 +881,7 @@ def validate_installer_surface_contract(
     profile: dict[str, Any],
     profile_path: Path,
     repo_root: Path,
+    donor_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     contract = _exact_keys(document, SURFACE_KEYS, "Sim installer surface contract")
     if (
@@ -943,12 +961,41 @@ def validate_installer_surface_contract(
         "approvedConceptHandoffSha256": (
             "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
         ),
+        "intakePath": "distribution/sim/brand/donor-intake.v1.json",
+        "intakeSha256": "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297",
         "canonicalDonorState": "pending-universal-common-core",
+        "canonicalDonorManifestPath": None,
+        "canonicalDonorManifestSha256": None,
         "canonicalDonorCommit": None,
+        "commonCoreBindingVerified": False,
+        "assetHashesVerified": False,
         "iconOverridePresent": False,
         "masterRedrawAllowed": False,
     }:
         raise SimInstallerContractError("Sim canonical brand donor state drifted")
+    intake_path = _resolve(repo_root, brand["intakePath"], "surface.brandDonor.intakePath")
+    if sha256_file(intake_path) != _sha(
+        brand["intakeSha256"], "surface.brandDonor.intakeSha256"
+    ):
+        raise SimInstallerContractError("Sim brand donor intake SHA-256 drifted")
+    brand_module = _load_brand_donor_module()
+    try:
+        intake = brand_module.validate_donor_intake(
+            brand_module.load_json(intake_path), repo_root=repo_root
+        )
+        if donor_manifest is not None:
+            brand_module.validate_canonical_donor_manifest(
+                donor_manifest,
+                intake=intake,
+                repo_root=repo_root,
+                require_working_tree_assets=True,
+            )
+    except brand_module.SimBrandDonorError as exc:
+        raise SimInstallerContractError(f"Sim brand donor verification failed: {exc}") from exc
+    if donor_manifest is not None:
+        raise SimInstallerContractError(
+            "canonical donor verified but installer surface remains pending integration"
+        )
 
     _validate_surface_source_refs(contract["staticSourceRefs"], repo_root=repo_root)
 
@@ -1044,6 +1091,7 @@ def main() -> int:
     surface_parser.add_argument(
         "--profile", type=Path, default=Path("distribution/sim/build-profile.v1.json")
     )
+    surface_parser.add_argument("--donor-manifest", type=Path)
     surface_parser.add_argument(
         "contract",
         type=Path,
@@ -1085,6 +1133,9 @@ def main() -> int:
                 profile=profile,
                 profile_path=args.profile,
                 repo_root=args.repo_root.resolve(),
+                donor_manifest=(
+                    load_json(args.donor_manifest) if args.donor_manifest is not None else None
+                ),
             )
         else:
             raise SimInstallerContractError(f"unsupported command: {args.command}")

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/sim-canonical-brand-donor-manifest.v1.json",
+  "title": "DroneDream SIM canonical brand donor manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "manifestVersion",
+    "editionId",
+    "source",
+    "identity",
+    "palette",
+    "assets",
+    "preservation",
+    "review"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-canonical-brand-donor-manifest"},
+    "manifestVersion": {"const": "1.0.0"},
+    "editionId": {"const": "sim"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branch",
+        "donorCommit",
+        "evidenceCommit",
+        "commonCoreCommit",
+        "commonCoreHash",
+        "commonCorePaths",
+        "approvedConceptHandoffSha256"
+      ],
+      "properties": {
+        "branch": {"const": "codex/software"},
+        "donorCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "evidenceCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "commonCoreCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "commonCoreHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "commonCorePaths": {
+          "const": ["backend", "desktop", "engine-pack", "frontend", "runtime", "worker"]
+        },
+        "approvedConceptHandoffSha256": {
+          "const": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["masterName", "displayName", "separator"],
+      "properties": {
+        "masterName": {"const": "DroneDream"},
+        "displayName": {"const": "DroneDream · SIM"},
+        "separator": {"const": " · "}
+      }
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "middle", "end"],
+      "properties": {
+        "start": {"const": "#00D9FF"},
+        "middle": {"const": "#2671FF"},
+        "end": {"const": "#744CFF"}
+      }
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/asset"}
+    },
+    "preservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceMasterPath",
+        "sourceMasterSha256",
+        "originalWingShapePreserved",
+        "whiteFlightPathPreserved",
+        "masterWordmarkPreserved",
+        "masterRedrawn"
+      ],
+      "properties": {
+        "sourceMasterPath": {"type": "string", "minLength": 1},
+        "sourceMasterSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "originalWingShapePreserved": {"const": true},
+        "whiteFlightPathPreserved": {"const": true},
+        "masterWordmarkPreserved": {"const": true},
+        "masterRedrawn": {"const": false}
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "releaseUseAuthorized", "conceptOnly", "approvalReference"],
+      "properties": {
+        "status": {"const": "reviewed-canonical"},
+        "releaseUseAuthorized": {"const": true},
+        "conceptOnly": {"const": false},
+        "approvalReference": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "$defs": {
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "path", "sha256", "bytes", "mimeType", "width", "height"],
+      "properties": {
+        "role": {
+          "enum": [
+            "master-mark-svg",
+            "sim-mark-svg",
+            "sim-lockup-svg",
+            "sim-icon-png-32",
+            "sim-icon-png-128",
+            "sim-icon-png-256",
+            "sim-icon-png-512",
+            "sim-windows-ico"
+          ]
+        },
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "mimeType": {"enum": ["image/svg+xml", "image/png", "image/x-icon"]},
+        "width": {"type": ["integer", "null"], "minimum": 1},
+        "height": {"type": ["integer", "null"], "minimum": 1}
+      }
+    }
+  }
+}
