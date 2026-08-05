@@ -233,7 +233,11 @@ process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 
 const frontendRequire = createRequire(path.join(frontendRoot, "package.json"));
 const { createServer } = await import(pathToFileURL(frontendRequire.resolve("vite")).href);
-const { chromium } = await import(pathToFileURL(frontendRequire.resolve("playwright")).href);
+const playwrightModule = await import(
+  pathToFileURL(frontendRequire.resolve("playwright")).href
+);
+const { chromium } = playwrightModule.default ?? playwrightModule;
+assert(chromium, "Playwright Chromium export is unavailable");
 
 async function screenshot(page, caseId, surface) {
   const target = path.join(outputRoot, `${caseId}-${surface}.png`);
