@@ -1,79 +1,72 @@
-# DroneDream brand identity
+# DroneDream canonical brand identity
 
-## Brand idea
+The repository-owned brand contract is `brand/brand-editions.v1.json`. It
+defines one shared wing/bat geometry and four presentation identities:
 
-The DroneDream mark is a rising bat drawn inside a compact, near-square visual
-footprint. The animal is not decorative:
+| Identity | Exact lockup | Gradient | Light / dark surface |
+| --- | --- | --- | --- |
+| Universal | `DroneDream` | `#FF5574` / `#6A4CFF` / `#E657D1` | `#F8F5FF` / `#171225` |
+| SIM | `DroneDream · SIM` | `#00D9FF` / `#2671FF` / `#744CFF` | `#F1FAFF` / `#071B31` |
+| LAB | `DroneDream · LAB` | `#A7E84A` / `#20C77A` / `#087E69` | `#F3FCEF` / `#092019` |
+| FIELD | `DroneDream · FIELD` | `#FFC247` / `#FF754B` / `#D746A5` | `#FFF8EF` / `#28140D` |
 
-- **Agile flight** represents the product's purpose: improving UAV control in
-  simulation.
-- **Echolocation** represents the Harness reading simulator feedback instead of
-  guessing from an unconstrained model response.
-- **The white echo path** represents the evidence gate. A proposal advances only
-  after the relevant experiment, verifier, and provenance checks succeed.
-- **The rising three-quarter pose** represents iterative improvement rather than
-  a static final answer.
-- **Night flight** connects the symbol directly to the `Dream` in DroneDream.
+Universal is the canonical mother brand. Edition colors and lockups are a
+visual mode only. They do not install modules, validate a Vehicle Pack, or
+grant simulation or hardware authority.
 
-## Core colors
+## Shared geometry
 
-| Role | Color | Hex |
-| --- | --- | --- |
-| Flight / intelligence | Electric violet | `#684BFF` |
-| Simulation / imagination | Light violet | `#9B72FF` |
-| Energy / iteration | Magenta | `#F166D8` |
-| Forward motion / lift | Coral | `#FF4E70` |
-| Precision / verification | Flight blue | `#3A74FF` |
-| Evidence path | White | `#FFFFFF` |
-| Dark-background fallback | Ink | `#171225` |
+Every identity uses the same rising wing/bat silhouette and the same white
+internal flight path. The geometry communicates agile flight, simulator
+feedback, and evidence-gated iteration. Never redraw the path per Edition or
+turn an Edition palette into a capability flag.
 
-The wordmark gradient runs from electric violet through light violet to
-magenta. The animal mark extends that system with coral at the rising wing and
-flight blue at the lower trailing edge, while violet remains the dominant
-bridge color. The mark also needs a single-color violet and a white version for
-contexts where gradients are unavailable or do not meet contrast requirements.
+## Lockup contract
 
-## Wordmarks
+- `DroneDream` uses the approved primary mixed-case wordmark.
+- Edition lockups add one centered dot and one uppercase Edition name on the
+  same line: `DroneDream · SIM`, `DroneDream · LAB`, or `DroneDream · FIELD`.
+- Compact lockups use the same geometry and naming contract with the existing
+  tracked uppercase responsive wordmark.
+- Keep the aspect ratio and clear space. Use the mark alone below a 24 px mark
+  height.
+- Images are decorative inside navigation; the containing control must retain
+  a real accessible text name.
 
-- **Primary:** `DroneDream` in a geometric semibold face. Use it on the public
-  website, report title page, account surfaces, and prominent marketing
-  placements.
-- **Compact:** `DRONEDREAM` in a heavier, tracked uppercase face. Use it in the
-  desktop title area, launch chrome, narrow horizontal placements, and small
-  technical labels.
+## Canonical source and outputs
 
-Both wordmarks use the same color progression and the same notched capital
-`D`. They are two responsive forms of one identity, not separate logos.
+- `brand/source/drone-dream-mark-master.png`: the Universal mother-brand
+  geometry source.
+- `brand/source/approved/`: exact approved SIM/LAB/FIELD 1024 px marks and
+  single-line centered-dot lockups. Canonical outputs preserve these bytes
+  without re-rendering.
+- `brand/source/space-grotesk-latin-wght-normal.woff2`: frozen wordmark font.
+- `brand/source/Space-Grotesk-OFL-1.1.txt`: exact OFL-1.1 license text.
+- `brand/generated/<edition>/`: canonical mark, lockups, favicon, PNG icon
+  sizes, and multi-frame Windows ICO for each identity.
+- `brand/generated/brand-assets.v1.json`: bytes, dimensions, source hashes,
+  generator hash, font/license hash, and every output SHA-256.
+- `brand/generated/edition-brand-preview.png`: light/dark visual review board.
+- `frontend/src/assets/brand/`: generated frontend mirrors.
+- `frontend/src/brand/edition-brand.generated.{ts,css}`: generated display
+  tokens. They explicitly carry no hardware authority.
+- `desktop/src-tauri/icons/`: Universal canonical Windows icon mirrors until an
+  exact Edition build selects its own canonical ICO.
 
-## Usage rules
+Approved concept boards are review input, not production or release assets.
+No runtime or build reads from the planning `work/` directory.
 
-- Keep the mark's aspect ratio. Never stretch it horizontally or vertically.
-- Keep clear space around the mark equal to at least one quarter of the mark's
-  visible width.
-- Do not add an enclosing tile, glow, drop shadow, technology lines, or animal
-  illustration details.
-- Use the full lockup at 24 px mark height or larger. Below that size, use the
-  mark alone.
-- Product navigation may use the fixed raster lockup to preserve the approved
-  optical alignment, but the containing link or landmark must expose the real
-  accessible name `DroneDream`; the image is never the sole accessible label.
-- On busy or low-contrast backgrounds, use the white single-color fallback
-  rather than adding effects.
+## Deterministic generation
 
-## Source and generated assets
+Run:
 
-- `docs/assets/drone-dream-logo-source.png`: selected transparent source artwork.
-- `docs/assets/drone-dream-icon.png`: normalized 1024 px production mark.
-- `docs/assets/brand/`: primary wordmark, compact wordmark, lockups, and preview.
-- `frontend/src/assets/drone-dream-mark.png`: standalone product and website mark.
-- `frontend/src/assets/drone-dream-lockup-primary.png`: public-site lockup.
-- `frontend/src/assets/drone-dream-lockup-compact.png`: desktop compact lockup.
-- `frontend/public/drone-favicon.png`: tight 64 px browser icon.
-- `desktop/src-tauri/app-icon.png`: source for generated Tauri/Windows icons.
+```text
+python scripts/build-brand-assets.py
+python scripts/build-brand-assets.py --check
+```
 
-Run `python scripts/build-brand-assets.py` after changing the selected source
-artwork. The script requires Pillow and fontTools in the selected Python
-environment plus the installed frontend dependencies, which supply the
-OFL-licensed Space Grotesk variable font. Regenerate the Windows icon set from
-`desktop/src-tauri/app-icon.png` with the Tauri icon command after changing the
-mark.
+The checked-in contract freezes the approved source hashes, output dimensions,
+and ICO frame set. The generator uses only repository-owned inputs and records
+its exact dependency lock plus Python, Pillow, fontTools, and zlib versions in
+the manifest. A generated icon is an input to a future Edition build; it is not
+proof that an installer was built or released.

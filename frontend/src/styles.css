@@ -1,3 +1,5 @@
+@import "./brand/edition-brand.generated.css";
+
 :root {
   color-scheme: dark;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
@@ -5915,6 +5917,9 @@ a {
   --distribution-surface-strong: #ffffff;
   --distribution-text: var(--text);
   --distribution-muted: var(--text-muted);
+  --distribution-brand-start: var(--dd-brand-start);
+  --distribution-brand-middle: var(--dd-brand-middle);
+  --distribution-brand-end: var(--dd-brand-end);
   display: grid;
   min-width: 0;
   gap: 0.85rem;
@@ -5923,7 +5928,11 @@ a {
   border: 1px solid var(--distribution-border);
   border-radius: 16px;
   background:
-    radial-gradient(circle at 92% 4%, rgba(83, 216, 242, 0.1), transparent 30%),
+    radial-gradient(
+      circle at 92% 4%,
+      color-mix(in srgb, var(--distribution-brand-start) 12%, transparent),
+      transparent 30%
+    ),
     linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(249, 245, 253, 0.88));
   box-shadow: 0 14px 38px rgba(48, 21, 63, 0.07);
 }
@@ -6052,21 +6061,41 @@ a {
   transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
 }
 
+.distribution-edition-options .brand-lockup {
+  display: block;
+  width: min(100%, 220px);
+  height: 32px;
+  object-fit: contain;
+  object-position: left center;
+}
+
 .distribution-edition-options label:hover > span,
 .distribution-edition-options input:focus-visible + span {
-  border-color: rgba(168, 85, 247, 0.48);
+  border-color: color-mix(
+    in srgb,
+    var(--dd-brand-middle) 48%,
+    var(--distribution-border)
+  );
   transform: translateY(-1px);
 }
 
 .distribution-edition-options input:focus-visible + span {
-  outline: 2px solid rgba(79, 197, 232, 0.62);
+  outline: 2px solid color-mix(in srgb, var(--dd-brand-start) 62%, transparent);
   outline-offset: 2px;
 }
 
 .distribution-edition-options input:checked + span {
-  border-color: rgba(168, 85, 247, 0.62);
-  background: linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(73, 208, 236, 0.08));
-  box-shadow: inset 3px 0 #b14fd2;
+  border-color: color-mix(
+    in srgb,
+    var(--dd-brand-middle) 62%,
+    var(--distribution-border)
+  );
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--dd-brand-start) 12%, transparent),
+    color-mix(in srgb, var(--dd-brand-end) 8%, transparent)
+  );
+  box-shadow: inset 3px 0 var(--dd-brand-middle);
 }
 
 .distribution-edition-options strong {
