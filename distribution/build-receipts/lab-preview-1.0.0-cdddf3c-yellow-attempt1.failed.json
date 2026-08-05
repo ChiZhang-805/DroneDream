@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-preview-1.0.0-cdddf3c-yellow-attempt1",
+  "attemptOrdinalForSource": 1,
+  "auditMode": "yellow-single-build-attempt",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "cdddf3c10ab3471aaca94b15576178972785bf4b",
+    "shortCommit": "cdddf3c",
+    "upstream": "origin/codex/software-lab",
+    "upstreamExactBeforeAttempt": true,
+    "treeStateBeforeAttempt": "clean",
+    "treeStateAfterAttempt": "clean"
+  },
+  "commonCore": {
+    "authorityName": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "productCommonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "excludedSimPreviewEvidenceCommit": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
+  },
+  "inputs": {
+    "buildScript": {
+      "path": "desktop/scripts/build-lab-preview.ps1",
+      "sha256": "957254360d014b8984b985ff9a32dc3f6f78d3017a7604ab27c16500cbacdc08"
+    },
+    "sharedLlvmBuildScript": {
+      "path": "desktop/scripts/build-windows-llvm.ps1",
+      "sha256": "d21562eaa71e8a309d3ae57bd552131163445bec628c244d48ff389b0c0bd580"
+    },
+    "tauriLabOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "sha256": "53d62bc0584d10b1d64d8b96549206c592302d20c586ae51a58650905eed768c"
+    },
+    "tauriLlvmOverlay": {
+      "path": "desktop/src-tauri/tauri.llvm.conf.json",
+      "sha256": "4af8e80d26e7c315ae3701e07ef83dd1d6a529f2c1fbbc2e21a938087f3eaca3"
+    },
+    "labBuildProfile": {
+      "path": "distribution/build-profiles/lab-preview.v1.json",
+      "sha256": "2e84a5a482032042f74a21b8402bdd2553f9862804aae57d14ae474e660dc56d"
+    },
+    "labEditionManifest": {
+      "path": "distribution/editions/lab.v1.json",
+      "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+    },
+    "executionGatePolicy": {
+      "path": "distribution/safety/edition-execution-gate.v1.json",
+      "sha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456"
+    },
+    "vehiclePackRegistry": {
+      "path": "distribution/vehicle-packs/registry.v1.json",
+      "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"
+    },
+    "licenseNotice": {
+      "path": "runtime/THIRD_PARTY_NOTICES.md",
+      "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+    }
+  },
+  "toolchain": {
+    "selection": "strict-pinned-gnullvm",
+    "rustupToolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+    "llvmMingwDirectory": "llvm-mingw-20260616-ucrt-x86_64",
+    "cargoBuildJobs": 2,
+    "cargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
+    "msvcLinkerRequired": false
+  },
+  "publicSupabaseClientConfig": {
+    "source": "GitHub repository Actions variables",
+    "repository": "ChiZhang-805/DroneDream",
+    "variableNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "singleProcessInjection": true,
+    "valuesPrinted": false,
+    "valuesPersisted": false,
+    "valuesHashed": false,
+    "modelApiKeyRead": false,
+    "accountPasswordRead": false,
+    "tauriSigningPrivateKeyRead": false
+  },
+  "command": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop\\scripts\\build-lab-preview.ps1 -Build -Toolchain gnullvm -OutputRoot C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-cdddf3c-attempt1\\artifact -CargoTargetDir C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
+  "attempt": {
+    "count": 1,
+    "startedAtUtc": "2026-08-05T15:22:31.1381511Z",
+    "finishedAtUtc": "2026-08-05T15:22:37.3884118Z",
+    "status": "failed-before-tauri",
+    "exitCode": 1,
+    "failureStage": "edition-product-name-preflight",
+    "failureReason": "Windows PowerShell 5.1 decoded the UTF-8 middle-dot productName literal in the no-BOM Lab build script differently from the UTF-8 Tauri JSON overlay.",
+    "cargoCompilationStarted": false,
+    "tauriStarted": false,
+    "nsisStarted": false,
+    "secondAttemptExecuted": false
+  },
+  "evidence": {
+    "runRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-cdddf3c-attempt1",
+    "log": {
+      "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-cdddf3c-attempt1\\lab-build-attempt1.log",
+      "bytes": 10784,
+      "sha256": "cd647abb5bfc2487e160234779dfb351ca67e496342d0a55c5e85fe52d80ce88"
+    },
+    "result": {
+      "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-cdddf3c-attempt1\\attempt-result.json",
+      "bytes": 905,
+      "sha256": "5a0956ef434ba419f9bd162e2fdd6d1a094c46ee89a0b8349f0e28b7fdd989ea"
+    },
+    "preserved": true
+  },
+  "artifact": {
+    "expectedFileName": "DroneDream-Lab-1.0.0.exe",
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-cdddf3c-attempt1\\artifact\\DroneDream-Lab-1.0.0.exe",
+    "exists": false,
+    "bytes": null,
+    "sha256": null,
+    "peCertificateTable": "not-produced",
+    "authenticode": "not-produced",
+    "tauriUpdaterSignature": "not-produced",
+    "sigFileExists": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecisionAtZeroValidatedPacks": "deny",
+    "installed": false,
+    "runtimeMigrated": false,
+    "px4GazeboStarted": false,
+    "hardwareConnected": false,
+    "releaseBranchCreated": false,
+    "uploadedOrDeployed": false
+  },
+  "remainingGates": [
+    "Apply and validate the edition-owned UTF-8 productName preflight fix without rebuilding.",
+    "Request fresh YELLOW authorization before any second Lab build attempt.",
+    "Produce one exact DroneDream-Lab-1.0.0.exe and bind bytes, SHA-256, PE certificate table, Authenticode, updater signature state, source, common core, manifest, payload, license, and NOTICE.",
+    "Keep installation, PX4/Gazebo, hardware, upload, and release branch actions outside this attempt.",
+    "Keep hardware write, arm, HITL, and flight denied while validatedVehiclePackCount is zero."
+  ]
+}
