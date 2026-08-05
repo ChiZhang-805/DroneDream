@@ -1,0 +1,76 @@
+{
+  "schema_id": "dronedream.software-test-receipt/v1",
+  "generated_at": "2026-08-05T07:16:55.628Z",
+  "subject_commit": "98202e042edeae8847acfd8b66b81bc0bd06a453",
+  "branch": "codex/software",
+  "resource_class": "GREEN_WITH_RELATED_YELLOW_REGRESSION",
+  "scope": "benchmark-p1-execution-disabled-arm-binding-fence",
+  "status": "passed",
+  "provider_calls": 0,
+  "api_keys_read": false,
+  "px4_or_gazebo_started": false,
+  "contract": {
+    "disabled_arm_binding": "rejected_before_job_holdout_sealing_or_budget_reservation",
+    "enabled_fixture_arms": [
+      "random-search/v1",
+      "seeded-halton/v1"
+    ],
+    "unknown_arm_semantics_preserved": true,
+    "started_batch_semantics_preserved": true,
+    "scenario_pairing_semantics_preserved": true,
+    "global_cap_atomic_rollback_preserved": true,
+    "production_runner_arm_routing_promoted": false
+  },
+  "changed_files": [
+    {
+      "path": "backend/app/benchmarking/coordinator.py",
+      "sha256": "63e3a03337df15f5e8a6fe20426d49f2b560974e4f538edd06a47c573758e687"
+    },
+    {
+      "path": "backend/tests/test_benchmark_campaign_contracts.py",
+      "sha256": "1419f390b32274220bef325c8520df2a8b63296b4e632d9d3301f8e953ff4189"
+    }
+  ],
+  "checks": [
+    {
+      "name": "focused-campaign-contracts",
+      "command": "python -m pytest backend/tests/test_benchmark_campaign_contracts.py -q",
+      "result": "18 passed in 33.88s"
+    },
+    {
+      "name": "related-benchmark-provider-and-cognitive-regression",
+      "command": "python -m pytest backend/tests/test_benchmark_campaign_contracts.py backend/tests/test_benchmark_composite_inventory.py backend/tests/test_benchmark_composite_inventory_observation.py backend/tests/test_benchmark_llm_arm_contracts.py backend/tests/test_benchmark_llm_durable_runtime.py backend/tests/test_benchmark_llm_fixture_runtime.py backend/tests/test_benchmark_method_inventory.py backend/tests/test_benchmark_pilot_readiness.py backend/tests/test_cognitive_budget.py backend/tests/test_cognitive_budget_ablation.py backend/tests/test_provider_request_accounting.py -q",
+      "result": "133 passed in 98.65s"
+    },
+    {
+      "name": "ruff",
+      "command": "python -m ruff check backend/app/benchmarking/coordinator.py backend/tests/test_benchmark_campaign_contracts.py",
+      "result": "passed"
+    },
+    {
+      "name": "mypy",
+      "command": "python -m mypy --ignore-missing-imports backend/app/benchmarking/coordinator.py",
+      "result": "passed; 1 source file"
+    },
+    {
+      "name": "git-diff-check",
+      "command": "git diff HEAD^ HEAD --check",
+      "result": "passed"
+    }
+  ],
+  "development_failure_history": [
+    {
+      "result": "test process did not start",
+      "cause": "the first command referenced a nonexistent backend/.venv/Scripts/python.exe path",
+      "resolution": "used the repository's configured Miniconda Python available in the login shell",
+      "rerun_result": "18 focused tests passed"
+    }
+  ],
+  "honest_boundaries": [
+    "No real provider request was made and no API key was read.",
+    "No PX4, Gazebo, installer, Runtime migration, visible window, or deployment was started.",
+    "This closure prevents disabled preregistration arms from becoming executable Job bindings; it does not yet make benchmark-bound Jobs dispatch through their frozen arm adapter.",
+    "Production campaign-runner arm routing and llm_direct promotion remain separate future closures.",
+    "The receipt commit that contains this file is evidence-only and must not replace subject_commit."
+  ]
+}
