@@ -1,0 +1,134 @@
+{
+  "schemaVersion": "dronedream.edition-installer-handoff-registry-validation.v1",
+  "generatedAt": "2026-08-05T14:25:44Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "subjectTree": "0f5082115c50e6f15613adc1be3140ab79dc7e21",
+    "staleDeploymentSource": "d1c5917ba5d724efacf9a578056c543665ed5e17",
+    "deploymentPerformed": false,
+    "productionTouched": false,
+    "browserMatrixPerformed": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "contract": {
+    "publicMetadata": "frontend/public/downloads/editions.json",
+    "metadataSchemaVersion": 3,
+    "runtimeRegistry": "frontend/src/site/editionReleaseRegistry.ts",
+    "handoffRegistry": "website/releases/edition-handoff-status.json",
+    "handoffSchemaVersion": 1,
+    "buildGate": "website/scripts/verify-edition-availability.mjs",
+    "requiredArtifactBinding": [
+      "edition-specific filename",
+      "sourceCommit",
+      "sizeBytes",
+      "sha256",
+      "signatureState=signed",
+      "receiptUrl",
+      "explicit urlFamily",
+      "download/checksum/signature URLs from one exact family"
+    ],
+    "failClosedRules": [
+      "metadata and software-line handoff must both be release-ready",
+      "an awaiting handoff cannot expose artifact fields or a download",
+      "one accepted edition cannot unlock another edition",
+      "cross-edition filename, bytes, URL, tag, branch, or receipt substitution is rejected",
+      "the website never rebuilds, renames, or substitutes installer bytes"
+    ]
+  },
+  "handoffStatus": {
+    "sim": {
+      "sourceBranch": "codex/software-sim",
+      "observedRemoteHead": "9dbff76b1411b0d31ae59c8ca7ad103a1a394d92",
+      "status": "awaiting-exact-handoff",
+      "knownPreviewAccepted": false
+    },
+    "lab": {
+      "sourceBranch": "codex/software-lab",
+      "observedRemoteHead": "e9752238cee9123705f896a6e4ebc519c50135dc",
+      "status": "awaiting-exact-handoff"
+    },
+    "field": {
+      "sourceBranch": "codex/software-field",
+      "observedRemoteHead": "973f3c1eace831e34a2ea83c37316506addc1a3c",
+      "status": "awaiting-exact-handoff"
+    },
+    "universal": {
+      "sourceBranch": "codex/software",
+      "observedRemoteHead": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+      "status": "awaiting-exact-handoff"
+    }
+  },
+  "websiteSurfaces": {
+    "product": "SIM, LAB, and FIELD cards consume only their matching registry entries",
+    "header": "the top Download entry consumes only Universal and uses the existing mother-brand mark",
+    "themes": {
+      "universal": ["#FF5574", "#6A4CFF", "#E657D1"],
+      "sim": ["#00D9FF", "#2671FF", "#744CFF"],
+      "lab": ["#A7E84A", "#20C77A", "#087E69"],
+      "field": ["#FFC247", "#FF754B", "#D746A5"]
+    },
+    "webCapabilityBoundary": "preview and download only; no local Runtime, PX4, Gazebo, or vehicle capability is claimed"
+  },
+  "validation": {
+    "focusedTests": {
+      "command": "npm.cmd --prefix frontend test -- EditionAvailability.test.ts EditionReleaseRegistry.test.ts ProductPage.test.tsx PublicSite.test.tsx",
+      "files": 4,
+      "tests": 40,
+      "passed": 40,
+      "failed": 0,
+      "locales": ["en", "zh-CN"],
+      "greenViewportWidths": [1440, 760, 390]
+    },
+    "negativeCases": [
+      "missing exact artifact field",
+      "wrong explicit URL family",
+      "mixed release tags",
+      "unsafe or foreign URL",
+      "cross-edition filename",
+      "duplicate bytes",
+      "metadata published before handoff acceptance",
+      "cross-edition handoff SHA or URL",
+      "wrong software branch",
+      "missing receipt"
+    ],
+    "standaloneVerifier": {
+      "command": "node --experimental-strip-types website/scripts/verify-edition-availability.mjs",
+      "status": "passed",
+      "downloadReady": {
+        "sim": false,
+        "lab": false,
+        "field": false,
+        "universal": false
+      }
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "siteBuild": {
+      "command": "npm.cmd --prefix frontend run site:build",
+      "status": "passed with explicit local-only Supabase URL and publishable-key placeholders",
+      "modulesTransformed": 2179,
+      "knownNonBlockingWarning": "existing main chunk exceeds the configured size warning",
+      "initialDiagnostic": "the first attempt stopped before building because the required local placeholder publishable key was omitted"
+    },
+    "deploymentContract": {
+      "command": "python -m unittest runtime.tests.test_website_deployment",
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed"
+  },
+  "repositoryGovernance": {
+    "forcePushPerformed": false,
+    "manualAndPdfDraftsExcluded": true,
+    "workDirectoryExcluded": true,
+    "historicalDirtyStatePreserved": true,
+    "githubPagesModified": false,
+    "aliyunModified": false,
+    "releaseAssetsModified": false,
+    "supabaseOrSecretsModified": false,
+    "dnsOrTlsModified": false
+  }
+}
