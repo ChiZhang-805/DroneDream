@@ -333,6 +333,10 @@ async function verifyOverview(page, testCase) {
 }
 
 async function verifySetup(page, testCase) {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    window.scrollTo(0, 0);
+  });
   const panel = page.locator(".distribution-setup-panel-setup");
   await panel.waitFor();
   const metrics = await panel.evaluate((element, productName) => ({
@@ -344,6 +348,15 @@ async function verifySetup(page, testCase) {
     controllerControlCount: element.querySelectorAll("select[id$='-controller']").length,
     optionalModuleControlCount: element.querySelectorAll(".distribution-optional-modules input").length,
     commandButtonCount: element.querySelectorAll("button").length,
+    skipLinkIntersectsViewport: (() => {
+      const skipLink = document.querySelector(".skip-link");
+      if (!(skipLink instanceof HTMLElement)) return false;
+      const rect = skipLink.getBoundingClientRect();
+      return rect.bottom > 0
+        && rect.right > 0
+        && rect.top < window.innerHeight
+        && rect.left < window.innerWidth;
+    })(),
     documentWidth: document.documentElement.clientWidth,
     documentScrollWidth: document.documentElement.scrollWidth,
     productName,
@@ -355,6 +368,7 @@ async function verifySetup(page, testCase) {
   assert.equal(metrics.controllerControlCount, 0);
   assert.equal(metrics.optionalModuleControlCount, 0);
   assert.equal(metrics.commandButtonCount, 0);
+  assert.equal(metrics.skipLinkIntersectsViewport, false);
   assert.equal(metrics.documentScrollWidth, metrics.documentWidth);
   return { ...metrics, image: await screenshot(page, testCase.id, "setup") };
 }
