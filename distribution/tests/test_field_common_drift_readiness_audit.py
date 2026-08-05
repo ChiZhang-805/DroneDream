@@ -48,6 +48,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
                 "test(field): bind build plans to common core commit",
                 "test(field): add prerelease audit contract",
                 "test(field): add lifecycle refusal contract",
+                "test(field): audit common drift readiness",
             ],
         )
         by_path = {item["path"]: item for item in audit["changedPaths"]}
