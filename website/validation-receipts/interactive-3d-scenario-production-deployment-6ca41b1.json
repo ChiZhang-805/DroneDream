@@ -1,0 +1,245 @@
+{
+  "schemaVersion": "dronedream.interactive-3d-scenario-production-deployment.v1",
+  "generatedAt": "2026-08-05T05:27:49.3808185Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "6ca41b1dc3ba892fa70e7fa9ef813f86fcb2f407",
+    "subjectTree": "d0f5aa8b067ebf2e8c13f8b5e30ab159ea1a4254",
+    "deployTag": "website-deploy-1.0.0-20260805-6ca41b1",
+    "deploymentPerformed": true,
+    "githubPagesDeploymentPerformed": true,
+    "aliyunDeploymentPerformed": true,
+    "githubReleaseAssetReplacementPerformed": false,
+    "installerRebuiltForThisWebsiteOnlyInteractionChange": false,
+    "supabaseFunctionsDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "paymentOrModelProductionMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "httpsEnforced": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "change": {
+    "requirements": [
+      "Make 3D the initial Fixed Scenario track view.",
+      "Render a genuinely perspective 3D scene with separated axes, grid, route elevation, depth, and shadow cues.",
+      "Rotate the 3D scene by pointer drag and zoom it by wheel without scrolling the page.",
+      "Keep XY, XZ, and YZ projections independently selectable without changing their established behavior."
+    ],
+    "implementedBehavior": {
+      "initialView": "3d",
+      "initialCamera": {
+        "yaw": -0.72,
+        "pitch": 0.58,
+        "zoom": 1.22
+      },
+      "pointerDragRotation": true,
+      "wheelZoom": true,
+      "passiveWheelListener": false,
+      "pageScrollSuppressedWhileZooming": true,
+      "viewModesPerCard": [
+        "XY",
+        "XZ",
+        "YZ",
+        "3D"
+      ]
+    },
+    "sourceFiles": [
+      "frontend/src/features/experiment/ScenarioTrackPreview.tsx",
+      "frontend/src/styles.css",
+      "frontend/src/__tests__/FixedScenarios.test.tsx",
+      "frontend/scripts/verify-software-ui-layout.mjs"
+    ],
+    "manualDraftsExcluded": true,
+    "manualDraftPaths": [
+      "frontend/public/docs/downloads/DroneDream-Manual-en.md",
+      "frontend/public/docs/downloads/DroneDream-Manual-zh-CN.md",
+      "website/manual-pdf/**",
+      "website/scripts/build_manual_pdf.py",
+      "website/scripts/audit_manual_pdf_layout.py",
+      "work/**"
+    ]
+  },
+  "validation": {
+    "focusedFixedScenarios": {
+      "files": 1,
+      "tests": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "completeFrontendSuite": {
+      "files": 60,
+      "tests": 417,
+      "passed": 417,
+      "failed": 0,
+      "publicSitePricingAvailability": "passed"
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "appProductionBuild": "passed with one non-failing Vite chunk-size advisory",
+    "siteProductionBuild": "passed",
+    "sharedSiteAndConsoleBuild": "passed",
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed",
+    "localBrowserLayoutVerification": {
+      "cases": 9,
+      "passed": 9,
+      "failed": 0,
+      "receiptSha256": "b2afb80794ef6572be7cb8efc9b19971877ac939bcc856e9b83cb319e7d85e05",
+      "visualInspection": "passed"
+    },
+    "onlineBrowserAudit": {
+      "origins": [
+        "http://getdronedream.com",
+        "http://47.93.180.216"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "languages": [
+        "en",
+        "zh-CN"
+      ],
+      "cases": 8,
+      "passed": 8,
+      "failed": 0,
+      "defaultView": "3d",
+      "axisCountPerCard": 3,
+      "desktopDragChangedCamera": true,
+      "desktopWheelChangedZoom": true,
+      "pageScrollDeltaWhileZoomingPx": 0,
+      "documentWidthParity": true,
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "unsafeRequests": 0,
+      "receiptSha256": "454d8d846e8653ab6658948a890922ed5dd7a14ecd705bb99715442d00d89abf",
+      "representativeScreenshots": {
+        "pagesEnglishDesktopDefaultSha256": "ddc76b5b4817497a9cd4b1201cb0fee229c13169b4abce40bb1c00a4bf5c71dc",
+        "pagesEnglishDesktopRotatedZoomedSha256": "77c00d7b29d2c1ebd8c0613ce2f43fb4edbf1fc2e83c5826d17704992360d144",
+        "pagesChineseDesktopSha256": "37f392be7b3ec751e019c7451dfcc58f6e14db9f56344de90f9b036e265b37eb",
+        "pagesEnglishMobileSha256": "8f6e3461eda59d8b74376628d087763e13def4b606d7cf4001b4e9f150383104",
+        "aliyunEnglishDesktopDefaultSha256": "bb111d69c4f3e5ad2eb706692debe6c8e436d0dc5ec54b522f05d94ee5b5c155",
+        "aliyunEnglishDesktopRotatedZoomedSha256": "10b38bd6a5ae5157a3f46b16b99ce78a513324bfadcfdf154b7542810535c69c",
+        "aliyunChineseDesktopSha256": "d6cc4281301f4757b1d21240ce0f8648406c139b01ab34c9cabbe6062bc74499",
+        "aliyunEnglishMobileSha256": "8714236753f5c936f5d53c2d9d54869e161cbe63e38165637540d9849522c024"
+      },
+      "visualInspection": "passed; the default scenes read as perspective 3D, drag and zoom states remain contained, and desktop/mobile layouts have no clipping or horizontal overflow"
+    }
+  },
+  "sharedArtifact": {
+    "buildCount": 1,
+    "sourceCommit": "6ca41b1dc3ba892fa70e7fa9ef813f86fcb2f407",
+    "workflowRunId": 30973710534,
+    "workflowRunUrl": "https://github.com/ChiZhang-805/DroneDream/actions/runs/30973710534",
+    "buildJobId": 92203261829,
+    "deployJobId": 92203400810,
+    "artifactId": 8917478418,
+    "artifactName": "dronedream-site-6ca41b1dc3ba892fa70e7fa9ef813f86fcb2f407",
+    "artifactBytes": 29721785,
+    "artifactDigest": "sha256:da1068dec6b9a85965f2742f76b98041be795004c0ce8f677c03764a4c656d56",
+    "pagesArtifactId": 8917479166,
+    "pagesArtifactBytes": 29716015,
+    "pagesArtifactDigest": "sha256:7e70de0aa3f896b4f94444c4595a0e4ff0e1b6032ff2642ce55e87af37e7e914",
+    "archiveBytes": 29686243,
+    "archiveSha256": "4712a07264158ffe8835d426ffe40b337147aaffbc6c6473623cf7cc6ee1246d",
+    "manifestListedFiles": 160,
+    "sha256SumsSha256": "61fcbfc4c8bf6cec48e695666c3b59d1733e75825d3bdb4852daa186e83aa7d5",
+    "buildManifestSha256": "a7616f721df2114eb939db6eeab799cf2f564a9372b7eacff994e84e10d71221",
+    "deploymentRule": "The exact GitHub Actions shared artifact was deployed to GitHub Pages and then downloaded, verified, and deployed to Aliyun without rebuilding either endpoint."
+  },
+  "deployments": {
+    "githubPages": {
+      "runId": 30973710534,
+      "status": "success",
+      "sourceCommit": "6ca41b1dc3ba892fa70e7fa9ef813f86fcb2f407",
+      "temporaryExactTagPolicyRemoved": true,
+      "restoredEnvironmentPolicy": {
+        "count": 1,
+        "id": 55186327,
+        "name": "main",
+        "type": "branch"
+      }
+    },
+    "aliyun": {
+      "server": "47.93.180.216",
+      "currentRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260805T045722Z",
+      "previousRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260805T033908Z",
+      "atomicSwitch": true,
+      "rollbackRetained": true,
+      "forbiddenServerTouched": false,
+      "forbiddenServer": "124.221.220.60"
+    },
+    "supersededTransitionalDeployment": {
+      "sourceCommit": "bd2038318d4781a8d5a0c5202e9b562b214f21e1",
+      "pagesRunId": 30971378283,
+      "aliyunRelease": "/www/wwwroot/dronedream/releases/1.0.0-20260805T033908Z",
+      "reason": "The initial deployment preceded the passive wheel listener correction and is retained only as the immediate rollback point."
+    }
+  },
+  "publicParity": {
+    "origins": [
+      "http://getdronedream.com",
+      "http://47.93.180.216"
+    ],
+    "siteArtifact": {
+      "buildManifestBytes": 1153,
+      "buildManifestSha256": "a7616f721df2114eb939db6eeab799cf2f564a9372b7eacff994e84e10d71221",
+      "sha256SumsBytes": 17183,
+      "sha256SumsSha256": "61fcbfc4c8bf6cec48e695666c3b59d1733e75825d3bdb4852daa186e83aa7d5",
+      "latestJsonBytes": 492,
+      "latestJsonSha256": "fd367b692f4785dd65a73bdc8bd2e0d3f64185f8303e1223b04d48dcfe7ff6e9",
+      "sourceCommit": "6ca41b1dc3ba892fa70e7fa9ef813f86fcb2f407",
+      "htmlJsCssByteParity": true,
+      "byteParity": true
+    },
+    "installer": {
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "exeBytes": 11115267,
+      "exeSha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "canonicalDownloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/signpath-candidate-v1.0.0/DroneDream_1.0.0_x64-setup.exe",
+      "githubReleasePublicRedownloadSha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "pagesPublicRedownloadSha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "aliyunPublicRedownloadSha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "threeWayByteParity": true,
+      "checksumFileSha256": "ed0c1f6c12360b9231e2c17ded3677ff658098126b159ab42726a93fd3f79cc8",
+      "updaterSignatureSha256": "24eda3efccc57e5c5e1dd5c29ea7a5692a5b607fc1adfb1adf81f77ff1b9aea7",
+      "tauriLatestJsonSha256": "deee3fd550b2fd4948ceff43b64fa8ee9941f7ffed477593e68ebaf28e73638a",
+      "changedByThisWebsiteOnlyInteractionDeployment": false
+    }
+  },
+  "repositoryGovernance": {
+    "remoteBranches": [
+      "main",
+      "codex/software",
+      "codex/website",
+      "codex/technical-report"
+    ],
+    "remoteBranchCount": 4,
+    "unexpectedRemoteBranches": [],
+    "forcePushPerformed": false,
+    "rootWorktreeModified": false
+  },
+  "remainingExternalGates": {
+    "desktopInstaller": "The public installer remained byte-identical during this website-only 3D interaction deployment. A future desktop package must consume this shared frontend source before claiming that the installed desktop binary contains the interaction.",
+    "tls": {
+      "status": "not complete",
+      "pagesProtectedDomainState": "verified",
+      "curlExitCode": 60,
+      "curlError": "SEC_E_WRONG_PRINCIPAL",
+      "httpsEnforced": false,
+      "conclusion": "HTTP production is live, but HTTPS is not claimed as complete and certificate validation was not bypassed."
+    },
+    "supabase": "Supabase Functions, migrations, Secrets, and production database state were not changed by this release.",
+    "payments": "Production payment configuration was not changed.",
+    "codeSigning": "The 1.0.0 installer remains an explicitly disclosed unsigned internal-test preview.",
+    "runtime": "Runtime assets were not changed by this website-only interaction deployment.",
+    "manualPdfWorkInProgress": "The pre-existing manual and PDF drafts remain unstaged and unchanged by this receipt commit."
+  }
+}
