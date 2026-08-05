@@ -41,6 +41,7 @@ def test_method_inventory_is_complete_and_matches_registry_provenance() -> None:
         "llm_react/v1",
         "llambo_uav/v1",
         "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
     ),
 )
 def test_only_reviewed_project_adapters_are_execution_ready(adapter_id: str) -> None:
@@ -53,6 +54,7 @@ def test_only_reviewed_project_adapters_are_execution_ready(adapter_id: str) -> 
         "llm_react/v1",
         "llambo_uav/v1",
         "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
     }:
         assert entry.environment_boundary == "provider_contract"
 
@@ -75,7 +77,11 @@ def test_external_references_are_pinned_candidates_but_fail_closed_until_locked(
     assert entry.environment_boundary == "isolated_benchmark"
     assert entry.execution_readiness == "blocked"
     assert "isolated_environment_missing" in entry.blocker_codes
-    assert "source_archive_hash_pending" in entry.blocker_codes
+    if adapter_id == "bipop_cma_es/v1":
+        assert "source_archive_hash_pending" not in entry.blocker_codes
+        assert all(source.distribution_sha256 for source in entry.sources)
+    else:
+        assert "source_archive_hash_pending" in entry.blocker_codes
     assert any(source.version_candidate == version for source in entry.sources)
     assert any(source.license_spdx == license_spdx for source in entry.sources)
     with pytest.raises(ValueError, match="benchmark method is blocked"):
@@ -143,4 +149,33 @@ def test_verified_license_requires_spdx_and_source_locator() -> None:
             source_kind="upstream_repository",
             locator="https://example.invalid/source",
             license_status="verified",
+        )
+
+
+def test_distribution_filename_and_hash_must_be_bound_together() -> None:
+    with pytest.raises(ValidationError, match="declared together"):
+        BenchmarkMethodSourceV1(
+            source_id="incomplete-package-lock",
+            source_kind="python_package",
+            locator="https://example.invalid/package.whl",
+            version_candidate="1.0.0",
+            dependency_name="package",
+            distribution_filename="package-1.0.0-py3-none-any.whl",
+            license_status="verified",
+            license_spdx="MIT",
+            license_locator="https://example.invalid/LICENSE",
+        )
+
+
+def test_distribution_lock_is_rejected_for_non_package_sources() -> None:
+    with pytest.raises(ValidationError, match="only Python-package"):
+        BenchmarkMethodSourceV1(
+            source_id="invalid-repository-archive",
+            source_kind="upstream_repository",
+            locator="https://example.invalid/source",
+            distribution_filename="source.tar.gz",
+            distribution_sha256="0" * 64,
+            license_status="verified",
+            license_spdx="MIT",
+            license_locator="https://example.invalid/LICENSE",
         )

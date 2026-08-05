@@ -58,7 +58,7 @@ _DESCRIPTORS = (
         "bipop_cma_es/v1",
         "traditional",
         "contract_only",
-        "pycma-bipop-reference-adapter-pending",
+        "pycma-4.4.4-bipop-coordinator-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(

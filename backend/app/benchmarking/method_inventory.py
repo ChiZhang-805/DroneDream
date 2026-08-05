@@ -14,7 +14,7 @@ from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.benchmarking.contracts import canonical_sha256
+from app.benchmarking.contracts import GitCommit, Sha256Hex, canonical_sha256
 
 MethodClassification = Literal[
     "standard_reference",
@@ -60,6 +60,9 @@ class BenchmarkMethodSourceV1(_FrozenStrict):
     locator: Annotated[str, Field(min_length=1, max_length=1024)]
     version_candidate: Annotated[str, Field(min_length=1, max_length=128)] | None = None
     dependency_name: Annotated[str, Field(min_length=1, max_length=128)] | None = None
+    distribution_filename: Annotated[str, Field(min_length=1, max_length=255)] | None = None
+    distribution_sha256: Sha256Hex | None = None
+    upstream_commit: GitCommit | None = None
     license_status: LicenseStatus
     license_spdx: Annotated[str, Field(min_length=1, max_length=64)] | None = None
     license_locator: Annotated[str, Field(min_length=1, max_length=1024)] | None = None
@@ -77,6 +80,10 @@ class BenchmarkMethodSourceV1(_FrozenStrict):
             raise ValueError("unverified licenses cannot declare an SPDX identifier")
         if self.source_kind == "python_package" and self.dependency_name is None:
             raise ValueError("python package sources require dependency_name")
+        if (self.distribution_filename is None) != (self.distribution_sha256 is None):
+            raise ValueError("distribution filename and SHA-256 must be declared together")
+        if self.distribution_filename is not None and self.source_kind != "python_package":
+            raise ValueError("only Python-package sources may bind a distribution artifact")
         return self
 
 
@@ -165,16 +172,44 @@ _ENTRIES = (
     BenchmarkMethodInventoryEntryV1(
         adapter_id="bipop_cma_es/v1",
         method_classification="standard_reference",
-        implementation_label="pycma-bipop-reference-adapter-pending",
+        implementation_label="pycma-4.4.4-bipop-coordinator-contract",
         execution_readiness="blocked",
         environment_boundary="isolated_benchmark",
         sources=(
             BenchmarkMethodSourceV1(
-                source_id="pycma-r4.4.4",
+                source_id="pycma-4.4.4-wheel",
                 source_kind="python_package",
-                locator="https://github.com/CMA-ES/pycma/tree/r4.4.4",
+                locator=(
+                    "https://files.pythonhosted.org/packages/d4/d4/"
+                    "ec46cedab6a6145e21768baa8110db3e2e836a320d8499e4ef18bc894e61/"
+                    "cma-4.4.4-py3-none-any.whl"
+                ),
                 version_candidate="4.4.4",
                 dependency_name="cma",
+                distribution_filename="cma-4.4.4-py3-none-any.whl",
+                distribution_sha256=(
+                    "edb6d02eb2aac2d54650f16a8f0c70711ff17445957de7c9de92ff7fd4b7ef38"
+                ),
+                upstream_commit="83089d1d681165b8cc849f4a05c9f1c1869d79a3",
+                license_status="verified",
+                license_spdx="BSD-3-Clause",
+                license_locator="https://github.com/CMA-ES/pycma/blob/r4.4.4/LICENSE",
+            ),
+            BenchmarkMethodSourceV1(
+                source_id="pycma-4.4.4-sdist",
+                source_kind="python_package",
+                locator=(
+                    "https://files.pythonhosted.org/packages/67/ac/"
+                    "8c27720838e293898671f01b5c452236a0c74f4799a3f2d5fcccbbf50d71/"
+                    "cma-4.4.4.tar.gz"
+                ),
+                version_candidate="4.4.4",
+                dependency_name="cma",
+                distribution_filename="cma-4.4.4.tar.gz",
+                distribution_sha256=(
+                    "632bd654b5dce04c0eaa3166679d3e4773ce7a79eab7934e7f363c341b9a8170"
+                ),
+                upstream_commit="83089d1d681165b8cc849f4a05c9f1c1869d79a3",
                 license_status="verified",
                 license_spdx="BSD-3-Clause",
                 license_locator="https://github.com/CMA-ES/pycma/blob/r4.4.4/LICENSE",
@@ -183,10 +218,11 @@ _ENTRIES = (
         blocker_codes=(
             "adapter_not_implemented",
             "isolated_environment_missing",
-            "source_archive_hash_pending",
         ),
         reproducibility_notes=(
             "The repository BIPOP-inspired implementation is a separate product arm.",
+            "Official BIPOP restart semantics remain owned by pycma fmin2 with bipop=True.",
+            "A one-candidate proposal wrapper is not accepted as equivalent to that coordinator.",
         ),
     ),
     BenchmarkMethodInventoryEntryV1(
