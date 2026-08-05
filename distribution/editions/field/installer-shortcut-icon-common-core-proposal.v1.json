@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-common-core-forward-port-proposal",
+  "proposalId": "field-installer-shortcut-icon-hook-v1",
+  "editionId": "field",
+  "status": "pending-universal-forward-port",
+  "fieldSourceCommit": "cf609d7012f4001be23c3c40b6376d1884cd8dc9",
+  "commonCoreBaseCommit": "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
+  "issue": {
+    "sharedHookPath": "desktop/src-tauri/nsis/webview2-health.nsh",
+    "sharedHookSha256": "30ac4b811b69038344e0b2be5563d2d01911a78b0efb60937fd09cfac1efda46",
+    "currentShortcutIcon": "$INSTDIR\\icons\\DroneDream.ico",
+    "impact": "Field upgrade shortcut refresh can fall back to the Universal icon even when the Field executable and installer consume the authorized Field mark."
+  },
+  "minimumUniversalPatch": {
+    "paths": [
+      "desktop/src-tauri/nsis/webview2-health.nsh",
+      "desktop/scripts/verify-nsis-template.ps1"
+    ],
+    "requirements": [
+      "Parameterize the refresh shortcut icon path while preserving the existing Universal default.",
+      "Keep the shared WebView2 health and shortcut refresh behavior in Universal.",
+      "Add a contract test proving an edition wrapper can select its executable icon without copying the shared hook."
+    ],
+    "historyRewriteAllowed": false,
+    "forcePushAllowed": false
+  },
+  "fieldFollowUpAfterForwardPort": {
+    "paths": [
+      "desktop/src-tauri/nsis/field-webview2-health.nsh",
+      "desktop/src-tauri/tauri.field.conf.json",
+      "distribution/tests/test_field_desktop_profile.py"
+    ],
+    "requirements": [
+      "Create a thin Field wrapper that selects the Field executable icon and includes the shared Universal hook.",
+      "Point only the Field Tauri overlay at the thin wrapper.",
+      "Re-run static installer structure verification before requesting a YELLOW preview build."
+    ]
+  },
+  "blockedUntilAccepted": [
+    "field-installer-shortcut-brand-coverage",
+    "field-preview-build-request"
+  ]
+}

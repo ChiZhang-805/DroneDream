@@ -217,6 +217,7 @@
         "brandManifestSha256",
         "brandCommonCoreCommit",
         "brandCopyPolicy",
+        "installerShortcutHook",
         "assets",
         "consumerChecks",
         "simulatorReferences",
@@ -233,6 +234,28 @@
         "brandManifestSha256": {"$ref": "#/$defs/sha256"},
         "brandCommonCoreCommit": {"$ref": "#/$defs/commit"},
         "brandCopyPolicy": {"const": "byte-for-byte-no-transcode"},
+        "installerShortcutHook": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256",
+            "fieldIconBound",
+            "commonCoreProposalPath",
+            "commonCoreProposalSha256",
+            "proposalStatus"
+          ],
+          "properties": {
+            "path": {"const": "desktop/src-tauri/nsis/webview2-health.nsh"},
+            "sha256": {"$ref": "#/$defs/sha256"},
+            "fieldIconBound": {"type": "boolean"},
+            "commonCoreProposalPath": {
+              "const": "distribution/editions/field/installer-shortcut-icon-common-core-proposal.v1.json"
+            },
+            "commonCoreProposalSha256": {"$ref": "#/$defs/sha256"},
+            "proposalStatus": {"const": "pending-universal-forward-port"}
+          }
+        },
         "assets": {
           "type": "array",
           "minItems": 2,
@@ -241,12 +264,15 @@
         },
         "consumerChecks": {
           "type": "object",
-          "additionalProperties": {"const": true},
+          "additionalProperties": {"type": "boolean"},
           "minProperties": 1
         },
         "simulatorReferences": {"type": "array", "maxItems": 0, "items": false},
-        "verificationErrors": {"type": "array", "maxItems": 0, "items": false},
-        "verified": {"const": true}
+        "verificationErrors": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "verified": {"type": "boolean"}
       }
     },
     "fieldPreviewReadinessReceipt": {

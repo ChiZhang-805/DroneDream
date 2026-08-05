@@ -58,6 +58,10 @@ FIELD_BRANDING_MANIFEST = Path("distribution/editions/field/branding/source-mani
 FIELD_TAURI_CONFIG = Path("desktop/src-tauri/tauri.field.conf.json")
 FIELD_FRONTEND_APP = Path("frontend/src/field/FieldApp.tsx")
 FIELD_VITE_CONFIG = Path("frontend/vite.field.config.ts")
+BASE_TAURI_CONFIG = Path("desktop/src-tauri/tauri.conf.json")
+FIELD_SHORTCUT_PROPOSAL = Path(
+    "distribution/editions/field/installer-shortcut-icon-common-core-proposal.v1.json"
+)
 
 
 class FieldDriftReadinessAuditError(ValueError):
@@ -225,9 +229,15 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
     manifest_path = repo_root / FIELD_BRANDING_MANIFEST
     manifest = load_json(manifest_path)
     tauri = load_json(repo_root / FIELD_TAURI_CONFIG)
+    base_tauri = load_json(repo_root / BASE_TAURI_CONFIG)
     edition = load_json(repo_root / "distribution" / "editions" / "field.v1.json")
     app_source = (repo_root / FIELD_FRONTEND_APP).read_text(encoding="utf-8")
     vite_source = (repo_root / FIELD_VITE_CONFIG).read_text(encoding="utf-8")
+    proposal_path = repo_root / FIELD_SHORTCUT_PROPOSAL
+    proposal = load_json(proposal_path)
+    hook_relative = base_tauri["bundle"]["windows"]["nsis"]["installerHooks"]
+    hook_path = repo_root / "desktop" / "src-tauri" / hook_relative
+    hook_source = hook_path.read_text(encoding="utf-8")
 
     verification_errors: list[str] = []
     assets = []
@@ -288,6 +298,8 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "fieldArtifactBaseName": edition.get("artifactBaseName")
         == "DroneDream-Field-1.0.0.exe",
         "authorityRemainsFalse": 'data-authority="false"' in app_source,
+        "installerShortcutFieldIcon": "$INSTDIR\\icons\\DroneDream.ico"
+        not in hook_source,
     }
     for check, passed in consumer_checks.items():
         if not passed:
@@ -318,6 +330,14 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "brandManifestSha256": sha256_file(manifest_path),
         "brandCommonCoreCommit": manifest["commonCoreCommit"],
         "brandCopyPolicy": manifest["copyPolicy"],
+        "installerShortcutHook": {
+            "path": hook_path.relative_to(repo_root).as_posix(),
+            "sha256": sha256_file(hook_path),
+            "fieldIconBound": consumer_checks["installerShortcutFieldIcon"],
+            "commonCoreProposalPath": FIELD_SHORTCUT_PROPOSAL.as_posix(),
+            "commonCoreProposalSha256": sha256_file(proposal_path),
+            "proposalStatus": proposal["status"],
+        },
         "assets": assets,
         "consumerChecks": consumer_checks,
         "simulatorReferences": simulator_references,
@@ -473,6 +493,8 @@ def field_preview_readiness_receipt(
         blockers.append("field.release-branch.present")
     if not desktop_structure["verified"]:
         blockers.append("field.desktop-preview-structure.invalid")
+    if not desktop_structure["consumerChecks"]["installerShortcutFieldIcon"]:
+        blockers.append("field.installer-shortcut-icon.common-core-hook-pending")
     receipt = {
         "schemaVersion": 1,
         "kind": RECEIPT_KIND,
@@ -549,13 +571,25 @@ def validate_field_preview_readiness_receipt(document: dict[str, Any]) -> dict[s
             raise FieldDriftReadinessAuditError(f"Field preview readiness allowed {key}")
     if document["registry"]["validatedHardwarePackCount"] != 0:
         raise FieldDriftReadinessAuditError("Field preview readiness overstated validated packs")
+    expected_receipt_hash = sha256_canonical(
+        {key: value for key, value in document.items() if key != "receiptSha256"}
+    )
+    if document["receiptSha256"] != expected_receipt_hash:
+        raise FieldDriftReadinessAuditError("Field preview readiness receipt hash drifted")
     structure = document["desktopPreviewStructure"]
-    if not structure["verified"] or structure["verificationErrors"]:
-        raise FieldDriftReadinessAuditError("Field desktop preview structure is not verified")
-    if structure["simulatorReferences"]:
-        raise FieldDriftReadinessAuditError("Field desktop preview structure references simulation")
-    if not all(structure["consumerChecks"].values()):
-        raise FieldDriftReadinessAuditError("Field desktop preview consumers drifted")
+    expected_verified = (
+        not structure["verificationErrors"]
+        and not structure["simulatorReferences"]
+        and all(structure["consumerChecks"].values())
+    )
+    if structure["verified"] != expected_verified:
+        raise FieldDriftReadinessAuditError("Field desktop preview verification state drifted")
+    if not structure["verified"] and "field.desktop-preview-structure.invalid" not in document["blockers"]:
+        raise FieldDriftReadinessAuditError("Field desktop preview blocker is missing")
+    if not structure["consumerChecks"]["installerShortcutFieldIcon"] and (
+        "field.installer-shortcut-icon.common-core-hook-pending" not in document["blockers"]
+    ):
+        raise FieldDriftReadinessAuditError("Field shortcut icon blocker is missing")
     if len(structure["assets"]) != 2 or not all(
         asset["hashMatchesSource"] and asset["transformationsEmpty"]
         for asset in structure["assets"]
