@@ -1,0 +1,85 @@
+{
+  "schema_id": "dronedream.software-test-receipt/v1",
+  "generated_at": "2026-08-05T06:57:40.717Z",
+  "subject_commit": "315edc173e13a813d6745cd88ccf9b58af11bbd4",
+  "branch": "codex/software",
+  "resource_class": "GREEN",
+  "scope": "benchmark-p1-provider-actual-usage-reconciliation",
+  "status": "passed",
+  "provider_calls": 0,
+  "api_keys_read": false,
+  "px4_or_gazebo_started": false,
+  "contract": {
+    "reservation_semantics": "preregistered-worst-case-capacity",
+    "actual_usage_semantics": "deterministic-recomputation-from-append-only-cognitive-and-network-ledgers",
+    "double_counting_forbidden": true,
+    "failed_and_indeterminate_work_in_denominator": true,
+    "successful_proposal_requires_complete_provider_usage": true,
+    "reconciliation_schema": "dronedream.benchmark-provider-run-usage/v1",
+    "registry_promotion_performed": false
+  },
+  "changed_files": [
+    {
+      "path": "backend/app/benchmarking/contracts.py",
+      "sha256": "a5fb8d251b9d7991632d5f2f6d2d5495810a9ce5d838ee7ece47f18f26aa6db5"
+    },
+    {
+      "path": "backend/app/benchmarking/llm_durable_runtime.py",
+      "sha256": "00d3363c8d05302df8733af4f244e048778f759b035c12ae0e909e7d5edadfe6"
+    },
+    {
+      "path": "backend/app/benchmarking/provider_usage_reconciliation.py",
+      "sha256": "426c6e13571b6b98c75e96d3fb0df96cb9ba6f22e07975e7f271042333a0686e"
+    },
+    {
+      "path": "backend/tests/test_benchmark_llm_durable_runtime.py",
+      "sha256": "79f863c141af47ee0e5ce8010e51e155203bfb2f77d8ef649d3b7e7a6d0199b8"
+    }
+  ],
+  "checks": [
+    {
+      "name": "focused-durable-direct-and-reconciliation",
+      "command": "python -m pytest backend/tests/test_benchmark_llm_durable_runtime.py -q",
+      "result": "22 passed in 27.71s"
+    },
+    {
+      "name": "related-benchmark-provider-and-cognitive-regression",
+      "command": "python -m pytest backend/tests/test_benchmark_campaign_contracts.py backend/tests/test_benchmark_composite_inventory.py backend/tests/test_benchmark_composite_inventory_observation.py backend/tests/test_benchmark_llm_arm_contracts.py backend/tests/test_benchmark_llm_durable_runtime.py backend/tests/test_benchmark_llm_fixture_runtime.py backend/tests/test_benchmark_method_inventory.py backend/tests/test_benchmark_pilot_readiness.py backend/tests/test_cognitive_budget.py backend/tests/test_cognitive_budget_ablation.py backend/tests/test_provider_request_accounting.py -q",
+      "result": "132 passed in 99.01s"
+    },
+    {
+      "name": "ruff",
+      "command": "python -m ruff check backend/app/benchmarking/contracts.py backend/app/benchmarking/provider_usage_reconciliation.py backend/app/benchmarking/llm_durable_runtime.py backend/tests/test_benchmark_llm_durable_runtime.py",
+      "result": "passed"
+    },
+    {
+      "name": "mypy",
+      "command": "python -m mypy --ignore-missing-imports backend/app/benchmarking/contracts.py backend/app/benchmarking/provider_usage_reconciliation.py backend/app/benchmarking/llm_durable_runtime.py",
+      "result": "passed; 3 source files"
+    },
+    {
+      "name": "git-diff-check",
+      "command": "git diff HEAD^ HEAD --check",
+      "result": "passed"
+    },
+    {
+      "name": "secret-pattern-scan",
+      "result": "passed; no credential-like value in source diff or new reconciliation module"
+    }
+  ],
+  "development_failure_history": [
+    {
+      "result": "5 failed, 17 passed",
+      "cause": "ledger hashing initially passed naive database datetime objects to canonical JSON; two negative tests initially targeted the Batch reservation rather than the exact provider-run reservation",
+      "resolution": "normalize ledger timestamps to UTC ISO-8601 and select the immutable provider-run reservation by exact key",
+      "rerun_result": "22 passed"
+    }
+  ],
+  "honest_boundaries": [
+    "No real provider request was made and no API key was read.",
+    "No PX4, Gazebo, installer, Runtime migration, visible window, or deployment was started.",
+    "llm_direct/v1 remains contract-only and blocked in the executable adapter registry.",
+    "Production campaign-runner binding and adapter promotion remain separate future closures.",
+    "The receipt commit that contains this file is evidence-only and must not replace subject_commit."
+  ]
+}
