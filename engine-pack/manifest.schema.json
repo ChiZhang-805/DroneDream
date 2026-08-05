@@ -55,7 +55,9 @@
           "then": {
             "properties": {
               "includesLargeSimulator": {"const": false},
-              "excludedSourcePaths": {"const": ["scripts/simulators"]}
+              "excludedSourcePaths": {
+                "const": ["backend/app/simulator", "scripts/simulators"]
+              }
             }
           }
         },

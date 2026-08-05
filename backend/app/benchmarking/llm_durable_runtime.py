@@ -10,18 +10,15 @@ never accepted by these contracts.
 
 from __future__ import annotations
 
-import math
 import time
 from dataclasses import dataclass
-from types import MappingProxyType
 from typing import Annotated, Any, Literal, NoReturn, Protocol
-from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app import models
 from app.benchmarking.contracts import (
     BenchmarkArmManifestV1,
     BenchmarkCampaignManifestV1,
@@ -29,14 +26,12 @@ from app.benchmarking.contracts import (
     BenchmarkProposalV1,
     BenchmarkRunBindingRequestV1,
     CompositeExecutionInventoryV1,
-    Sha256Hex,
     canonical_json_bytes,
     canonical_sha256,
 )
 from app.benchmarking.coordinator import run_binding_sha256
 from app.benchmarking.llm_arm_contracts import (
     BENCHMARK_LLM_ARM_POLICIES_SHA256,
-    BENCHMARK_LLM_MAX_RESPONSE_BYTES,
     BenchmarkLLMContractError,
     BenchmarkLLMTurnRequestV1,
     build_llm_turn_request,
@@ -45,8 +40,14 @@ from app.benchmarking.llm_arm_contracts import (
     require_llm_arm_policy,
     validate_proposal_response,
 )
-from app.benchmarking.provider_usage_reconciliation import (
+from app.benchmarking.provider_execution_contract import (
     BENCHMARK_DIRECT_RESERVATION_REASON,
+    BENCHMARK_PROVIDER_BASE_URLS,
+    BenchmarkProviderExecutionConfigV1,
+    BenchmarkProviderRequestEnvelope,
+    direct_provider_run_capacity,
+)
+from app.benchmarking.provider_usage_reconciliation import (
     BenchmarkProviderUsageBlocked,
     reconcile_direct_provider_run_usage,
     validate_provider_run_reservation,
@@ -63,20 +64,8 @@ from app.orchestration.provider_request_accounting import (
     provider_request_counts_for_turn,
 )
 
-BENCHMARK_PROVIDER_EXECUTION_SCHEMA_ID: Literal[
-    "dronedream.benchmark-provider-execution/v1"
-] = (
-    "dronedream.benchmark-provider-execution/v1"
-)
-BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID = (
-    "dronedream.benchmark-direct-proposal/v1"
-)
-BENCHMARK_PROVIDER_BASE_URLS = MappingProxyType(
-    {
-        "deepseek": "https://api.deepseek.com/v1",
-        "openai": "https://api.openai.com/v1",
-    }
-)
+BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID = "dronedream.benchmark-direct-proposal/v1"
+BENCHMARK_DIRECT_PROPOSAL_HANDOFF_SCHEMA_ID = "dronedream.benchmark-direct-proposal-handoff/v1"
 
 
 class BenchmarkDurableLLMBlocked(RuntimeError):
@@ -91,54 +80,6 @@ class _StrictFrozen(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
-class BenchmarkProviderExecutionConfigV1(_StrictFrozen):
-    """Secret-free provider and budget contract frozen inside one arm manifest."""
-
-    schema_id: Literal["dronedream.benchmark-provider-execution/v1"] = (
-        BENCHMARK_PROVIDER_EXECUTION_SCHEMA_ID
-    )
-    provider: Annotated[str, Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,63}$")]
-    model_snapshot: Annotated[str, Field(min_length=1, max_length=128)]
-    api_surface: Literal["chat_completions"] = "chat_completions"
-    base_url: Annotated[str, Field(min_length=8, max_length=2048)]
-    region: Annotated[str, Field(min_length=1, max_length=64)] | None = None
-    temperature: Annotated[float, Field(ge=0, le=2)]
-    top_p: Annotated[float, Field(gt=0, le=1)]
-    randomness_policy: Literal["fixed_seed", "provider_managed"]
-    response_format: Literal["json_schema"] = "json_schema"
-    maximum_generations: Annotated[int, Field(ge=1, le=128)]
-    maximum_output_tokens: Annotated[int, Field(ge=1, le=8192)]
-    request_timeout_ms: Annotated[int, Field(ge=1000, le=600_000)]
-    provider_retry_cap: Literal[0] = 0
-    llm_policy_registry_sha256: Sha256Hex
-    model_matrix_sha256: Sha256Hex
-    price_snapshot: schemas.ProviderPriceSnapshot
-
-    @model_validator(mode="after")
-    def _require_current_llm_policy(self) -> BenchmarkProviderExecutionConfigV1:
-        if self.llm_policy_registry_sha256 != BENCHMARK_LLM_ARM_POLICIES_SHA256:
-            raise ValueError("provider execution uses a different LLM policy registry")
-        if self.price_snapshot.source != "preregistered":
-            raise ValueError("formal provider execution requires preregistered prices")
-        expected_base_url = BENCHMARK_PROVIDER_BASE_URLS.get(self.provider)
-        parsed_base_url = urlsplit(self.base_url)
-        if (
-            expected_base_url is None
-            or self.base_url != expected_base_url
-            or parsed_base_url.scheme != "https"
-            or parsed_base_url.username is not None
-            or parsed_base_url.password is not None
-            or parsed_base_url.query
-            or parsed_base_url.fragment
-            or parsed_base_url.port not in {None, 443}
-        ):
-            raise ValueError(
-                "formal provider execution requires an exact approved "
-                "credential-free HTTPS base URL"
-            )
-        return self
-
-
 @dataclass(frozen=True)
 class BenchmarkProviderTransportResult:
     response_text: str
@@ -151,7 +92,7 @@ class BenchmarkDirectTransport(Protocol):
 
     def complete(
         self,
-        request: BenchmarkLLMTurnRequestV1,
+        request: BenchmarkProviderRequestEnvelope,
         config: BenchmarkProviderExecutionConfigV1,
     ) -> BenchmarkProviderTransportResult: ...
 
@@ -160,19 +101,22 @@ class BenchmarkDurableDirectExecutionV1(_StrictFrozen):
     schema_id: Literal["dronedream.benchmark-durable-direct-execution/v1"] = (
         "dronedream.benchmark-durable-direct-execution/v1"
     )
-    status: Literal["proposal", "first_qualified_stop"]
+    status: Literal["proposal", "proposal_recovered", "first_qualified_stop"]
     proposal: BenchmarkProposalV1 | None
     provider_turns_attempted: Annotated[int, Field(ge=0, le=1)]
     provider_turns_succeeded: Annotated[int, Field(ge=0, le=1)]
     provider_requests_attempted: Annotated[int, Field(ge=0, le=1)]
     provider_requests_succeeded: Annotated[int, Field(ge=0, le=1)]
+    recovered_from_handoff: bool = False
     safe_receipt: dict[str, Any]
 
     @model_validator(mode="after")
     def _validate_result(self) -> BenchmarkDurableDirectExecutionV1:
-        if self.status == "proposal":
+        if self.status in {"proposal", "proposal_recovered"}:
             if self.proposal is None or self.provider_turns_succeeded != 1:
                 raise ValueError("proposal result requires one successful durable turn")
+            if self.recovered_from_handoff != (self.status == "proposal_recovered"):
+                raise ValueError("proposal recovery status and flag disagree")
         elif self.proposal is not None or any(
             (
                 self.provider_turns_attempted,
@@ -182,6 +126,8 @@ class BenchmarkDurableDirectExecutionV1(_StrictFrozen):
             )
         ):
             raise ValueError("first-qualified stop must consume zero provider work")
+        elif self.recovered_from_handoff:
+            raise ValueError("first-qualified stop cannot be a recovered proposal")
         return self
 
 
@@ -280,9 +226,7 @@ def _load_context(
         campaign_manifest = BenchmarkCampaignManifestV1.model_validate_json(
             canonical_json_bytes(campaign.manifest_json)
         )
-        inventory = CompositeExecutionInventoryV1.model_validate(
-            campaign.composite_inventory_json
-        )
+        inventory = CompositeExecutionInventoryV1.model_validate(campaign.composite_inventory_json)
     except ValueError as exc:
         raise BenchmarkDurableLLMBlocked(
             "benchmark_manifest_invalid",
@@ -299,8 +243,7 @@ def _load_context(
     matching_arms = [
         item
         for item in campaign_manifest.arms
-        if item.benchmark_arm_id == arm.benchmark_arm_id
-        and item.arm_version == arm.arm_version
+        if item.benchmark_arm_id == arm.benchmark_arm_id and item.arm_version == arm.arm_version
     ]
     if len(matching_arms) != 1 or matching_arms[0] != arm_manifest:
         _blocked("benchmark_arm_campaign_mismatch", "Arm differs from the campaign manifest.")
@@ -328,6 +271,27 @@ def _load_context(
         ) from exc
     if provider.model_matrix_sha256 != inventory.model_matrix_sha256:
         _blocked("benchmark_model_matrix_drift", "Provider model matrix differs from inventory.")
+    if job.llm_access_mode != "byok":
+        _blocked(
+            "benchmark_provider_access_mode_drift",
+            "Formal direct-arm execution requires the Job's frozen BYOK access mode.",
+        )
+    if job.llm_provider != provider.provider:
+        _blocked(
+            "benchmark_provider_identity_drift",
+            "Job provider identity differs from the arm manifest.",
+        )
+    job_base_url = job.llm_base_url
+    if job_base_url is None and job.llm_provider == "openai":
+        # The legacy OpenAI request shape persists ``None`` for the SDK's exact
+        # default origin.  Resolve that semantic default before comparing it
+        # with the explicit, credential-free arm contract.
+        job_base_url = BENCHMARK_PROVIDER_BASE_URLS["openai"]
+    if job_base_url != provider.base_url:
+        _blocked(
+            "benchmark_provider_endpoint_drift",
+            "Job provider endpoint differs from the arm manifest.",
+        )
     if provider.model_snapshot != job.openai_model:
         _blocked("benchmark_model_snapshot_drift", "Job model differs from arm manifest.")
     if provider.maximum_generations != job.max_iterations or (
@@ -429,36 +393,161 @@ def _require_prereserved_budget(
         )
     except BenchmarkProviderUsageBlocked as exc:
         raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
-    config = context.provider
     request_bytes = len(canonical_json_bytes(request_body))
-    worst_tokens = request_bytes + config.maximum_output_tokens
-    input_rate = config.price_snapshot.input_microusd_per_million_tokens
-    output_rate = config.price_snapshot.output_microusd_per_million_tokens
-    if input_rate is None or output_rate is None:  # pragma: no cover - config validator guards.
-        _blocked("benchmark_provider_price_missing", "Provider price snapshot is incomplete.")
-    assert input_rate is not None and output_rate is not None
-    per_generation_cost = math.ceil(
-        (
-            request_bytes * input_rate
-            + config.maximum_output_tokens * output_rate
-        )
-        / 1_000_000
-    )
-    generations = config.maximum_generations
-    required = {
-        "logical_turns": generations,
-        "network_requests": generations,
-        "input_utf8_bytes": request_bytes * generations,
-        "output_utf8_bytes": BENCHMARK_LLM_MAX_RESPONSE_BYTES * generations,
-        "provider_tokens": worst_tokens * generations,
-        "provider_cost_microusd": per_generation_cost * generations,
-        "wall_time_seconds": math.ceil(config.request_timeout_ms / 1000) * generations,
-    }
-    if any(int(getattr(reservation, field)) < amount for field, amount in required.items()):
+    if request_bytes > context.provider.maximum_request_utf8_bytes:
         _blocked(
-            "benchmark_provider_budget_insufficient",
-            "Reserved provider budget is insufficient.",
+            "benchmark_provider_request_too_large",
+            "Serialized provider request exceeds the frozen per-turn byte cap.",
         )
+    required = direct_provider_run_capacity(context.provider)
+    if any(
+        int(getattr(reservation, field)) != amount
+        for field, amount in required.model_dump().items()
+    ):
+        _blocked(
+            "benchmark_provider_budget_drift",
+            "Reserved provider budget differs from the frozen run capacity.",
+        )
+
+
+def _recover_direct_proposal_handoff(
+    db: Session,
+    job: models.Job,
+    context: _BoundDirectContext,
+    observation: BenchmarkObservationV2,
+    request: BenchmarkLLMTurnRequestV1,
+) -> BenchmarkDurableDirectExecutionV1 | None:
+    """Recover one validated proposal without replaying provider I/O."""
+
+    turn = db.scalar(
+        select(models.HarnessCognitiveTurnReceipt).where(
+            models.HarnessCognitiveTurnReceipt.job_id == job.id,
+            models.HarnessCognitiveTurnReceipt.generation_index == observation.generation_index,
+            models.HarnessCognitiveTurnReceipt.turn_index == 1,
+        )
+    )
+    if turn is None:
+        return None
+    handoff = db.scalar(
+        select(models.BenchmarkDirectProposalHandoff).where(
+            models.BenchmarkDirectProposalHandoff.job_id == job.id,
+            models.BenchmarkDirectProposalHandoff.generation_index == observation.generation_index,
+        )
+    )
+    if handoff is None:
+        # The ordinary begin path preserves the existing pending/consumed
+        # classification.  In neither case may provider I/O be replayed.
+        return None
+    outcome = turn.outcome
+    if outcome is None or outcome.status != "succeeded":
+        _blocked(
+            "benchmark_direct_handoff_outcome_mismatch",
+            "Direct proposal handoff is not paired with a successful turn.",
+        )
+    observation_sha256 = canonical_sha256(observation)
+    if (
+        handoff.handoff_schema != BENCHMARK_DIRECT_PROPOSAL_HANDOFF_SCHEMA_ID
+        or handoff.job_id != job.id
+        or handoff.run_binding_id != context.binding.id
+        or handoff.cognitive_turn_receipt_id != turn.id
+        or handoff.generation_index != observation.generation_index
+        or handoff.dispatch_ordinal != observation.next_dispatch_ordinal
+        or handoff.source_commit != context.source_commit
+        or handoff.observation_sha256 != observation_sha256
+        or handoff.turn_binding_sha256 != request.binding_sha256
+        or turn.source_commit != context.source_commit
+        or turn.model_snapshot != request.model_snapshot
+        or turn.prompt_sha256 != request.prompt_sha256
+        or turn.evidence_sha256 != request.evidence_sha256
+        or turn.schema_sha256 != request.response_schema_sha256
+        or turn.tool_outputs_sha256 != request.tool_outputs_sha256
+        or canonical_sha256(handoff.parameters_json) != handoff.parameter_sha256
+        or canonical_sha256(handoff.proposal_receipt_json) != handoff.proposal_receipt_sha256
+        or outcome.response_sha256 != handoff.parameter_sha256
+    ):
+        _blocked(
+            "benchmark_direct_handoff_drift",
+            "Recovered direct proposal no longer matches its frozen provenance.",
+        )
+    receipt = handoff.proposal_receipt_json
+    expected_candidate_ref = (
+        f"llm-direct-g{observation.generation_index:06d}-"
+        f"d{observation.next_dispatch_ordinal:06d}-{handoff.parameter_sha256[:12]}"
+    )
+    if (
+        receipt.get("schema_id") != BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID
+        or receipt.get("campaign_id") != context.campaign.id
+        or receipt.get("run_binding_id") != context.binding.id
+        or receipt.get("arm_manifest_sha256") != context.arm.manifest_sha256
+        or receipt.get("composite_inventory_sha256")
+        != context.campaign.composite_inventory_sha256
+        or receipt.get("source_commit") != context.source_commit
+        or receipt.get("llm_policy_registry_sha256")
+        != BENCHMARK_LLM_ARM_POLICIES_SHA256
+        or receipt.get("turn_binding_sha256") != request.binding_sha256
+        or receipt.get("observation_sha256") != observation_sha256
+        or receipt.get("parameter_sha256") != handoff.parameter_sha256
+        or receipt.get("provider_turns_attempted") != 1
+        or receipt.get("provider_turns_succeeded") != 1
+        or receipt.get("provider_requests_attempted") != 1
+        or receipt.get("provider_requests_succeeded") != 1
+        or receipt.get("retry_cap") != 0
+        or handoff.candidate_ref != expected_candidate_ref
+        or handoff.reason_code != "benchmark-llm-direct"
+    ):
+        _blocked(
+            "benchmark_direct_handoff_receipt_drift",
+            "Recovered direct proposal receipt fields disagree with provenance.",
+        )
+    usage_sha256 = receipt.get("provider_usage_reconciliation_sha256")
+    if (
+        not isinstance(usage_sha256, str)
+        or len(usage_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in usage_sha256)
+    ):
+        _blocked(
+            "benchmark_direct_handoff_receipt_drift",
+            "Recovered direct proposal receipt lacks a usage reconciliation hash.",
+        )
+    try:
+        parameters = validate_proposal_response(
+            {
+                "schema_version": "1.0",
+                "decision": "propose",
+                "parameters": handoff.parameters_json,
+            },
+            observation,
+        )
+        proposal = BenchmarkProposalV1(
+            candidate_ref=handoff.candidate_ref,
+            parameters=parameters,
+            reason_code=handoff.reason_code,
+            proposal_receipt=handoff.proposal_receipt_json,
+        )
+    except (BenchmarkLLMContractError, ValueError) as exc:
+        raise BenchmarkDurableLLMBlocked(
+            "benchmark_direct_handoff_invalid",
+            "Recovered direct proposal fails the current frozen schema.",
+        ) from exc
+    request_counts = provider_request_counts_for_turn(
+        db,
+        cognitive_turn_receipt_id=turn.id,
+    )
+    if request_counts != (1, 1):
+        _blocked(
+            "benchmark_direct_handoff_request_mismatch",
+            "Recovered direct proposal does not bind one successful request.",
+        )
+    return BenchmarkDurableDirectExecutionV1(
+        status="proposal_recovered",
+        proposal=proposal,
+        provider_turns_attempted=1,
+        provider_turns_succeeded=1,
+        provider_requests_attempted=1,
+        provider_requests_succeeded=1,
+        recovered_from_handoff=True,
+        safe_receipt=handoff.proposal_receipt_json,
+    )
 
 
 def execute_durable_direct_arm(
@@ -497,6 +586,16 @@ def execute_durable_direct_arm(
     )
     body = _request_body(request, context.provider, context.binding.provider_seed)
     _require_prereserved_budget(db, context, body)
+    recovered = _recover_direct_proposal_handoff(
+        db,
+        job,
+        context,
+        observation,
+        request,
+    )
+    if recovered is not None:
+        return recovered
+    request_envelope = BenchmarkProviderRequestEnvelope.from_request_body(body)
     attempt = begin_benchmark_direct_turn(
         db,
         job,
@@ -530,7 +629,7 @@ def execute_durable_direct_arm(
     )
     started = time.monotonic()
     try:
-        result = transport.complete(request, context.provider)
+        result = transport.complete(request_envelope, context.provider)
     except Exception as exc:  # noqa: BLE001 - transport details must not enter evidence.
         latency_ms = max(0, int((time.monotonic() - started) * 1000))
         accountant.fail(
@@ -593,6 +692,18 @@ def execute_durable_direct_arm(
         usage=result.usage,
         latency_ms=result.latency_ms,
     )
+    if len(result.response_text.encode("utf-8")) > context.provider.maximum_response_utf8_bytes:
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="invalid_schema",
+            error_code="benchmark_provider_response_too_large",
+        )
+        _blocked(
+            "benchmark_provider_response_too_large",
+            "Provider response exceeds the frozen per-turn byte cap.",
+        )
     terminal_status = cancel_cognitive_turn_if_job_terminal(db, job, attempt)
     if terminal_status is not None:
         _blocked(
@@ -614,23 +725,51 @@ def execute_durable_direct_arm(
             "benchmark_direct_response_invalid",
             "Provider response failed the frozen direct-proposal schema.",
         ) from exc
-    status = finish_cognitive_turn(db, job, attempt, status="succeeded", response=parameters)
-    if status != "succeeded":
-        _blocked("benchmark_source_drift", "Source changed before cognitive finalization.")
     request_counts = provider_request_counts_for_turn(
         db,
         cognitive_turn_receipt_id=attempt.receipt_id,
     )
+    status = finish_cognitive_turn(
+        db,
+        job,
+        attempt,
+        status="succeeded",
+        response=parameters,
+        commit=False,
+    )
+    if status != "succeeded":
+        db.commit()
+        db.refresh(job)
+        _blocked("benchmark_source_drift", "Source changed before cognitive finalization.")
     try:
         usage_reconciliation = reconcile_direct_provider_run_usage(db, context.binding.id)
     except BenchmarkProviderUsageBlocked as exc:
+        db.rollback()
+        db.refresh(job)
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="provider_failed",
+            error_code=exc.code,
+        )
         raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
     if usage_reconciliation.status != "complete":
+        db.rollback()
+        db.refresh(job)
+        finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="provider_failed",
+            error_code="benchmark_provider_usage_incomplete",
+        )
         _blocked(
             "benchmark_provider_usage_incomplete",
             "Provider usage cannot be reconciled completely against the reservation.",
         )
     parameter_sha256 = canonical_sha256(parameters)
+    observation_sha256 = canonical_sha256(observation)
     safe_receipt = {
         "schema_id": BENCHMARK_DIRECT_PROPOSAL_RECEIPT_SCHEMA_ID,
         "campaign_id": context.campaign.id,
@@ -640,6 +779,7 @@ def execute_durable_direct_arm(
         "source_commit": context.source_commit,
         "llm_policy_registry_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
         "turn_binding_sha256": request.binding_sha256,
+        "observation_sha256": observation_sha256,
         "parameter_sha256": parameter_sha256,
         "provider_turns_attempted": 1,
         "provider_turns_succeeded": 1,
@@ -648,15 +788,37 @@ def execute_durable_direct_arm(
         "provider_usage_reconciliation_sha256": canonical_sha256(usage_reconciliation),
         "retry_cap": 0,
     }
+    candidate_ref = (
+        f"llm-direct-g{observation.generation_index:06d}-"
+        f"d{observation.next_dispatch_ordinal:06d}-{parameter_sha256[:12]}"
+    )
     proposal = BenchmarkProposalV1(
-        candidate_ref=(
-            f"llm-direct-g{observation.generation_index:06d}-"
-            f"d{observation.next_dispatch_ordinal:06d}-{parameter_sha256[:12]}"
-        ),
+        candidate_ref=candidate_ref,
         parameters=parameters,
         reason_code="benchmark-llm-direct",
         proposal_receipt=safe_receipt,
     )
+    db.add(
+        models.BenchmarkDirectProposalHandoff(
+            job_id=job.id,
+            run_binding_id=context.binding.id,
+            cognitive_turn_receipt_id=attempt.receipt_id,
+            handoff_schema=BENCHMARK_DIRECT_PROPOSAL_HANDOFF_SCHEMA_ID,
+            generation_index=observation.generation_index,
+            dispatch_ordinal=observation.next_dispatch_ordinal,
+            source_commit=context.source_commit,
+            observation_sha256=observation_sha256,
+            turn_binding_sha256=request.binding_sha256,
+            candidate_ref=candidate_ref,
+            reason_code="benchmark-llm-direct",
+            parameters_json=parameters,
+            parameter_sha256=parameter_sha256,
+            proposal_receipt_json=safe_receipt,
+            proposal_receipt_sha256=canonical_sha256(safe_receipt),
+        )
+    )
+    db.commit()
+    db.refresh(job)
     return BenchmarkDurableDirectExecutionV1(
         status="proposal",
         proposal=proposal,

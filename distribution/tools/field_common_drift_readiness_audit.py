@@ -38,7 +38,10 @@ FIELD_CONTRACT_PREFIXES = (
     "distribution/schemas/field-",
     "distribution/tests/test_field_",
     "distribution/tools/field_",
+    "frontend/src/__tests__/field",
+    "frontend/src/field/",
 )
+FIELD_EDITION_PATHS = {"distribution/runtime-contract-registry.v1.json"}
 PROTECTED_EVIDENCE_PREFIXES = ("artifacts/test-runs/",)
 
 
@@ -141,11 +144,11 @@ def classify_path(path: str) -> dict[str, str]:
             "topic": "engine-pack-edition-profile-and-runtime-whitelist",
             "action": "extract-minimal-shared-core-patch",
         }
-    if path.startswith(FIELD_CONTRACT_PREFIXES):
+    if path in FIELD_EDITION_PATHS or path.startswith(FIELD_CONTRACT_PREFIXES):
         return {
             "classification": "field-specific-contract",
-            "topic": "field-contract-and-readiness-audit",
-            "action": "keep-on-field-until-universal-contract-hook-exists",
+            "topic": "field-edition-contract-and-product-surface",
+            "action": "keep-on-field-through-universal-contract-registry-hook",
         }
     if path.startswith(PROTECTED_EVIDENCE_PREFIXES):
         return {
@@ -340,8 +343,9 @@ def field_preview_readiness_receipt(
         "field.simulation.prohibited-in-this-audit",
         "field.registry.zero-validated-packs",
         "field.quorum.missing-three-layer",
-        "field.common-core-backflow.pending",
     ]
+    if drift["summary"]["universalCommonCorePathCount"]:
+        blockers.append("field.common-core-backflow.pending")
     if not drift["source"]["treeClean"]:
         blockers.append("field.source-tree.not-clean")
     if release_branch["localPresent"] or release_branch["originPresent"]:

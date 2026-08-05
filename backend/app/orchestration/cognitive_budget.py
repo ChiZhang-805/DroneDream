@@ -555,8 +555,15 @@ def finish_cognitive_turn(
     status: TurnOutcomeStatus,
     response: Mapping[str, Any] | None = None,
     error_code: str | None = None,
+    commit: bool = True,
 ) -> TurnOutcomeStatus:
-    """Append and commit the terminal outcome for one attempted turn."""
+    """Append the terminal outcome for one attempted turn.
+
+    Most callers keep the default immediate commit. A caller that must bind a
+    safe derived record atomically to the outcome may request ``commit=False``;
+    it then owns the final commit or rollback and must not perform external I/O
+    before closing that transaction.
+    """
 
     receipt = db.get(models.HarnessCognitiveTurnReceipt, attempt.receipt_id)
     if receipt is None or receipt.job_id != job.id:
@@ -602,8 +609,12 @@ def finish_cognitive_turn(
                 "provider_turn_accounting_invalid",
                 "Succeeded provider-turn accounting would exceed attempts.",
             )
-    db.commit()
-    db.refresh(job)
+    if commit:
+        db.commit()
+        db.refresh(job)
+    else:
+        db.flush()
+        db.expire(receipt, ["outcome"])
     return final_status
 
 

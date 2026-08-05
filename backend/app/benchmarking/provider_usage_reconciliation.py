@@ -24,8 +24,9 @@ from app.benchmarking.contracts import (
     canonical_sha256,
 )
 from app.benchmarking.coordinator import run_binding_sha256
-
-BENCHMARK_DIRECT_RESERVATION_REASON = "benchmark-provider-execution"
+from app.benchmarking.provider_execution_contract import (
+    BENCHMARK_DIRECT_RESERVATION_REASON,
+)
 
 
 class BenchmarkProviderUsageBlocked(RuntimeError):

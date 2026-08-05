@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "dronedream.sim-preview-handoff-manifest.v1",
+  "generatedAt": "2026-08-05T10:08:41.9585239Z",
+  "productSourceCommit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+  "evidenceBranch": "codex/software",
+  "classification": "Sim-default unified-core preview / planned-not-built contract transition",
+  "artifact": {
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11347564,
+    "sha256": "b7d8481a6bf79678b7ca80ead7c4bf01a7a65bbeb81e93e6e4f28d0cea205863",
+    "authenticodeStatus": "NotSigned",
+    "tauriUpdaterSignatureState": "not-generated-out-of-scope"
+  },
+  "files": [
+    "DroneDream-Sim-1.0.0.exe",
+    "DroneDream-Sim-1.0.0.exe.sha256",
+    "release-receipt.json"
+  ],
+  "consumerRules": {
+    "exactBytesOnly": true,
+    "doNotRebuild": true,
+    "doNotPublish": true,
+    "doNotInstallWithoutSeparateRedAuthorization": true,
+    "doNotCallPromotionReady": true,
+    "doNotCallReleaseReady": true,
+    "doNotInferValidatedVehiclePack": true,
+    "doNotInferEmbeddedRuntimeBaseOrEnginePack": true
+  }
+}

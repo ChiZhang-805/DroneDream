@@ -28,22 +28,16 @@ ENGINE_API_VERSION = 1
 DEFAULT_EDITION_PROFILE = "unified-sim-lab"
 FIELD_EDITION_PROFILE = "field-lightweight"
 EDITION_PROFILES = {DEFAULT_EDITION_PROFILE, FIELD_EDITION_PROFILE}
-RUNTIME_DISTRIBUTION_PATHS = (
+RUNTIME_CONTRACT_REGISTRY_PATH = "distribution/runtime-contract-registry.v1.json"
+RUNTIME_DISTRIBUTION_BASE_PATHS = (
     "LICENSE",
     "runtime/THIRD_PARTY_NOTICES.md",
+    RUNTIME_CONTRACT_REGISTRY_PATH,
     "distribution/capabilities/core-capabilities.v1.json",
     "distribution/editions/field.v1.json",
     "distribution/editions/lab.v1.json",
     "distribution/editions/sim.v1.json",
     "distribution/safety/edition-execution-gate.v1.json",
-    "distribution/schemas/edition-execution-authorization.schema.json",
-    "distribution/schemas/edition-execution-gate-policy.schema.json",
-    "distribution/schemas/field-lifecycle-contract.schema.json",
-    "distribution/schemas/field-prerelease-audit.schema.json",
-    "distribution/tools/distribution_contract.py",
-    "distribution/tools/edition_safety_contract.py",
-    "distribution/tools/field_lifecycle_contract.py",
-    "distribution/tools/field_prerelease_audit.py",
     "distribution/upstream-sources.v1.json",
     "distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
     "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
@@ -55,7 +49,7 @@ RUNTIME_DISTRIBUTION_PATHS = (
     "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
     "distribution/vehicle-packs/registry.v1.json",
 )
-SOURCE_PATHS = (
+SOURCE_BASE_PATHS = (
     "backend/app",
     "backend/alembic",
     "backend/alembic.ini",
@@ -63,7 +57,6 @@ SOURCE_PATHS = (
     "worker/drone_dream_worker",
     "worker/pyproject.toml",
     "scripts/simulators",
-    *RUNTIME_DISTRIBUTION_PATHS,
 )
 FIELD_EXCLUDED_SOURCE_PATHS = ("backend/app/simulator", "scripts/simulators")
 IGNORED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
@@ -162,14 +155,64 @@ def source_date_epoch(repository_root: Path, source_commit: str) -> int:
         raise EnginePackError("source commit timestamp was invalid") from error
 
 
-def source_paths_for_profile(edition_profile: str) -> tuple[str, ...]:
+def runtime_distribution_paths(repository_root: Path) -> tuple[str, ...]:
+    registry_path = repository_root / RUNTIME_CONTRACT_REGISTRY_PATH
+    if registry_path.is_symlink() or not registry_path.is_file():
+        raise EnginePackError("Runtime contract registry must be an ordinary file")
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise EnginePackError("Runtime contract registry could not be read") from error
+    if not isinstance(registry, dict) or set(registry) != {
+        "schemaVersion",
+        "kind",
+        "contractPaths",
+    }:
+        raise EnginePackError("Runtime contract registry fields are invalid")
+    if (
+        registry["schemaVersion"] != 1
+        or registry["kind"] != "dronedream-runtime-contract-registry"
+    ):
+        raise EnginePackError("Runtime contract registry identity is unsupported")
+    paths = registry["contractPaths"]
+    if (
+        not isinstance(paths, list)
+        or not paths
+        or any(not isinstance(path, str) for path in paths)
+        or paths != sorted(set(paths))
+    ):
+        raise EnginePackError("Runtime contract registry paths must be unique and sorted")
+    allowed = re.compile(
+        r"^distribution/(?:schemas/[a-z0-9][a-z0-9.-]*\.schema\.json|tools/[a-z][a-z0-9_]*\.py)$"
+    )
+    root = repository_root.resolve()
+    for relative in paths:
+        if not allowed.fullmatch(relative):
+            raise EnginePackError(f"Runtime contract path is outside the allowlist: {relative}")
+        candidate = repository_root / relative
+        if (
+            candidate.is_symlink()
+            or not candidate.is_file()
+            or not candidate.resolve().is_relative_to(root)
+        ):
+            raise EnginePackError(f"Runtime contract path is unavailable: {relative}")
+    combined = (*RUNTIME_DISTRIBUTION_BASE_PATHS, *paths)
+    if len(combined) != len(set(combined)):
+        raise EnginePackError("Runtime distribution path registry contains duplicates")
+    return combined
+
+
+def source_paths_for_profile(
+    repository_root: Path, edition_profile: str
+) -> tuple[str, ...]:
     if edition_profile not in EDITION_PROFILES:
         raise EnginePackError(f"unsupported Engine Pack edition profile: {edition_profile}")
+    source_paths = (*SOURCE_BASE_PATHS, *runtime_distribution_paths(repository_root))
     if edition_profile == FIELD_EDITION_PROFILE:
         return tuple(
-            path for path in SOURCE_PATHS if path not in FIELD_EXCLUDED_SOURCE_PATHS
+            path for path in source_paths if path not in FIELD_EXCLUDED_SOURCE_PATHS
         )
-    return SOURCE_PATHS
+    return source_paths
 
 
 def is_excluded_for_profile(path: str, edition_profile: str) -> bool:
@@ -187,7 +230,7 @@ def production_files(
     edition_profile: str = DEFAULT_EDITION_PROFILE,
 ) -> list[tuple[str, Path]]:
     collected: dict[str, Path] = {}
-    for relative in source_paths_for_profile(edition_profile):
+    for relative in source_paths_for_profile(repository_root, edition_profile):
         candidate = repository_root / relative
         if not candidate.exists():
             raise EnginePackError(f"required Engine Pack source is missing: {relative}")

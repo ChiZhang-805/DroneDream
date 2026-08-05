@@ -38,7 +38,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
             "deny",
         )
 
-    def test_drift_audit_identifies_commits_paths_and_common_core_backflow(self) -> None:
+    def test_drift_audit_identifies_field_only_paths_after_common_core_backflow(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)
         subjects = [commit["subject"] for commit in audit["commits"]]
         for required_subject in (
@@ -50,24 +50,18 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         ):
             self.assertIn(required_subject, subjects)
         by_path = {item["path"]: item for item in audit["changedPaths"]}
-        self.assertEqual(
-            by_path["distribution/tools/edition_build_planner.py"]["classification"],
-            "universal-common-core-backflow",
-        )
-        self.assertEqual(
-            by_path["engine-pack/tools/engine_pack.py"]["classification"],
-            "universal-common-core-backflow",
-        )
+        self.assertNotIn("distribution/tools/edition_build_planner.py", by_path)
+        self.assertNotIn("engine-pack/tools/engine_pack.py", by_path)
         self.assertEqual(
             by_path["distribution/tools/field_prerelease_audit.py"]["classification"],
             "field-specific-contract",
         )
         self.assertEqual(
-            by_path[
-                "artifacts/test-runs/sim-preview-1.0.0-2aec69e/release-receipt.json"
-            ]["classification"],
-            "protected-evidence-drift",
+            by_path["distribution/runtime-contract-registry.v1.json"]["classification"],
+            "field-specific-contract",
         )
+        self.assertEqual(audit["summary"]["universalCommonCorePathCount"], 0)
+        self.assertEqual(audit["summary"]["protectedEvidenceDriftCount"], 0)
 
     def test_backflow_plan_excludes_field_specific_contract_implementations(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)
@@ -85,14 +79,11 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertIn("universal-core-engine-pack-edition-profile", plan_ids)
         self.assertIn("universal-core-field-contract-retention-hook", plan_ids)
 
-    def test_protected_evidence_deletions_are_not_backflowed(self) -> None:
+    def test_protected_evidence_no_longer_differs_from_universal(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)
         protected = audit["protectedEvidencePlan"]
         self.assertEqual(protected["backflowAction"], "none")
-        self.assertGreaterEqual(len(protected["paths"]), 1)
-        self.assertTrue(
-            all(path["path"].startswith("artifacts/test-runs/") for path in protected["paths"])
-        )
+        self.assertEqual(protected["paths"], [])
 
     def test_preview_build_readiness_is_fail_closed_and_non_executing(self) -> None:
         receipt = audit_tool.validate_field_preview_readiness_receipt(self.receipt)
@@ -106,7 +97,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertEqual(receipt["registry"]["validatedHardwarePackCount"], 0)
         self.assertEqual(receipt["registry"]["validatedHardwarePackIds"], [])
         self.assertIn("field.registry.zero-validated-packs", receipt["blockers"])
-        self.assertIn("field.common-core-backflow.pending", receipt["blockers"])
+        self.assertNotIn("field.common-core-backflow.pending", receipt["blockers"])
         self.assertIn("build DroneDream-Field-1.0.0.exe", receipt["prohibitedOperations"])
         self.assertIn("read OPENAI_API_KEY or provider credentials", receipt["prohibitedOperations"])
 
