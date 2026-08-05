@@ -328,6 +328,27 @@ def _load_context(
         ) from exc
     if provider.model_matrix_sha256 != inventory.model_matrix_sha256:
         _blocked("benchmark_model_matrix_drift", "Provider model matrix differs from inventory.")
+    if job.llm_access_mode != "byok":
+        _blocked(
+            "benchmark_provider_access_mode_drift",
+            "Formal direct-arm execution requires the Job's frozen BYOK access mode.",
+        )
+    if job.llm_provider != provider.provider:
+        _blocked(
+            "benchmark_provider_identity_drift",
+            "Job provider identity differs from the arm manifest.",
+        )
+    job_base_url = job.llm_base_url
+    if job_base_url is None and job.llm_provider == "openai":
+        # The legacy OpenAI request shape persists ``None`` for the SDK's exact
+        # default origin.  Resolve that semantic default before comparing it
+        # with the explicit, credential-free arm contract.
+        job_base_url = BENCHMARK_PROVIDER_BASE_URLS["openai"]
+    if job_base_url != provider.base_url:
+        _blocked(
+            "benchmark_provider_endpoint_drift",
+            "Job provider endpoint differs from the arm manifest.",
+        )
     if provider.model_snapshot != job.openai_model:
         _blocked("benchmark_model_snapshot_drift", "Job model differs from arm manifest.")
     if provider.maximum_generations != job.max_iterations or (

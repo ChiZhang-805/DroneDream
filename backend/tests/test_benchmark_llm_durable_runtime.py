@@ -205,6 +205,9 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
         provider_request_cap=2,
         provider_max_retries=0,
         openai_model=_MODEL,
+        llm_access_mode="byok",
+        llm_provider="openai",
+        llm_base_url=None,
         next_candidate_dispatch_ordinal=1,
     )
     db.add(job)
@@ -737,6 +740,20 @@ def test_reconciliation_rejects_actual_usage_beyond_rebound_capacity(
 @pytest.mark.parametrize(
     ("mutation", "expected_code"),
     [
+        (
+            lambda job, run, db, models: setattr(job, "llm_access_mode", "platform"),
+            "benchmark_provider_access_mode_drift",
+        ),
+        (
+            lambda job, run, db, models: setattr(job, "llm_provider", "deepseek"),
+            "benchmark_provider_identity_drift",
+        ),
+        (
+            lambda job, run, db, models: setattr(
+                job, "llm_base_url", "https://api.deepseek.com/v1"
+            ),
+            "benchmark_provider_endpoint_drift",
+        ),
         (
             lambda job, run, db, models: setattr(job, "provider_max_retries", 1),
             "benchmark_provider_budget_drift",
