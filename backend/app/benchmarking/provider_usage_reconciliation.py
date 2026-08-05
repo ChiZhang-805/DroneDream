@@ -24,6 +24,7 @@ from app.benchmarking.contracts import (
     canonical_sha256,
 )
 from app.benchmarking.coordinator import run_binding_sha256
+from app.benchmarking.llm_arm_contracts import require_llm_arm_policy
 from app.benchmarking.provider_execution_contract import (
     BENCHMARK_DIRECT_RESERVATION_REASON,
 )
@@ -120,16 +121,14 @@ def _validate_run_graph(
             "benchmark_provider_run_graph_drift",
             "Provider run binding graph is inconsistent.",
         )
-    if arm.proposal_adapter_id != "llm_direct/v1":
+    if arm.proposal_adapter_id not in {"llm_direct/v1", "llm_react/v1"}:
         _blocked(
             "benchmark_provider_reconciliation_arm_unsupported",
-            "This reconciliation contract currently supports only llm_direct/v1.",
+            "This reconciliation contract does not support the bound provider arm.",
         )
     try:
         arm_manifest = BenchmarkArmManifestV1.model_validate(arm.manifest_json)
-        campaign_manifest = BenchmarkCampaignManifestV1.model_validate(
-            campaign.manifest_json
-        )
+        campaign_manifest = BenchmarkCampaignManifestV1.model_validate(campaign.manifest_json)
         inventory = CompositeExecutionInventoryV1.model_validate(campaign.composite_inventory_json)
     except ValidationError as exc:
         raise BenchmarkProviderUsageBlocked(
@@ -153,8 +152,7 @@ def _validate_run_graph(
     matching_arms = [
         item
         for item in campaign_manifest.arms
-        if item.benchmark_arm_id == arm.benchmark_arm_id
-        and item.arm_version == arm.arm_version
+        if item.benchmark_arm_id == arm.benchmark_arm_id and item.arm_version == arm.arm_version
     ]
     if len(matching_arms) != 1 or matching_arms[0] != arm_manifest:
         _blocked(
@@ -162,11 +160,11 @@ def _validate_run_graph(
             "Run arm differs from the frozen campaign manifest.",
         )
     if (
-        arm_manifest.proposal_adapter_id != "llm_direct/v1"
+        arm_manifest.proposal_adapter_id != arm.proposal_adapter_id
         or arm_manifest.benchmark_arm_id != arm.benchmark_arm_id
         or arm_manifest.arm_version != arm.arm_version
     ):
-        _blocked("benchmark_direct_contract_mismatch", "Run arm differs from its manifest.")
+        _blocked("benchmark_llm_contract_mismatch", "Run arm differs from its manifest.")
     scenario_sha256 = run.scenario_suite_sha256
     qualification_sha256 = run.qualification_contract_sha256
     if scenario_sha256 is None or qualification_sha256 is None:
@@ -281,7 +279,7 @@ def _attempt_counts(statuses: list[str | None]) -> BenchmarkProviderAttemptCount
     )
 
 
-def reconcile_direct_provider_run_usage(
+def reconcile_provider_run_usage(
     db: Session,
     run_binding_id: str,
 ) -> BenchmarkProviderRunUsageReconciliationV1:
@@ -314,18 +312,32 @@ def reconcile_direct_provider_run_usage(
             )
         )
     )
+    policy = require_llm_arm_policy(arm.proposal_adapter_id)
+    expected_role = (
+        "direct_proposal" if arm.proposal_adapter_id == "llm_direct/v1" else "react_action"
+    )
+    expected_trigger = (
+        "benchmark-llm-direct-v1"
+        if arm.proposal_adapter_id == "llm_direct/v1"
+        else "benchmark-llm-react-v1"
+    )
+    expected_reason = (
+        ["preregistered-direct-turn"]
+        if arm.proposal_adapter_id == "llm_direct/v1"
+        else ["bounded-react-turn"]
+    )
     if any(
-        turn.turn_role != "direct_proposal"
-        or turn.turn_index != 1
-        or turn.trigger_policy_version != "benchmark-llm-direct-v1"
-        or turn.trigger_reasons_json != ["preregistered-direct-turn"]
+        turn.turn_role != expected_role
+        or not 1 <= turn.turn_index <= policy.maximum_turns_per_generation
+        or turn.trigger_policy_version != expected_trigger
+        or turn.trigger_reasons_json != expected_reason
         or turn.source_commit != source_commit
         or turn.model_snapshot != run.job.openai_model
         for turn in turns
     ):
         _blocked(
             "benchmark_provider_turn_contract_drift",
-            "Cognitive ledger contains work outside the direct arm contract.",
+            "Cognitive ledger contains work outside the bound LLM arm contract.",
         )
     requests = list(
         db.scalars(
@@ -442,9 +454,25 @@ def reconcile_direct_provider_run_usage(
         ) from exc
 
 
+def reconcile_direct_provider_run_usage(
+    db: Session,
+    run_binding_id: str,
+) -> BenchmarkProviderRunUsageReconciliationV1:
+    """Backward-compatible direct-arm entry point."""
+
+    run = db.get(models.BenchmarkCampaignRunBinding, run_binding_id)
+    if run is None or run.arm.proposal_adapter_id != "llm_direct/v1":
+        _blocked(
+            "benchmark_provider_reconciliation_arm_unsupported",
+            "The direct reconciliation entry point requires llm_direct/v1.",
+        )
+    return reconcile_provider_run_usage(db, run_binding_id)
+
+
 __all__ = [
     "BENCHMARK_DIRECT_RESERVATION_REASON",
     "BenchmarkProviderUsageBlocked",
     "reconcile_direct_provider_run_usage",
+    "reconcile_provider_run_usage",
     "validate_provider_run_reservation",
 ]

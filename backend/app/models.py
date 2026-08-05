@@ -51,12 +51,8 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("usr"))
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    identity_provider: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, index=True
-    )
-    external_subject: Mapped[str | None] = mapped_column(
-        String(255), nullable=True, index=True
-    )
+    identity_provider: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    external_subject: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -235,9 +231,7 @@ class BenchmarkCampaign(Base):
     protocol_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     manifest_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     manifest_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
-    composite_inventory_sha256: Mapped[str] = mapped_column(
-        String(64), nullable=False, index=True
-    )
+    composite_inventory_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     composite_inventory_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     job_cap: Mapped[int] = mapped_column(Integer, nullable=False)
     trial_cap: Mapped[int] = mapped_column(BigInteger, nullable=False)
@@ -331,9 +325,7 @@ class BenchmarkArm(Base):
     )
 
     campaign: Mapped[BenchmarkCampaign] = relationship(back_populates="arms")
-    run_bindings: Mapped[list[BenchmarkCampaignRunBinding]] = relationship(
-        back_populates="arm"
-    )
+    run_bindings: Mapped[list[BenchmarkCampaignRunBinding]] = relationship(back_populates="arm")
 
 
 class BenchmarkCampaignCoordinatorState(Base):
@@ -342,8 +334,7 @@ class BenchmarkCampaignCoordinatorState(Base):
     __tablename__ = "benchmark_campaign_coordinator_states"
     __table_args__ = (
         CheckConstraint(
-            "lease_generation >= 0 AND next_batch_ordinal >= 1 "
-            "AND next_run_ordinal >= 1",
+            "lease_generation >= 0 AND next_batch_ordinal >= 1 AND next_run_ordinal >= 1",
             name="ck_benchmark_coordinator_sequence",
         ),
         CheckConstraint(
@@ -362,9 +353,7 @@ class BenchmarkCampaignCoordinatorState(Base):
         primary_key=True,
     )
     lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    lease_token_hash: Mapped[str | None] = mapped_column(
-        String(64), nullable=True, unique=True
-    )
+    lease_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True)
     lease_generation: Mapped[int] = mapped_column(
         BigInteger, nullable=False, default=0, server_default="0"
     )
@@ -443,9 +432,7 @@ class BenchmarkBudgetReservation(Base):
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("bres")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("bres"))
     campaign_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("benchmark_campaigns.id", ondelete="CASCADE"),
@@ -485,15 +472,12 @@ class BenchmarkCampaignBatchBinding(Base):
             name="uq_benchmark_batch_binding_ordinal",
         ),
         CheckConstraint(
-            "batch_ordinal >= 1 AND lease_generation >= 1 "
-            "AND job_count >= 1 AND job_count <= 50",
+            "batch_ordinal >= 1 AND lease_generation >= 1 AND job_count >= 1 AND job_count <= 50",
             name="ck_benchmark_batch_binding_ordinals",
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("bbnd")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("bbnd"))
     campaign_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("benchmark_campaigns.id", ondelete="CASCADE"),
@@ -553,15 +537,12 @@ class BenchmarkCampaignRunBinding(Base):
             name="ck_benchmark_run_binding_ordinals",
         ),
         CheckConstraint(
-            "provider_randomness_policy IN "
-            "('not_applicable', 'fixed_seed', 'provider_managed')",
+            "provider_randomness_policy IN ('not_applicable', 'fixed_seed', 'provider_managed')",
             name="ck_benchmark_run_provider_policy",
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("brun")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("brun"))
     campaign_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("benchmark_campaigns.id", ondelete="CASCADE"),
@@ -594,15 +575,9 @@ class BenchmarkCampaignRunBinding(Base):
     simulator_seed_block: Mapped[str] = mapped_column(String(128), nullable=False)
     provider_randomness_policy: Mapped[str] = mapped_column(String(32), nullable=False)
     provider_seed: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    qualification_policy_version: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    scenario_suite_sha256: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
-    qualification_contract_sha256: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
+    qualification_policy_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    scenario_suite_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    qualification_contract_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     binding_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
@@ -684,9 +659,7 @@ class Job(Base):
     parameter_catalog_version: Mapped[str] = mapped_column(
         String(128), nullable=False, default="builtin-v1"
     )
-    parameter_space_json: Mapped[list[dict[str, Any]] | None] = mapped_column(
-        JSON, nullable=True
-    )
+    parameter_space_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     objective_config_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     scenario_suite_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
@@ -705,9 +678,7 @@ class Job(Base):
     simulator_backend_requested: Mapped[str] = mapped_column(
         String(32), nullable=False, default="mock"
     )
-    optimizer_strategy: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="heuristic"
-    )
+    optimizer_strategy: Mapped[str] = mapped_column(String(32), nullable=False, default="heuristic")
     max_iterations: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     trials_per_candidate: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     target_rmse: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -802,9 +773,7 @@ class Job(Base):
         default=False,
         server_default=false(),
     )
-    exploration_budget_json: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
+    exploration_budget_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     continuation_parent_job_id: Mapped[str | None] = mapped_column(
         String(64), ForeignKey("jobs.id"), nullable=True, index=True
     )
@@ -817,9 +786,7 @@ class Job(Base):
         default="legacy-visible-v0",
         server_default="legacy-visible-v0",
     )
-    holdout_contract_json: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
+    holdout_contract_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     # Cross-process finalization fencing. The opaque token identifies one
     # exact claim; generation prevents a stale claim from crossing a dispatch
     # boundary, and the explicit expiry is renewable without overloading
@@ -883,9 +850,12 @@ class Job(Base):
     cognitive_turn_receipts: Mapped[list[HarnessCognitiveTurnReceipt]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
-    benchmark_direct_proposal_handoffs: Mapped[
-        list[BenchmarkDirectProposalHandoff]
-    ] = relationship(back_populates="job", cascade="all, delete-orphan")
+    benchmark_direct_proposal_handoffs: Mapped[list[BenchmarkDirectProposalHandoff]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+    benchmark_llm_react_checkpoints: Mapped[list[BenchmarkLLMReactCheckpoint]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
     events: Mapped[list[JobEvent]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
@@ -939,18 +909,14 @@ class CandidateParameterSet(Base):
     # client arrival order, define deterministic dispatch/qualification order.
     dispatch_ordinal: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     qualification_sequence: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    qualified_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    qualified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     source_type: Mapped[str] = mapped_column(String(32), nullable=False, default="baseline")
     label: Mapped[str | None] = mapped_column(String(255), nullable=True)
     parameter_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     aggregated_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     aggregated_metric_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     proposal_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    optimizer_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
+    optimizer_metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     evidence_ledger_required: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -1025,9 +991,7 @@ class CandidateQualification(Base):
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("qlf")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("qlf"))
     job_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -1048,24 +1012,16 @@ class CandidateQualification(Base):
     state_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     qualification_sequence: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     screening_required: Mapped[int] = mapped_column(Integer, nullable=False, default=4)
-    qualification_initial_required: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=10
-    )
+    qualification_initial_required: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     qualification_extended_required: Mapped[int] = mapped_column(
         Integer, nullable=False, default=20
     )
     direct_pass_min: Mapped[int] = mapped_column(Integer, nullable=False, default=9)
-    extension_trigger_passes: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=8
-    )
+    extension_trigger_passes: Mapped[int] = mapped_column(Integer, nullable=False, default=8)
     extended_pass_min: Mapped[int] = mapped_column(Integer, nullable=False, default=18)
     max_candidates_per_run: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
-    sealed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    decided_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    sealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -1155,9 +1111,7 @@ class Trial(Base):
 
     job: Mapped[Job] = relationship(back_populates="trials")
     candidate: Mapped[CandidateParameterSet] = relationship(back_populates="trials")
-    qualification: Mapped[CandidateQualification | None] = relationship(
-        back_populates="trials"
-    )
+    qualification: Mapped[CandidateQualification | None] = relationship(back_populates="trials")
     qualification_receipt: Mapped[QualificationTrialReceipt | None] = relationship(
         back_populates="trial",
         uselist=False,
@@ -1199,16 +1153,12 @@ class QualificationTrialReceipt(Base):
             name="ck_qualification_trial_receipt_ordinal",
         ),
         CheckConstraint(
-            "terminal_status IN ("
-            "'COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'INDETERMINATE'"
-            ")",
+            "terminal_status IN ('COMPLETED', 'FAILED', 'CANCELLED', 'TIMEOUT', 'INDETERMINATE')",
             name="ck_qualification_trial_receipt_terminal_status",
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("qtr")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("qtr"))
     qualification_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("candidate_qualifications.id", ondelete="CASCADE"),
@@ -1229,17 +1179,11 @@ class QualificationTrialReceipt(Base):
     safety_critical_failure: Mapped[bool] = mapped_column(Boolean, nullable=False)
     effect_readback_complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
     evidence_complete: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    evidence_id: Mapped[str] = mapped_column(
-        String(71), nullable=False, unique=True, index=True
-    )
+    evidence_id: Mapped[str] = mapped_column(String(71), nullable=False, unique=True, index=True)
     evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
-    finalized_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    finalized_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    qualification: Mapped[CandidateQualification] = relationship(
-        back_populates="trial_receipts"
-    )
+    qualification: Mapped[CandidateQualification] = relationship(back_populates="trial_receipts")
     trial: Mapped[Trial] = relationship(back_populates="qualification_receipt")
 
 
@@ -1274,16 +1218,12 @@ class TrialMetric(Base):
 class WinnerFreezeReceipt(Base):
     __tablename__ = "winner_freeze_receipts"
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("wfr")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("wfr"))
     job_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("jobs.id"), nullable=False, unique=True, index=True
     )
     receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
-    evidence_id: Mapped[str] = mapped_column(
-        String(71), nullable=False, unique=True, index=True
-    )
+    evidence_id: Mapped[str] = mapped_column(String(71), nullable=False, unique=True, index=True)
     outcome_contract_id: Mapped[str] = mapped_column(String(71), nullable=False)
     baseline_candidate_id: Mapped[str] = mapped_column(String(64), nullable=False)
     winner_candidate_id: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -1334,9 +1274,7 @@ class FirstQualifiedFreezeReceipt(Base):
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("fqf")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("fqf"))
     job_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("jobs.id"), nullable=False, unique=True, index=True
     )
@@ -1359,9 +1297,7 @@ class FirstQualifiedFreezeReceipt(Base):
     trials_failed_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
     trials_cancelled_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
     trials_timed_out_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
-    trials_indeterminate_to_first_qualified: Mapped[int] = mapped_column(
-        Integer, nullable=False
-    )
+    trials_indeterminate_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
     generations_to_first_qualified: Mapped[int] = mapped_column(Integer, nullable=False)
     provider_turns_attempted_to_first_qualified: Mapped[int] = mapped_column(
         Integer, nullable=False
@@ -1408,9 +1344,7 @@ class HarnessCognitiveTurnReceipt(Base):
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("htr")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("htr"))
     job_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("jobs.id"), nullable=False, index=True
     )
@@ -1445,9 +1379,7 @@ class HarnessCognitiveTurnOutcome(Base):
 
     __tablename__ = "harness_cognitive_turn_outcomes"
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("hto")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("hto"))
     turn_receipt_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("harness_cognitive_turn_receipts.id"),
@@ -1463,9 +1395,7 @@ class HarnessCognitiveTurnOutcome(Base):
         DateTime(timezone=True), default=_now, nullable=False
     )
 
-    turn_receipt: Mapped[HarnessCognitiveTurnReceipt] = relationship(
-        back_populates="outcome"
-    )
+    turn_receipt: Mapped[HarnessCognitiveTurnReceipt] = relationship(back_populates="outcome")
 
 
 class BenchmarkDirectProposalHandoff(Base):
@@ -1495,9 +1425,7 @@ class BenchmarkDirectProposalHandoff(Base):
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("bdph")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("bdph"))
     job_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("jobs.id", ondelete="CASCADE"),
@@ -1533,9 +1461,75 @@ class BenchmarkDirectProposalHandoff(Base):
         DateTime(timezone=True), default=_now, nullable=False
     )
 
-    job: Mapped[Job] = relationship(
-        back_populates="benchmark_direct_proposal_handoffs"
+    job: Mapped[Job] = relationship(back_populates="benchmark_direct_proposal_handoffs")
+
+
+class BenchmarkLLMReactCheckpoint(Base):
+    """Append-only, secret-free state after one bounded ReAct provider turn.
+
+    The checkpoint and the cognitive-turn outcome are committed atomically. It
+    contains only schema-validated decisions and local proposal records, never
+    raw provider text, prompts, request identifiers, or credentials. A worker
+    may therefore resume at the next turn without replaying paid provider I/O.
+    """
+
+    __tablename__ = "benchmark_llm_react_checkpoints"
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "generation_index",
+            "turn_index",
+            name="uq_benchmark_react_checkpoint_job_generation_turn",
+        ),
+        UniqueConstraint(
+            "cognitive_turn_receipt_id",
+            name="uq_benchmark_react_checkpoint_turn",
+        ),
+        CheckConstraint(
+            "generation_index >= 1 AND turn_index >= 1 AND turn_index <= 4",
+            name="ck_benchmark_react_checkpoint_ordinals",
+        ),
+        CheckConstraint(
+            "decision IN ('act', 'dispatch', 'abandon')",
+            name="ck_benchmark_react_checkpoint_decision",
+        ),
     )
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("brcp"))
+    job_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    run_binding_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaign_run_bindings.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    cognitive_turn_receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("harness_cognitive_turn_receipts.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    checkpoint_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    adapter_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    generation_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    turn_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_commit: Mapped[str] = mapped_column(String(40), nullable=False)
+    observation_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    turn_binding_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    decision: Mapped[str] = mapped_column(String(16), nullable=False)
+    state_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    state_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(back_populates="benchmark_llm_react_checkpoints")
 
 
 class ProviderNetworkRequestReceipt(Base):
@@ -1576,9 +1570,7 @@ class ProviderNetworkRequestReceipt(Base):
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("pnr")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("pnr"))
     cognitive_turn_receipt_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("harness_cognitive_turn_receipts.id", ondelete="CASCADE"),
@@ -1641,9 +1633,7 @@ class ProviderNetworkRequestOutcome(Base):
         ),
     )
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("pno")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("pno"))
     request_receipt_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("provider_network_request_receipts.id", ondelete="CASCADE"),
@@ -1665,9 +1655,7 @@ class ProviderNetworkRequestOutcome(Base):
         DateTime(timezone=True), default=_now, nullable=False
     )
 
-    request_receipt: Mapped[ProviderNetworkRequestReceipt] = relationship(
-        back_populates="outcome"
-    )
+    request_receipt: Mapped[ProviderNetworkRequestReceipt] = relationship(back_populates="outcome")
 
 
 class HarnessCognitiveTurnDeleteAuthorization(Base):
@@ -1699,9 +1687,7 @@ class JobReport(Base):
     optimized_metric_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     comparison_metric_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     best_parameter_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
-    winner_evidence_json: Mapped[dict[str, Any] | None] = mapped_column(
-        JSON, nullable=True
-    )
+    winner_evidence_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     winner_freeze_receipt_id: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("winner_freeze_receipts.id"),
@@ -1768,9 +1754,7 @@ class Artifact(Base):
     # 32-bit INTEGER ceiling. SQLite already stores 64-bit integers, while
     # BigInteger keeps the production schema portable and lossless.
     file_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    integrity_policy: Mapped[str | None] = mapped_column(
-        String(32), nullable=True
-    )
+    integrity_policy: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
@@ -1785,9 +1769,7 @@ class Artifact(Base):
 class ArtifactDigestReceipt(Base):
     __tablename__ = "artifact_digest_receipts"
 
-    id: Mapped[str] = mapped_column(
-        String(64), primary_key=True, default=lambda: _new_id("adr")
-    )
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: _new_id("adr"))
     artifact_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("artifacts.id"),
@@ -1795,18 +1777,10 @@ class ArtifactDigestReceipt(Base):
         unique=True,
         index=True,
     )
-    evidence_id: Mapped[str] = mapped_column(
-        String(71), nullable=False, unique=True, index=True
-    )
-    content_sha256: Mapped[str] = mapped_column(
-        String(64), nullable=False
-    )
-    content_size_bytes: Mapped[int] = mapped_column(
-        BigInteger, nullable=False
-    )
-    storage_path_sha256: Mapped[str] = mapped_column(
-        String(64), nullable=False
-    )
+    evidence_id: Mapped[str] = mapped_column(String(71), nullable=False, unique=True, index=True)
+    content_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    content_size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    storage_path_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     owner_type: Mapped[str] = mapped_column(String(32), nullable=False)
     owner_id: Mapped[str] = mapped_column(String(64), nullable=False)
     artifact_type: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -1814,9 +1788,7 @@ class ArtifactDigestReceipt(Base):
         DateTime(timezone=True), default=_now, nullable=False
     )
 
-    artifact: Mapped[Artifact] = relationship(
-        back_populates="digest_receipt"
-    )
+    artifact: Mapped[Artifact] = relationship(back_populates="digest_receipt")
 
 
 class ArtifactDigestDeleteAuthorization(Base):
@@ -1855,21 +1827,15 @@ class TrialExecutionAttempt(Base):
         index=True,
     )
     job_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    candidate_id: Mapped[str] = mapped_column(
-        String(64), nullable=False, index=True
-    )
+    candidate_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False)
     worker_id_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     simulator_backend: Mapped[str] = mapped_column(String(64), nullable=False)
     claim_evidence_id: Mapped[str] = mapped_column(
         String(71), nullable=False, unique=True, index=True
     )
-    claim_evidence_json: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False
-    )
-    claimed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    claim_evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     trial: Mapped[Trial] = relationship(
         back_populates="execution_attempts",
@@ -1895,20 +1861,14 @@ class TrialExecutionAttemptOutcome(Base):
         unique=True,
         index=True,
     )
-    evidence_id: Mapped[str] = mapped_column(
-        String(71), nullable=False, unique=True, index=True
-    )
+    evidence_id: Mapped[str] = mapped_column(String(71), nullable=False, unique=True, index=True)
     terminal_status: Mapped[str] = mapped_column(String(32), nullable=False)
     outcome_class: Mapped[str] = mapped_column(String(64), nullable=False)
     accepted: Mapped[bool] = mapped_column(Boolean, nullable=False)
     evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
-    finished_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    finished_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    attempt: Mapped[TrialExecutionAttempt] = relationship(
-        back_populates="outcome"
-    )
+    attempt: Mapped[TrialExecutionAttempt] = relationship(back_populates="outcome")
 
 
 class TrialExecutionAttemptDeleteAuthorization(Base):
@@ -1948,34 +1908,20 @@ class CandidateEvidenceReceipt(Base):
     )
     job_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
-    previous_evidence_id: Mapped[str | None] = mapped_column(
-        String(71), nullable=True
-    )
+    previous_evidence_id: Mapped[str | None] = mapped_column(String(71), nullable=True)
     receipt_schema: Mapped[str] = mapped_column(String(128), nullable=False)
-    evidence_id: Mapped[str] = mapped_column(
-        String(71), nullable=False, unique=True, index=True
-    )
+    evidence_id: Mapped[str] = mapped_column(String(71), nullable=False, unique=True, index=True)
     aggregate_sha256: Mapped[str] = mapped_column(String(71), nullable=False)
-    outcome_evidence_id: Mapped[str] = mapped_column(
-        String(71), nullable=False
-    )
-    report_evidence_id: Mapped[str] = mapped_column(
-        String(71), nullable=False
-    )
-    outcome_evidence_json: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False
-    )
-    report_evidence_json: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False
-    )
+    outcome_evidence_id: Mapped[str] = mapped_column(String(71), nullable=False)
+    report_evidence_id: Mapped[str] = mapped_column(String(71), nullable=False)
+    outcome_evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    report_evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     evidence_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, nullable=False
     )
 
-    candidate: Mapped[CandidateParameterSet] = relationship(
-        back_populates="evidence_receipts"
-    )
+    candidate: Mapped[CandidateParameterSet] = relationship(back_populates="evidence_receipts")
 
 
 class CandidateEvidenceDeleteAuthorization(Base):
@@ -2030,33 +1976,19 @@ class HarnessExperienceMemory(Base):
     )
     source_generation: Mapped[int] = mapped_column(Integer, nullable=False)
     memory_schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
-    source_evidence_schema_version: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )
-    source_prompt_template_version: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )
-    source_tool_registry_version: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )
-    source_eligibility_policy_version: Mapped[str] = mapped_column(
-        String(32), nullable=False
-    )
-    task_family_sha256: Mapped[str] = mapped_column(
-        String(64), nullable=False, index=True
-    )
-    scenario_profile_json: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False
-    )
+    source_evidence_schema_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_prompt_template_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_tool_registry_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_eligibility_policy_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    task_family_sha256: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    scenario_profile_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     tool_id: Mapped[str] = mapped_column(String(64), nullable=False)
     decision_source: Mapped[str] = mapped_column(String(32), nullable=False)
     plan_phase: Mapped[str] = mapped_column(String(32), nullable=False)
     batch_policy: Mapped[str] = mapped_column(String(32), nullable=False)
     dispatched_candidates: Mapped[int] = mapped_column(Integer, nullable=False)
     planned_candidates: Mapped[int] = mapped_column(Integer, nullable=False)
-    observed_outcome_json: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False
-    )
+    observed_outcome_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     source_receipt_sha256: Mapped[str] = mapped_column(
         String(64), nullable=False, unique=True, index=True
     )
@@ -2069,9 +2001,7 @@ class HarnessExperienceMemory(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
-    revocation_reason: Mapped[str | None] = mapped_column(
-        String(64), nullable=True
-    )
+    revocation_reason: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="harness_experiences")
     source_job: Mapped[Job] = relationship(back_populates="harness_experiences")

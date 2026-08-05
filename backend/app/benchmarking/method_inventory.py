@@ -364,6 +364,33 @@ _ENTRIES = (
             "Formal execution requires zero provider retries and preregistered provider capacity.",
         ),
     ),
+    BenchmarkMethodInventoryEntryV1(
+        adapter_id="llm_react/v1",
+        method_classification="adapted_reference",
+        implementation_label="durable-bounded-react-v1",
+        execution_readiness="ready",
+        environment_boundary="provider_contract",
+        sources=(
+            _project_source(
+                "llm-react-durable-runtime",
+                "backend/app/benchmarking/llm_durable_runtime.py",
+            ),
+            _project_source(
+                "llm-react-closed-contract",
+                "backend/app/benchmarking/llm_arm_contracts.py",
+            ),
+            _project_source(
+                "llm-react-job-secret-transport",
+                "backend/app/benchmarking/provider_transport.py",
+            ),
+        ),
+        reproducibility_notes=(
+            "One to four durable action turns per generation with one request per turn.",
+            "Only allowlisted deterministic local proposal adapters may be invoked.",
+            "Every successful turn checkpoints validated state before the next turn.",
+            "Formal execution requires zero provider retries and preregistered capacity.",
+        ),
+    ),
     *(
         BenchmarkMethodInventoryEntryV1(
             adapter_id=adapter_id,
@@ -380,7 +407,6 @@ _ENTRIES = (
             blocker_codes=("adapter_not_implemented", "provider_contract_pending"),
         )
         for adapter_id, classification, label in (
-            ("llm_react/v1", "adapted_reference", "bounded-react-adapter-pending"),
             ("llambo_uav/v1", "adapted_reference", "noisy-uav-adaptation-pending"),
             (
                 "dronedream_fixed_two_turn/v1",
