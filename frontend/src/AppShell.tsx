@@ -114,7 +114,7 @@ import type {
 import { ECE498BH_COURSE_URL } from "./externalLinks";
 import { EditionThemeProvider } from "./theme/EditionThemeProvider";
 
-const NAV_ITEMS: {
+type NavigationItem = {
   to: string;
   labelKey?: TranslationKey;
   label?: string;
@@ -123,7 +123,9 @@ const NAV_ITEMS: {
   requiresRuntime?: boolean;
   externalUrl?: string;
   icon: LucideIcon;
-}[] = [
+};
+
+const CORE_NAV_ITEMS: NavigationItem[] = [
   {
     to: "/assistant",
     labelKey: "app.conversation",
@@ -155,6 +157,8 @@ const NAV_ITEMS: {
     icon: GraduationCap,
   },
 ];
+
+const NAV_ITEMS: NavigationItem[] = CORE_NAV_ITEMS;
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
   "CREATED",

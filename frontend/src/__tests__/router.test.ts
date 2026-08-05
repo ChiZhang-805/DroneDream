@@ -267,4 +267,18 @@ describe("environment-aware routing", () => {
 
     router.dispose();
   });
+
+  it("exposes the integrated Lab workspace in Universal", async () => {
+    delete window.__TAURI__;
+    window.history.replaceState(null, "", "/lab");
+    vi.resetModules();
+    const { router } = await import("../router");
+    const children = router.routes[0]?.children ?? [];
+
+    expect(children.find((route) => route.path === "lab")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(router.state.location.pathname).toBe("/lab");
+
+    router.dispose();
+  });
 });

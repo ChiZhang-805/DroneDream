@@ -28,7 +28,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           index: true,
           element: desktopRuntime
             ? <Navigate to="/desktop/setup" replace />
-            : <Navigate to="/assistant" replace />,
+            : <Navigate to={fallbackPath} replace />,
         },
         {
           path: "assistant",
@@ -112,6 +112,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           lazy: async () => {
             const { DesktopSetup } = await import("./pages/DesktopSetup");
             return { Component: DesktopSetup };
+          },
+        },
+        {
+          path: "lab",
+          lazy: async () => {
+            const { LabSetup } = await import("./lab/LabSetup");
+            return { Component: LabSetup };
           },
         },
         { path: "*", loader: () => redirect(fallbackPath) },
