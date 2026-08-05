@@ -14,6 +14,7 @@ from typing import Annotated, Any, Final, Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app import schemas
 from app.benchmarking.contracts import (
     CompositeExecutionInventoryV1,
     GitCommit,
@@ -421,6 +422,79 @@ def _trial_context(
     )
 
 
+def compile_physical_stability_job_request(
+    manifest: PhysicalStabilityManifestV1,
+    scenario: PhysicalStabilityScenarioV1,
+) -> schemas.JobCreateRequest:
+    """Materialize one exact, zero-provider Job request from the frozen registry.
+
+    The preregistration deliberately stores only the subset of Job configuration
+    needed by the physical contract.  Execution must reconstruct the complete
+    API payload from the content-addressed source problem, then prove that the
+    reconstructed flight, advanced effects, parameter domain, and baseline still
+    agree with the manifest before the request can be dispatched.
+    """
+
+    source = _source_problems()[1].get(scenario.source_problem_id)
+    if source is None:
+        raise ValueError(f"unknown P5 source problem {scenario.source_problem_id!r}")
+    if canonical_sha256(source) != scenario.source_problem_sha256:
+        raise ValueError("P5 source problem content no longer matches the manifest")
+    job = _derive_job(scenario.scenario_id, source)
+    if _job_config(job) != scenario.job_config:
+        raise ValueError("reconstructed P5 Job configuration does not match the manifest")
+    if _scenario_config(job) != scenario.scenario_config:
+        raise ValueError("reconstructed P5 advanced scenario does not match the manifest")
+    if _baseline_parameters(job) != manifest.fixed_baseline_parameters:
+        raise ValueError("reconstructed P5 baseline parameters do not match the manifest")
+
+    source_cases = job["scenario_suite"]["cases"]
+    if not source_cases or any(
+        case.get("config") != source_cases[0].get("config") for case in source_cases
+    ):
+        raise ValueError("P5 source scenario case configuration is ambiguous")
+    job["display_name"] = (
+        f"P5 stability {manifest.repository_subject_commit[:7]} {scenario.scenario_id}"
+    )
+    job["scenario_suite"] = {
+        "cases": [
+            {
+                "id": scenario.scenario_id,
+                "scenario_type": scenario.scenario_type,
+                "seeds": list(scenario.seeds),
+                "weight": 1.0,
+                "enabled": True,
+                "holdout": False,
+                "config": deepcopy(source_cases[0].get("config") or {}),
+            }
+        ],
+        "common_random_numbers": True,
+    }
+    job.update(
+        {
+            "simulator_backend": "real_cli",
+            "optimizer_strategy": "none",
+            "max_iterations": 1,
+            "trials_per_candidate": 10,
+            "max_total_trials": 10,
+            "completion_policy": "first_qualified_stop",
+            "provider_turn_cap": 0,
+            "provider_request_cap": 0,
+            "provider_max_retries": 0,
+            "continue_exploration_after_qualified": False,
+            "exploration_budget": None,
+            "openai": None,
+            "llm": None,
+        }
+    )
+    request = schemas.JobCreateRequest.model_validate(job)
+    if request.simulator_backend != "real_cli" or request.optimizer_strategy != "none":
+        raise ValueError("P5 execution request must remain baseline-only real_cli")
+    if request.provider_turn_cap != 0 or request.provider_request_cap != 0:
+        raise ValueError("P5 execution request must remain zero-provider")
+    return request
+
+
 def compile_physical_stability_trial_plan(
     manifest: PhysicalStabilityManifestV1,
 ) -> PhysicalStabilityTrialPlanV1:
@@ -519,5 +593,6 @@ __all__ = [
     "PhysicalStabilityManifestV1",
     "PhysicalStabilityTrialPlanV1",
     "build_physical_stability_manifest",
+    "compile_physical_stability_job_request",
     "compile_physical_stability_trial_plan",
 ]
