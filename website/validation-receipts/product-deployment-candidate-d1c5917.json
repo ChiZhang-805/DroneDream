@@ -1,0 +1,129 @@
+{
+  "schemaVersion": "dronedream.website-deployment-candidate.v1",
+  "generatedAt": "2026-08-05T13:45:00Z",
+  "scope": {
+    "branch": "codex/website",
+    "sourceCommit": "d1c5917ba5d724efacf9a578056c543665ed5e17",
+    "sourceTree": "6e57030f4288f06c916a9cab2f81efcbcab35ef5",
+    "brandSourceAncestor": "16e998b5d0754ac866e9d628bd46912aa530d05c",
+    "brandEvidenceCommit": "462464c87b615276609cacbc28de5784d00ef16f",
+    "metadataEvidenceCommit": "ad4bb392482094bdbee29ace3ec1bf8cc83ccd29",
+    "deploymentPerformed": false,
+    "productionTouched": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "sourceChanges": [
+    "frontend/public/downloads/editions.json",
+    "frontend/src/__tests__/EditionAvailability.test.ts",
+    "frontend/src/__tests__/ProductPage.test.tsx",
+    "frontend/src/site/editionAvailability.ts",
+    "website/scripts/build-pages-site.ps1",
+    "website/scripts/verify-edition-availability.mjs"
+  ],
+  "validation": {
+    "editionMetadataFocusedTests": {
+      "evidence": "website/validation-receipts/edition-release-metadata-v2-validation-d1c5917.json",
+      "tests": 29,
+      "passed": 29,
+      "failed": 0
+    },
+    "pricingAvailabilityRegression": {
+      "command": "npm.cmd --prefix frontend test -- PublicSite.test.tsx",
+      "tests": 20,
+      "passed": 20,
+      "failed": 0,
+      "contract": "/billing-checkout/availability"
+    },
+    "typecheck": "passed at sourceCommit; see edition metadata evidence",
+    "lint": "passed at sourceCommit; see edition metadata evidence",
+    "siteBuild": "passed at sourceCommit with local-only placeholder public variables; see edition metadata evidence",
+    "editionMetadataVerifier": "passed, schema v2, four editions",
+    "editionBrandAssetVerifier": "passed, six byte-identical assets",
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    }
+  },
+  "browserAudit": {
+    "artifact": "website/validation-receipts/assets/product-deployment-candidate-d1c5917/product-page-audit.json",
+    "artifactSha256": "a96ede658dfb0782fdcf6ee88afb42c074e157083ecf5a59638c8e8349e022ce",
+    "checks": 20,
+    "passed": 20,
+    "failed": 0,
+    "unavailableBrowsers": [],
+    "browsers": {
+      "edge": "151.0.4129.59",
+      "chrome": "129.0.6668.59",
+      "lenovo": "9.0.8.7271",
+      "firefox": "151.0"
+    },
+    "profiles": ["1440x1000", "2048x1280", "760x1000", "390x844"],
+    "locales": ["en", "zh-CN"],
+    "assertions": {
+      "singleViewportProductLayout": "passed",
+      "singleLineTitle": "passed",
+      "headerAndContentAlignment": "passed",
+      "productAndPriceNavigation": "passed",
+      "approvedEditionMarks": "passed",
+      "distinctEditionThemes": "passed",
+      "horizontalOverflow": 0,
+      "dialogs": 0,
+      "keyboardAndAria": "passed",
+      "universalDownload": "disabled-no-exact-handoff",
+      "editionDownloads": "disabled-no-release-ready-handoff"
+    },
+    "representativeScreenshots": {
+      "edgeEnglishDesktop": {
+        "path": "website/validation-receipts/assets/product-deployment-candidate-d1c5917/product-page-screenshots/edge-desktop-1440-en.png",
+        "sha256": "3e5cb15b1f630d88721b646ef09f2db28c09c3d43291a7c310a86e3836be807c"
+      },
+      "edgeChineseWide": {
+        "path": "website/validation-receipts/assets/product-deployment-candidate-d1c5917/product-page-screenshots/edge-wide-2048-zh-CN.png",
+        "sha256": "61693f46d9c3ad9afde4201291f81e95fe531d3efdddd5937ffc92590f6a97fb"
+      },
+      "lenovoChineseMobile": {
+        "path": "website/validation-receipts/assets/product-deployment-candidate-d1c5917/product-page-screenshots/lenovo-mobile-390-zh-CN.png",
+        "sha256": "4cc9c3dad1aae582bb28853a5bb6d754b0223183dd4e3aa7bc3067258d18af8f"
+      },
+      "firefoxEnglishMobile": {
+        "path": "website/validation-receipts/assets/product-deployment-candidate-d1c5917/product-page-screenshots/firefox-mobile-390-en.png",
+        "sha256": "2d58c3eed01d46bfafaa8bcd4a62c8ffd69fb29f98d0c90d0d21dae797dd9821"
+      }
+    }
+  },
+  "brandSurfaceAudit": {
+    "productEditionCards": "SIM, LAB, and FIELD approved marks are integrated",
+    "universalDownload": "keeps the existing mother-brand treatment and routes only Universal",
+    "editionChooser": "no active runtime surface exists",
+    "editionComparison": "no active runtime surface exists",
+    "webConsoleEditionPreview": "no active runtime surface exists; no hardware capability is implied",
+    "dotLockups": "preserved as approved repository assets; no suitable active horizontal edition surface exists"
+  },
+  "deploymentPlan": {
+    "authorizationState": "pending-new-exact-authorization",
+    "staleAuthorizationSource": "16e998b5d0754ac866e9d628bd46912aa530d05c",
+    "sharedArtifact": [
+      "build once from sourceCommit through the repository Pages build path",
+      "freeze the artifact manifest, SHA256SUMS, and latest.json",
+      "publish the exact same bytes to GitHub Pages and the Aliyun candidate release directory",
+      "verify public content hashes and metadata parity before completion is claimed"
+    ],
+    "githubPagesRollback": "redeploy the prior known-good frozen source and artifact through the Pages workflow",
+    "aliyunRollback": "atomically repoint current to the retained prior release directory after hash verification",
+    "prohibitedWithoutSeparateAuthorization": [
+      "GitHub Release asset mutation",
+      "Supabase Functions or migrations",
+      "production secrets",
+      "DNS or TLS"
+    ]
+  },
+  "repositoryGovernance": {
+    "forcePushPerformed": false,
+    "manualAndPdfDraftsExcluded": true,
+    "workDirectoryExcluded": true,
+    "historicalDirtyStatePreserved": true,
+    "runtimeDependencyOnWorkDirectory": false
+  }
+}
