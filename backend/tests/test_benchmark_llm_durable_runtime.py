@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ from app.benchmarking.llm_durable_runtime import (
     execute_durable_direct_arm,
 )
 from app.benchmarking.method_inventory import BENCHMARK_METHOD_INVENTORY
+from app.benchmarking.provider_execution_contract import direct_provider_run_capacity
 from app.benchmarking.provider_usage_reconciliation import (
     BenchmarkProviderUsageBlocked,
     reconcile_direct_provider_run_usage,
@@ -88,6 +90,8 @@ def _provider_config() -> BenchmarkProviderExecutionConfigV1:
         top_p=1.0,
         randomness_policy="fixed_seed",
         maximum_generations=2,
+        maximum_request_utf8_bytes=65_536,
+        maximum_response_utf8_bytes=8_192,
         maximum_output_tokens=128,
         request_timeout_ms=10_000,
         llm_policy_registry_sha256=BENCHMARK_LLM_ARM_POLICIES_SHA256,
@@ -205,6 +209,9 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
         provider_request_cap=2,
         provider_max_retries=0,
         openai_model=_MODEL,
+        llm_access_mode="byok",
+        llm_provider="openai",
+        llm_base_url=None,
         next_candidate_dispatch_ordinal=1,
     )
     db.add(job)
@@ -307,15 +314,7 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
     )
     db.add(run)
     db.flush()
-    reservation_usage = BenchmarkUsageDeltaV1(
-        logical_turns=2,
-        network_requests=2,
-        input_utf8_bytes=10_000_000,
-        output_utf8_bytes=10_000_000,
-        provider_tokens=10_000_000,
-        provider_cost_microusd=10_000_000,
-        wall_time_seconds=1000,
-    )
+    reservation_usage = direct_provider_run_capacity(_provider_config())
     reservation_request = BenchmarkBudgetReservationRequestV1(
         reservation_key=f"provider-run/{run.id}",
         lease_generation=1,
@@ -370,9 +369,11 @@ class _Transport:
     response: str | Exception | BaseException
     before_return: Callable[[], None] | None = None
     calls: int = 0
+    last_request: Any | None = None
 
     def complete(self, request: Any, config: Any) -> BenchmarkProviderTransportResult:
         self.calls += 1
+        self.last_request = request
         if self.before_return is not None:
             self.before_return()
         if isinstance(self.response, BaseException):
@@ -436,6 +437,18 @@ def test_provider_execution_contract_accepts_exact_deepseek_origin() -> None:
     assert parsed.base_url == "https://api.deepseek.com/v1"
 
 
+def test_direct_provider_capacity_is_deterministic_and_worst_case() -> None:
+    capacity = direct_provider_run_capacity(_provider_config())
+
+    assert capacity.logical_turns == 2
+    assert capacity.network_requests == 2
+    assert capacity.input_utf8_bytes == 65_536 * 2
+    assert capacity.output_utf8_bytes == 8_192 * 2
+    assert capacity.provider_tokens == (65_536 + 128) * 2
+    assert capacity.provider_cost_microusd == 264_192
+    assert capacity.wall_time_seconds == 20
+
+
 def test_durable_bridge_does_not_promote_direct_arm_before_campaign_reconciliation() -> None:
     descriptor = BENCHMARK_ADAPTER_REGISTRY["llm_direct/v1"]
     inventory = BENCHMARK_METHOD_INVENTORY["llm_direct/v1"]
@@ -473,6 +486,18 @@ def test_direct_attempts_are_committed_before_transport_and_success_is_safe(
         assert result.proposal.parameters == {"kp": 1.2}
         assert result.provider_turns_attempted == result.provider_turns_succeeded == 1
         assert result.provider_requests_attempted == result.provider_requests_succeeded == 1
+        request_receipt = db.scalar(select(models.ProviderNetworkRequestReceipt))
+        handoff = db.scalar(select(models.BenchmarkDirectProposalHandoff))
+        assert request_receipt is not None
+        assert handoff is not None
+        assert handoff.parameters_json == {"kp": 1.2}
+        assert handoff.parameter_sha256 == canonical_sha256({"kp": 1.2})
+        assert handoff.proposal_receipt_sha256 == canonical_sha256(result.safe_receipt)
+        assert transport.last_request.request_body()["seed"] == 20260805
+        assert (
+            request_receipt.request_body_sha256
+            == transport.last_request.request_body_sha256
+        )
         reconciliation = reconcile_direct_provider_run_usage(db, run.id)
         assert reconciliation.status == "complete"
         assert reconciliation.actual_observed.logical_turns == 1
@@ -491,6 +516,108 @@ def test_direct_attempts_are_committed_before_transport_and_success_is_safe(
         db.refresh(job)
         assert job.provider_turns_attempted == job.provider_turns_succeeded == 1
         assert job.provider_requests_attempted == job.provider_requests_succeeded == 1
+
+
+def test_successful_direct_proposal_recovers_without_replaying_provider(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        observation = _observation(job, run)
+        first_transport = _Transport(_proposal_json(1.35))
+        first = execute_durable_direct_arm(
+            db,
+            job,
+            observation,
+            transport=first_transport,
+        )
+        assert first.status == "proposal"
+        assert first_transport.calls == 1
+
+        replay_transport = _Transport(RuntimeError("must not replay"))
+        recovered = execute_durable_direct_arm(
+            db,
+            job,
+            observation,
+            transport=replay_transport,
+        )
+        assert recovered.status == "proposal_recovered"
+        assert recovered.recovered_from_handoff is True
+        assert recovered.proposal == first.proposal
+        assert recovered.safe_receipt == first.safe_receipt
+        assert replay_transport.calls == 0
+        assert db.scalar(select(models.HarnessCognitiveTurnReceipt)) is not None
+        assert len(list(db.scalars(select(models.ProviderNetworkRequestReceipt)))) == 1
+        assert len(list(db.scalars(select(models.BenchmarkDirectProposalHandoff)))) == 1
+
+
+def test_direct_handoff_persists_only_validated_safe_material(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        result = execute_durable_direct_arm(
+            db,
+            job,
+            _observation(job, run),
+            transport=_Transport(_proposal_json()),
+        )
+        handoff = db.scalar(select(models.BenchmarkDirectProposalHandoff))
+        assert handoff is not None
+        persisted = json.dumps(
+            {
+                "schema": handoff.handoff_schema,
+                "parameters": handoff.parameters_json,
+                "receipt": handoff.proposal_receipt_json,
+            },
+            sort_keys=True,
+        )
+        assert result.proposal is not None
+        assert result.proposal.parameters == handoff.parameters_json
+        for forbidden in (
+            "messages",
+            "system",
+            "user",
+            "request_id",
+            "api_key",
+            _proposal_json(),
+        ):
+            assert forbidden not in persisted
+
+
+def test_direct_handoff_cross_field_tamper_blocks_without_provider_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        observation = _observation(job, run)
+        execute_durable_direct_arm(
+            db,
+            job,
+            observation,
+            transport=_Transport(_proposal_json()),
+        )
+        handoff = db.scalar(select(models.BenchmarkDirectProposalHandoff))
+        assert handoff is not None
+        tampered = dict(handoff.proposal_receipt_json)
+        tampered["campaign_id"] = "campaign-from-another-run"
+        handoff.proposal_receipt_json = tampered
+        handoff.proposal_receipt_sha256 = canonical_sha256(tampered)
+        db.commit()
+
+        transport = _Transport(RuntimeError("must not replay"))
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_direct_arm(
+                db,
+                job,
+                observation,
+                transport=transport,
+            )
+        assert exc_info.value.code == "benchmark_direct_handoff_receipt_drift"
+        assert transport.calls == 0
 
 
 def test_provider_failure_is_fail_closed_and_does_not_persist_exception_text(
@@ -542,6 +669,36 @@ def test_schema_failure_records_network_success_but_not_model_success(
         request = db.scalar(select(models.ProviderNetworkRequestReceipt))
         assert turn is not None and turn.outcome.status == "invalid_schema"
         assert request is not None and request.outcome.status == "succeeded"
+        db.refresh(job)
+        assert job.provider_turns_succeeded == 0
+        assert job.provider_requests_succeeded == 1
+
+
+def test_response_byte_cap_records_consumed_request_but_rejects_model_result(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    oversized_response = "x" * 8_193
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_direct_arm(
+                db,
+                job,
+                _observation(job, run),
+                transport=_Transport(oversized_response),
+            )
+        assert exc_info.value.code == "benchmark_provider_response_too_large"
+        turn = db.scalar(select(models.HarnessCognitiveTurnReceipt))
+        request = db.scalar(select(models.ProviderNetworkRequestReceipt))
+        assert turn is not None and turn.outcome.status == "invalid_schema"
+        assert turn.outcome.error_code == "benchmark_provider_response_too_large"
+        assert request is not None and request.outcome.status == "succeeded"
+        assert request.outcome.output_utf8_bytes == 8_193
+        assert request.outcome.response_sha256 == hashlib.sha256(
+            oversized_response.encode("utf-8")
+        ).hexdigest()
+        assert oversized_response not in str(request.outcome.__dict__)
         db.refresh(job)
         assert job.provider_turns_succeeded == 0
         assert job.provider_requests_succeeded == 1
@@ -689,6 +846,51 @@ def test_reservation_hash_drift_blocks_before_transport(
         assert transport.calls == 0
 
 
+@pytest.mark.parametrize("delta", [-1, 1])
+def test_reservation_capacity_drift_blocks_before_transport(
+    durable_db: SimpleNamespace,
+    delta: int,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        reservation = db.scalar(
+            select(models.BenchmarkBudgetReservation).where(
+                models.BenchmarkBudgetReservation.reservation_key
+                == f"provider-run/{run.id}"
+            )
+        )
+        assert reservation is not None
+        reservation.input_utf8_bytes += delta
+        changed_usage = BenchmarkUsageDeltaV1(
+            **{
+                field: getattr(reservation, field)
+                for field in BenchmarkUsageDeltaV1.model_fields
+            }
+        )
+        reservation.reservation_sha256 = canonical_sha256(
+            BenchmarkBudgetReservationRequestV1(
+                reservation_key=reservation.reservation_key,
+                lease_generation=reservation.lease_generation,
+                reason=reservation.reason,
+                usage=changed_usage,
+            )
+        )
+        db.commit()
+        transport = _Transport(_proposal_json())
+
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_direct_arm(
+                db,
+                job,
+                _observation(job, run),
+                transport=transport,
+            )
+
+        assert exc_info.value.code == "benchmark_provider_budget_drift"
+        assert transport.calls == 0
+
+
 def test_reconciliation_rejects_actual_usage_beyond_rebound_capacity(
     durable_db: SimpleNamespace,
 ) -> None:
@@ -737,6 +939,20 @@ def test_reconciliation_rejects_actual_usage_beyond_rebound_capacity(
 @pytest.mark.parametrize(
     ("mutation", "expected_code"),
     [
+        (
+            lambda job, run, db, models: setattr(job, "llm_access_mode", "platform"),
+            "benchmark_provider_access_mode_drift",
+        ),
+        (
+            lambda job, run, db, models: setattr(job, "llm_provider", "deepseek"),
+            "benchmark_provider_identity_drift",
+        ),
+        (
+            lambda job, run, db, models: setattr(
+                job, "llm_base_url", "https://api.deepseek.com/v1"
+            ),
+            "benchmark_provider_endpoint_drift",
+        ),
         (
             lambda job, run, db, models: setattr(job, "provider_max_retries", 1),
             "benchmark_provider_budget_drift",

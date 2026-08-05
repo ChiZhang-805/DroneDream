@@ -848,7 +848,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260804_0030 (head)"]
+    assert heads == ["20260805_0031 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -890,7 +890,8 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "'harness_cognitive_turn_receipts', "
                 "'harness_cognitive_turn_outcomes', "
                 "'provider_network_request_receipts', "
-                "'provider_network_request_outcomes'"
+                "'provider_network_request_outcomes', "
+                "'benchmark_direct_proposal_handoffs'"
                 ")"
             ).fetchall()
         }
@@ -951,6 +952,14 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 ")"
             ).fetchall()
         }
+        direct_handoff_triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='trigger' "
+                "AND tbl_name='benchmark_direct_proposal_handoffs'"
+            ).fetchall()
+        }
         provider_accounting_columns = {
             row[1]
             for row in connection.execute("PRAGMA table_info('jobs')").fetchall()
@@ -979,13 +988,14 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             ).fetchall()
         }
 
-    assert version == ("20260804_0030",)
+    assert version == ("20260805_0031",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
         "harness_cognitive_turn_outcomes",
         "provider_network_request_receipts",
         "provider_network_request_outcomes",
+        "benchmark_direct_proposal_handoffs",
     }
     assert {
         "trg_candidate_evidence_required_no_downgrade",
@@ -1018,6 +1028,10 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
         "trg_provider_network_request_outcomes_no_update",
         "trg_provider_network_request_outcomes_no_delete",
         "trg_provider_network_request_receipts_policy_check",
+    }
+    assert direct_handoff_triggers == {
+        "trg_benchmark_direct_handoff_no_update",
+        "trg_benchmark_direct_handoff_no_delete",
     }
     assert {
         "provider_request_cap",
@@ -1147,6 +1161,44 @@ def test_postgresql_provider_request_migration_emits_immutable_guards(
     assert "BEFORE UPDATE OR DELETE ON provider_network_request_outcomes" in sql
     assert "harness_cognitive_turn_delete_authorizations" in sql
     assert "provider network request records are append-only" in sql
+
+
+def test_postgresql_direct_handoff_migration_emits_immutable_guard(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260805_0031_benchmark_direct_proposal_handoff.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "benchmark_direct_handoff_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _PostgresOp:
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration._install_postgres_guards()
+
+    sql = "\n".join(emitted)
+    assert (
+        "CREATE FUNCTION dronedream_reject_benchmark_direct_handoff_mutation()"
+        in sql
+    )
+    assert "BEFORE UPDATE OR DELETE ON benchmark_direct_proposal_handoffs" in sql
+    assert "harness_cognitive_turn_delete_authorizations" in sql
+    assert "benchmark direct proposal handoffs are append-only" in sql
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

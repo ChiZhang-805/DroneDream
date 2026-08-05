@@ -24,6 +24,7 @@
       "runtime",
       "worker"
     ],
+    "commonCoreCommit": "065382b68bfa04052d910cd4ed3b782617245049",
     "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9"
   },
   "execution": {
@@ -125,6 +126,7 @@
         "path": "distribution/editions/field.v1.json",
         "sha256": "13b585d4cd9adb90b11d6332f4fad796df8fdeeb107581da6903bd134ae2ae27"
       },
+      "commonCoreCommit": "065382b68bfa04052d910cd4ed3b782617245049",
       "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
       "componentIds": [
         "desktop-core",
@@ -188,6 +190,7 @@
         "creationState": "planned-not-created",
         "observedBranchHead": null,
         "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+        "commonCoreCommit": "065382b68bfa04052d910cd4ed3b782617245049",
         "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
         "promotionManifestState": "planned-not-generated",
         "prOnly": true,
@@ -212,6 +215,7 @@
         "path": "distribution/editions/lab.v1.json",
         "sha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356"
       },
+      "commonCoreCommit": "065382b68bfa04052d910cd4ed3b782617245049",
       "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
       "componentIds": [
         "desktop-core",
@@ -284,6 +288,7 @@
         "creationState": "planned-not-created",
         "observedBranchHead": null,
         "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+        "commonCoreCommit": "065382b68bfa04052d910cd4ed3b782617245049",
         "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
         "promotionManifestState": "planned-not-generated",
         "prOnly": true,
@@ -308,6 +313,7 @@
         "path": "distribution/editions/sim.v1.json",
         "sha256": "e6f71a0c80dfdfd3fbe31879e43de7ff5322f0a826888c161534e41a1bff454f"
       },
+      "commonCoreCommit": "065382b68bfa04052d910cd4ed3b782617245049",
       "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
       "componentIds": [
         "desktop-core",
@@ -368,6 +374,7 @@
         "creationState": "planned-not-created",
         "observedBranchHead": null,
         "sourceCommit": "065382b68bfa04052d910cd4ed3b782617245049",
+        "commonCoreCommit": "065382b68bfa04052d910cd4ed3b782617245049",
         "commonCoreHash": "ff78faf9fa90aac32bc0ac46cf089414de741438bb810b748205f306f4ca74a9",
         "promotionManifestState": "planned-not-generated",
         "prOnly": true,

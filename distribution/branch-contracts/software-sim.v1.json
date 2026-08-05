@@ -8,10 +8,18 @@
   "integrationBranch": "main",
   "recordedDate": "2026-08-05",
   "syncBaseline": {
-    "commonCoreCommit": "db7592fbfc39c5489bdbcc7d2373d1480a69897b",
-    "commonCoreHash": "512e98257cb2cef63d5ed6096dc0ebb211449eb27bceaf10ea5191ea581941b2",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
     "sourceTreeState": "clean",
     "sourceRemote": "origin"
+  },
+  "syncEvidence": {
+    "universalSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "universalReceiptHead": "d4a01f40676014d7a31f46a3f89afafdcdf4b45f",
+    "universalReceiptSha256": "6f2dd3f0331475074c39c28648905bd441c6afcfd341900a543374dbe28c9bf9",
+    "receiptHeadIsProductSource": false,
+    "validatedVehiclePackCount": 0,
+    "installerState": "planned-or-preview-not-promotion-ready"
   },
   "commonCorePaths": [
     "backend",

@@ -68,6 +68,7 @@ fn emit_git_provenance_reruns(repository_root: &std::path::Path) {
     }
     println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_SOURCE_COMMIT");
     println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_BUILD_NUMBER");
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_EDITION_PROFILE");
 }
 
 fn prepare_generated_directory(path: &std::path::Path) {
@@ -169,6 +170,11 @@ fn build_engine_pack(manifest_dir: &std::path::Path) {
         .arg(&output_directory)
         .arg("--source-commit")
         .arg(&source_commit)
+        .arg("--edition-profile")
+        .arg(
+            std::env::var("DRONEDREAM_EDITION_PROFILE")
+                .unwrap_or_else(|_| "unified-sim-lab".to_string()),
+        )
         .env("SOURCE_DATE_EPOCH", &source_date_epoch)
         .status()
         .unwrap_or_else(|error| {

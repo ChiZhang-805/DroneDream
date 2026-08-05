@@ -18,6 +18,12 @@ import edition_build_planner as planner  # noqa: E402
 
 CONTRACT_PATH = DISTRIBUTION / "branch-contracts" / "software-sim.v1.json"
 SIM_MANIFEST_PATH = DISTRIBUTION / "editions" / "sim.v1.json"
+ADOPTION_RECEIPT_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "adoptions"
+    / "sim-preview-1.0.0-2aec69e.adoption-receipt.v1.json"
+)
 CAPABILITY_POLICY_PATH = DISTRIBUTION / "capabilities" / "core-capabilities.v1.json"
 E4_REQUEST_PATH = DISTRIBUTION / "build-planning" / "e4-request.v1.json"
 
@@ -70,6 +76,27 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         )
         self.assertEqual(observed_hash, baseline["commonCoreHash"])
         self.assertEqual(tuple(contract["commonCorePaths"]), planner.CORE_PATHS)
+
+        evidence = contract["syncEvidence"]
+        self.assertEqual(evidence["universalSourceCommit"], baseline["commonCoreCommit"])
+        self.assertFalse(evidence["receiptHeadIsProductSource"])
+        self.assertEqual(evidence["validatedVehiclePackCount"], 0)
+        self.assertEqual(
+            evidence["installerState"],
+            "planned-or-preview-not-promotion-ready",
+        )
+
+    def test_common_core_sync_does_not_relabel_the_adopted_preview(self) -> None:
+        adoption = load_json(ADOPTION_RECEIPT_PATH)
+        historical_core = adoption["source"]["commonCoreCommit"]
+        self.assertEqual(
+            historical_core,
+            "db7592fbfc39c5489bdbcc7d2373d1480a69897b",
+        )
+        self.assertNotEqual(
+            historical_core,
+            self.contract["syncBaseline"]["commonCoreCommit"],
+        )
 
     def test_current_branch_diff_is_limited_to_sim_edition_contract_paths(self) -> None:
         baseline = self.contract["syncBaseline"]["commonCoreCommit"]
