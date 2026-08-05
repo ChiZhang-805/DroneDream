@@ -38,9 +38,18 @@ class FieldDesktopProfileTests(unittest.TestCase):
         self.assertTrue(endpoints[0].endswith("/field-latest.json"))
         self.assertFalse(self.config["bundle"]["createUpdaterArtifacts"])
 
-    def test_overlay_does_not_claim_or_replace_the_pending_icon_donor(self) -> None:
-        self.assertNotIn("icon", self.config["bundle"])
-        self.assertNotIn("resources", self.config["bundle"])
+    def test_overlay_binds_the_authorized_field_brand_assets(self) -> None:
+        self.assertEqual(self.config["bundle"]["icon"], [
+            "../../distribution/editions/field/branding/dronedream-field-mark.png",
+        ])
+        self.assertEqual(self.config["bundle"]["resources"], {
+            "../../distribution/editions/field/branding/dronedream-field-mark.png":
+                "branding/dronedream-field-mark.png",
+            "../../distribution/editions/field/branding/dronedream-field-dot-lockup.png":
+                "branding/dronedream-field-dot-lockup.png",
+            "../../distribution/editions/field/branding/source-manifest.v1.json":
+                "branding/source-manifest.v1.json",
+        })
         self.assertNotIn("windows", self.config["bundle"])
 
     def test_desktop_package_has_no_direct_field_executable_build_command(self) -> None:

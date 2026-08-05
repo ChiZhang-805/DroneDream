@@ -15,7 +15,10 @@ describe("FieldApp", () => {
   it("renders a Field-only navigation and fail-closed overview", () => {
     const { container } = render(<FieldApp initialLocale="en" />);
 
-    expect(screen.getByText("· FIELD")).toBeInTheDocument();
+    expect(container.querySelector(".field-brand")).toHaveAttribute(
+      "aria-label",
+      "DroneDream · FIELD",
+    );
     expect(screen.getByRole("navigation", { name: "Field navigation" }))
       .toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute(
@@ -25,6 +28,10 @@ describe("FieldApp", () => {
     expect(screen.getByRole("heading", { name: "Field readiness" }))
       .toBeInTheDocument();
     expect(screen.getByText("0 / 7")).toBeInTheDocument();
+    expect(container.querySelector(".field-brand-lockup")).toHaveAttribute(
+      "src",
+      "/dronedream-field-dot-lockup.png",
+    );
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
     expect(container.querySelector("[data-validated-pack-count='0']")).toBeTruthy();
   });

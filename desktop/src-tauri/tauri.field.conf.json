@@ -27,6 +27,14 @@
     "active": true,
     "createUpdaterArtifacts": false,
     "targets": ["nsis"],
+    "icon": [
+      "../../distribution/editions/field/branding/dronedream-field-mark.png"
+    ],
+    "resources": {
+      "../../distribution/editions/field/branding/dronedream-field-mark.png": "branding/dronedream-field-mark.png",
+      "../../distribution/editions/field/branding/dronedream-field-dot-lockup.png": "branding/dronedream-field-dot-lockup.png",
+      "../../distribution/editions/field/branding/source-manifest.v1.json": "branding/source-manifest.v1.json"
+    },
     "publisher": "DroneDream",
     "shortDescription": "Fail-closed field readiness for supported aircraft",
     "longDescription": "DroneDream · FIELD provides read-only device observation, compatibility review, parameter recovery planning, and preflight safety status. Hardware control remains unavailable until native safety contracts are satisfied."

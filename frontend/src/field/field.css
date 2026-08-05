@@ -114,15 +114,7 @@ select:focus-visible {
 .field-brand-lockup {
   display: block;
   width: auto;
-  height: 34px;
-}
-
-.field-brand > span {
-  flex: none;
-  color: var(--field-coral);
-  font-size: 16px;
-  font-weight: 760;
-  letter-spacing: 0;
+  height: 40px;
 }
 
 .field-topbar-actions,

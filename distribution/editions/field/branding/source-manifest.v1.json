@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-brand-assets-source",
+  "editionId": "field",
+  "displayName": "DroneDream · FIELD",
+  "copyPolicy": "byte-for-byte-no-transcode",
+  "commonCoreCommit": "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
+  "source": {
+    "directory": "Z:\\DroneDream\\work\\brand-edition-concepts-v1",
+    "handoffFilename": "BRAND_EDITION_HANDOFF_V2.md",
+    "handoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
+  },
+  "theme": {
+    "primary": "#ffc247",
+    "secondary": "#ff754b",
+    "accent": "#d746a5"
+  },
+  "assets": [
+    {
+      "assetId": "field-mark",
+      "role": "application-installer-shortcut-mark",
+      "sourceFilename": "dronedream-field-mark-concept-v1.png",
+      "targetFilename": "dronedream-field-mark.png",
+      "targetPath": "distribution/editions/field/branding/dronedream-field-mark.png",
+      "mediaType": "image/png",
+      "width": 1024,
+      "height": 1024,
+      "sizeBytes": 161228,
+      "sourceSha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
+      "targetSha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
+      "transformations": []
+    },
+    {
+      "assetId": "field-dot-lockup",
+      "role": "application-dot-lockup",
+      "sourceFilename": "dronedream-field-dot-lockup-concept-v2.png",
+      "targetFilename": "dronedream-field-dot-lockup.png",
+      "targetPath": "distribution/editions/field/branding/dronedream-field-dot-lockup.png",
+      "mediaType": "image/png",
+      "width": 1840,
+      "height": 340,
+      "sizeBytes": 81471,
+      "sourceSha256": "def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192",
+      "targetSha256": "def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192",
+      "transformations": []
+    }
+  ]
+}
