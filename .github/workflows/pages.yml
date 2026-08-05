@@ -10,7 +10,9 @@ on:
       - "frontend/**"
       - "website/deployment-targets.json"
       - "website/pages-release.json"
+      - "website/releases/edition-handoff-status.json"
       - "website/scripts/build-pages-site.ps1"
+      - "website/scripts/stage-edition-release-assets.mjs"
   workflow_dispatch:
     inputs:
       preserve_release_artifact:

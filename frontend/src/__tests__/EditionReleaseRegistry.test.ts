@@ -8,6 +8,7 @@ import {
 } from "../site/editionAvailability";
 import {
   buildEditionReleaseRegistry,
+  buildEditionPublicationPlan,
   editionThemes,
   getEditionRelease,
   isEditionHandoffRegistry,
@@ -58,6 +59,12 @@ function acceptHandoff(
       checksumUrl: edition.checksumUrl,
       signatureUrl: edition.signatureUrl,
       publishedAt: edition.publishedAt,
+      checksumSha256: "e".repeat(64),
+      checksumSizeBytes: 81,
+      signatureSha256: "f".repeat(64),
+      signatureSizeBytes: 96,
+      receiptSha256: "0".repeat(64),
+      receiptSizeBytes: 512,
     },
   });
 }
@@ -105,6 +112,9 @@ describe("edition release registry", () => {
     const handoffs = structuredClone(handoffStatus) as EditionHandoffRegistry;
     acceptHandoff(handoffs, availability, "sim");
     acceptHandoff(handoffs, availability, "lab");
+    handoffs.editions[1]!.acceptedArtifact!.checksumSha256 = "1".repeat(64);
+    handoffs.editions[1]!.acceptedArtifact!.signatureSha256 = "2".repeat(64);
+    handoffs.editions[1]!.acceptedArtifact!.receiptSha256 = "3".repeat(64);
 
     const wrongBytes = structuredClone(handoffs);
     wrongBytes.editions[0]!.acceptedArtifact!.sha256 =
@@ -123,5 +133,36 @@ describe("edition release registry", () => {
     const missingReceipt = structuredClone(handoffs);
     missingReceipt.editions[0]!.acceptedArtifact!.receiptUrl = "";
     expect(isEditionHandoffRegistry(missingReceipt, availability)).toBe(false);
+  });
+
+  it("builds a sixteen-file plan only when all four synthetic handoffs are exact", () => {
+    const availability = structuredClone(fallbackEditionAvailability);
+    const handoffs = structuredClone(handoffStatus) as EditionHandoffRegistry;
+    const fingerprints = ["4", "5", "6", "7"] as const;
+    const companionHashes = [
+      ["8", "9", "a"],
+      ["b", "c", "d"],
+      ["e", "f", "0"],
+      ["1", "2", "3"],
+    ] as const;
+    (["sim", "lab", "field", "universal"] as const).forEach((id, index) => {
+      publishEdition(availability, id, fingerprints[index]);
+      acceptHandoff(handoffs, availability, id);
+      const accepted = handoffs.editions[index]!.acceptedArtifact!;
+      accepted.checksumSha256 = companionHashes[index][0].repeat(64);
+      accepted.signatureSha256 = companionHashes[index][1].repeat(64);
+      accepted.receiptSha256 = companionHashes[index][2].repeat(64);
+    });
+
+    const plan = buildEditionPublicationPlan(availability, handoffs);
+    expect(plan.entries).toHaveLength(4);
+    expect(plan.entries.flatMap(({ files }) => files)).toHaveLength(16);
+    expect(plan.entries.map(({ id }) => id)).toEqual(["sim", "lab", "field", "universal"]);
+
+    const duplicateCompanion = structuredClone(handoffs);
+    duplicateCompanion.editions[3]!.acceptedArtifact!.receiptSha256 =
+      duplicateCompanion.editions[0]!.acceptedArtifact!.receiptSha256;
+    expect(isEditionHandoffRegistry(duplicateCompanion, availability)).toBe(false);
+    expect(() => buildEditionPublicationPlan(availability, duplicateCompanion)).toThrow();
   });
 });

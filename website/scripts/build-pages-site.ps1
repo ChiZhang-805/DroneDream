@@ -7,6 +7,8 @@ $deploymentTargetsPath = Join-Path $repositoryRoot "website\deployment-targets.j
 $releaseConfigPath = Join-Path $repositoryRoot "website\pages-release.json"
 $tauriConfigPath = Join-Path $repositoryRoot "desktop\src-tauri\tauri.conf.json"
 $codeSigningPolicyPath = Join-Path $repositoryRoot "CODE_SIGNING_POLICY.md"
+$editionMetadataPath = Join-Path $repositoryRoot "frontend\public\downloads\editions.json"
+$editionHandoffPath = Join-Path $repositoryRoot "website\releases\edition-handoff-status.json"
 $release = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
 $deploymentTargets = Get-Content -LiteralPath $deploymentTargetsPath -Raw |
     ConvertFrom-Json
@@ -277,6 +279,24 @@ foreach ($publicationInput in $publicationInputs) {
     }
 }
 
+$editionStagingDirectory = ([string]$env:DRONEDREAM_EDITION_STAGING_DIRECTORY).Trim()
+$editionStageArguments = @(
+    (Join-Path $repositoryRoot "website\scripts\stage-edition-release-assets.mjs"),
+    $editionMetadataPath,
+    $editionHandoffPath,
+    $downloadsDirectory
+)
+if (-not [string]::IsNullOrWhiteSpace($editionStagingDirectory)) {
+    $editionStageArguments += $editionStagingDirectory
+}
+& node --experimental-strip-types @editionStageArguments
+if ($LASTEXITCODE -ne 0) {
+    throw "Edition release assets failed shared-artifact staging."
+}
+$editionArtifactManifestPath = Join-Path $downloadsDirectory "edition-artifacts.json"
+$editionArtifactManifest = Get-Content -LiteralPath $editionArtifactManifestPath `
+    -Raw -Encoding UTF8 | ConvertFrom-Json
+
 $metadataJson = $metadata | ConvertTo-Json
 [IO.File]::WriteAllText(
     (Join-Path $downloadsDirectory "latest.json"),
@@ -322,6 +342,7 @@ $buildManifest = [ordered]@{
             sizeBytes = $updaterManifestSizeBytes
         }
     }
+    editionArtifacts = $editionArtifactManifest
     origins = [ordered]@{
         global = [string]$globalTarget.publicBaseUri
         mirror = [string]$mirrorTarget.publicBaseUri
@@ -329,7 +350,7 @@ $buildManifest = [ordered]@{
 }
 [IO.File]::WriteAllText(
     (Join-Path $outputDirectory "build-manifest.json"),
-    "$($buildManifest | ConvertTo-Json -Depth 4)$([Environment]::NewLine)",
+    "$($buildManifest | ConvertTo-Json -Depth 8)$([Environment]::NewLine)",
     $utf8WithoutBom
 )
 

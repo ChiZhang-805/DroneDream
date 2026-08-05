@@ -71,6 +71,21 @@ try {
         throw "The global site and mirror do not expose identical build and integrity manifests."
     }
 
+    $editionPaths = [Collections.Generic.HashSet[string]]::new(
+        [StringComparer]::Ordinal
+    )
+    [void]$editionPaths.Add('downloads/editions.json')
+    [void]$editionPaths.Add('downloads/edition-artifacts.json')
+    foreach ($edition in @($snapshots.global.BuildManifest.editionArtifacts.entries)) {
+        foreach ($file in @($edition.files)) {
+            $editionFileName = [string]$file.fileName
+            if ($editionFileName -notmatch '^[A-Za-z0-9._-]+$') {
+                throw "The edition build manifest contains an unsafe filename."
+            }
+            [void]$editionPaths.Add("downloads/$editionFileName")
+        }
+    }
+
     $verifiedPaths = @()
     $verifiedReleaseMetadata = @{}
     foreach ($line in Get-Content `
@@ -80,7 +95,8 @@ try {
         }
         $expectedHash = $Matches[1]
         $relativePath = $Matches[2]
-        if ($relativePath -notmatch (
+        if (-not $editionPaths.Contains($relativePath) -and
+            $relativePath -notmatch (
                 '^(?:index|site|404)\.html$|' +
                 '^(?:assets|console/assets)/.+\.(?:js|css)$|' +
                 '^console/index\.html$|' +
@@ -92,9 +108,10 @@ try {
             $downloadPath = Join-Path $temporaryRoot (
                 "$originName-" + [Guid]::NewGuid().ToString('N')
             )
+            $downloadTimeout = if ($editionPaths.Contains($relativePath)) { 120 } else { 30 }
             Invoke-WebRequest `
                 -Uri "$($snapshots[$originName].BaseUri)/$relativePath" `
-                -UseBasicParsing -OutFile $downloadPath -TimeoutSec 30
+                -UseBasicParsing -OutFile $downloadPath -TimeoutSec $downloadTimeout
             $actualHash = (Get-FileHash -LiteralPath $downloadPath `
                 -Algorithm SHA256).Hash.ToLowerInvariant()
             if ($actualHash -cne $expectedHash) {
@@ -131,11 +148,17 @@ try {
         $verifiedReleaseMetadata.Count -ne $originUris.Count) {
         throw "Parity verification did not cover enough HTML, JavaScript, CSS, and release metadata files."
     }
+    $missingEditionPaths = @(
+        $editionPaths | Where-Object { $_ -notin $verifiedPaths }
+    )
+    if ($missingEditionPaths.Count -ne 0) {
+        throw "Parity verification missed edition artifact paths: $($missingEditionPaths -join ', ')"
+    }
 
     $sourceCommit = [string]$snapshots.global.BuildManifest.sourceCommit
     Write-Host "Global and mirror manifests are identical."
     Write-Host "Source commit: $sourceCommit"
-    Write-Host "Verified $($verifiedPaths.Count) HTML, JavaScript, CSS, and release metadata files on both origins."
+    Write-Host "Verified $($verifiedPaths.Count) shared-artifact files on both origins, including edition downloads."
 } finally {
     if (Test-Path -LiteralPath $temporaryRoot) {
         Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

@@ -191,12 +191,19 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("SHA256SUMS", builder)
         self.assertIn("dronedream-shared-static-site", builder)
         self.assertIn("DRONEDREAM_RELEASE_STAGING_DIRECTORY", builder)
+        self.assertIn("DRONEDREAM_EDITION_STAGING_DIRECTORY", builder)
+        self.assertIn("stage-edition-release-assets.mjs", builder)
+        self.assertIn("edition-artifacts.json", builder)
+        self.assertIn("editionArtifacts = $editionArtifactManifest", builder)
+        self.assertIn("ConvertTo-Json -Depth 8", builder)
         self.assertIn("updaterSignature", builder)
         self.assertIn("updaterManifest", builder)
         self.assertIn("Publication file verification failed", builder)
         self.assertIn("-Recurse -Force -File", builder)
         self.assertIn("dronedream-site-${{ github.sha }}", workflow)
         self.assertIn("include-hidden-files: true", workflow)
+        self.assertIn('"website/releases/edition-handoff-status.json"', workflow)
+        self.assertIn('"website/scripts/stage-edition-release-assets.mjs"', workflow)
         self.assertIn("preserve_release_artifact:", workflow)
         self.assertIn(
             "github.event_name == 'workflow_dispatch' "
@@ -315,6 +322,11 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
             parity,
         )
         self.assertIn("downloads/latest.json", readme)
+        self.assertIn("downloads/editions.json", parity)
+        self.assertIn("downloads/edition-artifacts.json", parity)
+        self.assertIn("$snapshots.global.BuildManifest.editionArtifacts.entries", parity)
+        self.assertIn("Parity verification missed edition artifact paths", parity)
+        self.assertIn("including edition downloads", parity)
 
     def test_pages_build_verifies_policy_source_and_compiled_policy_links(self) -> None:
         builder = self.read("website/scripts/build-pages-site.ps1")
