@@ -101,7 +101,7 @@ import type {
   UserExperiencePreferences,
 } from "./types/api";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
-import { appDisplayName, labEditionEnabled } from "./edition";
+import { appDisplayName, appEdition, labEditionEnabled } from "./edition";
 
 type NavigationItem = {
   to: string;
@@ -2515,7 +2515,7 @@ function AppShellContent() {
 
   if (launcherMode) {
     return (
-      <div className="app-shell app-shell-launcher">
+      <div className="app-shell app-shell-launcher" data-brand-edition={appEdition}>
         <a
           className="skip-link"
           href="#main-content"
@@ -2528,7 +2528,7 @@ function AppShellContent() {
         </a>
         <header className="launcher-chrome">
           <Link to="/desktop/setup" className="launcher-brand" aria-label={appDisplayName}>
-            <BrandLockup variant="compact" />
+            <BrandLockup variant="compact" edition={appEdition} />
           </Link>
           <div className="launcher-chrome-actions">
             <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
@@ -2577,7 +2577,10 @@ function AppShellContent() {
   }
 
   return (
-    <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}>
+    <div
+      className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}
+      data-brand-edition={appEdition}
+    >
       <a
         className="skip-link"
         href="#main-content"
@@ -2595,11 +2598,11 @@ function AppShellContent() {
             className="app-title"
             aria-label={appDisplayName}
           >
-            <BrandLockup variant="compact" />
+            <BrandLockup variant="compact" edition={appEdition} />
           </Link>
         ) : (
           <a href="/" className="app-title" aria-label={appDisplayName}>
-            <BrandLockup variant="compact" />
+            <BrandLockup variant="compact" edition={appEdition} />
           </a>
         )}
         {mobileNavigationEnabled ? (

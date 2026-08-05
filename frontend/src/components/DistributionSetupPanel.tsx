@@ -1,6 +1,7 @@
 import { Boxes, Globe2, HardDrive, ShieldCheck } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
+import { BrandLockup } from "./BrandLockup";
 import {
   isDesktopRuntime,
   validateDistributionPlan,
@@ -186,6 +187,7 @@ export function DistributionSetupPanel({
       aria-labelledby={`${id}-title`}
       data-can-apply="false"
       data-edition={selection.editionId}
+      data-brand-edition={selection.editionId}
       data-native-plan-status={nativePlanState.status}
     >
       <header className="distribution-setup-heading">
@@ -205,7 +207,7 @@ export function DistributionSetupPanel({
       <fieldset className="distribution-edition-options">
         <legend>{copy.edition}</legend>
         {DISTRIBUTION_CATALOG.editions.map((edition) => (
-          <label key={edition.editionId}>
+          <label key={edition.editionId} data-brand-edition={edition.editionId}>
             <input
               type="radio"
               name={`${id}-edition`}
@@ -214,7 +216,10 @@ export function DistributionSetupPanel({
               onChange={() => updateSelection({ ...selection, editionId: edition.editionId })}
             />
             <span>
-              <strong>{localizedDistributionText(edition.displayName, localeKey)}</strong>
+              <BrandLockup edition={edition.editionId} />
+              <strong className="sr-only">
+                {localizedDistributionText(edition.displayName, localeKey)}
+              </strong>
               <small>{localizedDistributionText(edition.description, localeKey)}</small>
             </span>
           </label>

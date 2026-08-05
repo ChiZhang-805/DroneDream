@@ -32,10 +32,10 @@ EXPECTED_ASSETS = {
 }
 
 EXPECTED_DERIVATIVES = {
-    "desktop-32": ("32x32.png", 2046, "fca69d87a8f7a68618eae06a791158ce47a2abc665b34be3d2ab111e1001ddd5"),
-    "desktop-128": ("128x128.png", 11316, "0dcf0ae7449d21dcd27c5985a279ac17abd359aaa204b113e6ab45e6a02ad4f7"),
-    "desktop-256": ("128x128@2x.png", 25495, "ebede2b419aff90be66ab607f3de52f8e98b7c2c37986408035b38f4aee3a36b"),
-    "windows-ico": ("icon.ico", 52067, "4dcdd9792a810226cf898a0f85a67ee4d45dd2a1424eb46d8b1c5caae007424d"),
+    "desktop-32": ("32x32.png", 2040, "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc"),
+    "desktop-128": ("128x128.png", 11272, "4dc38efa82202dc8674b1e4ed782447a041e2e8793c7615ff164501248a3b485"),
+    "desktop-256": ("128x128@2x.png", 25420, "b0a38390f2f58f6f873847e6a52ab07fe26945705a9940957a746970faabb0b1"),
+    "windows-ico": ("icon.ico", 55959, "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"),
 }
 
 
@@ -47,7 +47,7 @@ def png_dimensions(payload: bytes) -> tuple[int, int]:
 
 def ico_dimensions(payload: bytes) -> set[tuple[int, int]]:
     reserved, image_type, count = struct.unpack("<HHH", payload[:6])
-    if (reserved, image_type, count) != (0, 1, 7):
+    if (reserved, image_type, count) != (0, 1, 9):
         raise AssertionError("Lab Windows icon container header drifted")
     dimensions = set()
     for index in range(count):
@@ -68,6 +68,16 @@ class LabBrandAssetTests(unittest.TestCase):
             ["#A7E84A", "#20C77A", "#087E69"],
         )
         self.assertFalse(self.manifest["theme"]["grantsHardwareAuthority"])
+        self.assertTrue(self.manifest["theme"]["presentationOnly"])
+        self.assertEqual(
+            self.manifest["sourceAuthority"]["donorCommit"],
+            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+        )
+        donor_path = ROOT / self.manifest["sourceAuthority"]["canonicalContract"]["path"]
+        self.assertEqual(
+            hashlib.sha256(donor_path.read_bytes()).hexdigest(),
+            self.manifest["sourceAuthority"]["canonicalContract"]["sha256"],
+        )
         self.assertEqual(
             self.manifest["commonCore"]["productSourceCommit"],
             "e374d3f8d96b1265fcdb06864208b676566e94d9",
@@ -91,9 +101,11 @@ class LabBrandAssetTests(unittest.TestCase):
             self.assertEqual(len(payload), expected["bytes"])
             self.assertEqual(digest, expected["sha256"])
             self.assertEqual(png_dimensions(payload), expected["dimensions"])
-            self.assertEqual(entry["sourceBytes"], len(payload))
+            canonical_source = ROOT / entry["canonicalSourcePath"]
+            self.assertEqual(canonical_source.read_bytes(), payload)
+            self.assertEqual(entry["canonicalSourceBytes"], len(payload))
             self.assertEqual(entry["repositoryBytes"], len(payload))
-            self.assertEqual(entry["sourceSha256"], digest)
+            self.assertEqual(entry["canonicalSourceSha256"], digest)
             self.assertEqual(entry["repositorySha256"], digest)
             self.assertEqual(entry["copyMode"], "exact-bytes")
 
@@ -121,7 +133,7 @@ class LabBrandAssetTests(unittest.TestCase):
         )
         self.assertEqual(derivation["sourceRole"], "mark")
         self.assertEqual(derivation["sourceSha256"], EXPECTED_ASSETS["mark"]["sha256"])
-        self.assertEqual(derivation["operation"], "rgba-lanczos-resize-and-ico-container-only")
+        self.assertEqual(derivation["operation"], "universal-canonical-generator-v1")
         self.assertFalse(derivation["designChanges"])
 
         assets = {entry["role"]: entry for entry in derivation["assets"]}
@@ -141,21 +153,31 @@ class LabBrandAssetTests(unittest.TestCase):
         self.assertEqual(png_dimensions((ROOT / assets["desktop-256"]["repositoryPath"]).read_bytes()), (256, 256))
         self.assertEqual(
             ico_dimensions((ROOT / assets["windows-ico"]["repositoryPath"]).read_bytes()),
-            {(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)},
+            {
+                (16, 16),
+                (20, 20),
+                (24, 24),
+                (32, 32),
+                (40, 40),
+                (48, 48),
+                (64, 64),
+                (128, 128),
+                (256, 256),
+            },
         )
 
     def test_integration_state_does_not_overstate_build_or_authority(self) -> None:
         self.assertEqual(
             self.manifest["integration"]["application"],
-            "applied-compile-time-lab-only",
+            "canonical-lockup-selected-by-lab-gate",
         )
         self.assertEqual(
             self.manifest["integration"]["installer"],
-            "applied-lab-overlay-not-built",
+            "canonical-lab-icon-bound-in-overlay-not-built",
         )
         self.assertEqual(
             self.manifest["integration"]["shortcut"],
-            "applied-through-lab-executable-icon-not-built",
+            "canonical-lab-executable-icon-bound-not-built",
         )
 
     def test_tauri_overlay_binds_lab_installer_and_shortcut_identity(self) -> None:
@@ -186,11 +208,11 @@ class LabBrandAssetTests(unittest.TestCase):
         base_icon = ROOT / "desktop" / "src-tauri" / "icons" / "icon.ico"
         self.assertEqual(
             hashlib.sha256(base_icon.read_bytes()).hexdigest(),
-            "e2b4f1ac3e48f6e49e78c86e4a805ed4cfdb15f9f0bfff458c41e5fbe2c26a53",
+            "88223fab6c2b0d493aaedab932c04d40def4da58e28f6d670adbfd745a6ca8ba",
         )
         self.assertNotEqual(
             hashlib.sha256(base_icon.read_bytes()).hexdigest(),
-            expected_by_path["distribution/editions/lab/assets/desktop/icon.ico"],
+            expected_by_path["brand/generated/lab/windows/icon.ico"],
         )
 
     def test_green_receipt_binds_branded_source_without_claiming_an_exe(self) -> None:

@@ -37,6 +37,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
     if (
         not isinstance(authority, dict)
         or authority.get("brandSourceManifest")
+        != "brand/brand-editions.v1.json"
+        or authority.get("labBrandSourceManifest")
         != "distribution/editions/lab/brand-source-manifest.v1.json"
     ):
         raise LabPreviewContractError("Lab preview brand source authority is missing")
@@ -87,11 +89,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "frontend/package.json",
         "frontend/scripts/verify-lab-ui.mjs",
         "frontend/src/AppShell.tsx",
-        "frontend/src/__tests__/BrandLockup.test.tsx",
         "frontend/src/__tests__/edition.test.ts",
         "frontend/src/__tests__/router.test.ts",
-        "frontend/src/components/BrandLockup.tsx",
-        "frontend/src/components/brandAssets.ts",
         "frontend/src/edition.ts",
         "frontend/src/features/distribution/catalog.v1.json",
         "frontend/src/i18n/I18nProvider.tsx",
@@ -134,12 +133,15 @@ def verify_lab_preview_contract() -> dict[str, object]:
     if (
         not isinstance(brand, dict)
         or brand.get("displayName") != "DroneDream · LAB"
-        or brand.get("sourceManifest")
+        or brand.get("canonicalDonorCommit")
+        != "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235"
+        or brand.get("canonicalDonorManifest") != "brand/brand-editions.v1.json"
+        or brand.get("labSourceManifest")
         != "distribution/editions/lab/brand-source-manifest.v1.json"
         or brand.get("applicationLockup")
-        != "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png"
+        != "brand/generated/lab/lockup-compact.png"
         or brand.get("windowsIcon")
-        != "distribution/editions/lab/assets/desktop/icon.ico"
+        != "brand/generated/lab/windows/icon.ico"
         or brand.get("grantsHardwareAuthority") is not False
     ):
         raise LabPreviewContractError("Lab preview brand payload drifted or grants authority")
@@ -222,16 +224,19 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError("Lab Tauri overlay must bundle the source Lab profile")
     bundle = overlay.get("bundle")
     if not isinstance(bundle, dict) or tuple(bundle.get("icon", ())) != (
-        "../../distribution/editions/lab/assets/desktop/32x32.png",
-        "../../distribution/editions/lab/assets/desktop/128x128.png",
-        "../../distribution/editions/lab/assets/desktop/128x128@2x.png",
-        "../../distribution/editions/lab/assets/desktop/icon.ico",
+        "../../brand/generated/lab/windows/32x32.png",
+        "../../brand/generated/lab/windows/128x128.png",
+        "../../brand/generated/lab/windows/128x128@2x.png",
+        "../../brand/generated/lab/windows/icon.ico",
     ):
         raise LabPreviewContractError("Lab Tauri overlay icon set drifted")
     for required_brand_resource in (
         "../../distribution/editions/lab/brand-source-manifest.v1.json",
         "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
         "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+        "../../brand/brand-editions.v1.json",
+        "../../brand/generated/brand-assets.v1.json",
+        "../../brand/generated/brand-visual-receipt.v1.json",
     ):
         if required_brand_resource not in resources:
             raise LabPreviewContractError("Lab Tauri overlay brand resources are incomplete")
@@ -262,6 +267,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'Get-Sha256Text $coreListing.Trim()',
         '$tauriProductName = "DroneDream · LAB"',
         'brand-source-manifest.v1.json',
+        'canonicalDonor = New-RepoFileRef "brand\\brand-editions.v1.json"',
         'grantsHardwareAuthority = $false',
     )
     for fragment in required_script_fragments:

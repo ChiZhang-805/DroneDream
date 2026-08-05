@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/brand-editions.v1.json",
+  "title": "DroneDream edition brand system",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "brandVersion",
+    "masterName",
+    "separator",
+    "geometry",
+    "font",
+    "artifactContract",
+    "editions",
+    "safety",
+    "approval",
+    "approvedEditionAssets"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-edition-brand-system"},
+    "brandVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "masterName": {"const": "DroneDream"},
+    "separator": {"const": "·"},
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourcePath", "preserveWhiteFlightPath", "recolorMode"],
+      "properties": {
+        "sourcePath": {"const": "brand/source/drone-dream-mark-master.png"},
+        "preserveWhiteFlightPath": {"const": true},
+        "recolorMode": {"const": "shared-alpha-and-neutral-detail-mask-v1"}
+      }
+    },
+    "font": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "sourcePath", "licensePath", "license"],
+      "properties": {
+        "family": {"const": "Space Grotesk"},
+        "sourcePath": {"const": "brand/source/space-grotesk-latin-wght-normal.woff2"},
+        "licensePath": {"const": "brand/source/Space-Grotesk-OFL-1.1.txt"},
+        "license": {"const": "OFL-1.1"}
+      }
+    },
+    "artifactContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "markRasterSizesPx",
+        "faviconPngSizePx",
+        "windowsPngSizesPx",
+        "windowsIcoFrameSizesPx",
+        "lockupVariants",
+        "transparentBackground"
+      ],
+      "properties": {
+        "markRasterSizesPx": {"const": [1024, 512, 256]},
+        "faviconPngSizePx": {"const": 64},
+        "windowsPngSizesPx": {"const": [32, 128, 256]},
+        "windowsIcoFrameSizesPx": {"const": [16, 20, 24, 32, 40, 48, 64, 128, 256]},
+        "lockupVariants": {"const": ["primary", "compact"]},
+        "transparentBackground": {"const": true}
+      }
+    },
+    "editions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["universal", "sim", "lab", "field"],
+      "patternProperties": {
+        "^(universal|sim|lab|field)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["productName", "editionLabel", "gradientStops", "lightSurface", "darkSurface"],
+          "properties": {
+            "productName": {"type": "string", "minLength": 1},
+            "editionLabel": {"type": ["string", "null"]},
+            "gradientStops": {
+              "type": "array",
+              "prefixItems": [
+                {"type": "string", "pattern": "^#[0-9A-F]{6}$"},
+                {"type": "string", "pattern": "^#[0-9A-F]{6}$"},
+                {"type": "string", "pattern": "^#[0-9A-F]{6}$"}
+              ],
+              "items": false,
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "lightSurface": {"type": "string", "pattern": "^#[0-9A-F]{6}$"},
+            "darkSurface": {"type": "string", "pattern": "^#[0-9A-F]{6}$"}
+          }
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["presentationOnly", "grantsHardwareAuthority"],
+      "properties": {
+        "presentationOnly": {"const": true},
+        "grantsHardwareAuthority": {"const": false}
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["handoffSha256", "conceptAssetsAreReleaseAssets"],
+      "properties": {
+        "handoffSha256": {"const": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"},
+        "conceptAssetsAreReleaseAssets": {"const": false}
+      }
+    },
+    "approvedEditionAssets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sim", "lab", "field"],
+      "patternProperties": {
+        "^(sim|lab|field)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["markPath", "markSha256", "dotLockupPath", "dotLockupSha256"],
+          "properties": {
+            "markPath": {
+              "type": "string",
+              "pattern": "^brand/source/approved/(sim|lab|field)-mark-1024\\.png$"
+            },
+            "markSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "dotLockupPath": {
+              "type": "string",
+              "pattern": "^brand/source/approved/(sim|lab|field)-dot-lockup\\.png$"
+            },
+            "dotLockupSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        }
+      }
+    }
+  }
+}

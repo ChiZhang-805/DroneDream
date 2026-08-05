@@ -29,7 +29,13 @@ from app.benchmarking.job_runtime import (
     build_benchmark_job_observation,
     require_benchmark_job_runtime_context,
 )
-from app.benchmarking.registry import create_benchmark_adapter
+from app.benchmarking.llm_durable_runtime import (
+    BenchmarkDurableLLMBlocked,
+    execute_durable_direct_arm,
+)
+from app.benchmarking.method_inventory import require_execution_ready_method
+from app.benchmarking.provider_transport import build_job_secret_benchmark_transport
+from app.benchmarking.registry import create_benchmark_adapter, require_registered_adapter
 from app.optimization.experimental_types import ExperimentalOptimizerStrategy
 from app.optimization.scenarios import (
     ScenarioRun,
@@ -1119,7 +1125,7 @@ def dispatch_next_benchmark_generation(
 
     This path intentionally ignores ``job.optimizer_strategy``.  Local
     numerical adapters consume the same holdout-free observation, while LLM
-    arms remain blocked until their separate durable transport is promoted.
+    provider arms use their separately durable, JobSecret-bound transport.
     """
 
     if _first_qualified_dispatch_stopped(job):
@@ -1127,7 +1133,10 @@ def dispatch_next_benchmark_generation(
     _require_current_outcome_contract(db, job)
     try:
         context, observation = build_benchmark_job_observation(db, job)
-        adapter = create_benchmark_adapter(context.arm.proposal_adapter_id)
+        adapter_id = context.arm.proposal_adapter_id
+        require_registered_adapter(adapter_id)
+        require_execution_ready_method(adapter_id)
+        adapter = None if adapter_id == "llm_direct/v1" else create_benchmark_adapter(adapter_id)
     except BenchmarkJobRuntimeBlocked as exc:
         return BenchmarkDispatchResult(
             status="benchmark_blocked",
@@ -1147,7 +1156,30 @@ def dispatch_next_benchmark_generation(
     if observation.wall_time_remaining_ms < 1:
         return BenchmarkDispatchResult(status="wall_time_exhausted")
     try:
-        proposal = adapter.propose(observation)
+        if adapter_id == "llm_direct/v1":
+            direct = execute_durable_direct_arm(
+                db,
+                job,
+                observation,
+                transport_factory=lambda provider: build_job_secret_benchmark_transport(
+                    db, job, provider
+                ),
+            )
+            if direct.status == "first_qualified_stop":
+                return BenchmarkDispatchResult(status="first_qualified_stop")
+            if direct.proposal is None:  # pragma: no cover - strict result contract.
+                raise RuntimeError("durable direct execution returned no proposal")
+            proposal = direct.proposal
+        else:
+            if adapter is None:  # pragma: no cover - exhaustive registry routing.
+                raise RuntimeError("benchmark adapter routing is incomplete")
+            proposal = adapter.propose(observation)
+    except BenchmarkDurableLLMBlocked as exc:
+        return BenchmarkDispatchResult(
+            status="benchmark_blocked",
+            error_code=exc.code,
+            error=str(exc),
+        )
     except BenchmarkAdapterError as exc:
         message = str(exc)
         return BenchmarkDispatchResult(
@@ -1156,7 +1188,7 @@ def dispatch_next_benchmark_generation(
             error=message,
         )
     proposal_context = BenchmarkProposalContextV1(
-        proposal_adapter_id=adapter.adapter_id,
+        proposal_adapter_id=adapter_id,
         reason_code=proposal.reason_code,
         proposal_receipt_sha256=canonical_sha256(proposal.proposal_receipt),
         optimizer_metadata={"proposal_receipt": proposal.proposal_receipt},
@@ -1172,7 +1204,7 @@ def dispatch_next_benchmark_generation(
     candidate_proposal = CandidateProposal(
         generation_index=observation.generation_index,
         label=proposal.candidate_ref,
-        strategy=f"benchmark:{adapter.adapter_id}",
+        strategy=f"benchmark:{adapter_id}",
         parameters=proposal.parameters,
         metadata=metadata,
     )
@@ -1194,7 +1226,7 @@ def dispatch_next_benchmark_generation(
         "benchmark_generation_dispatched",
         {
             "benchmark_arm_id": context.arm.benchmark_arm_id,
-            "proposal_adapter_id": adapter.adapter_id,
+            "proposal_adapter_id": adapter_id,
             "run_binding_id": context.binding.id,
             "generation_index": observation.generation_index,
             "candidate_id": candidate.id,

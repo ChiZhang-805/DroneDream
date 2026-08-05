@@ -26,6 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 LAB_MANIFEST_PATH = ROOT / "distribution/editions/lab.v1.json"
 BRAND_MANIFEST_PATH = ROOT / "distribution/editions/lab/brand-source-manifest.v1.json"
+BRAND_DONOR_PATH = ROOT / "brand/brand-editions.v1.json"
 TAURI_OVERLAY_PATH = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
 REGISTRY_PATH = ROOT / "distribution/vehicle-packs/registry.v1.json"
 GATE_POLICY_PATH = ROOT / "distribution/safety/edition-execution-gate.v1.json"
@@ -36,6 +37,7 @@ SUPABASE_DESKTOP_VERIFIER_PATH = ROOT / "desktop/scripts/verify-browser-auth-con
 
 COMMON_CORE_PRODUCT_SOURCE_COMMIT = artifact_verifier.COMMON_CORE_PRODUCT_SOURCE_COMMIT
 EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT = artifact_verifier.EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT
+CANONICAL_BRAND_DONOR_COMMIT = "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235"
 COMMON_CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
 HARDWARE_ACTIONS = (
     "hardware.parameter.write",
@@ -183,6 +185,7 @@ def _vehicle_pack_state() -> dict[str, Any]:
 
 def _brand_state() -> dict[str, Any]:
     manifest = _load_json(BRAND_MANIFEST_PATH)
+    donor = _load_json(BRAND_DONOR_PATH)
     overlay = _load_json(TAURI_OVERLAY_PATH)
     assets = manifest.get("assets")
     derivatives = manifest.get("derivation", {}).get("assets")
@@ -213,8 +216,21 @@ def _brand_state() -> dict[str, Any]:
     ]
     integration = manifest.get("integration")
     theme = manifest.get("theme")
+    source_authority = manifest.get("sourceAuthority")
+    merge_head = _git("rev-parse", "--verify", "MERGE_HEAD", check=False)
+    donor_is_integrated = _git_success(
+        "merge-base", "--is-ancestor", CANONICAL_BRAND_DONOR_COMMIT, "HEAD"
+    ) or merge_head == CANONICAL_BRAND_DONOR_COMMIT
     ready = (
         manifest.get("displayName") == "DroneDream · LAB"
+        and isinstance(source_authority, dict)
+        and source_authority.get("donorCommit") == CANONICAL_BRAND_DONOR_COMMIT
+        and source_authority.get("canonicalContract", {}).get("sha256")
+        == _sha256_file(BRAND_DONOR_PATH)
+        and donor.get("editions", {}).get("lab", {}).get("productName")
+        == "DroneDream · LAB"
+        and donor.get("safety", {}).get("grantsHardwareAuthority") is False
+        and donor_is_integrated
         and isinstance(theme, dict)
         and theme.get("palette") == ["#A7E84A", "#20C77A", "#087E69"]
         and theme.get("grantsHardwareAuthority") is False
@@ -222,12 +238,17 @@ def _brand_state() -> dict[str, Any]:
         and overlay.get("productName") == "DroneDream · LAB"
         and overlay.get("bundle", {}).get("icon") == expected_icons
         and isinstance(integration, dict)
-        and integration.get("application") == "applied-compile-time-lab-only"
-        and integration.get("installer") == "applied-lab-overlay-not-built"
-        and integration.get("shortcut") == "applied-through-lab-executable-icon-not-built"
+        and integration.get("application") == "canonical-lockup-selected-by-lab-gate"
+        and integration.get("installer") == "canonical-lab-icon-bound-in-overlay-not-built"
+        and integration.get("shortcut") == "canonical-lab-executable-icon-bound-not-built"
     )
     return {
         "sourceManifest": _file_ref(BRAND_MANIFEST_PATH),
+        "canonicalDonor": {
+            "commit": CANONICAL_BRAND_DONOR_COMMIT,
+            "file": _file_ref(BRAND_DONOR_PATH),
+            "integrated": donor_is_integrated,
+        },
         "tauriOverlay": _file_ref(TAURI_OVERLAY_PATH),
         "displayName": manifest.get("displayName"),
         "palette": theme.get("palette") if isinstance(theme, dict) else None,

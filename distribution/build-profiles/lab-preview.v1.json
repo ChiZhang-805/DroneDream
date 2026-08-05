@@ -7,7 +7,8 @@
   "state": "source-contract-only",
   "authority": {
     "editionManifest": "distribution/editions/lab.v1.json",
-    "brandSourceManifest": "distribution/editions/lab/brand-source-manifest.v1.json",
+    "brandSourceManifest": "brand/brand-editions.v1.json",
+    "labBrandSourceManifest": "distribution/editions/lab/brand-source-manifest.v1.json",
     "buildRequest": "distribution/build-planning/e4-request.v1.json",
     "buildPlan": "distribution/build-plans/software-1.0.0-065382b68bfa.v1.json",
     "capabilityPolicy": "distribution/capabilities/core-capabilities.v1.json",
@@ -55,11 +56,8 @@
     "frontend/package.json",
     "frontend/scripts/verify-lab-ui.mjs",
     "frontend/src/AppShell.tsx",
-    "frontend/src/__tests__/BrandLockup.test.tsx",
     "frontend/src/__tests__/edition.test.ts",
     "frontend/src/__tests__/router.test.ts",
-    "frontend/src/components/BrandLockup.tsx",
-    "frontend/src/components/brandAssets.ts",
     "frontend/src/edition.ts",
     "frontend/src/features/distribution/catalog.v1.json",
     "frontend/src/i18n/I18nProvider.tsx",
@@ -122,9 +120,11 @@
     "runtimeProfile": "full-lab",
     "brand": {
       "displayName": "DroneDream · LAB",
-      "sourceManifest": "distribution/editions/lab/brand-source-manifest.v1.json",
-      "applicationLockup": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
-      "windowsIcon": "distribution/editions/lab/assets/desktop/icon.ico",
+      "canonicalDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+      "canonicalDonorManifest": "brand/brand-editions.v1.json",
+      "labSourceManifest": "distribution/editions/lab/brand-source-manifest.v1.json",
+      "applicationLockup": "brand/generated/lab/lockup-compact.png",
+      "windowsIcon": "brand/generated/lab/windows/icon.ico",
       "grantsHardwareAuthority": false
     },
     "simulationPayload": [

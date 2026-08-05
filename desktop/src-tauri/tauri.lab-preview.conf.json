@@ -21,10 +21,10 @@
     "shortDescription": "DroneDream · LAB internal unsigned preview",
     "longDescription": "DroneDream · LAB is an internal unsigned preview of the shared DroneDream core with simulation workflows and hardware workflow configuration behind native, backend, and runtime safety gates.",
     "icon": [
-      "../../distribution/editions/lab/assets/desktop/32x32.png",
-      "../../distribution/editions/lab/assets/desktop/128x128.png",
-      "../../distribution/editions/lab/assets/desktop/128x128@2x.png",
-      "../../distribution/editions/lab/assets/desktop/icon.ico"
+      "../../brand/generated/lab/windows/32x32.png",
+      "../../brand/generated/lab/windows/128x128.png",
+      "../../brand/generated/lab/windows/128x128@2x.png",
+      "../../brand/generated/lab/windows/icon.ico"
     ],
     "resources": {
       "../../distribution/build-profiles/lab-preview.v1.json": "distribution/lab-preview.v1.json",
@@ -34,7 +34,10 @@
       "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json",
       "../../distribution/editions/lab/brand-source-manifest.v1.json": "distribution/editions/lab/brand-source-manifest.v1.json",
       "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
-      "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png"
+      "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+      "../../brand/brand-editions.v1.json": "brand/brand-editions.v1.json",
+      "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json",
+      "../../brand/generated/brand-visual-receipt.v1.json": "brand/generated/brand-visual-receipt.v1.json"
     }
   }
 }

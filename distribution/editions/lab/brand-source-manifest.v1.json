@@ -5,14 +5,25 @@
   "editionVersion": "1.0.0",
   "displayName": "DroneDream · LAB",
   "sourceAuthority": {
-    "kind": "controller-approved-exact-byte-assets",
-    "sourceRoot": "Z:/DroneDream/work/brand-edition-concepts-v1",
-    "sourceThreadId": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9",
-    "handoff": {
-      "filename": "BRAND_EDITION_HANDOFF_V2.md",
-      "bytes": 2958,
-      "sha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
-    }
+    "kind": "universal-canonical-donor",
+    "donorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "donorParentCommit": "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
+    "canonicalContract": {
+      "path": "brand/brand-editions.v1.json",
+      "bytes": 2964,
+      "sha256": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc"
+    },
+    "canonicalAssetManifest": {
+      "path": "brand/generated/brand-assets.v1.json",
+      "bytes": 15574,
+      "sha256": "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34"
+    },
+    "canonicalVisualReceipt": {
+      "path": "brand/generated/brand-visual-receipt.v1.json",
+      "bytes": 538,
+      "sha256": "2c980725b436beb887cdccc5bb3767967bf56efd3eb6d98057f9bef1b2d34ab3"
+    },
+    "approvalHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
   },
   "commonCore": {
     "authority": "Universal/Core",
@@ -21,15 +32,18 @@
   },
   "theme": {
     "palette": ["#A7E84A", "#20C77A", "#087E69"],
+    "lightSurface": "#F3FCEF",
+    "darkSurface": "#092019",
     "supersededPalette": ["#16D6A3", "#19BBD3", "#5268F2"],
+    "presentationOnly": true,
     "grantsHardwareAuthority": false
   },
   "assets": [
     {
       "role": "mark",
-      "sourceFilename": "dronedream-lab-mark-concept-v2.png",
-      "sourceBytes": 98418,
-      "sourceSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+      "canonicalSourcePath": "brand/source/approved/lab-mark-1024.png",
+      "canonicalSourceBytes": 98418,
+      "canonicalSourceSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
       "repositoryPath": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
       "repositoryBytes": 98418,
       "repositorySha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
@@ -37,9 +51,9 @@
     },
     {
       "role": "dot-lockup",
-      "sourceFilename": "dronedream-lab-dot-lockup-concept-v2.png",
-      "sourceBytes": 98556,
-      "sourceSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+      "canonicalSourcePath": "brand/source/approved/lab-dot-lockup.png",
+      "canonicalSourceBytes": 98556,
+      "canonicalSourceSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
       "repositoryPath": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
       "repositoryBytes": 98556,
       "repositorySha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
@@ -49,40 +63,40 @@
   "derivation": {
     "sourceRole": "mark",
     "sourceSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
-    "operation": "rgba-lanczos-resize-and-ico-container-only",
+    "operation": "universal-canonical-generator-v1",
     "designChanges": false,
-    "generatorPath": "distribution/editions/lab/build-brand-derivatives.py",
-    "generatorSha256": "52a03c8fbd775cb841b127503143eeebaa61f13b2c7144780c55a506110cc9a3",
+    "generatorPath": "scripts/build-brand-assets.py",
+    "generatorSha256": "b0f6401cdcad4d93af7ebe56f5526cac07978e491075ddf7cfe019b7b097be13",
     "assets": [
       {
         "role": "desktop-32",
-        "repositoryPath": "distribution/editions/lab/assets/desktop/32x32.png",
-        "bytes": 2046,
-        "sha256": "fca69d87a8f7a68618eae06a791158ce47a2abc665b34be3d2ab111e1001ddd5"
+        "repositoryPath": "brand/generated/lab/windows/32x32.png",
+        "bytes": 2040,
+        "sha256": "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc"
       },
       {
         "role": "desktop-128",
-        "repositoryPath": "distribution/editions/lab/assets/desktop/128x128.png",
-        "bytes": 11316,
-        "sha256": "0dcf0ae7449d21dcd27c5985a279ac17abd359aaa204b113e6ab45e6a02ad4f7"
+        "repositoryPath": "brand/generated/lab/windows/128x128.png",
+        "bytes": 11272,
+        "sha256": "4dc38efa82202dc8674b1e4ed782447a041e2e8793c7615ff164501248a3b485"
       },
       {
         "role": "desktop-256",
-        "repositoryPath": "distribution/editions/lab/assets/desktop/128x128@2x.png",
-        "bytes": 25495,
-        "sha256": "ebede2b419aff90be66ab607f3de52f8e98b7c2c37986408035b38f4aee3a36b"
+        "repositoryPath": "brand/generated/lab/windows/128x128@2x.png",
+        "bytes": 25420,
+        "sha256": "b0a38390f2f58f6f873847e6a52ab07fe26945705a9940957a746970faabb0b1"
       },
       {
         "role": "windows-ico",
-        "repositoryPath": "distribution/editions/lab/assets/desktop/icon.ico",
-        "bytes": 52067,
-        "sha256": "4dcdd9792a810226cf898a0f85a67ee4d45dd2a1424eb46d8b1c5caae007424d"
+        "repositoryPath": "brand/generated/lab/windows/icon.ico",
+        "bytes": 55959,
+        "sha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
       }
     ]
   },
   "integration": {
-    "application": "applied-compile-time-lab-only",
-    "installer": "applied-lab-overlay-not-built",
-    "shortcut": "applied-through-lab-executable-icon-not-built"
+    "application": "canonical-lockup-selected-by-lab-gate",
+    "installer": "canonical-lab-icon-bound-in-overlay-not-built",
+    "shortcut": "canonical-lab-executable-icon-bound-not-built"
   }
 }

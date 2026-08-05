@@ -17,9 +17,10 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 EDITION_PATH = ROOT / "distribution/editions/lab.v1.json"
 BRAND_MANIFEST_PATH = ROOT / "distribution/editions/lab/brand-source-manifest.v1.json"
+BRAND_DONOR_PATH = ROOT / "brand/brand-editions.v1.json"
 BRAND_MARK_PATH = ROOT / "distribution/editions/lab/assets/dronedream-lab-mark-v2.png"
 BRAND_LOCKUP_PATH = ROOT / "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png"
-BRAND_ICON_PATH = ROOT / "distribution/editions/lab/assets/desktop/icon.ico"
+BRAND_ICON_PATH = ROOT / "brand/generated/lab/windows/icon.ico"
 VEHICLE_PACK_PATH = ROOT / "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json"
 LICENSE_NOTICE_PATH = ROOT / "runtime/THIRD_PARTY_NOTICES.md"
 PAYLOAD_PATH = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
@@ -176,6 +177,7 @@ def fake_lab_preview_receipt(
         "profile": _file_ref(PROFILE_PATH),
         "brand": {
             "displayName": "DroneDream · LAB",
+            "canonicalDonor": _file_ref(BRAND_DONOR_PATH),
             "sourceManifest": _file_ref(BRAND_MANIFEST_PATH),
             "mark": _file_ref(BRAND_MARK_PATH),
             "dotLockup": _file_ref(BRAND_LOCKUP_PATH),
@@ -312,6 +314,7 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
         document["brand"],
         {
             "displayName",
+            "canonicalDonor",
             "sourceManifest",
             "mark",
             "dotLockup",
@@ -325,6 +328,7 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
     if brand["grantsHardwareAuthority"] is not False:
         raise LabPreviewArtifactError("Lab visual brand cannot grant hardware authority")
     for label, path in (
+        ("canonicalDonor", BRAND_DONOR_PATH),
         ("sourceManifest", BRAND_MANIFEST_PATH),
         ("mark", BRAND_MARK_PATH),
         ("dotLockup", BRAND_LOCKUP_PATH),

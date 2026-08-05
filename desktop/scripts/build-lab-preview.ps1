@@ -151,10 +151,11 @@ $receipt = [ordered]@{
     profile = New-RepoFileRef "distribution\build-profiles\lab-preview.v1.json"
     brand = [ordered]@{
         displayName = $tauriProductName
+        canonicalDonor = New-RepoFileRef "brand\brand-editions.v1.json"
         sourceManifest = New-RepoFileRef "distribution\editions\lab\brand-source-manifest.v1.json"
         mark = New-RepoFileRef "distribution\editions\lab\assets\dronedream-lab-mark-v2.png"
         dotLockup = New-RepoFileRef "distribution\editions\lab\assets\dronedream-lab-dot-lockup-v2.png"
-        installerIcon = New-RepoFileRef "distribution\editions\lab\assets\desktop\icon.ico"
+        installerIcon = New-RepoFileRef "brand\generated\lab\windows\icon.ico"
         grantsHardwareAuthority = $false
     }
     workspaces = [ordered]@{

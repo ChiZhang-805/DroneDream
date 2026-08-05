@@ -509,6 +509,72 @@ def test_engine_pack_payload_and_attestation_tamper_fail_closed() -> None:
         _compile(values)
 
 
+@pytest.mark.parametrize(
+    ("profile", "message"),
+    (
+        (
+            {
+                "profileId": "unified-sim-lab",
+                "includesLargeSimulator": False,
+                "excludedSourcePaths": [],
+            },
+            "internally inconsistent",
+        ),
+        (
+            {
+                "profileId": "unknown-profile",
+                "includesLargeSimulator": True,
+                "excludedSourcePaths": [],
+            },
+            "unsupported",
+        ),
+        (
+            {
+                "profileId": "field-lightweight",
+                "includesLargeSimulator": False,
+                "excludedSourcePaths": ["../backend/app/simulator"],
+            },
+            "excluded paths",
+        ),
+    ),
+)
+def test_engine_pack_edition_profile_drift_fails_closed(
+    profile: dict[str, object],
+    message: str,
+) -> None:
+    values = _fixture()
+    manifest = json.loads(values["engine_pack_manifest_bytes"])
+    manifest["editionProfile"] = profile
+    raw = engine_pack.canonical_json(manifest)
+    values["engine_pack_manifest_bytes"] = raw
+    attestation = values["engine_pack_attestation"]
+    assert isinstance(attestation, EnginePackManifestAttestationV1)
+    values["engine_pack_attestation"] = attestation.model_copy(
+        update={"manifest_sha256": _sha256(raw)}
+    )
+    with pytest.raises(CompositeObservationCompilationError, match=message):
+        _compile(values)
+
+
+def test_engine_pack_edition_profile_is_bound_into_pack_identity() -> None:
+    values = _fixture()
+    manifest = json.loads(values["engine_pack_manifest_bytes"])
+    manifest["editionProfile"] = {
+        "profileId": "field-lightweight",
+        "includesLargeSimulator": False,
+        "excludedSourcePaths": ["backend/app/simulator", "scripts/simulators"],
+    }
+    raw = engine_pack.canonical_json(manifest)
+    values["engine_pack_manifest_bytes"] = raw
+    attestation = values["engine_pack_attestation"]
+    assert isinstance(attestation, EnginePackManifestAttestationV1)
+    values["engine_pack_attestation"] = attestation.model_copy(
+        update={"manifest_sha256": _sha256(raw)}
+    )
+    with pytest.raises(CompositeObservationCompilationError, match="payload identity"):
+        _compile(values)
+
+
 def test_artifact_sizes_and_release_timestamps_are_bound() -> None:
     values = _fixture()
     attestation = values["runtime_attestation"]

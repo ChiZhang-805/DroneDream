@@ -45,6 +45,7 @@
       "additionalProperties": false,
       "required": [
         "displayName",
+        "canonicalDonor",
         "sourceManifest",
         "mark",
         "dotLockup",
@@ -53,6 +54,7 @@
       ],
       "properties": {
         "displayName": {"const": "DroneDream · LAB"},
+        "canonicalDonor": {"$ref": "#/$defs/fileRef"},
         "sourceManifest": {"$ref": "#/$defs/fileRef"},
         "mark": {"$ref": "#/$defs/fileRef"},
         "dotLockup": {"$ref": "#/$defs/fileRef"},

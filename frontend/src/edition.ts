@@ -1,3 +1,5 @@
+import { EDITION_BRAND_TOKENS } from "./brand/edition-brand.generated";
+
 export type AppEdition = "universal" | "lab";
 
 export function resolveAppEdition(value: string | undefined): AppEdition {
@@ -11,7 +13,7 @@ export const appEdition = resolveAppEdition(
 export const labEditionEnabled = appEdition === "lab";
 
 export function resolveAppDisplayName(edition: AppEdition) {
-  return edition === "lab" ? "DroneDream · LAB" : "DroneDream";
+  return EDITION_BRAND_TOKENS[edition].productName;
 }
 
 export const appDisplayName = resolveAppDisplayName(appEdition);

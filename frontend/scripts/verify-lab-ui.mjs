@@ -101,6 +101,10 @@ const tauriOverlayPath = path.join(
 );
 const tauriOverlay = JSON.parse(await readFile(tauriOverlayPath, "utf8"));
 assert.equal(brandManifest.displayName, "DroneDream · LAB");
+assert.equal(
+  brandManifest.sourceAuthority.donorCommit,
+  "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+);
 assert.deepEqual(brandManifest.theme.palette, ["#A7E84A", "#20C77A", "#087E69"]);
 assert.equal(brandManifest.theme.grantsHardwareAuthority, false);
 assert.equal(tauriOverlay.productName, brandManifest.displayName);
@@ -154,7 +158,7 @@ try {
       ? "Simulation and hardware laboratory"
       : "仿真与真机实验室";
     await page.getByRole("heading", { name: title }).waitFor();
-    const brandImage = page.locator('img[src*="dronedream-lab-dot-lockup-v2"]').first();
+    const brandImage = page.locator('img[data-brand-edition="lab"]').first();
     await brandImage.waitFor({ state: "attached" });
     const brandImageState = await brandImage.evaluate((image) => ({
       complete: image instanceof HTMLImageElement && image.complete,
@@ -165,7 +169,7 @@ try {
     assert((await page.getByText("DroneDream · LAB", { exact: false }).count()) > 0);
     const palette = await page.locator(".lab-page").evaluate((element) => {
       const style = getComputedStyle(element);
-      return ["--lab-lime", "--lab-green", "--lab-deep-green"]
+      return ["--dd-brand-start", "--dd-brand-middle", "--dd-brand-end"]
         .map((property) => style.getPropertyValue(property).trim().toUpperCase());
     });
     assert.deepEqual(palette, ["#A7E84A", "#20C77A", "#087E69"]);
@@ -239,6 +243,12 @@ const report = {
     sourceManifest: {
       path: path.relative(repoRoot, brandManifestPath).replaceAll("\\", "/"),
       sha256: await sha256File(brandManifestPath),
+    },
+    canonicalDonor: {
+      commit: brandManifest.sourceAuthority.donorCommit,
+      contract: brandManifest.sourceAuthority.canonicalContract,
+      assetManifest: brandManifest.sourceAuthority.canonicalAssetManifest,
+      visualReceipt: brandManifest.sourceAuthority.canonicalVisualReceipt,
     },
     exactByteAssets: brandManifest.assets.map((asset) => ({
       role: asset.role,
