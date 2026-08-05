@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/field-common-core-sync-acceptance.v1.json",
+  "title": "DroneDream Field common-core sync acceptance contract",
+  "oneOf": [
+    {"$ref": "#/$defs/syncAcceptanceRequest"},
+    {"$ref": "#/$defs/syncAcceptanceReceipt"}
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "path": {"type": "string", "minLength": 1, "maxLength": 256},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "commit", "commonCoreHash"],
+      "properties": {
+        "branch": {"const": "codex/software"},
+        "commit": {"$ref": "#/$defs/commit"},
+        "commonCoreHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "fieldSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "commit", "driftAuditSha256"],
+      "properties": {
+        "branch": {"const": "codex/software-field"},
+        "commit": {"$ref": "#/$defs/commit"},
+        "driftAuditSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "backflowPathObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "fieldSha256", "universalSha256", "universalStatus"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "fieldSha256": {"$ref": "#/$defs/sha256"},
+        "universalSha256": {"$ref": "#/$defs/sha256"},
+        "universalStatus": {"const": "present"}
+      }
+    },
+    "backflowGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "universalStatus", "pathObservations"],
+      "properties": {
+        "path": {
+          "enum": [
+            "universal-core-common-core-commit-binding",
+            "universal-core-engine-pack-edition-profile",
+            "universal-core-field-contract-retention-hook"
+          ]
+        },
+        "universalStatus": {"const": "present"},
+        "pathObservations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/backflowPathObservation"}
+        }
+      }
+    },
+    "fieldSpecificObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "fieldSha256", "universalStatus"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "fieldSha256": {"$ref": "#/$defs/sha256"},
+        "universalStatus": {"const": "absent"}
+      }
+    },
+    "protectedEvidenceObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "baseSha256", "universalSha256", "universalStatus"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "baseSha256": {"$ref": "#/$defs/sha256"},
+        "universalSha256": {"$ref": "#/$defs/sha256"},
+        "universalStatus": {"const": "present"}
+      }
+    },
+    "safetyGates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "validatedHardwarePackCount",
+        "threeLayerQuorum",
+        "buildAllowed",
+        "installAllowed",
+        "deviceEnumerationAllowed",
+        "hardwareActionsAllowed"
+      ],
+      "properties": {
+        "validatedHardwarePackCount": {"const": 0},
+        "threeLayerQuorum": {"const": "missing"},
+        "buildAllowed": {"const": false},
+        "installAllowed": {"const": false},
+        "deviceEnumerationAllowed": {"const": false},
+        "hardwareActionsAllowed": {"const": false}
+      }
+    },
+    "syncAcceptanceRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "universalSource",
+        "fieldSource",
+        "backflowGroups",
+        "fieldSpecificIsolation",
+        "protectedEvidence",
+        "safetyGates"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-common-core-sync-acceptance-request"},
+        "universalSource": {"$ref": "#/$defs/source"},
+        "fieldSource": {"$ref": "#/$defs/fieldSource"},
+        "backflowGroups": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {"$ref": "#/$defs/backflowGroup"}
+        },
+        "fieldSpecificIsolation": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": {"$ref": "#/$defs/fieldSpecificObservation"}
+        },
+        "protectedEvidence": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": {"$ref": "#/$defs/protectedEvidenceObservation"}
+        },
+        "safetyGates": {"$ref": "#/$defs/safetyGates"}
+      }
+    },
+    "syncAcceptanceReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "editionId",
+        "source",
+        "acceptanceDecision",
+        "commonCoreBackflowPending",
+        "buildAllowed",
+        "installAllowed",
+        "deviceEnumerationAllowed",
+        "hardwareActionsAllowed",
+        "simulationAllowed",
+        "validatedHardwarePackCount",
+        "threeLayerQuorum",
+        "acceptedBackflowGroups",
+        "fieldSpecificPathsStillFieldOnly",
+        "protectedEvidencePathsPreserved",
+        "blockers",
+        "errors",
+        "receiptSha256"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-common-core-sync-acceptance-receipt"},
+        "editionId": {"const": "field"},
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fieldCommit", "universalCommit", "universalCommonCoreHash"],
+          "properties": {
+            "fieldCommit": {"$ref": "#/$defs/commit"},
+            "universalCommit": {"$ref": "#/$defs/commit"},
+            "universalCommonCoreHash": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "acceptanceDecision": {"enum": ["accept", "deny"]},
+        "commonCoreBackflowPending": {"type": "boolean"},
+        "buildAllowed": {"const": false},
+        "installAllowed": {"const": false},
+        "deviceEnumerationAllowed": {"const": false},
+        "hardwareActionsAllowed": {"const": false},
+        "simulationAllowed": {"const": false},
+        "validatedHardwarePackCount": {"const": 0},
+        "threeLayerQuorum": {"const": "missing"},
+        "acceptedBackflowGroups": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "fieldSpecificPathsStillFieldOnly": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/path"}
+        },
+        "protectedEvidencePathsPreserved": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/path"}
+        },
+        "blockers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "errors": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
