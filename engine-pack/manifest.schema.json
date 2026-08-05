@@ -10,6 +10,7 @@
     "packId",
     "engineApiVersion",
     "source",
+    "editionProfile",
     "runtimeCompatibility",
     "files"
   ],
@@ -26,6 +27,50 @@
         "gitCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
         "sourceDateEpoch": {"type": "integer", "minimum": 0}
       }
+    },
+    "editionProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profileId", "includesLargeSimulator", "excludedSourcePaths"],
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "enum": ["field-lightweight", "unified-sim-lab"]
+        },
+        "includesLargeSimulator": {"type": "boolean"},
+        "excludedSourcePaths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"profileId": {"const": "field-lightweight"}}
+          },
+          "then": {
+            "properties": {
+              "includesLargeSimulator": {"const": false},
+              "excludedSourcePaths": {"const": ["scripts/simulators"]}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"profileId": {"const": "unified-sim-lab"}}
+          },
+          "then": {
+            "properties": {
+              "includesLargeSimulator": {"const": true},
+              "excludedSourcePaths": {"const": []}
+            }
+          }
+        }
+      ]
     },
     "runtimeCompatibility": {
       "type": "object",

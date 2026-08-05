@@ -25,6 +25,9 @@ MANIFEST_FILENAME = "engine-pack-manifest.json"
 KIND = "dronedream-engine-pack"
 SCHEMA_VERSION = 1
 ENGINE_API_VERSION = 1
+DEFAULT_EDITION_PROFILE = "unified-sim-lab"
+FIELD_EDITION_PROFILE = "field-lightweight"
+EDITION_PROFILES = {DEFAULT_EDITION_PROFILE, FIELD_EDITION_PROFILE}
 RUNTIME_DISTRIBUTION_PATHS = (
     "LICENSE",
     "runtime/THIRD_PARTY_NOTICES.md",
@@ -58,6 +61,7 @@ SOURCE_PATHS = (
     "scripts/simulators",
     *RUNTIME_DISTRIBUTION_PATHS,
 )
+FIELD_EXCLUDED_SOURCE_PATHS = ("scripts/simulators",)
 IGNORED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -154,9 +158,23 @@ def source_date_epoch(repository_root: Path, source_commit: str) -> int:
         raise EnginePackError("source commit timestamp was invalid") from error
 
 
-def production_files(repository_root: Path) -> list[tuple[str, Path]]:
+def source_paths_for_profile(edition_profile: str) -> tuple[str, ...]:
+    if edition_profile not in EDITION_PROFILES:
+        raise EnginePackError(f"unsupported Engine Pack edition profile: {edition_profile}")
+    if edition_profile == FIELD_EDITION_PROFILE:
+        return tuple(
+            path for path in SOURCE_PATHS if path not in FIELD_EXCLUDED_SOURCE_PATHS
+        )
+    return SOURCE_PATHS
+
+
+def production_files(
+    repository_root: Path,
+    *,
+    edition_profile: str = DEFAULT_EDITION_PROFILE,
+) -> list[tuple[str, Path]]:
     collected: dict[str, Path] = {}
-    for relative in SOURCE_PATHS:
+    for relative in source_paths_for_profile(edition_profile):
         candidate = repository_root / relative
         if not candidate.exists():
             raise EnginePackError(f"required Engine Pack source is missing: {relative}")
@@ -199,6 +217,7 @@ def payload_identity(records: list[dict[str, Any]]) -> str:
 
 def manifest_identity(
     source: dict[str, Any],
+    edition_profile: dict[str, Any],
     compatibility: dict[str, Any],
     records: list[dict[str, Any]],
 ) -> str:
@@ -207,6 +226,7 @@ def manifest_identity(
             {
                 "engineApiVersion": ENGINE_API_VERSION,
                 "source": source,
+                "editionProfile": edition_profile,
                 "runtimeCompatibility": compatibility,
                 "payloadSha256": payload_identity(records),
                 "files": records,
@@ -220,12 +240,21 @@ def build_manifest(
     source_commit: str,
     epoch: int,
     records: list[dict[str, Any]],
+    *,
+    edition_profile_id: str = DEFAULT_EDITION_PROFILE,
 ) -> dict[str, Any]:
     if not COMMIT_RE.fullmatch(source_commit):
         raise EnginePackError("source commit must be a full lowercase Git SHA")
     pins = read_pins(repository_root / "runtime" / "pins.env")
     lock = repository_root / "runtime" / "locks" / "python-requirements.lock"
     source = {"gitCommit": source_commit, "sourceDateEpoch": epoch}
+    edition_profile = {
+        "profileId": edition_profile_id,
+        "includesLargeSimulator": edition_profile_id != FIELD_EDITION_PROFILE,
+        "excludedSourcePaths": list(FIELD_EXCLUDED_SOURCE_PATHS)
+        if edition_profile_id == FIELD_EDITION_PROFILE
+        else [],
+    }
     compatibility = {
         # This is the stable product/distribution identity. The Runtime
         # manifest's `runtimeId` is a build-specific UUID and must not be used
@@ -240,9 +269,10 @@ def build_manifest(
     return {
         "schemaVersion": SCHEMA_VERSION,
         "kind": KIND,
-        "packId": f"sha256:{manifest_identity(source, compatibility, records)}",
+        "packId": f"sha256:{manifest_identity(source, edition_profile, compatibility, records)}",
         "engineApiVersion": ENGINE_API_VERSION,
         "source": source,
+        "editionProfile": edition_profile,
         "runtimeCompatibility": compatibility,
         "files": records,
     }
@@ -305,15 +335,24 @@ def write_archive(
 def build(args: argparse.Namespace) -> int:
     root = Path(args.repository_root).resolve()
     output = Path(args.output_directory).resolve()
+    edition_profile = args.edition_profile
+    if edition_profile not in EDITION_PROFILES:
+        raise EnginePackError(f"unsupported Engine Pack edition profile: {edition_profile}")
     if not root.is_dir():
         raise EnginePackError("repository root does not exist")
     if output.exists() and any(output.iterdir()):
         raise EnginePackError(f"output directory must be absent or empty: {output}")
     output.mkdir(parents=True, exist_ok=True)
-    files = production_files(root)
+    files = production_files(root, edition_profile=edition_profile)
     records = file_records(files)
     epoch = source_date_epoch(root, args.source_commit)
-    manifest = build_manifest(root, args.source_commit, epoch, records)
+    manifest = build_manifest(
+        root,
+        args.source_commit,
+        epoch,
+        records,
+        edition_profile_id=edition_profile,
+    )
     manifest_bytes = canonical_json(manifest)
     manifest_path = output / MANIFEST_FILENAME
     archive_path = output / ARCHIVE_FILENAME
@@ -366,6 +405,7 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         "packId",
         "engineApiVersion",
         "source",
+        "editionProfile",
         "runtimeCompatibility",
         "files",
     }:
@@ -381,6 +421,32 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         raise EnginePackError("Engine Pack source commit is invalid")
     if type(source["sourceDateEpoch"]) is not int or source["sourceDateEpoch"] < 0:
         raise EnginePackError("Engine Pack source timestamp is invalid")
+    edition_profile = manifest["editionProfile"]
+    if not isinstance(edition_profile, dict) or set(edition_profile) != {
+        "profileId",
+        "includesLargeSimulator",
+        "excludedSourcePaths",
+    }:
+        raise EnginePackError("Engine Pack edition profile identity is invalid")
+    profile_id = edition_profile["profileId"]
+    if profile_id not in EDITION_PROFILES:
+        raise EnginePackError("Engine Pack edition profile is unsupported")
+    if type(edition_profile["includesLargeSimulator"]) is not bool:
+        raise EnginePackError("Engine Pack simulator inclusion flag is invalid")
+    excluded_paths = edition_profile["excludedSourcePaths"]
+    if (
+        not isinstance(excluded_paths, list)
+        or any(not isinstance(path, str) for path in excluded_paths)
+        or len(excluded_paths) != len(set(excluded_paths))
+    ):
+        raise EnginePackError("Engine Pack excluded source paths are invalid")
+    if profile_id == FIELD_EDITION_PROFILE:
+        if edition_profile["includesLargeSimulator"] is not False or tuple(
+            excluded_paths
+        ) != FIELD_EXCLUDED_SOURCE_PATHS:
+            raise EnginePackError("Field Engine Pack profile does not exclude simulator payloads")
+    elif edition_profile["includesLargeSimulator"] is not True or excluded_paths:
+        raise EnginePackError("default Engine Pack profile drifted")
     compatibility = manifest["runtimeCompatibility"]
     compatibility_keys = {
         "runtimeProductId",
@@ -418,7 +484,10 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
     if paths != sorted(set(paths)):
         raise EnginePackError("Engine Pack files are not unique and sorted")
     expected_pack_id = "sha256:" + manifest_identity(
-        manifest["source"], manifest["runtimeCompatibility"], manifest["files"]
+        manifest["source"],
+        manifest["editionProfile"],
+        manifest["runtimeCompatibility"],
+        manifest["files"],
     )
     if manifest["packId"] != expected_pack_id:
         raise EnginePackError("Engine Pack payload identity does not match its file list")
@@ -560,6 +629,11 @@ def parser() -> argparse.ArgumentParser:
     build_parser.add_argument("--repository-root", required=True)
     build_parser.add_argument("--output-directory", required=True)
     build_parser.add_argument("--source-commit", required=True)
+    build_parser.add_argument(
+        "--edition-profile",
+        choices=sorted(EDITION_PROFILES),
+        default=DEFAULT_EDITION_PROFILE,
+    )
     build_parser.set_defaults(handler=build)
     verify_parser = commands.add_parser("verify")
     verify_parser.add_argument("--descriptor", required=True)

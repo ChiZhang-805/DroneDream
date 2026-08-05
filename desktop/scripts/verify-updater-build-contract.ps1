@@ -30,6 +30,10 @@ Assert-Contract ($updateSource.Contains('remote_source_commit != env!("DRONEDREA
     "Equal-version updates must reject the currently installed source commit."
 Assert-Contract ($buildScript.Contains('cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_SOURCE_COMMIT')) `
     "The embedded Engine Pack must be rebuilt when frozen release provenance changes."
+Assert-Contract ($buildScript.Contains('cargo:rerun-if-env-changed=DRONEDREAM_EDITION_PROFILE')) `
+    "The embedded Engine Pack must be rebuilt when the edition profile changes."
+Assert-Contract ($buildScript.Contains('--edition-profile')) `
+    "The embedded Engine Pack build must bind an explicit edition profile."
 Assert-Contract ($buildScript.Contains('["rev-parse", "--git-path", &symbolic_ref]')) `
     "The embedded Engine Pack must track the active Git branch ref."
 foreach ($requiredText in @(
