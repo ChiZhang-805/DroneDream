@@ -20,6 +20,7 @@ if (!["http:", "https:"].includes(baseUrl.protocol)) {
 const outputPath = outputRaw ? resolve(outputRaw) : "";
 const routes = [
   { name: "home", path: "/" },
+  { name: "product", path: "/product/" },
   { name: "pricing", path: "/pricing/" },
   { name: "manual", path: "/manual/" },
   { name: "community", path: "/community/" },

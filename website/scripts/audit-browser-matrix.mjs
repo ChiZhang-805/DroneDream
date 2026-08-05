@@ -83,6 +83,7 @@ for (const browserName of requestedBrowsers) {
 
 const routes = [
   { name: "home", path: "/", root: "#home" },
+  { name: "product", path: "/product/", root: "#site-root > .dd-site" },
   { name: "pricing", path: "/pricing/", root: "#site-root > .dd-site" },
   { name: "manual", path: "/manual/", root: "#site-root > .dd-site" },
   { name: "community", path: "/community/", root: "#site-root > .dd-site" },
@@ -222,6 +223,9 @@ const collectLayout = async (page, routeName) => page.evaluate((activeRoute) => 
     ".site-header",
     ".site-shell",
     ".portal-page-heading",
+    ".site-product-page-shell",
+    ".site-product-edition",
+    ".site-product-current",
     ".pricing-grid",
     ".pricing-card",
     ".manual-shell",
@@ -284,6 +288,14 @@ const collectLayout = async (page, routeName) => page.evaluate((activeRoute) => 
     if (spread > tolerance) violations.push(`pricing card height spread ${spread}px`);
   }
 
+  const productCards = [...document.querySelectorAll(".site-product-edition")]
+    .filter((node) => visible(node) && inActiveSurface(node));
+  const productHeights = productCards.map((node) => Math.round(node.getBoundingClientRect().height));
+  if (activeRoute === "product" && viewportWidth >= 1000 && productHeights.length >= 3) {
+    const spread = Math.max(...productHeights) - Math.min(...productHeights);
+    if (spread > tolerance) violations.push(`product card height spread ${spread}px`);
+  }
+
   const headingRoot = activeModal ?? document;
   const headings = [...headingRoot.querySelectorAll("h1, h2, [role=heading]")].filter(visible);
   if (headings.length === 0) {
@@ -296,6 +308,7 @@ const collectLayout = async (page, routeName) => page.evaluate((activeRoute) => 
     viewportWidth,
     documentWidth,
     pricingHeights,
+    productHeights,
     violations,
   };
 }, routeName);

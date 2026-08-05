@@ -81,7 +81,7 @@ node website/scripts/audit-browser-matrix.mjs `
   edge,chrome,lenovo,firefox
 ```
 
-The matrix covers `/`, `/pricing/`, `/manual/`, `/community/`, and `/console/`
+The matrix covers `/`, `/product/`, `/pricing/`, `/manual/`, `/community/`, and `/console/`
 in English and Simplified Chinese. It checks 1440x1000 desktop and 390x844
 mobile layouts in every browser, plus 2048x1280 and a 125%-scaled 1440x1000
 profile in Edge. Missing requested browsers, page errors, overflow, clipped
@@ -136,7 +136,7 @@ node website/scripts/audit-site-typography.mjs `
   work/website-layout-mobile.json layout-only
 ```
 
-Finally, audit cold-entry resource budgets for all five routes:
+Finally, audit cold-entry resource budgets for all public routes:
 
 ```powershell
 node website/scripts/audit-site-performance.mjs `

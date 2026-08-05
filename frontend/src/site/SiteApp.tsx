@@ -804,6 +804,10 @@ export function SiteApp({
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
   const path = currentSiteUrl.pathname.replace(/\/+$/u, "") || "/";
+  const isCurrentNavTarget = (target: string) => {
+    const targetPath = new URL(target, window.location.origin).pathname.replace(/\/+$/u, "") || "/";
+    return targetPath === path;
+  };
   const sitePage = path === "/manual"
     ? "manual"
     : path === "/product"
@@ -1316,9 +1320,20 @@ export function SiteApp({
           className={`site-nav${menuOpen ? " is-open" : ""}`}
           aria-label={copy.navLabel}
         >
-          {copy.nav.map(([label, target]) => (
-            <a key={target} href={target} onClick={closeMenu}>{label}</a>
-          ))}
+          {copy.nav.map(([label, target]) => {
+            const active = isCurrentNavTarget(target);
+            return (
+              <a
+                key={target}
+                href={target}
+                className={active ? "active" : undefined}
+                aria-current={active ? "page" : undefined}
+                onClick={closeMenu}
+              >
+                {label}
+              </a>
+            );
+          })}
           <button
             type="button"
             disabled={!accountCommunityActionsEnabled}

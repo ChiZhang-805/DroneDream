@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         input: {
           main: `${projectRoot}site.html`,
+          product: `${projectRoot}product/index.html`,
           manual: `${projectRoot}manual/index.html`,
           pricing: `${projectRoot}pricing/index.html`,
           community: `${projectRoot}community/index.html`,

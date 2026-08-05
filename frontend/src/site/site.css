@@ -160,10 +160,14 @@ body:has(#site-root) a {
 
 .site-nav a:hover,
 .site-nav a:focus-visible,
+.site-nav a.active,
+.site-nav a[aria-current="page"],
 .site-nav button:hover,
 .site-nav button:focus-visible { color: #fff; }
 .site-nav a:hover::after,
 .site-nav a:focus-visible::after,
+.site-nav a.active::after,
+.site-nav a[aria-current="page"]::after,
 .site-nav button:hover::after,
 .site-nav button:focus-visible::after { right: 0; left: 0; }
 
@@ -846,7 +850,7 @@ html[lang="zh-CN"] .site-hero h1 {
   max-width: 920px;
   margin: 0;
   font-size: clamp(2.5rem, 4.8vw, 5.6rem);
-  letter-spacing: -0.058em;
+  letter-spacing: 0;
   line-height: 0.98;
 }
 
@@ -1071,6 +1075,7 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 @media (max-width: 900px) {
+  .site-product-page { padding-top: calc(66px + 1.5rem); }
   .site-product-page-grid { grid-template-columns: minmax(0, 1fr); }
   .site-product-edition { min-height: 0; }
   .site-product-edition-audience { min-height: 0; }
@@ -1079,7 +1084,7 @@ html[lang="zh-CN"] .site-hero h1 {
 
 @media (max-width: 520px) {
   .site-product-page {
-    padding: 1.65rem 1rem 2rem;
+    padding: calc(66px + 1.2rem) 1rem 2rem;
   }
 
   .site-product-page-header h1 { font-size: 2.4rem; }
