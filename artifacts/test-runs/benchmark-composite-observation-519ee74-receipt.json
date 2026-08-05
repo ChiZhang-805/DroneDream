@@ -1,0 +1,121 @@
+{
+  "schema_id": "dronedream.benchmark-composite-observation-verification/v1",
+  "generated_at": "2026-08-05T05:17:07.657Z",
+  "subject_commit": "519ee746596d3200efcc3e6110378f481b934d8d",
+  "subject_branch": "codex/software",
+  "protocol": {
+    "path": "Z:/DroneDream/work/DRONEDREAM_MODEL_HARNESS_BENCHMARK_PROTOCOL.md",
+    "sha256": "734bb6b42ec25ffc92bd9f15bb6fa27bc3482b4ce0841ce9aa3b080eafb8caee"
+  },
+  "scope": {
+    "resource_state": "GREEN",
+    "closure": "trusted-runtime-engine-desktop-manifest-to-composite-observation",
+    "execution_authorized": false,
+    "filesystem_io": false,
+    "network_io": false,
+    "provider_calls": 0,
+    "api_key_read": false,
+    "wsl_started": false,
+    "px4_started": false,
+    "gazebo_started": false,
+    "installer_or_runtime_mutation": false,
+    "device_actions": false
+  },
+  "source_files": [
+    {
+      "path": "backend/app/benchmarking/composite_inventory_observation.py",
+      "sha256": "f47e2fed0800123ce66fe53b49788c2fc94144d3852b9feaa258bb2482573044",
+      "git_blob": "22a73c289570a975c46ca1701295d99d22efc58d"
+    },
+    {
+      "path": "backend/tests/test_benchmark_composite_inventory_observation.py",
+      "sha256": "f4107e0da2711fef9578053307d20fa3a69b2d353c5d8666a199240a740e4e86",
+      "git_blob": "3b0df65499fccaeb143cd1c4ca63d769f892ab1f"
+    }
+  ],
+  "environment": {
+    "platform": "Windows",
+    "python": "3.13.0",
+    "pydantic": "2.11.7",
+    "pytest": "9.1.0"
+  },
+  "verification": [
+    {
+      "name": "focused manifest compiler",
+      "command": "python -m pytest -q backend/tests/test_benchmark_composite_inventory_observation.py",
+      "result": "passed",
+      "passed": 12,
+      "failed": 0,
+      "duration_seconds": 0.19
+    },
+    {
+      "name": "composite inventory and P5 authorization chain",
+      "command": "python -m pytest -q backend/tests/test_benchmark_composite_inventory.py backend/tests/test_benchmark_composite_inventory_observation.py backend/tests/test_benchmark_physical_stability_execution.py backend/tests/test_benchmark_physical_stability_bridge.py backend/tests/test_benchmark_physical_stability_runner.py",
+      "result": "passed",
+      "passed": 54,
+      "failed": 0,
+      "duration_seconds": 7.68
+    },
+    {
+      "name": "Runtime and Engine Pack authoritative delivery contracts",
+      "command": "python -m pytest -q runtime/tests/test_runtime_contract.py runtime/tests/test_runtime_release.py engine-pack/tests/test_engine_pack.py",
+      "result": "passed_with_skips",
+      "passed": 61,
+      "skipped": 5,
+      "subtests_passed": 9,
+      "failed": 0,
+      "duration_seconds": 6.58
+    },
+    {
+      "name": "E5 backend-runtime safety regression at current HEAD",
+      "command": "python -m pytest -q backend/tests/test_distribution_safety.py runtime/tests/test_edition_safety_gate.py distribution/tests/test_edition_safety_contract.py",
+      "result": "passed",
+      "passed": 37,
+      "failed": 0,
+      "duration_seconds": 1.35
+    },
+    {
+      "name": "Ruff benchmark scope",
+      "command": "python -m ruff check backend/app/benchmarking backend/tests/test_benchmark_composite_inventory.py backend/tests/test_benchmark_composite_inventory_observation.py backend/tests/test_benchmark_physical_stability_execution.py backend/tests/test_benchmark_physical_stability_bridge.py backend/tests/test_benchmark_physical_stability_runner.py",
+      "result": "passed"
+    },
+    {
+      "name": "Mypy composite and P5 bridge scope",
+      "command": "python -m mypy backend/app/benchmarking/composite_inventory.py backend/app/benchmarking/composite_inventory_observation.py backend/app/benchmarking/physical_stability_execution.py backend/app/benchmarking/physical_stability_bridge.py backend/app/benchmarking/physical_stability_runner.py --config-file backend/pyproject.toml",
+      "result": "passed",
+      "checked_source_files": 5
+    },
+    {
+      "name": "Git whitespace check",
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "preserved_failures": [
+    {
+      "classification": "test-invocation-path-error",
+      "command_family": "pytest/ruff/mypy benchmark physical execution authorization",
+      "detail": "The first expanded command referenced the nonexistent legacy paths backend/tests/test_benchmark_physical_execution_authorization.py and backend/app/benchmarking/physical_execution_authorization.py. Pytest collected no tests; Ruff and Mypy reported file-not-found. The command was corrected to the repository's physical_stability_execution, physical_stability_bridge, and physical_stability_runner paths and then passed. This setup failure is not counted as a product test pass or product runtime failure."
+    }
+  ],
+  "verified_boundaries": [
+    "Runtime release and installed promoted manifest use canonical exact bytes and trusted receipt hashes.",
+    "Engine Pack descriptor, sidecar manifest, archive hash and actual byte size are cross-bound.",
+    "Desktop, Runtime Base, Engine Pack and PX4 may use independent source commits.",
+    "Duplicate JSON keys, unknown attestation fields, noncanonical bytes, source drift, identity drift, smoke drift, payload drift, size drift and timestamp drift fail closed.",
+    "The same positive fixtures pass the authoritative Runtime release, Runtime manifest and Engine Pack validators.",
+    "A verified compilation remains evidence only and cannot authorize execution."
+  ],
+  "remaining_external_gates": [
+    "No live installed desktop provenance was observed in this GREEN closure.",
+    "No active WSL Runtime Base or Engine Pack was inspected.",
+    "No PX4/Gazebo physical baseline or provider campaign was started.",
+    "Live composite alignment remains a RED-stage operation requiring explicit coordination."
+  ],
+  "sensitive_data": {
+    "contains_credentials": false,
+    "contains_api_keys": false,
+    "contains_raw_prompts_or_chat": false,
+    "contains_provider_request_ids": false
+  }
+}
