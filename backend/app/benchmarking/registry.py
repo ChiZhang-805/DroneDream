@@ -127,8 +127,8 @@ _DESCRIPTORS = (
     BenchmarkAdapterDescriptor(
         "llm_direct/v1",
         "llm_harness",
-        "contract_only",
-        "direct-adapter-pending",
+        "implemented",
+        "durable-chat-completions-direct-v1",
         "adapted_reference",
     ),
     BenchmarkAdapterDescriptor(
@@ -195,6 +195,11 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
     if descriptor.availability != "implemented":
         raise ValueError(f"benchmark proposal adapter is not implemented: {adapter_id}")
     require_execution_ready_method(adapter_id)
+    if adapter_id == "llm_direct/v1":
+        raise ValueError(
+            "benchmark proposal adapter is server-managed by the durable provider runtime: "
+            f"{adapter_id}"
+        )
     from app.benchmarking.adapters import (
         RandomSearchAdapterV1,
         RepositoryOptimizerAdapterV1,

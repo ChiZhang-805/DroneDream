@@ -166,14 +166,14 @@ def test_ready_only_means_ready_to_request_separate_batch_approval() -> None:
     assert receipt.verified_gate_ids == _GATES
 
 
-def test_current_registry_blocks_unimplemented_reference_and_llm_arms() -> None:
+def test_current_registry_blocks_only_unimplemented_required_arms() -> None:
     receipt = assess_benchmark_pilot_readiness(
         _observation(required_adapter_ids=("optuna_tpe/v1", "llm_direct/v1"))
     )
 
     assert receipt.status == "blocked"
-    assert receipt.blocked_adapter_ids == ("llm_direct/v1", "optuna_tpe/v1")
-    assert "blocked-adapter:llm_direct/v1" in receipt.blocker_codes
+    assert receipt.blocked_adapter_ids == ("optuna_tpe/v1",)
+    assert "blocked-adapter:llm_direct/v1" not in receipt.blocker_codes
     assert "blocked-adapter:optuna_tpe/v1" in receipt.blocker_codes
 
 
