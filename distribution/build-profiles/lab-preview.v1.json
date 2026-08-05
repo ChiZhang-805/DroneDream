@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-preview-build-profile",
+  "profileVersion": "1.0.0",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "state": "source-contract-only",
+  "authority": {
+    "editionManifest": "distribution/editions/lab.v1.json",
+    "buildRequest": "distribution/build-planning/e4-request.v1.json",
+    "buildPlan": "distribution/build-plans/software-1.0.0-065382b68bfa.v1.json",
+    "capabilityPolicy": "distribution/capabilities/core-capabilities.v1.json",
+    "executionGatePolicy": "distribution/safety/edition-execution-gate.v1.json",
+    "vehiclePackRegistry": "distribution/vehicle-packs/registry.v1.json",
+    "licenseNotice": "runtime/THIRD_PARTY_NOTICES.md"
+  },
+  "commonCore": {
+    "reuseOnly": true,
+    "forkOrCopyAllowed": false,
+    "paths": [
+      "backend",
+      "desktop",
+      "engine-pack",
+      "frontend",
+      "runtime",
+      "worker"
+    ],
+    "publicFixesMustReturnToCore": true
+  },
+  "editionPayload": {
+    "artifactFileName": "DroneDream-Lab-1.0.0.exe",
+    "tauriConfigOverlay": "desktop/src-tauri/tauri.lab-preview.conf.json",
+    "buildScript": "desktop/scripts/build-lab-preview.ps1",
+    "selectedVehiclePack": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+    "selectedControllerModel": "Pixhawk 6C",
+    "runtimeProfile": "full-lab",
+    "modules": [
+      "desktop-core",
+      "engine-pack",
+      "hardware-bridge",
+      "runtime-core",
+      "runtime-simulation",
+      "simulator-gazebo-harmonic",
+      "simulator-px4-sitl",
+      "vehicle-pack-hardware",
+      "vehicle-pack-sim",
+      "vehicle-pack-validation"
+    ]
+  },
+  "buildGuards": {
+    "requiresExactCleanSource": true,
+    "requiresOriginSoftwareAncestor": true,
+    "defaultCargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
+    "forbidRepositoryTargetDirectory": true,
+    "forbidReleaseBranchCreation": true,
+    "forbidForcePush": true,
+    "forbidSigningSecretRead": true,
+    "doNotOverwritePublicAssets": true
+  },
+  "signaturePolicy": {
+    "authenticode": "not-signed",
+    "tauriUpdaterSignature": "not-issued",
+    "unsignedInternalPreviewAllowed": true,
+    "mustNotClaimSigned": true
+  },
+  "safetyPolicy": {
+    "validatedVehiclePackCount": 0,
+    "uiCanDisplayAndConfigureHardwareWorkflow": true,
+    "uiCanAuthorizeHardwareAction": false,
+    "hardwareActionsFailClosedUntilValidatedPackAndQuorum": [
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl.execute"
+    ],
+    "requiredDecisionLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ]
+  },
+  "installLifecycleContract": {
+    "freshInstall": "source-bound unsigned preview installer only",
+    "overlayInstall": "must preserve and verify existing owned runtime handoff before replacement",
+    "uninstall": "must preserve separately owned DroneDreamRuntime and user data",
+    "rollback": "must target a recorded previous verified promotion before production use",
+    "upgrade": "must bind source commit, common core hash, artifact hash, and receipt"
+  },
+  "previewBlockers": [
+    "No real EXE has been built by this profile.",
+    "All Vehicle Packs remain planned or contract-only; zero are validated.",
+    "Hardware writes, unlocking, arming, HITL, and flight remain denied by native, backend, and runtime safety gates.",
+    "The preview is unsigned and must not be represented as Authenticode-signed.",
+    "No release branch may be created from this profile."
+  ]
+}

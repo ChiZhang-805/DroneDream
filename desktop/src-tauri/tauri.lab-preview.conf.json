@@ -1,0 +1,31 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream Lab",
+  "identifier": "io.dronedream.desktop.lab",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream Lab",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "publisher": "DroneDream",
+    "shortDescription": "DroneDream Lab internal unsigned preview",
+    "longDescription": "DroneDream Lab is an internal unsigned preview of the shared DroneDream core with simulation workflows and hardware workflow configuration behind native, backend, and runtime safety gates.",
+    "resources": {
+      "../../distribution/build-profiles/lab-preview.v1.json": "distribution/lab-preview.v1.json",
+      "../../distribution/editions/lab.v1.json": "distribution/editions/lab.v1.json",
+      "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",
+      "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",
+      "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json"
+    }
+  }
+}
