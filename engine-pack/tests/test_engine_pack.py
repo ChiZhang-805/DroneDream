@@ -61,7 +61,12 @@ class EnginePackTests(unittest.TestCase):
             runtime_gate.RUNTIME_DISTRIBUTION_PATHS,
         )
 
-    def build(self, output: Path) -> None:
+    def build(
+        self,
+        output: Path,
+        *,
+        edition_profile: str = engine_pack.DEFAULT_EDITION_PROFILE,
+    ) -> None:
         commit = "1" * 40
         previous = engine_pack.source_date_epoch
         engine_pack.source_date_epoch = lambda _root, _commit: 1_722_000_000
@@ -74,6 +79,7 @@ class EnginePackTests(unittest.TestCase):
                         "repository_root": str(ROOT),
                         "output_directory": str(output),
                         "source_commit": commit,
+                        "edition_profile": edition_profile,
                     },
                 )()
             )
@@ -166,6 +172,11 @@ class EnginePackTests(unittest.TestCase):
                 (output / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
             )
             compatibility = manifest["runtimeCompatibility"]
+            self.assertEqual(
+                manifest["editionProfile"]["profileId"],
+                engine_pack.DEFAULT_EDITION_PROFILE,
+            )
+            self.assertTrue(manifest["editionProfile"]["includesLargeSimulator"])
             self.assertEqual(compatibility["runtimeProductId"], "DroneDreamRuntime")
             self.assertRegex(compatibility["px4Commit"], r"^[0-9a-f]{40}$")
             self.assertRegex(compatibility["dependencyLockSha256"], r"^[0-9a-f]{64}$")
@@ -189,6 +200,11 @@ class EnginePackTests(unittest.TestCase):
             "packId": "sha256:" + "0" * 64,
             "engineApiVersion": 1,
             "source": {"gitCommit": "1" * 40, "sourceDateEpoch": 1},
+            "editionProfile": {
+                "profileId": engine_pack.DEFAULT_EDITION_PROFILE,
+                "includesLargeSimulator": True,
+                "excludedSourcePaths": [],
+            },
             "runtimeCompatibility": {
                 "runtimeProductId": "DroneDreamRuntime",
                 "runtimeVersion": pins["DRONEDREAM_RUNTIME_VERSION"],
@@ -203,6 +219,33 @@ class EnginePackTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(engine_pack.EnginePackError, "unsafe archive member"):
             engine_pack.validate_manifest(manifest)
+
+    def test_field_profile_excludes_simulator_sources_and_marks_lightweight(self) -> None:
+        files = engine_pack.production_files(
+            ROOT,
+            edition_profile=engine_pack.FIELD_EDITION_PROFILE,
+        )
+        paths = [path for path, _source in files]
+        self.assertFalse(any(path.startswith("scripts/simulators/") for path in paths))
+        self.assertIn("distribution/editions/field.v1.json", paths)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            self.build(output, edition_profile=engine_pack.FIELD_EDITION_PROFILE)
+            with tarfile.open(output / engine_pack.ARCHIVE_FILENAME, mode="r:gz") as archive:
+                names = [member.name for member in archive.getmembers()]
+            self.assertFalse(any(name.startswith("payload/scripts/simulators/") for name in names))
+            manifest = json.loads(
+                (output / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["editionProfile"],
+                {
+                    "profileId": engine_pack.FIELD_EDITION_PROFILE,
+                    "includesLargeSimulator": False,
+                    "excludedSourcePaths": list(engine_pack.FIELD_EXCLUDED_SOURCE_PATHS),
+                },
+            )
 
     def test_descriptor_cannot_redirect_the_manifest_sidecar(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
