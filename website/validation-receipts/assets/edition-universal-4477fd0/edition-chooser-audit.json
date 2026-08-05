@@ -1,0 +1,217 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-05T09:23:39.251Z",
+  "baseUrl": "http://127.0.0.1:54648/",
+  "passed": true,
+  "failures": [],
+  "results": [
+    {
+      "locale": "en",
+      "profile": "desktop",
+      "screenshotPath": "Z:\\DroneDream-worktrees\\website-20260728\\website\\validation-receipts\\assets\\edition-universal-4477fd0\\en-desktop.png",
+      "metrics": {
+        "profileName": "desktop",
+        "viewportWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "top": 186.328125,
+          "bottom": 813.65625,
+          "width": 840,
+          "clientHeight": 625,
+          "scrollHeight": 625,
+          "overflowY": "auto"
+        },
+        "gridColumns": "254.266px 254.266px 254.266px",
+        "cardCount": 3,
+        "cardHeightSpread": 0,
+        "actionBottomSpread": 0,
+        "audienceLines": [
+          1,
+          1,
+          1
+        ],
+        "editionLinks": 0,
+        "currentPreviewLinks": 1,
+        "disabledPrimaryActions": 3,
+        "universalRows": 1,
+        "disabledUniversalActions": 1
+      },
+      "checks": {
+        "noDocumentOverflow": true,
+        "threeCards": true,
+        "noPlannedDownloadLinks": true,
+        "currentPreviewDiscoverable": true,
+        "plannedPrimaryActionsDisabled": true,
+        "oneUniversalRow": true,
+        "plannedUniversalActionDisabled": true,
+        "audienceSingleLine": true,
+        "desktopWidth": true,
+        "desktopEqualCards": true,
+        "desktopAlignedActions": true,
+        "desktopThreeColumns": true,
+        "mobileOneColumn": true,
+        "mobileBottomSheet": true,
+        "mobileScrollable": true,
+        "noPageErrors": true,
+        "focusRestore": true
+      },
+      "pageErrors": []
+    },
+    {
+      "locale": "en",
+      "profile": "mobile",
+      "screenshotPath": "Z:\\DroneDream-worktrees\\website-20260728\\website\\validation-receipts\\assets\\edition-universal-4477fd0\\en-mobile.png",
+      "metrics": {
+        "profileName": "mobile",
+        "viewportWidth": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "top": 84,
+          "bottom": 844,
+          "width": 390,
+          "clientHeight": 759,
+          "scrollHeight": 1091,
+          "overflowY": "auto"
+        },
+        "gridColumns": "358px",
+        "cardCount": 3,
+        "cardHeightSpread": 0,
+        "actionBottomSpread": 467.15625,
+        "audienceLines": [
+          1,
+          1,
+          1
+        ],
+        "editionLinks": 0,
+        "currentPreviewLinks": 1,
+        "disabledPrimaryActions": 3,
+        "universalRows": 1,
+        "disabledUniversalActions": 1
+      },
+      "checks": {
+        "noDocumentOverflow": true,
+        "threeCards": true,
+        "noPlannedDownloadLinks": true,
+        "currentPreviewDiscoverable": true,
+        "plannedPrimaryActionsDisabled": true,
+        "oneUniversalRow": true,
+        "plannedUniversalActionDisabled": true,
+        "audienceSingleLine": true,
+        "desktopWidth": true,
+        "desktopEqualCards": true,
+        "desktopAlignedActions": true,
+        "desktopThreeColumns": true,
+        "mobileOneColumn": true,
+        "mobileBottomSheet": true,
+        "mobileScrollable": true,
+        "noPageErrors": true,
+        "focusRestore": true
+      },
+      "pageErrors": []
+    },
+    {
+      "locale": "zh-CN",
+      "profile": "desktop",
+      "screenshotPath": "Z:\\DroneDream-worktrees\\website-20260728\\website\\validation-receipts\\assets\\edition-universal-4477fd0\\zh-CN-desktop.png",
+      "metrics": {
+        "profileName": "desktop",
+        "viewportWidth": 1440,
+        "documentWidth": 1440,
+        "dialog": {
+          "top": 186.328125,
+          "bottom": 813.65625,
+          "width": 840,
+          "clientHeight": 625,
+          "scrollHeight": 625,
+          "overflowY": "auto"
+        },
+        "gridColumns": "254.266px 254.266px 254.266px",
+        "cardCount": 3,
+        "cardHeightSpread": 0,
+        "actionBottomSpread": 0,
+        "audienceLines": [
+          1,
+          1,
+          1
+        ],
+        "editionLinks": 0,
+        "currentPreviewLinks": 1,
+        "disabledPrimaryActions": 3,
+        "universalRows": 1,
+        "disabledUniversalActions": 1
+      },
+      "checks": {
+        "noDocumentOverflow": true,
+        "threeCards": true,
+        "noPlannedDownloadLinks": true,
+        "currentPreviewDiscoverable": true,
+        "plannedPrimaryActionsDisabled": true,
+        "oneUniversalRow": true,
+        "plannedUniversalActionDisabled": true,
+        "audienceSingleLine": true,
+        "desktopWidth": true,
+        "desktopEqualCards": true,
+        "desktopAlignedActions": true,
+        "desktopThreeColumns": true,
+        "mobileOneColumn": true,
+        "mobileBottomSheet": true,
+        "mobileScrollable": true,
+        "noPageErrors": true,
+        "focusRestore": true
+      },
+      "pageErrors": []
+    },
+    {
+      "locale": "zh-CN",
+      "profile": "mobile",
+      "screenshotPath": "Z:\\DroneDream-worktrees\\website-20260728\\website\\validation-receipts\\assets\\edition-universal-4477fd0\\zh-CN-mobile.png",
+      "metrics": {
+        "profileName": "mobile",
+        "viewportWidth": 390,
+        "documentWidth": 390,
+        "dialog": {
+          "top": 84,
+          "bottom": 844,
+          "width": 390,
+          "clientHeight": 759,
+          "scrollHeight": 1091,
+          "overflowY": "auto"
+        },
+        "gridColumns": "358px",
+        "cardCount": 3,
+        "cardHeightSpread": 0,
+        "actionBottomSpread": 467.15625,
+        "audienceLines": [
+          1,
+          1,
+          1
+        ],
+        "editionLinks": 0,
+        "currentPreviewLinks": 1,
+        "disabledPrimaryActions": 3,
+        "universalRows": 1,
+        "disabledUniversalActions": 1
+      },
+      "checks": {
+        "noDocumentOverflow": true,
+        "threeCards": true,
+        "noPlannedDownloadLinks": true,
+        "currentPreviewDiscoverable": true,
+        "plannedPrimaryActionsDisabled": true,
+        "oneUniversalRow": true,
+        "plannedUniversalActionDisabled": true,
+        "audienceSingleLine": true,
+        "desktopWidth": true,
+        "desktopEqualCards": true,
+        "desktopAlignedActions": true,
+        "desktopThreeColumns": true,
+        "mobileOneColumn": true,
+        "mobileBottomSheet": true,
+        "mobileScrollable": true,
+        "noPageErrors": true,
+        "focusRestore": true
+      },
+      "pageErrors": []
+    }
+  ]
+}

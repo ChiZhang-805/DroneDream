@@ -1,0 +1,214 @@
+{
+  "schemaVersion": 1,
+  "receiptKind": "website-source-validation-attestation",
+  "subjectCommit": "4477fd02b3c41548b96643cf520969fe833cc1c7",
+  "validatedAt": "2026-08-05T09:26:01.5792249Z",
+  "scope": "Metadata-driven Universal entry beneath the fail-closed Sim, Lab, and Field public-site edition chooser",
+  "environment": {
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "powershell": "5.1.26100.8875",
+    "node": "v24.14.1",
+    "npm": "11.11.0",
+    "python": "3.13.0",
+    "git": "2.55.0.windows.2",
+    "edge": "151.0.4129.59"
+  },
+  "sourceContract": {
+    "editionMetadata": "frontend/public/downloads/editions.json",
+    "primaryEditionOrder": [
+      "sim",
+      "lab",
+      "field"
+    ],
+    "editions": [
+      {
+        "id": "sim",
+        "fileName": "DroneDream-Sim-1.0.0.exe",
+        "releaseStatus": "planned-not-built",
+        "artifactMetadataPresent": false
+      },
+      {
+        "id": "lab",
+        "fileName": "DroneDream-Lab-1.0.0.exe",
+        "releaseStatus": "planned-not-built",
+        "artifactMetadataPresent": false
+      },
+      {
+        "id": "field",
+        "fileName": "DroneDream-Field-1.0.0.exe",
+        "releaseStatus": "planned-not-built",
+        "artifactMetadataPresent": false
+      },
+      {
+        "id": "universal",
+        "fileName": "DroneDream-Universal-1.0.0.exe",
+        "releaseStatus": "planned-not-built",
+        "artifactMetadataPresent": false
+      }
+    ],
+    "universalPresentation": {
+      "placement": "lightweight row beneath the three equal-height primary cards",
+      "currentState": "coming-soon-disabled",
+      "modeBoundary": "may switch workspaces later; does not imply that a UI mode unlocks real-hardware capability",
+      "requiresExplicitSelectionThenConfirmationWhenPublished": true
+    },
+    "publishedEditionEnablementRequires": [
+      "releaseStatus=published",
+      "version",
+      "fileName",
+      "downloadUrl",
+      "checksumUrl",
+      "signatureUrl",
+      "sizeBytes",
+      "sha256",
+      "sourceCommit",
+      "publishedAt"
+    ],
+    "currentPreviewRemainsSeparatelyDiscoverable": {
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "sizeBytes": 11115267,
+      "sha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "publishedAt": "2026-08-04"
+    }
+  },
+  "validation": [
+    {
+      "name": "focused edition chooser tests",
+      "command": "npm test -- EditionAvailability.test.ts EditionChooser.test.tsx PublicSite.test.tsx",
+      "result": "pass",
+      "testFiles": 3,
+      "tests": 27
+    },
+    {
+      "name": "frontend full test suite",
+      "command": "npm test -- --maxWorkers=1",
+      "result": "pass",
+      "testFiles": 62,
+      "tests": 425,
+      "durationSeconds": 109.37,
+      "logSha256": "4761505ff0fe464f2ec5b37a10d6aa6c1bc2ac71fe6fc702e84f6a5b713b3134"
+    },
+    {
+      "name": "frontend typecheck",
+      "command": "npm run typecheck",
+      "result": "pass",
+      "logSha256": "70b3c3927615afdf5f5a277b682ce10528f9baed352029eb1ad9b1146db47acd"
+    },
+    {
+      "name": "frontend lint",
+      "command": "npm run lint",
+      "result": "pass",
+      "logSha256": "0a0909db1fb8b2a2edb14bdc5a7992cbb6d02839f44caf6fdd98bd1d27c4afed"
+    },
+    {
+      "name": "frontend application build",
+      "command": "npm run build",
+      "result": "pass",
+      "advisories": [
+        "Vite reported a non-failing chunk-size advisory"
+      ],
+      "logSha256": "a6261c5ee681f68c2f7ef4a3f9366d1aa468ab44787e7425780c9e5431901e90"
+    },
+    {
+      "name": "shared site and console build",
+      "command": "powershell -File website/scripts/build-pages-site.ps1",
+      "result": "pass",
+      "sourceCommit": "4477fd02b3c41548b96643cf520969fe833cc1c7",
+      "fileCount": 163,
+      "sha256SumsEntries": 162,
+      "buildManifestSha256": "a76dbc8089d5be1a90c8bf7484d1e6f3aed336a66b3fd9c18542ff9a13e6c45f",
+      "sha256SumsSha256": "773053318bb2aefa7c1a15a919bea3e500171ca88897c384703ae74d0088e0ec",
+      "logSha256": "4d833ff7a6812276de9510e7a2780ff22b8ad71ca391aaef4ef0b495ab024b06",
+      "environmentNote": "The isolated exact-source clone used local-only placeholder values for the public Supabase build-variable names. It did not connect to production and no secret value was read or recorded."
+    },
+    {
+      "name": "website deployment contract",
+      "command": "python -m unittest runtime.tests.test_website_deployment",
+      "result": "pass",
+      "tests": 13,
+      "logSha256": "16860b2aba5e1681bd7f0a6ee7f74ac2b9e573905e5d131068ff6567360aa2fe"
+    },
+    {
+      "name": "Edge bilingual responsive visual audit",
+      "command": "node website/scripts/audit-edition-chooser.mjs",
+      "result": "pass",
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "desktopDialogWidth": 840,
+      "desktopGridColumns": 3,
+      "desktopCardHeightSpread": 0,
+      "desktopActionBaselineSpread": 0,
+      "plannedDownloadLinks": 0,
+      "disabledPrimaryActions": 3,
+      "universalRows": 1,
+      "disabledUniversalActions": 1,
+      "currentPreviewLinks": 1,
+      "documentWidthParity": true,
+      "mobileScrollableBottomSheet": true,
+      "focusRestoredAfterClose": true,
+      "pageErrors": 0
+    },
+    {
+      "name": "git whitespace validation",
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "rerunClassification": {
+    "initialSerialFullSuite": "61/62 files and 424/425 tests; one NewJob test reached its 5-second timeout during exact-source validation",
+    "focusedNewJobRerun": "41/41 tests passed",
+    "authoritativeSerialFullSuite": "62/62 files and 425/425 tests passed",
+    "classification": "transient timing fluctuation, not a reproducible product regression",
+    "sharedBuildPreparation": "Two isolated-build preparation attempts stopped before a successful build because the clean clone intentionally lacked untracked local build variables. The authoritative build passed after supplying local-only placeholder public values."
+  },
+  "visualEvidence": [
+    {
+      "path": "website/validation-receipts/assets/edition-universal-4477fd0/edition-chooser-audit.json",
+      "bytes": 6481,
+      "sha256": "04123ca15102a585fe147fca7536dbdab4521f6d170b89be1fc7dcde85c34ba5"
+    },
+    {
+      "path": "website/validation-receipts/assets/edition-universal-4477fd0/en-desktop.png",
+      "bytes": 295314,
+      "sha256": "18ced4d25a57fd52e5f9e8d7f562092fa1a18ae7b48d757be79ba0e542d6fa95"
+    },
+    {
+      "path": "website/validation-receipts/assets/edition-universal-4477fd0/en-mobile.png",
+      "bytes": 102276,
+      "sha256": "3677b9935060ed8f663ee9ca10c0baa68c9ba074d0305a3249f9b1a22d11b70c"
+    },
+    {
+      "path": "website/validation-receipts/assets/edition-universal-4477fd0/zh-CN-desktop.png",
+      "bytes": 282841,
+      "sha256": "1d32c7cc6a3d2a971477f08089742e4c9ccdc571afb6b5cd7ef98430124eadb8"
+    },
+    {
+      "path": "website/validation-receipts/assets/edition-universal-4477fd0/zh-CN-mobile.png",
+      "bytes": 94671,
+      "sha256": "00b9e9f0e78bb18d04dd4309221593e6a79c4ee4048f6094f9512c88f865df1d"
+    }
+  ],
+  "manualVisualReview": {
+    "performed": true,
+    "result": "pass",
+    "notes": "All four screenshots were inspected. Desktop retains three equal-height primary cards with aligned actions and a restrained Universal row beneath them. Mobile uses a one-column scrollable bottom sheet; Universal and the current preview remain reachable without horizontal overflow. English and Chinese copy are independently concise."
+  },
+  "boundaries": {
+    "deploymentPerformed": false,
+    "releaseModified": false,
+    "serverModified": false,
+    "dnsOrTlsModified": false,
+    "supabaseModified": false,
+    "technicalReportModified": false,
+    "editionBinariesAvailable": false,
+    "universalBinaryAvailable": false,
+    "unrelatedManualPdfWorkIncluded": false
+  }
+}
