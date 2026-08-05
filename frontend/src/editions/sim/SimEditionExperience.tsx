@@ -16,14 +16,25 @@ import "./sim.css";
 
 export function SimBrandLockup({ className = "" }: { className?: string }) {
   const classes = ["sim-brand-lockup", className].filter(Boolean).join(" ");
-  return <img className={classes} src={simDotLockup} alt="" aria-hidden="true" />;
+  return (
+    <img
+      className={classes}
+      src={simDotLockup}
+      alt=""
+      aria-hidden="true"
+      data-brand-edition="sim"
+    />
+  );
 }
 
 export function SimEditionBadge({ compact = false }: { compact?: boolean }) {
   const { locale } = useI18n();
   const copy = simCopy(locale);
   return (
-    <span className={`sim-edition-badge${compact ? " sim-edition-badge-compact" : ""}`}>
+    <span
+      className={`sim-edition-badge${compact ? " sim-edition-badge-compact" : ""}`}
+      data-brand-edition="sim"
+    >
       <img className="sim-brand-mark" src={simMark} alt="" aria-hidden="true" />
       {copy.editionBadge}
     </span>
@@ -34,7 +45,11 @@ export function SimEditionSettingsPanel() {
   const { locale } = useI18n();
   const copy = simCopy(locale);
   return (
-    <section className="sim-settings-panel" aria-labelledby="sim-settings-title">
+    <section
+      className="sim-settings-panel"
+      aria-labelledby="sim-settings-title"
+      data-brand-edition="sim"
+    >
       <div>
         <span className="sim-settings-kicker">{copy.fixedMode}</span>
         <h3 id="sim-settings-title">{copy.settingsTitle}</h3>
@@ -64,7 +79,7 @@ export function SimOverview() {
   const blocked = new URLSearchParams(location.search).has("blocked");
 
   return (
-    <div className="sim-overview-page">
+    <div className="sim-overview-page" data-brand-edition="sim">
       {blocked ? (
         <section className="sim-route-blocked" role="alert" aria-labelledby="sim-blocked-title">
           <ShieldCheck aria-hidden="true" />

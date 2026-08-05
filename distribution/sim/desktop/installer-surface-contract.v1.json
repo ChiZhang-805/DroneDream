@@ -13,10 +13,12 @@
   },
   "overlay": {
     "path": "distribution/sim/desktop/tauri.sim.conf.json",
+    "sha256": "fcbd5f1306ae8e8c9214dba7389df60cbcbf29424e3a10008ba6fbb3517c1dfe",
     "baseConfigPath": "desktop/src-tauri/tauri.conf.json",
     "baseConfigSha256": "cbcd45f68670e61c9e221ee292baeb4cefd26c492fb8511a20e9d41c34145cd5",
     "baseConfigMustRemainUniversal": true,
-    "artifactRenameRequired": true
+    "artifactRenameRequired": true,
+    "buildCommand": "npm --prefix desktop run tauri -- build --config ../distribution/sim/desktop/tauri.sim.conf.json"
   },
   "brandDonor": {
     "approvedConceptHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
@@ -27,14 +29,28 @@
     "approvedEditionAssetState": "vendored-exact-bytes",
     "approvedEditionAssetHashesVerified": true,
     "approvedEditionApplicationSourceWired": true,
-    "canonicalDonorState": "pending-universal-common-core",
-    "canonicalDonorManifestPath": null,
-    "canonicalDonorManifestSha256": null,
-    "canonicalDonorCommit": null,
-    "commonCoreBindingVerified": false,
-    "assetHashesVerified": false,
-    "iconOverridePresent": false,
+    "canonicalDonorState": "adopted-path-limited-brand-only",
+    "canonicalDonorReceiptPath": "distribution/sim/brand/canonical-donor-adoption-receipt.v1.json",
+    "canonicalDonorReceiptSha256": "81decef72e0028baecfee0e130d521cd2b7de34e9224883358ac1ebcdff27026",
+    "canonicalDonorManifestPath": "brand/generated/brand-assets.v1.json",
+    "canonicalDonorManifestSha256": "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34",
+    "canonicalDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
+    "commonCoreUpdated": false,
+    "commonCoreBindingVerified": true,
+    "assetHashesVerified": true,
+    "iconOverridePresent": true,
+    "iconPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+    "iconSha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+    "iconBytes": 54431,
+    "iconFrameSizesPx": [16, 20, 24, 32, 40, 48, 64, 128, 256],
     "masterRedrawAllowed": false
+  },
+  "websiteHandoff": {
+    "path": "distribution/sim/release/website-exact-exe-handoff.v1.json",
+    "sha256": "a0c8e2252d0a82b5b8918e467907a27fd94953ce3cfbd60546f91b8f4ed765cc",
+    "state": "awaiting-exact-yellow2-and-lifecycle-handoff"
   },
   "staticSourceRefs": [
     {
@@ -111,7 +127,6 @@
     "shortcutsObserved": false,
     "uninstallObserved": false,
     "rollbackObserved": false,
-    "canonicalIconIntegrated": false,
     "validated": false,
     "promotionReady": false
   }

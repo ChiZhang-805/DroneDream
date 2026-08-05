@@ -3,10 +3,10 @@
   "kind": "dronedream-sim-yellow-execution-plan",
   "planVersion": "1.0.0",
   "editionId": "sim",
-  "executionClass": "GREEN-plan-only",
-  "state": "pre-registered-not-authorized",
+  "executionClass": "GREEN-static-ready-yellow2-not-authorized",
+  "state": "yellow1-complete-canonical-brand-adopted-yellow2-awaiting-authorization",
   "authorization": {
-    "yellow1Approved": false,
+    "yellow1Approved": true,
     "yellow2Approved": false,
     "yellow3Approved": false,
     "separateApprovalRequiredForEachStage": true,
@@ -23,8 +23,12 @@
       "mobile-en",
       "mobile-zh-CN"
     ],
-    "browserStarted": false,
-    "productionBuildExecuted": false
+    "browserStarted": true,
+    "productionBuildExecuted": true,
+    "productSourceCommit": "1af895287c2c8249acfa581919446e24ec16f575",
+    "evidenceCommit": "b3180803db89de0dab7f01dca374cb47f8021031",
+    "evidenceRecordPath": "distribution/sim/frontend/yellow-1-evidence-record.v1.json",
+    "evidenceRecordSha256": "09c7683f3c0091093f6078f47bd242876a129c10db5d46ad1218ba07e06659d5"
   },
   "approvedEditionAssetGate": {
     "manifestPath": "distribution/sim/brand/approved-edition-assets.v1.json",
@@ -35,32 +39,49 @@
       "sim-dot-lockup-png": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548"
     },
     "applicationSourceWired": true,
-    "installerDerivativeReady": false,
-    "canonicalUniversalDonorIntegrated": false
+    "installerDerivativeReady": true,
+    "canonicalUniversalDonorIntegrated": true,
+    "adoptionReceiptPath": "distribution/sim/brand/canonical-donor-adoption-receipt.v1.json",
+    "adoptionReceiptSha256": "81decef72e0028baecfee0e130d521cd2b7de34e9224883358ac1ebcdff27026",
+    "installerIcoPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+    "installerIcoSha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+    "installerIcoBytes": 54431,
+    "installerIcoFrameSizesPx": [16, 20, 24, 32, 40, 48, 64, 128, 256]
   },
   "canonicalSyncGate": {
     "auditPath": "distribution/sim/brand/canonical-sync-conflict-audit.v1.json",
     "auditSha256": "9e38977b9f29bcc32ccb4ae399784462771954ad50dfb1eaef52e35661fbcd2d",
-    "state": "observed-not-merged-awaiting-authoritative-handoff",
+    "historicalAuditState": "observed-not-merged-awaiting-authoritative-handoff",
+    "state": "canonical-brand-adopted-path-limited",
     "baseCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "simOverlayCheckpoint": "4086ff3134847b5bbe049cc1f43b17141e984f8c",
     "donorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
     "recordedCommonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "recordedCommonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
-    "authoritativeProductSourceCommit": null,
-    "authoritativeEvidenceCommit": null,
-    "formalHandoffReceived": false,
-    "semanticIntegrationExecuted": false,
-    "canonicalBrandManifestConsumed": false,
-    "installerIcoConsumed": false,
+    "brandDonorCommitIsCommonCore": false,
+    "adoptionReceiptPath": "distribution/sim/brand/canonical-donor-adoption-receipt.v1.json",
+    "adoptionReceiptSha256": "81decef72e0028baecfee0e130d521cd2b7de34e9224883358ac1ebcdff27026",
+    "formalHandoffReceived": true,
+    "semanticIntegrationExecuted": true,
+    "canonicalBrandManifestConsumed": true,
+    "installerIcoConsumed": true,
     "releaseAsset": false,
-    "yellow2Ready": false
+    "yellow2Ready": true
   },
   "artifactGate": {
     "yellow2OutputFileName": "DroneDream-Sim-1.0.0.exe",
     "yellow2ReceiptKind": "dronedream-sim-yellow-build-receipt",
     "yellow3RequiresExactYellow2Receipt": true,
-    "yellow2BlockedUntilInstallerDerivativeContract": true,
+    "yellow2BlockedUntilInstallerDerivativeContract": false,
+    "yellow2StaticReady": true,
+    "installerSurfaceContract": {
+      "path": "distribution/sim/desktop/installer-surface-contract.v1.json",
+      "sha256": "1ceab6b419eb8b2416d8b744a0face49cab78a96a7601f16b825d8f804d2d88b"
+    },
+    "websiteHandoffContract": {
+      "path": "distribution/sim/release/website-exact-exe-handoff.v1.json",
+      "sha256": "a0c8e2252d0a82b5b8918e467907a27fd94953ce3cfbd60546f91b8f4ed765cc"
+    },
     "requiredReceiptFields": [
       "sourceCommit",
       "sourceTreeState",

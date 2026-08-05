@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -26,6 +27,7 @@ READINESS_AUDIT_PATH = (
 SURFACE_CONTRACT_PATH = (
     ROOT / "distribution" / "sim" / "desktop" / "installer-surface-contract.v1.json"
 )
+OVERLAY_PATH = ROOT / "distribution" / "sim" / "desktop" / "tauri.sim.conf.json"
 TOOL_PATH = ROOT / "distribution" / "sim" / "tools" / "sim_installer_contract.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_installer_contract", TOOL_PATH)
@@ -323,9 +325,14 @@ class SimInstallerContractTests(unittest.TestCase):
         validated = self.validate_surface(self.installer_surface())
         self.assertEqual(validated["identity"]["displayName"], "DroneDream \u00b7 SIM")
         self.assertEqual(validated["installerUi"]["locales"], ["en", "zh-CN"])
-        self.assertFalse(validated["brandDonor"]["iconOverridePresent"])
-        self.assertFalse(validated["brandDonor"]["commonCoreBindingVerified"])
-        self.assertFalse(validated["brandDonor"]["assetHashesVerified"])
+        self.assertTrue(validated["brandDonor"]["iconOverridePresent"])
+        self.assertTrue(validated["brandDonor"]["commonCoreBindingVerified"])
+        self.assertTrue(validated["brandDonor"]["assetHashesVerified"])
+        self.assertFalse(validated["brandDonor"]["commonCoreUpdated"])
+        self.assertEqual(
+            validated["brandDonor"]["canonicalDonorCommit"],
+            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+        )
         self.assertEqual(
             validated["brandDonor"]["approvedEditionAssetState"],
             "vendored-exact-bytes",
@@ -345,16 +352,20 @@ class SimInstallerContractTests(unittest.TestCase):
                 ):
                     self.validate_surface(invalid)
 
-    def test_installer_surface_rejects_canonical_icon_claim_before_donor(self) -> None:
+    def test_installer_surface_rejects_canonical_donor_or_icon_drift(self) -> None:
         invalid = self.installer_surface()
         invalid["brandDonor"]["canonicalDonorCommit"] = "e374d3f8d96b1265fcdb06864208b676566e94d9"
-        invalid["brandDonor"]["iconOverridePresent"] = True
         with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "brand donor state"):
             self.validate_surface(invalid)
 
-    def test_installer_surface_rejects_invalid_donor_input_while_pending(self) -> None:
+        invalid = self.installer_surface()
+        invalid["brandDonor"]["iconSha256"] = "0" * 64
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "brand donor state"):
+            self.validate_surface(invalid)
+
+    def test_installer_surface_rejects_external_donor_override(self) -> None:
         with self.assertRaisesRegex(
-            sim_contract.SimInstallerContractError, "brand donor verification failed"
+            sim_contract.SimInstallerContractError, "cannot override"
         ):
             sim_contract.validate_installer_surface_contract(
                 self.installer_surface(),
@@ -369,6 +380,81 @@ class SimInstallerContractTests(unittest.TestCase):
         invalid["staticSourceRefs"][0]["sha256"] = "0" * 64
         with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "SHA-256 drifted"):
             self.validate_surface(invalid)
+
+        invalid = self.installer_surface()
+        invalid["staticSourceRefs"][0]["requiredText"][0] = "unsafe NSIS drift"
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError, "required text contract"
+        ):
+            self.validate_surface(invalid)
+
+        invalid = self.installer_surface()
+        invalid["overlay"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError, "overlay policy"
+        ):
+            self.validate_surface(invalid)
+
+    def test_tauri_overlay_rejects_wrong_edition_or_icon(self) -> None:
+        overlay = sim_contract.validate_sim_tauri_overlay_config(
+            load_json(OVERLAY_PATH), repo_root=ROOT
+        )
+        self.assertEqual(overlay["productName"], "DroneDream \u00b7 SIM")
+
+        invalid = deepcopy(overlay)
+        invalid["productName"] = "DroneDream \u00b7 LAB"
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError, "overlay identity"
+        ):
+            sim_contract.validate_sim_tauri_overlay_config(invalid, repo_root=ROOT)
+
+        invalid = deepcopy(overlay)
+        invalid["bundle"]["icon"] = ["icons/icon.ico"]
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError, "overlay identity"
+        ):
+            sim_contract.validate_sim_tauri_overlay_config(invalid, repo_root=ROOT)
+
+    def test_release_source_static_policy_passes_without_building(self) -> None:
+        completed = subprocess.run(
+            ["node", "desktop/scripts/verify-release-source-policy.mjs"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("Release-source policy verified", completed.stdout)
+
+    def test_website_handoff_stays_exact_and_awaiting(self) -> None:
+        surface = self.validate_surface(self.installer_surface())
+        handoff_path = ROOT / surface["websiteHandoff"]["path"]
+        handoff = sim_contract.validate_website_handoff_contract(
+            load_json(handoff_path)
+        )
+        self.assertEqual(
+            handoff["artifactIdentity"]["fileName"],
+            "DroneDream-Sim-1.0.0.exe",
+        )
+        self.assertFalse(handoff["current"]["exactExeReceived"])
+        self.assertFalse(handoff["current"]["releaseReady"])
+
+    def test_website_handoff_rejects_preview_or_release_overclaim(self) -> None:
+        surface = self.installer_surface()
+        handoff = load_json(ROOT / surface["websiteHandoff"]["path"])
+        handoff["artifactIdentity"]["previewSubstitutionAllowed"] = True
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError, "artifact identity"
+        ):
+            sim_contract.validate_website_handoff_contract(handoff)
+
+        handoff = load_json(ROOT / surface["websiteHandoff"]["path"])
+        handoff["current"]["releaseReady"] = True
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError, "overclaims"
+        ):
+            sim_contract.validate_website_handoff_contract(handoff)
 
     def test_installer_surface_rejects_observed_or_promotion_claims(self) -> None:
         for claim in ("installerExecuted", "rollbackObserved", "promotionReady"):

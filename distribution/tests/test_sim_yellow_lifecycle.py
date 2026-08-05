@@ -187,7 +187,7 @@ class SimYellowLifecycleTests(unittest.TestCase):
         self.assertTrue(
             all(case["status"] == "planned-not-executed" for case in self.contract["yellow3Matrix"])
         )
-        self.assertFalse(self.contract["authorization"]["yellow1Approved"])
+        self.assertTrue(self.contract["authorization"]["yellow1Approved"])
         self.assertFalse(self.contract["authorization"]["yellow2Approved"])
         self.assertFalse(self.contract["authorization"]["yellow3Approved"])
         asset_gate = self.contract["approvedEditionAssetGate"]
@@ -196,26 +196,28 @@ class SimYellowLifecycleTests(unittest.TestCase):
             ["sim-mark-png", "sim-dot-lockup-png"],
         )
         self.assertTrue(asset_gate["applicationSourceWired"])
-        self.assertFalse(asset_gate["installerDerivativeReady"])
-        self.assertFalse(asset_gate["canonicalUniversalDonorIntegrated"])
+        self.assertTrue(asset_gate["installerDerivativeReady"])
+        self.assertTrue(asset_gate["canonicalUniversalDonorIntegrated"])
         sync_gate = self.contract["canonicalSyncGate"]
         self.assertEqual(
             sync_gate["state"],
-            "observed-not-merged-awaiting-authoritative-handoff",
+            "canonical-brand-adopted-path-limited",
         )
         self.assertEqual(
             sync_gate["recordedCommonCoreCommit"],
             "e374d3f8d96b1265fcdb06864208b676566e94d9",
         )
-        self.assertIsNone(sync_gate["authoritativeProductSourceCommit"])
-        self.assertIsNone(sync_gate["authoritativeEvidenceCommit"])
+        self.assertFalse(sync_gate["brandDonorCommitIsCommonCore"])
+        self.assertTrue(sync_gate["formalHandoffReceived"])
+        self.assertTrue(sync_gate["installerIcoConsumed"])
         self.assertFalse(sync_gate["releaseAsset"])
-        self.assertFalse(sync_gate["yellow2Ready"])
-        self.assertTrue(
+        self.assertTrue(sync_gate["yellow2Ready"])
+        self.assertFalse(
             self.contract["artifactGate"][
                 "yellow2BlockedUntilInstallerDerivativeContract"
             ]
         )
+        self.assertTrue(self.contract["artifactGate"]["yellow2StaticReady"])
 
     def test_stage_plans_expand_only_owned_run_paths_without_execution(self) -> None:
         yellow2 = sim_yellow.create_stage_plan(
@@ -226,9 +228,9 @@ class SimYellowLifecycleTests(unittest.TestCase):
         self.assertIn("sim-y2-20260805T120000Z-1234abcd", yellow2["paths"]["runRootTemplate"])
         self.assertFalse(yellow2["executionAuthorized"])
         self.assertTrue(all(value is False for value in yellow2["nonClaims"].values()))
-        self.assertFalse(yellow2["approvedEditionAssetGate"]["installerDerivativeReady"])
-        self.assertFalse(yellow2["canonicalSyncGate"]["formalHandoffReceived"])
-        self.assertFalse(yellow2["canonicalSyncGate"]["installerIcoConsumed"])
+        self.assertTrue(yellow2["approvedEditionAssetGate"]["installerDerivativeReady"])
+        self.assertTrue(yellow2["canonicalSyncGate"]["formalHandoffReceived"])
+        self.assertTrue(yellow2["canonicalSyncGate"]["installerIcoConsumed"])
 
         yellow3 = sim_yellow.create_stage_plan(
             self.contract,
@@ -282,16 +284,16 @@ class SimYellowLifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(sim_yellow.SimYellowLifecycleError, "matrix case"):
             self.validate(invalid)
 
-    def test_rejects_canonical_sync_handoff_or_release_overclaim(self) -> None:
+    def test_rejects_canonical_sync_rollback_or_release_overclaim(self) -> None:
         for key, value in (
-            ("formalHandoffReceived", True),
-            ("semanticIntegrationExecuted", True),
-            ("canonicalBrandManifestConsumed", True),
-            ("installerIcoConsumed", True),
+            ("formalHandoffReceived", False),
+            ("semanticIntegrationExecuted", False),
+            ("canonicalBrandManifestConsumed", False),
+            ("installerIcoConsumed", False),
             ("releaseAsset", True),
-            ("yellow2Ready", True),
-            ("authoritativeProductSourceCommit", "d" * 40),
-            ("authoritativeEvidenceCommit", "e" * 40),
+            ("yellow2Ready", False),
+            ("brandDonorCommitIsCommonCore", True),
+            ("adoptionReceiptSha256", "0" * 64),
         ):
             with self.subTest(key=key):
                 invalid = deepcopy(load_json(PLAN_PATH))

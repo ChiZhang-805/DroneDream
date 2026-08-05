@@ -17,6 +17,7 @@
     ]
   },
   "bundle": {
+    "icon": ["../../distribution/sim/desktop/icons/dronedream-sim.ico"],
     "shortDescription": "PX4 SITL and Gazebo simulation workspace",
     "longDescription": "DroneDream · SIM provides simulation-only PX4 SITL and Gazebo workflows. Runtime Base and Engine Pack remain external dependencies. Hardware and HITL capabilities are not included or authorized."
   }

@@ -192,6 +192,7 @@ export function DistributionSetupPanel({
       aria-labelledby={`${id}-title`}
       data-can-apply="false"
       data-edition={selection.editionId}
+      data-brand-edition="sim"
       data-capability-boundary="simulation-only"
       data-native-plan-status={nativePlanState.status}
     >

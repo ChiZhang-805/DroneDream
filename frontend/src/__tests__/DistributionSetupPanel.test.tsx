@@ -87,6 +87,7 @@ describe("DistributionSetupPanel", () => {
       .toBeInTheDocument();
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(container.querySelector("[data-can-apply='false']")).toBeTruthy();
+    expect(container.querySelector("[data-brand-edition='sim']")).toBeTruthy();
   });
 
   it("rejects a stored Field selection and persists only the locked Sim draft", async () => {

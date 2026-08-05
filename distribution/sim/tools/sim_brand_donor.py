@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+import struct
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
@@ -402,6 +403,111 @@ SYNC_AUDIT_RESOLUTIONS = {
     },
 }
 
+ADOPTION_RECEIPT_KEYS = {
+    "schemaVersion",
+    "kind",
+    "receiptVersion",
+    "editionId",
+    "state",
+    "source",
+    "canonicalRefs",
+    "assetBindings",
+    "semanticSync",
+    "installerBinding",
+    "nonClaims",
+}
+ADOPTION_SOURCE_KEYS = {
+    "donorBranch",
+    "brandDonorCommit",
+    "donorParentCommit",
+    "authorizationThreadId",
+    "authorizationDate",
+    "commonCoreCommit",
+    "commonCoreHash",
+    "brandDonorIsCommonCoreBaseline",
+    "commonCoreUpdated",
+}
+ADOPTION_REF_KEYS = {
+    "brandContract",
+    "assetManifest",
+    "visualReceipt",
+    "brandLockupComponent",
+}
+ADOPTION_ASSET_KEYS = {
+    "role",
+    "donorPath",
+    "editionPath",
+    "sha256",
+    "bytes",
+    "frameSizesPx",
+    "exactByteIdentity",
+}
+ADOPTION_SEMANTIC_KEYS = {
+    "mode",
+    "donorBrandLockupPath",
+    "simAdapterPaths",
+    "dataBrandEdition",
+    "lockedEdition",
+    "editionRadioPresent",
+    "labOrFieldSwitchPresent",
+    "hardwareAuthorityGranted",
+    "wholeCommitCherryPicked",
+    "benchmarkOrBackendPathsAdopted",
+}
+ADOPTION_INSTALLER_KEYS = {
+    "overlayPath",
+    "iconPath",
+    "artifactFileName",
+    "productVersion",
+    "executionAuthorized",
+}
+ADOPTION_NONCLAIM_KEYS = {
+    "installerBuilt",
+    "installerExecuted",
+    "releaseAsset",
+    "promotionReady",
+    "validatedVehiclePackCount",
+    "yellow3Authorized",
+    "redAuthorized",
+}
+ADOPTION_REF_PATHS = {
+    "brandContract": "brand/brand-editions.v1.json",
+    "assetManifest": "brand/generated/brand-assets.v1.json",
+    "visualReceipt": "brand/generated/brand-visual-receipt.v1.json",
+    "brandLockupComponent": "frontend/src/components/BrandLockup.tsx",
+}
+ADOPTION_REF_SHA256 = {
+    "brandContract": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc",
+    "assetManifest": "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34",
+    "visualReceipt": "2c980725b436beb887cdccc5bb3767967bf56efd3eb6d98057f9bef1b2d34ab3",
+    "brandLockupComponent": (
+        "6817c7d1eb1dbe35c42e3e60e728f7ff0f79db623822c04490e7962ab56d46d5"
+    ),
+}
+ADOPTION_ASSETS = {
+    "sim-mark-png": {
+        "donorPath": "brand/source/approved/sim-mark-1024.png",
+        "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
+        "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+        "bytes": 162699,
+        "frameSizesPx": None,
+    },
+    "sim-dot-lockup-png": {
+        "donorPath": "brand/source/approved/sim-dot-lockup.png",
+        "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-dot-lockup.png",
+        "sha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+        "bytes": 77713,
+        "frameSizesPx": None,
+    },
+    "sim-windows-ico": {
+        "donorPath": "brand/generated/sim/windows/icon.ico",
+        "editionPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+        "sha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+        "bytes": 54431,
+        "frameSizesPx": [16, 20, 24, 32, 40, 48, 64, 128, 256],
+    },
+}
+
 
 class SimBrandDonorError(ValueError):
     """Raised when canonical donor evidence is incomplete or inconsistent."""
@@ -558,6 +664,25 @@ def _validate_asset_signature(payload: bytes, mime_type: str, label: str) -> Non
         raise SimBrandDonorError(f"{label} is not recognizable PNG content")
     if mime_type == "image/x-icon" and not payload.startswith(b"\x00\x00\x01\x00"):
         raise SimBrandDonorError(f"{label} is not recognizable ICO content")
+
+
+def _ico_frame_sizes(payload: bytes, label: str) -> list[int]:
+    if len(payload) < 6:
+        raise SimBrandDonorError(f"{label} ICO header is truncated")
+    reserved, image_type, count = struct.unpack_from("<HHH", payload)
+    if reserved != 0 or image_type != 1 or count < 1 or len(payload) < 6 + count * 16:
+        raise SimBrandDonorError(f"{label} ICO directory is invalid")
+    sizes: list[int] = []
+    for index in range(count):
+        width, height, _, _, _, bits, size, offset = struct.unpack_from(
+            "<BBBBHHII", payload, 6 + index * 16
+        )
+        width = width or 256
+        height = height or 256
+        if width != height or bits != 32 or offset + size > len(payload):
+            raise SimBrandDonorError(f"{label} ICO frame {index} is invalid")
+        sizes.append(width)
+    return sizes
 
 
 def validate_donor_intake(document: Any, *, repo_root: Path) -> dict[str, Any]:
@@ -1190,6 +1315,179 @@ def validate_canonical_reconciliation_candidate(
     return candidate
 
 
+def validate_canonical_donor_adoption_receipt(
+    document: Any,
+    *,
+    repo_root: Path,
+) -> dict[str, Any]:
+    receipt = _exact_keys(
+        document, ADOPTION_RECEIPT_KEYS, "SIM canonical donor adoption receipt"
+    )
+    if (
+        receipt["schemaVersion"] != 1
+        or receipt["kind"]
+        != "dronedream-sim-canonical-brand-donor-adoption-receipt"
+        or receipt["receiptVersion"] != "1.0.0"
+        or receipt["editionId"] != "sim"
+        or receipt["state"] != "canonical-brand-adopted-yellow2-static-ready"
+    ):
+        raise SimBrandDonorError("SIM canonical donor adoption identity drifted")
+
+    source = _exact_keys(receipt["source"], ADOPTION_SOURCE_KEYS, "adoption source")
+    if source != {
+        "donorBranch": "origin/codex/software",
+        "brandDonorCommit": RECONCILIATION_DONOR_COMMIT,
+        "donorParentCommit": RECONCILIATION_PARENT_COMMIT,
+        "authorizationThreadId": APPROVED_SOURCE_THREAD_ID,
+        "authorizationDate": "2026-08-05",
+        "commonCoreCommit": MINIMUM_COMMON_CORE_ANCESTOR,
+        "commonCoreHash": (
+            "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b"
+        ),
+        "brandDonorIsCommonCoreBaseline": False,
+        "commonCoreUpdated": False,
+    }:
+        raise SimBrandDonorError("SIM donor and commonCore classification drifted")
+    if (
+        not _git_is_ancestor(
+            repo_root, source["brandDonorCommit"], source["donorBranch"]
+        )
+        or not _git_is_ancestor(
+            repo_root, source["commonCoreCommit"], source["brandDonorCommit"]
+        )
+        or _git_common_core_hash(
+            repo_root, source["commonCoreCommit"], COMMON_CORE_PATHS
+        )
+        != source["commonCoreHash"]
+    ):
+        raise SimBrandDonorError("SIM donor or retained commonCore ancestry drifted")
+
+    refs = _exact_keys(receipt["canonicalRefs"], ADOPTION_REF_KEYS, "adoption refs")
+    donor_payloads: dict[str, bytes] = {}
+    for role, expected_path in ADOPTION_REF_PATHS.items():
+        ref = _exact_keys(refs[role], FILE_REF_KEYS, f"adoption ref {role}")
+        payload = _git_asset_reader(
+            repo_root, source["brandDonorCommit"], expected_path
+        )
+        if ref != {
+            "path": expected_path,
+            "sha256": ADOPTION_REF_SHA256[role],
+        } or sha256_bytes(payload) != ref["sha256"]:
+            raise SimBrandDonorError(f"canonical adoption ref {role} drifted")
+        donor_payloads[role] = payload
+    brand_contract = _json_payload(donor_payloads["brandContract"], "brand contract")
+    asset_manifest = _json_payload(donor_payloads["assetManifest"], "asset manifest")
+    visual_receipt = _json_payload(donor_payloads["visualReceipt"], "visual receipt")
+    if (
+        brand_contract.get("editions", {}).get("sim", {}).get("productName")
+        != "DroneDream · SIM"
+        or brand_contract.get("safety")
+        != {"presentationOnly": True, "grantsHardwareAuthority": False}
+        or asset_manifest.get("presentationOnly") is not True
+        or asset_manifest.get("grantsHardwareAuthority") is not False
+        or visual_receipt.get("releaseAsset") is not False
+    ):
+        raise SimBrandDonorError("canonical adoption safety claims drifted")
+    if b"data-brand-edition={edition}" not in donor_payloads["brandLockupComponent"]:
+        raise SimBrandDonorError("canonical BrandLockup edition binding is absent")
+
+    bindings = receipt["assetBindings"]
+    if not isinstance(bindings, list) or len(bindings) != len(ADOPTION_ASSETS):
+        raise SimBrandDonorError("canonical adoption asset inventory is incomplete")
+    observed_roles: list[str] = []
+    for index, raw_binding in enumerate(bindings):
+        binding = _exact_keys(
+            raw_binding, ADOPTION_ASSET_KEYS, f"adoption asset {index}"
+        )
+        role = binding["role"]
+        expected = ADOPTION_ASSETS.get(role)
+        if expected is None or role in observed_roles or binding != {
+            "role": role,
+            **expected,
+            "exactByteIdentity": True,
+        }:
+            raise SimBrandDonorError("canonical adoption asset metadata drifted")
+        donor_bytes = _git_asset_reader(
+            repo_root, source["brandDonorCommit"], binding["donorPath"]
+        )
+        edition_path = _resolve(
+            repo_root, binding["editionPath"], f"adoption asset {role}"
+        )
+        edition_bytes = edition_path.read_bytes()
+        if (
+            donor_bytes != edition_bytes
+            or len(edition_bytes) != binding["bytes"]
+            or sha256_bytes(edition_bytes) != binding["sha256"]
+        ):
+            raise SimBrandDonorError(f"canonical adoption {role} bytes drifted")
+        if role == "sim-windows-ico" and _ico_frame_sizes(
+            edition_bytes, role
+        ) != binding["frameSizesPx"]:
+            raise SimBrandDonorError("canonical Sim ICO frame inventory drifted")
+        observed_roles.append(role)
+    if tuple(observed_roles) != tuple(ADOPTION_ASSETS):
+        raise SimBrandDonorError("canonical adoption asset ordering drifted")
+
+    semantic = _exact_keys(
+        receipt["semanticSync"], ADOPTION_SEMANTIC_KEYS, "adoption semantic sync"
+    )
+    if semantic != {
+        "mode": "path-limited-semantic",
+        "donorBrandLockupPath": ADOPTION_REF_PATHS["brandLockupComponent"],
+        "simAdapterPaths": [
+            "frontend/src/editions/sim/SimEditionExperience.tsx",
+            "frontend/src/components/DistributionSetupPanel.tsx",
+            "distribution/sim/desktop/tauri.sim.conf.json",
+        ],
+        "dataBrandEdition": "sim",
+        "lockedEdition": "sim",
+        "editionRadioPresent": False,
+        "labOrFieldSwitchPresent": False,
+        "hardwareAuthorityGranted": False,
+        "wholeCommitCherryPicked": False,
+        "benchmarkOrBackendPathsAdopted": False,
+    }:
+        raise SimBrandDonorError("canonical donor semantic boundary drifted")
+    adapter_sources = [
+        _resolve(repo_root, path, "Sim brand adapter").read_text(encoding="utf-8")
+        for path in semantic["simAdapterPaths"][:2]
+    ]
+    if any('data-brand-edition="sim"' not in source for source in adapter_sources):
+        raise SimBrandDonorError("Sim data-brand-edition binding is absent")
+
+    installer = _exact_keys(
+        receipt["installerBinding"], ADOPTION_INSTALLER_KEYS, "adoption installer"
+    )
+    if installer != {
+        "overlayPath": "distribution/sim/desktop/tauri.sim.conf.json",
+        "iconPath": ADOPTION_ASSETS["sim-windows-ico"]["editionPath"],
+        "artifactFileName": "DroneDream-Sim-1.0.0.exe",
+        "productVersion": "1.0.0",
+        "executionAuthorized": False,
+    }:
+        raise SimBrandDonorError("canonical donor installer binding drifted")
+    overlay = load_json(_resolve(repo_root, installer["overlayPath"], "Sim overlay"))
+    if overlay.get("bundle", {}).get("icon") != [
+        "../../distribution/sim/desktop/icons/dronedream-sim.ico"
+    ]:
+        raise SimBrandDonorError("canonical Sim ICO is not wired into the overlay")
+
+    non_claims = _exact_keys(
+        receipt["nonClaims"], ADOPTION_NONCLAIM_KEYS, "adoption non-claims"
+    )
+    if non_claims != {
+        "installerBuilt": False,
+        "installerExecuted": False,
+        "releaseAsset": False,
+        "promotionReady": False,
+        "validatedVehiclePackCount": 0,
+        "yellow3Authorized": False,
+        "redAuthorized": False,
+    }:
+        raise SimBrandDonorError("canonical donor adoption overclaims readiness")
+    return receipt
+
+
 def validate_canonical_sync_conflict_audit(
     document: Any,
     *,
@@ -1396,6 +1694,16 @@ def main() -> int:
             "distribution/sim/brand/canonical-reconciliation-candidate.v1.json"
         ),
     )
+    adoption_parser = subparsers.add_parser("verify-adoption")
+    adoption_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    adoption_parser.add_argument(
+        "receipt",
+        type=Path,
+        nargs="?",
+        default=Path(
+            "distribution/sim/brand/canonical-donor-adoption-receipt.v1.json"
+        ),
+    )
     sync_audit_parser = subparsers.add_parser("verify-sync-audit")
     sync_audit_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     sync_audit_parser.add_argument(
@@ -1428,6 +1736,10 @@ def main() -> int:
         elif args.command == "verify-reconciliation":
             validate_canonical_reconciliation_candidate(
                 load_json(args.candidate), repo_root=repo_root
+            )
+        elif args.command == "verify-adoption":
+            validate_canonical_donor_adoption_receipt(
+                load_json(args.receipt), repo_root=repo_root
             )
         elif args.command == "verify-sync-audit":
             validate_canonical_sync_conflict_audit(

@@ -12,7 +12,6 @@ import hashlib
 import importlib.util
 import json
 import re
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -184,6 +183,7 @@ SURFACE_KEYS = {
     "identity",
     "overlay",
     "brandDonor",
+    "websiteHandoff",
     "staticSourceRefs",
     "installerUi",
     "shortcuts",
@@ -200,10 +200,12 @@ SURFACE_IDENTITY_KEYS = {
 }
 SURFACE_OVERLAY_KEYS = {
     "path",
+    "sha256",
     "baseConfigPath",
     "baseConfigSha256",
     "baseConfigMustRemainUniversal",
     "artifactRenameRequired",
+    "buildCommand",
 }
 SURFACE_BRAND_KEYS = {
     "approvedConceptHandoffSha256",
@@ -215,14 +217,24 @@ SURFACE_BRAND_KEYS = {
     "approvedEditionAssetHashesVerified",
     "approvedEditionApplicationSourceWired",
     "canonicalDonorState",
+    "canonicalDonorReceiptPath",
+    "canonicalDonorReceiptSha256",
     "canonicalDonorManifestPath",
     "canonicalDonorManifestSha256",
     "canonicalDonorCommit",
+    "commonCoreCommit",
+    "commonCoreHash",
+    "commonCoreUpdated",
     "commonCoreBindingVerified",
     "assetHashesVerified",
     "iconOverridePresent",
+    "iconPath",
+    "iconSha256",
+    "iconBytes",
+    "iconFrameSizesPx",
     "masterRedrawAllowed",
 }
+SURFACE_WEBSITE_HANDOFF_KEYS = {"path", "sha256", "state"}
 SURFACE_SOURCE_REF_KEYS = {"path", "sha256", "requiredText"}
 SURFACE_UI_KEYS = {
     "locales",
@@ -251,10 +263,89 @@ SURFACE_NONCLAIM_KEYS = {
     "shortcutsObserved",
     "uninstallObserved",
     "rollbackObserved",
-    "canonicalIconIntegrated",
     "validated",
     "promotionReady",
 }
+WEBSITE_HANDOFF_KEYS = {
+    "schemaVersion",
+    "kind",
+    "contractVersion",
+    "editionId",
+    "state",
+    "recipient",
+    "artifactIdentity",
+    "requiredHandoffFields",
+    "consistency",
+    "current",
+    "execution",
+}
+WEBSITE_RECIPIENT_KEYS = {
+    "branch",
+    "productSourceCommit",
+    "evidenceCommit",
+    "evidenceCommitIsProductSource",
+    "behavior",
+}
+WEBSITE_IDENTITY_KEYS = {
+    "fileName",
+    "version",
+    "editionDisplayName",
+    "previewSubstitutionAllowed",
+    "crossEditionSubstitutionAllowed",
+}
+WEBSITE_CONSISTENCY_KEYS = {
+    "sameEditionRequired",
+    "sameUrlFamilyRequired",
+    "uniqueShaUrlTagRequired",
+    "sourceAndEvidenceMustRemainSeparate",
+    "signatureSidecarOptionalOnlyWhenStateNotIssued",
+}
+WEBSITE_CURRENT_KEYS = {
+    "exactExeReceived",
+    "productSourceCommit",
+    "absoluteExePath",
+    "bytes",
+    "sha256",
+    "authenticodeState",
+    "updaterSigPath",
+    "updaterSigSha256",
+    "receiptPath",
+    "receiptSha256",
+    "manifestPath",
+    "manifestSha256",
+    "buildCount",
+    "lifecycleValidated",
+    "releaseReady",
+}
+WEBSITE_EXECUTION_KEYS = {
+    "installerBuilt",
+    "installerExecuted",
+    "uploaded",
+    "releaseBranchCreated",
+}
+WEBSITE_REQUIRED_FIELDS = (
+    "exactCleanProductSourceCommit",
+    "absoluteExePath",
+    "fileName",
+    "version",
+    "bytes",
+    "sha256Lowercase",
+    "authenticodeState",
+    "updaterSigPath",
+    "updaterSigSha256",
+    "receiptPath",
+    "receiptSha256",
+    "manifestPath",
+    "manifestSha256",
+    "buildCount",
+    "freshInstallBoundary",
+    "overlayBoundary",
+    "uninstallBoundary",
+    "shortcutBoundary",
+    "webView2Boundary",
+    "localeBoundary",
+    "releaseReady",
+)
 
 SIM_DISPLAY_NAME = "DroneDream \u00b7 SIM"
 SURFACE_SOURCE_REQUIREMENTS = {
@@ -880,6 +971,113 @@ def _validate_surface_source_refs(value: Any, *, repo_root: Path) -> None:
         raise SimInstallerContractError("installer surface source ref ordering drifted")
 
 
+def validate_website_handoff_contract(document: Any) -> dict[str, Any]:
+    contract = _exact_keys(
+        document, WEBSITE_HANDOFF_KEYS, "Website exact EXE handoff contract"
+    )
+    if (
+        contract["schemaVersion"] != 1
+        or contract["kind"] != "dronedream-sim-website-exact-exe-handoff-contract"
+        or contract["contractVersion"] != "1.0.0"
+        or contract["editionId"] != "sim"
+        or contract["state"] != "awaiting-exact-yellow2-and-lifecycle-handoff"
+    ):
+        raise SimInstallerContractError("Website exact EXE handoff identity drifted")
+    recipient = _exact_keys(
+        contract["recipient"], WEBSITE_RECIPIENT_KEYS, "Website handoff recipient"
+    )
+    if recipient != {
+        "branch": "codex/website",
+        "productSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+        "evidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+        "evidenceCommitIsProductSource": False,
+        "behavior": "read-only-receive-no-rebuild-no-rename",
+    }:
+        raise SimInstallerContractError("Website source/evidence binding drifted")
+    identity = _exact_keys(
+        contract["artifactIdentity"], WEBSITE_IDENTITY_KEYS, "Website artifact identity"
+    )
+    if identity != {
+        "fileName": "DroneDream-Sim-1.0.0.exe",
+        "version": "1.0.0",
+        "editionDisplayName": SIM_DISPLAY_NAME,
+        "previewSubstitutionAllowed": False,
+        "crossEditionSubstitutionAllowed": False,
+    }:
+        raise SimInstallerContractError("Website Sim artifact identity drifted")
+    if tuple(contract["requiredHandoffFields"]) != WEBSITE_REQUIRED_FIELDS:
+        raise SimInstallerContractError("Website required handoff fields drifted")
+    consistency = _exact_keys(
+        contract["consistency"], WEBSITE_CONSISTENCY_KEYS, "Website handoff consistency"
+    )
+    if any(value is not True for value in consistency.values()):
+        raise SimInstallerContractError("Website URL and edition consistency drifted")
+    current = _exact_keys(
+        contract["current"], WEBSITE_CURRENT_KEYS, "Website current handoff state"
+    )
+    if any(
+        value is not False if key in {"exactExeReceived", "lifecycleValidated", "releaseReady"}
+        else value is not None
+        for key, value in current.items()
+    ):
+        raise SimInstallerContractError("Website handoff overclaims exact EXE readiness")
+    execution = _exact_keys(
+        contract["execution"], WEBSITE_EXECUTION_KEYS, "Website handoff execution"
+    )
+    if any(value is not False for value in execution.values()):
+        raise SimInstallerContractError("Website handoff execution must remain false")
+    return contract
+
+
+def validate_sim_tauri_overlay_config(
+    document: Any, *, repo_root: Path
+) -> dict[str, Any]:
+    expected = {
+        "$schema": "https://schema.tauri.app/config/2",
+        "productName": SIM_DISPLAY_NAME,
+        "identifier": "io.dronedream.sim",
+        "app": {
+            "windows": [
+                {
+                    "label": "main",
+                    "title": SIM_DISPLAY_NAME,
+                    "width": 1440,
+                    "height": 900,
+                    "minWidth": 390,
+                    "minHeight": 700,
+                    "resizable": True,
+                    "fullscreen": False,
+                }
+            ]
+        },
+        "bundle": {
+            "icon": ["../../distribution/sim/desktop/icons/dronedream-sim.ico"],
+            "shortDescription": "PX4 SITL and Gazebo simulation workspace",
+            "longDescription": (
+                f"{SIM_DISPLAY_NAME} provides simulation-only PX4 SITL and Gazebo workflows. "
+                "Runtime Base and Engine Pack remain external dependencies. Hardware and HITL "
+                "capabilities are not included or authorized."
+            ),
+        },
+    }
+    if document != expected:
+        raise SimInstallerContractError("Sim desktop overlay identity drifted")
+    icon_relative = document["bundle"]["icon"][0]
+    icon_path = (repo_root / "desktop" / "src-tauri" / icon_relative).resolve()
+    expected_icon = (
+        repo_root / "distribution" / "sim" / "desktop" / "icons" / "dronedream-sim.ico"
+    ).resolve()
+    if icon_path != expected_icon or not icon_path.is_file():
+        raise SimInstallerContractError("Sim desktop overlay icon path drifted")
+    if (
+        icon_path.stat().st_size != 54431
+        or sha256_file(icon_path)
+        != "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c"
+    ):
+        raise SimInstallerContractError("Sim desktop overlay icon bytes drifted")
+    return document
+
+
 def validate_installer_surface_contract(
     document: Any,
     *,
@@ -911,9 +1109,16 @@ def validate_installer_surface_contract(
     overlay = _exact_keys(contract["overlay"], SURFACE_OVERLAY_KEYS, "surface.overlay")
     if (
         overlay["path"] != "distribution/sim/desktop/tauri.sim.conf.json"
+        or overlay["sha256"]
+        != "fcbd5f1306ae8e8c9214dba7389df60cbcbf29424e3a10008ba6fbb3517c1dfe"
         or overlay["baseConfigPath"] != "desktop/src-tauri/tauri.conf.json"
         or overlay["baseConfigMustRemainUniversal"] is not True
         or overlay["artifactRenameRequired"] is not True
+        or overlay["buildCommand"]
+        != (
+            "npm --prefix desktop run tauri -- build --config "
+            "../distribution/sim/desktop/tauri.sim.conf.json"
+        )
     ):
         raise SimInstallerContractError("Sim desktop overlay policy drifted")
     base_path = _resolve(repo_root, overlay["baseConfigPath"], "surface.overlay.baseConfigPath")
@@ -928,38 +1133,14 @@ def validate_installer_surface_contract(
     ):
         raise SimInstallerContractError("desktop base config is no longer Universal")
 
-    overlay_config = load_json(_resolve(repo_root, overlay["path"], "surface.overlay.path"))
-    expected_overlay_config = {
-        "$schema": "https://schema.tauri.app/config/2",
-        "productName": SIM_DISPLAY_NAME,
-        "identifier": identity["bundleIdentifier"],
-        "app": {
-            "windows": [
-                {
-                    "label": "main",
-                    "title": SIM_DISPLAY_NAME,
-                    "width": 1440,
-                    "height": 900,
-                    "minWidth": 390,
-                    "minHeight": 700,
-                    "resizable": True,
-                    "fullscreen": False,
-                }
-            ]
-        },
-        "bundle": {
-            "shortDescription": "PX4 SITL and Gazebo simulation workspace",
-            "longDescription": (
-                f"{SIM_DISPLAY_NAME} provides simulation-only PX4 SITL and Gazebo workflows. "
-                "Runtime Base and Engine Pack remain external dependencies. Hardware and HITL "
-                "capabilities are not included or authorized."
-            ),
-        },
-    }
-    if overlay_config != expected_overlay_config:
-        raise SimInstallerContractError("Sim desktop overlay identity drifted")
-    if _contains_icon_override(overlay_config):
-        raise SimInstallerContractError("Sim icon override must wait for the canonical donor")
+    overlay_path = _resolve(repo_root, overlay["path"], "surface.overlay.path")
+    if sha256_file(overlay_path) != overlay["sha256"]:
+        raise SimInstallerContractError("Sim desktop overlay SHA-256 drifted")
+    overlay_config = validate_sim_tauri_overlay_config(
+        load_json(overlay_path), repo_root=repo_root
+    )
+    if not _contains_icon_override(overlay_config):
+        raise SimInstallerContractError("Sim canonical icon override is absent")
 
     brand = _exact_keys(contract["brandDonor"], SURFACE_BRAND_KEYS, "surface.brandDonor")
     if brand != {
@@ -977,13 +1158,32 @@ def validate_installer_surface_contract(
         "approvedEditionAssetState": "vendored-exact-bytes",
         "approvedEditionAssetHashesVerified": True,
         "approvedEditionApplicationSourceWired": True,
-        "canonicalDonorState": "pending-universal-common-core",
-        "canonicalDonorManifestPath": None,
-        "canonicalDonorManifestSha256": None,
-        "canonicalDonorCommit": None,
-        "commonCoreBindingVerified": False,
-        "assetHashesVerified": False,
-        "iconOverridePresent": False,
+        "canonicalDonorState": "adopted-path-limited-brand-only",
+        "canonicalDonorReceiptPath": (
+            "distribution/sim/brand/canonical-donor-adoption-receipt.v1.json"
+        ),
+        "canonicalDonorReceiptSha256": (
+            "81decef72e0028baecfee0e130d521cd2b7de34e9224883358ac1ebcdff27026"
+        ),
+        "canonicalDonorManifestPath": "brand/generated/brand-assets.v1.json",
+        "canonicalDonorManifestSha256": (
+            "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34"
+        ),
+        "canonicalDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+        "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+        "commonCoreHash": (
+            "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b"
+        ),
+        "commonCoreUpdated": False,
+        "commonCoreBindingVerified": True,
+        "assetHashesVerified": True,
+        "iconOverridePresent": True,
+        "iconPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+        "iconSha256": (
+            "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c"
+        ),
+        "iconBytes": 54431,
+        "iconFrameSizesPx": [16, 20, 24, 32, 40, 48, 64, 128, 256],
         "masterRedrawAllowed": False,
     }:
         raise SimInstallerContractError("Sim canonical brand donor state drifted")
@@ -994,7 +1194,7 @@ def validate_installer_surface_contract(
         raise SimInstallerContractError("Sim brand donor intake SHA-256 drifted")
     brand_module = _load_brand_donor_module()
     try:
-        intake = brand_module.validate_donor_intake(
+        brand_module.validate_donor_intake(
             brand_module.load_json(intake_path), repo_root=repo_root
         )
         approved_manifest_path = _resolve(
@@ -1013,21 +1213,53 @@ def validate_installer_surface_contract(
             brand_module.load_json(approved_manifest_path),
             repo_root=repo_root,
         )
-        if donor_manifest is not None:
-            brand_module.validate_canonical_donor_manifest(
-                donor_manifest,
-                intake=intake,
-                repo_root=repo_root,
-                require_working_tree_assets=True,
-            )
+        adoption_path = _resolve(
+            repo_root,
+            brand["canonicalDonorReceiptPath"],
+            "surface.brandDonor.canonicalDonorReceiptPath",
+        )
+        if sha256_file(adoption_path) != brand["canonicalDonorReceiptSha256"]:
+            raise SimInstallerContractError("canonical donor adoption receipt drifted")
+        adoption = brand_module.validate_canonical_donor_adoption_receipt(
+            brand_module.load_json(adoption_path), repo_root=repo_root
+        )
+        if (
+            adoption["source"]["brandDonorCommit"] != brand["canonicalDonorCommit"]
+            or adoption["source"]["commonCoreCommit"] != brand["commonCoreCommit"]
+            or adoption["source"]["commonCoreHash"] != brand["commonCoreHash"]
+            or adoption["canonicalRefs"]["assetManifest"]
+            != {
+                "path": brand["canonicalDonorManifestPath"],
+                "sha256": brand["canonicalDonorManifestSha256"],
+            }
+        ):
+            raise SimInstallerContractError("canonical donor adoption binding drifted")
     except brand_module.SimBrandDonorError as exc:
         raise SimInstallerContractError(f"Sim brand donor verification failed: {exc}") from exc
     if donor_manifest is not None:
         raise SimInstallerContractError(
-            "canonical donor verified but installer surface remains pending integration"
+            "external donor input cannot override the adopted canonical receipt"
         )
 
     _validate_surface_source_refs(contract["staticSourceRefs"], repo_root=repo_root)
+
+    website_ref = _exact_keys(
+        contract["websiteHandoff"],
+        SURFACE_WEBSITE_HANDOFF_KEYS,
+        "surface.websiteHandoff",
+    )
+    if website_ref != {
+        "path": "distribution/sim/release/website-exact-exe-handoff.v1.json",
+        "sha256": "a0c8e2252d0a82b5b8918e467907a27fd94953ce3cfbd60546f91b8f4ed765cc",
+        "state": "awaiting-exact-yellow2-and-lifecycle-handoff",
+    }:
+        raise SimInstallerContractError("Website handoff ref drifted")
+    website_path = _resolve(repo_root, website_ref["path"], "surface.websiteHandoff.path")
+    if sha256_file(website_path) != website_ref["sha256"]:
+        raise SimInstallerContractError("Website handoff SHA-256 drifted")
+    website = validate_website_handoff_contract(load_json(website_path))
+    if website["state"] != website_ref["state"]:
+        raise SimInstallerContractError("Website handoff state drifted")
 
     installer_ui = _exact_keys(contract["installerUi"], SURFACE_UI_KEYS, "surface.installerUi")
     if (

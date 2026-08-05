@@ -34,6 +34,13 @@ SYNC_AUDIT_PATH = (
     / "brand"
     / "canonical-sync-conflict-audit.v1.json"
 )
+ADOPTION_PATH = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "brand"
+    / "canonical-donor-adoption-receipt.v1.json"
+)
 TOOL_PATH = ROOT / "distribution" / "sim" / "tools" / "sim_brand_donor.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_brand_donor", TOOL_PATH)
@@ -300,6 +307,57 @@ class SimBrandDonorTests(unittest.TestCase):
         invalid["observedSource"]["authoritativeHandoffReceived"] = True
         with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "overclaims adoption"):
             sim_brand.validate_canonical_reconciliation_candidate(invalid, repo_root=ROOT)
+
+    def test_canonical_adoption_binds_donor_core_and_nine_frame_ico(self) -> None:
+        adoption = sim_brand.validate_canonical_donor_adoption_receipt(
+            load_json(ADOPTION_PATH), repo_root=ROOT
+        )
+        self.assertEqual(
+            adoption["source"]["brandDonorCommit"],
+            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+        )
+        self.assertEqual(
+            adoption["source"]["commonCoreCommit"],
+            "e374d3f8d96b1265fcdb06864208b676566e94d9",
+        )
+        self.assertFalse(adoption["source"]["commonCoreUpdated"])
+        ico = next(
+            item
+            for item in adoption["assetBindings"]
+            if item["role"] == "sim-windows-ico"
+        )
+        self.assertEqual(ico["bytes"], 54431)
+        self.assertEqual(ico["frameSizesPx"], [16, 20, 24, 32, 40, 48, 64, 128, 256])
+        self.assertFalse(adoption["nonClaims"]["releaseAsset"])
+
+    def test_canonical_adoption_rejects_core_asset_or_semantic_drift(self) -> None:
+        invalid = deepcopy(load_json(ADOPTION_PATH))
+        invalid["source"]["commonCoreUpdated"] = True
+        with self.assertRaisesRegex(
+            sim_brand.SimBrandDonorError, "donor and commonCore classification"
+        ):
+            sim_brand.validate_canonical_donor_adoption_receipt(invalid, repo_root=ROOT)
+
+        invalid = deepcopy(load_json(ADOPTION_PATH))
+        invalid["assetBindings"][2]["frameSizesPx"] = [256]
+        with self.assertRaisesRegex(
+            sim_brand.SimBrandDonorError, "asset metadata"
+        ):
+            sim_brand.validate_canonical_donor_adoption_receipt(invalid, repo_root=ROOT)
+
+        invalid = deepcopy(load_json(ADOPTION_PATH))
+        invalid["semanticSync"]["editionRadioPresent"] = True
+        with self.assertRaisesRegex(
+            sim_brand.SimBrandDonorError, "semantic boundary"
+        ):
+            sim_brand.validate_canonical_donor_adoption_receipt(invalid, repo_root=ROOT)
+
+        invalid = deepcopy(load_json(ADOPTION_PATH))
+        invalid["nonClaims"]["releaseAsset"] = True
+        with self.assertRaisesRegex(
+            sim_brand.SimBrandDonorError, "overclaims readiness"
+        ):
+            sim_brand.validate_canonical_donor_adoption_receipt(invalid, repo_root=ROOT)
 
         invalid = load_json(RECONCILIATION_PATH)
         invalid["adoptionGates"]["releaseAssetClaimed"] = True

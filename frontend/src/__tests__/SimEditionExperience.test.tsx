@@ -31,6 +31,9 @@ describe("DroneDream Sim experience", () => {
     const mark = container.querySelector(".sim-brand-mark");
     expect(lockup?.getAttribute("src")).toContain("dronedream-sim-dot-lockup.png");
     expect(lockup).toHaveAttribute("aria-hidden", "true");
+    expect(lockup).toHaveAttribute("data-brand-edition", "sim");
+    expect(container.querySelector(".sim-overview-page"))
+      .toHaveAttribute("data-brand-edition", "sim");
     expect(mark?.getAttribute("src")).toContain("dronedream-sim-mark.png");
     expect(mark).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByRole("list", { name: "Simulation workspace" }))
@@ -80,7 +83,7 @@ describe("DroneDream Sim experience", () => {
 
   it("exposes the fixed Sim mode in settings", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
-    render(
+    const { container } = render(
       <I18nProvider>
         <SimEditionSettingsPanel />
       </I18nProvider>,
@@ -89,5 +92,7 @@ describe("DroneDream Sim experience", () => {
     expect(screen.getByRole("heading", { name: "Sim edition" })).toBeInTheDocument();
     expect(screen.getByText(/There is no Lab or Field mode switch/)).toBeInTheDocument();
     expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(container.querySelector(".sim-settings-panel"))
+      .toHaveAttribute("data-brand-edition", "sim");
   });
 });

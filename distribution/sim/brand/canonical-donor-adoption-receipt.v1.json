@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-canonical-brand-donor-adoption-receipt",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "canonical-brand-adopted-yellow2-static-ready",
+  "source": {
+    "donorBranch": "origin/codex/software",
+    "brandDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "donorParentCommit": "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
+    "authorizationThreadId": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9",
+    "authorizationDate": "2026-08-05",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
+    "brandDonorIsCommonCoreBaseline": false,
+    "commonCoreUpdated": false
+  },
+  "canonicalRefs": {
+    "brandContract": {
+      "path": "brand/brand-editions.v1.json",
+      "sha256": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc"
+    },
+    "assetManifest": {
+      "path": "brand/generated/brand-assets.v1.json",
+      "sha256": "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34"
+    },
+    "visualReceipt": {
+      "path": "brand/generated/brand-visual-receipt.v1.json",
+      "sha256": "2c980725b436beb887cdccc5bb3767967bf56efd3eb6d98057f9bef1b2d34ab3"
+    },
+    "brandLockupComponent": {
+      "path": "frontend/src/components/BrandLockup.tsx",
+      "sha256": "6817c7d1eb1dbe35c42e3e60e728f7ff0f79db623822c04490e7962ab56d46d5"
+    }
+  },
+  "assetBindings": [
+    {
+      "role": "sim-mark-png",
+      "donorPath": "brand/source/approved/sim-mark-1024.png",
+      "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
+      "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+      "bytes": 162699,
+      "frameSizesPx": null,
+      "exactByteIdentity": true
+    },
+    {
+      "role": "sim-dot-lockup-png",
+      "donorPath": "brand/source/approved/sim-dot-lockup.png",
+      "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-dot-lockup.png",
+      "sha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+      "bytes": 77713,
+      "frameSizesPx": null,
+      "exactByteIdentity": true
+    },
+    {
+      "role": "sim-windows-ico",
+      "donorPath": "brand/generated/sim/windows/icon.ico",
+      "editionPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+      "sha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+      "bytes": 54431,
+      "frameSizesPx": [16, 20, 24, 32, 40, 48, 64, 128, 256],
+      "exactByteIdentity": true
+    }
+  ],
+  "semanticSync": {
+    "mode": "path-limited-semantic",
+    "donorBrandLockupPath": "frontend/src/components/BrandLockup.tsx",
+    "simAdapterPaths": [
+      "frontend/src/editions/sim/SimEditionExperience.tsx",
+      "frontend/src/components/DistributionSetupPanel.tsx",
+      "distribution/sim/desktop/tauri.sim.conf.json"
+    ],
+    "dataBrandEdition": "sim",
+    "lockedEdition": "sim",
+    "editionRadioPresent": false,
+    "labOrFieldSwitchPresent": false,
+    "hardwareAuthorityGranted": false,
+    "wholeCommitCherryPicked": false,
+    "benchmarkOrBackendPathsAdopted": false
+  },
+  "installerBinding": {
+    "overlayPath": "distribution/sim/desktop/tauri.sim.conf.json",
+    "iconPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+    "artifactFileName": "DroneDream-Sim-1.0.0.exe",
+    "productVersion": "1.0.0",
+    "executionAuthorized": false
+  },
+  "nonClaims": {
+    "installerBuilt": false,
+    "installerExecuted": false,
+    "releaseAsset": false,
+    "promotionReady": false,
+    "validatedVehiclePackCount": 0,
+    "yellow3Authorized": false,
+    "redAuthorized": false
+  }
+}

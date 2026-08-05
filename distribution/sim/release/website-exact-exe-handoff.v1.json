@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-website-exact-exe-handoff-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "awaiting-exact-yellow2-and-lifecycle-handoff",
+  "recipient": {
+    "branch": "codex/website",
+    "productSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "evidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+    "evidenceCommitIsProductSource": false,
+    "behavior": "read-only-receive-no-rebuild-no-rename"
+  },
+  "artifactIdentity": {
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "version": "1.0.0",
+    "editionDisplayName": "DroneDream · SIM",
+    "previewSubstitutionAllowed": false,
+    "crossEditionSubstitutionAllowed": false
+  },
+  "requiredHandoffFields": [
+    "exactCleanProductSourceCommit",
+    "absoluteExePath",
+    "fileName",
+    "version",
+    "bytes",
+    "sha256Lowercase",
+    "authenticodeState",
+    "updaterSigPath",
+    "updaterSigSha256",
+    "receiptPath",
+    "receiptSha256",
+    "manifestPath",
+    "manifestSha256",
+    "buildCount",
+    "freshInstallBoundary",
+    "overlayBoundary",
+    "uninstallBoundary",
+    "shortcutBoundary",
+    "webView2Boundary",
+    "localeBoundary",
+    "releaseReady"
+  ],
+  "consistency": {
+    "sameEditionRequired": true,
+    "sameUrlFamilyRequired": true,
+    "uniqueShaUrlTagRequired": true,
+    "sourceAndEvidenceMustRemainSeparate": true,
+    "signatureSidecarOptionalOnlyWhenStateNotIssued": true
+  },
+  "current": {
+    "exactExeReceived": false,
+    "productSourceCommit": null,
+    "absoluteExePath": null,
+    "bytes": null,
+    "sha256": null,
+    "authenticodeState": null,
+    "updaterSigPath": null,
+    "updaterSigSha256": null,
+    "receiptPath": null,
+    "receiptSha256": null,
+    "manifestPath": null,
+    "manifestSha256": null,
+    "buildCount": null,
+    "lifecycleValidated": false,
+    "releaseReady": false
+  },
+  "execution": {
+    "installerBuilt": false,
+    "installerExecuted": false,
+    "uploaded": false,
+    "releaseBranchCreated": false
+  }
+}

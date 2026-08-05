@@ -13,6 +13,7 @@ from typing import Any
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}$")
+FILE_REF_KEYS = {"path", "sha256"}
 RUN_ID_RE = re.compile(r"^sim-y(?P<stage>[23])-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$")
 RUN_ID_CONTRACT_PATTERN = r"^sim-y(?:2|3)-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$"
 RUNTIME_ROOT_RE = re.compile(r"^[A-Za-z]:/DroneDream(?:$|\.download-cache(?:/|$))")
@@ -50,6 +51,10 @@ VISUAL_BINDING_KEYS = {
     "requiredCaseIds",
     "browserStarted",
     "productionBuildExecuted",
+    "productSourceCommit",
+    "evidenceCommit",
+    "evidenceRecordPath",
+    "evidenceRecordSha256",
 }
 APPROVED_ASSET_GATE_KEYS = {
     "manifestPath",
@@ -59,18 +64,26 @@ APPROVED_ASSET_GATE_KEYS = {
     "applicationSourceWired",
     "installerDerivativeReady",
     "canonicalUniversalDonorIntegrated",
+    "adoptionReceiptPath",
+    "adoptionReceiptSha256",
+    "installerIcoPath",
+    "installerIcoSha256",
+    "installerIcoBytes",
+    "installerIcoFrameSizesPx",
 }
 CANONICAL_SYNC_GATE_KEYS = {
     "auditPath",
     "auditSha256",
+    "historicalAuditState",
     "state",
     "baseCommit",
     "simOverlayCheckpoint",
     "donorCommit",
     "recordedCommonCoreCommit",
     "recordedCommonCoreHash",
-    "authoritativeProductSourceCommit",
-    "authoritativeEvidenceCommit",
+    "brandDonorCommitIsCommonCore",
+    "adoptionReceiptPath",
+    "adoptionReceiptSha256",
     "formalHandoffReceived",
     "semanticIntegrationExecuted",
     "canonicalBrandManifestConsumed",
@@ -83,6 +96,9 @@ ARTIFACT_GATE_KEYS = {
     "yellow2ReceiptKind",
     "yellow3RequiresExactYellow2Receipt",
     "yellow2BlockedUntilInstallerDerivativeContract",
+    "yellow2StaticReady",
+    "installerSurfaceContract",
+    "websiteHandoffContract",
     "requiredReceiptFields",
     "ineligiblePreview",
     "unsignedAllowedWithDisclosure",
@@ -400,14 +416,15 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         or plan["kind"] != "dronedream-sim-yellow-execution-plan"
         or plan["planVersion"] != "1.0.0"
         or plan["editionId"] != "sim"
-        or plan["executionClass"] != "GREEN-plan-only"
-        or plan["state"] != "pre-registered-not-authorized"
+        or plan["executionClass"] != "GREEN-static-ready-yellow2-not-authorized"
+        or plan["state"]
+        != "yellow1-complete-canonical-brand-adopted-yellow2-awaiting-authorization"
     ):
         raise SimYellowLifecycleError("Sim YELLOW execution plan identity drifted")
 
     authorization = _exact_keys(plan["authorization"], AUTHORIZATION_KEYS, "authorization")
     if authorization != {
-        "yellow1Approved": False,
+        "yellow1Approved": True,
         "yellow2Approved": False,
         "yellow3Approved": False,
         "separateApprovalRequiredForEachStage": True,
@@ -427,10 +444,32 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
     ]
     if (
         visual["requiredCaseIds"] != expected_visual_cases
-        or visual["browserStarted"] is not False
-        or visual["productionBuildExecuted"] is not False
+        or visual["browserStarted"] is not True
+        or visual["productionBuildExecuted"] is not True
+        or visual["productSourceCommit"]
+        != "1af895287c2c8249acfa581919446e24ec16f575"
+        or visual["evidenceCommit"]
+        != "b3180803db89de0dab7f01dca374cb47f8021031"
     ):
-        raise SimYellowLifecycleError("YELLOW-1 six-case registration drifted")
+        raise SimYellowLifecycleError("YELLOW-1 six-case evidence binding drifted")
+    evidence_path = _repo_file(
+        repo_root, visual["evidenceRecordPath"], "YELLOW-1 evidence record"
+    )
+    if sha256_file(evidence_path) != _sha(
+        visual["evidenceRecordSha256"], "YELLOW-1 evidence record SHA-256"
+    ):
+        raise SimYellowLifecycleError("YELLOW-1 evidence record SHA-256 drifted")
+    evidence = load_json(evidence_path)
+    if (
+        evidence.get("source", {}).get("productSourceCommit")
+        != visual["productSourceCommit"]
+        or evidence.get("source", {}).get("evidenceRecordCommitIsProductSource")
+        is not False
+        or evidence.get("results", {}).get("edgeCaseCount") != 6
+        or evidence.get("results", {}).get("screenshotCount") != 18
+        or evidence.get("releaseBoundary", {}).get("promotionReady") is not False
+    ):
+        raise SimYellowLifecycleError("YELLOW-1 evidence content drifted")
 
     approved_assets = _exact_keys(
         plan["approvedEditionAssetGate"],
@@ -461,12 +500,35 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         approved_assets["requiredAssetRoles"] != ["sim-mark-png", "sim-dot-lockup-png"]
         or approved_assets["requiredAssetSha256"] != manifest_hashes
         or approved_assets["applicationSourceWired"] is not True
-        or approved_assets["installerDerivativeReady"] is not False
-        or approved_assets["canonicalUniversalDonorIntegrated"] is not False
+        or approved_assets["installerDerivativeReady"] is not True
+        or approved_assets["canonicalUniversalDonorIntegrated"] is not True
         or approved_manifest.get("integrationState", {}).get("applicationSourceWired") is not True
         or approved_manifest.get("integrationState", {}).get("windowsIcoGenerated") is not False
     ):
         raise SimYellowLifecycleError("approved edition asset gate drifted")
+    adoption_path = _repo_file(
+        repo_root, approved_assets["adoptionReceiptPath"], "canonical adoption receipt"
+    )
+    if sha256_file(adoption_path) != _sha(
+        approved_assets["adoptionReceiptSha256"], "canonical adoption receipt SHA-256"
+    ):
+        raise SimYellowLifecycleError("canonical adoption receipt SHA-256 drifted")
+    adoption = load_json(adoption_path)
+    ico_path = _repo_file(repo_root, approved_assets["installerIcoPath"], "Sim ICO")
+    if (
+        approved_assets["installerIcoSha256"]
+        != "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c"
+        or sha256_file(ico_path) != approved_assets["installerIcoSha256"]
+        or ico_path.stat().st_size != approved_assets["installerIcoBytes"]
+        or approved_assets["installerIcoBytes"] != 54431
+        or approved_assets["installerIcoFrameSizesPx"]
+        != [16, 20, 24, 32, 40, 48, 64, 128, 256]
+        or adoption.get("source", {}).get("commonCoreCommit")
+        != "e374d3f8d96b1265fcdb06864208b676566e94d9"
+        or adoption.get("source", {}).get("commonCoreUpdated") is not False
+        or adoption.get("nonClaims", {}).get("releaseAsset") is not False
+    ):
+        raise SimYellowLifecycleError("canonical adoption or Sim ICO gate drifted")
 
     sync_gate = _exact_keys(
         plan["canonicalSyncGate"], CANONICAL_SYNC_GATE_KEYS, "canonicalSyncGate"
@@ -476,7 +538,8 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         "auditSha256": (
             "9e38977b9f29bcc32ccb4ae399784462771954ad50dfb1eaef52e35661fbcd2d"
         ),
-        "state": "observed-not-merged-awaiting-authoritative-handoff",
+        "historicalAuditState": "observed-not-merged-awaiting-authoritative-handoff",
+        "state": "canonical-brand-adopted-path-limited",
         "baseCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
         "simOverlayCheckpoint": "4086ff3134847b5bbe049cc1f43b17141e984f8c",
         "donorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
@@ -484,14 +547,19 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         "recordedCommonCoreHash": (
             "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b"
         ),
-        "authoritativeProductSourceCommit": None,
-        "authoritativeEvidenceCommit": None,
-        "formalHandoffReceived": False,
-        "semanticIntegrationExecuted": False,
-        "canonicalBrandManifestConsumed": False,
-        "installerIcoConsumed": False,
+        "brandDonorCommitIsCommonCore": False,
+        "adoptionReceiptPath": (
+            "distribution/sim/brand/canonical-donor-adoption-receipt.v1.json"
+        ),
+        "adoptionReceiptSha256": (
+            "81decef72e0028baecfee0e130d521cd2b7de34e9224883358ac1ebcdff27026"
+        ),
+        "formalHandoffReceived": True,
+        "semanticIntegrationExecuted": True,
+        "canonicalBrandManifestConsumed": True,
+        "installerIcoConsumed": True,
         "releaseAsset": False,
-        "yellow2Ready": False,
+        "yellow2Ready": True,
     }
     if sync_gate != expected_sync_gate:
         raise SimYellowLifecycleError("canonical sync gate overclaims readiness")
@@ -514,7 +582,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
     ):
         raise SimYellowLifecycleError("canonical sync source binding drifted")
     if (
-        sync_audit.get("state") != sync_gate["state"]
+        sync_audit.get("state") != sync_gate["historicalAuditState"]
         or any(value is not False for value in sync_audit.get("execution", {}).values())
         or sync_audit.get("syncPolicy", {}).get("wholeCommitCherryPickAllowed") is not False
         or sync_audit.get("syncPolicy", {}).get("backendCommonCoreAutoAdoptionAllowed")
@@ -523,6 +591,17 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         is not True
     ):
         raise SimYellowLifecycleError("canonical sync audit execution boundary drifted")
+    if (
+        sync_gate["adoptionReceiptPath"] != approved_assets["adoptionReceiptPath"]
+        or sync_gate["adoptionReceiptSha256"]
+        != approved_assets["adoptionReceiptSha256"]
+        or adoption.get("source", {}).get("brandDonorCommit")
+        != sync_gate["donorCommit"]
+        or adoption.get("semanticSync", {}).get("wholeCommitCherryPicked") is not False
+        or adoption.get("semanticSync", {}).get("benchmarkOrBackendPathsAdopted")
+        is not False
+    ):
+        raise SimYellowLifecycleError("canonical path-limited adoption binding drifted")
     branch_contract = load_json(
         _repo_file(
             repo_root,
@@ -561,11 +640,55 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         artifact["yellow2OutputFileName"] != "DroneDream-Sim-1.0.0.exe"
         or artifact["yellow2ReceiptKind"] != "dronedream-sim-yellow-build-receipt"
         or artifact["yellow3RequiresExactYellow2Receipt"] is not True
-        or artifact["yellow2BlockedUntilInstallerDerivativeContract"] is not True
+        or artifact["yellow2BlockedUntilInstallerDerivativeContract"] is not False
+        or artifact["yellow2StaticReady"] is not True
         or artifact["unsignedAllowedWithDisclosure"] is not True
         or artifact["validatedVehiclePackCount"] != 0
     ):
         raise SimYellowLifecycleError("YELLOW artifact gate drifted")
+    for key, expected_path, expected_sha in (
+        (
+            "installerSurfaceContract",
+            "distribution/sim/desktop/installer-surface-contract.v1.json",
+            "1ceab6b419eb8b2416d8b744a0face49cab78a96a7601f16b825d8f804d2d88b",
+        ),
+        (
+            "websiteHandoffContract",
+            "distribution/sim/release/website-exact-exe-handoff.v1.json",
+            "a0c8e2252d0a82b5b8918e467907a27fd94953ce3cfbd60546f91b8f4ed765cc",
+        ),
+    ):
+        ref = _exact_keys(artifact[key], FILE_REF_KEYS, f"artifactGate.{key}")
+        path = _repo_file(repo_root, ref["path"], f"artifactGate.{key}.path")
+        if (
+            ref != {"path": expected_path, "sha256": expected_sha}
+            or sha256_file(path) != ref["sha256"]
+        ):
+            raise SimYellowLifecycleError(f"YELLOW artifact {key} binding drifted")
+    installer_surface = load_json(
+        _repo_file(
+            repo_root,
+            artifact["installerSurfaceContract"]["path"],
+            "installer surface contract",
+        )
+    )
+    website_handoff = load_json(
+        _repo_file(
+            repo_root,
+            artifact["websiteHandoffContract"]["path"],
+            "Website handoff contract",
+        )
+    )
+    if (
+        installer_surface.get("brandDonor", {}).get("iconOverridePresent") is not True
+        or installer_surface.get("nonClaims", {}).get("installerBuiltFromOverlay")
+        is not False
+        or website_handoff.get("artifactIdentity", {}).get("fileName")
+        != artifact["yellow2OutputFileName"]
+        or website_handoff.get("current", {}).get("exactExeReceived") is not False
+        or website_handoff.get("current", {}).get("releaseReady") is not False
+    ):
+        raise SimYellowLifecycleError("YELLOW artifact static readiness overclaims release")
     _string_list(artifact["requiredReceiptFields"], "artifact required fields", expected_count=17)
     ineligible = artifact["ineligiblePreview"]
     if (
