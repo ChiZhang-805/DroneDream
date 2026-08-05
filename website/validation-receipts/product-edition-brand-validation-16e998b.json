@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "dronedream.product-edition-brand-validation.v1",
+  "generatedAt": "2026-08-05T13:12:22.176Z",
+  "scope": {
+    "branch": "codex/website",
+    "structuralBaseCommit": "983637dc9dd2b2247eaafae58ec5fbb6423b7c4c",
+    "subjectCommit": "16e998b5d0754ac866e9d628bd46912aa530d05c",
+    "subjectTree": "a8bb960caa1e2e1354016eceee616f53293d7fb4",
+    "deploymentPerformed": false,
+    "githubPagesDeploymentPerformed": false,
+    "aliyunDeploymentPerformed": false,
+    "githubReleaseAssetMutationPerformed": false,
+    "supabaseDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "brandHandoff": {
+    "approval": "commander-approved-brand-handoff-v2",
+    "copyPolicy": "byte-for-byte",
+    "runtimeSource": "repository-assets-only",
+    "manifest": "frontend/src/site/assets/editions/source-manifest.json",
+    "manifestSha256": "91ebdae931c3a3bdb6116c922f61eb4334ab5d1f92fbb906ec27a2ece1fe975c",
+    "assetVerifier": {
+      "command": "node website/scripts/verify-edition-brand-assets.mjs",
+      "assetsChecked": 6,
+      "status": "passed"
+    },
+    "marks": {
+      "sim": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+      "lab": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+      "field": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5"
+    },
+    "dotLockups": {
+      "sim": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+      "lab": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+      "field": "def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192"
+    }
+  },
+  "validation": {
+    "focusedProductTests": {
+      "files": 3,
+      "tests": 26,
+      "passed": 26,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "siteBuild": {
+      "status": "passed",
+      "modulesTransformed": 2178,
+      "knownNonBlockingWarning": "existing main chunk exceeds the configured size warning"
+    },
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed"
+  },
+  "browserAudit": {
+    "artifact": "website/validation-receipts/assets/product-edition-brand-16e998b/product-page-audit.json",
+    "artifactSha256": "f8b4750bc1164b2a49c5c5733ab0539771ccf41a1974eee86c4ad464fb68ac43",
+    "checks": 20,
+    "passed": 20,
+    "failed": 0,
+    "unavailableBrowsers": [],
+    "browsers": {
+      "edge": "151.0.4129.59",
+      "chrome": "129.0.6668.59",
+      "lenovo": "9.0.8.7271",
+      "firefox": "151.0"
+    },
+    "profiles": ["1440x1000", "2048x1280", "760x1000", "390x844"],
+    "locales": ["en", "zh-CN"],
+    "assertions": {
+      "singleViewport": "passed",
+      "singleLineTitle": "passed",
+      "headerAndContentAlignment": "passed",
+      "productAndPriceNavigation": "passed",
+      "approvedMarksLoaded": "passed",
+      "markSourceDimensions": "1024x1024",
+      "markSmallSizeSampling": "passed at 144px and 44px",
+      "lightCardAndDarkTransparencyInspection": "passed",
+      "markClipping": 0,
+      "horizontalOverflow": 0,
+      "dialogs": 0,
+      "keyboardAndAria": "passed",
+      "universalDownload": "disabled-no-exact-handoff",
+      "editionDownloads": "disabled-no-release-ready-handoff"
+    },
+    "representativeScreenshots": {
+      "edgeEnglishDesktop": {
+        "path": "website/validation-receipts/assets/product-edition-brand-16e998b/product-page-screenshots/edge-desktop-1440-en.png",
+        "sha256": "7a6cf5652066a6300f1b91e519c900369d3edb68714786a24293528a780e3e07"
+      },
+      "edgeChineseWide": {
+        "path": "website/validation-receipts/assets/product-edition-brand-16e998b/product-page-screenshots/edge-wide-2048-zh-CN.png",
+        "sha256": "61693f46d9c3ad9afde4201291f81e95fe531d3efdddd5937ffc92590f6a97fb"
+      },
+      "lenovoChineseMobile": {
+        "path": "website/validation-receipts/assets/product-edition-brand-16e998b/product-page-screenshots/lenovo-mobile-390-zh-CN.png",
+        "sha256": "4cc9c3dad1aae582bb28853a5bb6d754b0223183dd4e3aa7bc3067258d18af8f"
+      },
+      "firefoxEnglishMobile": {
+        "path": "website/validation-receipts/assets/product-edition-brand-16e998b/product-page-screenshots/firefox-mobile-390-en.png",
+        "sha256": "2d58c3eed01d46bfafaa8bcd4a62c8ffd69fb29f98d0c90d0d21dae797dd9821"
+      }
+    }
+  },
+  "repositoryGovernance": {
+    "forcePushPerformed": false,
+    "mainMergePerformed": false,
+    "manualAndPdfDraftsExcluded": true,
+    "workDirectoryExcluded": true,
+    "runtimeDependencyOnWorkDirectory": false
+  }
+}
