@@ -16,6 +16,12 @@ LAB_UI_RECEIPT = (
     / "build-receipts"
     / "lab-ui-1.0.0-19f6185.functional-prebrand.json"
 )
+READINESS_RECEIPT = (
+    ROOT
+    / "distribution"
+    / "build-receipts"
+    / "lab-yellow-readiness-1.0.0-8654d44.brand-linker-blocked.json"
+)
 TOOLS = ROOT / "distribution" / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
@@ -278,6 +284,28 @@ class LabPreviewContractTests(unittest.TestCase):
         )
         self.assertFalse(result["toolchain"]["tauriInvoked"])
         self.assertFalse(result["toolchain"]["nsisInvoked"])
+
+    def test_real_readiness_receipt_preserves_the_linker_blocker(self) -> None:
+        receipt = json.loads(READINESS_RECEIPT.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["state"], "blocked-before-yellow-request")
+        self.assertEqual(
+            receipt["source"]["commit"],
+            "8654d441b8759e66984285a0914e051f4ca1a8e2",
+        )
+        self.assertTrue(receipt["brand"]["readyForYellowBuild"])
+        self.assertFalse(receipt["brand"]["grantsHardwareAuthority"])
+        self.assertEqual(receipt["toolchain"]["requiredLinker"], "link.exe")
+        self.assertFalse(receipt["toolchain"]["linkerAvailable"])
+        self.assertFalse(receipt["yellowBuildRequest"]["requestable"])
+        self.assertEqual(
+            receipt["yellowBuildRequest"]["requestBlockers"],
+            ["required Rust host linker is unavailable: link.exe"],
+        )
+        self.assertFalse(receipt["postBuildAcceptance"]["installableNow"])
+        self.assertFalse(receipt["postBuildAcceptance"]["executableExists"])
+        self.assertEqual(receipt["postBuildAcceptance"]["validatedVehiclePackCount"], 0)
+        self.assertEqual(receipt["postBuildAcceptance"]["hardwareActionDecision"], "deny")
+        self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-readiness-receipt",
+  "classification": "GREEN-READ-ONLY",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "state": "blocked-before-yellow-request",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "8654d441b8759e66984285a0914e051f4ca1a8e2",
+    "upstream": "origin/codex/software-lab",
+    "clean": true
+  },
+  "commonCore": {
+    "authority": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "observedOriginSoftwareHead": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "observedOriginHeadIsProductSource": false
+  },
+  "brand": {
+    "displayName": "DroneDream · LAB",
+    "sourceManifestSha256": "1b6a43b561037669586eff519264f783ef2f4216a80babe266e33acb4d6aa8ee",
+    "tauriOverlaySha256": "7e7ae5b7abd957e7c3946451703973e3a61ecb18127852d38d1b6077262d2ef5",
+    "assetCount": 6,
+    "allAssetsMatchManifest": true,
+    "grantsHardwareAuthority": false,
+    "readyForYellowBuild": true
+  },
+  "toolchain": {
+    "rustcAvailable": true,
+    "cargoAvailable": true,
+    "rustHost": "x86_64-pc-windows-msvc",
+    "requiredLinker": "link.exe",
+    "linkerAvailable": false,
+    "linkerPath": null,
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target"
+  },
+  "yellowBuildRequest": {
+    "requestable": false,
+    "requiresControllerApprovalBeforeBuild": true,
+    "requestBlockers": [
+      "required Rust host linker is unavailable: link.exe"
+    ]
+  },
+  "postBuildAcceptance": {
+    "installableNow": false,
+    "executableExists": false,
+    "realArtifactReceiptExists": false,
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecision": "deny"
+  },
+  "tests": {
+    "readinessFocused": {"tests": 14, "result": "passed"},
+    "distribution": {"tests": 141, "result": "passed"}
+  },
+  "sideEffects": {
+    "tauriBuild": false,
+    "nsisBuild": false,
+    "install": false,
+    "runtimeMigration": false,
+    "px4Gazebo": false,
+    "hardwareProbe": false,
+    "providerCall": false,
+    "apiKeyRead": false,
+    "releaseBranchCreated": false,
+    "uploadOrDeploy": false
+  },
+  "resumeEntry": {
+    "condition": "Resolve link.exe for the MSVC Rust host, then rerun the GREEN readiness audit.",
+    "auditCommand": "python distribution/tools/lab_yellow_readiness_audit.py",
+    "buildCommandRequiresNewYellowApproval": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/scripts/build-lab-preview.ps1 -Build"
+  }
+}
