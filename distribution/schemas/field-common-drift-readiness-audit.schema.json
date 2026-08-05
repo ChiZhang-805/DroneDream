@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/field-common-drift-readiness-audit.v1.json",
+  "title": "DroneDream Field common-core drift and preview readiness audit",
+  "oneOf": [
+    {"$ref": "#/$defs/commonCoreDriftAudit"},
+    {"$ref": "#/$defs/fieldPreviewReadinessReceipt"}
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "pathRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "path", "classification", "topic", "action"],
+      "properties": {
+        "status": {"type": "string", "minLength": 1, "maxLength": 8},
+        "path": {"type": "string", "minLength": 1, "maxLength": 256},
+        "classification": {
+          "enum": [
+            "universal-common-core-backflow",
+            "field-specific-contract",
+            "protected-evidence-drift",
+            "unclassified-review-required"
+          ]
+        },
+        "topic": {"type": "string", "minLength": 1, "maxLength": 128},
+        "action": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "commitRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "subject", "changedPaths"],
+      "properties": {
+        "commit": {"$ref": "#/$defs/commit"},
+        "subject": {"type": "string", "minLength": 1, "maxLength": 160},
+        "changedPaths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/pathRecord"}
+        }
+      }
+    },
+    "dependencyRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dependencyId", "dependsOnPaths"],
+      "properties": {
+        "dependencyId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "dependsOnPaths": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "mustBackflowBefore": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "mustStayFieldSpecificUntil": {"type": "string", "minLength": 1, "maxLength": 160}
+      },
+      "oneOf": [
+        {"required": ["mustBackflowBefore"]},
+        {"required": ["mustStayFieldSpecificUntil"]}
+      ]
+    },
+    "backflowPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["planId", "sourceCommits", "paths", "method", "excludePaths"],
+      "properties": {
+        "planId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "sourceCommits": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/commit"}
+        },
+        "paths": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        },
+        "method": {"type": "string", "minLength": 1, "maxLength": 180},
+        "excludePaths": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1, "maxLength": 256}
+        }
+      }
+    },
+    "commonCoreDriftAudit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "source",
+        "commits",
+        "changedPaths",
+        "summary",
+        "dependencies",
+        "minimumForwardBackflowPlan",
+        "protectedEvidencePlan",
+        "auditSha256"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-common-drift-readiness-audit"},
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseRef", "headRef", "headCommit", "branch", "treeClean"],
+          "properties": {
+            "baseRef": {"type": "string", "minLength": 1, "maxLength": 128},
+            "headRef": {"type": "string", "minLength": 1, "maxLength": 128},
+            "headCommit": {"$ref": "#/$defs/commit"},
+            "branch": {"type": "string", "minLength": 1, "maxLength": 128},
+            "treeClean": {"type": "boolean"}
+          }
+        },
+        "commits": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/commitRecord"}
+        },
+        "changedPaths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/pathRecord"}
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "commitCount",
+            "changedPathCount",
+            "universalCommonCorePathCount",
+            "fieldSpecificPathCount",
+            "protectedEvidenceDriftCount"
+          ],
+          "properties": {
+            "commitCount": {"type": "integer", "minimum": 0},
+            "changedPathCount": {"type": "integer", "minimum": 0},
+            "universalCommonCorePathCount": {"type": "integer", "minimum": 0},
+            "fieldSpecificPathCount": {"type": "integer", "minimum": 0},
+            "protectedEvidenceDriftCount": {"type": "integer", "minimum": 0}
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/dependencyRecord"}
+        },
+        "minimumForwardBackflowPlan": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/backflowPlan"}
+        },
+        "protectedEvidencePlan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["paths", "backflowAction", "reason"],
+          "properties": {
+            "paths": {
+              "type": "array",
+              "items": {"$ref": "#/$defs/pathRecord"}
+            },
+            "backflowAction": {"const": "none"},
+            "reason": {"type": "string", "minLength": 1, "maxLength": 256}
+          }
+        },
+        "auditSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "registrySummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "packCount",
+        "validatedHardwarePackCount",
+        "validatedHardwarePackIds"
+      ],
+      "properties": {
+        "path": {"const": "distribution/vehicle-packs/registry.v1.json"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "packCount": {"type": "integer", "minimum": 0},
+        "validatedHardwarePackCount": {"const": 0},
+        "validatedHardwarePackIds": {
+          "type": "array",
+          "maxItems": 0,
+          "items": false
+        }
+      }
+    },
+    "fieldPreviewReadinessReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "editionId",
+        "source",
+        "decision",
+        "buildAllowed",
+        "installAllowed",
+        "releaseBranchAllowed",
+        "hardwareActionsAllowed",
+        "deviceEnumerationAllowed",
+        "simulationAllowed",
+        "registry",
+        "releaseBranch",
+        "prohibitedOperations",
+        "blockers",
+        "receiptSha256"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-preview-build-readiness-receipt"},
+        "editionId": {"const": "field"},
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["branch", "headCommit", "baseRef", "driftAuditSha256"],
+          "properties": {
+            "branch": {"const": "codex/software-field"},
+            "headCommit": {"$ref": "#/$defs/commit"},
+            "baseRef": {"const": "origin/codex/software"},
+            "driftAuditSha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "decision": {"const": "deny"},
+        "buildAllowed": {"const": false},
+        "installAllowed": {"const": false},
+        "releaseBranchAllowed": {"const": false},
+        "hardwareActionsAllowed": {"const": false},
+        "deviceEnumerationAllowed": {"const": false},
+        "simulationAllowed": {"const": false},
+        "registry": {"$ref": "#/$defs/registrySummary"},
+        "releaseBranch": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["localPresent", "originPresent"],
+          "properties": {
+            "localPresent": {"type": "boolean"},
+            "originPresent": {"type": "boolean"}
+          }
+        },
+        "prohibitedOperations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "blockers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
