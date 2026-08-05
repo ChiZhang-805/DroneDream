@@ -1,7 +1,7 @@
 import {
-  DISTRIBUTION_CATALOG,
-  type DistributionValidationStatus,
-} from "../features/distribution/catalog";
+  FIELD_CATALOG,
+  type FieldValidationStatus,
+} from "./catalog";
 
 export const FIELD_HARDWARE_ACTIONS = [
   "parameter-write",
@@ -35,7 +35,7 @@ export interface FieldDeviceObservation {
   vehiclePackId: string | null;
   controller: string | null;
   firmwareVersion: string | null;
-  validationTier: DistributionValidationStatus | null;
+  validationTier: FieldValidationStatus | null;
   quorum: FieldQuorumObservation;
 }
 
@@ -60,8 +60,8 @@ export interface FieldSafetyDecision {
   blockers: FieldSafetyBlocker[];
 }
 
-export const FIELD_VALIDATED_PACK_COUNT = DISTRIBUTION_CATALOG.vehiclePacks.filter(
-  (pack) => pack.supportedEditions.includes("field") && pack.validationStatus === "validated",
+export const FIELD_VALIDATED_PACK_COUNT = FIELD_CATALOG.vehiclePacks.filter(
+  (pack) => pack.validationStatus === "validated",
 ).length;
 
 function observationBlocker(state: FieldObservationState): FieldSafetyBlocker {
