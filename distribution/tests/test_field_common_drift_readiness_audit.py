@@ -109,6 +109,10 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertEqual(structure["artifactBaseName"], "DroneDream-Field-1.0.0.exe")
         self.assertEqual(structure["frontendDist"], "../../frontend/field-dist")
         self.assertEqual(structure["updaterManifestFilename"], "field-latest.json")
+        self.assertEqual(
+            structure["canonicalDonor"]["commit"],
+            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+        )
         self.assertEqual(structure["simulatorReferences"], [])
         self.assertIn(
             "field.desktop-consumer.invalid:installerShortcutFieldIcon",

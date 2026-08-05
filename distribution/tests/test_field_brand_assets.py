@@ -12,6 +12,7 @@ MANIFEST_PATH = BRANDING_ROOT / "source-manifest.v1.json"
 FIELD_APP = ROOT / "frontend" / "src" / "field" / "FieldApp.tsx"
 FIELD_VITE = ROOT / "frontend" / "vite.field.config.ts"
 FIELD_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.field.conf.json"
+CANONICAL_MANIFEST = ROOT / "brand" / "generated" / "brand-assets.v1.json"
 
 
 def sha256(path: Path) -> str:
@@ -41,8 +42,11 @@ class FieldBrandAssetTests(unittest.TestCase):
         self.assertEqual(self.manifest["copyPolicy"], "byte-for-byte-no-transcode")
         self.assertEqual(
             self.manifest["commonCoreCommit"],
-            "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
+            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
         )
+        donor = self.manifest["canonicalDonor"]
+        self.assertEqual(donor["commit"], self.manifest["commonCoreCommit"])
+        self.assertEqual(donor["manifestSha256"], sha256(CANONICAL_MANIFEST))
         self.assertEqual(
             self.manifest["source"]["handoffSha256"],
             "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
@@ -61,19 +65,29 @@ class FieldBrandAssetTests(unittest.TestCase):
             self.assertEqual(sha256(target), asset["targetSha256"])
             self.assertEqual(target.stat().st_size, asset["sizeBytes"])
             self.assertEqual(png_dimensions(target), (asset["width"], asset["height"]))
+            donor_path = ROOT / self.manifest["canonicalDonor"][
+                "markPath" if asset["assetId"] == "field-mark" else "dotLockupPath"
+            ]
+            self.assertEqual(sha256(donor_path), asset["sourceSha256"])
+            self.assertEqual(target.read_bytes(), donor_path.read_bytes())
 
     def test_frontend_and_desktop_consume_only_field_owned_assets(self) -> None:
         app_source = FIELD_APP.read_text(encoding="utf-8")
         vite_source = FIELD_VITE.read_text(encoding="utf-8")
         desktop_config = json.loads(FIELD_CONFIG.read_text(encoding="utf-8"))
 
-        self.assertIn('src="/dronedream-field-dot-lockup.png"', app_source)
-        self.assertNotIn("BrandLockup", app_source)
-        self.assertIn("../distribution/editions/field/branding", vite_source)
+        self.assertIn("BrandLockup", app_source)
+        self.assertIn('edition="field"', app_source)
+        self.assertNotIn("../distribution/editions/field/branding", vite_source)
         self.assertIn('data-authority="false"', app_source)
         self.assertEqual(
             desktop_config["bundle"]["icon"],
-            ["../../distribution/editions/field/branding/dronedream-field-mark.png"],
+            [
+                "../../brand/generated/field/windows/32x32.png",
+                "../../brand/generated/field/windows/128x128.png",
+                "../../brand/generated/field/windows/128x128@2x.png",
+                "../../brand/generated/field/windows/icon.ico",
+            ],
         )
 
 

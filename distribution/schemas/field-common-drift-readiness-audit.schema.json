@@ -217,6 +217,7 @@
         "brandManifestSha256",
         "brandCommonCoreCommit",
         "brandCopyPolicy",
+        "canonicalDonor",
         "installerShortcutHook",
         "assets",
         "consumerChecks",
@@ -234,6 +235,22 @@
         "brandManifestSha256": {"$ref": "#/$defs/sha256"},
         "brandCommonCoreCommit": {"$ref": "#/$defs/commit"},
         "brandCopyPolicy": {"const": "byte-for-byte-no-transcode"},
+        "canonicalDonor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "commit",
+            "contractSha256",
+            "manifestSha256",
+            "visualReceiptSha256"
+          ],
+          "properties": {
+            "commit": {"$ref": "#/$defs/commit"},
+            "contractSha256": {"$ref": "#/$defs/sha256"},
+            "manifestSha256": {"$ref": "#/$defs/sha256"},
+            "visualReceiptSha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
         "installerShortcutHook": {
           "type": "object",
           "additionalProperties": false,

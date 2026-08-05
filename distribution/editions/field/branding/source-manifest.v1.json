@@ -4,7 +4,18 @@
   "editionId": "field",
   "displayName": "DroneDream · FIELD",
   "copyPolicy": "byte-for-byte-no-transcode",
-  "commonCoreCommit": "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
+  "commonCoreCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+  "canonicalDonor": {
+    "commit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "contractPath": "brand/brand-editions.v1.json",
+    "contractSha256": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc",
+    "manifestPath": "brand/generated/brand-assets.v1.json",
+    "manifestSha256": "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34",
+    "visualReceiptPath": "brand/generated/brand-visual-receipt.v1.json",
+    "visualReceiptSha256": "2c980725b436beb887cdccc5bb3767967bf56efd3eb6d98057f9bef1b2d34ab3",
+    "markPath": "brand/source/approved/field-mark-1024.png",
+    "dotLockupPath": "brand/source/approved/field-dot-lockup.png"
+  },
   "source": {
     "directory": "Z:\\DroneDream\\work\\brand-edition-concepts-v1",
     "handoffFilename": "BRAND_EDITION_HANDOFF_V2.md",

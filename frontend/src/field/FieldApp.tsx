@@ -18,6 +18,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 
+import { BrandLockup } from "../components/BrandLockup";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
 import {
   evaluateFieldSafety,
@@ -278,10 +279,10 @@ export function FieldApp({
       <a className="field-skip-link" href="#overview">{copy.skip}</a>
       <header className="field-topbar">
         <div className="field-brand" aria-label="DroneDream · FIELD">
-          <img
-            aria-hidden="true"
+          <BrandLockup
             className="field-brand-lockup"
-            src="/dronedream-field-dot-lockup.png"
+            edition="field"
+            variant="compact"
           />
         </div>
         <div className="field-topbar-actions">

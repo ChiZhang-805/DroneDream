@@ -269,6 +269,12 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
             }
         )
 
+    expected_icons = [
+        "../../brand/generated/field/windows/32x32.png",
+        "../../brand/generated/field/windows/128x128.png",
+        "../../brand/generated/field/windows/128x128@2x.png",
+        "../../brand/generated/field/windows/icon.ico",
+    ]
     expected_mark = "../../distribution/editions/field/branding/dronedream-field-mark.png"
     expected_lockup = (
         "../../distribution/editions/field/branding/dronedream-field-dot-lockup.png"
@@ -276,6 +282,23 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
     expected_manifest = (
         "../../distribution/editions/field/branding/source-manifest.v1.json"
     )
+    canonical = manifest["canonicalDonor"]
+    canonical_checks = {
+        "contract": sha256_file(repo_root / canonical["contractPath"])
+        == canonical["contractSha256"],
+        "manifest": sha256_file(repo_root / canonical["manifestPath"])
+        == canonical["manifestSha256"],
+        "visualReceipt": sha256_file(repo_root / canonical["visualReceiptPath"])
+        == canonical["visualReceiptSha256"],
+        "mark": sha256_file(repo_root / canonical["markPath"])
+        == next(asset["sourceSha256"] for asset in manifest["assets"] if asset["assetId"] == "field-mark"),
+        "dotLockup": sha256_file(repo_root / canonical["dotLockupPath"])
+        == next(
+            asset["sourceSha256"]
+            for asset in manifest["assets"]
+            if asset["assetId"] == "field-dot-lockup"
+        ),
+    }
     bundle = tauri.get("bundle", {})
     resources = bundle.get("resources", {})
     endpoint = tauri.get("plugins", {}).get("updater", {}).get("endpoints", [""])[0]
@@ -283,14 +306,21 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "displayName": tauri.get("productName") == manifest.get("displayName"),
         "windowTitle": tauri.get("app", {}).get("windows", [{}])[0].get("title")
         == manifest.get("displayName"),
-        "frontendDotLockup": 'src="/dronedream-field-dot-lockup.png"' in app_source,
-        "frontendBrandingRoot": "../distribution/editions/field/branding" in vite_source,
-        "tauriIcon": bundle.get("icon") == [expected_mark],
+        "frontendCanonicalLockup": "BrandLockup" in app_source
+        and 'edition="field"' in app_source,
+        "frontendNoPrivateBrandingRoot": "../distribution/editions/field/branding"
+        not in vite_source,
+        "tauriIcon": bundle.get("icon") == expected_icons,
         "tauriResources": resources
         == {
             expected_mark: "branding/dronedream-field-mark.png",
             expected_lockup: "branding/dronedream-field-dot-lockup.png",
             expected_manifest: "branding/source-manifest.v1.json",
+            "../../brand/generated/brand-assets.v1.json":
+                "branding/canonical-brand-assets.v1.json",
+            "../../brand/generated/brand-visual-receipt.v1.json":
+                "branding/canonical-brand-visual-receipt.v1.json",
+            "../../brand/generated/field/windows/icon.ico": "icons/DroneDream-Field.ico",
         },
         "fieldFrontendDist": tauri.get("build", {}).get("frontendDist")
         == "../../frontend/field-dist",
@@ -298,6 +328,7 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "fieldArtifactBaseName": edition.get("artifactBaseName")
         == "DroneDream-Field-1.0.0.exe",
         "authorityRemainsFalse": 'data-authority="false"' in app_source,
+        "canonicalDonor": all(canonical_checks.values()),
         "installerShortcutFieldIcon": "$INSTDIR\\icons\\DroneDream.ico"
         not in hook_source,
     }
@@ -330,6 +361,12 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "brandManifestSha256": sha256_file(manifest_path),
         "brandCommonCoreCommit": manifest["commonCoreCommit"],
         "brandCopyPolicy": manifest["copyPolicy"],
+        "canonicalDonor": {
+            "commit": canonical["commit"],
+            "contractSha256": canonical["contractSha256"],
+            "manifestSha256": canonical["manifestSha256"],
+            "visualReceiptSha256": canonical["visualReceiptSha256"],
+        },
         "installerShortcutHook": {
             "path": hook_path.relative_to(repo_root).as_posix(),
             "sha256": sha256_file(hook_path),

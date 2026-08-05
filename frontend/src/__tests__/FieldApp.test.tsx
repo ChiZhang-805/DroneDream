@@ -29,8 +29,8 @@ describe("FieldApp", () => {
       .toBeInTheDocument();
     expect(screen.getByText("0 / 7")).toBeInTheDocument();
     expect(container.querySelector(".field-brand-lockup")).toHaveAttribute(
-      "src",
-      "/dronedream-field-dot-lockup.png",
+      "data-brand-edition",
+      "field",
     );
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
     expect(container.querySelector("[data-validated-pack-count='0']")).toBeTruthy();

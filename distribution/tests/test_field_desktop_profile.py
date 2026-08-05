@@ -40,7 +40,10 @@ class FieldDesktopProfileTests(unittest.TestCase):
 
     def test_overlay_binds_the_authorized_field_brand_assets(self) -> None:
         self.assertEqual(self.config["bundle"]["icon"], [
-            "../../distribution/editions/field/branding/dronedream-field-mark.png",
+            "../../brand/generated/field/windows/32x32.png",
+            "../../brand/generated/field/windows/128x128.png",
+            "../../brand/generated/field/windows/128x128@2x.png",
+            "../../brand/generated/field/windows/icon.ico",
         ])
         self.assertEqual(self.config["bundle"]["resources"], {
             "../../distribution/editions/field/branding/dronedream-field-mark.png":
@@ -49,6 +52,12 @@ class FieldDesktopProfileTests(unittest.TestCase):
                 "branding/dronedream-field-dot-lockup.png",
             "../../distribution/editions/field/branding/source-manifest.v1.json":
                 "branding/source-manifest.v1.json",
+            "../../brand/generated/brand-assets.v1.json":
+                "branding/canonical-brand-assets.v1.json",
+            "../../brand/generated/brand-visual-receipt.v1.json":
+                "branding/canonical-brand-visual-receipt.v1.json",
+            "../../brand/generated/field/windows/icon.ico":
+                "icons/DroneDream-Field.ico",
         })
         self.assertNotIn("windows", self.config["bundle"])
 

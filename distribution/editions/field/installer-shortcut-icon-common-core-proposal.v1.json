@@ -32,7 +32,7 @@
       "distribution/tests/test_field_desktop_profile.py"
     ],
     "requirements": [
-      "Create a thin Field wrapper that selects the Field executable icon and includes the shared Universal hook.",
+      "Create a thin Field wrapper that selects $INSTDIR\\icons\\DroneDream-Field.ico and includes the shared Universal hook.",
       "Point only the Field Tauri overlay at the thin wrapper.",
       "Re-run static installer structure verification before requesting a YELLOW preview build."
     ]
