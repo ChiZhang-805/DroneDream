@@ -15,6 +15,10 @@ from typing import Annotated, Final, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.benchmarking.composite_inventory import (
+    COMPOSITE_EXECUTION_VERIFICATION_CONTRACT_SHA256,
+    CompositeExecutionVerificationReceiptV1,
+)
 from app.benchmarking.contracts import (
     GitCommit,
     Identifier,
@@ -86,6 +90,8 @@ class PhysicalStabilityExecutionAuthorizationV1(_StrictFrozen):
     manifest_sha256: Sha256Hex
     plan_sha256: Sha256Hex
     composite_execution_inventory_sha256: Sha256Hex
+    composite_execution_verification: CompositeExecutionVerificationReceiptV1
+    composite_execution_verification_receipt_sha256: Sha256Hex
     runtime_base_manifest_sha256: Sha256Hex
     engine_pack_id: PackId
     engine_pack_manifest_sha256: Sha256Hex
@@ -110,6 +116,36 @@ class PhysicalStabilityExecutionAuthorizationV1(_StrictFrozen):
             raise ValueError("execution authorization must expire after it is issued")
         if self.expires_at_utc - self.issued_at_utc > _MAX_AUTHORIZATION_WINDOW:
             raise ValueError("execution authorization window cannot exceed eight hours")
+        receipt = self.composite_execution_verification
+        if receipt.status != "verified" or not receipt.compatible:
+            raise ValueError(
+                "execution authorization requires a verified compatible composite inventory"
+            )
+        if receipt.execution_authorized:
+            raise ValueError(
+                "composite verification evidence cannot self-authorize execution"
+            )
+        if (
+            receipt.verification_contract_sha256
+            != COMPOSITE_EXECUTION_VERIFICATION_CONTRACT_SHA256
+        ):
+            raise ValueError(
+                "execution authorization uses an unknown composite verification contract"
+            )
+        if (
+            receipt.inventory_sha256
+            != self.composite_execution_inventory_sha256
+        ):
+            raise ValueError(
+                "composite verification evidence does not bind the authorized inventory"
+            )
+        if (
+            canonical_sha256(receipt)
+            != self.composite_execution_verification_receipt_sha256
+        ):
+            raise ValueError(
+                "composite verification receipt hash does not match its exact content"
+            )
         return self
 
 
@@ -218,6 +254,7 @@ class PhysicalStabilityExecutionLedgerV1(_StrictFrozen):
     manifest_sha256: Sha256Hex
     plan_sha256: Sha256Hex
     composite_execution_inventory_sha256: Sha256Hex
+    composite_execution_verification_receipt_sha256: Sha256Hex
     authorization_sha256: Sha256Hex
     authorization_id: Identifier
     trial_cap: Literal[60] = 60
@@ -320,6 +357,27 @@ def _validate_authorized_inputs(
         raise ValueError("execution authorization does not bind the P5 trial plan")
     if authorization.composite_execution_inventory_sha256 != inventory_sha:
         raise ValueError("execution authorization does not bind the composite inventory")
+    expected_component_ids = tuple(
+        component.component_id
+        for component in (
+            *(
+                [manifest.composite_execution_inventory.desktop]
+                if manifest.composite_execution_inventory.desktop is not None
+                else []
+            ),
+            manifest.composite_execution_inventory.runtime_base,
+            manifest.composite_execution_inventory.engine_pack,
+            manifest.composite_execution_inventory.px4,
+            manifest.composite_execution_inventory.gazebo,
+        )
+    )
+    if (
+        authorization.composite_execution_verification.verified_component_ids
+        != expected_component_ids
+    ):
+        raise ValueError(
+            "composite verification receipt does not cover the exact inventory components"
+        )
     if authorization.repository_subject_commit != manifest.repository_subject_commit:
         raise ValueError("execution authorization source does not match the P5 manifest")
     if plan.repository_subject_commit != manifest.repository_subject_commit:
@@ -361,6 +419,9 @@ def build_physical_stability_execution_ledger(
         plan_sha256=canonical_sha256(plan),
         composite_execution_inventory_sha256=canonical_sha256(
             manifest.composite_execution_inventory
+        ),
+        composite_execution_verification_receipt_sha256=(
+            authorization.composite_execution_verification_receipt_sha256
         ),
         authorization_sha256=canonical_sha256(authorization),
         authorization_id=authorization.authorization_id,

@@ -10,6 +10,10 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app import schemas
+from app.benchmarking.composite_inventory import (
+    COMPOSITE_EXECUTION_VERIFICATION_CONTRACT_SHA256,
+    CompositeExecutionVerificationReceiptV1,
+)
 from app.benchmarking.contracts import CompositeExecutionInventoryV1, canonical_sha256
 from app.benchmarking.physical_stability import (
     build_physical_stability_manifest,
@@ -84,6 +88,24 @@ def _contracts():
     )
     plan = compile_physical_stability_trial_plan(manifest)
     bundle = build_physical_stability_execution_bundle(manifest, plan)
+    verification = CompositeExecutionVerificationReceiptV1(
+        status="verified",
+        compatible=True,
+        inventory_sha256=canonical_sha256(inventory),
+        observation_sha256="5" * 64,
+        compatibility_summary_sha256="6" * 64,
+        verification_contract_sha256=(
+            COMPOSITE_EXECUTION_VERIFICATION_CONTRACT_SHA256
+        ),
+        verified_component_ids=(
+            "desktop",
+            "runtime-base",
+            "engine-pack",
+            "px4",
+            "gazebo",
+        ),
+        reason_codes=(),
+    )
     authorization = PhysicalStabilityExecutionAuthorizationV1(
         authorization_id="p5-red-window-bridge-unit",
         authorization_nonce="1" * 32,
@@ -93,6 +115,10 @@ def _contracts():
         manifest_sha256=canonical_sha256(manifest),
         plan_sha256=canonical_sha256(plan),
         composite_execution_inventory_sha256=canonical_sha256(inventory),
+        composite_execution_verification=verification,
+        composite_execution_verification_receipt_sha256=canonical_sha256(
+            verification
+        ),
         runtime_base_manifest_sha256=inventory.runtime_base.manifest_sha256,
         engine_pack_id="sha256:" + "4" * 64,
         engine_pack_manifest_sha256=inventory.engine_pack.manifest_sha256,

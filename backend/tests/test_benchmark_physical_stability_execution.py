@@ -4,6 +4,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.benchmarking.composite_inventory import (
+    COMPOSITE_EXECUTION_VERIFICATION_CONTRACT_SHA256,
+    CompositeExecutionVerificationReceiptV1,
+)
 from app.benchmarking.contracts import (
     CompositeExecutionInventoryV1,
     canonical_sha256,
@@ -66,7 +70,33 @@ def _contracts(*, engine_source: str = _SOURCE):
     return manifest, plan
 
 
+def _verification_receipt(
+    inventory: CompositeExecutionInventoryV1, **changes
+) -> CompositeExecutionVerificationReceiptV1:
+    payload = {
+        "status": "verified",
+        "compatible": True,
+        "inventory_sha256": canonical_sha256(inventory),
+        "observation_sha256": "5" * 64,
+        "compatibility_summary_sha256": "6" * 64,
+        "verification_contract_sha256": (
+            COMPOSITE_EXECUTION_VERIFICATION_CONTRACT_SHA256
+        ),
+        "verified_component_ids": (
+            "desktop",
+            "runtime-base",
+            "engine-pack",
+            "px4",
+            "gazebo",
+        ),
+        "reason_codes": (),
+    }
+    payload.update(changes)
+    return CompositeExecutionVerificationReceiptV1.model_validate(payload)
+
+
 def _authorization(manifest, plan, **changes) -> PhysicalStabilityExecutionAuthorizationV1:
+    verification = _verification_receipt(manifest.composite_execution_inventory)
     payload = {
         "authorization_id": "p5-red-window-unit",
         "authorization_nonce": "1" * 32,
@@ -77,6 +107,10 @@ def _authorization(manifest, plan, **changes) -> PhysicalStabilityExecutionAutho
         "plan_sha256": canonical_sha256(plan),
         "composite_execution_inventory_sha256": canonical_sha256(
             manifest.composite_execution_inventory
+        ),
+        "composite_execution_verification": verification,
+        "composite_execution_verification_receipt_sha256": canonical_sha256(
+            verification
         ),
         "runtime_base_manifest_sha256": (
             manifest.composite_execution_inventory.runtime_base.manifest_sha256
@@ -125,15 +159,55 @@ def test_builds_zero_work_ledger_only_from_exact_short_lived_red_authorization()
     [
         ({"manifest_sha256": "0" * 64}, "manifest"),
         ({"plan_sha256": "0" * 64}, "trial plan"),
-        ({"composite_execution_inventory_sha256": "0" * 64}, "composite inventory"),
+        ({"composite_execution_inventory_sha256": "0" * 64}, "authorized inventory"),
         ({"runtime_base_manifest_sha256": "0" * 64}, "Runtime Base"),
         ({"engine_pack_manifest_sha256": "0" * 64}, "Engine Pack"),
     ],
 )
 def test_rejects_tampered_source_bound_authorization(change, message) -> None:
     manifest, plan = _contracts()
-    authorization = _authorization(manifest, plan, **change)
     with pytest.raises(ValueError, match=message):
+        authorization = _authorization(manifest, plan, **change)
+        build_physical_stability_execution_ledger(
+            manifest, plan, authorization, now_utc=_NOW
+        )
+
+
+def test_rejects_tampered_denied_and_incomplete_composite_verification() -> None:
+    manifest, plan = _contracts()
+    with pytest.raises(ValueError, match="receipt hash"):
+        _authorization(
+            manifest,
+            plan,
+            composite_execution_verification_receipt_sha256="0" * 64,
+        )
+
+    denied = _verification_receipt(
+        manifest.composite_execution_inventory,
+        status="denied",
+        compatible=False,
+        verified_component_ids=(),
+        reason_codes=("fixture-denial",),
+    )
+    with pytest.raises(ValueError, match="verified compatible"):
+        _authorization(
+            manifest,
+            plan,
+            composite_execution_verification=denied,
+            composite_execution_verification_receipt_sha256=canonical_sha256(denied),
+        )
+
+    incomplete = _verification_receipt(
+        manifest.composite_execution_inventory,
+        verified_component_ids=("runtime-base", "engine-pack", "px4", "gazebo"),
+    )
+    authorization = _authorization(
+        manifest,
+        plan,
+        composite_execution_verification=incomplete,
+        composite_execution_verification_receipt_sha256=canonical_sha256(incomplete),
+    )
+    with pytest.raises(ValueError, match="exact inventory components"):
         build_physical_stability_execution_ledger(
             manifest, plan, authorization, now_utc=_NOW
         )
