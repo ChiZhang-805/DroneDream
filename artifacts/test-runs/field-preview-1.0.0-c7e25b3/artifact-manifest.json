@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-unsigned-preview-artifact-manifest",
+  "editionId": "field",
+  "version": "1.0.0",
+  "productSource": {
+    "branch": "codex/software-field",
+    "commit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "upstreamCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "treeStateAtBuildStart": "clean",
+    "trackedTreeChangedDuringBuild": false,
+    "buildNumber": 698,
+    "commonCoreCommit": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+    "commonCoreHash": "c6e480dfd2cf4eccb07ee34cd836f096843afab375b03a5fb2d57ab964b5c94a"
+  },
+  "artifact": {
+    "absolutePath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "originalGeneratedFilename": "DroneDream · FIELD_1.0.0_x64-setup.exe",
+    "bytes": 11267482,
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0",
+    "productName": "DroneDream · FIELD",
+    "packaging": "tauri-nsis",
+    "cargoBuildCount": 1,
+    "nsisInvocationCount": 1
+  },
+  "signature": {
+    "signatureState": "unsigned",
+    "authenticodeStatus": "NotSigned",
+    "signerCertificatePresent": false,
+    "timestampCertificatePresent": false,
+    "peCertificateTableOffset": 0,
+    "peCertificateTableBytes": 0
+  },
+  "updater": {
+    "createUpdaterArtifacts": false,
+    "signaturePath": null,
+    "signatureSha256": null,
+    "signatureState": "not-issued"
+  },
+  "branding": {
+    "canonicalDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "fieldIconSha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",
+    "fieldMarkSha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
+    "fieldDotLockupSha256": "def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192",
+    "installedShortcutIconPath": "icons/DroneDream.ico",
+    "productDisplayName": "DroneDream · FIELD"
+  },
+  "payload": {
+    "inventoryPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\payload-inventory.json",
+    "inventorySha256": "bbba2cb8385aec8280c7d3cf0324faf503260c0c32554ac84b490726e5d38c94",
+    "inventoryFileCount": 36,
+    "inventoryBytes": 32832384,
+    "enginePack": {
+      "profileId": "field-lightweight",
+      "includesLargeSimulator": false,
+      "excludedSourcePaths": [
+        "backend/app/simulator",
+        "scripts/simulators"
+      ],
+      "sourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+      "descriptorSha256": "cbf4becfaefebab8e48a703b03c3838af4066786585db92f89bc688c5394e4b4",
+      "manifestSha256": "10e05fd2e0bd3d2c17d4955ac75943ae74a5f3fd066b8a5f1e64200a3f0f7c01",
+      "archiveSha256": "6106f9aa22cd84e6816c74a89e8e02c6d132236a5aba3657c38a10de5e1fd2dc",
+      "archiveBytes": 711921,
+      "postbuildAuditPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\postbuild-payload-audit.json",
+      "postbuildAuditSha256": "dad609edb3b8ecbf97a6aa6dd5164a304cec2148771131c9a8f858e0043c4c1e",
+      "forbiddenSimulatorPayloads": [],
+      "vehiclePackCount": 8,
+      "validatedHardwarePackCount": 0
+    },
+    "frontend": {
+      "fileCount": 29,
+      "bytes": 5608634,
+      "forbiddenSimulatorExecutableOrScriptPaths": [],
+      "simulatorTextReferencesInGenericManuals": [
+        {
+          "path": "docs/downloads/DroneDream-Manual-en.md",
+          "matchCount": 5
+        },
+        {
+          "path": "docs/downloads/DroneDream-Manual-zh-CN.md",
+          "matchCount": 5
+        }
+      ],
+      "visualOnlySharedEditionLockupAssets": [
+        "assets/lab-lockup-compact-DS3cqqo3.png",
+        "assets/sim-lockup-compact-BdaLzdcO.png",
+        "assets/universal-lockup-compact-lWyiFqZ7.png",
+        "assets/universal-lockup-primary-DuUEqIch.png"
+      ],
+      "visualAssetsAreHardwareAuthority": false
+    }
+  },
+  "licenses": {
+    "repositoryLicensePath": "LICENSE",
+    "repositoryLicenseSha256": "d04dd6d500dfbcc5fad9a2f9695a5db8cc95ffc07591a13404fbc996b1e19e76",
+    "noticePath": "runtime/THIRD_PARTY_NOTICES.md",
+    "noticeSha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa",
+    "valkeyLicensePath": "runtime/licenses/valkey-COPYING",
+    "valkeyLicenseSha256": "1a53dca3aab7ce048e91e77b03c0342f3075366f9dede8ec4d19d0cf229e12a0",
+    "allIncludedByGeneratedNsis": true
+  },
+  "installerStructure": {
+    "generatedNsiPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\payload\\nsis\\installer.nsi",
+    "generatedNsiSha256": "b17816ceedf38db29726c3117c8cece83b2a2bd8a09138306141232233aeb9da",
+    "webView2Contract": "verified-embedded-microsoft-signed-bootstrapper",
+    "webView2BootstrapperSha256": "f91077e2c116dcf6377e555d0d4a3a564d242351ad6718b6954658d4f74819c1",
+    "webView2LoaderSha256": "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c",
+    "compiledLanguages": [
+      "English:1033",
+      "SimplifiedChinese:2052"
+    ],
+    "languageTableCount": 2,
+    "shortcutHookPath": "desktop/src-tauri/nsis/webview2-health.nsh",
+    "shortcutHookSha256": "30ac4b811b69038344e0b2be5563d2d01911a78b0efb60937fd09cfac1efda46",
+    "installMode": "currentUser",
+    "installExecuted": false,
+    "upgradeExecuted": false,
+    "uninstallExecuted": false
+  },
+  "safety": {
+    "vehiclePackCount": 8,
+    "validatedHardwarePackCount": 0,
+    "hardwareWriteUnlockArmFlightDecision": "deny",
+    "requiredQuorumLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "deviceAccessExecuted": false,
+    "simulationExecuted": false,
+    "apiKeyRead": false
+  },
+  "release": {
+    "previewReady": true,
+    "releaseReady": false,
+    "releaseBranchCreated": false,
+    "uploaded": false,
+    "websiteHandoffState": "awaiting-exact-release-ready-handoff",
+    "blockers": [
+      "Authenticode is unsigned",
+      "fresh install not executed",
+      "upgrade not executed",
+      "uninstall not executed",
+      "shortcut behavior not validated on an installed system",
+      "public URL family and re-download not issued or verified"
+    ]
+  }
+}

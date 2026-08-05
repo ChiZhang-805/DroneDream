@@ -1,0 +1,112 @@
+{
+  "profileId": "field-lightweight",
+  "includesLargeSimulator": false,
+  "excludedSourcePaths": [
+    "backend/app/simulator",
+    "scripts/simulators"
+  ],
+  "enginePack": {
+    "packId": "sha256:79a86f6addb0476afe2e292c052b5b3b1a530461ebcecc81d36cfa83303ecd77",
+    "descriptorSha256": "cbf4becfaefebab8e48a703b03c3838af4066786585db92f89bc688c5394e4b4",
+    "archiveFilename": "DroneDreamEnginePack.tar.gz",
+    "archiveSha256": "6106f9aa22cd84e6816c74a89e8e02c6d132236a5aba3657c38a10de5e1fd2dc",
+    "archiveSizeBytes": 711921,
+    "manifestSha256": "10e05fd2e0bd3d2c17d4955ac75943ae74a5f3fd066b8a5f1e64200a3f0f7c01",
+    "manifestSizeBytes": 32733
+  },
+  "source": {
+    "enginePackSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "commonCoreCommit": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+    "commonCoreHash": "c6e480dfd2cf4eccb07ee34cd836f096843afab375b03a5fb2d57ab964b5c94a"
+  },
+  "forbiddenPayloads": [],
+  "requiredResources": [
+    {
+      "path": "LICENSE",
+      "sizeBytes": 1087,
+      "sha256": "d04dd6d500dfbcc5fad9a2f9695a5db8cc95ffc07591a13404fbc996b1e19e76"
+    },
+    {
+      "path": "runtime/THIRD_PARTY_NOTICES.md",
+      "sizeBytes": 4410,
+      "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+    },
+    {
+      "path": "distribution/editions/field.v1.json",
+      "sizeBytes": 2946,
+      "sha256": "13b585d4cd9adb90b11d6332f4fad796df8fdeeb107581da6903bd134ae2ae27"
+    },
+    {
+      "path": "distribution/safety/edition-execution-gate.v1.json",
+      "sizeBytes": 4522,
+      "sha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456"
+    },
+    {
+      "path": "distribution/schemas/edition-execution-authorization.schema.json",
+      "sizeBytes": 11554,
+      "sha256": "1feff6e1d3b0f9887156267622bd3ac6fe5bfff793996b95f605677d69df75b1"
+    },
+    {
+      "path": "distribution/schemas/field-lifecycle-contract.schema.json",
+      "sizeBytes": 7548,
+      "sha256": "373e26854ff73db925a729bb13d68ba914664aa42da1faf74c39b14d340e90f7"
+    },
+    {
+      "path": "distribution/schemas/field-prerelease-audit.schema.json",
+      "sizeBytes": 10733,
+      "sha256": "4fbf1e66f76a8c6b4374b51242cd987b6c939b2a9ebaeefae2dc37ede1f0feff"
+    },
+    {
+      "path": "distribution/tools/edition_safety_contract.py",
+      "sizeBytes": 33591,
+      "sha256": "4c2aa96065b5672b7bf886ab86e0389d557df417e3d63adbe87657fa996aa8d8"
+    },
+    {
+      "path": "distribution/tools/field_lifecycle_contract.py",
+      "sizeBytes": 11500,
+      "sha256": "39ed8fed4a0f324791b4fd43356ea88e8a0995786928bbbb028057a620b8d8bf"
+    },
+    {
+      "path": "distribution/tools/field_prerelease_audit.py",
+      "sizeBytes": 20212,
+      "sha256": "09aaa0957a99d584381917d6882f4fb34166df43c0f418dbf0c612badf665554"
+    },
+    {
+      "path": "distribution/vehicle-packs/registry.v1.json",
+      "sizeBytes": 7750,
+      "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"
+    }
+  ],
+  "bindings": {
+    "fieldManifestSha256": "13b585d4cd9adb90b11d6332f4fad796df8fdeeb107581da6903bd134ae2ae27",
+    "executionGatePolicySha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456",
+    "controllerFirmwareRegistrySha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7",
+    "licenseSha256": "d04dd6d500dfbcc5fad9a2f9695a5db8cc95ffc07591a13404fbc996b1e19e76",
+    "noticeSha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+  },
+  "retainedSafetyResources": {
+    "requiredReceiptTypes": [
+      "control-takeover",
+      "emergency-stop",
+      "operator-confirmation",
+      "parameter-snapshot",
+      "preflight",
+      "safety-zone",
+      "transaction-rollback",
+      "trusted-qualification"
+    ],
+    "hardwareActionsRequireValidatedSignedPack": true,
+    "zeroValidatedPackDecision": "deny"
+  },
+  "registrySummary": {
+    "packCount": 8,
+    "validatedHardwarePackCount": 0,
+    "validatedPackIds": []
+  },
+  "fieldManifest": {
+    "editionId": "field",
+    "artifactBaseName": "DroneDream-Field-1.0.0.exe",
+    "validationTier": "contract-only",
+    "includesLargeSimulator": false
+  }
+}

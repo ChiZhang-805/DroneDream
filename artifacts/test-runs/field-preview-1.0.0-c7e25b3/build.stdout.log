@@ -1,0 +1,51 @@
+
+> drone-dream-desktop@1.0.0 frontend:field-build
+> npm --prefix ../frontend run field:build
+
+
+> drone-dream-frontend@1.0.0 field:build
+> tsc -b && vite build --config vite.field.config.ts
+
+[36mvite v7.3.6 [32mbuilding client environment for production...[36m[39m
+transforming...
+[32m✓[39m 1798 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mfield-dist/[22m[32mfield.html                                                  [39m[1m[2m  0.67 kB[22m[1m[22m[2m │ gzip:  0.35 kB[22m
+[2mfield-dist/[22m[32massets/space-grotesk-vietnamese-wght-normal-D0rl6rjA.woff2  [39m[1m[2m  6.71 kB[22m[1m[22m
+[2mfield-dist/[22m[32massets/space-grotesk-latin-ext-wght-normal-D9tNdqV9.woff2   [39m[1m[2m 18.94 kB[22m[1m[22m
+[2mfield-dist/[22m[32massets/space-grotesk-latin-wght-normal-BhU9QXUp.woff2       [39m[1m[2m 22.29 kB[22m[1m[22m
+[2mfield-dist/[22m[32massets/sim-lockup-compact-BdaLzdcO.png                      [39m[1m[2m 77.71 kB[22m[1m[22m
+[2mfield-dist/[22m[32massets/field-lockup-compact-vYjyWZi4.png                    [39m[1m[2m 81.47 kB[22m[1m[22m
+[2mfield-dist/[22m[32massets/universal-lockup-compact-lWyiFqZ7.png                [39m[1m[2m 88.91 kB[22m[1m[22m
+[2mfield-dist/[22m[32massets/lab-lockup-compact-DS3cqqo3.png                      [39m[1m[2m 98.56 kB[22m[1m[22m
+[2mfield-dist/[22m[32massets/universal-lockup-primary-DuUEqIch.png                [39m[1m[2m102.86 kB[22m[1m[22m
+[2mfield-dist/[22m[35massets/field-CPcazg-d.css                                   [39m[1m[2m 13.47 kB[22m[1m[22m[2m │ gzip:  3.31 kB[22m
+[2mfield-dist/[22m[36massets/icon-vendor-B1dJy0Fi.js                              [39m[1m[2m 12.22 kB[22m[1m[22m[2m │ gzip:  4.96 kB[22m
+[2mfield-dist/[22m[36massets/field-C8ETqyVk.js                                    [39m[1m[2m 23.80 kB[22m[1m[22m[2m │ gzip:  7.57 kB[22m
+[2mfield-dist/[22m[36massets/react-vendor-Cwn4nXG8.js                             [39m[1m[2m134.08 kB[22m[1m[22m[2m │ gzip: 43.06 kB[22m
+[32m✓ built in 1.37s[39m
+MakeNSIS v3.11 - Copyright 1999-2025 Contributors
+See the file COPYING for license details.
+Credits can be found in the Users Manual.
+
+Processing config: C:\Users\zju20\AppData\Local\tauri\NSIS\nsisconf.nsh
+Processing script file: "C:\Users\zju20\AppData\Local\DroneDream\codex-cache\field-cargo-target\c7e25b3\x86_64-pc-windows-gnullvm\release\nsis\x64\installer.nsi" (UTF8)
+
+Processed 1 file, writing output (x86-unicode):
+
+Output: "C:\Users\zju20\AppData\Local\DroneDream\codex-cache\field-cargo-target\c7e25b3\x86_64-pc-windows-gnullvm\release\nsis\x64\nsis-output.exe"
+Install: 7 pages (448 bytes), 3 sections (6216 bytes), 3189 instructions (89292 bytes), 689 strings (30744 bytes), 2 language tables (1084 bytes).
+Uninstall: 2 pages (192 bytes), 1 section (2072 bytes), 742 instructions (20776 bytes), 296 strings (12228 bytes), 2 language tables (604 bytes).
+Datablock optimizer saved 25856 KiB (~49.5%).
+
+Using lzma (compress whole) compression.
+
+EXE header size:               54272 / 38912 bytes
+Install code:                          (128248 bytes)
+Install data:                          (26865999 bytes)
+Uninstall code+data:                   (102472 bytes)
+Compressed data:            11213206 / 27096719 bytes
+CRC (0xA6857C09):                  4 / 4 bytes
+
+Total size:                 11267482 / 27135635 bytes (41.5%)

@@ -1,0 +1,117 @@
+python.exe : test_formal_assets_match_source_hash_size_and_dimensions (test_field_brand_assets.FieldBrandAssetTests.tes
+t_formal_assets_match_source_hash_size_and_dimensions) ... ok
+At line:2 char:146
++ ... tests.log'; & python -m unittest discover -s distribution/tests -p 't ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (test_formal_ass...ensions) ... ok:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+test_frontend_and_desktop_consume_only_field_owned_assets (test_field_brand_assets.FieldBrandAssetTests.test_frontend_a
+nd_desktop_consume_only_field_owned_assets) ... ok
+test_manifest_binds_the_authorized_field_donor (test_field_brand_assets.FieldBrandAssetTests.test_manifest_binds_the_au
+thorized_field_donor) ... ok
+test_actual_universal_backflow_source_is_accepted (test_field_common_core_sync_acceptance.FieldCommonCoreSyncAcceptance
+Tests.test_actual_universal_backflow_source_is_accepted) ... ok
+test_exact_path_sets_are_the_previous_acceptance_scope (test_field_common_core_sync_acceptance.FieldCommonCoreSyncAccep
+tanceTests.test_exact_path_sets_are_the_previous_acceptance_scope) ... ok
+test_field_specific_leak_is_rejected (test_field_common_core_sync_acceptance.FieldCommonCoreSyncAcceptanceTests.test_fi
+eld_specific_leak_is_rejected) ... ok
+test_protected_evidence_delete_or_tamper_is_rejected (test_field_common_core_sync_acceptance.FieldCommonCoreSyncAccepta
+nceTests.test_protected_evidence_delete_or_tamper_is_rejected) ... ok
+test_public_patch_drift_keeps_common_core_backflow_pending (test_field_common_core_sync_acceptance.FieldCommonCoreSyncA
+cceptanceTests.test_public_patch_drift_keeps_common_core_backflow_pending) ... ok
+test_safety_gate_drift_is_rejected_even_after_sync (test_field_common_core_sync_acceptance.FieldCommonCoreSyncAcceptanc
+eTests.test_safety_gate_drift_is_rejected_even_after_sync) ... ok
+test_schema_is_closed_versioned_draft_2020_contract (test_field_common_core_sync_acceptance.FieldCommonCoreSyncAcceptan
+ceTests.test_schema_is_closed_versioned_draft_2020_contract) ... ok
+test_theoretical_pass_clears_only_common_core_backflow_pending (test_field_common_core_sync_acceptance.FieldCommonCoreS
+yncAcceptanceTests.test_theoretical_pass_clears_only_common_core_backflow_pending) ... ok
+test_backflow_plan_excludes_field_specific_contract_implementations (test_field_common_drift_readiness_audit.FieldCommo
+nDriftReadinessAuditTests.test_backflow_plan_excludes_field_specific_contract_implementations) ... ok
+test_desktop_preview_structure_binds_exact_brand_and_installer_inputs (test_field_common_drift_readiness_audit.FieldCom
+monDriftReadinessAuditTests.test_desktop_preview_structure_binds_exact_brand_and_installer_inputs) ... ok
+test_desktop_preview_structure_drift_is_rejected (test_field_common_drift_readiness_audit.FieldCommonDriftReadinessAudi
+tTests.test_desktop_preview_structure_drift_is_rejected) ... ok
+test_drift_audit_identifies_field_only_paths_after_common_core_backflow (test_field_common_drift_readiness_audit.FieldC
+ommonDriftReadinessAuditTests.test_drift_audit_identifies_field_only_paths_after_common_core_backflow) ... ok
+test_preview_build_readiness_is_fail_closed_and_non_executing (test_field_common_drift_readiness_audit.FieldCommonDrift
+ReadinessAuditTests.test_preview_build_readiness_is_fail_closed_and_non_executing) ... ok
+test_protected_evidence_no_longer_differs_from_universal (test_field_common_drift_readiness_audit.FieldCommonDriftReadi
+nessAuditTests.test_protected_evidence_no_longer_differs_from_universal) ... ok
+test_release_field_branch_is_observed_but_not_created (test_field_common_drift_readiness_audit.FieldCommonDriftReadines
+sAuditTests.test_release_field_branch_is_observed_but_not_created) ... ok
+test_schema_is_closed_versioned_draft_2020_contract (test_field_common_drift_readiness_audit.FieldCommonDriftReadinessA
+uditTests.test_schema_is_closed_versioned_draft_2020_contract) ... ok
+test_shortcut_icon_common_core_proposal_retains_resolved_history (test_field_common_drift_readiness_audit.FieldCommonDr
+iftReadinessAuditTests.test_shortcut_icon_common_core_proposal_retains_resolved_history) ... ok
+test_tauri_json_merge_patch_removes_universal_icon_source (test_field_common_drift_readiness_audit.FieldCommonDriftRead
+inessAuditTests.test_tauri_json_merge_patch_removes_universal_icon_source) ... ok
+test_desktop_package_has_no_direct_field_executable_build_command (test_field_desktop_profile.FieldDesktopProfileTests.
+test_desktop_package_has_no_direct_field_executable_build_command) ... ok
+test_field_overlay_uses_the_independent_frontend_and_identity (test_field_desktop_profile.FieldDesktopProfileTests.test
+_field_overlay_uses_the_independent_frontend_and_identity) ... ok
+test_overlay_binds_the_authorized_field_brand_assets (test_field_desktop_profile.FieldDesktopProfileTests.test_overlay_
+binds_the_authorized_field_brand_assets) ... ok
+test_window_and_updater_are_field_specific (test_field_desktop_profile.FieldDesktopProfileTests.test_window_and_updater
+_are_field_specific) ... ok
+test_zero_validated_pack_registry_denies_before_any_build (test_field_desktop_profile.FieldDesktopProfileTests.test_zer
+o_validated_pack_registry_denies_before_any_build) ... ok
+test_contract_rejects_execution_signature_claims_and_frontend_authority (test_field_lifecycle_contract.FieldLifecycleCo
+ntractTests.test_contract_rejects_execution_signature_claims_and_frontend_authority) ... ok
+test_dangerous_actions_offline_and_missing_device_all_deny (test_field_lifecycle_contract.FieldLifecycleContractTests.t
+est_dangerous_actions_offline_and_missing_device_all_deny) ... ok
+test_en_zh_and_accessibility_messages_are_required (test_field_lifecycle_contract.FieldLifecycleContractTests.test_en_z
+h_and_accessibility_messages_are_required) ... ok
+test_lifecycle_paths_are_plan_only_and_never_install_or_build_exe (test_field_lifecycle_contract.FieldLifecycleContract
+Tests.test_lifecycle_paths_are_plan_only_and_never_install_or_build_exe) ... ok
+test_receipt_binds_source_artifact_policy_and_scenario_counts (test_field_lifecycle_contract.FieldLifecycleContractTest
+s.test_receipt_binds_source_artifact_policy_and_scenario_counts) ... ok
+test_schema_is_closed_versioned_draft_2020_contract (test_field_lifecycle_contract.FieldLifecycleContractTests.test_sch
+ema_is_closed_versioned_draft_2020_contract) ... ok
+test_discovery_is_not_authorization_even_for_known_contract_pack (test_field_prerelease_audit.FieldPrereleaseAuditTests
+.test_discovery_is_not_authorization_even_for_known_contract_pack) ... ok
+test_fake_readonly_observation_rejects_device_open_and_writes (test_field_prerelease_audit.FieldPrereleaseAuditTests.te
+st_fake_readonly_observation_rejects_device_open_and_writes) ... ok
+test_field_engine_pack_payload_has_no_large_simulator_payload_and_keeps_safety (test_field_prerelease_audit.FieldPrerel
+easeAuditTests.test_field_engine_pack_payload_has_no_large_simulator_payload_and_keeps_safety) ... ok
+test_schema_is_closed_versioned_draft_2020_contract (test_field_prerelease_audit.FieldPrereleaseAuditTests.test_schema_
+is_closed_versioned_draft_2020_contract) ... ok
+test_signature_validation_tier_license_notice_install_and_rollback_are_bound (test_field_prerelease_audit.FieldPrerelea
+seAuditTests.test_signature_validation_tier_license_notice_install_and_rollback_are_bound) ... ok
+test_unified_sim_lab_pack_is_not_a_field_payload (test_field_prerelease_audit.FieldPrereleaseAuditTests.test_unified_si
+m_lab_pack_is_not_a_field_payload) ... ok
+test_zero_validated_packs_unknown_device_firmware_drift_and_missing_quorum_deny (test_field_prerelease_audit.FieldPrere
+leaseAuditTests.test_zero_validated_packs_unknown_device_firmware_drift_and_missing_quorum_deny) ... ok
+test_all_wrong_package_cases_are_denied_for_the_expected_reason (test_field_yellow_readiness.FieldYellowReadinessTests.
+test_all_wrong_package_cases_are_denied_for_the_expected_reason) ... ok
+test_field_branding_nsis_license_and_notice_are_bound (test_field_yellow_readiness.FieldYellowReadinessTests.test_field
+_branding_nsis_license_and_notice_are_bound) ... ok
+test_final_website_handoff_remains_exact_and_unissued (test_field_yellow_readiness.FieldYellowReadinessTests.test_final
+_website_handoff_remains_exact_and_unissued) ... ok
+test_hardware_allow_mutation_is_rejected_without_trusting_receipt_hash (test_field_yellow_readiness.FieldYellowReadines
+sTests.test_hardware_allow_mutation_is_rejected_without_trusting_receipt_hash) ... ok
+test_lifecycle_remains_plan_only_and_accessible (test_field_yellow_readiness.FieldYellowReadinessTests.test_lifecycle_r
+emains_plan_only_and_accessible) ... ok
+test_payload_freeze_excludes_executable_simulator_content (test_field_yellow_readiness.FieldYellowReadinessTests.test_p
+ayload_freeze_excludes_executable_simulator_content) ... ok
+test_receipt_hash_drift_is_rejected (test_field_yellow_readiness.FieldYellowReadinessTests.test_receipt_hash_drift_is_r
+ejected) ... ok
+test_schema_is_versioned_and_closes_receipt_and_candidate (test_field_yellow_readiness.FieldYellowReadinessTests.test_s
+chema_is_versioned_and_closes_receipt_and_candidate) ... ok
+test_static_candidate_is_ready_to_request_but_not_authorized (test_field_yellow_readiness.FieldYellowReadinessTests.tes
+t_static_candidate_is_ready_to_request_but_not_authorized) ... ok
+test_zero_validated_pack_and_all_three_layers_deny_hardware (test_field_yellow_readiness.FieldYellowReadinessTests.test
+_zero_validated_pack_and_all_three_layers_deny_hardware) ... ok
+
+----------------------------------------------------------------------
+Ran 49 tests in 24.573s
+
+OK
+{"archive": {"filename": "DroneDreamEnginePack.tar.gz", "sha256": "8f0ceab62ffb026bbf8db92e694046c99bbe696ecdfd17dc9cbfe4fec92ea1dc", "sizeBytes": 711846}, "kind": "dronedream-engine-pack-bundle", "manifest": {"filename": "engine-pack-manifest.json", "sha256": "c16c818be35b4e22a210c83b91112022f33d3b1c32892a4298752bd65d42d26e", "sizeBytes": 32733}, "packId": "sha256:ef994a77764c1c2153236d996badfce6fda5917d8d91b1fd0dab4e7ed46513a2", "schemaVersion": 1, "sourceCommit": "3333333333333333333333333333333333333333"}
+{"archive": {"filename": "DroneDreamEnginePack.tar.gz", "sha256": "8f0ceab62ffb026bbf8db92e694046c99bbe696ecdfd17dc9cbfe4fec92ea1dc", "sizeBytes": 711846}, "kind": "dronedream-engine-pack-bundle", "manifest": {"filename": "engine-pack-manifest.json", "sha256": "c16c818be35b4e22a210c83b91112022f33d3b1c32892a4298752bd65d42d26e", "sizeBytes": 32733}, "packId": "sha256:ef994a77764c1c2153236d996badfce6fda5917d8d91b1fd0dab4e7ed46513a2", "schemaVersion": 1, "sourceCommit": "3333333333333333333333333333333333333333"}
+{"archive": {"filename": "DroneDreamEnginePack.tar.gz", "sha256": "8f0ceab62ffb026bbf8db92e694046c99bbe696ecdfd17dc9cbfe4fec92ea1dc", "sizeBytes": 711846}, "kind": "dronedream-engine-pack-bundle", "manifest": {"filename": "engine-pack-manifest.json", "sha256": "c16c818be35b4e22a210c83b91112022f33d3b1c32892a4298752bd65d42d26e", "sizeBytes": 32733}, "packId": "sha256:ef994a77764c1c2153236d996badfce6fda5917d8d91b1fd0dab4e7ed46513a2", "schemaVersion": 1, "sourceCommit": "3333333333333333333333333333333333333333"}
+{"archive": {"filename": "DroneDreamEnginePack.tar.gz", "sha256": "34a45fffad7d31c83d01148a7b32a60c8d360f6b3932fab1dabac741ac9805cd", "sizeBytes": 922190}, "kind": "dronedream-engine-pack-bundle", "manifest": {"filename": "engine-pack-manifest.json", "sha256": "6c7d62d7d2dc22c3a6db1f901eeac71ae943efdd041ef522595b76ae87654b6b", "sizeBytes": 35925}, "packId": "sha256:dc6401d733e3b2f4f146c38a90d789e00c56f1378878b3fe8b142fc658142e98", "schemaVersion": 1, "sourceCommit": "3333333333333333333333333333333333333333"}
+{"archive": {"filename": "DroneDreamEnginePack.tar.gz", "sha256": "8f0ceab62ffb026bbf8db92e694046c99bbe696ecdfd17dc9cbfe4fec92ea1dc", "sizeBytes": 711846}, "kind": "dronedream-engine-pack-bundle", "manifest": {"filename": "engine-pack-manifest.json", "sha256": "c16c818be35b4e22a210c83b91112022f33d3b1c32892a4298752bd65d42d26e", "sizeBytes": 32733}, "packId": "sha256:ef994a77764c1c2153236d996badfce6fda5917d8d91b1fd0dab4e7ed46513a2", "schemaVersion": 1, "sourceCommit": "3333333333333333333333333333333333333333"}
+{"archive": {"filename": "DroneDreamEnginePack.tar.gz", "sha256": "8f0ceab62ffb026bbf8db92e694046c99bbe696ecdfd17dc9cbfe4fec92ea1dc", "sizeBytes": 711846}, "kind": "dronedream-engine-pack-bundle", "manifest": {"filename": "engine-pack-manifest.json", "sha256": "c16c818be35b4e22a210c83b91112022f33d3b1c32892a4298752bd65d42d26e", "sizeBytes": 32733}, "packId": "sha256:ef994a77764c1c2153236d996badfce6fda5917d8d91b1fd0dab4e7ed46513a2", "schemaVersion": 1, "sourceCommit": "3333333333333333333333333333333333333333"}
+{"archive": {"filename": "DroneDreamEnginePack.tar.gz", "sha256": "8f0ceab62ffb026bbf8db92e694046c99bbe696ecdfd17dc9cbfe4fec92ea1dc", "sizeBytes": 711846}, "kind": "dronedream-engine-pack-bundle", "manifest": {"filename": "engine-pack-manifest.json", "sha256": "c16c818be35b4e22a210c83b91112022f33d3b1c32892a4298752bd65d42d26e", "sizeBytes": 32733}, "packId": "sha256:ef994a77764c1c2153236d996badfce6fda5917d8d91b1fd0dab4e7ed46513a2", "schemaVersion": 1, "sourceCommit": "3333333333333333333333333333333333333333"}
+{"archive": {"filename": "DroneDreamEnginePack.tar.gz", "sha256": "8f0ceab62ffb026bbf8db92e694046c99bbe696ecdfd17dc9cbfe4fec92ea1dc", "sizeBytes": 711846}, "kind": "dronedream-engine-pack-bundle", "manifest": {"filename": "engine-pack-manifest.json", "sha256": "c16c818be35b4e22a210c83b91112022f33d3b1c32892a4298752bd65d42d26e", "sizeBytes": 32733}, "packId": "sha256:ef994a77764c1c2153236d996badfce6fda5917d8d91b1fd0dab4e7ed46513a2", "schemaVersion": 1, "sourceCommit": "3333333333333333333333333333333333333333"}

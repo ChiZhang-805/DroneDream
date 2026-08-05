@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-single-yellow-build-receipt",
+  "editionId": "field",
+  "decision": "unsigned-preview-built-not-release-ready",
+  "productSourceHead": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+  "evidenceGitHead": null,
+  "commonCoreCommit": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+  "commonCoreHash": "c6e480dfd2cf4eccb07ee34cd836f096843afab375b03a5fb2d57ab964b5c94a",
+  "build": {
+    "authorizedBuildCount": 1,
+    "cargoBuildCount": 1,
+    "nsisInvocationCount": 1,
+    "preCompilationTauriCliAbortCount": 1,
+    "preCompilationAbortProducedTarget": false,
+    "preCompilationAbortProducedExe": false,
+    "startedAt": "2026-08-05T15:04:35Z",
+    "finishedAt": "2026-08-05T15:07:22Z",
+    "durationSeconds": 167,
+    "stdoutLog": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\build.stdout.log",
+    "stdoutLogSha256": "21706da5de25badbf9b1d1a33efa8f5144dfb9cb8e09e3f31933f41113624aa6",
+    "stderrLog": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\build.stderr.log",
+    "stderrLogSha256": "d51ab15b44653d409ec97b35a1345b01ccb95eedb691cee7b986fcccc0b18e6a"
+  },
+  "authorization": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\build-authorization.json",
+    "sha256": "2456d625a25a5f3bf8045fe1e53e5983be64510679b307c9959f0fec065b9712",
+    "tauriOverlayPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\tauri-yellow-override.json",
+    "tauriOverlaySha256": "747ae52f3bbe55f70f65d7fda9cb84c8dfc38cfe2458712b825fedfb10a4c2fa",
+    "frozenReadinessPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-c7e25b3\\receipt.json",
+    "frozenReadinessSha256": "8b33439b3874571d268f58b64ccc805ba038aed96bb1758089267b4c9771178b"
+  },
+  "artifact": {
+    "absolutePath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "originalGeneratedFilename": "DroneDream · FIELD_1.0.0_x64-setup.exe",
+    "bytes": 11267482,
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0",
+    "productName": "DroneDream · FIELD",
+    "packaging": "tauri-nsis",
+    "cargoBuildCount": 1,
+    "nsisInvocationCount": 1
+  },
+  "artifactManifest": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\artifact-manifest.json",
+    "sha256": "4f0904bd84abe56797dbf74fe51cd372aa73965a816ff9a326b7d1dba699b430"
+  },
+  "payloadInventory": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\payload-inventory.json",
+    "sha256": "bbba2cb8385aec8280c7d3cf0324faf503260c0c32554ac84b490726e5d38c94"
+  },
+  "postbuildPayloadAudit": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\postbuild-payload-audit.json",
+    "sha256": "dad609edb3b8ecbf97a6aa6dd5164a304cec2148771131c9a8f858e0043c4c1e",
+    "forbiddenPayloads": [],
+    "validatedHardwarePackCount": 0
+  },
+  "resourceEvidence": {
+    "cargoTargetPath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\c7e25b3",
+    "cargoTargetBytes": 1522491259,
+    "cargoTargetBytesMaximum": 8589934592,
+    "workspaceTemporaryBytes": 5768954,
+    "workspaceTemporaryBytesMaximum": 1073741824,
+    "configuredMemoryBytesMaximum": 8589934592,
+    "observedPeakMemoryBytes": null,
+    "memoryBoundaryNote": "Process peak memory was not independently recorded.",
+    "cargoBuildJobs": 4
+  },
+  "offlineEvidence": {
+    "cargoNetOffline": true,
+    "npmOffline": true,
+    "invalidHttpProxyConfigured": true,
+    "buildLogDownloadReferenceCount": 0,
+    "networkTrafficIndependentlyMeasured": false
+  },
+  "verification": {
+    "fieldDistributionContracts": {
+      "result": "pass",
+      "testCount": 49,
+      "logPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\field-contract-tests.log",
+      "logSha256": "9613976e2a7245b89f85956c8342f1b124c4d80564237dedc63fa7fc76cd62b3"
+    },
+    "filenameVersionBytesSha256": "pass",
+    "authenticodeAndPeCertificate": "pass-unsigned-confirmed",
+    "enginePackFieldProfile": "pass",
+    "forbiddenSimulatorExecutablePayload": "pass",
+    "licenseNoticeValkey": "pass",
+    "webView2CompiledStructure": "pass",
+    "englishChineseCompiledLocales": "pass",
+    "shortcutIconStaticStructure": "pass",
+    "installUpgradeUninstall": "not-executed-requires-separate-approval",
+    "realHardware": "not-executed-red"
+  },
+  "websiteAcceptance": {
+    "websiteSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "websiteEvidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+    "state": "awaiting-exact-release-ready-handoff",
+    "previewSubstitutionAllowed": false,
+    "crossEditionAttachmentAllowed": false,
+    "singleEditionUrlFamilyVerified": false
+  },
+  "previewReady": true,
+  "releaseReady": false,
+  "remainingGates": [
+    "Authenticode is unsigned",
+    "fresh install not executed",
+    "upgrade not executed",
+    "uninstall not executed",
+    "shortcut behavior not validated on an installed system",
+    "public URL family and re-download not issued or verified"
+  ],
+  "generatedAt": "2026-08-05T15:23:39Z"
+}

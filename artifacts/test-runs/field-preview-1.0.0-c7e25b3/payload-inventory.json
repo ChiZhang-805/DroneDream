@@ -1,0 +1,191 @@
+﻿{
+    "schemaVersion":  1,
+    "kind":  "dronedream-field-preview-payload-inventory",
+    "editionId":  "field",
+    "productSourceCommit":  "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "root":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\payload",
+    "fileCount":  36,
+    "totalBytes":  32832384,
+    "files":  [
+                  {
+                      "path":  "application/drone-dream-desktop.exe",
+                      "bytes":  24595456,
+                      "sha256":  "28c725502fdc2cb0bbfcd621ca244e09da8edfe4115944de48ea67e3e42b78bc"
+                  },
+                  {
+                      "path":  "engine-pack/DroneDreamEnginePack.tar.gz",
+                      "bytes":  711921,
+                      "sha256":  "6106f9aa22cd84e6816c74a89e8e02c6d132236a5aba3657c38a10de5e1fd2dc"
+                  },
+                  {
+                      "path":  "engine-pack/engine-pack-bundle.json",
+                      "bytes":  494,
+                      "sha256":  "cbf4becfaefebab8e48a703b03c3838af4066786585db92f89bc688c5394e4b4"
+                  },
+                  {
+                      "path":  "engine-pack/engine-pack-manifest.json",
+                      "bytes":  32733,
+                      "sha256":  "10e05fd2e0bd3d2c17d4955ac75943ae74a5f3fd066b8a5f1e64200a3f0f7c01"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/field-C8ETqyVk.js",
+                      "bytes":  23800,
+                      "sha256":  "7b05acc468dd6e45c42fe273f75ec8b8aaa67e279ddd254323ad89e55c271cd0"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/field-CPcazg-d.css",
+                      "bytes":  13465,
+                      "sha256":  "a79bff378d6f16272c98542c5c39348a6712cbdf50adbbc00411cbaafcd844dd"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/field-lockup-compact-vYjyWZi4.png",
+                      "bytes":  81471,
+                      "sha256":  "def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/icon-vendor-B1dJy0Fi.js",
+                      "bytes":  12218,
+                      "sha256":  "5627db24795f6bc34577b027e4b81a5bf48d1a18ad2a751a06a4f0710e0eb13e"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/lab-lockup-compact-DS3cqqo3.png",
+                      "bytes":  98556,
+                      "sha256":  "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/react-vendor-Cwn4nXG8.js",
+                      "bytes":  134078,
+                      "sha256":  "3ed54bc95ced604dcd493707964e042ac554515e83eb20101026613877240311"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/sim-lockup-compact-BdaLzdcO.png",
+                      "bytes":  77713,
+                      "sha256":  "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/space-grotesk-latin-ext-wght-normal-D9tNdqV9.woff2",
+                      "bytes":  18940,
+                      "sha256":  "952dddb45d2f96f71cbf3b7f510b24379afc3c89ea02fcf89d377b45d62c0166"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/space-grotesk-latin-wght-normal-BhU9QXUp.woff2",
+                      "bytes":  22288,
+                      "sha256":  "0640890476fc1198ab4de571fb658de443c4d85b66466ec09534a8737ab1ce9d"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/space-grotesk-vietnamese-wght-normal-D0rl6rjA.woff2",
+                      "bytes":  6712,
+                      "sha256":  "8895e3d49825128bfa5238e4c96e9b432d7a3dadbe5c17c6081267398305dc71"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/universal-lockup-compact-lWyiFqZ7.png",
+                      "bytes":  88913,
+                      "sha256":  "092f59b75f1f8e6ae2cc0a8f8750c84b0b88cde14f7471491d1741b419ce6470"
+                  },
+                  {
+                      "path":  "frontend-field-dist/assets/universal-lockup-primary-DuUEqIch.png",
+                      "bytes":  102860,
+                      "sha256":  "7b340621cad5e0275985ad5bc2e7d92afa5b42a7296aeda9bb4bbf5da2789d8a"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/dashboard.png",
+                      "bytes":  356661,
+                      "sha256":  "e1c3c7185ce1fa388e83dab3bcf2b1afa89b4e0d1f621cb84bffadb30eb0aba3"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/downloads/DroneDream-Manual-en.md",
+                      "bytes":  9872,
+                      "sha256":  "b60019b4ab7d9151702b95870dc53b6dffcfb9c9beb475b05c3b9e2265ee60fe"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/downloads/DroneDream-Manual-en.pdf",
+                      "bytes":  1255797,
+                      "sha256":  "94db2d7ddac73d7076b8d37eeaee26cb6344bf2dfad5de0622a022080fbd3ee8"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/downloads/DroneDream-Manual-zh-CN.md",
+                      "bytes":  8952,
+                      "sha256":  "2c46cc6698fb5184f1f371c0f342623a852ba7f4f1c9857a3da3876aad5210f1"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/downloads/DroneDream-Manual-zh-CN.pdf",
+                      "bytes":  872814,
+                      "sha256":  "c3e3df35fa81ef54676a266ed4d2398e831160b835b204f325ec499074fad0a0"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/en/dashboard.png",
+                      "bytes":  1013619,
+                      "sha256":  "c4b46a700b0e3d08233ce9c4a40d238c1bc2d2bf8c8c70ad86c68e7222067dd6"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/en/flight-setup.png",
+                      "bytes":  118206,
+                      "sha256":  "57e1ba0c16bbdbe5d3110baf997622c5f1fc6f741ccb929e148d2c2971578b67"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/en/tuning-chat.png",
+                      "bytes":  177409,
+                      "sha256":  "ba5fccfb753aa632555dcf10c8c5f6595669589f3f56a7ce88ff37f0f85307ae"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/flight-setup.png",
+                      "bytes":  122186,
+                      "sha256":  "e78f071986fb710a1f5aaf27797a5e8379b20c280545a4299dd9de3ee6010ecf"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/scenarios.png",
+                      "bytes":  140324,
+                      "sha256":  "423efa3df23c938c0e529aeff8453acd7144af891ce76a01e2831921050de5c1"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/tuning-chat.png",
+                      "bytes":  177428,
+                      "sha256":  "eb2dc178c467694fd834646ffac6bc1c7c5ce521c3f852934fa30f3fe60db393"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/zh-CN/dashboard.png",
+                      "bytes":  356661,
+                      "sha256":  "e1c3c7185ce1fa388e83dab3bcf2b1afa89b4e0d1f621cb84bffadb30eb0aba3"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/zh-CN/flight-setup.png",
+                      "bytes":  123671,
+                      "sha256":  "0c756a60fb8fcea310bd9a4236ff487d1c930eb98e5da60a65b895b6a41b78a5"
+                  },
+                  {
+                      "path":  "frontend-field-dist/docs/zh-CN/tuning-chat.png",
+                      "bytes":  182940,
+                      "sha256":  "c7dab3f7663bea2c20f372fd0244b2848d075ace9e2da0f5bfe81acde59113db"
+                  },
+                  {
+                      "path":  "frontend-field-dist/drone-favicon.png",
+                      "bytes":  5922,
+                      "sha256":  "8fd42f13c98769e18af86966c33029ed8456aa5e172a24fe8931ed90a195a6e8"
+                  },
+                  {
+                      "path":  "frontend-field-dist/field.html",
+                      "bytes":  668,
+                      "sha256":  "8918985f6c4f556bd092fef8d0419c48d394d7e6e3209a813959a916a9a3f6e8"
+                  },
+                  {
+                      "path":  "frontend-field-dist/licenses/space-grotesk-OFL-1.1.txt",
+                      "bytes":  4490,
+                      "sha256":  "eedb5a89d8a84984a4923fe23b438fc654fe603657de7d335f67afdafb47a2a3"
+                  },
+                  {
+                      "path":  "nsis/installer.nsi",
+                      "bytes":  34034,
+                      "sha256":  "b17816ceedf38db29726c3117c8cece83b2a2bd8a09138306141232233aeb9da"
+                  },
+                  {
+                      "path":  "nsis/MicrosoftEdgeWebview2Setup.exe",
+                      "bytes":  1688792,
+                      "sha256":  "f91077e2c116dcf6377e555d0d4a3a564d242351ad6718b6954658d4f74819c1"
+                  },
+                  {
+                      "path":  "nsis/WebView2Loader.dll",
+                      "bytes":  160320,
+                      "sha256":  "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c"
+                  }
+              ]
+}

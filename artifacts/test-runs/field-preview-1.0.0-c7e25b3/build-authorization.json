@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-single-yellow-build-authorization",
+  "editionId": "field",
+  "decision": "allow-one-unsigned-preview-build",
+  "authorizedAt": "2026-08-05T14:59:37Z",
+  "authorizationSourceThreadId": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9",
+  "source": {
+    "branch": "codex/software-field",
+    "commit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "upstreamCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "commonCoreCommit": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+    "commonCoreHash": "c6e480dfd2cf4eccb07ee34cd836f096843afab375b03a5fb2d57ab964b5c94a",
+    "requiredTreeState": "clean"
+  },
+  "readinessEvidence": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-c7e25b3\\receipt.json",
+    "fileSha256": "8b33439b3874571d268f58b64ccc805ba038aed96bb1758089267b4c9771178b",
+    "canonicalReceiptSha256": "c601a63c39e4ea28fc964c03e446120bad42cbb31e6f579864011dfb9bc4862c"
+  },
+  "tauriAuthorizationOverlay": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\tauri-yellow-override.json",
+    "sha256": "747ae52f3bbe55f70f65d7fda9cb84c8dfc38cfe2458712b825fedfb10a4c2fa",
+    "onlyOverride": "build.beforeBuildCommand=npm run frontend:field-build"
+  },
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "signatureState": "unsigned",
+    "buildCountMaximum": 1,
+    "nsisInvocationMaximum": 1,
+    "uploadAllowed": false
+  },
+  "resourceLimits": {
+    "cpu": "high-transient",
+    "memoryBytesMaximum": 8589934592,
+    "cargoTargetPath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\c7e25b3",
+    "cargoTargetBytesMaximum": 8589934592,
+    "workspaceTemporaryBytesMaximum": 1073741824,
+    "estimatedDurationMinutes": {
+      "minimum": 20,
+      "maximum": 45
+    }
+  },
+  "requiredEnvironment": {
+    "DRONEDREAM_RELEASE_SOURCE_COMMIT": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "DRONEDREAM_RELEASE_BUILD_NUMBER": "698",
+    "DRONEDREAM_EDITION_PROFILE": "field-lightweight",
+    "CARGO_NET_OFFLINE": "true",
+    "npm_config_offline": "true"
+  },
+  "prohibitedOperations": [
+    "network access",
+    "installation",
+    "upgrade",
+    "uninstallation",
+    "device enumeration",
+    "USB or serial access",
+    "hardware action",
+    "PX4, Gazebo, SITL, or HITL execution",
+    "API key or updater private-key read",
+    "release branch creation",
+    "artifact upload",
+    "second NSIS build"
+  ]
+}
