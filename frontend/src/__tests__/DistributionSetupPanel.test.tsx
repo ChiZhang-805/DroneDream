@@ -85,6 +85,7 @@ describe("DistributionSetupPanel", () => {
       .toBeInTheDocument();
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(container.querySelector("[data-can-apply='false']")).toBeTruthy();
+    expect(container.querySelector("[data-brand-edition='sim']")).toBeTruthy();
   });
 
   it("normalizes edition and region changes and persists only the versioned draft", () => {
@@ -115,6 +116,10 @@ describe("DistributionSetupPanel", () => {
       optionalModules: ["qgroundcontrol-external"],
     });
     expect(JSON.stringify(saved)).not.toMatch(/password|api.?key|secret/i);
+    expect(document.querySelector(".distribution-setup-panel"))
+      .toHaveAttribute("data-brand-edition", "field");
+    expect(document.querySelector(".distribution-setup-panel"))
+      .toHaveAttribute("data-can-apply", "false");
   });
 
   it("fails closed to a safe default when stored state is malformed", () => {

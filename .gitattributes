@@ -24,6 +24,12 @@ backend/evaluation_artifacts/*.sha256 text eol=lf
 *.jpg binary
 *.jpeg binary
 *.webp binary
+*.ico binary
+*.woff2 binary
+
+# Canonical brand manifests hash these repository byte streams.
+/brand/requirements.lock.txt text eol=lf
+/brand/source/Space-Grotesk-OFL-1.1.txt text eol=lf
 
 /runtime/** text eol=lf
 /scripts/**/*.sh text eol=lf
