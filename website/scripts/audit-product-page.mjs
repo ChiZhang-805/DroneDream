@@ -1,9 +1,18 @@
-import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { createServer } from "node:http";
+import { tmpdir } from "node:os";
 
 const frontendRequire = createRequire(new URL("../../frontend/package.json", import.meta.url));
 const { chromium, firefox } = frontendRequire("playwright");
@@ -11,14 +20,14 @@ const { chromium, firefox } = frontendRequire("playwright");
 const [
   baseUrlRaw,
   outputRaw = "work/product-page-audit.json",
-  browserListRaw = "edge,chrome,firefox",
+  browserListRaw = "edge,chrome,lenovo,firefox",
   siteDirectoryRaw = "",
 ] =
   process.argv.slice(2);
 if (!baseUrlRaw) {
   console.error(
     "Usage: node audit-product-page.mjs <base-url> [output.json] "
-    + "[edge,chrome,firefox] [site-dist-directory]",
+    + "[edge,chrome,lenovo,firefox] [site-dist-directory]",
   );
   process.exit(2);
 }
@@ -97,6 +106,14 @@ const browserCandidates = {
       join(process.env.LOCALAPPDATA ?? "", "Google", "Chrome", "Application", "chrome.exe"),
     ],
   },
+  lenovo: {
+    engine: chromium,
+    paths: [
+      "C:\\Program Files (x86)\\Lenovo\\SLBrowser\\SLBrowser.exe",
+      "C:\\Program Files\\Lenovo\\SLBrowser\\SLBrowser.exe",
+      join(process.env.LOCALAPPDATA ?? "", "Lenovo", "SLBrowser", "SLBrowser.exe"),
+    ],
+  },
   firefox: { engine: firefox, paths: [] },
 };
 
@@ -122,17 +139,13 @@ const profiles = {
 };
 
 const copy = (locale) => ({
+  title: locale === "zh-CN" ? "DroneDream 专业版本" : "DroneDream Editions",
   productNav: locale === "zh-CN" ? "产品" : "Product",
   priceNav: locale === "zh-CN" ? "价格" : "Price",
   universalDisabled: locale === "zh-CN"
     ? "DroneDream Universal 正在准备"
     : "DroneDream Universal is coming soon",
-  currentPreview: locale === "zh-CN" ? "下载当前预览版" : "Download current preview",
-  windowsPreview: locale === "zh-CN" ? "下载 Windows 预览版" : "Download Windows preview",
-  comingSoon: locale === "zh-CN" ? "即将推出" : "Coming soon",
-  headings: locale === "zh-CN"
-    ? ["DroneDream 仿真版", "DroneDream 实验室版", "DroneDream 真机版"]
-    : ["DroneDream Sim", "DroneDream Lab", "DroneDream Field"],
+  headings: ["DroneDream · SIM", "DroneDream · LAB", "DroneDream · FIELD"],
 });
 
 const sha256File = async (path) => createHash("sha256").update(await readFile(path)).digest("hex");
@@ -153,19 +166,45 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
     node.getAttribute("aria-label") || node.textContent || ""
   ).replace(/\s+/gu, " ").trim();
   const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
   const documentWidth = Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth ?? 0);
+  const documentHeight = Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0);
   const violations = [];
   if (documentWidth > viewportWidth + tolerance) {
     violations.push(`document horizontal overflow ${documentWidth - viewportWidth}px`);
   }
+  if (documentHeight > viewportHeight + tolerance) {
+    violations.push(`Product page exceeds one viewport by ${documentHeight - viewportHeight}px`);
+  }
   if (document.querySelector('[role="dialog"]')) violations.push("legacy dialog is present");
   const header = document.querySelector(".site-header");
+  const shell = document.querySelector(".site-product-page-shell");
   const title = document.querySelector(".site-product-page-header h1");
   if (visible(header) && visible(title)) {
     const headerRect = header.getBoundingClientRect();
     const titleRect = title.getBoundingClientRect();
     if (headerRect.bottom > titleRect.top + tolerance) {
       violations.push(`fixed header overlaps product heading by ${Math.round(headerRect.bottom - titleRect.top)}px`);
+    }
+  }
+  if (!title || nameOf(title) !== expected.title) violations.push("Product page title is incorrect");
+  if (title) {
+    const titleRange = document.createRange();
+    titleRange.selectNodeContents(title);
+    if (titleRange.getClientRects().length !== 1) violations.push("Product page title wraps to multiple lines");
+  }
+  if (document.querySelector(".site-product-page-header p")) {
+    violations.push("Product page explanatory copy remains under the title");
+  }
+  if (visible(header) && visible(shell) && viewportWidth > 900) {
+    const shellRect = shell.getBoundingClientRect();
+    const brandRect = document.querySelector(".site-brand")?.getBoundingClientRect();
+    const actionsRect = document.querySelector(".site-header-actions")?.getBoundingClientRect();
+    if (!brandRect || Math.abs(brandRect.left - shellRect.left) > tolerance) {
+      violations.push("header brand is not aligned with Product content");
+    }
+    if (!actionsRect || Math.abs(actionsRect.right - shellRect.right) > tolerance) {
+      violations.push("header actions are not aligned with Product content");
     }
   }
 
@@ -196,34 +235,39 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
   for (const heading of expected.headings) {
     if (!headings.includes(heading)) violations.push(`missing product heading: ${heading}`);
   }
-  const disabledActions = cards.flatMap((card) => (
-    [...card.querySelectorAll("button.site-product-edition-action")].filter(visible)
-  ));
-  if (disabledActions.length !== 3) {
-    violations.push(`expected 3 disabled product actions, found ${disabledActions.length}`);
+  const pendingIconSlots = cards.map((card) => card.querySelector('[data-icon-donor="pending"]'));
+  if (pendingIconSlots.some((slot) => !slot)) violations.push("canonical icon donor pending contract is missing");
+  if (pendingIconSlots.some(visible)) violations.push("temporary icon placeholder is visible");
+  if (cards.some((card) => card.querySelector(".site-product-edition-icon img"))) {
+    violations.push("an icon is rendered before the canonical donor is available");
   }
-  for (const action of disabledActions) {
-    if (!action.disabled || nameOf(action) !== expected.comingSoon) {
-      violations.push("product action is not the expected disabled coming-soon button");
-    }
+  if (document.querySelector(".site-product-edition-visual")) {
+    violations.push("legacy rounded product visual remains");
+  }
+  if (document.querySelector(".site-product-edition-heading span")) {
+    violations.push("legacy preparation status badge remains");
+  }
+  if (cards.some((card) => card.querySelector("button.site-product-edition-action"))) {
+    violations.push("planned editions still render disabled action buttons");
   }
   const inventedDownloads = [...document.querySelectorAll(".site-product-edition a[href]")]
     .filter((node) => /DroneDream-(Sim|Lab|Field|Universal)-1\.0\.0\.exe/u.test(node.getAttribute("href") ?? ""));
   if (inventedDownloads.length > 0) violations.push("planned product package has a live download link");
 
-  const currentPreview = [...document.querySelectorAll(".site-product-current a[href]")]
-    .find((node) => nameOf(node) === expected.currentPreview);
-  if (!currentPreview) violations.push("current 1.0.0 preview entry is missing from Product page");
-  else if (!/DroneDream_1\.0\.0_x64-setup\.exe/u.test(currentPreview.href)) {
-    violations.push("current preview entry does not point to the 1.0.0 installer");
+  if (document.querySelector(".site-product-current")) {
+    violations.push("current preview panel remains on Product page");
   }
-  if ([...document.querySelectorAll("a[href]")].some((node) => nameOf(node) === expected.windowsPreview)) {
-    violations.push("home Windows preview CTA leaked onto Product page");
-  }
+
+  const themeTokens = cards.map((card) => {
+    const style = getComputedStyle(card);
+    return ["--edition-accent-a", "--edition-accent-b", "--edition-accent-c", "--edition-surface"]
+      .map((property) => style.getPropertyValue(property).trim()).join("|");
+  });
+  if (new Set(themeTokens).size !== 3) violations.push("edition cards do not expose three unique themes");
 
   const critical = [...document.querySelectorAll(
     ".site-header,.site-nav,.site-product-page-shell,.site-product-page-header,"
-    + ".site-product-page-grid,.site-product-edition,.site-product-current,h1,h2",
+    + ".site-product-page-grid,.site-product-edition,h1,h2",
   )].filter(visible);
   for (const [index, node] of critical.entries()) {
     const rect = node.getBoundingClientRect();
@@ -241,27 +285,23 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
   }
 
   const heights = cards.map((card) => Math.round(card.getBoundingClientRect().height));
-  const actionTops = cards.map((card) => {
-    const action = card.querySelector(".site-product-edition-action");
-    return action ? Math.round(action.getBoundingClientRect().top) : 0;
-  }).filter(Boolean);
   if (viewportWidth >= 1000 && heights.length === 3) {
     const heightSpread = Math.max(...heights) - Math.min(...heights);
-    const actionSpread = Math.max(...actionTops) - Math.min(...actionTops);
     if (heightSpread > tolerance) violations.push(`product card height spread ${heightSpread}px`);
-    if (actionSpread > tolerance) violations.push(`product action baseline spread ${actionSpread}px`);
   }
 
   return {
+    documentHeight,
     documentWidth,
+    viewportHeight,
     viewportWidth,
     nav,
     headings,
     productCardHeights: heights,
-    productActionTops: actionTops,
-    disabledProductActions: disabledActions.length,
+    iconDonorState: "pending",
+    uniqueThemeCount: new Set(themeTokens).size,
     universalDisabledPresent: Boolean(universalButton),
-    currentPreviewHref: currentPreview?.getAttribute("href") ?? null,
+    currentPreviewPresent: Boolean(document.querySelector(".site-product-current")),
     dialogs: document.querySelectorAll('[role="dialog"]').length,
     violations,
   };
@@ -323,23 +363,35 @@ for (const browserName of requestedBrowsers) {
     unavailable.push({ browser: browserName, reason: "browser executable not found" });
     continue;
   }
-  const browser = await definition.engine.launch({
+  const launchOptions = {
     headless: true,
     ...(executablePath ? { executablePath } : {}),
     ...(definition.engine === chromium
       ? { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--disable-gpu"] }
       : {}),
-  });
+  };
+  const browser = browserName === "lenovo"
+    ? null
+    : await definition.engine.launch(launchOptions);
   try {
     for (const profile of (browserName === "edge" ? profiles.edge : profiles.standard)) {
       for (const locale of locales) {
-        const context = await browser.newContext({
+        const contextOptions = {
           viewport: profile.viewport,
           deviceScaleFactor: 1,
           locale,
           colorScheme: "dark",
           reducedMotion: "reduce",
-        });
+        };
+        const lenovoProfile = browserName === "lenovo"
+          ? mkdtempSync(join(tmpdir(), "dronedream-lenovo-product-"))
+          : "";
+        const context = browserName === "lenovo"
+          ? await definition.engine.launchPersistentContext(
+            lenovoProfile,
+            { ...launchOptions, ...contextOptions },
+          )
+          : await browser.newContext(contextOptions);
         await context.addInitScript((nextLocale) => {
           window.localStorage.setItem("drone-dream:locale", nextLocale);
         }, locale);
@@ -352,7 +404,11 @@ for (const browserName of requestedBrowsers) {
           }
         });
         page.on("response", (response) => {
-          if (response.status() >= 400 && new URL(response.url()).origin === baseUrl.origin) {
+          if (
+            response.status() >= 400 &&
+            new URL(response.url()).origin === baseUrl.origin &&
+            !response.url().endsWith("/downloads/latest.json")
+          ) {
             errors.push(`${response.status()} ${response.request().method()} ${response.url()}`);
           }
         });
@@ -372,7 +428,7 @@ for (const browserName of requestedBrowsers) {
         await page.screenshot({ path: screenshot, fullPage: true });
         results.push({
           browser: browserName,
-          browserVersion: browser.version(),
+          browserVersion: context.browser()?.version() ?? browser?.version() ?? "unknown",
           locale,
           profile: profile.name,
           viewport: profile.viewport,
@@ -382,10 +438,11 @@ for (const browserName of requestedBrowsers) {
           errors: [...new Set(errors)],
         });
         await context.close();
+        if (lenovoProfile) rmSync(lenovoProfile, { recursive: true, force: true });
       }
     }
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 }
 

@@ -1406,7 +1406,6 @@ export function SiteApp({
         ) : sitePage === "product" ? (
           <ProductPage
             availability={editionAvailability}
-            currentRelease={release}
             locale={locale}
           />
         ) : sitePage === "pricing" ? (
