@@ -267,4 +267,19 @@ describe("environment-aware routing", () => {
 
     router.dispose();
   });
+
+  it("exposes the Lab setup route only when the Lab build identifier is exact", async () => {
+    delete window.__TAURI__;
+    window.history.replaceState(null, "", "/lab/setup");
+    vi.stubEnv("VITE_DRONEDREAM_EDITION", "lab");
+    vi.resetModules();
+    const { router } = await import("../router");
+    const children = router.routes[0]?.children ?? [];
+
+    expect(children.find((route) => route.path === "lab/setup")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(router.state.location.pathname).toBe("/lab/setup");
+
+    router.dispose();
+  });
 });

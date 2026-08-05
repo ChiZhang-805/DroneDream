@@ -72,6 +72,16 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "distribution/tools/lab_preinstall_acceptance.py",
         "distribution/tools/verify_lab_preview_artifact.py",
         "distribution/tools/verify_lab_preview_contract.py",
+        "frontend/package.json",
+        "frontend/scripts/verify-lab-ui.mjs",
+        "frontend/src/AppShell.tsx",
+        "frontend/src/__tests__/edition.test.ts",
+        "frontend/src/__tests__/router.test.ts",
+        "frontend/src/edition.ts",
+        "frontend/src/i18n/I18nProvider.tsx",
+        "frontend/src/lab",
+        "frontend/src/router.tsx",
+        "frontend/src/vite-env.d.ts",
     ):
         raise LabPreviewContractError("Lab preview delta paths drifted")
 
@@ -158,6 +168,22 @@ def verify_lab_preview_contract() -> dict[str, object]:
     if tuple(safety.get("requiredDecisionLayers", ())) != ("native", "backend", "runtime"):
         raise LabPreviewContractError("Lab preview hardware actions must require the three-layer quorum")
 
+    frontend = profile.get("frontend")
+    if not isinstance(frontend, dict):
+        raise LabPreviewContractError("Lab preview frontend contract is missing")
+    if (
+        frontend.get("implementationState") != "green-source-implemented"
+        or frontend.get("buildEnvironmentVariable") != "VITE_DRONEDREAM_EDITION"
+        or frontend.get("buildEnvironmentValue") != "lab"
+        or frontend.get("route") != "/lab/setup"
+        or frontend.get("sourceRoot") != "frontend/src/lab"
+        or frontend.get("vehiclePackAdapter")
+        != "frontend/src/lab/vehicle-pack-adapter.v1.json"
+        or frontend.get("workspaceSwitchCountsAsAuthority") is not False
+        or frontend.get("hardwareActionDecisionAtZeroValidatedPacks") != "deny"
+    ):
+        raise LabPreviewContractError("Lab preview frontend boundary drifted")
+
     if overlay.get("productName") != "DroneDream Lab":
         raise LabPreviewContractError("Lab Tauri overlay must create a distinct product name")
     if overlay.get("identifier") == "io.dronedream.desktop":
@@ -185,6 +211,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'hardwareActionDecision = "deny"',
         'authenticode',
         'tauriUpdaterSignature = "not-issued"',
+        'VITE_DRONEDREAM_EDITION = "lab"',
     )
     for fragment in required_script_fragments:
         if fragment not in script:

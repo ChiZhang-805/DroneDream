@@ -13,6 +13,7 @@ import {
   Camera,
   CircleUserRound,
   Download,
+  FlaskConical,
   GraduationCap,
   History,
   ImagePlus,
@@ -100,8 +101,9 @@ import type {
   UserExperiencePreferences,
 } from "./types/api";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
+import { labEditionEnabled } from "./edition";
 
-const NAV_ITEMS: {
+type NavigationItem = {
   to: string;
   labelKey?: TranslationKey;
   label?: string;
@@ -110,7 +112,9 @@ const NAV_ITEMS: {
   requiresRuntime?: boolean;
   externalUrl?: string;
   icon: LucideIcon;
-}[] = [
+};
+
+const CORE_NAV_ITEMS: NavigationItem[] = [
   {
     to: "/assistant",
     labelKey: "app.conversation",
@@ -137,6 +141,18 @@ const NAV_ITEMS: {
     icon: GraduationCap,
   },
 ];
+
+const NAV_ITEMS: NavigationItem[] = labEditionEnabled
+  ? [
+      {
+        to: "/lab/setup",
+        labelKey: "app.labWorkspace",
+        end: true,
+        icon: FlaskConical,
+      },
+      ...CORE_NAV_ITEMS,
+    ]
+  : CORE_NAV_ITEMS;
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
   "CREATED",
@@ -2574,7 +2590,11 @@ function AppShellContent() {
       </a>
       <aside className="app-sidebar">
         {desktopRuntime ? (
-          <Link to="/assistant" className="app-title" aria-label="DroneDream">
+          <Link
+            to={labEditionEnabled ? "/lab/setup" : "/assistant"}
+            className="app-title"
+            aria-label={labEditionEnabled ? "DroneDream Lab" : "DroneDream"}
+          >
             <BrandLockup variant="compact" />
           </Link>
         ) : (
@@ -2765,7 +2785,9 @@ function AppShellContent() {
       </aside>
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
-          <div className="app-header-title">DroneDream — {t("app.platform")}</div>
+          <div className="app-header-title">
+            {labEditionEnabled ? "DroneDream Lab" : "DroneDream"} — {t("app.platform")}
+          </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">
               <button

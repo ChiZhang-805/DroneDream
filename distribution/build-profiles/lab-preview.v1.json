@@ -46,7 +46,17 @@
     "distribution/tools/lab_yellow_readiness_audit.py",
     "distribution/tools/lab_preinstall_acceptance.py",
     "distribution/tools/verify_lab_preview_artifact.py",
-    "distribution/tools/verify_lab_preview_contract.py"
+    "distribution/tools/verify_lab_preview_contract.py",
+    "frontend/package.json",
+    "frontend/scripts/verify-lab-ui.mjs",
+    "frontend/src/AppShell.tsx",
+    "frontend/src/__tests__/edition.test.ts",
+    "frontend/src/__tests__/router.test.ts",
+    "frontend/src/edition.ts",
+    "frontend/src/i18n/I18nProvider.tsx",
+    "frontend/src/lab",
+    "frontend/src/router.tsx",
+    "frontend/src/vite-env.d.ts"
   ],
   "workspaces": {
     "simulation": {
@@ -124,6 +134,16 @@
       "vehicle-pack-sim",
       "vehicle-pack-validation"
     ]
+  },
+  "frontend": {
+    "implementationState": "green-source-implemented",
+    "buildEnvironmentVariable": "VITE_DRONEDREAM_EDITION",
+    "buildEnvironmentValue": "lab",
+    "route": "/lab/setup",
+    "sourceRoot": "frontend/src/lab",
+    "vehiclePackAdapter": "frontend/src/lab/vehicle-pack-adapter.v1.json",
+    "workspaceSwitchCountsAsAuthority": false,
+    "hardwareActionDecisionAtZeroValidatedPacks": "deny"
   },
   "buildGuards": {
     "requiresExactCleanSource": true,

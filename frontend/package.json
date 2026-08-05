@@ -18,6 +18,8 @@
     "test:desktop-browser-auth": "node scripts/verify-desktop-browser-auth.mjs",
     "test:admin-layout": "node scripts/verify-admin-console-layout.mjs",
     "test:software-ui-layout": "node scripts/verify-software-ui-layout.mjs",
+    "test:lab-ui": "vitest run src/lab src/__tests__/edition.test.ts src/__tests__/router.test.ts",
+    "test:lab-ui-layout": "node scripts/verify-lab-ui.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

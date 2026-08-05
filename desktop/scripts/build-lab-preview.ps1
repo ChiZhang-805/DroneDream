@@ -107,6 +107,7 @@ if (-not $Build) {
 $env:CARGO_TARGET_DIR = $cargoTargetFull
 $env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $sourceCommit
 $env:DRONEDREAM_LAB_PREVIEW = "1"
+$env:VITE_DRONEDREAM_EDITION = "lab"
 
 & npm.cmd --prefix (Join-Path $repoRoot "desktop") run build -- `
     --config src-tauri/tauri.lab-preview.conf.json

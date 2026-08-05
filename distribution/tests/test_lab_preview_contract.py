@@ -7,6 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LAB_EDITION = ROOT / "distribution" / "editions" / "lab.v1.json"
+VEHICLE_PACK_REGISTRY = ROOT / "distribution" / "vehicle-packs" / "registry.v1.json"
+LAB_UI_ADAPTER = ROOT / "frontend" / "src" / "lab" / "vehicle-pack-adapter.v1.json"
 TOOLS = ROOT / "distribution" / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
@@ -100,6 +102,45 @@ class LabPreviewContractTests(unittest.TestCase):
         )
         self.assertNotEqual(manifest["displayName"]["zh-CN"], manifest["displayName"]["en"])
         self.assertNotEqual(manifest["description"]["zh-CN"], manifest["description"]["en"])
+
+    def test_lab_ui_vehicle_adapter_matches_authoritative_registry(self) -> None:
+        registry = json.loads(VEHICLE_PACK_REGISTRY.read_text(encoding="utf-8"))
+        adapter = json.loads(LAB_UI_ADAPTER.read_text(encoding="utf-8"))
+        self.assertEqual(adapter["kind"], "dronedream-lab-vehicle-pack-ui-adapter")
+        self.assertEqual(adapter["source"]["registryVersion"], registry["registryVersion"])
+        self.assertEqual(adapter["source"]["auditDate"], registry["auditDate"])
+        self.assertEqual(adapter["policy"]["validatedPackCount"], 0)
+        self.assertFalse(adapter["policy"]["frontendIsAuthority"])
+        self.assertEqual(adapter["policy"]["zeroValidatedPackDecision"], "deny")
+
+        registry_packs = {entry["packId"]: entry for entry in registry["packs"]}
+        adapter_packs = {entry["packId"]: entry for entry in adapter["packs"]}
+        self.assertEqual(set(adapter_packs), set(registry_packs))
+        self.assertEqual(len(adapter_packs), 8)
+        for pack_id, registry_entry in registry_packs.items():
+            manifest_path = ROOT / registry_entry["manifestPath"]
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            adapted = adapter_packs[pack_id]
+            self.assertEqual(adapted["manifestPath"], registry_entry["manifestPath"])
+            self.assertEqual(adapted["manifestSha256"], registry_entry["manifestSha256"])
+            self.assertEqual(adapted["displayName"], manifest["displayName"])
+            self.assertEqual(adapted["validationStatus"], manifest["validationStatus"])
+            self.assertEqual(adapted["validationTier"], manifest["validationTier"])
+            self.assertEqual(adapted["supportedEditions"], manifest["supportedEditions"])
+            self.assertEqual(adapted["autopilotFamily"], manifest["autopilot"]["family"])
+            expected_controllers = [
+                {
+                    "vendor": controller["vendor"],
+                    "model": controller["model"],
+                    "status": controller["status"],
+                }
+                for controller in manifest["controllers"]
+            ]
+            self.assertEqual(adapted["controllers"], expected_controllers)
+            self.assertEqual(
+                adapted["firmwareVersions"],
+                manifest["autopilot"]["supportedFirmwareVersions"],
+            )
 
     def test_lab_preinstall_acceptance_is_read_only_and_blocked_without_real_receipt(self) -> None:
         result = lab_preinstall.evaluate_preinstall()

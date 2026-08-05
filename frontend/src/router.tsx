@@ -9,6 +9,7 @@ import type { RouteObject } from "react-router-dom";
 import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
 import { getDesktopStartupGateSession } from "./desktop/startupGate";
+import { labEditionEnabled } from "./edition";
 
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
   const requireDesktopReadiness = (feature: "experiment" | "job") =>
@@ -17,7 +18,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         ? null
         : redirect(`/dashboard?settings=runtime&required=${feature}`)
       : undefined;
-  const fallbackPath = "/assistant";
+  const fallbackPath = labEditionEnabled ? "/lab/setup" : "/assistant";
 
   return [
     {
@@ -28,7 +29,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           index: true,
           element: desktopRuntime
             ? <Navigate to="/desktop/setup" replace />
-            : <Navigate to="/assistant" replace />,
+            : <Navigate to={fallbackPath} replace />,
         },
         {
           path: "assistant",
@@ -107,6 +108,15 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             return { Component: DesktopSetup };
           },
         },
+        ...(labEditionEnabled
+          ? [{
+              path: "lab/setup",
+              lazy: async () => {
+                const { LabSetup } = await import("./lab/LabSetup");
+                return { Component: LabSetup };
+              },
+            } satisfies RouteObject]
+          : []),
         { path: "*", loader: () => redirect(fallbackPath) },
       ],
     },

@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-vehicle-pack-ui-adapter",
+  "source": {
+    "registryPath": "distribution/vehicle-packs/registry.v1.json",
+    "registryVersion": "1.0.0",
+    "auditDate": "2026-08-05"
+  },
+  "policy": {
+    "validatedPackCount": 0,
+    "frontendIsAuthority": false,
+    "zeroValidatedPackDecision": "deny"
+  },
+  "packs": [
+    {
+      "packId": "px4-gazebo-x500-reference",
+      "manifestPath": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+      "manifestSha256": "cb5b9bf431571292024dacbbf8fdf03d1e7f19ae0cac0f614b42c1ee3a0b56c4",
+      "displayName": {
+        "en": "PX4 Gazebo X500 Reference",
+        "zh-CN": "PX4 Gazebo X500 参考机型"
+      },
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "productAvailability": "simulation-only",
+      "supportedEditions": ["sim", "lab"],
+      "autopilotFamily": "px4",
+      "controllers": [],
+      "firmwareVersions": ["v1.16.0"]
+    },
+    {
+      "packId": "holybro-x500-v2-pixhawk6",
+      "manifestPath": "distribution/vehicle-packs/holybro-x500-v2-pixhawk6.v1.json",
+      "manifestSha256": "3fefda5f57f34095b6db979768aced2ba7fb7df8046b1858e8df1ff664225ab3",
+      "displayName": {
+        "en": "Holybro X500 v2 with Pixhawk 6",
+        "zh-CN": "Holybro X500 v2 + Pixhawk 6"
+      },
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "productAvailability": "listed-available",
+      "supportedEditions": ["sim", "lab", "field"],
+      "autopilotFamily": "px4",
+      "controllers": [
+        {"vendor": "Holybro", "model": "Pixhawk 6C", "status": "contract-only"},
+        {"vendor": "Holybro", "model": "Pixhawk 6X", "status": "contract-only"}
+      ],
+      "firmwareVersions": ["v1.16.0"]
+    },
+    {
+      "packId": "holybro-s500-v2-pixhawk6c",
+      "manifestPath": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+      "manifestSha256": "02ba34bccd6656e6d20e8022a94db1976b9e4a849757e0f9d78927a72883ba0d",
+      "displayName": {
+        "en": "Holybro S500 v2 with Pixhawk 6C",
+        "zh-CN": "Holybro S500 v2 + Pixhawk 6C"
+      },
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "productAvailability": "listed-available",
+      "supportedEditions": ["lab", "field"],
+      "autopilotFamily": "px4",
+      "controllers": [
+        {"vendor": "Holybro", "model": "Pixhawk 6C", "status": "contract-only"}
+      ],
+      "firmwareVersions": ["v1.16.0"]
+    },
+    {
+      "packId": "holybro-qav250-pixhawk6c-mini",
+      "manifestPath": "distribution/vehicle-packs/holybro-qav250-pixhawk6c-mini.v1.json",
+      "manifestSha256": "3cbd02332027078c8426cd68b3a5f5b24d42165fc15f68aa3f7213d324df46b8",
+      "displayName": {
+        "en": "Holybro QAV250 with Pixhawk 6C Mini",
+        "zh-CN": "Holybro QAV250 + Pixhawk 6C Mini"
+      },
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "productAvailability": "variant-limited",
+      "supportedEditions": ["lab", "field"],
+      "autopilotFamily": "px4",
+      "controllers": [
+        {"vendor": "Holybro", "model": "Pixhawk 6C Mini", "status": "contract-only"}
+      ],
+      "firmwareVersions": ["v1.16.0"]
+    },
+    {
+      "packId": "holybro-x650-pixhawk6",
+      "manifestPath": "distribution/vehicle-packs/holybro-x650-pixhawk6.v1.json",
+      "manifestSha256": "104edd21c05fcd1da2a0c253d9bfb7058ad8ab13aafaa7bfb0e7faa0c7d271ef",
+      "displayName": {
+        "en": "Holybro X650 with Pixhawk 6",
+        "zh-CN": "Holybro X650 + Pixhawk 6"
+      },
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "productAvailability": "listed-sold-out",
+      "supportedEditions": ["lab", "field"],
+      "autopilotFamily": "px4",
+      "controllers": [
+        {"vendor": "Holybro", "model": "Pixhawk 6C", "status": "contract-only"},
+        {"vendor": "Holybro", "model": "Pixhawk 6X", "status": "contract-only"}
+      ],
+      "firmwareVersions": ["v1.16.0"]
+    },
+    {
+      "packId": "amovlab-p450-px4",
+      "manifestPath": "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
+      "manifestSha256": "36e8f51915cc1877e38104f2d8ee8725d4a2ea5688a5d71d9b7ab40abbbe7885",
+      "displayName": {
+        "en": "Amovlab P450 PX4 Research Platform",
+        "zh-CN": "阿木实验室 P450 PX4 科研平台"
+      },
+      "validationStatus": "planned",
+      "validationTier": "planned",
+      "productAvailability": "documentation-only",
+      "supportedEditions": ["lab", "field"],
+      "autopilotFamily": "px4",
+      "controllers": [
+        {"vendor": "Amovlab", "model": "Allspark V6C", "status": "planned"}
+      ],
+      "firmwareVersions": ["v1.16.0-contract-target"]
+    },
+    {
+      "packId": "amovlab-mfp450-pixhawk6c",
+      "manifestPath": "distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
+      "manifestSha256": "54ce400438520944708899ca71a1608126b96923351c1427ec0773e6f3e8bee2",
+      "displayName": {
+        "en": "Amovlab MFP450 with Pixhawk 6C",
+        "zh-CN": "阿木实验室 MFP450 + Pixhawk 6C"
+      },
+      "validationStatus": "planned",
+      "validationTier": "planned",
+      "productAvailability": "documentation-only",
+      "supportedEditions": ["lab", "field"],
+      "autopilotFamily": "px4",
+      "controllers": [
+        {"vendor": "Holybro", "model": "Pixhawk 6C", "status": "planned"},
+        {"vendor": "Amovlab", "model": "ICF5", "status": "planned"}
+      ],
+      "firmwareVersions": ["v1.16.0-contract-target"]
+    },
+    {
+      "packId": "bitcraze-crazyflie-2-1-plus",
+      "manifestPath": "distribution/vehicle-packs/bitcraze-crazyflie-2-1-plus.v1.json",
+      "manifestSha256": "43a39a061f832b40f39aaf9722e6928f5b685e9b1f68f70e08726f14119191cc",
+      "displayName": {
+        "en": "Bitcraze Crazyflie 2.1+",
+        "zh-CN": "Bitcraze Crazyflie 2.1+ 教学微型机"
+      },
+      "validationStatus": "planned",
+      "validationTier": "planned",
+      "productAvailability": "listed-available",
+      "supportedEditions": ["lab", "field"],
+      "autopilotFamily": "crazyflie",
+      "controllers": [
+        {"vendor": "Bitcraze", "model": "Crazyflie 2.1+", "status": "planned"}
+      ],
+      "firmwareVersions": ["audited-commit-5d287434b21b9b4fd3577c51e4d90bb4c54a5145"]
+    }
+  ]
+}

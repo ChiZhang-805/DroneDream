@@ -12,6 +12,7 @@ interface ImportMetaEnv {
   readonly VITE_AUTH_GOOGLE_ENABLED?: "true" | "false";
   readonly VITE_AUTH_APPLE_ENABLED?: "true" | "false";
   readonly VITE_PUBLIC_DEMO_CONSOLE?: string;
+  readonly VITE_DRONEDREAM_EDITION?: "lab";
 }
 
 interface ImportMeta {
