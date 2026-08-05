@@ -397,7 +397,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'tauriUpdaterSignature = "not-issued"',
         'VITE_DRONEDREAM_EDITION = "lab"',
         'Get-Sha256Text $coreListing.Trim()',
-        '$tauriProductName = "DroneDream · LAB"',
+        '$tauriOverlayPath = Join-Path $repoRoot "desktop\\src-tauri\\tauri.lab-preview.conf.json"',
+        'Get-Content -LiteralPath $tauriOverlayPath -Raw -Encoding UTF8',
+        '$tauriProductName = [string]$tauriOverlay.productName',
         'brand-source-manifest.v1.json',
         'canonicalDonor = New-RepoFileRef "brand\\brand-editions.v1.json"',
         'websiteHandoffContract = New-RepoFileRef "distribution\\editions\\lab\\website-exact-exe-handoff.awaiting.v1.json"',
@@ -418,6 +420,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         if fragment not in script:
             raise LabPreviewContractError(f"Lab build script is missing: {fragment}")
     forbidden_script_fragments = (
+        '"DroneDream · LAB"',
         "TAURI_SIGNING_PRIVATE_KEY_PATH |",
         "invoke-tauri-updater-signer.ps1",
         "git push",

@@ -91,7 +91,17 @@ if (-not $OutputRoot) {
 }
 $outputRootFull = [IO.Path]::GetFullPath($OutputRoot)
 $artifactName = "DroneDream-Lab-1.0.0.exe"
-$tauriProductName = "DroneDream · LAB"
+$tauriOverlayPath = Join-Path $repoRoot "desktop\src-tauri\tauri.lab-preview.conf.json"
+try {
+    $tauriOverlay = Get-Content -LiteralPath $tauriOverlayPath -Raw -Encoding UTF8 |
+        ConvertFrom-Json
+} catch {
+    throw "The Lab Tauri overlay must be valid UTF-8 JSON."
+}
+$tauriProductName = [string]$tauriOverlay.productName
+if (-not $tauriProductName) {
+    throw "The Lab Tauri overlay productName is missing."
+}
 $artifactPath = Join-Path $outputRootFull $artifactName
 $receiptPath = Join-Path $outputRootFull "lab-preview-receipt.json"
 
@@ -138,7 +148,7 @@ $env:DRONEDREAM_LAB_PREVIEW = "1"
 $env:VITE_DRONEDREAM_EDITION = "lab"
 
 & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
-    -AdditionalConfigPath (Join-Path $repoRoot "desktop\src-tauri\tauri.lab-preview.conf.json") `
+    -AdditionalConfigPath $tauriOverlayPath `
     -CargoTargetDir $cargoTargetFull `
     -LlvmRoot $gnullvm.llvmRoot `
     -ExpectedProductName $tauriProductName `

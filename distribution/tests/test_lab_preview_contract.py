@@ -82,6 +82,17 @@ class LabPreviewContractTests(unittest.TestCase):
             ),
         )
 
+    def test_lab_build_reads_unicode_product_name_from_utf8_overlay(self) -> None:
+        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "Get-Content -LiteralPath $tauriOverlayPath -Raw -Encoding UTF8",
+            script,
+        )
+        self.assertIn("$tauriProductName = [string]$tauriOverlay.productName", script)
+        self.assertNotIn('"DroneDream · LAB"', script)
+
     def test_fake_lab_artifact_receipt_binds_workspace_module_and_artifact_contracts(self) -> None:
         receipt = lab_artifact.fake_lab_preview_receipt()
         validated = lab_artifact.validate_receipt(receipt)
