@@ -26,6 +26,7 @@ PLAN_KEYS = {
     "authorization",
     "yellow1VisualBinding",
     "approvedEditionAssetGate",
+    "canonicalSyncGate",
     "artifactGate",
     "staging",
     "protectedInventory",
@@ -56,6 +57,24 @@ APPROVED_ASSET_GATE_KEYS = {
     "applicationSourceWired",
     "installerDerivativeReady",
     "canonicalUniversalDonorIntegrated",
+}
+CANONICAL_SYNC_GATE_KEYS = {
+    "auditPath",
+    "auditSha256",
+    "state",
+    "baseCommit",
+    "simOverlayCheckpoint",
+    "donorCommit",
+    "recordedCommonCoreCommit",
+    "recordedCommonCoreHash",
+    "authoritativeProductSourceCommit",
+    "authoritativeEvidenceCommit",
+    "formalHandoffReceived",
+    "semanticIntegrationExecuted",
+    "canonicalBrandManifestConsumed",
+    "installerIcoConsumed",
+    "releaseAsset",
+    "yellow2Ready",
 }
 ARTIFACT_GATE_KEYS = {
     "yellow2OutputFileName",
@@ -307,6 +326,94 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
     ):
         raise SimYellowLifecycleError("approved edition asset gate drifted")
 
+    sync_gate = _exact_keys(
+        plan["canonicalSyncGate"], CANONICAL_SYNC_GATE_KEYS, "canonicalSyncGate"
+    )
+    expected_sync_gate = {
+        "auditPath": "distribution/sim/brand/canonical-sync-conflict-audit.v1.json",
+        "auditSha256": (
+            "9e38977b9f29bcc32ccb4ae399784462771954ad50dfb1eaef52e35661fbcd2d"
+        ),
+        "state": "observed-not-merged-awaiting-authoritative-handoff",
+        "baseCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+        "simOverlayCheckpoint": "4086ff3134847b5bbe049cc1f43b17141e984f8c",
+        "donorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+        "recordedCommonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+        "recordedCommonCoreHash": (
+            "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b"
+        ),
+        "authoritativeProductSourceCommit": None,
+        "authoritativeEvidenceCommit": None,
+        "formalHandoffReceived": False,
+        "semanticIntegrationExecuted": False,
+        "canonicalBrandManifestConsumed": False,
+        "installerIcoConsumed": False,
+        "releaseAsset": False,
+        "yellow2Ready": False,
+    }
+    if sync_gate != expected_sync_gate:
+        raise SimYellowLifecycleError("canonical sync gate overclaims readiness")
+    sync_audit_path = _repo_file(
+        repo_root, sync_gate["auditPath"], "canonical sync conflict audit"
+    )
+    if sha256_file(sync_audit_path) != _sha(
+        sync_gate["auditSha256"], "canonical sync conflict audit SHA-256"
+    ):
+        raise SimYellowLifecycleError("canonical sync conflict audit SHA-256 drifted")
+    sync_audit = load_json(sync_audit_path)
+    sync_source = sync_audit.get("source")
+    if not isinstance(sync_source, dict) or any(
+        sync_source.get(audit_key) != sync_gate[gate_key]
+        for audit_key, gate_key in (
+            ("baseCommit", "baseCommit"),
+            ("simOverlayCheckpoint", "simOverlayCheckpoint"),
+            ("donorCommit", "donorCommit"),
+        )
+    ):
+        raise SimYellowLifecycleError("canonical sync source binding drifted")
+    if (
+        sync_audit.get("state") != sync_gate["state"]
+        or any(value is not False for value in sync_audit.get("execution", {}).values())
+        or sync_audit.get("syncPolicy", {}).get("wholeCommitCherryPickAllowed") is not False
+        or sync_audit.get("syncPolicy", {}).get("backendCommonCoreAutoAdoptionAllowed")
+        is not False
+        or sync_audit.get("syncPolicy", {}).get("brandAssetsRequireCanonicalManifestSha256")
+        is not True
+    ):
+        raise SimYellowLifecycleError("canonical sync audit execution boundary drifted")
+    branch_contract = load_json(
+        _repo_file(
+            repo_root,
+            "distribution/branch-contracts/software-sim.v1.json",
+            "Sim branch contract",
+        )
+    )
+    branch_baseline = branch_contract.get("syncBaseline")
+    if not isinstance(branch_baseline, dict) or (
+        branch_baseline.get("commonCoreCommit") != sync_gate["recordedCommonCoreCommit"]
+        or branch_baseline.get("commonCoreHash") != sync_gate["recordedCommonCoreHash"]
+    ):
+        raise SimYellowLifecycleError("canonical sync recorded commonCore binding drifted")
+    candidate_ref = sync_source.get("reconciliationCandidate")
+    if not isinstance(candidate_ref, dict):
+        raise SimYellowLifecycleError("canonical reconciliation candidate ref is missing")
+    candidate_path = _repo_file(
+        repo_root,
+        candidate_ref.get("path"),
+        "canonical reconciliation candidate",
+    )
+    if sha256_file(candidate_path) != _sha(
+        candidate_ref.get("sha256"), "canonical reconciliation candidate SHA-256"
+    ):
+        raise SimYellowLifecycleError("canonical reconciliation candidate SHA-256 drifted")
+    candidate = load_json(candidate_path)
+    if (
+        candidate.get("observedSource", {}).get("authoritativeHandoffReceived") is not False
+        or candidate.get("observedSource", {}).get("sourceEvidenceHead") is not None
+        or any(value is not False for value in candidate.get("adoptionGates", {}).values())
+    ):
+        raise SimYellowLifecycleError("canonical reconciliation candidate overclaims adoption")
+
     artifact = _exact_keys(plan["artifactGate"], ARTIFACT_GATE_KEYS, "artifactGate")
     if (
         artifact["yellow2OutputFileName"] != "DroneDream-Sim-1.0.0.exe"
@@ -461,6 +568,7 @@ def create_stage_plan(contract: dict[str, Any], *, stage: str, run_id: str) -> d
         "executionAuthorized": False,
         "paths": expanded,
         "approvedEditionAssetGate": contract["approvedEditionAssetGate"],
+        "canonicalSyncGate": contract["canonicalSyncGate"],
         "artifactGate": contract["artifactGate"],
         "protectedInventory": contract["protectedInventory"],
         "yellow3Matrix": contract["yellow3Matrix"] if stage == "yellow-3" else [],

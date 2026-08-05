@@ -38,6 +38,24 @@
     "installerDerivativeReady": false,
     "canonicalUniversalDonorIntegrated": false
   },
+  "canonicalSyncGate": {
+    "auditPath": "distribution/sim/brand/canonical-sync-conflict-audit.v1.json",
+    "auditSha256": "9e38977b9f29bcc32ccb4ae399784462771954ad50dfb1eaef52e35661fbcd2d",
+    "state": "observed-not-merged-awaiting-authoritative-handoff",
+    "baseCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "simOverlayCheckpoint": "4086ff3134847b5bbe049cc1f43b17141e984f8c",
+    "donorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "recordedCommonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "recordedCommonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
+    "authoritativeProductSourceCommit": null,
+    "authoritativeEvidenceCommit": null,
+    "formalHandoffReceived": false,
+    "semanticIntegrationExecuted": false,
+    "canonicalBrandManifestConsumed": false,
+    "installerIcoConsumed": false,
+    "releaseAsset": false,
+    "yellow2Ready": false
+  },
   "artifactGate": {
     "yellow2OutputFileName": "DroneDream-Sim-1.0.0.exe",
     "yellow2ReceiptKind": "dronedream-sim-yellow-build-receipt",
