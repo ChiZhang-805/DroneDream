@@ -6,11 +6,20 @@ from dataclasses import dataclass, field
 
 import pytest
 
-from app.benchmarking.contracts import BenchmarkObservationV2, BenchmarkProposalV1
+from app.benchmarking.adaptive_triggers import (
+    BENCHMARK_ADAPTIVE_TRIGGER_POLICY_MANIFEST,
+    BENCHMARK_ADAPTIVE_TRIGGER_POLICY_SHA256,
+    BenchmarkAdaptiveTriggerContractError,
+    evaluate_benchmark_adaptive_triggers,
+)
+from app.benchmarking.contracts import (
+    BenchmarkObservationV2,
+    BenchmarkProposalV1,
+    canonical_sha256,
+)
 from app.benchmarking.llm_arm_contracts import BenchmarkLLMTurnRequestV1
 from app.benchmarking.llm_fixture_runtime import (
     BenchmarkLLMFixtureExecutionError,
-    evaluate_benchmark_adaptive_triggers,
     execute_offline_llm_arm,
 )
 
@@ -416,6 +425,62 @@ def test_trigger_cooldown_suppresses_same_severity_but_allows_severity_upgrade()
     assert "trailing_stagnation" in decision.suppressed_by_cooldown
     assert "trailing_stagnation" not in decision.diagnosis_reasons
     assert "hard_boundary_candidate" in decision.critic_reasons
+
+
+def test_adaptive_trigger_policy_manifest_is_frozen_and_bound_to_each_decision() -> None:
+    observation = _observation("dronedream_adaptive_1_4/v1", discrete=True)
+    selected = BenchmarkProposalV1(
+        candidate_ref="selected",
+        parameters={"mode": 0.0},
+        reason_code="fixture",
+    )
+    decision = evaluate_benchmark_adaptive_triggers(observation, [selected], selected)
+
+    assert (
+        canonical_sha256(BENCHMARK_ADAPTIVE_TRIGGER_POLICY_MANIFEST)
+        == BENCHMARK_ADAPTIVE_TRIGGER_POLICY_SHA256
+    )
+    assert decision.policy_sha256 == BENCHMARK_ADAPTIVE_TRIGGER_POLICY_SHA256
+
+
+@pytest.mark.parametrize(
+    "previous_family_state",
+    (
+        {"unknown": (1, 1)},
+        {"progress": (-1, 1)},
+        {"progress": (3, 1)},
+        {"progress": (1, 3)},
+    ),
+)
+def test_adaptive_trigger_rejects_invalid_or_future_cooldown_state(
+    previous_family_state: dict[str, tuple[int, int]],
+) -> None:
+    observation = _observation("dronedream_adaptive_1_4/v1", generation_index=2)
+    selected = BenchmarkProposalV1(
+        candidate_ref="selected",
+        parameters={"kp": 1.0},
+        reason_code="fixture",
+    )
+
+    with pytest.raises(BenchmarkAdaptiveTriggerContractError):
+        evaluate_benchmark_adaptive_triggers(
+            observation,
+            [selected],
+            selected,
+            previous_family_state=previous_family_state,
+        )
+
+
+def test_adaptive_trigger_rejects_selection_not_bound_to_proposal_set() -> None:
+    observation = _observation("dronedream_adaptive_1_4/v1")
+    selected = BenchmarkProposalV1(
+        candidate_ref="selected",
+        parameters={"kp": 1.0},
+        reason_code="fixture",
+    )
+
+    with pytest.raises(BenchmarkAdaptiveTriggerContractError):
+        evaluate_benchmark_adaptive_triggers(observation, [], selected)
 
 
 def test_provider_failure_and_invalid_response_are_safe_and_counted_without_raw_text() -> None:
