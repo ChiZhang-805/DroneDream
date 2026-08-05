@@ -391,6 +391,36 @@ _ENTRIES = (
             "Formal execution requires zero provider retries and preregistered capacity.",
         ),
     ),
+    BenchmarkMethodInventoryEntryV1(
+        adapter_id="llambo_uav/v1",
+        method_classification="adapted_reference",
+        implementation_label="durable-noisy-constrained-uav-llambo-adaptation-v1",
+        execution_readiness="ready",
+        environment_boundary="provider_contract",
+        sources=(
+            _project_source(
+                "llambo-uav-durable-runtime",
+                "backend/app/benchmarking/llm_durable_runtime.py",
+            ),
+            _project_source(
+                "llambo-uav-closed-contract",
+                "backend/app/benchmarking/llm_arm_contracts.py",
+            ),
+            _project_source(
+                "llambo-uav-job-secret-transport",
+                "backend/app/benchmarking/provider_transport.py",
+            ),
+        ),
+        reproducibility_notes=(
+            "One durable proposal turn and one actual request per generation.",
+            "Uses the shared holdout-free UAV observation under noisy constrained BO instructions.",
+            (
+                "This is a DroneDream UAV adaptation and is not claimed as a standard "
+                "LLAMBO reproduction."
+            ),
+            "The transport uses one same-Job encrypted BYOK slot with zero provider retries.",
+        ),
+    ),
     *(
         BenchmarkMethodInventoryEntryV1(
             adapter_id=adapter_id,
@@ -407,7 +437,6 @@ _ENTRIES = (
             blocker_codes=("adapter_not_implemented", "provider_contract_pending"),
         )
         for adapter_id, classification, label in (
-            ("llambo_uav/v1", "adapted_reference", "noisy-uav-adaptation-pending"),
             (
                 "dronedream_fixed_two_turn/v1",
                 "product_native",

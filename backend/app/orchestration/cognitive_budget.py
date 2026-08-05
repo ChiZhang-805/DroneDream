@@ -50,7 +50,7 @@ MAX_PROVIDER_TURNS_PER_GENERATION = 4
 MAX_PROVIDER_TURNS_PER_JOB = 128
 
 TurnRole = Literal["plan", "revision", "diagnosis", "critic"]
-BenchmarkTurnRole = Literal["direct_proposal", "react_action"]
+BenchmarkTurnRole = Literal["direct_proposal", "react_action", "llambo_proposal"]
 TurnOutcomeStatus = Literal[
     "succeeded",
     "provider_failed",
@@ -531,7 +531,7 @@ def begin_benchmark_llm_turn(
     generation_index: int,
     turn_index: int,
     turn_role: BenchmarkTurnRole,
-    adapter_id: Literal["llm_direct/v1", "llm_react/v1"],
+    adapter_id: Literal["llm_direct/v1", "llm_react/v1", "llambo_uav/v1"],
     maximum_turns_per_generation: int,
     model_snapshot: str,
     prompt_sha256: str,
@@ -554,6 +554,7 @@ def begin_benchmark_llm_turn(
     expected_role = {
         "llm_direct/v1": "direct_proposal",
         "llm_react/v1": "react_action",
+        "llambo_uav/v1": "llambo_proposal",
     }[adapter_id]
     if turn_role != expected_role:
         raise CognitiveTurnBlocked(
@@ -570,10 +571,10 @@ def begin_benchmark_llm_turn(
             "turn_limit_exceeded",
             "Benchmark LLM turn exceeded its frozen per-generation cap.",
         )
-    if adapter_id == "llm_direct/v1" and turn_index != 1:
+    if adapter_id in {"llm_direct/v1", "llambo_uav/v1"} and turn_index != 1:
         raise CognitiveTurnBlocked(
             "turn_limit_exceeded",
-            "The direct benchmark arm permits exactly one turn per generation.",
+            "This single-turn benchmark arm permits exactly one turn per generation.",
         )
     if adapter_id == "llm_react/v1" and turn_index > 1:
         predecessor = db.scalar(
@@ -601,18 +602,22 @@ def begin_benchmark_llm_turn(
             "benchmark_retry_policy_drift",
             "Formal benchmark provider retries must be zero.",
         )
-    trigger_reason = (
-        "preregistered-direct-turn" if adapter_id == "llm_direct/v1" else "bounded-react-turn"
-    )
+    trigger_reason = {
+        "llm_direct/v1": "preregistered-direct-turn",
+        "llm_react/v1": "bounded-react-turn",
+        "llambo_uav/v1": "preregistered-llambo-uav-turn",
+    }[adapter_id]
     return _commit_cognitive_turn(
         db,
         job,
         generation_index=generation_index,
         turn_index=turn_index,
         turn_role=turn_role,
-        trigger_policy_version=(
-            "benchmark-llm-direct-v1" if adapter_id == "llm_direct/v1" else "benchmark-llm-react-v1"
-        ),
+        trigger_policy_version={
+            "llm_direct/v1": "benchmark-llm-direct-v1",
+            "llm_react/v1": "benchmark-llm-react-v1",
+            "llambo_uav/v1": "benchmark-llambo-uav-v1",
+        }[adapter_id],
         trigger_reasons=(trigger_reason,),
         model_snapshot=model_snapshot,
         prompt_sha256=prompt_sha256,

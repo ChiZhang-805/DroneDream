@@ -121,7 +121,7 @@ def _validate_run_graph(
             "benchmark_provider_run_graph_drift",
             "Provider run binding graph is inconsistent.",
         )
-    if arm.proposal_adapter_id not in {"llm_direct/v1", "llm_react/v1"}:
+    if arm.proposal_adapter_id not in {"llm_direct/v1", "llm_react/v1", "llambo_uav/v1"}:
         _blocked(
             "benchmark_provider_reconciliation_arm_unsupported",
             "This reconciliation contract does not support the bound provider arm.",
@@ -313,19 +313,21 @@ def reconcile_provider_run_usage(
         )
     )
     policy = require_llm_arm_policy(arm.proposal_adapter_id)
-    expected_role = (
-        "direct_proposal" if arm.proposal_adapter_id == "llm_direct/v1" else "react_action"
-    )
-    expected_trigger = (
-        "benchmark-llm-direct-v1"
-        if arm.proposal_adapter_id == "llm_direct/v1"
-        else "benchmark-llm-react-v1"
-    )
-    expected_reason = (
-        ["preregistered-direct-turn"]
-        if arm.proposal_adapter_id == "llm_direct/v1"
-        else ["bounded-react-turn"]
-    )
+    expected_role = {
+        "llm_direct/v1": "direct_proposal",
+        "llm_react/v1": "react_action",
+        "llambo_uav/v1": "llambo_proposal",
+    }[arm.proposal_adapter_id]
+    expected_trigger = {
+        "llm_direct/v1": "benchmark-llm-direct-v1",
+        "llm_react/v1": "benchmark-llm-react-v1",
+        "llambo_uav/v1": "benchmark-llambo-uav-v1",
+    }[arm.proposal_adapter_id]
+    expected_reason = {
+        "llm_direct/v1": ["preregistered-direct-turn"],
+        "llm_react/v1": ["bounded-react-turn"],
+        "llambo_uav/v1": ["preregistered-llambo-uav-turn"],
+    }[arm.proposal_adapter_id]
     if any(
         turn.turn_role != expected_role
         or not 1 <= turn.turn_index <= policy.maximum_turns_per_generation

@@ -32,6 +32,7 @@ from app.benchmarking.job_runtime import (
 from app.benchmarking.llm_durable_runtime import (
     BenchmarkDurableLLMBlocked,
     execute_durable_direct_arm,
+    execute_durable_llambo_arm,
     execute_durable_react_arm,
 )
 from app.benchmarking.method_inventory import require_execution_ready_method
@@ -1135,7 +1136,7 @@ def dispatch_next_benchmark_generation(
         require_execution_ready_method(adapter_id)
         adapter = (
             None
-            if adapter_id in {"llm_direct/v1", "llm_react/v1"}
+            if adapter_id in {"llm_direct/v1", "llm_react/v1", "llambo_uav/v1"}
             else create_benchmark_adapter(adapter_id)
         )
     except BenchmarkJobRuntimeBlocked as exc:
@@ -1171,6 +1172,20 @@ def dispatch_next_benchmark_generation(
             if direct.proposal is None:  # pragma: no cover - strict result contract.
                 raise RuntimeError("durable direct execution returned no proposal")
             proposal = direct.proposal
+        elif adapter_id == "llambo_uav/v1":
+            llambo = execute_durable_llambo_arm(
+                db,
+                job,
+                observation,
+                transport_factory=lambda provider: build_job_secret_benchmark_transport(
+                    db, job, provider
+                ),
+            )
+            if llambo.status == "first_qualified_stop":
+                return BenchmarkDispatchResult(status="first_qualified_stop")
+            if llambo.proposal is None:  # pragma: no cover - strict result contract.
+                raise RuntimeError("durable LLAMBO execution returned no proposal")
+            proposal = llambo.proposal
         elif adapter_id == "llm_react/v1":
             react = execute_durable_react_arm(
                 db,
