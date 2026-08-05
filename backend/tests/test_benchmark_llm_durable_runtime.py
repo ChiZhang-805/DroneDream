@@ -487,7 +487,12 @@ def test_direct_attempts_are_committed_before_transport_and_success_is_safe(
         assert result.provider_turns_attempted == result.provider_turns_succeeded == 1
         assert result.provider_requests_attempted == result.provider_requests_succeeded == 1
         request_receipt = db.scalar(select(models.ProviderNetworkRequestReceipt))
+        handoff = db.scalar(select(models.BenchmarkDirectProposalHandoff))
         assert request_receipt is not None
+        assert handoff is not None
+        assert handoff.parameters_json == {"kp": 1.2}
+        assert handoff.parameter_sha256 == canonical_sha256({"kp": 1.2})
+        assert handoff.proposal_receipt_sha256 == canonical_sha256(result.safe_receipt)
         assert transport.last_request.request_body()["seed"] == 20260805
         assert (
             request_receipt.request_body_sha256
@@ -511,6 +516,108 @@ def test_direct_attempts_are_committed_before_transport_and_success_is_safe(
         db.refresh(job)
         assert job.provider_turns_attempted == job.provider_turns_succeeded == 1
         assert job.provider_requests_attempted == job.provider_requests_succeeded == 1
+
+
+def test_successful_direct_proposal_recovers_without_replaying_provider(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        observation = _observation(job, run)
+        first_transport = _Transport(_proposal_json(1.35))
+        first = execute_durable_direct_arm(
+            db,
+            job,
+            observation,
+            transport=first_transport,
+        )
+        assert first.status == "proposal"
+        assert first_transport.calls == 1
+
+        replay_transport = _Transport(RuntimeError("must not replay"))
+        recovered = execute_durable_direct_arm(
+            db,
+            job,
+            observation,
+            transport=replay_transport,
+        )
+        assert recovered.status == "proposal_recovered"
+        assert recovered.recovered_from_handoff is True
+        assert recovered.proposal == first.proposal
+        assert recovered.safe_receipt == first.safe_receipt
+        assert replay_transport.calls == 0
+        assert db.scalar(select(models.HarnessCognitiveTurnReceipt)) is not None
+        assert len(list(db.scalars(select(models.ProviderNetworkRequestReceipt)))) == 1
+        assert len(list(db.scalars(select(models.BenchmarkDirectProposalHandoff)))) == 1
+
+
+def test_direct_handoff_persists_only_validated_safe_material(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        result = execute_durable_direct_arm(
+            db,
+            job,
+            _observation(job, run),
+            transport=_Transport(_proposal_json()),
+        )
+        handoff = db.scalar(select(models.BenchmarkDirectProposalHandoff))
+        assert handoff is not None
+        persisted = json.dumps(
+            {
+                "schema": handoff.handoff_schema,
+                "parameters": handoff.parameters_json,
+                "receipt": handoff.proposal_receipt_json,
+            },
+            sort_keys=True,
+        )
+        assert result.proposal is not None
+        assert result.proposal.parameters == handoff.parameters_json
+        for forbidden in (
+            "messages",
+            "system",
+            "user",
+            "request_id",
+            "api_key",
+            _proposal_json(),
+        ):
+            assert forbidden not in persisted
+
+
+def test_direct_handoff_cross_field_tamper_blocks_without_provider_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        observation = _observation(job, run)
+        execute_durable_direct_arm(
+            db,
+            job,
+            observation,
+            transport=_Transport(_proposal_json()),
+        )
+        handoff = db.scalar(select(models.BenchmarkDirectProposalHandoff))
+        assert handoff is not None
+        tampered = dict(handoff.proposal_receipt_json)
+        tampered["campaign_id"] = "campaign-from-another-run"
+        handoff.proposal_receipt_json = tampered
+        handoff.proposal_receipt_sha256 = canonical_sha256(tampered)
+        db.commit()
+
+        transport = _Transport(RuntimeError("must not replay"))
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_direct_arm(
+                db,
+                job,
+                observation,
+                transport=transport,
+            )
+        assert exc_info.value.code == "benchmark_direct_handoff_receipt_drift"
+        assert transport.calls == 0
 
 
 def test_provider_failure_is_fail_closed_and_does_not_persist_exception_text(

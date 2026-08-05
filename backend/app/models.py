@@ -883,6 +883,9 @@ class Job(Base):
     cognitive_turn_receipts: Mapped[list[HarnessCognitiveTurnReceipt]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
+    benchmark_direct_proposal_handoffs: Mapped[
+        list[BenchmarkDirectProposalHandoff]
+    ] = relationship(back_populates="job", cascade="all, delete-orphan")
     events: Mapped[list[JobEvent]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
@@ -1462,6 +1465,76 @@ class HarnessCognitiveTurnOutcome(Base):
 
     turn_receipt: Mapped[HarnessCognitiveTurnReceipt] = relationship(
         back_populates="outcome"
+    )
+
+
+class BenchmarkDirectProposalHandoff(Base):
+    """Durable, secret-free handoff from one paid direct turn to dispatch.
+
+    The row is committed atomically with the successful cognitive outcome. It
+    contains only schema-validated numeric parameters and provenance hashes;
+    raw prompts, raw provider responses, credentials, and provider request IDs
+    are deliberately excluded. A worker may therefore recover the exact
+    proposal after a crash without replaying paid provider I/O.
+    """
+
+    __tablename__ = "benchmark_direct_proposal_handoffs"
+    __table_args__ = (
+        UniqueConstraint(
+            "job_id",
+            "generation_index",
+            name="uq_benchmark_direct_handoff_job_generation",
+        ),
+        UniqueConstraint(
+            "cognitive_turn_receipt_id",
+            name="uq_benchmark_direct_handoff_turn",
+        ),
+        CheckConstraint(
+            "generation_index >= 1 AND dispatch_ordinal >= 1",
+            name="ck_benchmark_direct_handoff_ordinals",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(
+        String(64), primary_key=True, default=lambda: _new_id("bdph")
+    )
+    job_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    run_binding_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("benchmark_campaign_run_bindings.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    cognitive_turn_receipt_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("harness_cognitive_turn_receipts.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    handoff_schema: Mapped[str] = mapped_column(String(128), nullable=False)
+    generation_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    dispatch_ordinal: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    source_commit: Mapped[str] = mapped_column(String(40), nullable=False)
+    observation_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    turn_binding_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    candidate_ref: Mapped[str] = mapped_column(String(255), nullable=False)
+    reason_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    parameters_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    parameter_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    proposal_receipt_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    proposal_receipt_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, nullable=False
+    )
+
+    job: Mapped[Job] = relationship(
+        back_populates="benchmark_direct_proposal_handoffs"
     )
 
 
@@ -2083,6 +2156,7 @@ class JobSecret(Base):
 __all__ = [
     "Artifact",
     "BenchmarkArm",
+    "BenchmarkDirectProposalHandoff",
     "BenchmarkBudgetReservation",
     "BenchmarkCampaign",
     "BenchmarkCampaignCoordinatorState",
