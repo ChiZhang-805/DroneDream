@@ -85,6 +85,39 @@ const profile = JSON.parse(await readFile(
   path.join(repoRoot, "distribution", "build-profiles", "lab-preview.v1.json"),
   "utf8",
 ));
+const brandManifestPath = path.join(
+  repoRoot,
+  "distribution",
+  "editions",
+  "lab",
+  "brand-source-manifest.v1.json",
+);
+const brandManifest = JSON.parse(await readFile(brandManifestPath, "utf8"));
+const tauriOverlayPath = path.join(
+  repoRoot,
+  "desktop",
+  "src-tauri",
+  "tauri.lab-preview.conf.json",
+);
+const tauriOverlay = JSON.parse(await readFile(tauriOverlayPath, "utf8"));
+assert.equal(brandManifest.displayName, "DroneDream · LAB");
+assert.deepEqual(brandManifest.theme.palette, ["#A7E84A", "#20C77A", "#087E69"]);
+assert.equal(brandManifest.theme.grantsHardwareAuthority, false);
+assert.equal(tauriOverlay.productName, brandManifest.displayName);
+assert.equal(tauriOverlay.app.windows[0].title, brandManifest.displayName);
+
+for (const asset of brandManifest.assets) {
+  const assetPath = path.join(repoRoot, ...asset.repositoryPath.split("/"));
+  assert.equal(await sha256File(assetPath), asset.repositorySha256);
+}
+const installerIcons = [];
+for (const iconPath of tauriOverlay.bundle.icon) {
+  const absolutePath = path.resolve(path.dirname(tauriOverlayPath), iconPath);
+  installerIcons.push({
+    path: path.relative(repoRoot, absolutePath).replaceAll("\\", "/"),
+    sha256: await sha256File(absolutePath),
+  });
+}
 const commonCoreListing = execFileSync(
   "git",
   [
@@ -121,6 +154,21 @@ try {
       ? "Simulation and hardware laboratory"
       : "仿真与真机实验室";
     await page.getByRole("heading", { name: title }).waitFor();
+    const brandImage = page.locator('img[src*="dronedream-lab-dot-lockup-v2"]').first();
+    await brandImage.waitFor({ state: "attached" });
+    const brandImageState = await brandImage.evaluate((image) => ({
+      complete: image instanceof HTMLImageElement && image.complete,
+      naturalWidth: image instanceof HTMLImageElement ? image.naturalWidth : 0,
+      naturalHeight: image instanceof HTMLImageElement ? image.naturalHeight : 0,
+    }));
+    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 1840, naturalHeight: 340 });
+    assert((await page.getByText("DroneDream · LAB", { exact: false }).count()) > 0);
+    const palette = await page.locator(".lab-page").evaluate((element) => {
+      const style = getComputedStyle(element);
+      return ["--lab-lime", "--lab-green", "--lab-deep-green"]
+        .map((property) => style.getPropertyValue(property).trim().toUpperCase());
+    });
+    assert.deepEqual(palette, ["#A7E84A", "#20C77A", "#087E69"]);
     assert.equal(await page.locator("html").getAttribute("lang"), testCase.locale);
     assert.equal(await page.getByText(testCase.locale === "en" ? "0 of 8" : "0 / 8").count(), 1);
     assert.equal(await page.getByText(testCase.locale === "en" ? "DENY" : "拒绝").first().count(), 1);
@@ -184,6 +232,28 @@ const report = {
   executionAuthority: false,
   validatedVehiclePackCount: 0,
   hardwareActionDecision: "deny",
+  brand: {
+    displayName: brandManifest.displayName,
+    palette: brandManifest.theme.palette,
+    grantsHardwareAuthority: brandManifest.theme.grantsHardwareAuthority,
+    sourceManifest: {
+      path: path.relative(repoRoot, brandManifestPath).replaceAll("\\", "/"),
+      sha256: await sha256File(brandManifestPath),
+    },
+    exactByteAssets: brandManifest.assets.map((asset) => ({
+      role: asset.role,
+      path: asset.repositoryPath,
+      sha256: asset.repositorySha256,
+    })),
+    applicationLockupLoaded: true,
+    installerOverlay: {
+      path: path.relative(repoRoot, tauriOverlayPath).replaceAll("\\", "/"),
+      sha256: await sha256File(tauriOverlayPath),
+      productName: tauriOverlay.productName,
+      icons: installerIcons,
+      generatedNsiVerified: false,
+    },
+  },
   cases: cases.map((testCase) => ({
     ...testCase,
     surfaces: ["simulation", "hardware", "evidence", "safety"],
@@ -195,6 +265,8 @@ const report = {
     simulationStarted: false,
     hardwareConnected: false,
     providerCalled: false,
+    tauriBuilt: false,
+    nsisBuilt: false,
   },
 };
 const reportPath = path.join(outputRoot, "lab-ui-verification.json");
