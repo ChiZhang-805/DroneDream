@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +25,8 @@ import verify_lab_preview_contract as profile_verifier
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 LAB_MANIFEST_PATH = ROOT / "distribution/editions/lab.v1.json"
+BRAND_MANIFEST_PATH = ROOT / "distribution/editions/lab/brand-source-manifest.v1.json"
+TAURI_OVERLAY_PATH = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
 REGISTRY_PATH = ROOT / "distribution/vehicle-packs/registry.v1.json"
 GATE_POLICY_PATH = ROOT / "distribution/safety/edition-execution-gate.v1.json"
 NOTICE_PATH = ROOT / "runtime/THIRD_PARTY_NOTICES.md"
@@ -178,6 +181,103 @@ def _vehicle_pack_state() -> dict[str, Any]:
     }
 
 
+def _brand_state() -> dict[str, Any]:
+    manifest = _load_json(BRAND_MANIFEST_PATH)
+    overlay = _load_json(TAURI_OVERLAY_PATH)
+    assets = manifest.get("assets")
+    derivatives = manifest.get("derivation", {}).get("assets")
+    if not isinstance(assets, list) or not isinstance(derivatives, list):
+        raise LabYellowReadinessError("Lab brand source or derivative assets are missing")
+
+    refs = []
+    for entry in [*assets, *derivatives]:
+        if not isinstance(entry, dict):
+            raise LabYellowReadinessError("Lab brand asset entry must be an object")
+        repository_path = entry.get("repositoryPath")
+        expected_sha256 = entry.get("repositorySha256", entry.get("sha256"))
+        if not isinstance(repository_path, str) or not isinstance(expected_sha256, str):
+            raise LabYellowReadinessError("Lab brand asset binding is incomplete")
+        path = ROOT / repository_path
+        refs.append(
+            {
+                "path": repository_path,
+                "sha256": _sha256_file(path),
+                "matchesManifest": _sha256_file(path) == expected_sha256,
+            }
+        )
+
+    expected_icons = [
+        f"../../{entry['repositoryPath']}"
+        for entry in derivatives
+        if isinstance(entry, dict)
+    ]
+    integration = manifest.get("integration")
+    theme = manifest.get("theme")
+    ready = (
+        manifest.get("displayName") == "DroneDream · LAB"
+        and isinstance(theme, dict)
+        and theme.get("palette") == ["#A7E84A", "#20C77A", "#087E69"]
+        and theme.get("grantsHardwareAuthority") is False
+        and all(ref["matchesManifest"] for ref in refs)
+        and overlay.get("productName") == "DroneDream · LAB"
+        and overlay.get("bundle", {}).get("icon") == expected_icons
+        and isinstance(integration, dict)
+        and integration.get("application") == "applied-compile-time-lab-only"
+        and integration.get("installer") == "applied-lab-overlay-not-built"
+        and integration.get("shortcut") == "applied-through-lab-executable-icon-not-built"
+    )
+    return {
+        "sourceManifest": _file_ref(BRAND_MANIFEST_PATH),
+        "tauriOverlay": _file_ref(TAURI_OVERLAY_PATH),
+        "displayName": manifest.get("displayName"),
+        "palette": theme.get("palette") if isinstance(theme, dict) else None,
+        "grantsHardwareAuthority": (
+            theme.get("grantsHardwareAuthority") if isinstance(theme, dict) else None
+        ),
+        "assets": refs,
+        "readyForYellowBuild": ready,
+    }
+
+
+def _toolchain_state() -> dict[str, Any]:
+    rustc_path = shutil.which("rustc")
+    cargo_path = shutil.which("cargo")
+    rust_host = None
+    if rustc_path:
+        completed = subprocess.run(
+            [rustc_path, "-vV"],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        if completed.returncode == 0:
+            rust_host = next(
+                (
+                    line.removeprefix("host: ")
+                    for line in completed.stdout.splitlines()
+                    if line.startswith("host: ")
+                ),
+                None,
+            )
+
+    required_linker = "link.exe" if rust_host and rust_host.endswith("-msvc") else None
+    linker_path = shutil.which(required_linker) if required_linker else None
+    return {
+        "rustcAvailable": rustc_path is not None,
+        "cargoAvailable": cargo_path is not None,
+        "rustHost": rust_host,
+        "requiredLinker": required_linker,
+        "linkerAvailable": required_linker is None or linker_path is not None,
+        "linkerPath": linker_path,
+        "expectedCargoTargetDir": (
+            "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target"
+        ),
+        "tauriInvoked": False,
+        "nsisInvoked": False,
+    }
+
+
 def _safety_state(profile: dict[str, Any]) -> dict[str, Any]:
     gate = _load_json(GATE_POLICY_PATH)
     safety = profile["safetyPolicy"]
@@ -198,7 +298,11 @@ def _safety_state(profile: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def evaluate_readiness(*, require_clean: bool = True) -> dict[str, Any]:
+def evaluate_readiness(
+    *,
+    require_clean: bool = True,
+    toolchain_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Return the Lab YELLOW build request readiness audit as JSON data."""
 
     profile = _load_json(PROFILE_PATH)
@@ -207,6 +311,8 @@ def evaluate_readiness(*, require_clean: bool = True) -> dict[str, Any]:
     common_core = _common_core_binding()
     supabase = _supabase_public_config_source()
     vehicle_packs = _vehicle_pack_state()
+    brand = _brand_state()
+    toolchain = toolchain_state if toolchain_state is not None else _toolchain_state()
     safety = _safety_state(profile)
     profile_result = profile_verifier.verify_lab_preview_contract()
 
@@ -227,6 +333,14 @@ def evaluate_readiness(*, require_clean: bool = True) -> dict[str, Any]:
         request_blockers.append("validated Vehicle Pack count drifted from zero")
     if safety["zeroValidatedPackDecision"] != "deny":
         request_blockers.append("zero-validated-pack hardware decision is not deny")
+    if not brand["readyForYellowBuild"]:
+        request_blockers.append("Lab brand source, application, or installer binding drifted")
+    if not toolchain.get("rustcAvailable") or not toolchain.get("cargoAvailable"):
+        request_blockers.append("Rust compiler or Cargo is unavailable")
+    if not toolchain.get("linkerAvailable"):
+        request_blockers.append(
+            f"required Rust host linker is unavailable: {toolchain.get('requiredLinker')}"
+        )
 
     post_build_blockers = [
         "No Lab preview EXE has been built by this GREEN audit.",
@@ -253,6 +367,8 @@ def evaluate_readiness(*, require_clean: bool = True) -> dict[str, Any]:
             "validationTier": manifest["validationTier"],
         },
         "profile": {"file": _file_ref(PROFILE_PATH), "verified": profile_result},
+        "brand": brand,
+        "toolchain": toolchain,
         "workspaceContract": profile["workspaces"],
         "publicSupabaseClientConfigSource": supabase,
         "licenseNotice": _file_ref(NOTICE_PATH),

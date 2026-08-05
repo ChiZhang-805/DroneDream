@@ -221,7 +221,20 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertTrue(all(value is False for value in result["sideEffects"].values()))
 
     def test_lab_yellow_readiness_audit_is_read_only_and_requestable(self) -> None:
-        result = lab_readiness.evaluate_readiness(require_clean=False)
+        result = lab_readiness.evaluate_readiness(
+            require_clean=False,
+            toolchain_state={
+                "rustcAvailable": True,
+                "cargoAvailable": True,
+                "rustHost": "x86_64-pc-windows-msvc",
+                "requiredLinker": "link.exe",
+                "linkerAvailable": True,
+                "linkerPath": "fixture/link.exe",
+                "expectedCargoTargetDir": "fixture/lab-cargo-target",
+                "tauriInvoked": False,
+                "nsisInvoked": False,
+            },
+        )
         self.assertEqual(result["kind"], "dronedream-lab-yellow-readiness-audit")
         self.assertTrue(result["yellowBuildRequest"]["requestable"])
         self.assertEqual(
@@ -239,7 +252,32 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertEqual(result["vehiclePacks"]["validatedPackCount"], 0)
         self.assertEqual(result["safety"]["hardwareActionDecisionAtZeroValidatedPacks"], "deny")
         self.assertFalse(result["postBuildAcceptance"]["installableNow"])
+        self.assertTrue(result["brand"]["readyForYellowBuild"])
+        self.assertFalse(result["brand"]["grantsHardwareAuthority"])
         self.assertTrue(all(value is False for value in result["sideEffects"].values()))
+
+    def test_lab_yellow_readiness_blocks_when_required_linker_is_missing(self) -> None:
+        result = lab_readiness.evaluate_readiness(
+            require_clean=False,
+            toolchain_state={
+                "rustcAvailable": True,
+                "cargoAvailable": True,
+                "rustHost": "x86_64-pc-windows-msvc",
+                "requiredLinker": "link.exe",
+                "linkerAvailable": False,
+                "linkerPath": None,
+                "expectedCargoTargetDir": "fixture/lab-cargo-target",
+                "tauriInvoked": False,
+                "nsisInvoked": False,
+            },
+        )
+        self.assertFalse(result["yellowBuildRequest"]["requestable"])
+        self.assertIn(
+            "required Rust host linker is unavailable: link.exe",
+            result["yellowBuildRequest"]["requestBlockers"],
+        )
+        self.assertFalse(result["toolchain"]["tauriInvoked"])
+        self.assertFalse(result["toolchain"]["nsisInvoked"])
 
 
 if __name__ == "__main__":
