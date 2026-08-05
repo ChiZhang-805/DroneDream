@@ -6,6 +6,9 @@
   "scripts": {
     "frontend:dev": "npm --prefix ../frontend run dev",
     "frontend:build": "node scripts/verify-browser-auth-config.mjs && npm --prefix ../frontend run build",
+    "frontend:field-dev": "npm --prefix ../frontend run field:dev",
+    "frontend:field-build": "npm --prefix ../frontend run field:build",
+    "frontend:field-build-gated": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-field-preview-build-authorization.ps1 && npm run frontend:field-build",
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",

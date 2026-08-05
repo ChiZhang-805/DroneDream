@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream · FIELD",
+  "version": "1.0.0",
+  "identifier": "io.dronedream.desktop.field",
+  "build": {
+    "beforeDevCommand": "npm run frontend:field-dev",
+    "beforeBuildCommand": "npm run frontend:field-build-gated",
+    "devUrl": "http://127.0.0.1:5174/field.html",
+    "frontendDist": "../../frontend/field-dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream · FIELD",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 390,
+        "minHeight": 620,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": false,
+    "targets": ["nsis"],
+    "publisher": "DroneDream",
+    "shortDescription": "Fail-closed field readiness for supported aircraft",
+    "longDescription": "DroneDream · FIELD provides read-only device observation, compatibility review, parameter recovery planning, and preflight safety status. Hardware control remains unavailable until native safety contracts are satisfied."
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
