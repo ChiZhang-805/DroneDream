@@ -27,8 +27,10 @@ REQUIRED_PAYLOAD_RESOURCES = (
     "distribution/editions/field.v1.json",
     "distribution/safety/edition-execution-gate.v1.json",
     "distribution/schemas/edition-execution-authorization.schema.json",
+    "distribution/schemas/field-lifecycle-contract.schema.json",
     "distribution/schemas/field-prerelease-audit.schema.json",
     "distribution/tools/edition_safety_contract.py",
+    "distribution/tools/field_lifecycle_contract.py",
     "distribution/tools/field_prerelease_audit.py",
     "distribution/vehicle-packs/registry.v1.json",
 )

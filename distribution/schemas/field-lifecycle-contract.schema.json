@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/field-lifecycle-contract.v1.json",
+  "title": "DroneDream Field lifecycle refusal contract",
+  "oneOf": [
+    {"$ref": "#/$defs/lifecycleContract"},
+    {"$ref": "#/$defs/lifecycleReceipt"}
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "localizedMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "zh-CN"],
+      "properties": {
+        "en": {"$ref": "#/$defs/messageBody"},
+        "zh-CN": {"$ref": "#/$defs/messageBody"}
+      }
+    },
+    "messageBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "body", "primaryActionLabel", "screenReaderSummary"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1, "maxLength": 128},
+        "body": {"type": "string", "minLength": 1, "maxLength": 256},
+        "primaryActionLabel": {"type": "string", "minLength": 1, "maxLength": 64},
+        "screenReaderSummary": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commonCoreCommit",
+        "commonCoreHash",
+        "fieldManifestSha256",
+        "capabilityPolicySha256",
+        "executionGatePolicySha256"
+      ],
+      "properties": {
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreHash": {"$ref": "#/$defs/sha256"},
+        "fieldManifestSha256": {"$ref": "#/$defs/sha256"},
+        "capabilityPolicySha256": {"$ref": "#/$defs/sha256"},
+        "executionGatePolicySha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifactPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expectedBaseName",
+        "exeBuilt",
+        "exeInstalled",
+        "unsignedPreviewAllowedOnlyWhenExplicit",
+        "signatureMayBeClaimed"
+      ],
+      "properties": {
+        "expectedBaseName": {"const": "DroneDream-Field-1.0.0.exe"},
+        "exeBuilt": {"const": false},
+        "exeInstalled": {"const": false},
+        "unsignedPreviewAllowedOnlyWhenExplicit": {"const": true},
+        "signatureMayBeClaimed": {"const": false}
+      }
+    },
+    "lifecycleScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioId",
+        "state",
+        "expectedArtifactBaseName",
+        "installerBuilt",
+        "installerInstalled",
+        "writesFilesystemOutsidePlan",
+        "requiresRollbackReceipt",
+        "decision",
+        "reasonCodes",
+        "localizedMessage"
+      ],
+      "properties": {
+        "scenarioId": {"enum": ["fresh-install", "upgrade", "uninstall", "rollback"]},
+        "state": {"const": "planned-not-executed"},
+        "expectedArtifactBaseName": {"const": "DroneDream-Field-1.0.0.exe"},
+        "installerBuilt": {"const": false},
+        "installerInstalled": {"const": false},
+        "writesFilesystemOutsidePlan": {"const": false},
+        "requiresRollbackReceipt": {"type": "boolean"},
+        "decision": {"const": "deny"},
+        "reasonCodes": {
+          "type": "array",
+          "minItems": 1,
+          "contains": {"const": "field.lifecycle.plan-only"},
+          "items": {"type": "string", "minLength": 1}
+        },
+        "localizedMessage": {"$ref": "#/$defs/localizedMessage"}
+      }
+    },
+    "refusalScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarioId",
+        "action",
+        "decision",
+        "frontendIsAuthority",
+        "requiresValidatedSignedPack",
+        "requiresThreeLayerQuorum",
+        "reasonCodes",
+        "localizedMessage"
+      ],
+      "properties": {
+        "scenarioId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "action": {
+          "enum": [
+            "hardware.parameter.write",
+            "hardware.unlock",
+            "hardware.arm",
+            "hardware.flight",
+            "hardware.discover"
+          ]
+        },
+        "decision": {"const": "deny"},
+        "frontendIsAuthority": {"const": false},
+        "requiresValidatedSignedPack": {"const": true},
+        "requiresThreeLayerQuorum": {"const": true},
+        "reasonCodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "localizedMessage": {"$ref": "#/$defs/localizedMessage"}
+      }
+    },
+    "lifecycleContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "editionId",
+        "source",
+        "artifactPolicy",
+        "lifecycleScenarios",
+        "refusalScenarios",
+        "accessibilityPolicy",
+        "contractSha256"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-lifecycle-refusal-contract"},
+        "editionId": {"const": "field"},
+        "source": {"$ref": "#/$defs/sourceBinding"},
+        "artifactPolicy": {"$ref": "#/$defs/artifactPolicy"},
+        "lifecycleScenarios": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {"$ref": "#/$defs/lifecycleScenario"}
+        },
+        "refusalScenarios": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {"$ref": "#/$defs/refusalScenario"}
+        },
+        "accessibilityPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "localizedLanguages",
+            "screenReaderSummaryRequired",
+            "keyboardAccessibleReviewActionRequired"
+          ],
+          "properties": {
+            "localizedLanguages": {
+              "type": "array",
+              "prefixItems": [{"const": "en"}, {"const": "zh-CN"}],
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "screenReaderSummaryRequired": {"const": true},
+            "keyboardAccessibleReviewActionRequired": {"const": true}
+          }
+        },
+        "contractSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "lifecycleReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "editionId",
+        "decision",
+        "contractSha256",
+        "source",
+        "artifactPolicy",
+        "scenarioCounts",
+        "reasonCodes",
+        "receiptSha256"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-lifecycle-refusal-receipt"},
+        "editionId": {"const": "field"},
+        "decision": {"const": "deny"},
+        "contractSha256": {"$ref": "#/$defs/sha256"},
+        "source": {"$ref": "#/$defs/sourceBinding"},
+        "artifactPolicy": {"$ref": "#/$defs/artifactPolicy"},
+        "scenarioCounts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lifecycle", "refusal"],
+          "properties": {
+            "lifecycle": {"const": 4},
+            "refusal": {"const": 6}
+          }
+        },
+        "reasonCodes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
