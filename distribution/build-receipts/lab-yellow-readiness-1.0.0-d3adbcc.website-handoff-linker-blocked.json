@@ -1,0 +1,295 @@
+{
+  "auditMode": "green-read-only",
+  "brand": {
+    "assets": [
+      {
+        "matchesManifest": true,
+        "path": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
+        "sha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806"
+      },
+      {
+        "matchesManifest": true,
+        "path": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+        "sha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+      },
+      {
+        "matchesManifest": true,
+        "path": "brand/generated/lab/windows/32x32.png",
+        "sha256": "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc"
+      },
+      {
+        "matchesManifest": true,
+        "path": "brand/generated/lab/windows/128x128.png",
+        "sha256": "4dc38efa82202dc8674b1e4ed782447a041e2e8793c7615ff164501248a3b485"
+      },
+      {
+        "matchesManifest": true,
+        "path": "brand/generated/lab/windows/128x128@2x.png",
+        "sha256": "b0a38390f2f58f6f873847e6a52ab07fe26945705a9940957a746970faabb0b1"
+      },
+      {
+        "matchesManifest": true,
+        "path": "brand/generated/lab/windows/icon.ico",
+        "sha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
+      }
+    ],
+    "canonicalDonor": {
+      "commit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+      "file": {
+        "path": "brand/brand-editions.v1.json",
+        "sha256": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc"
+      },
+      "integrated": true
+    },
+    "displayName": "DroneDream · LAB",
+    "grantsHardwareAuthority": false,
+    "palette": [
+      "#A7E84A",
+      "#20C77A",
+      "#087E69"
+    ],
+    "readyForYellowBuild": true,
+    "sourceManifest": {
+      "path": "distribution/editions/lab/brand-source-manifest.v1.json",
+      "sha256": "31e844c46973c0784f892829002c0d3672074bfd291884ed90d39d3d227a3415"
+    },
+    "tauriOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "sha256": "53d62bc0584d10b1d64d8b96549206c592302d20c586ae51a58650905eed768c"
+    }
+  },
+  "buildArtifactFileName": "DroneDream-Lab-1.0.0.exe",
+  "commonCore": {
+    "authorityBranch": "codex/software",
+    "authorityName": "Universal/Core",
+    "commonCorePaths": [
+      "backend",
+      "desktop",
+      "engine-pack",
+      "frontend",
+      "runtime",
+      "worker"
+    ],
+    "excludedSimPreviewEvidenceCommit": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571",
+    "excludedSimPreviewEvidenceHash": "c6bdfdb9723cacf8c402acf9a6200e7f9dda37d75af50e9b8fe308f8aceb41bb",
+    "observedOriginHeadIsProductSource": false,
+    "observedOriginSoftwareHead": "9d90fc7dbb5dcca38c849b4744902c8d1a628b17",
+    "productCommonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "productSourceExists": true,
+    "productSourceIsAncestorOfLabHead": true,
+    "sameCommonCoreInventoryAsExcludedEvidence": false
+  },
+  "editionId": "lab",
+  "kind": "dronedream-lab-yellow-readiness-audit",
+  "labManifest": {
+    "description": {
+      "en": "Unified simulation, HITL, and real-hardware laboratory workflows behind native, runtime, and backend safety fences.",
+      "zh-CN": "统一提供仿真、HITL 与真机实验，但所有真机能力都必须通过 native、Runtime 与后端三层安全门。"
+    },
+    "displayName": {
+      "en": "DroneDream · LAB",
+      "zh-CN": "DroneDream · LAB"
+    },
+    "file": {
+      "path": "distribution/editions/lab.v1.json",
+      "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+    },
+    "implementationStatus": "contract-only",
+    "validationTier": "contract-only"
+  },
+  "licenseNotice": {
+    "path": "runtime/THIRD_PARTY_NOTICES.md",
+    "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+  },
+  "postBuildAcceptance": {
+    "blockers": [
+      "No Lab preview EXE has been built by this GREEN audit.",
+      "No real Lab artifact receipt exists for installation acceptance.",
+      "Lab preview remains unsigned internal-test material until YELLOW build evidence exists.",
+      "There are zero validated Vehicle Packs; hardware write, arm, HITL, and flight stay denied.",
+      "No codex/release-lab branch or production promotion is authorized by this audit.",
+      "Website remains awaiting-exact-handoff until artifact, validation, publication, and cross-Edition evidence are complete."
+    ],
+    "installableNow": false
+  },
+  "productDisplayVersion": "1.0.0",
+  "profile": {
+    "file": {
+      "path": "distribution/build-profiles/lab-preview.v1.json",
+      "sha256": "f513de61f670ce9eef227f2af160a38b30725534627cc991207495f50fc88667"
+    },
+    "verified": {
+      "artifactFileName": "DroneDream-Lab-1.0.0.exe",
+      "overlay": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "profile": "distribution/build-profiles/lab-preview.v1.json",
+      "script": "desktop/scripts/build-lab-preview.ps1"
+    }
+  },
+  "publicSupabaseClientConfigSource": {
+    "actualEnvironmentRead": false,
+    "clientSource": {
+      "path": "frontend/src/features/auth/supabaseClient.ts",
+      "sha256": "7f8603c6a73edff9272a2a48e02ed5392ae798857a47a2c3a3aaf295be643ed1"
+    },
+    "desktopVerifier": {
+      "path": "desktop/scripts/verify-browser-auth-config.mjs",
+      "sha256": "ff292c28141cc199a71c27b5328061163b3e65235f2923a52ec44e8563a36852"
+    },
+    "desktopVerifierRejectsServiceRole": true,
+    "envExample": {
+      "path": "frontend/.env.example",
+      "sha256": "50fe75b23a929a36beeaea8ea6f622aa7306362b7a31fc4e8b7963812e04fa99"
+    },
+    "envExampleLeavesPublicValuesBlank": true,
+    "secretMaterialRequiredForAudit": false,
+    "sourceUsesVitePublicEnv": true
+  },
+  "safety": {
+    "executionGatePolicy": {
+      "path": "distribution/safety/edition-execution-gate.v1.json",
+      "sha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456"
+    },
+    "frontendAcceptedAsAuthority": false,
+    "hardwareActionDecisionAtZeroValidatedPacks": "deny",
+    "hardwareActions": [
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl.execute"
+    ],
+    "hardwareActionsRequireValidatedSignedPack": true,
+    "preinstallDecision": "blocked",
+    "preinstallSideEffects": {
+      "buildExe": false,
+      "createReleaseBranch": false,
+      "hardwareProbe": false,
+      "install": false,
+      "px4Gazebo": false,
+      "readSecrets": false
+    },
+    "profileSafetyPolicy": {
+      "hardwareActionsFailClosedUntilValidatedPackAndQuorum": [
+        "hardware.parameter.write",
+        "hardware.arm",
+        "hardware.flight",
+        "hardware.hitl.execute"
+      ],
+      "requiredDecisionLayers": [
+        "native",
+        "backend",
+        "runtime"
+      ],
+      "uiCanAuthorizeHardwareAction": false,
+      "uiCanDisplayAndConfigureHardwareWorkflow": true,
+      "validatedVehiclePackCount": 0
+    },
+    "quorumRequiredLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "zeroValidatedPackDecision": "deny"
+  },
+  "schemaVersion": 1,
+  "sideEffects": {
+    "createReleaseBranch": false,
+    "hardwareProbe": false,
+    "install": false,
+    "nsis": false,
+    "px4Gazebo": false,
+    "readApiKey": false,
+    "readProviderSecrets": false,
+    "tauri": false
+  },
+  "source": {
+    "branch": "codex/software-lab",
+    "head": "d3adbcce59ba08113599b6ac6d772cb32394c30d",
+    "statusPorcelain": "",
+    "upstream": "origin/codex/software-lab"
+  },
+  "toolchain": {
+    "cargoAvailable": true,
+    "expectedCargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target",
+    "linkerAvailable": false,
+    "linkerPath": null,
+    "nsisInvoked": false,
+    "requiredLinker": "link.exe",
+    "rustHost": "x86_64-pc-windows-msvc",
+    "rustcAvailable": true,
+    "tauriInvoked": false
+  },
+  "vehiclePacks": {
+    "registry": {
+      "path": "distribution/vehicle-packs/registry.v1.json",
+      "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"
+    },
+    "selectedLabPackId": "holybro-s500-v2-pixhawk6c",
+    "selectedLabPackValidationStatus": "contract-only",
+    "selectedLabPackValidationTier": "contract-only",
+    "totalPacks": 8,
+    "validatedPackCount": 0,
+    "validatedPacks": []
+  },
+  "websiteExactExeHandoff": {
+    "file": {
+      "path": "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json",
+      "sha256": "9b2c0e09256fc750eedff4367620f0fd92e75a975418abb9e5c81ec3fcc2580a"
+    },
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "receiverEvidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+    "receiverSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "releaseReady": false,
+    "state": "awaiting-exact-handoff"
+  },
+  "workspaceContract": {
+    "hardwareLab": {
+      "allowedActions": [
+        "hardware.discover",
+        "hardware.parameter.read",
+        "hardware.preflight.execute",
+        "hardware.emergency-stop"
+      ],
+      "authority": "ui-workflow-only",
+      "countsTowardNativeBackendRuntimeAuthority": false,
+      "deniedHardwareActions": [
+        "hardware.parameter.write",
+        "hardware.arm",
+        "hardware.flight",
+        "hardware.hitl.execute"
+      ],
+      "displayName": "Hardware Lab Workspace",
+      "switchEffect": "changes interface and workflow only",
+      "workspaceId": "hardware-lab"
+    },
+    "simulation": {
+      "allowedActions": [
+        "qualification.simulation.issue",
+        "simulation.execute",
+        "simulation.parameter.write",
+        "simulation.vehicle.arm"
+      ],
+      "authority": "ui-workflow-only",
+      "countsTowardNativeBackendRuntimeAuthority": false,
+      "deniedHardwareActions": [
+        "hardware.parameter.write",
+        "hardware.arm",
+        "hardware.flight",
+        "hardware.hitl.execute"
+      ],
+      "displayName": "Simulation Workspace",
+      "switchEffect": "changes interface and workflow only",
+      "workspaceId": "simulation"
+    }
+  },
+  "yellowBuildRequest": {
+    "classification": "YELLOW",
+    "expectedReceiptKind": "dronedream-lab-preview-artifact-receipt",
+    "requestBlockers": [
+      "required Rust host linker is unavailable: link.exe"
+    ],
+    "requestable": false,
+    "requestedCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop\\scripts\\build-lab-preview.ps1 -Build",
+    "requiresControllerApprovalBeforeBuild": true
+  }
+}

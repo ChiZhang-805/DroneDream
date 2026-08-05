@@ -22,6 +22,12 @@ READINESS_RECEIPT = (
     / "build-receipts"
     / "lab-yellow-readiness-1.0.0-8654d44.brand-linker-blocked.json"
 )
+WEBSITE_HANDOFF_READINESS_RECEIPT = (
+    ROOT
+    / "distribution"
+    / "build-receipts"
+    / "lab-yellow-readiness-1.0.0-d3adbcc.website-handoff-linker-blocked.json"
+)
 TOOLS = ROOT / "distribution" / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
@@ -316,6 +322,39 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertFalse(receipt["postBuildAcceptance"]["executableExists"])
         self.assertEqual(receipt["postBuildAcceptance"]["validatedVehiclePackCount"], 0)
         self.assertEqual(receipt["postBuildAcceptance"]["hardwareActionDecision"], "deny")
+        self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
+
+    def test_website_handoff_readiness_receipt_preserves_awaiting_state(self) -> None:
+        receipt = json.loads(
+            WEBSITE_HANDOFF_READINESS_RECEIPT.read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            receipt["source"]["head"],
+            "d3adbcce59ba08113599b6ac6d772cb32394c30d",
+        )
+        self.assertEqual(
+            receipt["websiteExactExeHandoff"]["receiverSourceCommit"],
+            "afdcdee5b60883290c9d1cc0c036141920066659",
+        )
+        self.assertEqual(
+            receipt["websiteExactExeHandoff"]["receiverEvidenceCommit"],
+            "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+        )
+        self.assertEqual(
+            receipt["websiteExactExeHandoff"]["fileName"],
+            "DroneDream-Lab-1.0.0.exe",
+        )
+        self.assertEqual(
+            receipt["websiteExactExeHandoff"]["state"],
+            "awaiting-exact-handoff",
+        )
+        self.assertFalse(receipt["websiteExactExeHandoff"]["releaseReady"])
+        self.assertEqual(
+            receipt["yellowBuildRequest"]["requestBlockers"],
+            ["required Rust host linker is unavailable: link.exe"],
+        )
+        self.assertFalse(receipt["toolchain"]["tauriInvoked"])
+        self.assertFalse(receipt["toolchain"]["nsisInvoked"])
         self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
 
 
