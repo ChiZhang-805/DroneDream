@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-brand-green-receipt",
+  "classification": "GREEN",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "state": "branded-source-and-static-installer",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "f33af86751c3e7c52234471617723171f7103e1c",
+    "clean": true
+  },
+  "commonCore": {
+    "authority": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9"
+  },
+  "brand": {
+    "displayName": "DroneDream · LAB",
+    "palette": ["#A7E84A", "#20C77A", "#087E69"],
+    "grantsHardwareAuthority": false,
+    "donorBinding": {
+      "kind": "controller-approved-exact-byte-source-directory",
+      "gitCommit": null,
+      "sourceRoot": "Z:/DroneDream/work/brand-edition-concepts-v1",
+      "handoffFilename": "BRAND_EDITION_HANDOFF_V2.md",
+      "handoffBytes": 2958,
+      "handoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
+    },
+    "sourceManifest": {
+      "path": "distribution/editions/lab/brand-source-manifest.v1.json",
+      "bytes": 3451,
+      "sha256": "1b6a43b561037669586eff519264f783ef2f4216a80babe266e33acb4d6aa8ee"
+    },
+    "exactByteAssets": [
+      {
+        "role": "mark",
+        "path": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
+        "bytes": 98418,
+        "sha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806"
+      },
+      {
+        "role": "dot-lockup",
+        "path": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+        "bytes": 98556,
+        "sha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+      }
+    ],
+    "derivativeGenerator": {
+      "path": "distribution/editions/lab/build-brand-derivatives.py",
+      "bytes": 1429,
+      "sha256": "52a03c8fbd775cb841b127503143eeebaa61f13b2c7144780c55a506110cc9a3",
+      "operation": "rgba-lanczos-resize-and-ico-container-only",
+      "designChanges": false,
+      "repeatRunDeterministic": true
+    }
+  },
+  "application": {
+    "editionGate": "VITE_DRONEDREAM_EDITION=lab",
+    "fixedNameVisible": true,
+    "approvedDotLockupLoaded": true,
+    "supersededLabPaletteFound": false,
+    "productionBuild": {
+      "result": "passed",
+      "transformedModules": 1991,
+      "distFileCount": 55,
+      "distBytes": 7191944,
+      "distInventorySha256": "fc45e9eee2ca1210d39cd2fc4bb277ba6f4a2dbac8eef9c4b69f974821420129",
+      "warning": "The existing main index chunk remains above the configured 510 kB warning threshold."
+    }
+  },
+  "visualVerification": {
+    "report": {
+      "path": "artifacts/test-runs/lab-ui-f33af86-branded/lab-ui-verification.json",
+      "bytes": 8224,
+      "sha256": "f87f76a37ece9122e068cae0a459b837fdcd1b36a292798e298b073b546a1b39"
+    },
+    "locales": ["en", "zh-CN"],
+    "viewports": [
+      {"width": 1440, "height": 1000},
+      {"width": 760, "height": 900},
+      {"width": 390, "height": 844}
+    ],
+    "caseCount": 6,
+    "surfacesPerCase": ["simulation", "hardware", "evidence", "safety"],
+    "screenshotCount": 24,
+    "screenshotBytes": 1694916,
+    "screenshotInventorySha256": "ebe17eb0200c81fea903e2ea51befcbfbcec9a03f4bca8f71a70e740974fffd7",
+    "horizontalOverflow": false,
+    "visibleTextClipping": false,
+    "keyboardArrowTabsPassed": true,
+    "ariaRolesPassed": true,
+    "manualRepresentativeReviewPassed": true
+  },
+  "installerStructure": {
+    "productName": "DroneDream · LAB",
+    "overlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "bytes": 2011,
+      "sha256": "7e7ae5b7abd957e7c3946451703973e3a61ecb18127852d38d1b6077262d2ef5"
+    },
+    "windowsIconSha256": "4dcdd9792a810226cf898a0f85a67ee4d45dd2a1424eb46d8b1c5caae007424d",
+    "universalBaseIconUnchangedSha256": "e2b4f1ac3e48f6e49e78c86e4a805ed4cfdb15f9f0bfff458c41e5fbe2c26a53",
+    "tauriCliVersion": "2.11.4",
+    "staticNsisTemplateVerification": "passed",
+    "installerIconBinding": "configured-not-built",
+    "startMenuShortcutIconBinding": "through-lab-executable-icon-not-built",
+    "desktopShortcutIconBinding": "through-lab-executable-icon-not-built",
+    "generatedNsiVerified": false,
+    "executableExists": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "frontendIsAuthority": false,
+    "visualThemeIsAuthority": false,
+    "requiredQuorum": ["native", "backend", "runtime"],
+    "hardwareActionDecision": "deny",
+    "deniedHardwareActions": [
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl.execute"
+    ]
+  },
+  "tests": {
+    "labFrontendFocused": {"files": 5, "tests": 24, "result": "passed"},
+    "brandAndPreviewContracts": {"tests": 19, "result": "passed"},
+    "distribution": {"tests": 139, "result": "passed"},
+    "frontendTypecheck": "passed",
+    "frontendLint": "passed",
+    "frontendProductionBuild": "passed",
+    "nsisTemplateStatic": "passed",
+    "fullFrontend": {
+      "passed": 474,
+      "failed": 1,
+      "failure": "Existing PublicSite billing availability mock observed only /downloads/latest.json; no Lab-owned patch was applied."
+    }
+  },
+  "sideEffects": {
+    "tauriBuild": false,
+    "nsisBuild": false,
+    "install": false,
+    "runtimeMigration": false,
+    "px4Gazebo": false,
+    "hardwareProbe": false,
+    "providerCall": false,
+    "apiKeyRead": false,
+    "releaseBranchCreated": false,
+    "uploadOrDeploy": false
+  },
+  "remainingGates": [
+    "No DroneDream-Lab-1.0.0.exe exists; the one authorized build attempt remains failed before NSIS.",
+    "A second Tauri/NSIS build requires a new YELLOW authorization and a resolved Rust linker target.",
+    "Generated NSIS locale, install, uninstall, overlay, rollback, PX4/Gazebo, and real-hardware acceptance remain unexecuted.",
+    "All eight Vehicle Packs remain planned or contract-only; hardware execution remains denied.",
+    "The existing PublicSite billing availability mock failure requires a minimal fix in Universal, not a Lab fork."
+  ]
+}

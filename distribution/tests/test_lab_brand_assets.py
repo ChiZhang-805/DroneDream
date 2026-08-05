@@ -12,6 +12,9 @@ MANIFEST_PATH = (
     ROOT / "distribution" / "editions" / "lab" / "brand-source-manifest.v1.json"
 )
 TAURI_OVERLAY_PATH = ROOT / "desktop" / "src-tauri" / "tauri.lab-preview.conf.json"
+GREEN_RECEIPT_PATH = (
+    ROOT / "distribution" / "build-receipts" / "lab-brand-1.0.0-f33af86.green.json"
+)
 
 EXPECTED_ASSETS = {
     "mark": {
@@ -189,6 +192,43 @@ class LabBrandAssetTests(unittest.TestCase):
             hashlib.sha256(base_icon.read_bytes()).hexdigest(),
             expected_by_path["distribution/editions/lab/assets/desktop/icon.ico"],
         )
+
+    def test_green_receipt_binds_branded_source_without_claiming_an_exe(self) -> None:
+        receipt = json.loads(GREEN_RECEIPT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(receipt["state"], "branded-source-and-static-installer")
+        self.assertEqual(
+            receipt["source"]["commit"],
+            "f33af86751c3e7c52234471617723171f7103e1c",
+        )
+        self.assertEqual(receipt["brand"]["displayName"], "DroneDream · LAB")
+        self.assertFalse(receipt["brand"]["grantsHardwareAuthority"])
+        self.assertIsNone(receipt["brand"]["donorBinding"]["gitCommit"])
+        self.assertEqual(
+            receipt["brand"]["donorBinding"]["kind"],
+            "controller-approved-exact-byte-source-directory",
+        )
+
+        report_path = ROOT / receipt["visualVerification"]["report"]["path"]
+        report_bytes = report_path.read_bytes()
+        self.assertEqual(len(report_bytes), receipt["visualVerification"]["report"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(report_bytes).hexdigest(),
+            receipt["visualVerification"]["report"]["sha256"],
+        )
+        report = json.loads(report_bytes.decode("utf-8"))
+        self.assertEqual(report["sourceCommit"], receipt["source"]["commit"])
+        self.assertEqual(report["sourceStatus"], "clean")
+        self.assertEqual(len(report["screenshots"]), 24)
+        self.assertTrue(report["brand"]["applicationLockupLoaded"])
+        self.assertFalse(report["brand"]["grantsHardwareAuthority"])
+
+        self.assertFalse(receipt["installerStructure"]["generatedNsiVerified"])
+        self.assertFalse(receipt["installerStructure"]["executableExists"])
+        self.assertEqual(receipt["safety"]["validatedVehiclePackCount"], 0)
+        self.assertFalse(receipt["safety"]["frontendIsAuthority"])
+        self.assertFalse(receipt["safety"]["visualThemeIsAuthority"])
+        self.assertEqual(receipt["safety"]["hardwareActionDecision"], "deny")
+        self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
 
 
 if __name__ == "__main__":
