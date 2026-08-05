@@ -68,13 +68,20 @@ class EditionBuildPlannerTests(unittest.TestCase):
         plan = self.create()
         self.assertEqual(plan["state"], "plan-only")
         self.assertEqual(plan["source"]["commit"], self.source_commit)
+        self.assertEqual(plan["source"]["commonCoreCommit"], self.source_commit)
         self.assertEqual(plan["source"]["commonCoreHash"], self.core_hash)
         self.assertEqual(
             {item["editionId"] for item in plan["editions"]},
             {"sim", "lab", "field"},
         )
         self.assertTrue(
-            all(item["commonCoreHash"] == self.core_hash for item in plan["editions"])
+            all(
+                item["commonCoreCommit"] == self.source_commit
+                and item["commonCoreHash"] == self.core_hash
+                and item["promotion"]["commonCoreCommit"] == self.source_commit
+                and item["promotion"]["commonCoreHash"] == self.core_hash
+                for item in plan["editions"]
+            )
         )
         self.assertTrue(
             all(item["artifact"]["state"] == "planned-not-built" for item in plan["editions"])
@@ -189,6 +196,11 @@ class EditionBuildPlannerTests(unittest.TestCase):
                 "common-core",
                 lambda plan: plan["source"].update({"commonCoreHash": "0" * 64}),
                 "source",
+            ),
+            (
+                "common-core-commit",
+                lambda plan: plan["editions"][0].update({"commonCoreCommit": "a" * 40}),
+                "editions",
             ),
             (
                 "policy",

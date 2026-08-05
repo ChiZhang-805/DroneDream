@@ -20,18 +20,16 @@ from pathlib import Path, PurePosixPath
 from types import ModuleType
 from typing import Any
 
-RUNTIME_DISTRIBUTION_PATHS = (
+RUNTIME_CONTRACT_REGISTRY_PATH = "distribution/runtime-contract-registry.v1.json"
+RUNTIME_DISTRIBUTION_BASE_PATHS = (
     "LICENSE",
     "runtime/THIRD_PARTY_NOTICES.md",
+    RUNTIME_CONTRACT_REGISTRY_PATH,
     "distribution/capabilities/core-capabilities.v1.json",
     "distribution/editions/field.v1.json",
     "distribution/editions/lab.v1.json",
     "distribution/editions/sim.v1.json",
     "distribution/safety/edition-execution-gate.v1.json",
-    "distribution/schemas/edition-execution-authorization.schema.json",
-    "distribution/schemas/edition-execution-gate-policy.schema.json",
-    "distribution/tools/distribution_contract.py",
-    "distribution/tools/edition_safety_contract.py",
     "distribution/upstream-sources.v1.json",
     "distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
     "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
@@ -48,6 +46,57 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 class RuntimeEditionSafetyError(RuntimeError):
     """Raised when no trustworthy Runtime decision can be produced."""
+
+
+def runtime_distribution_paths(active_engine_root: Path) -> tuple[str, ...]:
+    registry_path = active_engine_root / RUNTIME_CONTRACT_REGISTRY_PATH
+    if registry_path.is_symlink() or not registry_path.is_file():
+        raise RuntimeEditionSafetyError("Runtime contract registry must be an ordinary file")
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise RuntimeEditionSafetyError("Runtime contract registry could not be read") from error
+    if not isinstance(registry, dict) or set(registry) != {
+        "schemaVersion",
+        "kind",
+        "contractPaths",
+    }:
+        raise RuntimeEditionSafetyError("Runtime contract registry fields are invalid")
+    if (
+        registry["schemaVersion"] != 1
+        or registry["kind"] != "dronedream-runtime-contract-registry"
+    ):
+        raise RuntimeEditionSafetyError("Runtime contract registry identity is unsupported")
+    paths = registry["contractPaths"]
+    if (
+        not isinstance(paths, list)
+        or not paths
+        or any(not isinstance(path, str) for path in paths)
+        or paths != sorted(set(paths))
+    ):
+        raise RuntimeEditionSafetyError(
+            "Runtime contract registry paths must be unique and sorted"
+        )
+    allowed = re.compile(
+        r"^distribution/(?:schemas/[a-z0-9][a-z0-9.-]*\.schema\.json|tools/[a-z][a-z0-9_]*\.py)$"
+    )
+    root = active_engine_root.resolve()
+    for relative in paths:
+        if not allowed.fullmatch(relative):
+            raise RuntimeEditionSafetyError(
+                f"Runtime contract path is outside the allowlist: {relative}"
+            )
+        candidate = active_engine_root / relative
+        if (
+            candidate.is_symlink()
+            or not candidate.is_file()
+            or not candidate.resolve().is_relative_to(root)
+        ):
+            raise RuntimeEditionSafetyError(f"Runtime contract path is unavailable: {relative}")
+    combined = (*RUNTIME_DISTRIBUTION_BASE_PATHS, *paths)
+    if len(combined) != len(set(combined)):
+        raise RuntimeEditionSafetyError("Runtime distribution path registry contains duplicates")
+    return combined
 
 
 def _load_contract(active_engine_root: Path) -> ModuleType:
@@ -216,7 +265,12 @@ def _active_inventory_reasons(
     )
     if any(path.startswith(forbidden_prefixes) for path in records):
         reasons.append("runtime.engine-pack.planned-artifact-present")
-    for relative in RUNTIME_DISTRIBUTION_PATHS:
+    try:
+        distribution_paths = runtime_distribution_paths(observed.active_engine_root)
+    except RuntimeEditionSafetyError:
+        reasons.append("runtime.engine-pack.contract-registry-invalid")
+        return reasons
+    for relative in distribution_paths:
         record = records.get(relative)
         path = observed.active_engine_root / Path(relative)
         if (
@@ -531,9 +585,11 @@ def evaluate_runtime_authorization(
 
 
 __all__ = [
-    "RUNTIME_DISTRIBUTION_PATHS",
+    "RUNTIME_CONTRACT_REGISTRY_PATH",
+    "RUNTIME_DISTRIBUTION_BASE_PATHS",
     "RuntimeEditionSafetyError",
     "RuntimeLayerDecision",
     "RuntimeTrustedObservation",
     "evaluate_runtime_authorization",
+    "runtime_distribution_paths",
 ]

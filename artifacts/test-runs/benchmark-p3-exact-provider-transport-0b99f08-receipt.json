@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "dronedream.benchmark-provider-transport-receipt/v1",
+  "generatedAt": "2026-08-05T11:16:18.5981375Z",
+  "subjectCommit": "0b99f08e02043f064c45a71a04488b2458fc9454",
+  "evidenceBranch": "codex/software",
+  "resourceClass": "GREEN",
+  "scope": "Exact canonical provider request envelope and strict single-request Chat Completions transport",
+  "sourceFiles": [
+    {
+      "path": "backend/app/benchmarking/provider_execution_contract.py",
+      "bytes": 7649,
+      "sha256": "877efe42bc1c744ebb0e862849eeb7a67f9b06b7fa70d50b80016c14794d96ea"
+    },
+    {
+      "path": "backend/app/benchmarking/llm_durable_runtime.py",
+      "bytes": 25270,
+      "sha256": "dedcfe20597226be60cd4394761c1ef1b7e58f1b8480d0ce27db93920e25eef8"
+    },
+    {
+      "path": "backend/app/benchmarking/provider_transport.py",
+      "bytes": 3930,
+      "sha256": "429402fb6424c3c6fa12fc42f3f15c3e8ba4b75b9551dfdaa0394d8771a6c1e6"
+    },
+    {
+      "path": "backend/tests/test_benchmark_provider_transport.py",
+      "bytes": 6106,
+      "sha256": "4baf5c6830855dace58c4eeaf671174648a307a480e82cf5569375ee88e4167b"
+    },
+    {
+      "path": "backend/tests/test_benchmark_llm_durable_runtime.py",
+      "bytes": 35084,
+      "sha256": "0eef6bf335026ef1d7635c10a66b41a40c7d0a4d85ed701154e2b7ae53be4331"
+    }
+  ],
+  "verifiedContracts": {
+    "actualRequestEqualsAccountedCanonicalBody": true,
+    "providerSeedPreserved": true,
+    "sdkAutomaticRetries": 0,
+    "compatibilityFallbackRequests": 0,
+    "credentialPersistedOrLogged": false,
+    "missingUsageFabricated": false,
+    "llmDirectArmPromoted": false
+  },
+  "tests": [
+    {
+      "command": "python -m pytest -q backend/tests/test_benchmark_provider_transport.py backend/tests/test_benchmark_llm_durable_runtime.py",
+      "result": "34 passed",
+      "durationSeconds": 32.14
+    },
+    {
+      "command": "python -m pytest -q backend/tests/test_benchmark_campaign_contracts.py backend/tests/test_benchmark_job_runtime.py backend/tests/test_benchmark_llm_arm_contracts.py backend/tests/test_provider_request_accounting.py backend/tests/test_benchmark_pilot_readiness.py",
+      "result": "47 passed",
+      "durationSeconds": 58.47
+    },
+    {
+      "command": "python -m ruff check <five changed Python paths>",
+      "result": "pass"
+    },
+    {
+      "command": "python -m compileall -q <changed runtime and test paths>",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "knownResiduals": [
+    "llm_direct/v1 remains contract-only and blocked until JobSecret loading, dispatch routing, integration tests, and registry promotion are closed.",
+    "A scoped mypy run followed project imports and reported existing missing pyulog/boto3 stubs plus an existing coordinator.py argument-type warning; none was introduced in a changed path.",
+    "No real provider request, API key read, PX4/Gazebo execution, deployment, installer build, or Runtime migration occurred in this closure."
+  ]
+}

@@ -97,7 +97,9 @@ const commonCoreListing = execFileSync(
   ],
   { cwd: repoRoot },
 );
-const commonCoreHash = createHash("sha256").update(commonCoreListing).digest("hex");
+const commonCoreHash = createHash("sha256")
+  .update(commonCoreListing.toString("utf8").trim())
+  .digest("hex");
 const server = await createServer({
   configFile: path.join(frontendRoot, "vite.config.ts"),
   server: { host, port, strictPort: true },

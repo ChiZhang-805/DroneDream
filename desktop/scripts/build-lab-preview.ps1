@@ -55,7 +55,7 @@ if ($sourceStatus) {
     throw "Lab preview builds require an exact clean source tree."
 }
 
-$commonCoreCommit = "2aec69e88ee8844cff759a025f109e5b938d18c0"
+$commonCoreCommit = "e374d3f8d96b1265fcdb06864208b676566e94d9"
 $excludedPreviewEvidenceCommit = "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
 Invoke-GitText @("cat-file", "-e", "$commonCoreCommit^{commit}") | Out-Null
 Invoke-GitText @("cat-file", "-e", "$excludedPreviewEvidenceCommit^{commit}") | Out-Null
@@ -97,7 +97,7 @@ $coreListing = (& git -C $repoRoot ls-tree -r --full-tree $commonCoreCommit -- @
 if ($LASTEXITCODE -ne 0 -or -not $coreListing.Trim()) {
     throw "Unable to compute the Lab preview common-core hash."
 }
-$commonCoreHash = Get-Sha256Text $coreListing
+$commonCoreHash = Get-Sha256Text $coreListing.Trim()
 
 if (-not $Build) {
     Write-Host "Lab preview contract verified for $sourceCommit; no EXE was built. Pass -Build to create the unsigned internal preview."

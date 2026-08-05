@@ -41,7 +41,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
         common_core.get("authorityName") != "Universal/Core"
         or common_core.get("authorityBranch") != "codex/software"
         or common_core.get("simIsCommonAuthority") is not False
-        or common_core.get("productSourceCommit") != "2aec69e88ee8844cff759a025f109e5b938d18c0"
+        or common_core.get("productSourceCommit") != "e374d3f8d96b1265fcdb06864208b676566e94d9"
+        or common_core.get("productSourceHash")
+        != "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9"
         or common_core.get("excludedPreviewEvidenceCommit")
         != "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
         or common_core.get("hashSource")
@@ -196,7 +198,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'param(',
         '[switch]$Build',
         'status", "--porcelain=v1", "--untracked-files=all',
-        '$commonCoreCommit = "2aec69e88ee8844cff759a025f109e5b938d18c0"',
+        '$commonCoreCommit = "e374d3f8d96b1265fcdb06864208b676566e94d9"',
         '$excludedPreviewEvidenceCommit = "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"',
         'merge-base --is-ancestor $commonCoreCommit HEAD',
         'TAURI_SIGNING_PRIVATE_KEY_PATH',
@@ -212,6 +214,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'authenticode',
         'tauriUpdaterSignature = "not-issued"',
         'VITE_DRONEDREAM_EDITION = "lab"',
+        'Get-Sha256Text $coreListing.Trim()',
     )
     for fragment in required_script_fragments:
         if fragment not in script:

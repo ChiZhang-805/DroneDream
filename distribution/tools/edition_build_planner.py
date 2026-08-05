@@ -555,6 +555,7 @@ def create_build_plan(
                     "path": selection["editionManifestPath"],
                     "sha256": edition_shas[edition_id],
                 },
+                "commonCoreCommit": source_commit,
                 "commonCoreHash": observed_common_core_hash,
                 "componentIds": component_ids,
                 "vehiclePack": {
@@ -586,6 +587,7 @@ def create_build_plan(
                     "creationState": "planned-not-created",
                     "observedBranchHead": observed_release_heads[edition_id],
                     "sourceCommit": source_commit,
+                    "commonCoreCommit": source_commit,
                     "commonCoreHash": observed_common_core_hash,
                     "promotionManifestState": "planned-not-generated",
                     "prOnly": True,
@@ -651,6 +653,7 @@ def create_build_plan(
             "commit": source_commit,
             "treeState": "clean",
             "commonCorePaths": request["commonCorePaths"],
+            "commonCoreCommit": source_commit,
             "commonCoreHash": observed_common_core_hash,
         },
         "execution": {

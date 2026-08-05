@@ -57,7 +57,7 @@ def active_observation(
 ) -> gate.RuntimeTrustedObservation:
     active_root = tmp_path / "active-engine"
     records: list[dict[str, object]] = []
-    for relative in gate.RUNTIME_DISTRIBUTION_PATHS:
+    for relative in gate.runtime_distribution_paths(ROOT):
         source = ROOT / relative
         destination = active_root / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -197,6 +197,20 @@ def test_active_engine_signature_and_contract_file_tamper_are_denied(tmp_path: P
         "runtime.engine-pack.contract-file-size-mismatch",
         "runtime.engine-pack.contract-file-hash-mismatch",
     } <= set(result.reason_codes)
+
+
+def test_runtime_contract_registry_drift_is_a_structured_deny(tmp_path: Path) -> None:
+    request = request_fixture()
+    observation = allow_override(active_observation(tmp_path, request))
+    registry_path = observation.active_engine_root / gate.RUNTIME_CONTRACT_REGISTRY_PATH
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["contractPaths"] = ["distribution/tests/test_fake.py"]
+    write_json(registry_path, registry)
+
+    result = gate.evaluate_runtime_authorization(request, observation)
+
+    assert result.decision == "deny"
+    assert "runtime.engine-pack.contract-registry-invalid" in result.reason_codes
 
 
 def test_runtime_reverifies_engine_and_runtime_source_binding(tmp_path: Path) -> None:

@@ -42,6 +42,7 @@ class EnginePackManagerTests(unittest.TestCase):
                         "repository_root": str(ROOT),
                         "output_directory": str(self.output),
                         "source_commit": "2" * 40,
+                        "edition_profile": engine_pack.DEFAULT_EDITION_PROFILE,
                     },
                 )()
             )

@@ -24,6 +24,15 @@ class LabPreviewContractTests(unittest.TestCase):
         result = lab_preview.verify_lab_preview_contract()
         self.assertEqual(result["artifactFileName"], "DroneDream-Lab-1.0.0.exe")
         self.assertEqual(result["profile"], "distribution/build-profiles/lab-preview.v1.json")
+        profile = json.loads(
+            (ROOT / result["profile"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(
+            profile["commonCore"]["productSourceHash"],
+            lab_artifact.common_core_hash(
+                profile["commonCore"]["productSourceCommit"]
+            ),
+        )
 
     def test_fake_lab_artifact_receipt_binds_workspace_module_and_artifact_contracts(self) -> None:
         receipt = lab_artifact.fake_lab_preview_receipt()
