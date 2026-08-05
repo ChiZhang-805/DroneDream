@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-preview-adoption-sidecar",
+  "sidecarVersion": "1.0.0",
+  "editionId": "sim",
+  "classification": {
+    "subject": "Sim-default unified-core preview",
+    "state": "planned-not-built contract transition",
+    "notValidated": true,
+    "notPromotionReady": true,
+    "notFullStack": true,
+    "releaseBranchCreated": false
+  },
+  "sourceSeparation": {
+    "productSubjectCommit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+    "postAdoptionEvidenceHead": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571",
+    "evidenceHeadIsProductSource": false,
+    "commonCoreCommit": "db7592fbfc39c5489bdbcc7d2373d1480a69897b",
+    "commonCoreHash": "512e98257cb2cef63d5ed6096dc0ebb211449eb27bceaf10ea5191ea581941b2"
+  },
+  "universalHandoff": {
+    "receiptSha256": "32900cb1841b3c3a6564e85355db82504e2e355e2d29d145e2060cb7ef9f438c",
+    "handoffManifestSha256": "faadca18215e40a5b1f935d2ae68baa2cbbfbc0f5a533d557ebeb535770f8c36",
+    "artifactSha256": "b7d8481a6bf79678b7ca80ead7c4bf01a7a65bbeb81e93e6e4f28d0cea205863",
+    "artifactBytes": 11347564
+  },
+  "localAdoption": {
+    "receiptPath": "distribution/sim/adoptions/sim-preview-1.0.0-2aec69e.adoption-receipt.v1.json",
+    "receiptSha256": "dcc8ed669aa16cd995d247df6c2e2abf9b2a97e2795a721d3a6999ecc42bd412",
+    "verifierPath": "distribution/sim/tools/sim_installer_contract.py",
+    "verifierCommand": "python distribution/sim/tools/sim_installer_contract.py verify-receipt --artifact Z:/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/sim-preview-1.0.0-2aec69e/DroneDream-Sim-1.0.0.exe --expected-source-commit 2aec69e88ee8844cff759a025f109e5b938d18c0 distribution/sim/adoptions/sim-preview-1.0.0-2aec69e.adoption-receipt.v1.json"
+  },
+  "artifactObservation": {
+    "path": "Z:/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/sim-preview-1.0.0-2aec69e/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11347564,
+    "sha256": "b7d8481a6bf79678b7ca80ead7c4bf01a7a65bbeb81e93e6e4f28d0cea205863",
+    "sigSidecarPathExists": false,
+    "authenticodeStatus": "NotSigned",
+    "signerCertificatePresent": false,
+    "pe": {
+      "magic": "0x10b",
+      "certificateTableVirtualAddress": 0,
+      "certificateTableSize": 0,
+      "certificateTableEmpty": true
+    }
+  },
+  "packAndRuntimeAudit": {
+    "validatedVehiclePackCount": 0,
+    "runtimeEmbedded": false,
+    "runtimeEmbeddingEvidence": {
+      "artifactBytes": 11347564,
+      "runtimeBaseReferenceBytes": 6141118464,
+      "artifactSmallerThanRuntimeBaseReference": true,
+      "binaryNeedleFindings": {
+        "runtime-base-full-simulation": false,
+        "rootfs.tar": false,
+        "rootfs.tar.gz": false,
+        "px4_autopilot_dir": false,
+        "px4-gazebo-smoke": false,
+        "dronedream-runtime-init": false
+      }
+    }
+  },
+  "forbiddenActionsNotPerformed": [
+    "rebuild",
+    "install",
+    "upload",
+    "release-branch-create",
+    "runtime-start",
+    "px4-start",
+    "gazebo-start"
+  ]
+}

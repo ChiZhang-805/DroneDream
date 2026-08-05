@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-installer-adoption-receipt",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "profile": {
+    "path": "distribution/sim/build-profile.v1.json",
+    "sha256": "b5116a3b1c28ea62d355f2ebc8be3de17f9939c3ae2dfc8bcfe51cfa611c1e11"
+  },
+  "source": {
+    "sourceCommit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+    "sourceTreeState": "clean",
+    "commonCoreCommit": "db7592fbfc39c5489bdbcc7d2373d1480a69897b",
+    "commonCoreHash": "512e98257cb2cef63d5ed6096dc0ebb211449eb27bceaf10ea5191ea581941b2"
+  },
+  "artifact": {
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "sha256": "b7d8481a6bf79678b7ca80ead7c4bf01a7a65bbeb81e93e6e4f28d0cea205863",
+    "bytes": 11347564,
+    "authenticodeState": "not-signed",
+    "unsignedDisclosure": true,
+    "updaterSignatureState": "not-issued"
+  },
+  "payload": {
+    "modules": [
+      "desktop-core",
+      "engine-pack",
+      "runtime-core",
+      "runtime-simulation",
+      "simulator-gazebo-harmonic",
+      "simulator-px4-sitl",
+      "vehicle-pack-sim",
+      "vehicle-pack-validation"
+    ],
+    "capabilities": [
+      "qualification.simulation.issue",
+      "simulation.execute",
+      "simulation.parameter.write",
+      "simulation.vehicle.arm",
+      "updater.module.apply",
+      "vehicle-pack.install"
+    ],
+    "vehiclePacks": ["px4-gazebo-x500-reference"],
+    "commandAudit": {
+      "scannedCommandCount": 0,
+      "observedCommands": [],
+      "forbiddenFindings": []
+    }
+  },
+  "licenseNotice": {
+    "path": "runtime/THIRD_PARTY_NOTICES.md",
+    "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa",
+    "sizeBytes": 4410
+  },
+  "installLifecycle": {
+    "upgradePlan": "same-version-internal-replacement-requires-identical-source-bound-receipt",
+    "rollbackPlan": "previous-verified-sim-promotion-or-explicit-no-prior-release",
+    "uninstallPlan": "remove-bundle-owned-files-preserve-app-diagnostics"
+  },
+  "handoff": {
+    "universalReceiptSha256": "32900cb1841b3c3a6564e85355db82504e2e355e2d29d145e2060cb7ef9f438c",
+    "universalArtifactSha256": "b7d8481a6bf79678b7ca80ead7c4bf01a7a65bbeb81e93e6e4f28d0cea205863",
+    "universalSourceCommit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+    "acceptedBy": "codex/software-sim"
+  }
+}
