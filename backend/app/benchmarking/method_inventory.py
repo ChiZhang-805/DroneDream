@@ -228,16 +228,44 @@ _ENTRIES = (
     BenchmarkMethodInventoryEntryV1(
         adapter_id="optuna_tpe/v1",
         method_classification="standard_reference",
-        implementation_label="optuna-multivariate-tpe-reference-adapter-pending",
+        implementation_label="optuna-4.9.0-multivariate-tpe-contract",
         execution_readiness="blocked",
         environment_boundary="isolated_benchmark",
         sources=(
             BenchmarkMethodSourceV1(
-                source_id="optuna-v4.9.0",
+                source_id="optuna-4.9.0-wheel",
                 source_kind="python_package",
-                locator="https://github.com/optuna/optuna/tree/v4.9.0",
+                locator=(
+                    "https://files.pythonhosted.org/packages/ab/f3/"
+                    "e5fcd5d9b15771ed6dc10e3a7eeddc672e418f4f4c4653d216cc1d857e2d/"
+                    "optuna-4.9.0-py3-none-any.whl"
+                ),
                 version_candidate="4.9.0",
                 dependency_name="optuna",
+                distribution_filename="optuna-4.9.0-py3-none-any.whl",
+                distribution_sha256=(
+                    "f52f3be6148654850c92a5860d398fd88ec6b2c84ab68d9c3d07dcff02e7afee"
+                ),
+                upstream_commit="4db42e31c24b200e52595df9d4c00e2cdeefea2b",
+                license_status="verified",
+                license_spdx="MIT",
+                license_locator="https://github.com/optuna/optuna/blob/v4.9.0/LICENSE",
+            ),
+            BenchmarkMethodSourceV1(
+                source_id="optuna-4.9.0-sdist",
+                source_kind="python_package",
+                locator=(
+                    "https://files.pythonhosted.org/packages/f4/aa/"
+                    "05f5e3f662cc96a4c478fc3446b8ed6359825a2b504ecb614a9ac84e4a4d/"
+                    "optuna-4.9.0.tar.gz"
+                ),
+                version_candidate="4.9.0",
+                dependency_name="optuna",
+                distribution_filename="optuna-4.9.0.tar.gz",
+                distribution_sha256=(
+                    "b322e5cbdf1655fb84c37646c4a7a1f391de1b47806bbe222e015825d0a82b87"
+                ),
+                upstream_commit="4db42e31c24b200e52595df9d4c00e2cdeefea2b",
                 license_status="verified",
                 license_spdx="MIT",
                 license_locator="https://github.com/optuna/optuna/blob/v4.9.0/LICENSE",
@@ -246,10 +274,11 @@ _ENTRIES = (
                 source_id="optuna-tpe-4.9.0-docs",
                 source_kind="upstream_documentation",
                 locator=(
-                    "https://optuna.readthedocs.io/en/stable/reference/samplers/"
+                    "https://optuna.readthedocs.io/en/v4.9.0/reference/samplers/"
                     "generated/optuna.samplers.TPESampler.html"
                 ),
                 version_candidate="4.9.0",
+                upstream_commit="4db42e31c24b200e52595df9d4c00e2cdeefea2b",
                 license_status="verified",
                 license_spdx="MIT",
                 license_locator="https://github.com/optuna/optuna/blob/v4.9.0/LICENSE",
@@ -258,11 +287,11 @@ _ENTRIES = (
         blocker_codes=(
             "adapter_not_implemented",
             "isolated_environment_missing",
-            "source_archive_hash_pending",
         ),
         reproducibility_notes=(
             "Freeze TPESampler(multivariate=True, seed=...) and sequential n_jobs=1.",
             "Unsafe, failed, and indeterminate trials cannot receive fabricated losses.",
+            "LICENSE_THIRD_PARTY must accompany any redistributed Optuna environment.",
         ),
     ),
     _ready_project(

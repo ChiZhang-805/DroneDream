@@ -65,7 +65,7 @@ _DESCRIPTORS = (
         "optuna_tpe/v1",
         "traditional",
         "contract_only",
-        "optuna-multivariate-tpe-reference-adapter-pending",
+        "optuna-4.9.0-multivariate-tpe-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
