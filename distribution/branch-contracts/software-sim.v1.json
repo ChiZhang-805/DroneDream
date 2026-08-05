@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-edition-branch-sync-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "sim",
+  "editionBranch": "codex/software-sim",
+  "commonCoreBranch": "codex/software",
+  "integrationBranch": "main",
+  "recordedDate": "2026-08-05",
+  "syncBaseline": {
+    "commonCoreCommit": "db7592fbfc39c5489bdbcc7d2373d1480a69897b",
+    "commonCoreHash": "512e98257cb2cef63d5ed6096dc0ebb211449eb27bceaf10ea5191ea581941b2",
+    "sourceTreeState": "clean",
+    "sourceRemote": "origin"
+  },
+  "commonCorePaths": [
+    "backend",
+    "desktop",
+    "engine-pack",
+    "frontend",
+    "runtime",
+    "worker"
+  ],
+  "editionSpecificPathPrefixes": [
+    "distribution/branch-contracts/",
+    "distribution/tests/test_software_sim_branch_contract.py",
+    "distribution/editions/sim.v1.json",
+    "distribution/build-planning/",
+    "distribution/build-plans/",
+    "distribution/composite-installations/sim/",
+    "distribution/release-promotions/sim/"
+  ],
+  "commonCoreChangePolicy": {
+    "commonFixesReturnToBranch": "codex/software",
+    "simBranchMayCarryOnlyEditionSpecificDiffs": true,
+    "syncRequiresCommonCoreCommitAndHashRefresh": true,
+    "forcePushAllowed": false
+  },
+  "simEditionBoundary": {
+    "allowedTargetKinds": ["simulation"],
+    "allowedSimulatorStack": ["px4-sitl", "gazebo"],
+    "forbiddenTargetKinds": ["hitl", "real-hardware"],
+    "forbiddenCapabilities": [
+      "external.qgroundcontrol.launch",
+      "hardware.arm",
+      "hardware.discover",
+      "hardware.emergency-stop",
+      "hardware.flight",
+      "hardware.hitl.execute",
+      "hardware.parameter.read",
+      "hardware.parameter.write",
+      "hardware.preflight.execute",
+      "qualification.trusted.consume"
+    ],
+    "frontendMaySwitchToLabOrField": false
+  },
+  "releaseBoundary": {
+    "artifactFileName": "DroneDream-Sim-1.0.0.exe",
+    "releaseBranch": "codex/release-sim",
+    "releaseBranchState": "planned-not-created",
+    "requiresExactCleanSource": true,
+    "requiresIndependentArtifactSha256": true,
+    "requiresUnsignedFactInReceiptWhenUnsigned": true,
+    "waitForUniversalYellowBuildHandoff": true
+  },
+  "resourceProtocol": {
+    "currentWorkClass": "GREEN",
+    "ordinaryCompileClass": "YELLOW",
+    "realPx4GazeboStabilityClass": "RED",
+    "apiKeyUseAllowed": false,
+    "deployAllowed": false,
+    "runtimeMigrationAllowed": false,
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target"
+  }
+}
