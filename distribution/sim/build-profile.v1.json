@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-build-profile",
+  "profileVersion": "1.0.0",
+  "editionId": "sim",
+  "artifact": {
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "productVersion": "1.0.0",
+    "targetArchitecture": "windows-x86_64",
+    "packaging": "tauri-nsis-windows"
+  },
+  "source": {
+    "editionBranch": "codex/software-sim",
+    "commonCoreBranch": "codex/software",
+    "commonCoreCommit": "db7592fbfc39c5489bdbcc7d2373d1480a69897b",
+    "commonCoreHash": "512e98257cb2cef63d5ed6096dc0ebb211449eb27bceaf10ea5191ea581941b2",
+    "commonCorePaths": [
+      "backend",
+      "desktop",
+      "engine-pack",
+      "frontend",
+      "runtime",
+      "worker"
+    ],
+    "sourceCommitPolicy": "handoff-exact-clean-source",
+    "sourceTreeRequired": "clean"
+  },
+  "manifests": {
+    "edition": {
+      "path": "distribution/editions/sim.v1.json",
+      "sha256": "e6f71a0c80dfdfd3fbe31879e43de7ff5322f0a826888c161534e41a1bff454f"
+    },
+    "capabilityPolicy": {
+      "path": "distribution/capabilities/core-capabilities.v1.json",
+      "sha256": "d2b880e2ea85ef91980f5f1909485ca2634e68fa763ca885b49b125ec3874903"
+    },
+    "vehiclePacks": [
+      {
+        "packId": "px4-gazebo-x500-reference",
+        "path": "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+        "sha256": "cb5b9bf431571292024dacbbf8fdf03d1e7f19ae0cac0f614b42c1ee3a0b56c4",
+        "payloadSha256": "58f757ce03b4425219484c20a2f705758f52bd31dfad699d9fc1092d3581a162",
+        "requiredSimulationOnly": true
+      }
+    ],
+    "licenseNotice": {
+      "path": "runtime/THIRD_PARTY_NOTICES.md",
+      "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa",
+      "sizeBytes": 4410
+    }
+  },
+  "deterministicPayload": {
+    "ordering": "lexicographic-by-module-then-pack-id",
+    "allowedModules": [
+      "desktop-core",
+      "engine-pack",
+      "runtime-core",
+      "runtime-simulation",
+      "simulator-gazebo-harmonic",
+      "simulator-px4-sitl",
+      "vehicle-pack-sim",
+      "vehicle-pack-validation"
+    ],
+    "forbiddenModules": [
+      "hardware-bridge",
+      "qgroundcontrol-external",
+      "vehicle-pack-hardware"
+    ],
+    "allowedCapabilities": [
+      "qualification.simulation.issue",
+      "simulation.execute",
+      "simulation.parameter.write",
+      "simulation.vehicle.arm",
+      "updater.module.apply",
+      "vehicle-pack.install"
+    ],
+    "forbiddenCapabilities": [
+      "external.qgroundcontrol.launch",
+      "hardware.arm",
+      "hardware.discover",
+      "hardware.emergency-stop",
+      "hardware.flight",
+      "hardware.hitl.execute",
+      "hardware.parameter.read",
+      "hardware.parameter.write",
+      "hardware.preflight.execute",
+      "qualification.trusted.consume"
+    ],
+    "allowedVehiclePacks": ["px4-gazebo-x500-reference"],
+    "forbiddenEditionIds": ["lab", "field"],
+    "forbiddenCommandFragments": [
+      "hardware.discover",
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl",
+      "hitl",
+      "qgroundcontrol",
+      "vehicle-pack-hardware"
+    ]
+  },
+  "installerPlan": {
+    "outputReceiptKind": "dronedream-sim-installer-adoption-receipt",
+    "receiptSchemaPath": "distribution/sim/schemas/sim-installer-receipt.schema.json",
+    "unsignedAllowed": true,
+    "unsignedDisclosureRequired": true,
+    "upgradePolicy": "same-version-internal-replacement-requires-identical-source-bound-receipt",
+    "rollbackPolicy": "previous-verified-sim-promotion-or-explicit-no-prior-release",
+    "uninstallPolicy": "remove-bundle-owned-files-preserve-app-diagnostics",
+    "releaseBranch": "codex/release-sim",
+    "releaseBranchState": "planned-not-created",
+    "universalHandoffRequired": true
+  },
+  "acceptance": {
+    "exactArtifactRequiredFields": [
+      "editionId",
+      "artifact.fileName",
+      "artifact.sha256",
+      "artifact.bytes",
+      "source.sourceCommit",
+      "source.commonCoreCommit",
+      "source.commonCoreHash",
+      "profile.sha256",
+      "licenseNotice.sha256",
+      "installLifecycle.rollbackPlan",
+      "installLifecycle.upgradePlan"
+    ],
+    "rejectIf": [
+      "editionId is not sim",
+      "artifact fileName is not DroneDream-Sim-1.0.0.exe",
+      "artifact sha256 or bytes are missing or mismatch the file",
+      "source tree is not clean",
+      "hardware, HITL, Field, or Lab module/capability/command appears",
+      "unsigned artifact omits explicit unsigned disclosure",
+      "release branch is created by this verifier"
+    ],
+    "adoptionVerifier": "distribution/sim/tools/sim_installer_contract.py"
+  },
+  "resourceProtocol": {
+    "currentWorkClass": "GREEN",
+    "ordinaryCompileClass": "YELLOW",
+    "realPx4GazeboStabilityClass": "RED",
+    "apiKeyUseAllowed": false,
+    "deployAllowed": false,
+    "runtimeMigrationAllowed": false,
+    "buildAllowed": false,
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target"
+  }
+}

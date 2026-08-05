@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/sim-installer-receipt.v1.json",
+  "title": "DroneDream Sim installer adoption receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "receiptVersion",
+    "editionId",
+    "profile",
+    "source",
+    "artifact",
+    "payload",
+    "licenseNotice",
+    "installLifecycle",
+    "handoff"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-sim-installer-adoption-receipt"},
+    "receiptVersion": {"const": "1.0.0"},
+    "editionId": {"const": "sim"},
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": "distribution/sim/build-profile.v1.json"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceCommit", "sourceTreeState", "commonCoreCommit", "commonCoreHash"],
+      "properties": {
+        "sourceCommit": {"$ref": "#/$defs/commit"},
+        "sourceTreeState": {"const": "clean"},
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fileName",
+        "sha256",
+        "bytes",
+        "authenticodeState",
+        "unsignedDisclosure",
+        "updaterSignatureState"
+      ],
+      "properties": {
+        "fileName": {"const": "DroneDream-Sim-1.0.0.exe"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "authenticodeState": {"enum": ["valid", "not-signed"]},
+        "unsignedDisclosure": {"type": "boolean"},
+        "updaterSignatureState": {"enum": ["verified", "not-issued"]}
+      }
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modules", "capabilities", "vehiclePacks", "commandAudit"],
+      "properties": {
+        "modules": {"$ref": "#/$defs/idArray"},
+        "capabilities": {"$ref": "#/$defs/idArray"},
+        "vehiclePacks": {"$ref": "#/$defs/idArray"},
+        "commandAudit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scannedCommandCount", "observedCommands", "forbiddenFindings"],
+          "properties": {
+            "scannedCommandCount": {"type": "integer", "minimum": 0},
+            "observedCommands": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1, "maxLength": 512}
+            },
+            "forbiddenFindings": {
+              "type": "array",
+              "maxItems": 0,
+              "items": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "licenseNotice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "sizeBytes"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "sizeBytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "installLifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["upgradePlan", "rollbackPlan", "uninstallPlan"],
+      "properties": {
+        "upgradePlan": {"type": "string", "minLength": 1, "maxLength": 256},
+        "rollbackPlan": {"type": "string", "minLength": 1, "maxLength": 256},
+        "uninstallPlan": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "universalReceiptSha256",
+        "universalArtifactSha256",
+        "universalSourceCommit",
+        "acceptedBy"
+      ],
+      "properties": {
+        "universalReceiptSha256": {"$ref": "#/$defs/sha256"},
+        "universalArtifactSha256": {"$ref": "#/$defs/sha256"},
+        "universalSourceCommit": {"$ref": "#/$defs/commit"},
+        "acceptedBy": {"const": "codex/software-sim"}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)*$"},
+    "idArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    }
+  }
+}

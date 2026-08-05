@@ -23,6 +23,8 @@
   ],
   "editionSpecificPathPrefixes": [
     "distribution/branch-contracts/",
+    "distribution/sim/",
+    "distribution/tests/test_sim_installer_contract.py",
     "distribution/tests/test_software_sim_branch_contract.py",
     "distribution/editions/sim.v1.json",
     "distribution/build-planning/",
