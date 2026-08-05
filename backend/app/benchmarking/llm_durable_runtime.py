@@ -11,6 +11,7 @@ never accepted by these contracts.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal, NoReturn, Protocol
 
@@ -95,6 +96,11 @@ class BenchmarkDirectTransport(Protocol):
         request: BenchmarkProviderRequestEnvelope,
         config: BenchmarkProviderExecutionConfigV1,
     ) -> BenchmarkProviderTransportResult: ...
+
+
+BenchmarkDirectTransportFactory = Callable[
+    [BenchmarkProviderExecutionConfigV1], BenchmarkDirectTransport
+]
 
 
 class BenchmarkDurableDirectExecutionV1(_StrictFrozen):
@@ -555,7 +561,8 @@ def execute_durable_direct_arm(
     job: models.Job,
     observation: BenchmarkObservationV2,
     *,
-    transport: BenchmarkDirectTransport,
+    transport: BenchmarkDirectTransport | None = None,
+    transport_factory: BenchmarkDirectTransportFactory | None = None,
 ) -> BenchmarkDurableDirectExecutionV1:
     """Execute exactly one direct proposal after durable attempts are committed."""
 
@@ -595,6 +602,21 @@ def execute_durable_direct_arm(
     )
     if recovered is not None:
         return recovered
+    if (transport is None) == (transport_factory is None):
+        _blocked(
+            "benchmark_provider_transport_binding_invalid",
+            "Direct execution requires exactly one transport binding.",
+        )
+    if transport is None:
+        try:
+            transport = transport_factory(context.provider)  # type: ignore[misc]
+        except BenchmarkDurableLLMBlocked:
+            raise
+        except Exception as exc:  # noqa: BLE001 - credential details remain private.
+            raise BenchmarkDurableLLMBlocked(
+                "benchmark_provider_credential_unavailable",
+                "The Job-bound provider credential is unavailable.",
+            ) from exc
     request_envelope = BenchmarkProviderRequestEnvelope.from_request_body(body)
     attempt = begin_benchmark_direct_turn(
         db,
@@ -834,6 +856,7 @@ __all__ = [
     "BENCHMARK_DIRECT_RESERVATION_REASON",
     "BENCHMARK_PROVIDER_BASE_URLS",
     "BenchmarkDirectTransport",
+    "BenchmarkDirectTransportFactory",
     "BenchmarkDurableDirectExecutionV1",
     "BenchmarkDurableLLMBlocked",
     "BenchmarkProviderExecutionConfigV1",

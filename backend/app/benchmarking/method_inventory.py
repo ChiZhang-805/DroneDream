@@ -338,6 +338,32 @@ _ENTRIES = (
         "product_native",
         "backend/app/optimization/cma_optimizers.py",
     ),
+    BenchmarkMethodInventoryEntryV1(
+        adapter_id="llm_direct/v1",
+        method_classification="adapted_reference",
+        implementation_label="durable-chat-completions-direct-v1",
+        execution_readiness="ready",
+        environment_boundary="provider_contract",
+        sources=(
+            _project_source(
+                "llm-direct-durable-runtime",
+                "backend/app/benchmarking/llm_durable_runtime.py",
+            ),
+            _project_source(
+                "llm-direct-job-secret-transport",
+                "backend/app/benchmarking/provider_transport.py",
+            ),
+            _project_source(
+                "llm-direct-job-dispatch",
+                "backend/app/orchestration/job_manager.py",
+            ),
+        ),
+        reproducibility_notes=(
+            "One durable direct proposal turn and one actual request per generation.",
+            "The transport uses one same-Job encrypted BYOK slot and never an environment key.",
+            "Formal execution requires zero provider retries and preregistered provider capacity.",
+        ),
+    ),
     *(
         BenchmarkMethodInventoryEntryV1(
             adapter_id=adapter_id,
@@ -354,7 +380,6 @@ _ENTRIES = (
             blocker_codes=("adapter_not_implemented", "provider_contract_pending"),
         )
         for adapter_id, classification, label in (
-            ("llm_direct/v1", "adapted_reference", "direct-adapter-pending"),
             ("llm_react/v1", "adapted_reference", "bounded-react-adapter-pending"),
             ("llambo_uav/v1", "adapted_reference", "noisy-uav-adaptation-pending"),
             (

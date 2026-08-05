@@ -449,14 +449,218 @@ def test_direct_provider_capacity_is_deterministic_and_worst_case() -> None:
     assert capacity.wall_time_seconds == 20
 
 
-def test_durable_bridge_does_not_promote_direct_arm_before_campaign_reconciliation() -> None:
+def test_direct_arm_is_promoted_only_to_server_managed_durable_execution() -> None:
     descriptor = BENCHMARK_ADAPTER_REGISTRY["llm_direct/v1"]
     inventory = BENCHMARK_METHOD_INVENTORY["llm_direct/v1"]
-    assert descriptor.availability == "contract_only"
-    assert inventory.execution_readiness == "blocked"
-    assert "adapter_not_implemented" in inventory.blocker_codes
-    with pytest.raises(ValueError, match="not implemented"):
+    assert descriptor.availability == "implemented"
+    assert inventory.execution_readiness == "ready"
+    assert inventory.blocker_codes == ()
+    with pytest.raises(ValueError, match="server-managed"):
         create_benchmark_adapter("llm_direct/v1")
+
+
+def _production_observation(job: Any, run: Any) -> BenchmarkObservationV2:
+    return _observation(job, run).model_copy(
+        update={
+            "parameter_domain": [
+                {
+                    "name": "MPC_XY_P",
+                    "baseline": 0.95,
+                    "minimum": 0.6,
+                    "maximum": 1.3,
+                    "value_type": "float",
+                }
+            ]
+        }
+    )
+
+
+def _production_proposal_json(value: float = 1.1) -> str:
+    return json.dumps(
+        {
+            "schema_version": "1.0",
+            "decision": "propose",
+            "parameters": {"MPC_XY_P": value},
+        }
+    )
+
+
+def _prepare_production_job(job: Any) -> None:
+    job.parameter_space_json = [
+        {
+            "name": "MPC_XY_P",
+            "baseline": 0.95,
+            "minimum": 0.6,
+            "maximum": 1.3,
+            "enabled": True,
+            "locked": False,
+        }
+    ]
+    job.baseline_parameter_json = {"MPC_XY_P": 0.95}
+
+
+def test_production_dispatch_routes_direct_handoff_to_candidate_and_trials(
+    durable_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import job_manager
+
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        _prepare_production_job(job)
+        db.commit()
+        observation = _production_observation(job, run)
+        context = SimpleNamespace(
+            arm=SimpleNamespace(
+                proposal_adapter_id="llm_direct/v1",
+                benchmark_arm_id="llm-direct",
+            ),
+            binding=run,
+        )
+        transport = _Transport(_production_proposal_json())
+        monkeypatch.setattr(
+            job_manager,
+            "build_benchmark_job_observation",
+            lambda _db, _job: (context, observation),
+        )
+        monkeypatch.setattr(
+            job_manager,
+            "build_job_secret_benchmark_transport",
+            lambda _db, _job, _provider: transport,
+        )
+
+        result = job_manager.dispatch_next_benchmark_generation(db, job)
+
+        assert result.status == "dispatched"
+        assert result.dispatched_candidates == 1
+        assert transport.calls == 1
+        candidates = list(
+            db.scalars(
+                select(durable_db.models.CandidateParameterSet).where(
+                    durable_db.models.CandidateParameterSet.job_id == job.id,
+                    durable_db.models.CandidateParameterSet.is_baseline.is_(False),
+                )
+            )
+        )
+        assert len(candidates) == 1
+        candidate = candidates[0]
+        assert candidate.parameter_json["MPC_XY_P"] == pytest.approx(1.1)
+        assert candidate.proposal_reason == "benchmark:llm_direct/v1"
+        assert list(
+            db.scalars(
+                select(durable_db.models.Trial).where(
+                    durable_db.models.Trial.candidate_id == candidate.id
+                )
+            )
+        )
+        context_payload = candidate.optimizer_metadata_json["benchmark_proposal_context"]
+        assert context_payload["proposal_adapter_id"] == "llm_direct/v1"
+        assert "messages" not in json.dumps(candidate.optimizer_metadata_json)
+
+
+def test_production_dispatch_recovers_handoff_without_secret_or_provider_replay(
+    durable_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import job_manager
+
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        _prepare_production_job(job)
+        db.commit()
+        observation = _production_observation(job, run)
+        first_transport = _Transport(_production_proposal_json(1.2))
+        execute_durable_direct_arm(db, job, observation, transport=first_transport)
+        assert first_transport.calls == 1
+
+        context = SimpleNamespace(
+            arm=SimpleNamespace(
+                proposal_adapter_id="llm_direct/v1",
+                benchmark_arm_id="llm-direct",
+            ),
+            binding=run,
+        )
+        secret_resolutions = 0
+
+        def forbidden_secret_resolution(*_args: Any, **_kwargs: Any) -> Any:
+            nonlocal secret_resolutions
+            secret_resolutions += 1
+            raise AssertionError("recovery must not resolve a credential")
+
+        monkeypatch.setattr(
+            job_manager,
+            "build_benchmark_job_observation",
+            lambda _db, _job: (context, observation),
+        )
+        monkeypatch.setattr(
+            job_manager,
+            "build_job_secret_benchmark_transport",
+            forbidden_secret_resolution,
+        )
+
+        result = job_manager.dispatch_next_benchmark_generation(db, job)
+
+        assert result.status == "dispatched"
+        assert secret_resolutions == 0
+        assert (
+            len(
+                list(
+                    db.scalars(
+                        select(durable_db.models.CandidateParameterSet).where(
+                            durable_db.models.CandidateParameterSet.job_id == job.id,
+                            durable_db.models.CandidateParameterSet.is_baseline.is_(False),
+                        )
+                    )
+                )
+            )
+            == 1
+        )
+        assert (
+            len(
+                list(
+                    db.scalars(
+                        select(durable_db.models.ProviderNetworkRequestReceipt)
+                    )
+                )
+            )
+            == 1
+        )
+
+
+def test_production_dispatch_without_job_secret_fails_before_attempt(
+    durable_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import job_manager
+
+    monkeypatch.setenv("OPENAI_API_KEY", "environment-key-must-not-be-consumed")
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db)
+        _prepare_production_job(job)
+        db.commit()
+        observation = _production_observation(job, run)
+        context = SimpleNamespace(
+            arm=SimpleNamespace(
+                proposal_adapter_id="llm_direct/v1",
+                benchmark_arm_id="llm-direct",
+            ),
+            binding=run,
+        )
+        monkeypatch.setattr(
+            job_manager,
+            "build_benchmark_job_observation",
+            lambda _db, _job: (context, observation),
+        )
+
+        result = job_manager.dispatch_next_benchmark_generation(db, job)
+
+        assert result.status == "benchmark_blocked"
+        assert result.error_code == "benchmark_provider_credential_unavailable"
+        assert "environment-key-must-not-be-consumed" not in (result.error or "")
+        assert job.provider_turns_attempted == 0
+        assert job.provider_requests_attempted == 0
+        assert not list(db.scalars(select(durable_db.models.HarnessCognitiveTurnReceipt)))
+        assert not list(db.scalars(select(durable_db.models.ProviderNetworkRequestReceipt)))
 
 
 def test_direct_attempts_are_committed_before_transport_and_success_is_safe(

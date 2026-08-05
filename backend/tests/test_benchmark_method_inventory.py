@@ -37,6 +37,7 @@ def test_method_inventory_is_complete_and_matches_registry_provenance() -> None:
         "repo_turbo_inspired/v1",
         "repo_bipop_cma_inspired/v1",
         "repo_surrogate_cma/v1",
+        "llm_direct/v1",
     ),
 )
 def test_only_reviewed_project_adapters_are_execution_ready(adapter_id: str) -> None:
@@ -44,6 +45,8 @@ def test_only_reviewed_project_adapters_are_execution_ready(adapter_id: str) -> 
     assert entry.execution_readiness == "ready"
     assert entry.blocker_codes == ()
     assert all(source.license_status == "inherited_project" for source in entry.sources)
+    if adapter_id == "llm_direct/v1":
+        assert entry.environment_boundary == "provider_contract"
 
 
 @pytest.mark.parametrize(
