@@ -50,7 +50,7 @@ MAX_PROVIDER_TURNS_PER_GENERATION = 4
 MAX_PROVIDER_TURNS_PER_JOB = 128
 
 TurnRole = Literal["plan", "revision", "diagnosis", "critic"]
-BenchmarkTurnRole = Literal["direct_proposal"]
+BenchmarkTurnRole = Literal["direct_proposal", "react_action"]
 TurnOutcomeStatus = Literal[
     "succeeded",
     "provider_failed",
@@ -161,10 +161,7 @@ def recover_existing_cognitive_turn(
     ):
         return "pending"
     outcome_deadline = _as_utc(receipt.attempted_at) + timedelta(
-        seconds=(
-            settings.llm_request_timeout_seconds * (job.provider_max_retries + 2)
-            + 60
-        )
+        seconds=(settings.llm_request_timeout_seconds * (job.provider_max_retries + 2) + 60)
     )
     if datetime.now(timezone.utc) < outcome_deadline:
         return "pending"
@@ -511,6 +508,39 @@ def begin_benchmark_direct_turn(
 ) -> CognitiveTurnAttempt:
     """Persist one preregistered benchmark-direct turn without changing Job policy."""
 
+    return begin_benchmark_llm_turn(
+        db,
+        job,
+        generation_index=generation_index,
+        turn_index=1,
+        turn_role=turn_role,
+        adapter_id="llm_direct/v1",
+        maximum_turns_per_generation=1,
+        model_snapshot=model_snapshot,
+        prompt_sha256=prompt_sha256,
+        evidence_sha256=evidence_sha256,
+        schema_sha256=schema_sha256,
+        tool_outputs_sha256=tool_outputs_sha256,
+    )
+
+
+def begin_benchmark_llm_turn(
+    db: Session,
+    job: models.Job,
+    *,
+    generation_index: int,
+    turn_index: int,
+    turn_role: BenchmarkTurnRole,
+    adapter_id: Literal["llm_direct/v1", "llm_react/v1"],
+    maximum_turns_per_generation: int,
+    model_snapshot: str,
+    prompt_sha256: str,
+    evidence_sha256: str,
+    schema_sha256: str,
+    tool_outputs_sha256: str,
+) -> CognitiveTurnAttempt:
+    """Persist one preregistered benchmark LLM turn before provider I/O."""
+
     if job.first_qualified_candidate_id is not None:
         raise CognitiveTurnBlocked(
             "first_qualified_stop",
@@ -521,24 +551,69 @@ def begin_benchmark_direct_turn(
             "generation_drift",
             "Benchmark generation no longer matches Job state.",
         )
-    if turn_role != "direct_proposal":
+    expected_role = {
+        "llm_direct/v1": "direct_proposal",
+        "llm_react/v1": "react_action",
+    }[adapter_id]
+    if turn_role != expected_role:
         raise CognitiveTurnBlocked(
             "turn_role_mismatch",
-            "The direct benchmark adapter permits only direct_proposal.",
+            "The benchmark LLM turn role differs from the frozen arm policy.",
         )
+    if not 1 <= maximum_turns_per_generation <= MAX_PROVIDER_TURNS_PER_GENERATION:
+        raise CognitiveTurnBlocked(
+            "benchmark_turn_policy_invalid",
+            "Benchmark LLM per-generation turn policy is invalid.",
+        )
+    if not 1 <= turn_index <= maximum_turns_per_generation:
+        raise CognitiveTurnBlocked(
+            "turn_limit_exceeded",
+            "Benchmark LLM turn exceeded its frozen per-generation cap.",
+        )
+    if adapter_id == "llm_direct/v1" and turn_index != 1:
+        raise CognitiveTurnBlocked(
+            "turn_limit_exceeded",
+            "The direct benchmark arm permits exactly one turn per generation.",
+        )
+    if adapter_id == "llm_react/v1" and turn_index > 1:
+        predecessor = db.scalar(
+            select(models.BenchmarkLLMReactCheckpoint.id)
+            .join(
+                models.HarnessCognitiveTurnOutcome,
+                models.HarnessCognitiveTurnOutcome.turn_receipt_id
+                == models.BenchmarkLLMReactCheckpoint.cognitive_turn_receipt_id,
+            )
+            .where(
+                models.BenchmarkLLMReactCheckpoint.job_id == job.id,
+                models.BenchmarkLLMReactCheckpoint.adapter_id == adapter_id,
+                models.BenchmarkLLMReactCheckpoint.generation_index == generation_index,
+                models.BenchmarkLLMReactCheckpoint.turn_index == turn_index - 1,
+                models.HarnessCognitiveTurnOutcome.status == "succeeded",
+            )
+        )
+        if predecessor is None:
+            raise CognitiveTurnBlocked(
+                "cognitive_predecessor_missing",
+                "The prior bounded ReAct turn has no successful durable checkpoint.",
+            )
     if job.provider_max_retries != 0:
         raise CognitiveTurnBlocked(
             "benchmark_retry_policy_drift",
             "Formal benchmark provider retries must be zero.",
         )
+    trigger_reason = (
+        "preregistered-direct-turn" if adapter_id == "llm_direct/v1" else "bounded-react-turn"
+    )
     return _commit_cognitive_turn(
         db,
         job,
         generation_index=generation_index,
-        turn_index=1,
+        turn_index=turn_index,
         turn_role=turn_role,
-        trigger_policy_version="benchmark-llm-direct-v1",
-        trigger_reasons=("preregistered-direct-turn",),
+        trigger_policy_version=(
+            "benchmark-llm-direct-v1" if adapter_id == "llm_direct/v1" else "benchmark-llm-react-v1"
+        ),
+        trigger_reasons=(trigger_reason,),
         model_snapshot=model_snapshot,
         prompt_sha256=prompt_sha256,
         evidence_sha256=evidence_sha256,
@@ -890,6 +965,7 @@ __all__ = [
     "CognitiveTurnBlocked",
     "CognitiveTurnPending",
     "begin_benchmark_direct_turn",
+    "begin_benchmark_llm_turn",
     "begin_cognitive_turn",
     "cancel_cognitive_turn_if_job_terminal",
     "canonical_json",

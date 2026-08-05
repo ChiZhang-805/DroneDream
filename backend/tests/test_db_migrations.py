@@ -243,12 +243,7 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
     db_module._apply_sqlite_lightweight_migrations()
 
     with db_module.engine.begin() as conn:
-        job_columns = {
-            row[1]
-            for row in conn.execute(
-                text("PRAGMA table_info('jobs')")
-            ).fetchall()
-        }
+        job_columns = {row[1] for row in conn.execute(text("PRAGMA table_info('jobs')")).fetchall()}
         columns = {row[1] for row in conn.execute(text("PRAGMA table_info('trials')")).fetchall()}
         batch_columns = {
             row[1] for row in conn.execute(text("PRAGMA table_info('batch_jobs')")).fetchall()
@@ -299,10 +294,7 @@ def test_sqlite_lightweight_migration_adds_trial_lease_columns(tmp_path, monkeyp
         first_qualified_delete_authorization_columns = {
             row[1]
             for row in conn.execute(
-                text(
-                    "PRAGMA table_info("
-                    "'first_qualified_freeze_delete_authorizations')"
-                )
+                text("PRAGMA table_info('first_qualified_freeze_delete_authorizations')")
             ).fetchall()
         }
         artifact_columns = {
@@ -460,15 +452,15 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
                 "'trial_execution_attempt_outcomes', "
                 "'candidate_evidence_receipts', "
                 "'candidate_parameter_sets', "
-                 "'harness_cognitive_turn_receipts', "
-                 "'harness_cognitive_turn_outcomes', "
-                 "'benchmark_campaigns', "
-                 "'benchmark_arms', "
-                 "'benchmark_budget_reservations', "
-                 "'benchmark_campaign_batch_bindings', "
-                 "'benchmark_campaign_run_bindings', "
-                 "'qualification_trial_receipts', "
-                 "'trials'"
+                "'harness_cognitive_turn_receipts', "
+                "'harness_cognitive_turn_outcomes', "
+                "'benchmark_campaigns', "
+                "'benchmark_arms', "
+                "'benchmark_budget_reservations', "
+                "'benchmark_campaign_batch_bindings', "
+                "'benchmark_campaign_run_bindings', "
+                "'qualification_trial_receipts', "
+                "'trials'"
                 ")"
             ).fetchall()
         }
@@ -506,9 +498,7 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         }
         api_idempotency_columns = {
             row[1]
-            for row in connection.execute(
-                "PRAGMA table_info('api_idempotency_records')"
-            ).fetchall()
+            for row in connection.execute("PRAGMA table_info('api_idempotency_records')").fetchall()
         }
         candidate_columns = {
             row[1]
@@ -517,22 +507,11 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
             ).fetchall()
         }
         trial_columns = {
-            row[1]
-            for row in connection.execute(
-                "PRAGMA table_info('trials')"
-            ).fetchall()
+            row[1] for row in connection.execute("PRAGMA table_info('trials')").fetchall()
         }
-        job_columns = {
-            row[1]
-            for row in connection.execute(
-                "PRAGMA table_info('jobs')"
-            ).fetchall()
-        }
+        job_columns = {row[1] for row in connection.execute("PRAGMA table_info('jobs')").fetchall()}
         batch_columns = {
-            row[1]
-            for row in connection.execute(
-                "PRAGMA table_info('batch_jobs')"
-            ).fetchall()
+            row[1] for row in connection.execute("PRAGMA table_info('batch_jobs')").fetchall()
         }
         first_qualified_tables = {
             row[0]
@@ -626,9 +605,7 @@ def test_alembic_accepts_percent_encoded_database_urls(tmp_path: Path) -> None:
         "harness_cognitive_turn_receipts",
         "harness_cognitive_turn_outcomes",
     }
-    assert cognitive_authorization_tables == {
-        "harness_cognitive_turn_delete_authorizations"
-    }
+    assert cognitive_authorization_tables == {"harness_cognitive_turn_delete_authorizations"}
     assert benchmark_tables == {
         "benchmark_campaigns",
         "benchmark_arms",
@@ -848,7 +825,7 @@ def test_alembic_has_one_schema_head() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     heads = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    assert heads == ["20260805_0031 (head)"]
+    assert heads == ["20260805_0032 (head)"]
 
 
 def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None:
@@ -891,7 +868,8 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "'harness_cognitive_turn_outcomes', "
                 "'provider_network_request_receipts', "
                 "'provider_network_request_outcomes', "
-                "'benchmark_direct_proposal_handoffs'"
+                "'benchmark_direct_proposal_handoffs', "
+                "'benchmark_llm_react_checkpoints'"
                 ")"
             ).fetchall()
         }
@@ -960,9 +938,16 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
                 "AND tbl_name='benchmark_direct_proposal_handoffs'"
             ).fetchall()
         }
+        react_checkpoint_triggers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type='trigger' "
+                "AND tbl_name='benchmark_llm_react_checkpoints'"
+            ).fetchall()
+        }
         provider_accounting_columns = {
-            row[1]
-            for row in connection.execute("PRAGMA table_info('jobs')").fetchall()
+            row[1] for row in connection.execute("PRAGMA table_info('jobs')").fetchall()
         }
         provider_receipt_columns = {
             row[1]
@@ -974,9 +959,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             row[2] == 1
             and [
                 column[2]
-                for column in connection.execute(
-                    f"PRAGMA index_info('{row[1]}')"
-                ).fetchall()
+                for column in connection.execute(f"PRAGMA index_info('{row[1]}')").fetchall()
             ]
             == ["continuation_parent_job_id"]
             for row in connection.execute("PRAGMA index_list('jobs')").fetchall()
@@ -988,7 +971,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
             ).fetchall()
         }
 
-    assert version == ("20260805_0031",)
+    assert version == ("20260805_0032",)
     assert table_names == {
         "first_qualified_freeze_receipts",
         "harness_cognitive_turn_receipts",
@@ -996,6 +979,7 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
         "provider_network_request_receipts",
         "provider_network_request_outcomes",
         "benchmark_direct_proposal_handoffs",
+        "benchmark_llm_react_checkpoints",
     }
     assert {
         "trg_candidate_evidence_required_no_downgrade",
@@ -1010,18 +994,14 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
         "provider_requests_attempted_to_first_qualified",
         "provider_requests_succeeded_to_first_qualified",
     }.issubset(first_qualified_columns)
-    assert first_qualified_authorization_tables == {
-        "first_qualified_freeze_delete_authorizations"
-    }
+    assert first_qualified_authorization_tables == {"first_qualified_freeze_delete_authorizations"}
     assert cognitive_triggers == {
         "trg_harness_cognitive_turn_receipts_no_update",
         "trg_harness_cognitive_turn_receipts_no_delete",
         "trg_harness_cognitive_turn_outcomes_no_update",
         "trg_harness_cognitive_turn_outcomes_no_delete",
     }
-    assert cognitive_authorization_tables == {
-        "harness_cognitive_turn_delete_authorizations"
-    }
+    assert cognitive_authorization_tables == {"harness_cognitive_turn_delete_authorizations"}
     assert provider_network_triggers == {
         "trg_provider_network_request_receipts_no_update",
         "trg_provider_network_request_receipts_no_delete",
@@ -1033,15 +1013,17 @@ def test_first_qualified_migration_round_trips_on_sqlite(tmp_path: Path) -> None
         "trg_benchmark_direct_handoff_no_update",
         "trg_benchmark_direct_handoff_no_delete",
     }
+    assert react_checkpoint_triggers == {
+        "trg_benchmark_react_checkpoint_no_update",
+        "trg_benchmark_react_checkpoint_no_delete",
+    }
     assert {
         "provider_request_cap",
         "provider_max_retries",
         "provider_requests_attempted",
         "provider_requests_succeeded",
     }.issubset(provider_accounting_columns)
-    assert {"request_kind", "retry_policy_version"}.issubset(
-        provider_receipt_columns
-    )
+    assert {"request_kind", "retry_policy_version"}.issubset(provider_receipt_columns)
     assert continuation_parent_is_unique is True
     assert {
         "qualification_policy_version",
@@ -1079,10 +1061,7 @@ def test_postgresql_first_qualified_migration_emits_immutable_guard(
     migration._install_postgres_guards()
 
     sql = "\n".join(emitted)
-    assert (
-        "CREATE FUNCTION dronedream_reject_first_qualified_freeze_mutation()"
-        in sql
-    )
+    assert "CREATE FUNCTION dronedream_reject_first_qualified_freeze_mutation()" in sql
     assert "BEFORE UPDATE OR DELETE ON first_qualified_freeze_receipts" in sql
     assert "first_qualified_freeze_delete_authorizations" in sql
     assert "first-qualified freeze receipts are append-only" in sql
@@ -1153,10 +1132,7 @@ def test_postgresql_provider_request_migration_emits_immutable_guards(
     migration._install_postgres_guards()
 
     sql = "\n".join(emitted)
-    assert (
-        "CREATE FUNCTION dronedream_reject_provider_network_request_mutation()"
-        in sql
-    )
+    assert "CREATE FUNCTION dronedream_reject_provider_network_request_mutation()" in sql
     assert "BEFORE UPDATE OR DELETE ON provider_network_request_receipts" in sql
     assert "BEFORE UPDATE OR DELETE ON provider_network_request_outcomes" in sql
     assert "harness_cognitive_turn_delete_authorizations" in sql
@@ -1192,13 +1168,45 @@ def test_postgresql_direct_handoff_migration_emits_immutable_guard(
     migration._install_postgres_guards()
 
     sql = "\n".join(emitted)
-    assert (
-        "CREATE FUNCTION dronedream_reject_benchmark_direct_handoff_mutation()"
-        in sql
-    )
+    assert "CREATE FUNCTION dronedream_reject_benchmark_direct_handoff_mutation()" in sql
     assert "BEFORE UPDATE OR DELETE ON benchmark_direct_proposal_handoffs" in sql
     assert "harness_cognitive_turn_delete_authorizations" in sql
     assert "benchmark direct proposal handoffs are append-only" in sql
+
+
+def test_postgresql_react_checkpoint_migration_emits_immutable_guard(
+    monkeypatch,
+) -> None:
+    migration_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "20260805_0032_benchmark_llm_react_checkpoint.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "benchmark_react_checkpoint_migration",
+        migration_path,
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    emitted: list[str] = []
+
+    class _PostgresOp:
+        @staticmethod
+        def execute(statement: str) -> None:
+            emitted.append(statement)
+
+    monkeypatch.setattr(migration, "op", _PostgresOp)
+    migration._install_postgres_guards()
+
+    sql = "\n".join(emitted)
+    assert "CREATE FUNCTION dronedream_reject_benchmark_react_checkpoint_mutation()" in sql
+    assert "BEFORE UPDATE OR DELETE ON benchmark_llm_react_checkpoints" in sql
+    assert "harness_cognitive_turn_delete_authorizations" in sql
+    assert "benchmark ReAct checkpoints are append-only" in sql
 
 
 def test_postgresql_candidate_evidence_migration_emits_immutable_guard(

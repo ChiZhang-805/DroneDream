@@ -20,9 +20,9 @@ from app.benchmarking.llm_arm_contracts import (
     BENCHMARK_LLM_MAX_RESPONSE_BYTES,
 )
 
-BENCHMARK_PROVIDER_EXECUTION_SCHEMA_ID: Literal[
+BENCHMARK_PROVIDER_EXECUTION_SCHEMA_ID: Literal["dronedream.benchmark-provider-execution/v1"] = (
     "dronedream.benchmark-provider-execution/v1"
-] = "dronedream.benchmark-provider-execution/v1"
+)
 BENCHMARK_DIRECT_RESERVATION_REASON = "benchmark-provider-execution"
 BENCHMARK_DIRECT_MAX_REQUEST_BYTES = 65_536
 BENCHMARK_PROVIDER_BASE_URLS = MappingProxyType(
@@ -155,6 +155,19 @@ def direct_provider_run_capacity(
 ) -> BenchmarkUsageDeltaV1:
     """Return the immutable worst-case capacity reserved for one direct run."""
 
+    return provider_run_capacity(config, maximum_turns_per_generation=1)
+
+
+def provider_run_capacity(
+    config: BenchmarkProviderExecutionConfigV1,
+    *,
+    maximum_turns_per_generation: int,
+) -> BenchmarkUsageDeltaV1:
+    """Return immutable worst-case provider capacity for one bounded LLM run."""
+
+    if not 1 <= maximum_turns_per_generation <= 4:
+        raise ValueError("provider turns per generation must be between one and four")
+
     input_rate = config.price_snapshot.input_microusd_per_million_tokens
     output_rate = config.price_snapshot.output_microusd_per_million_tokens
     if input_rate is None or output_rate is None:  # pragma: no cover - model validator guards.
@@ -167,17 +180,15 @@ def direct_provider_run_capacity(
         / 1_000_000
     )
     generations = config.maximum_generations
+    turns = generations * maximum_turns_per_generation
     return BenchmarkUsageDeltaV1(
-        logical_turns=generations,
-        network_requests=generations,
-        input_utf8_bytes=config.maximum_request_utf8_bytes * generations,
-        output_utf8_bytes=config.maximum_response_utf8_bytes * generations,
-        provider_tokens=(
-            config.maximum_request_utf8_bytes + config.maximum_output_tokens
-        )
-        * generations,
-        provider_cost_microusd=per_generation_cost * generations,
-        wall_time_seconds=math.ceil(config.request_timeout_ms / 1000) * generations,
+        logical_turns=turns,
+        network_requests=turns,
+        input_utf8_bytes=config.maximum_request_utf8_bytes * turns,
+        output_utf8_bytes=config.maximum_response_utf8_bytes * turns,
+        provider_tokens=(config.maximum_request_utf8_bytes + config.maximum_output_tokens) * turns,
+        provider_cost_microusd=per_generation_cost * turns,
+        wall_time_seconds=math.ceil(config.request_timeout_ms / 1000) * turns,
     )
 
 
@@ -189,4 +200,5 @@ __all__ = [
     "BenchmarkProviderExecutionConfigV1",
     "BenchmarkProviderRequestEnvelope",
     "direct_provider_run_capacity",
+    "provider_run_capacity",
 ]

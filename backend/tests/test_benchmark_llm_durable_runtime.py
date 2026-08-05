@@ -24,22 +24,34 @@ from app.benchmarking.contracts import (
     canonical_sha256,
 )
 from app.benchmarking.coordinator import run_binding_sha256
-from app.benchmarking.llm_arm_contracts import BENCHMARK_LLM_ARM_POLICIES_SHA256
+from app.benchmarking.llm_arm_contracts import (
+    BENCHMARK_LLM_ARM_POLICIES_SHA256,
+    build_llm_turn_request,
+    require_llm_arm_policy,
+)
 from app.benchmarking.llm_durable_runtime import (
     BENCHMARK_DIRECT_RESERVATION_REASON,
     BenchmarkDurableLLMBlocked,
     BenchmarkProviderExecutionConfigV1,
     BenchmarkProviderTransportResult,
     execute_durable_direct_arm,
+    execute_durable_react_arm,
 )
 from app.benchmarking.method_inventory import BENCHMARK_METHOD_INVENTORY
-from app.benchmarking.provider_execution_contract import direct_provider_run_capacity
+from app.benchmarking.provider_execution_contract import (
+    direct_provider_run_capacity,
+    provider_run_capacity,
+)
 from app.benchmarking.provider_usage_reconciliation import (
     BenchmarkProviderUsageBlocked,
     reconcile_direct_provider_run_usage,
 )
 from app.benchmarking.registry import BENCHMARK_ADAPTER_REGISTRY, create_benchmark_adapter
-from app.orchestration.cognitive_budget import CognitiveTurnPending
+from app.orchestration.cognitive_budget import (
+    CognitiveTurnBlocked,
+    CognitiveTurnPending,
+    begin_benchmark_llm_turn,
+)
 from app.orchestration.provider_request_accounting import (
     ProviderUsage,
     recover_abandoned_provider_requests,
@@ -127,24 +139,24 @@ def _inventory() -> dict[str, Any]:
     }
 
 
-def _arm_manifest() -> BenchmarkArmManifestV1:
+def _arm_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkArmManifestV1:
+    arm_id = "llm-direct" if adapter_id == "llm_direct/v1" else "llm-react"
     return BenchmarkArmManifestV1(
-        benchmark_arm_id="llm-direct",
+        benchmark_arm_id=arm_id,
         arm_version="v1",
         arm_family="llm_harness",
-        proposal_adapter_id="llm_direct/v1",
-        intervention={
-            "provider_execution": _provider_config().model_dump(mode="json")
-        },
+        proposal_adapter_id=adapter_id,
+        intervention={"provider_execution": _provider_config().model_dump(mode="json")},
         provider_contract_sha256=BENCHMARK_LLM_ARM_POLICIES_SHA256,
         execution_enabled=True,
     )
 
 
-def _campaign_manifest() -> BenchmarkCampaignManifestV1:
+def _campaign_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkCampaignManifestV1:
+    turn_cap = 2 if adapter_id == "llm_direct/v1" else 8
     return BenchmarkCampaignManifestV1.model_validate(
         {
-            "campaign_key": "durable-direct-test",
+            "campaign_key": f"durable-{adapter_id.split('/')[0]}-test",
             "campaign_version": "v1",
             "name": "Durable direct contract fixture",
             "panel": "engineering",
@@ -166,8 +178,8 @@ def _campaign_manifest() -> BenchmarkCampaignManifestV1:
             "budget_caps": {
                 "jobs": 2,
                 "trials": 100,
-                "logical_turns": 2,
-                "network_requests": 2,
+                "logical_turns": turn_cap,
+                "network_requests": turn_cap,
                 "input_utf8_bytes": 10_000_000,
                 "output_utf8_bytes": 10_000_000,
                 "provider_tokens": 10_000_000,
@@ -175,12 +187,17 @@ def _campaign_manifest() -> BenchmarkCampaignManifestV1:
                 "wall_time_seconds": 1000,
                 "disk_bytes": 10_000_000,
             },
-            "arms": [_arm_manifest().model_dump(mode="json")],
+            "arms": [_arm_manifest(adapter_id).model_dump(mode="json")],
         }
     )
 
 
-def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, Any]:
+def _create_bound_run(
+    db: Session,
+    durable_db: SimpleNamespace,
+    *,
+    adapter_id: str = "llm_direct/v1",
+) -> tuple[Any, Any]:
     models = durable_db.models
     user = models.User(email="owner@example.test")
     db.add(user)
@@ -192,6 +209,7 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
     )
     db.add(batch)
     db.flush()
+    turns_per_generation = 1 if adapter_id == "llm_direct/v1" else 4
     job = models.Job(
         user_id=user.id,
         batch_id=batch.id,
@@ -205,8 +223,8 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
         max_iterations=2,
         max_total_trials=100,
         current_generation=0,
-        provider_turn_cap=2,
-        provider_request_cap=2,
+        provider_turn_cap=2 * turns_per_generation,
+        provider_request_cap=2 * turns_per_generation,
         provider_max_retries=0,
         openai_model=_MODEL,
         llm_access_mode="byok",
@@ -216,7 +234,7 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
     )
     db.add(job)
     db.flush()
-    campaign_manifest = _campaign_manifest()
+    campaign_manifest = _campaign_manifest(adapter_id)
     inventory = campaign_manifest.composite_execution_inventory
     campaign = models.BenchmarkCampaign(
         user_id=user.id,
@@ -232,8 +250,8 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
         composite_inventory_json=inventory.model_dump(mode="json"),
         job_cap=2,
         trial_cap=100,
-        logical_turn_cap=2,
-        network_request_cap=2,
+        logical_turn_cap=2 * turns_per_generation,
+        network_request_cap=2 * turns_per_generation,
         input_utf8_byte_cap=10_000_000,
         output_utf8_byte_cap=10_000_000,
         provider_token_cap=10_000_000,
@@ -243,7 +261,7 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
     )
     db.add(campaign)
     db.flush()
-    arm_manifest = _arm_manifest()
+    arm_manifest = _arm_manifest(adapter_id)
     arm = models.BenchmarkArm(
         campaign_id=campaign.id,
         benchmark_arm_id=arm_manifest.benchmark_arm_id,
@@ -282,7 +300,7 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
     scenario_sha = "5" * 64
     qualification_sha = "6" * 64
     request = BenchmarkRunBindingRequestV1(
-        run_key="direct-run-001",
+        run_key=f"{adapter_id.split('/')[0]}-run-001",
         job_id=job.id,
         benchmark_arm_id=arm.benchmark_arm_id,
         arm_version=arm.arm_version,
@@ -314,7 +332,10 @@ def _create_bound_run(db: Session, durable_db: SimpleNamespace) -> tuple[Any, An
     )
     db.add(run)
     db.flush()
-    reservation_usage = direct_provider_run_capacity(_provider_config())
+    reservation_usage = provider_run_capacity(
+        _provider_config(),
+        maximum_turns_per_generation=turns_per_generation,
+    )
     reservation_request = BenchmarkBudgetReservationRequestV1(
         reservation_key=f"provider-run/{run.id}",
         lease_generation=1,
@@ -341,7 +362,7 @@ def _observation(job: Any, run: Any) -> BenchmarkObservationV2:
     return BenchmarkObservationV2(
         campaign_id=run.campaign_id,
         run_id=run.id,
-        benchmark_arm_id="llm-direct",
+        benchmark_arm_id=run.arm.benchmark_arm_id,
         generation_index=job.current_generation + 1,
         next_dispatch_ordinal=job.next_candidate_dispatch_ordinal,
         algorithm_seed=run.algorithm_seed,
@@ -385,6 +406,24 @@ class _Transport:
         )
 
 
+@dataclass
+class _SequenceTransport:
+    responses: list[str | Exception | BaseException]
+    calls: int = 0
+
+    def complete(self, request: Any, config: Any) -> BenchmarkProviderTransportResult:
+        index = self.calls
+        self.calls += 1
+        response = self.responses[index]
+        if isinstance(response, BaseException):
+            raise response
+        return BenchmarkProviderTransportResult(
+            response_text=response,
+            usage=ProviderUsage(input_tokens=90, output_tokens=10, total_tokens=100),
+            latency_ms=20,
+        )
+
+
 def _proposal_json(value: float = 1.2) -> str:
     return json.dumps(
         {
@@ -393,6 +432,298 @@ def _proposal_json(value: float = 1.2) -> str:
             "parameters": {"kp": value},
         }
     )
+
+
+def _react_json(
+    decision: str,
+    *,
+    tools: tuple[str, ...] = (),
+    selected: str | None = None,
+) -> str:
+    return json.dumps(
+        {
+            "schema_version": "1.0",
+            "decision": decision,
+            "tool_adapter_ids": list(tools),
+            "selected_proposal_ref": selected,
+        }
+    )
+
+
+def test_react_arm_is_promoted_to_durable_server_managed_execution() -> None:
+    descriptor = BENCHMARK_ADAPTER_REGISTRY["llm_react/v1"]
+    inventory = BENCHMARK_METHOD_INVENTORY["llm_react/v1"]
+
+    assert descriptor.availability == "implemented"
+    assert descriptor.implementation_label == "durable-bounded-react-v1"
+    assert inventory.execution_readiness == "ready"
+    assert inventory.blocker_codes == ()
+    with pytest.raises(ValueError, match="server-managed"):
+        create_benchmark_adapter("llm_react/v1")
+
+
+def test_durable_react_checkpoints_action_then_dispatch_and_recovers_without_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        observation = _observation(job, run)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        transport = _SequenceTransport(
+            [
+                _react_json("act", tools=("random_search/v1",)),
+                _react_json("dispatch", selected=local.candidate_ref),
+            ]
+        )
+
+        result = execute_durable_react_arm(db, job, observation, transport=transport)
+
+        assert result.status == "proposal"
+        assert result.proposal is not None
+        assert result.proposal.parameters == local.parameters
+        assert result.provider_turns_attempted == result.provider_turns_succeeded == 2
+        assert transport.calls == 2
+        checkpoints = list(
+            db.scalars(
+                select(models.BenchmarkLLMReactCheckpoint).order_by(
+                    models.BenchmarkLLMReactCheckpoint.turn_index
+                )
+            )
+        )
+        assert [item.decision for item in checkpoints] == ["act", "dispatch"]
+        assert checkpoints[0].state_json["terminal_receipt"] == {}
+        assert checkpoints[1].state_json["final_proposal"]["candidate_ref"] == (
+            result.proposal.candidate_ref
+        )
+
+        replay = _SequenceTransport([AssertionError("provider replayed")])
+        recovered = execute_durable_react_arm(db, job, observation, transport=replay)
+        assert recovered.status == "proposal_recovered"
+        assert recovered.proposal == result.proposal
+        assert replay.calls == 0
+
+
+def test_durable_react_next_turn_requires_successful_checkpoint(
+    durable_db: SimpleNamespace,
+) -> None:
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        observation = _observation(job, run)
+        request = build_llm_turn_request(
+            policy=require_llm_arm_policy("llm_react/v1"),
+            observation=observation,
+            model_snapshot=_MODEL,
+            turn_index=1,
+            turn_role="react_action",
+            response_schema={"type": "object"},
+            tool_outputs=[],
+        )
+        begin_benchmark_llm_turn(
+            db,
+            job,
+            generation_index=observation.generation_index,
+            turn_index=1,
+            turn_role="react_action",
+            adapter_id="llm_react/v1",
+            maximum_turns_per_generation=4,
+            model_snapshot=_MODEL,
+            prompt_sha256=request.prompt_sha256,
+            evidence_sha256=request.evidence_sha256,
+            schema_sha256=request.response_schema_sha256,
+            tool_outputs_sha256=request.tool_outputs_sha256,
+        )
+
+        with pytest.raises(CognitiveTurnBlocked) as exc_info:
+            begin_benchmark_llm_turn(
+                db,
+                job,
+                generation_index=observation.generation_index,
+                turn_index=2,
+                turn_role="react_action",
+                adapter_id="llm_react/v1",
+                maximum_turns_per_generation=4,
+                model_snapshot=_MODEL,
+                prompt_sha256="a" * 64,
+                evidence_sha256="b" * 64,
+                schema_sha256="c" * 64,
+                tool_outputs_sha256="d" * 64,
+            )
+
+        assert exc_info.value.code == "cognitive_predecessor_missing"
+
+
+def test_durable_react_abandon_is_terminal_and_recoverable(
+    durable_db: SimpleNamespace,
+) -> None:
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        observation = _observation(job, run)
+        result = execute_durable_react_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport([_react_json("abandon")]),
+        )
+        assert result.status == "abandoned"
+        assert result.proposal is None
+        recovered = execute_durable_react_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport([AssertionError("provider replayed")]),
+        )
+        assert recovered.status == "abandoned_recovered"
+
+
+def test_durable_react_terminal_checkpoint_tamper_blocks_without_provider_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        observation = _observation(job, run)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        execute_durable_react_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport(
+                [
+                    _react_json("act", tools=("random_search/v1",)),
+                    _react_json("dispatch", selected=local.candidate_ref),
+                ]
+            ),
+        )
+        terminal = db.scalar(
+            select(models.BenchmarkLLMReactCheckpoint).where(
+                models.BenchmarkLLMReactCheckpoint.turn_index == 2
+            )
+        )
+        assert terminal is not None
+        state = dict(terminal.state_json)
+        receipt = dict(state["terminal_receipt"])
+        receipt["provider_turns_attempted"] = 1
+        state["terminal_receipt"] = receipt
+        final_proposal = dict(state["final_proposal"])
+        final_proposal["proposal_receipt"] = receipt
+        state["final_proposal"] = final_proposal
+        terminal.state_json = state
+        terminal.state_sha256 = canonical_sha256(state)
+        db.commit()
+
+        replay = _SequenceTransport([AssertionError("provider replayed")])
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_react_arm(db, job, observation, transport=replay)
+        assert exc_info.value.code == "benchmark_react_checkpoint_drift"
+        assert replay.calls == 0
+
+
+def test_durable_react_rejects_repeated_tool_without_replaying_consumed_turn(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        observation = _observation(job, run)
+        transport = _SequenceTransport(
+            [
+                _react_json("act", tools=("random_search/v1",)),
+                _react_json("act", tools=("random_search/v1",)),
+            ]
+        )
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_react_arm(db, job, observation, transport=transport)
+        assert exc_info.value.code == "benchmark_react_state_rejected"
+        assert transport.calls == 2
+        assert (
+            db.scalar(
+                select(models.BenchmarkLLMReactCheckpoint).where(
+                    models.BenchmarkLLMReactCheckpoint.turn_index == 2
+                )
+            )
+            is None
+        )
+        second = db.scalar(
+            select(models.HarnessCognitiveTurnReceipt).where(
+                models.HarnessCognitiveTurnReceipt.turn_index == 2
+            )
+        )
+        assert second is not None and second.outcome.status == "invalid_schema"
+        replay = _SequenceTransport([AssertionError("provider replayed")])
+        with pytest.raises(CognitiveTurnBlocked) as replay_error:
+            execute_durable_react_arm(db, job, observation, transport=replay)
+        assert replay_error.value.code == "turn_result_not_replayable"
+        assert replay.calls == 0
+
+
+def test_durable_react_fourth_turn_cannot_extend_the_tool_loop(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        observation = _observation(job, run)
+        transport = _SequenceTransport(
+            [
+                _react_json("act", tools=("random_search/v1",)),
+                _react_json("act", tools=("seeded_halton/v1",)),
+                _react_json("act", tools=("repo_constrained_mobo/v1",)),
+                _react_json("act", tools=("optimizer_portfolio/v1",)),
+            ]
+        )
+
+        with pytest.raises(BenchmarkDurableLLMBlocked) as exc_info:
+            execute_durable_react_arm(db, job, observation, transport=transport)
+
+        assert exc_info.value.code == "benchmark_react_state_rejected"
+        assert transport.calls == 4
+        checkpoints = list(
+            db.scalars(
+                select(models.BenchmarkLLMReactCheckpoint).order_by(
+                    models.BenchmarkLLMReactCheckpoint.turn_index
+                )
+            )
+        )
+        assert [item.turn_index for item in checkpoints] == [1, 2, 3]
+        fourth = db.scalar(
+            select(models.HarnessCognitiveTurnReceipt).where(
+                models.HarnessCognitiveTurnReceipt.turn_index == 4
+            )
+        )
+        assert fourth is not None and fourth.outcome.status == "invalid_schema"
+        assert job.provider_turns_attempted == 4
+        assert job.provider_requests_attempted == 4
+
+
+def test_durable_react_crash_after_checkpoint_never_replays_paid_next_turn(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        observation = _observation(job, run)
+        transport = _SequenceTransport(
+            [
+                _react_json("act", tools=("random_search/v1",)),
+                KeyboardInterrupt("simulated process crash"),
+            ]
+        )
+        with pytest.raises(KeyboardInterrupt):
+            execute_durable_react_arm(db, job, observation, transport=transport)
+        assert transport.calls == 2
+        checkpoints = list(db.scalars(select(models.BenchmarkLLMReactCheckpoint)))
+        assert len(checkpoints) == 1 and checkpoints[0].turn_index == 1
+        second = db.scalar(
+            select(models.HarnessCognitiveTurnReceipt).where(
+                models.HarnessCognitiveTurnReceipt.turn_index == 2
+            )
+        )
+        assert second is not None and second.outcome is None
+        replay = _SequenceTransport([AssertionError("provider replayed")])
+        with pytest.raises(CognitiveTurnPending):
+            execute_durable_react_arm(db, job, observation, transport=replay)
+        assert replay.calls == 0
 
 
 def test_provider_execution_contract_rejects_stringified_budget_numbers() -> None:
@@ -447,6 +778,10 @@ def test_direct_provider_capacity_is_deterministic_and_worst_case() -> None:
     assert capacity.provider_tokens == (65_536 + 128) * 2
     assert capacity.provider_cost_microusd == 264_192
     assert capacity.wall_time_seconds == 20
+    react_capacity = provider_run_capacity(_provider_config(), maximum_turns_per_generation=4)
+    assert react_capacity.logical_turns == 8
+    assert react_capacity.network_requests == 8
+    assert react_capacity.provider_cost_microusd == capacity.provider_cost_microusd * 4
 
 
 def test_direct_arm_is_promoted_only_to_server_managed_durable_execution() -> None:
@@ -558,6 +893,135 @@ def test_production_dispatch_routes_direct_handoff_to_candidate_and_trials(
         assert "messages" not in json.dumps(candidate.optimizer_metadata_json)
 
 
+def test_production_dispatch_routes_bounded_react_checkpoint_to_candidate_and_trials(
+    durable_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import job_manager
+
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        _prepare_production_job(job)
+        db.commit()
+        observation = _production_observation(job, run)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        context = SimpleNamespace(
+            arm=SimpleNamespace(
+                proposal_adapter_id="llm_react/v1",
+                benchmark_arm_id="llm-react",
+            ),
+            binding=run,
+        )
+        transport = _SequenceTransport(
+            [
+                _react_json("act", tools=("random_search/v1",)),
+                _react_json("dispatch", selected=local.candidate_ref),
+            ]
+        )
+        monkeypatch.setattr(
+            job_manager,
+            "build_benchmark_job_observation",
+            lambda _db, _job: (context, observation),
+        )
+        monkeypatch.setattr(
+            job_manager,
+            "build_job_secret_benchmark_transport",
+            lambda _db, _job, _provider: transport,
+        )
+
+        result = job_manager.dispatch_next_benchmark_generation(db, job)
+
+        assert result.status == "dispatched"
+        assert result.dispatched_candidates == 1
+        assert transport.calls == 2
+        candidate = db.scalar(
+            select(durable_db.models.CandidateParameterSet).where(
+                durable_db.models.CandidateParameterSet.job_id == job.id,
+                durable_db.models.CandidateParameterSet.is_baseline.is_(False),
+            )
+        )
+        assert candidate is not None
+        assert candidate.parameter_json["MPC_XY_P"] == pytest.approx(local.parameters["MPC_XY_P"])
+        assert candidate.proposal_reason == "benchmark:llm_react/v1"
+        assert list(
+            db.scalars(
+                select(durable_db.models.Trial).where(
+                    durable_db.models.Trial.candidate_id == candidate.id
+                )
+            )
+        )
+        payload = candidate.optimizer_metadata_json["benchmark_proposal_context"]
+        assert payload["proposal_adapter_id"] == "llm_react/v1"
+        assert "messages" not in json.dumps(candidate.optimizer_metadata_json)
+
+
+def test_production_dispatch_recovers_react_checkpoint_without_secret_resolution(
+    durable_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.orchestration import job_manager
+
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="llm_react/v1")
+        _prepare_production_job(job)
+        db.commit()
+        observation = _production_observation(job, run)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        transport = _SequenceTransport(
+            [
+                _react_json("act", tools=("random_search/v1",)),
+                _react_json("dispatch", selected=local.candidate_ref),
+            ]
+        )
+        execute_durable_react_arm(db, job, observation, transport=transport)
+        assert transport.calls == 2
+
+        context = SimpleNamespace(
+            arm=SimpleNamespace(
+                proposal_adapter_id="llm_react/v1",
+                benchmark_arm_id="llm-react",
+            ),
+            binding=run,
+        )
+        secret_resolutions = 0
+
+        def forbidden_secret_resolution(*_args: Any, **_kwargs: Any) -> Any:
+            nonlocal secret_resolutions
+            secret_resolutions += 1
+            raise AssertionError("checkpoint recovery must not resolve a credential")
+
+        monkeypatch.setattr(
+            job_manager,
+            "build_benchmark_job_observation",
+            lambda _db, _job: (context, observation),
+        )
+        monkeypatch.setattr(
+            job_manager,
+            "build_job_secret_benchmark_transport",
+            forbidden_secret_resolution,
+        )
+
+        result = job_manager.dispatch_next_benchmark_generation(db, job)
+
+        assert result.status == "dispatched"
+        assert result.dispatched_candidates == 1
+        assert secret_resolutions == 0
+        assert (
+            len(
+                list(
+                    db.scalars(
+                        select(durable_db.models.CandidateParameterSet).where(
+                            durable_db.models.CandidateParameterSet.job_id == job.id,
+                            durable_db.models.CandidateParameterSet.is_baseline.is_(False),
+                        )
+                    )
+                )
+            )
+            == 1
+        )
+        assert len(list(db.scalars(select(durable_db.models.ProviderNetworkRequestReceipt)))) == 2
+
+
 def test_production_dispatch_recovers_handoff_without_secret_or_provider_replay(
     durable_db: SimpleNamespace,
     monkeypatch: pytest.MonkeyPatch,
@@ -615,34 +1079,31 @@ def test_production_dispatch_recovers_handoff_without_secret_or_provider_replay(
             )
             == 1
         )
-        assert (
-            len(
-                list(
-                    db.scalars(
-                        select(durable_db.models.ProviderNetworkRequestReceipt)
-                    )
-                )
-            )
-            == 1
-        )
+        assert len(list(db.scalars(select(durable_db.models.ProviderNetworkRequestReceipt)))) == 1
 
 
+@pytest.mark.parametrize(
+    ("adapter_id", "arm_id"),
+    (("llm_direct/v1", "llm-direct"), ("llm_react/v1", "llm-react")),
+)
 def test_production_dispatch_without_job_secret_fails_before_attempt(
     durable_db: SimpleNamespace,
     monkeypatch: pytest.MonkeyPatch,
+    adapter_id: str,
+    arm_id: str,
 ) -> None:
     from app.orchestration import job_manager
 
     monkeypatch.setenv("OPENAI_API_KEY", "environment-key-must-not-be-consumed")
     with Session(durable_db.engine) as db:
-        job, run = _create_bound_run(db, durable_db)
+        job, run = _create_bound_run(db, durable_db, adapter_id=adapter_id)
         _prepare_production_job(job)
         db.commit()
         observation = _production_observation(job, run)
         context = SimpleNamespace(
             arm=SimpleNamespace(
-                proposal_adapter_id="llm_direct/v1",
-                benchmark_arm_id="llm-direct",
+                proposal_adapter_id=adapter_id,
+                benchmark_arm_id=arm_id,
             ),
             binding=run,
         )
@@ -698,10 +1159,7 @@ def test_direct_attempts_are_committed_before_transport_and_success_is_safe(
         assert handoff.parameter_sha256 == canonical_sha256({"kp": 1.2})
         assert handoff.proposal_receipt_sha256 == canonical_sha256(result.safe_receipt)
         assert transport.last_request.request_body()["seed"] == 20260805
-        assert (
-            request_receipt.request_body_sha256
-            == transport.last_request.request_body_sha256
-        )
+        assert request_receipt.request_body_sha256 == transport.last_request.request_body_sha256
         reconciliation = reconcile_direct_provider_run_usage(db, run.id)
         assert reconciliation.status == "complete"
         assert reconciliation.actual_observed.logical_turns == 1
@@ -849,8 +1307,7 @@ def test_provider_failure_is_fail_closed_and_does_not_persist_exception_text(
         assert reconciliation.actual_observed.logical_turns == 1
         assert reconciliation.actual_observed.network_requests == 1
         persisted = " ".join(
-            str(item.__dict__)
-            for item in (turn, turn.outcome, request, request.outcome)
+            str(item.__dict__) for item in (turn, turn.outcome, request, request.outcome)
         )
         assert "must-not-persist" not in persisted
 
@@ -899,28 +1356,33 @@ def test_response_byte_cap_records_consumed_request_but_rejects_model_result(
         assert turn.outcome.error_code == "benchmark_provider_response_too_large"
         assert request is not None and request.outcome.status == "succeeded"
         assert request.outcome.output_utf8_bytes == 8_193
-        assert request.outcome.response_sha256 == hashlib.sha256(
-            oversized_response.encode("utf-8")
-        ).hexdigest()
+        assert (
+            request.outcome.response_sha256
+            == hashlib.sha256(oversized_response.encode("utf-8")).hexdigest()
+        )
         assert oversized_response not in str(request.outcome.__dict__)
         db.refresh(job)
         assert job.provider_turns_succeeded == 0
         assert job.provider_requests_succeeded == 1
 
 
-def test_first_qualified_stop_consumes_zero_provider_work(durable_db: SimpleNamespace) -> None:
+@pytest.mark.parametrize("adapter_id", ("llm_direct/v1", "llm_react/v1"))
+def test_first_qualified_stop_consumes_zero_provider_work(
+    durable_db: SimpleNamespace,
+    adapter_id: str,
+) -> None:
     models = durable_db.models
     with Session(durable_db.engine) as db:
-        job, run = _create_bound_run(db, durable_db)
+        job, run = _create_bound_run(db, durable_db, adapter_id=adapter_id)
         job.first_qualified_candidate_id = "frozen-candidate"
         db.commit()
         transport = _Transport(RuntimeError("must not run"))
-        result = execute_durable_direct_arm(
-            db,
-            job,
-            _observation(job, run),
-            transport=transport,
+        executor = (
+            execute_durable_direct_arm
+            if adapter_id == "llm_direct/v1"
+            else execute_durable_react_arm
         )
+        result = executor(db, job, _observation(job, run), transport=transport)
         assert result.status == "first_qualified_stop"
         assert transport.calls == 0
         assert db.scalar(select(models.HarnessCognitiveTurnReceipt)) is None
@@ -948,13 +1410,16 @@ def test_process_crash_leaves_indeterminate_attempt_and_never_replays(
         attempted_at = request.attempted_at
         if attempted_at.tzinfo is None:
             attempted_at = attempted_at.replace(tzinfo=timezone.utc)
-        assert recover_abandoned_provider_requests(
-            db,
-            job,
-            cognitive_turn_receipt_id=turn.id,
-            request_timeout_seconds=10,
-            now=attempted_at + timedelta(seconds=71),
-        ) == 1
+        assert (
+            recover_abandoned_provider_requests(
+                db,
+                job,
+                cognitive_turn_receipt_id=turn.id,
+                request_timeout_seconds=10,
+                now=attempted_at + timedelta(seconds=71),
+            )
+            == 1
+        )
         db.refresh(request)
         assert request.outcome.status == "indeterminate"
         second_transport = _Transport(_proposal_json())
@@ -1060,17 +1525,13 @@ def test_reservation_capacity_drift_blocks_before_transport(
         job, run = _create_bound_run(db, durable_db)
         reservation = db.scalar(
             select(models.BenchmarkBudgetReservation).where(
-                models.BenchmarkBudgetReservation.reservation_key
-                == f"provider-run/{run.id}"
+                models.BenchmarkBudgetReservation.reservation_key == f"provider-run/{run.id}"
             )
         )
         assert reservation is not None
         reservation.input_utf8_bytes += delta
         changed_usage = BenchmarkUsageDeltaV1(
-            **{
-                field: getattr(reservation, field)
-                for field in BenchmarkUsageDeltaV1.model_fields
-            }
+            **{field: getattr(reservation, field) for field in BenchmarkUsageDeltaV1.model_fields}
         )
         reservation.reservation_sha256 = canonical_sha256(
             BenchmarkBudgetReservationRequestV1(

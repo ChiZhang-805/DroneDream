@@ -53,9 +53,9 @@ _BENCHMARK_SCENARIO_SUITE = {
     ],
     "common_random_numbers": True,
 }
-_NORMALIZED_BENCHMARK_SCENARIO_SUITE = ScenarioSuiteConfig(
-    **_BENCHMARK_SCENARIO_SUITE
-).model_dump(mode="json")
+_NORMALIZED_BENCHMARK_SCENARIO_SUITE = ScenarioSuiteConfig(**_BENCHMARK_SCENARIO_SUITE).model_dump(
+    mode="json"
+)
 _BENCHMARK_JOB_PAYLOAD = {
     **HEURISTIC_JOB_PAYLOAD,
     "scenario_suite": _BENCHMARK_SCENARIO_SUITE,
@@ -86,9 +86,7 @@ def _manifest() -> dict[str, object]:
         "campaign_version": "v1",
         "name": "Panel A pilot preregistration",
         "panel": "A",
-        "protocol_sha256": (
-            "734bb6b42ec25ffc92bd9f15bb6fa27bc3482b4ce0841ce9aa3b080eafb8caee"
-        ),
+        "protocol_sha256": ("734bb6b42ec25ffc92bd9f15bb6fa27bc3482b4ce0841ce9aa3b080eafb8caee"),
         "generated_at": "2026-08-04T10:00:00Z",
         "composite_execution_inventory": {
             "schema_id": "dronedream.composite-execution-inventory/v1",
@@ -119,9 +117,7 @@ def _manifest() -> dict[str, object]:
             "failure_semantics_sha256": "d" * 64,
             "simulator_budget_sha256": "e" * 64,
             "qualification_rule_sha256": QUALIFICATION_RULE_SHA256,
-            "scenario_manifest_sha256": canonical_sha256(
-                _NORMALIZED_BENCHMARK_SCENARIO_SUITE
-            ),
+            "scenario_manifest_sha256": canonical_sha256(_NORMALIZED_BENCHMARK_SCENARIO_SUITE),
             "seed_block_manifest_sha256": "1" * 64,
         },
         "budget_caps": {
@@ -251,6 +247,23 @@ def _direct_job_payload() -> dict[str, object]:
     }
 
 
+def _executable_react_manifest(*, version: str) -> dict[str, object]:
+    manifest = _executable_direct_manifest(version=version)
+    arm = manifest["arms"][0]
+    arm["benchmark_arm_id"] = "llm-react"
+    arm["proposal_adapter_id"] = "llm_react/v1"
+    manifest["budget_caps"]["logical_turns"] = 8
+    manifest["budget_caps"]["network_requests"] = 8
+    return manifest
+
+
+def _react_job_payload() -> dict[str, object]:
+    payload = _direct_job_payload()
+    payload["provider_turn_cap"] = 8
+    payload["provider_request_cap"] = 8
+    return payload
+
+
 def test_unified_observation_excludes_holdout_and_sensitive_payloads() -> None:
     v1_schema = BenchmarkObservationV1.model_json_schema()
     v2_schema = BenchmarkObservationV2.model_json_schema()
@@ -338,9 +351,7 @@ def test_new_campaign_cannot_silently_execute_the_legacy_v1_observation_contract
 ) -> None:
     manifest = _manifest()
     manifest["campaign_version"] = "legacy-observation-v1"
-    manifest["fairness"][
-        "observation_contract_sha256"
-    ] = BENCHMARK_OBSERVATION_V1_CONTRACT_SHA256
+    manifest["fairness"]["observation_contract_sha256"] = BENCHMARK_OBSERVATION_V1_CONTRACT_SHA256
 
     response = client.post("/api/v1/benchmark-campaigns", json={"manifest": manifest})
 
@@ -358,9 +369,7 @@ def test_new_campaign_requires_the_server_frozen_qualification_rule(
     response = client.post("/api/v1/benchmark-campaigns", json={"manifest": manifest})
 
     assert response.status_code == 422
-    assert response.json()["error"]["code"] == (
-        "BENCHMARK_QUALIFICATION_RULE_MISMATCH"
-    )
+    assert response.json()["error"]["code"] == ("BENCHMARK_QUALIFICATION_RULE_MISMATCH")
 
 
 def test_create_campaign_freezes_manifest_and_registered_arms(client: TestClient) -> None:
@@ -562,10 +571,7 @@ def test_campaign_coordinator_fences_and_idempotently_accounts_global_caps(
     with SessionLocal() as db:
         with pytest.raises(DatabaseError, match="reservations are append-only"):
             db.execute(
-                text(
-                    "UPDATE benchmark_budget_reservations SET trials=999 "
-                    "WHERE id=:id"
-                ),
+                text("UPDATE benchmark_budget_reservations SET trials=999 WHERE id=:id"),
                 {"id": reservation["id"]},
             )
             db.commit()
@@ -725,17 +731,14 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
     )
     expected_contract_sha256 = sealed_qualification_contract_sha256(frozen_contract)
     assert all(
-        run["qualification_policy_version"] == "sealed-two-stage-v1"
+        run["qualification_policy_version"] == "sealed-two-stage-v1" for run in binding["runs"]
+    )
+    assert all(
+        run["scenario_suite_sha256"] == canonical_sha256(_NORMALIZED_BENCHMARK_SCENARIO_SUITE)
         for run in binding["runs"]
     )
     assert all(
-        run["scenario_suite_sha256"]
-        == canonical_sha256(_NORMALIZED_BENCHMARK_SCENARIO_SUITE)
-        for run in binding["runs"]
-    )
-    assert all(
-        run["qualification_contract_sha256"] == expected_contract_sha256
-        for run in binding["runs"]
+        run["qualification_contract_sha256"] == expected_contract_sha256 for run in binding["runs"]
     )
 
     from app import models
@@ -779,9 +782,7 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
         "/api/v1/batches",
         json={"name": "paired-block-02", "jobs": [_BENCHMARK_JOB_PAYLOAD]},
     ).json()["data"]
-    second_job = client.get(
-        f"/api/v1/batches/{second_batch['id']}/jobs"
-    ).json()["data"][0]
+    second_job = client.get(f"/api/v1/batches/{second_batch['id']}/jobs").json()["data"][0]
     second_binding = client.post(
         endpoint,
         json={
@@ -812,10 +813,7 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
     with SessionLocal() as db:
         with pytest.raises(DatabaseError, match="execution bindings are append-only"):
             db.execute(
-                text(
-                    "UPDATE benchmark_campaign_run_bindings SET algorithm_seed=999 "
-                    "WHERE id=:id"
-                ),
+                text("UPDATE benchmark_campaign_run_bindings SET algorithm_seed=999 WHERE id=:id"),
                 {"id": binding["runs"][0]["id"]},
             )
             db.commit()
@@ -896,8 +894,7 @@ def test_direct_batch_binding_atomically_reserves_frozen_provider_capacity(
     with SessionLocal() as db:
         reservation = db.scalar(
             select(models.BenchmarkBudgetReservation).where(
-                models.BenchmarkBudgetReservation.reservation_key
-                == f"provider-run/{run_id}"
+                models.BenchmarkBudgetReservation.reservation_key == f"provider-run/{run_id}"
             )
         )
         assert reservation is not None
@@ -909,6 +906,77 @@ def test_direct_batch_binding_atomically_reserves_frozen_provider_capacity(
         assert reservation.provider_tokens == (65_536 + 128) * 2
         assert reservation.provider_cost_microusd == 264_192
         assert reservation.wall_time_seconds == 20
+
+
+def test_react_batch_binding_reserves_four_bounded_turns_per_generation(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_SECRET_KEY", "unit-test-secret-material")
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
+    created_response = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _executable_react_manifest(version="react-reserve-v1")},
+    )
+    assert created_response.status_code == 200, created_response.text
+    created = created_response.json()["data"]
+    batch_response = client.post(
+        "/api/v1/batches",
+        json={"name": "react-block-01", "jobs": [_react_job_payload()]},
+    )
+    assert batch_response.status_code == 200, batch_response.text
+    batch = batch_response.json()["data"]
+    job = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"][0]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "react-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    response = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings",
+        json={
+            "binding_key": "react-block-01",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [
+                {
+                    "run_key": "react-run-01",
+                    "job_id": job["id"],
+                    "benchmark_arm_id": "llm-react",
+                    "arm_version": "v1",
+                    "algorithm_seed": 101,
+                    "simulator_seed_block": "crn-react-01",
+                    "provider_randomness_policy": "fixed_seed",
+                    "provider_seed": 20260805,
+                }
+            ],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+    assert response.status_code == 200, response.text
+    run_id = response.json()["data"]["runs"][0]["id"]
+    with SessionLocal() as db:
+        reservation = db.scalar(
+            select(models.BenchmarkBudgetReservation).where(
+                models.BenchmarkBudgetReservation.reservation_key == f"provider-run/{run_id}"
+            )
+        )
+        assert reservation is not None
+        assert reservation.logical_turns == reservation.network_requests == 8
+        assert reservation.input_utf8_bytes == 65_536 * 8
+        assert reservation.output_utf8_bytes == 8_192 * 8
+        assert reservation.provider_tokens == (65_536 + 128) * 8
+        assert reservation.provider_cost_microusd == 264_192 * 4
+        assert reservation.wall_time_seconds == 80
 
 
 def test_direct_batch_binding_rolls_back_when_provider_capacity_exceeds_campaign(
@@ -981,21 +1049,30 @@ def test_direct_batch_binding_rolls_back_when_provider_capacity_exceeds_campaign
     assert response.json()["error"]["code"] == "BENCHMARK_CAMPAIGN_CAP_EXCEEDED"
 
     with SessionLocal() as db:
-        assert db.scalar(
-            select(models.BenchmarkCampaignBatchBinding).where(
-                models.BenchmarkCampaignBatchBinding.campaign_id == created["id"]
+        assert (
+            db.scalar(
+                select(models.BenchmarkCampaignBatchBinding).where(
+                    models.BenchmarkCampaignBatchBinding.campaign_id == created["id"]
+                )
             )
-        ) is None
-        assert db.scalar(
-            select(models.BenchmarkCampaignRunBinding).where(
-                models.BenchmarkCampaignRunBinding.campaign_id == created["id"]
+            is None
+        )
+        assert (
+            db.scalar(
+                select(models.BenchmarkCampaignRunBinding).where(
+                    models.BenchmarkCampaignRunBinding.campaign_id == created["id"]
+                )
             )
-        ) is None
-        assert db.scalar(
-            select(models.BenchmarkBudgetReservation).where(
-                models.BenchmarkBudgetReservation.campaign_id == created["id"]
+            is None
+        )
+        assert (
+            db.scalar(
+                select(models.BenchmarkBudgetReservation).where(
+                    models.BenchmarkBudgetReservation.campaign_id == created["id"]
+                )
             )
-        ) is None
+            is None
+        )
         state = db.get(models.BenchmarkCampaignCoordinatorState, created["id"])
         assert state is not None
         assert state.next_batch_ordinal == 1
@@ -1143,9 +1220,7 @@ def test_campaign_binding_rejects_preregistered_but_execution_disabled_arm(
     )
 
     assert response.status_code == 422
-    assert response.json()["error"]["code"] == (
-        "BENCHMARK_RUN_ARM_EXECUTION_DISABLED"
-    )
+    assert response.json()["error"]["code"] == ("BENCHMARK_RUN_ARM_EXECUTION_DISABLED")
     usage = client.get(f"/api/v1/benchmark-campaigns/{created['id']}/usage")
     assert usage.json()["data"]["used"]["jobs"] == 0
     with SessionLocal() as db:
@@ -1172,11 +1247,7 @@ def test_campaign_binding_rejects_a_job_without_exact_sealed_contract(
 ) -> None:
     created = client.post(
         "/api/v1/benchmark-campaigns",
-        json={
-            "manifest": _executable_pair_manifest(
-                version="invalid-sealed-matrix-v1"
-            )
-        },
+        json={"manifest": _executable_pair_manifest(version="invalid-sealed-matrix-v1")},
     ).json()["data"]
     batch = client.post(
         "/api/v1/batches",
