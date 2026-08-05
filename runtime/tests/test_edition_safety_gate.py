@@ -377,6 +377,23 @@ def test_backend_allow_runtime_deny_cannot_become_joint_allow(tmp_path: Path) ->
     assert backend_denied.decision == "deny"
     assert runtime_allowed.decision == "allow"
 
+    reverse_layers = [native, dict(backend_denied.receipt), dict(runtime_allowed.receipt)]
+    reverse_quorum = deepcopy(quorum)
+    reverse_quorum["layerDecisionHashes"] = {
+        str(receipt["layer"]): receipt["canonicalDecisionHash"]
+        for receipt in reverse_layers
+    }
+    reverse_quorum["reasonCodes"] = list(backend_denied.reason_codes)
+    validated_reverse = contract.validate_quorum_receipt(
+        reverse_quorum,
+        request=request,
+        layer_receipts=reverse_layers,
+        policy=policy_contract,
+        app_env="test",
+        now=runtime_observation.observed_at,
+    )
+    assert validated_reverse["decision"] == "deny"
+
 
 def test_runtime_module_exposes_no_action_or_device_handler() -> None:
     assert not any(
