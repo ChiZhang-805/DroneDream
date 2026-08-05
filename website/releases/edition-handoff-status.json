@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-05",
+  "contract": "dronedream.exact-edition-exe-handoff.v1",
+  "editions": [
+    {
+      "id": "sim",
+      "sourceBranch": "codex/software-sim",
+      "observedRemoteHead": "9dbff76b1411b0d31ae59c8ca7ad103a1a394d92",
+      "handoffStatus": "awaiting-exact-handoff",
+      "acceptedArtifact": null,
+      "note": "The known DroneDream-Sim-1.0.0.exe preview is not accepted as release-ready."
+    },
+    {
+      "id": "lab",
+      "sourceBranch": "codex/software-lab",
+      "observedRemoteHead": "e9752238cee9123705f896a6e4ebc519c50135dc",
+      "handoffStatus": "awaiting-exact-handoff",
+      "acceptedArtifact": null,
+      "note": "No exact LAB release-ready EXE handoff has been received."
+    },
+    {
+      "id": "field",
+      "sourceBranch": "codex/software-field",
+      "observedRemoteHead": "973f3c1eace831e34a2ea83c37316506addc1a3c",
+      "handoffStatus": "awaiting-exact-handoff",
+      "acceptedArtifact": null,
+      "note": "No exact FIELD release-ready EXE handoff has been received."
+    },
+    {
+      "id": "universal",
+      "sourceBranch": "codex/software",
+      "observedRemoteHead": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+      "handoffStatus": "awaiting-exact-handoff",
+      "acceptedArtifact": null,
+      "note": "No exact Universal release-ready EXE handoff has been received."
+    }
+  ]
+}

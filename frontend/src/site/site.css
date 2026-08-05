@@ -251,11 +251,11 @@ body:has(#site-root) a {
   gap: 0.48rem;
   flex: 0 0 auto;
   padding: 0.78rem 1.28rem;
-  border: 1px solid rgba(132, 227, 255, 0.25);
+  border: 1px solid rgba(230, 87, 209, 0.28);
   border-radius: 999px;
   color: #07101b;
-  background: linear-gradient(110deg, var(--site-cyan), #a6a0ff 55%, var(--site-magenta));
-  box-shadow: 0 8px 28px rgba(105, 216, 255, 0.15);
+  background: linear-gradient(110deg, #ff5574, #6a4cff 55%, #e657d1);
+  box-shadow: 0 8px 28px rgba(230, 87, 209, 0.18);
   font-size: 1.04rem;
   font-family: inherit;
   font-weight: 750;
@@ -274,7 +274,13 @@ body:has(#site-root) a {
   stroke-width: 1.9;
 }
 
-.site-header-download:hover { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(105, 216, 255, 0.24); }
+.site-header-download img {
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
+}
+
+.site-header-download:hover { transform: translateY(-2px); box-shadow: 0 12px 34px rgba(230, 87, 209, 0.26); }
 .site-header-download:disabled {
   opacity: 0.48;
   box-shadow: none;

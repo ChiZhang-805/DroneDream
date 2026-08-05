@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n/I18nProvider";
+import { fallbackEditionAvailability } from "../site/editionAvailability";
 import { PricingPage } from "../site/PricingPage";
 import { SiteApp } from "../site/SiteApp";
 import {
@@ -52,6 +53,15 @@ describe("DroneDream public website", () => {
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
     expect(screen.getByRole("button", { name: "DroneDream Universal is coming soon" }))
       .toBeDisabled();
+    const universalDownload = screen.getByRole("button", {
+      name: "DroneDream Universal is coming soon",
+    });
+    expect(universalDownload).toHaveAttribute("data-edition", "universal");
+    expect(universalDownload).toHaveAttribute("data-release-registry", "exact-edition-exe-v1");
+    expect(universalDownload.querySelector("img")).toHaveAttribute(
+      "src",
+      expect.stringContaining("drone-dream-mark.png"),
+    );
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
     expect(starflightButton).not.toHaveTextContent("+");
@@ -106,6 +116,41 @@ describe("DroneDream public website", () => {
       "/downloads/latest.json",
       expect.objectContaining({ cache: "no-cache" }),
     ));
+  });
+
+  it("unlocks only the Universal header entry from an accepted Universal registry item", async () => {
+    const availability = structuredClone(fallbackEditionAvailability);
+    const universal = availability.editions.find(({ id }) => id === "universal");
+    if (!universal) throw new Error("Missing Universal fixture");
+    Object.assign(universal, {
+      releaseStatus: "published",
+      availability: "downloadable",
+      signatureState: "signed",
+      downloadUrl: "/downloads/DroneDream-Universal-1.0.0.exe",
+      checksumUrl: "/downloads/DroneDream-Universal-1.0.0.exe.sha256",
+      signatureUrl: "/downloads/DroneDream-Universal-1.0.0.exe.sig",
+      receiptUrl: "/downloads/DroneDream-Universal-1.0.0.exe.receipt.json",
+      urlFamily: "/downloads",
+      sizeBytes: 12_345_678,
+      sha256: "a".repeat(64),
+      sourceCommit: "b".repeat(40),
+      publishedAt: availability.generatedAt,
+    });
+    vi.stubGlobal("fetch", vi.fn((input: string | URL | Request) => {
+      if (String(input) === "/downloads/editions.json") {
+        return Promise.resolve({ ok: true, json: async () => availability });
+      }
+      return Promise.reject(new Error("offline test"));
+    }));
+    renderSite();
+
+    const link = await screen.findByRole("link", { name: /DroneDream Universal.*Download/ });
+    expect(link).toHaveAttribute("href", "/downloads/DroneDream-Universal-1.0.0.exe");
+    expect(link).toHaveAttribute("download", "DroneDream-Universal-1.0.0.exe");
+    expect(link).toHaveAttribute("data-edition", "universal");
+    expect(document.querySelector('a[href*="DroneDream-Sim-1.0.0.exe"]')).toBeNull();
+    expect(document.querySelector('a[href*="DroneDream-Lab-1.0.0.exe"]')).toBeNull();
+    expect(document.querySelector('a[href*="DroneDream-Field-1.0.0.exe"]')).toBeNull();
   });
 
   it("keeps static downloads available while HTTP-mirror sensitive entries are disabled", () => {

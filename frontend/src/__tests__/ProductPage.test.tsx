@@ -18,6 +18,7 @@ function publishedSimAvailability(): EditionAvailabilityDocument {
   sim.checksumUrl = "/downloads/DroneDream-Sim-1.0.0.exe.sha256";
   sim.signatureUrl = "/downloads/DroneDream-Sim-1.0.0.exe.sig";
   sim.receiptUrl = "/downloads/DroneDream-Sim-1.0.0.exe.receipt.json";
+  sim.urlFamily = "/downloads";
   sim.sizeBytes = 12_345_678;
   sim.sha256 = "a".repeat(64);
   sim.sourceCommit = "b".repeat(40);
@@ -61,6 +62,31 @@ describe("ProductPage", () => {
     expect(container.querySelector('a[href*="DroneDream_1.0.0_x64-setup.exe"]')).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it.each([
+    ["en", 1440, "DroneDream Editions"],
+    ["en", 760, "DroneDream Editions"],
+    ["en", 390, "DroneDream Editions"],
+    ["zh-CN", 1440, "DroneDream 专业版本"],
+    ["zh-CN", 760, "DroneDream 专业版本"],
+    ["zh-CN", 390, "DroneDream 专业版本"],
+  ] as const)(
+    "keeps the %s download chooser fail-closed at %ipx",
+    (locale, viewportWidth, title) => {
+      Object.defineProperty(window, "innerWidth", {
+        configurable: true,
+        value: viewportWidth,
+      });
+      const { container } = render(
+        <ProductPage availability={fallbackEditionAvailability} locale={locale} />,
+      );
+      expect(screen.getByRole("heading", { name: title })).toBeVisible();
+      expect(container.querySelectorAll(
+        '[data-release-registry="exact-edition-exe-v1"][data-download-ready="false"]',
+      )).toHaveLength(3);
+      expect(container.querySelectorAll(".site-product-edition-action")).toHaveLength(0);
+    },
+  );
 
   it("enables only a product whose complete published artifact binding is present", () => {
     render(

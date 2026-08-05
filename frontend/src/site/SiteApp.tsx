@@ -17,9 +17,13 @@ import { ProductPage } from "./ProductPage";
 import {
   fallbackEditionAvailability,
   isEditionAvailabilityDocument,
-  isEditionDownloadReady,
   type EditionAvailabilityDocument,
 } from "./editionAvailability";
+import { editionBrandAssets } from "./editionBrandAssets";
+import {
+  buildEditionReleaseRegistry,
+  getEditionRelease,
+} from "./editionReleaseRegistry";
 import {
   compareReleaseVersions,
   fallbackRelease,
@@ -958,10 +962,11 @@ export function SiteApp({
 
   const currentPhase = copy.demoPhases[activePhase];
   const displaySize = useMemo(() => formatBinarySize(release.sizeBytes), [release.sizeBytes]);
-  const universalEdition = editionAvailability.editions.find((edition) => edition.id === "universal");
-  const universalDownloadReady = Boolean(
-    universalEdition && isEditionDownloadReady(universalEdition) && universalEdition.downloadUrl,
+  const editionReleaseRegistry = useMemo(
+    () => buildEditionReleaseRegistry(editionAvailability),
+    [editionAvailability],
   );
+  const universalRelease = getEditionRelease(editionReleaseRegistry, "universal");
   const universalPendingLabel = locale === "zh-CN"
     ? "DroneDream Universal 正在准备"
     : "DroneDream Universal is coming soon";
@@ -1361,25 +1366,31 @@ export function SiteApp({
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z" /></svg>
             {copy.language}
           </button>
-          {universalDownloadReady && universalEdition?.downloadUrl ? (
+          {universalRelease.downloadReady && universalRelease.downloadUrl ? (
             <a
               className="site-header-download"
-              href={universalEdition.downloadUrl}
-              download={universalEdition.fileName}
+              data-brand-handoff="existing-universal-mother-brand"
+              data-edition="universal"
+              data-release-registry="exact-edition-exe-v1"
+              href={universalRelease.downloadUrl}
+              download={universalRelease.artifact.fileName}
               aria-label={`DroneDream Universal — ${copy.downloadShort}`}
             >
-              <DownloadIcon />
+              <img alt="" aria-hidden="true" src={editionBrandAssets.universal.mark} />
               {copy.downloadShort}
             </a>
           ) : (
             <button
               type="button"
               className="site-header-download"
+              data-brand-handoff="existing-universal-mother-brand"
+              data-edition="universal"
+              data-release-registry="exact-edition-exe-v1"
               disabled
               title={universalPendingLabel}
               aria-label={universalPendingLabel}
             >
-              <DownloadIcon />
+              <img alt="" aria-hidden="true" src={editionBrandAssets.universal.mark} />
               {copy.downloadShort}
             </button>
           )}

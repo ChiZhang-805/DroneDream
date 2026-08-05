@@ -19,6 +19,7 @@ function publishedAvailability(): EditionAvailabilityDocument {
   sim.checksumUrl = "/downloads/DroneDream-Sim-1.0.0.exe.sha256";
   sim.signatureUrl = "/downloads/DroneDream-Sim-1.0.0.exe.sig";
   sim.receiptUrl = "/downloads/DroneDream-Sim-1.0.0.exe.receipt.json";
+  sim.urlFamily = "/downloads";
   sim.sizeBytes = 12_345_678;
   sim.sha256 = "a".repeat(64);
   sim.sourceCommit = "b".repeat(40);
@@ -72,6 +73,7 @@ describe("edition availability metadata", () => {
       "checksumUrl",
       "signatureUrl",
       "receiptUrl",
+      "urlFamily",
       "sizeBytes",
       "sha256",
       "sourceCommit",
@@ -97,6 +99,11 @@ describe("edition availability metadata", () => {
     mixedRelease.editions[0]!.receiptUrl =
       "https://github.com/ChiZhang-805/DroneDream/releases/download/other/DroneDream-Sim-1.0.0.exe.receipt.json";
     expect(isEditionAvailabilityDocument(mixedRelease)).toBe(false);
+
+    const wrongFamily = publishedAvailability();
+    wrongFamily.editions[0]!.urlFamily =
+      "https://github.com/ChiZhang-805/DroneDream/releases/download/v1.0.0";
+    expect(isEditionAvailabilityDocument(wrongFamily)).toBe(false);
 
     const leakedPlanned = structuredClone(fallbackEditionAvailability);
     leakedPlanned.editions[0]!.sha256 = "a".repeat(64);

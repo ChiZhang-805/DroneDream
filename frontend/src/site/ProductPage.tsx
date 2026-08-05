@@ -1,10 +1,13 @@
 import {
-  isEditionDownloadReady,
   primaryEditionIds,
   type EditionAvailabilityDocument,
   type PrimaryEditionId,
 } from "./editionAvailability";
 import { editionBrandAssets } from "./editionBrandAssets";
+import {
+  buildEditionReleaseRegistry,
+  getEditionRelease,
+} from "./editionReleaseRegistry";
 
 type Locale = "en" | "zh-CN";
 
@@ -76,10 +79,10 @@ export function ProductPage({
   locale: Locale;
 }) {
   const text = copy[locale];
+  const registry = buildEditionReleaseRegistry(availability);
   const editions = primaryEditionIds.map((id) => {
-    const edition = availability.editions.find((candidate) => candidate.id === id);
-    if (!edition) throw new Error(`Missing required edition metadata: ${id}`);
-    return { id, edition, text: text.editions[id] };
+    const release = getEditionRelease(registry, id);
+    return { id, release, text: text.editions[id] };
   });
 
   return (
@@ -90,17 +93,17 @@ export function ProductPage({
         </header>
 
         <div className="site-product-page-grid">
-          {editions.map(({ id, edition, text: editionText }) => {
-            const ready = isEditionDownloadReady(edition);
+          {editions.map(({ id, release, text: editionText }) => {
             const brandAssets = editionBrandAssets[id];
-            const titleId = `site-product-${edition.id}-title`;
+            const titleId = `site-product-${release.id}-title`;
             return (
               <article
                 aria-labelledby={titleId}
                 className="site-product-edition"
-                data-download-ready={ready ? "true" : "false"}
-                data-edition={edition.id}
-                key={edition.id}
+                data-download-ready={release.downloadReady ? "true" : "false"}
+                data-edition={release.id}
+                data-release-registry="exact-edition-exe-v1"
+                key={release.id}
               >
                 <div className="site-product-edition-brand">
                   <img
@@ -118,10 +121,14 @@ export function ProductPage({
                 <ul>
                   {editionText.features.map((feature) => <li key={feature}>{feature}</li>)}
                 </ul>
-                {ready && edition.downloadUrl ? (
-                  <a className="site-product-edition-action" href={edition.downloadUrl} download={edition.fileName}>
+                {release.downloadReady && release.downloadUrl ? (
+                  <a
+                    className="site-product-edition-action"
+                    href={release.downloadUrl}
+                    download={release.artifact.fileName}
+                  >
                     <DownloadIcon />
-                    {edition.fileName}
+                    {release.artifact.fileName}
                   </a>
                 ) : null}
               </article>

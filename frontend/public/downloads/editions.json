@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "generatedAt": "2026-08-05",
   "vehiclePacks": {
     "total": 8,
@@ -20,6 +20,7 @@
       "checksumUrl": null,
       "signatureUrl": null,
       "receiptUrl": null,
+      "urlFamily": null,
       "sizeBytes": null,
       "sha256": null,
       "sourceCommit": null,
@@ -36,6 +37,7 @@
       "checksumUrl": null,
       "signatureUrl": null,
       "receiptUrl": null,
+      "urlFamily": null,
       "sizeBytes": null,
       "sha256": null,
       "sourceCommit": null,
@@ -52,6 +54,7 @@
       "checksumUrl": null,
       "signatureUrl": null,
       "receiptUrl": null,
+      "urlFamily": null,
       "sizeBytes": null,
       "sha256": null,
       "sourceCommit": null,
@@ -68,6 +71,7 @@
       "checksumUrl": null,
       "signatureUrl": null,
       "receiptUrl": null,
+      "urlFamily": null,
       "sizeBytes": null,
       "sha256": null,
       "sourceCommit": null,

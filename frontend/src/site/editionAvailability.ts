@@ -18,6 +18,7 @@ export type EditionArtifact = {
   checksumUrl: string | null;
   signatureUrl: string | null;
   receiptUrl: string | null;
+  urlFamily: string | null;
   sizeBytes: number | null;
   sha256: string | null;
   sourceCommit: string | null;
@@ -25,7 +26,7 @@ export type EditionArtifact = {
 };
 
 export type EditionAvailabilityDocument = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   generatedAt: string;
   vehiclePacks: {
     total: number;
@@ -50,6 +51,7 @@ function plannedEdition(id: EditionId): EditionArtifact {
     checksumUrl: null,
     signatureUrl: null,
     receiptUrl: null,
+    urlFamily: null,
     sizeBytes: null,
     sha256: null,
     sourceCommit: null,
@@ -58,7 +60,7 @@ function plannedEdition(id: EditionId): EditionArtifact {
 }
 
 export const fallbackEditionAvailability: EditionAvailabilityDocument = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   generatedAt: "2026-08-05",
   vehiclePacks: {
     total: 8,
@@ -76,7 +78,7 @@ function isIsoCalendarDate(value: string) {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-function artifactUrlFamily(value: string, expectedFileName: string) {
+export function artifactUrlFamily(value: string, expectedFileName: string) {
   if (value === `/downloads/${expectedFileName}`) return "/downloads";
   try {
     const url = new URL(value);
@@ -117,7 +119,7 @@ function isEditionArtifact(value: unknown, expectedId: EditionId): value is Edit
   if (!hasExactKeys(edition, [
     "id", "releaseStatus", "availability", "signatureState", "version",
     "fileName", "downloadUrl", "checksumUrl", "signatureUrl", "receiptUrl",
-    "sizeBytes", "sha256", "sourceCommit", "publishedAt",
+    "urlFamily", "sizeBytes", "sha256", "sourceCommit", "publishedAt",
   ])) return false;
   if (
     edition.id !== expectedId ||
@@ -130,6 +132,7 @@ function isEditionArtifact(value: unknown, expectedId: EditionId): value is Edit
     edition.checksumUrl,
     edition.signatureUrl,
     edition.receiptUrl,
+    edition.urlFamily,
     edition.sizeBytes,
     edition.sha256,
     edition.sourceCommit,
@@ -148,6 +151,7 @@ function isEditionArtifact(value: unknown, expectedId: EditionId): value is Edit
     typeof edition.checksumUrl !== "string" ||
     typeof edition.signatureUrl !== "string" ||
     typeof edition.receiptUrl !== "string" ||
+    typeof edition.urlFamily !== "string" ||
     typeof edition.sizeBytes !== "number" ||
     !Number.isSafeInteger(edition.sizeBytes) ||
     edition.sizeBytes <= 0 ||
@@ -166,7 +170,7 @@ function isEditionArtifact(value: unknown, expectedId: EditionId): value is Edit
     artifactUrlFamily(edition.signatureUrl, `${fileName}.sig`),
     artifactUrlFamily(edition.receiptUrl, `${fileName}.receipt.json`),
   ];
-  return families.every((family) => family !== null) && new Set(families).size === 1;
+  return families.every((family) => family === edition.urlFamily);
 }
 
 export function isEditionAvailabilityDocument(
@@ -178,7 +182,7 @@ export function isEditionAvailabilityDocument(
     return false;
   }
   if (
-    document.schemaVersion !== 2 ||
+    document.schemaVersion !== 3 ||
     typeof document.generatedAt !== "string" ||
     !isIsoCalendarDate(document.generatedAt) ||
     !document.vehiclePacks ||
