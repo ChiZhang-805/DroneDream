@@ -44,6 +44,23 @@ _TRIGGER_SEVERITY: Final = {
     "timeout_or_sensor_anomaly": 2,
     "hard_boundary_candidate": 2,
 }
+BENCHMARK_ADAPTIVE_DIAGNOSIS_REASONS: Final = frozenset(
+    {
+        "trailing_stagnation",
+        "tool_direction_conflict",
+        "prediction_outcome_mismatch",
+        "domain_failure_spike",
+        "ood_no_transfer_memory",
+    }
+)
+BENCHMARK_ADAPTIVE_CRITIC_REASONS: Final = frozenset(
+    {
+        "crash_or_instability",
+        "timeout_or_sensor_anomaly",
+        "near_threshold_uncertain",
+        "hard_boundary_candidate",
+    }
+)
 
 
 class BenchmarkAdaptiveTriggerPolicyManifestV1(BaseModel):
@@ -257,6 +274,8 @@ def evaluate_benchmark_adaptive_triggers(
 
 
 __all__ = [
+    "BENCHMARK_ADAPTIVE_CRITIC_REASONS",
+    "BENCHMARK_ADAPTIVE_DIAGNOSIS_REASONS",
     "BENCHMARK_ADAPTIVE_TRIGGER_POLICY_MANIFEST",
     "BENCHMARK_ADAPTIVE_TRIGGER_POLICY_SHA256",
     "BENCHMARK_ADAPTIVE_TRIGGER_POLICY_VERSION",

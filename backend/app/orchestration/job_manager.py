@@ -31,6 +31,7 @@ from app.benchmarking.job_runtime import (
 )
 from app.benchmarking.llm_durable_runtime import (
     BenchmarkDurableLLMBlocked,
+    execute_durable_adaptive_arm,
     execute_durable_direct_arm,
     execute_durable_fixed_two_turn_arm,
     execute_durable_llambo_arm,
@@ -1143,6 +1144,7 @@ def dispatch_next_benchmark_generation(
                 "llm_react/v1",
                 "llambo_uav/v1",
                 "dronedream_fixed_two_turn/v1",
+                "dronedream_adaptive_1_4/v1",
             }
             else create_benchmark_adapter(adapter_id)
         )
@@ -1233,6 +1235,26 @@ def dispatch_next_benchmark_generation(
             if fixed.proposal is None:  # pragma: no cover - strict result contract.
                 raise RuntimeError("durable fixed two-turn execution returned no proposal")
             proposal = fixed.proposal
+        elif adapter_id == "dronedream_adaptive_1_4/v1":
+            adaptive = execute_durable_adaptive_arm(
+                db,
+                job,
+                observation,
+                transport_factory=lambda provider: build_job_secret_benchmark_transport(
+                    db, job, provider
+                ),
+            )
+            if adaptive.status == "first_qualified_stop":
+                return BenchmarkDispatchResult(status="first_qualified_stop")
+            if adaptive.status.startswith("abandoned"):
+                return BenchmarkDispatchResult(
+                    status="proposal_failed",
+                    error_code="benchmark_adaptive_abandoned",
+                    error="The adaptive Harness safely abandoned this generation.",
+                )
+            if adaptive.proposal is None:  # pragma: no cover - strict result contract.
+                raise RuntimeError("durable adaptive execution returned no proposal")
+            proposal = adaptive.proposal
         else:
             if adapter is None:  # pragma: no cover - exhaustive registry routing.
                 raise RuntimeError("benchmark adapter routing is incomplete")

@@ -34,6 +34,7 @@ from app.benchmarking.llm_durable_runtime import (
     BenchmarkDurableLLMBlocked,
     BenchmarkProviderExecutionConfigV1,
     BenchmarkProviderTransportResult,
+    execute_durable_adaptive_arm,
     execute_durable_direct_arm,
     execute_durable_fixed_two_turn_arm,
     execute_durable_llambo_arm,
@@ -147,6 +148,7 @@ def _arm_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkArmManifestV1:
         "llm_react/v1": "llm-react",
         "llambo_uav/v1": "llambo-uav",
         "dronedream_fixed_two_turn/v1": "dronedream-fixed-two-turn",
+        "dronedream_adaptive_1_4/v1": "dronedream-adaptive-one-four",
     }[adapter_id]
     return BenchmarkArmManifestV1(
         benchmark_arm_id=arm_id,
@@ -163,6 +165,7 @@ def _campaign_manifest(adapter_id: str = "llm_direct/v1") -> BenchmarkCampaignMa
     turns_per_generation = {
         "llm_react/v1": 4,
         "dronedream_fixed_two_turn/v1": 2,
+        "dronedream_adaptive_1_4/v1": 4,
     }.get(adapter_id, 1)
     turn_cap = 2 * turns_per_generation
     return BenchmarkCampaignManifestV1.model_validate(
@@ -223,6 +226,7 @@ def _create_bound_run(
     turns_per_generation = {
         "llm_react/v1": 4,
         "dronedream_fixed_two_turn/v1": 2,
+        "dronedream_adaptive_1_4/v1": 4,
     }.get(adapter_id, 1)
     job = models.Job(
         user_id=user.id,
@@ -482,6 +486,416 @@ def _fixed_revision_json(selected: str | None) -> str:
             "selected_proposal_ref": selected,
         }
     )
+
+
+def _diagnosis_json(decision: str, selected: str | None) -> str:
+    return json.dumps(
+        {
+            "schema_version": "1.0",
+            "decision": decision,
+            "selected_proposal_ref": selected,
+        }
+    )
+
+
+def _critic_json(decision: str, selected: str | None) -> str:
+    return json.dumps(
+        {
+            "schema_version": "1.0",
+            "decision": decision,
+            "selected_proposal_ref": selected,
+        }
+    )
+
+
+def _adaptive_observation(
+    job: Any,
+    run: Any,
+    *,
+    stagnant: bool = False,
+    discrete: bool = False,
+) -> BenchmarkObservationV2:
+    base = _observation(job, run)
+    parameter_domain: list[dict[str, object]] = (
+        [
+            {
+                "name": "mode",
+                "baseline": 0.0,
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "value_type": "enum",
+                "choices": [0.0, 1.0],
+            }
+        ]
+        if discrete
+        else [dict(item) for item in base.parameter_domain]
+    )
+    parameters = {"mode": 0.0} if discrete else {"kp": 1.0}
+    history = (
+        [
+            {
+                "candidate_ref": f"history-{ordinal}",
+                "generation_index": 0,
+                "dispatch_ordinal": ordinal,
+                "parameters": parameters,
+                "screening_status": "passed",
+                "proposal_context": {
+                    "proposal_adapter_id": "random_search/v1",
+                    "reason_code": "fixture",
+                    "proposal_receipt_sha256": "a" * 64,
+                    "optimizer_metadata": {},
+                },
+                "outcome": {
+                    "role": "objective",
+                    "loss": 1.0,
+                    "objectives": {"rmse": 1.0},
+                    "objective_directions": {"rmse": "minimize"},
+                    "constraint_violations": {},
+                    "feasible": True,
+                    "failure_rate": 0.0,
+                    "completed": True,
+                },
+            }
+            for ordinal in (1, 2, 3)
+        ]
+        if stagnant
+        else []
+    )
+    payload = base.model_dump(mode="json")
+    payload.update(
+        {
+            "parameter_domain": parameter_domain,
+            "history": history,
+        }
+    )
+    return BenchmarkObservationV2.model_validate(payload)
+
+
+def test_durable_adaptive_supports_one_turn_stop_and_default_two_turn_proposal(
+    durable_db: SimpleNamespace,
+) -> None:
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        observation = _adaptive_observation(job, run)
+        stopped = execute_durable_adaptive_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport([_fixed_plan_json(decision="stop")]),
+        )
+        assert stopped.status == "abandoned"
+        assert stopped.provider_turns_attempted == 1
+        assert stopped.trigger_decision is None
+
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        observation = _adaptive_observation(job, run)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        result = execute_durable_adaptive_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport(
+                [
+                    _fixed_plan_json("random_search/v1"),
+                    _fixed_revision_json(local.candidate_ref),
+                ]
+            ),
+        )
+        assert result.status == "proposal"
+        assert result.provider_turns_attempted == 2
+        assert result.trigger_decision is not None
+        assert not result.trigger_decision.diagnosis_reasons
+        assert not result.trigger_decision.critic_reasons
+
+
+def test_durable_adaptive_uses_diagnosis_and_recovers_without_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        observation = _adaptive_observation(job, run, stagnant=True)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        result = execute_durable_adaptive_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport(
+                [
+                    _fixed_plan_json("random_search/v1"),
+                    _fixed_revision_json(local.candidate_ref),
+                    _diagnosis_json("keep", local.candidate_ref),
+                ]
+            ),
+        )
+        assert result.status == "proposal"
+        assert result.provider_turns_attempted == 3
+        assert result.trigger_decision is not None
+        assert "trailing_stagnation" in result.trigger_decision.diagnosis_reasons
+        turns = list(
+            db.scalars(
+                select(models.HarnessCognitiveTurnReceipt).order_by(
+                    models.HarnessCognitiveTurnReceipt.turn_index
+                )
+            )
+        )
+        assert [(turn.turn_index, turn.turn_role) for turn in turns] == [
+            (1, "plan"),
+            (2, "revision"),
+            (3, "diagnosis"),
+        ]
+        assert turns[2].trigger_reasons_json == ["trailing_stagnation"]
+
+        replay = _SequenceTransport([AssertionError("provider replayed")])
+        recovered = execute_durable_adaptive_arm(db, job, observation, transport=replay)
+        assert recovered.status == "proposal_recovered"
+        assert recovered.proposal == result.proposal
+        assert replay.calls == 0
+
+
+def test_durable_adaptive_carries_cooldown_across_generations(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        first_observation = _adaptive_observation(job, run, stagnant=True)
+        first_local = create_benchmark_adapter("random_search/v1").propose(first_observation)
+        first = execute_durable_adaptive_arm(
+            db,
+            job,
+            first_observation,
+            transport=_SequenceTransport(
+                [
+                    _fixed_plan_json("random_search/v1"),
+                    _fixed_revision_json(first_local.candidate_ref),
+                    _diagnosis_json("keep", first_local.candidate_ref),
+                ]
+            ),
+        )
+        assert first.trigger_decision is not None
+        assert first.trigger_decision.diagnosis_reasons == ("trailing_stagnation",)
+
+        job.current_generation = 1
+        db.commit()
+        second_observation = _adaptive_observation(job, run, stagnant=True)
+        second_local = create_benchmark_adapter("random_search/v1").propose(second_observation)
+        second_transport = _SequenceTransport(
+            [
+                _fixed_plan_json("random_search/v1"),
+                _fixed_revision_json(second_local.candidate_ref),
+            ]
+        )
+        second = execute_durable_adaptive_arm(
+            db,
+            job,
+            second_observation,
+            transport=second_transport,
+        )
+
+        assert second.status == "proposal"
+        assert second_transport.calls == 2
+        assert second.trigger_decision is not None
+        assert second.trigger_decision.diagnosis_reasons == ()
+        assert second.trigger_decision.suppressed_by_cooldown == ("trailing_stagnation",)
+        second_generation_turns = list(
+            db.scalars(
+                select(models.HarnessCognitiveTurnReceipt)
+                .where(models.HarnessCognitiveTurnReceipt.generation_index == 2)
+                .order_by(models.HarnessCognitiveTurnReceipt.turn_index)
+            )
+        )
+        assert [turn.turn_index for turn in second_generation_turns] == [1, 2]
+
+
+def test_durable_adaptive_can_skip_diagnosis_and_use_critic_at_turn_four(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        observation = _adaptive_observation(job, run, discrete=True)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        result = execute_durable_adaptive_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport(
+                [
+                    _fixed_plan_json("random_search/v1"),
+                    _fixed_revision_json(local.candidate_ref),
+                    _critic_json("approve", local.candidate_ref),
+                ]
+            ),
+        )
+        assert result.status == "proposal"
+        assert result.provider_turns_attempted == 3
+        assert result.trigger_decision is not None
+        assert result.trigger_decision.critic_reasons == ("hard_boundary_candidate",)
+        turns = list(
+            db.scalars(
+                select(models.HarnessCognitiveTurnReceipt).order_by(
+                    models.HarnessCognitiveTurnReceipt.turn_index
+                )
+            )
+        )
+        assert [turn.turn_index for turn in turns] == [1, 2, 4]
+
+
+def test_durable_adaptive_uses_all_four_turns_and_vetoes_safely(
+    durable_db: SimpleNamespace,
+) -> None:
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        observation = _adaptive_observation(job, run, stagnant=True, discrete=True)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        result = execute_durable_adaptive_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport(
+                [
+                    _fixed_plan_json("random_search/v1"),
+                    _fixed_revision_json(local.candidate_ref),
+                    _diagnosis_json("keep", local.candidate_ref),
+                    _critic_json("veto", None),
+                ]
+            ),
+        )
+        assert result.status == "abandoned"
+        assert result.proposal is None
+        assert result.provider_turns_attempted == 4
+
+
+def test_durable_adaptive_recovers_two_turns_then_calls_only_diagnosis(
+    durable_db: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.benchmarking import llm_durable_runtime
+
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        observation = _adaptive_observation(job, run, stagnant=True)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        original = llm_durable_runtime.diagnosis_response_schema
+
+        def _interrupt_after_revision(proposal_refs: tuple[str, ...]) -> dict[str, Any]:
+            raise RuntimeError("simulated process exit after adaptive revision")
+
+        monkeypatch.setattr(
+            llm_durable_runtime,
+            "diagnosis_response_schema",
+            _interrupt_after_revision,
+        )
+        first = _SequenceTransport(
+            [
+                _fixed_plan_json("random_search/v1"),
+                _fixed_revision_json(local.candidate_ref),
+            ]
+        )
+        with pytest.raises(RuntimeError, match="simulated process exit"):
+            execute_durable_adaptive_arm(db, job, observation, transport=first)
+        assert first.calls == 2
+        assert (
+            db.scalar(
+                select(models.BenchmarkLLMPlanRevisionCheckpoint.id).where(
+                    models.BenchmarkLLMPlanRevisionCheckpoint.turn_index == 2
+                )
+            )
+            is not None
+        )
+
+        monkeypatch.setattr(llm_durable_runtime, "diagnosis_response_schema", original)
+        diagnosis = _SequenceTransport([_diagnosis_json("keep", local.candidate_ref)])
+        recovered = execute_durable_adaptive_arm(db, job, observation, transport=diagnosis)
+        assert recovered.status == "proposal_recovered"
+        assert recovered.provider_turns_attempted == 3
+        assert diagnosis.calls == 1
+
+
+def test_durable_adaptive_trigger_tamper_blocks_without_provider_replay(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        observation = _adaptive_observation(job, run, stagnant=True)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        execute_durable_adaptive_arm(
+            db,
+            job,
+            observation,
+            transport=_SequenceTransport(
+                [
+                    _fixed_plan_json("random_search/v1"),
+                    _fixed_revision_json(local.candidate_ref),
+                    _diagnosis_json("keep", local.candidate_ref),
+                ]
+            ),
+        )
+        revision = db.scalar(
+            select(models.BenchmarkLLMPlanRevisionCheckpoint).where(
+                models.BenchmarkLLMPlanRevisionCheckpoint.turn_index == 2
+            )
+        )
+        assert revision is not None
+        state = dict(revision.state_json)
+        trigger = dict(state["trigger_decision"])
+        trigger["diagnosis_reasons"] = []
+        state["trigger_decision"] = trigger
+        revision.state_json = state
+        revision.state_sha256 = canonical_sha256(state)
+        db.commit()
+
+        replay = _SequenceTransport([AssertionError("provider replayed")])
+        with pytest.raises(BenchmarkDurableLLMBlocked) as error:
+            execute_durable_adaptive_arm(db, job, observation, transport=replay)
+        assert error.value.code == "benchmark_adaptive_checkpoint_drift"
+        assert replay.calls == 0
+
+
+def test_durable_adaptive_rejects_unknown_diagnosis_reference(
+    durable_db: SimpleNamespace,
+) -> None:
+    models = durable_db.models
+    with Session(durable_db.engine) as db:
+        job, run = _create_bound_run(db, durable_db, adapter_id="dronedream_adaptive_1_4/v1")
+        observation = _adaptive_observation(job, run, stagnant=True)
+        local = create_benchmark_adapter("random_search/v1").propose(observation)
+        with pytest.raises(BenchmarkDurableLLMBlocked) as error:
+            execute_durable_adaptive_arm(
+                db,
+                job,
+                observation,
+                transport=_SequenceTransport(
+                    [
+                        _fixed_plan_json("random_search/v1"),
+                        _fixed_revision_json(local.candidate_ref),
+                        _diagnosis_json("replace", "unknown-proposal-ref"),
+                    ]
+                ),
+            )
+        assert error.value.code == "benchmark_adaptive_state_rejected"
+        diagnosis = db.scalar(
+            select(models.HarnessCognitiveTurnReceipt).where(
+                models.HarnessCognitiveTurnReceipt.turn_index == 3
+            )
+        )
+        assert diagnosis is not None and diagnosis.outcome.status == "invalid_schema"
+
+
+def test_adaptive_arm_is_promoted_to_durable_server_managed_execution() -> None:
+    descriptor = BENCHMARK_ADAPTER_REGISTRY["dronedream_adaptive_1_4/v1"]
+    inventory = BENCHMARK_METHOD_INVENTORY["dronedream_adaptive_1_4/v1"]
+
+    assert descriptor.availability == "implemented"
+    assert descriptor.implementation_label == "durable-adaptive-one-four-v1"
+    assert inventory.execution_readiness == "ready"
+    assert inventory.blocker_codes == ()
+    with pytest.raises(ValueError, match="server-managed"):
+        create_benchmark_adapter("dronedream_adaptive_1_4/v1")
 
 
 def test_fixed_two_turn_arm_is_promoted_to_durable_server_managed_execution() -> None:
@@ -1356,6 +1770,7 @@ def test_production_dispatch_recovers_handoff_without_secret_or_provider_replay(
         ("llm_direct/v1", "llm-direct"),
         ("llm_react/v1", "llm-react"),
         ("dronedream_fixed_two_turn/v1", "dronedream-fixed-two-turn"),
+        ("dronedream_adaptive_1_4/v1", "dronedream-adaptive-one-four"),
     ),
 )
 def test_production_dispatch_without_job_secret_fails_before_attempt(
@@ -1727,6 +2142,7 @@ def test_response_byte_cap_records_consumed_request_but_rejects_model_result(
         "llm_react/v1",
         "llambo_uav/v1",
         "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
     ),
 )
 def test_first_qualified_stop_consumes_zero_provider_work(
@@ -1744,6 +2160,7 @@ def test_first_qualified_stop_consumes_zero_provider_work(
             "llm_react/v1": execute_durable_react_arm,
             "llambo_uav/v1": execute_durable_llambo_arm,
             "dronedream_fixed_two_turn/v1": execute_durable_fixed_two_turn_arm,
+            "dronedream_adaptive_1_4/v1": execute_durable_adaptive_arm,
         }[adapter_id]
         result = executor(db, job, _observation(job, run), transport=transport)
         assert result.status == "first_qualified_stop"

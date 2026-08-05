@@ -11,6 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.benchmarking.adaptive_triggers import (
+    BENCHMARK_ADAPTIVE_TRIGGER_POLICY_VERSION,
+    BenchmarkAdaptiveTriggerDecisionV1,
+)
 from app.benchmarking.contracts import (
     BenchmarkArmManifestV1,
     BenchmarkBudgetReservationRequestV1,
@@ -21,6 +25,7 @@ from app.benchmarking.contracts import (
     BenchmarkRunBindingRequestV1,
     BenchmarkUsageDeltaV1,
     CompositeExecutionInventoryV1,
+    canonical_json_bytes,
     canonical_sha256,
 )
 from app.benchmarking.coordinator import run_binding_sha256
@@ -126,6 +131,7 @@ def _validate_run_graph(
         "llm_react/v1",
         "llambo_uav/v1",
         "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
     }:
         _blocked(
             "benchmark_provider_reconciliation_arm_unsupported",
@@ -323,19 +329,59 @@ def reconcile_provider_run_usage(
         "llm_react/v1": "react_action",
         "llambo_uav/v1": "llambo_proposal",
         "dronedream_fixed_two_turn/v1": None,
+        "dronedream_adaptive_1_4/v1": None,
     }[arm.proposal_adapter_id]
     expected_trigger = {
         "llm_direct/v1": "benchmark-llm-direct-v1",
         "llm_react/v1": "benchmark-llm-react-v1",
         "llambo_uav/v1": "benchmark-llambo-uav-v1",
         "dronedream_fixed_two_turn/v1": "benchmark-fixed-two-turn-v1",
+        "dronedream_adaptive_1_4/v1": BENCHMARK_ADAPTIVE_TRIGGER_POLICY_VERSION,
     }[arm.proposal_adapter_id]
     static_expected_reason: list[str] | None = {
         "llm_direct/v1": ["preregistered-direct-turn"],
         "llm_react/v1": ["bounded-react-turn"],
         "llambo_uav/v1": ["preregistered-llambo-uav-turn"],
         "dronedream_fixed_two_turn/v1": None,
+        "dronedream_adaptive_1_4/v1": None,
     }[arm.proposal_adapter_id]
+
+    def _adaptive_review_reasons(
+        turn: models.HarnessCognitiveTurnReceipt,
+    ) -> list[str] | None:
+        if turn.turn_index == 1:
+            return ["adaptive-plan-turn"]
+        if turn.turn_index == 2:
+            return ["adaptive-revision-turn"]
+        if turn.turn_index not in {3, 4}:
+            return None
+        revision = db.scalar(
+            select(models.BenchmarkLLMPlanRevisionCheckpoint).where(
+                models.BenchmarkLLMPlanRevisionCheckpoint.job_id == turn.job_id,
+                models.BenchmarkLLMPlanRevisionCheckpoint.run_binding_id == run.id,
+                models.BenchmarkLLMPlanRevisionCheckpoint.adapter_id
+                == "dronedream_adaptive_1_4/v1",
+                models.BenchmarkLLMPlanRevisionCheckpoint.generation_index == turn.generation_index,
+                models.BenchmarkLLMPlanRevisionCheckpoint.turn_index == 2,
+                models.BenchmarkLLMPlanRevisionCheckpoint.turn_role == "revision",
+            )
+        )
+        if (
+            revision is None
+            or canonical_sha256(revision.state_json) != revision.state_sha256
+            or not isinstance(revision.state_json, dict)
+        ):
+            return None
+        trigger_payload = revision.state_json.get("trigger_decision")
+        if not isinstance(trigger_payload, dict):
+            return None
+        try:
+            trigger = BenchmarkAdaptiveTriggerDecisionV1.model_validate_json(
+                canonical_json_bytes(trigger_payload)
+            )
+        except ValidationError:
+            return None
+        return list(trigger.diagnosis_reasons if turn.turn_index == 3 else trigger.critic_reasons)
 
     def _turn_contract_matches(turn: models.HarnessCognitiveTurnReceipt) -> bool:
         turn_expected_role: str | None
@@ -345,6 +391,14 @@ def reconcile_provider_run_usage(
             turn_expected_reason = [
                 "fixed-plan-turn" if turn.turn_index == 1 else "fixed-revision-turn"
             ]
+        elif arm.proposal_adapter_id == "dronedream_adaptive_1_4/v1":
+            turn_expected_role = {
+                1: "plan",
+                2: "revision",
+                3: "diagnosis",
+                4: "critic",
+            }.get(turn.turn_index)
+            turn_expected_reason = _adaptive_review_reasons(turn)
         else:
             turn_expected_role = static_expected_role
             turn_expected_reason = static_expected_reason
@@ -352,6 +406,7 @@ def reconcile_provider_run_usage(
             turn.turn_role == turn_expected_role
             and 1 <= turn.turn_index <= policy.maximum_turns_per_generation
             and turn.trigger_policy_version == expected_trigger
+            and turn_expected_reason is not None
             and turn.trigger_reasons_json == turn_expected_reason
             and turn.source_commit == source_commit
             and turn.model_snapshot == run.job.openai_model

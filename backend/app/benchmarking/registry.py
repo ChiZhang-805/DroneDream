@@ -155,8 +155,8 @@ _DESCRIPTORS = (
     BenchmarkAdapterDescriptor(
         "dronedream_adaptive_1_4/v1",
         "llm_harness",
-        "contract_only",
-        "adaptive-one-four-pending",
+        "implemented",
+        "durable-adaptive-one-four-v1",
         "product_native",
     ),
 )
@@ -200,6 +200,7 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
         "llm_react/v1",
         "llambo_uav/v1",
         "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
     }:
         raise ValueError(
             "benchmark proposal adapter is server-managed by a durable provider runtime: "

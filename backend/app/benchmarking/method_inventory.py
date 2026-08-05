@@ -10,7 +10,7 @@ never silently stand in for that reference.
 from __future__ import annotations
 
 from types import MappingProxyType
-from typing import Annotated, Final, Literal, cast
+from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -448,28 +448,37 @@ _ENTRIES = (
             "Local tools add no provider requests; provider retries remain zero.",
         ),
     ),
-    *(
-        BenchmarkMethodInventoryEntryV1(
-            adapter_id=adapter_id,
-            method_classification=cast(MethodClassification, classification),
-            implementation_label=label,
-            execution_readiness="blocked",
-            environment_boundary="provider_contract",
-            sources=(
-                _project_source(
-                    adapter_id.replace("/", "-"),
-                    "backend/app/benchmarking/registry.py",
-                ),
+    BenchmarkMethodInventoryEntryV1(
+        adapter_id="dronedream_adaptive_1_4/v1",
+        method_classification="product_native",
+        implementation_label="durable-adaptive-one-four-v1",
+        execution_readiness="ready",
+        environment_boundary="provider_contract",
+        sources=(
+            _project_source(
+                "adaptive-durable-runtime",
+                "backend/app/benchmarking/llm_durable_runtime.py",
             ),
-            blocker_codes=("adapter_not_implemented", "provider_contract_pending"),
-        )
-        for adapter_id, classification, label in (
-            (
-                "dronedream_adaptive_1_4/v1",
-                "product_native",
-                "adaptive-one-four-pending",
+            _project_source(
+                "adaptive-trigger-policy",
+                "backend/app/benchmarking/adaptive_triggers.py",
             ),
-        )
+            _project_source(
+                "adaptive-closed-contract",
+                "backend/app/benchmarking/llm_arm_contracts.py",
+            ),
+            _project_source(
+                "adaptive-job-secret-transport",
+                "backend/app/benchmarking/provider_transport.py",
+            ),
+        ),
+        reproducibility_notes=(
+            "One or two provider turns by default, with a hard four-turn ceiling.",
+            "Optional diagnosis and critic turns require deterministic versioned triggers.",
+            "Diagnosis may only keep, replace with an existing proposal, or abandon.",
+            "Critic may only approve the current proposal or veto; retries remain zero.",
+            "Durable checkpoints prevent paid provider-turn replay after interruption.",
+        ),
     ),
 )
 

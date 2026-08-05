@@ -19,6 +19,12 @@ from sqlalchemy.orm import Session
 
 from app import models
 from app.benchmarking.adapters import BenchmarkAdapterError
+from app.benchmarking.adaptive_triggers import (
+    BENCHMARK_ADAPTIVE_TRIGGER_POLICY_SHA256,
+    BenchmarkAdaptiveTriggerContractError,
+    BenchmarkAdaptiveTriggerDecisionV1,
+    evaluate_benchmark_adaptive_triggers,
+)
 from app.benchmarking.contracts import (
     BenchmarkArmManifestV1,
     BenchmarkCampaignManifestV1,
@@ -35,12 +41,16 @@ from app.benchmarking.llm_arm_contracts import (
     BenchmarkLLMContractError,
     BenchmarkLLMTurnRequestV1,
     build_llm_turn_request,
+    critic_response_schema,
+    diagnosis_response_schema,
     parse_bounded_json_response,
     proposal_response_schema,
     react_response_schema,
     require_llm_arm_policy,
     selection_response_schema,
     tool_action_response_schema,
+    validate_critic_response,
+    validate_diagnosis_response,
     validate_proposal_response,
     validate_react_response,
     validate_selection_response,
@@ -84,6 +94,8 @@ BENCHMARK_PLAN_REVISION_CHECKPOINT_SCHEMA_ID = (
 BENCHMARK_FIXED_TWO_TURN_PROPOSAL_RECEIPT_SCHEMA_ID = (
     "dronedream.benchmark-fixed-two-turn-proposal/v1"
 )
+BENCHMARK_ADAPTIVE_CHECKPOINT_SCHEMA_ID = "dronedream.benchmark-llm-adaptive-checkpoint/v1"
+BENCHMARK_ADAPTIVE_PROPOSAL_RECEIPT_SCHEMA_ID = "dronedream.benchmark-adaptive-proposal/v1"
 
 
 class BenchmarkDurableLLMBlocked(RuntimeError):
@@ -277,6 +289,57 @@ class BenchmarkDurableFixedTwoTurnExecutionV1(_StrictFrozen):
         return self
 
 
+class BenchmarkDurableAdaptiveExecutionV1(_StrictFrozen):
+    schema_id: Literal["dronedream.benchmark-durable-adaptive-execution/v1"] = (
+        "dronedream.benchmark-durable-adaptive-execution/v1"
+    )
+    status: Literal[
+        "proposal",
+        "proposal_recovered",
+        "abandoned",
+        "abandoned_recovered",
+        "first_qualified_stop",
+    ]
+    proposal: BenchmarkProposalV1 | None
+    provider_turns_attempted: Annotated[int, Field(ge=0, le=4)]
+    provider_turns_succeeded: Annotated[int, Field(ge=0, le=4)]
+    provider_requests_attempted: Annotated[int, Field(ge=0, le=4)]
+    provider_requests_succeeded: Annotated[int, Field(ge=0, le=4)]
+    recovered_from_checkpoint: bool = False
+    trigger_decision: BenchmarkAdaptiveTriggerDecisionV1 | None = None
+    safe_receipt: dict[str, Any]
+
+    @model_validator(mode="after")
+    def _validate_result(self) -> BenchmarkDurableAdaptiveExecutionV1:
+        if self.provider_turns_succeeded > self.provider_turns_attempted:
+            raise ValueError("successful turns cannot exceed attempted turns")
+        if self.provider_requests_succeeded > self.provider_requests_attempted:
+            raise ValueError("successful requests cannot exceed attempted requests")
+        if self.provider_requests_attempted != self.provider_turns_attempted:
+            raise ValueError("adaptive Harness permits one request per attempted turn")
+        if self.status == "first_qualified_stop":
+            if (
+                self.proposal is not None
+                or self.trigger_decision is not None
+                or any(
+                    (
+                        self.provider_turns_attempted,
+                        self.provider_turns_succeeded,
+                        self.provider_requests_attempted,
+                        self.provider_requests_succeeded,
+                    )
+                )
+            ):
+                raise ValueError("first-qualified stop must consume zero provider work")
+        elif not 1 <= self.provider_turns_attempted <= 4:
+            raise ValueError("adaptive completion must consume between one and four turns")
+        if self.status.startswith("proposal") != (self.proposal is not None):
+            raise ValueError("adaptive proposal status and payload disagree")
+        if self.recovered_from_checkpoint != self.status.endswith("_recovered"):
+            raise ValueError("adaptive recovery status and flag disagree")
+        return self
+
+
 def _usage_is_complete(value: object) -> bool:
     if not isinstance(value, ProviderUsage):
         return False
@@ -348,6 +411,7 @@ def _load_context(
         "llm_react/v1",
         "llambo_uav/v1",
         "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
     ] = ("llm_direct/v1"),
 ) -> _BoundDirectContext:
     binding = db.scalar(
@@ -1222,10 +1286,15 @@ def _call_durable_provider_turn(
     body: dict[str, Any],
     transport: BenchmarkDirectTransport,
     *,
-    adapter_id: Literal["llm_react/v1", "dronedream_fixed_two_turn/v1"],
-    turn_role: Literal["react_action", "plan", "revision"],
+    adapter_id: Literal[
+        "llm_react/v1",
+        "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
+    ],
+    turn_role: Literal["react_action", "plan", "revision", "diagnosis", "critic"],
     maximum_turns_per_generation: int,
     error_namespace: str,
+    adaptive_trigger_reasons: Sequence[str] | None = None,
 ) -> tuple[object, CognitiveTurnAttempt]:
     attempt = begin_benchmark_llm_turn(
         db,
@@ -1240,6 +1309,7 @@ def _call_durable_provider_turn(
         evidence_sha256=request.evidence_sha256,
         schema_sha256=request.response_schema_sha256,
         tool_outputs_sha256=request.tool_outputs_sha256,
+        adaptive_trigger_reasons=adaptive_trigger_reasons,
     )
     accountant = BoundProviderRequestAccountant(
         db,
@@ -2373,12 +2443,785 @@ def execute_durable_fixed_two_turn_arm(
     _blocked("benchmark_fixed_turn_sequence_incomplete", "Fixed two-turn sequence is incomplete.")
 
 
+def _adaptive_family_state_from_json(
+    value: object,
+    *,
+    maximum_generation: int,
+) -> dict[str, tuple[int, int]]:
+    if not isinstance(value, dict):
+        _blocked(
+            "benchmark_adaptive_checkpoint_invalid",
+            "Adaptive cooldown state is not an object.",
+        )
+    parsed: dict[str, tuple[int, int]] = {}
+    for family, item in value.items():
+        if (
+            not isinstance(family, str)
+            or not isinstance(item, list | tuple)
+            or len(item) != 2
+            or isinstance(item[0], bool)
+            or not isinstance(item[0], int)
+            or not 0 <= item[0] <= maximum_generation
+            or isinstance(item[1], bool)
+            or not isinstance(item[1], int)
+            or item[1] not in {1, 2}
+        ):
+            _blocked(
+                "benchmark_adaptive_checkpoint_invalid",
+                "Adaptive cooldown state contains an invalid family record.",
+            )
+        parsed[family] = (item[0], item[1])
+    return parsed
+
+
+def _adaptive_family_state_json(value: dict[str, tuple[int, int]]) -> dict[str, list[int]]:
+    return {key: [item[0], item[1]] for key, item in sorted(value.items())}
+
+
+def _load_adaptive_previous_family_state(
+    db: Session,
+    job: models.Job,
+    context: _BoundDirectContext,
+    observation: BenchmarkObservationV2,
+) -> dict[str, tuple[int, int]]:
+    if observation.generation_index == 1:
+        return {}
+    checkpoint = db.scalar(
+        select(models.BenchmarkLLMPlanRevisionCheckpoint)
+        .where(
+            models.BenchmarkLLMPlanRevisionCheckpoint.job_id == job.id,
+            models.BenchmarkLLMPlanRevisionCheckpoint.run_binding_id == context.binding.id,
+            models.BenchmarkLLMPlanRevisionCheckpoint.adapter_id == "dronedream_adaptive_1_4/v1",
+            models.BenchmarkLLMPlanRevisionCheckpoint.generation_index
+            == observation.generation_index - 1,
+        )
+        .order_by(models.BenchmarkLLMPlanRevisionCheckpoint.turn_index.desc())
+    )
+    if checkpoint is None:
+        _blocked(
+            "benchmark_adaptive_prior_state_missing",
+            "Adaptive cooldown state has no terminal checkpoint for the prior generation.",
+        )
+    state = checkpoint.state_json
+    if (
+        checkpoint.checkpoint_schema != BENCHMARK_ADAPTIVE_CHECKPOINT_SCHEMA_ID
+        or checkpoint.source_commit != context.source_commit
+        or canonical_sha256(state) != checkpoint.state_sha256
+        or not isinstance(state, dict)
+        or state.get("terminal") is not True
+        or state.get("generation_index") != observation.generation_index - 1
+        or state.get("run_binding_id") != context.binding.id
+        or state.get("source_commit") != context.source_commit
+    ):
+        _blocked(
+            "benchmark_adaptive_prior_state_drift",
+            "Adaptive prior-generation terminal checkpoint drifted or is incomplete.",
+        )
+    return _adaptive_family_state_from_json(
+        state.get("next_family_state"),
+        maximum_generation=observation.generation_index - 1,
+    )
+
+
+def _adaptive_terminal_receipt(
+    *,
+    context: _BoundDirectContext,
+    observation: BenchmarkObservationV2,
+    selected: BenchmarkProposalV1 | None,
+    turn_bindings: Sequence[str],
+    trigger_decision: BenchmarkAdaptiveTriggerDecisionV1 | None,
+    usage_reconciliation_sha256: str,
+) -> tuple[BenchmarkProposalV1 | None, dict[str, Any]]:
+    attempted = len(turn_bindings)
+    common = {
+        "campaign_id": context.campaign.id,
+        "run_binding_id": context.binding.id,
+        "arm_manifest_sha256": context.arm.manifest_sha256,
+        "composite_inventory_sha256": context.campaign.composite_inventory_sha256,
+        "source_commit": context.source_commit,
+        "llm_policy_registry_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
+        "adaptive_trigger_policy_sha256": BENCHMARK_ADAPTIVE_TRIGGER_POLICY_SHA256,
+        "observation_sha256": canonical_sha256(observation),
+        "turn_binding_sha256": list(turn_bindings),
+        "provider_turns_attempted": attempted,
+        "provider_turns_succeeded": attempted,
+        "provider_requests_attempted": attempted,
+        "provider_requests_succeeded": attempted,
+        "provider_usage_reconciliation_sha256": usage_reconciliation_sha256,
+        "trigger_decision": (
+            None if trigger_decision is None else trigger_decision.model_dump(mode="json")
+        ),
+        "retry_cap": 0,
+    }
+    if selected is None:
+        return None, {
+            "schema_id": "dronedream.benchmark-adaptive-abandon/v1",
+            **common,
+        }
+    parameter_sha256 = canonical_sha256(selected.parameters)
+    safe_receipt = {
+        "schema_id": BENCHMARK_ADAPTIVE_PROPOSAL_RECEIPT_SCHEMA_ID,
+        **common,
+        "selected_local_proposal_ref": selected.candidate_ref,
+        "selected_local_proposal_receipt_sha256": canonical_sha256(selected.proposal_receipt),
+        "parameter_sha256": parameter_sha256,
+    }
+    candidate_ref = (
+        f"dronedream-adaptive-g{observation.generation_index:06d}-"
+        f"d{observation.next_dispatch_ordinal:06d}-{parameter_sha256[:12]}"
+    )
+    return (
+        BenchmarkProposalV1(
+            candidate_ref=candidate_ref,
+            parameters=dict(selected.parameters),
+            reason_code="benchmark-dronedream-adaptive",
+            proposal_receipt=safe_receipt,
+        ),
+        safe_receipt,
+    )
+
+
+@dataclass(frozen=True)
+class _RecoveredAdaptiveCheckpoint:
+    decision: str
+    proposals: list[BenchmarkProposalV1]
+    used_tools: list[str]
+    selected_ref: str | None
+    trigger_decision: BenchmarkAdaptiveTriggerDecisionV1 | None
+    terminal: bool
+    proposal: BenchmarkProposalV1 | None
+    safe_receipt: dict[str, Any]
+    state_sha256: str
+
+
+def _recover_adaptive_checkpoint(
+    db: Session,
+    job: models.Job,
+    context: _BoundDirectContext,
+    observation: BenchmarkObservationV2,
+    request: BenchmarkLLMTurnRequestV1,
+    *,
+    proposals_before: Sequence[BenchmarkProposalV1],
+    used_tools_before: Sequence[str],
+    selected_ref_before: str | None,
+    trigger_before: BenchmarkAdaptiveTriggerDecisionV1 | None,
+    previous_family_state: dict[str, tuple[int, int]],
+    prior_state_sha256: str | None,
+    turn_bindings: Sequence[str],
+) -> _RecoveredAdaptiveCheckpoint | None:
+    checkpoint = db.scalar(
+        select(models.BenchmarkLLMPlanRevisionCheckpoint).where(
+            models.BenchmarkLLMPlanRevisionCheckpoint.job_id == job.id,
+            models.BenchmarkLLMPlanRevisionCheckpoint.generation_index
+            == observation.generation_index,
+            models.BenchmarkLLMPlanRevisionCheckpoint.turn_index == request.turn_index,
+        )
+    )
+    if checkpoint is None:
+        return None
+    turn = db.get(models.HarnessCognitiveTurnReceipt, checkpoint.cognitive_turn_receipt_id)
+    state = checkpoint.state_json
+    expected_role = request.turn_role
+    observation_sha256 = canonical_sha256(observation)
+    if (
+        turn is None
+        or turn.outcome is None
+        or turn.outcome.status != "succeeded"
+        or checkpoint.checkpoint_schema != BENCHMARK_ADAPTIVE_CHECKPOINT_SCHEMA_ID
+        or checkpoint.adapter_id != "dronedream_adaptive_1_4/v1"
+        or checkpoint.run_binding_id != context.binding.id
+        or checkpoint.turn_role != expected_role
+        or checkpoint.source_commit != context.source_commit
+        or checkpoint.observation_sha256 != observation_sha256
+        or checkpoint.turn_binding_sha256 != request.binding_sha256
+        or canonical_sha256(state) != checkpoint.state_sha256
+        or turn.source_commit != context.source_commit
+        or turn.turn_role != expected_role
+        or turn.model_snapshot != request.model_snapshot
+        or turn.prompt_sha256 != request.prompt_sha256
+        or turn.evidence_sha256 != request.evidence_sha256
+        or turn.schema_sha256 != request.response_schema_sha256
+        or turn.tool_outputs_sha256 != request.tool_outputs_sha256
+        or provider_request_counts_for_turn(db, cognitive_turn_receipt_id=turn.id) != (1, 1)
+        or not isinstance(state, dict)
+        or state.get("schema_id") != BENCHMARK_ADAPTIVE_CHECKPOINT_SCHEMA_ID
+    ):
+        _blocked(
+            "benchmark_adaptive_checkpoint_drift",
+            "Recovered adaptive checkpoint or provider ledger drifted.",
+        )
+    expected_keys = {
+        "schema_id",
+        "campaign_id",
+        "run_binding_id",
+        "arm_manifest_sha256",
+        "composite_inventory_sha256",
+        "source_commit",
+        "llm_policy_registry_sha256",
+        "adaptive_trigger_policy_sha256",
+        "observation_sha256",
+        "generation_index",
+        "turn_index",
+        "turn_role",
+        "turn_binding_sha256",
+        "prior_state_sha256",
+        "decision",
+        "validated_response",
+        "used_tool_adapter_ids",
+        "proposals",
+        "selected_proposal_ref",
+        "previous_family_state",
+        "trigger_decision",
+        "next_family_state",
+        "terminal",
+        "final_proposal",
+        "terminal_receipt",
+    }
+    if set(state) != expected_keys:
+        _blocked("benchmark_adaptive_checkpoint_invalid", "Adaptive checkpoint is not closed.")
+    expected_base = {
+        "campaign_id": context.campaign.id,
+        "run_binding_id": context.binding.id,
+        "arm_manifest_sha256": context.arm.manifest_sha256,
+        "composite_inventory_sha256": context.campaign.composite_inventory_sha256,
+        "source_commit": context.source_commit,
+        "llm_policy_registry_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
+        "adaptive_trigger_policy_sha256": BENCHMARK_ADAPTIVE_TRIGGER_POLICY_SHA256,
+        "observation_sha256": observation_sha256,
+        "generation_index": observation.generation_index,
+        "turn_index": request.turn_index,
+        "turn_role": expected_role,
+        "turn_binding_sha256": request.binding_sha256,
+        "prior_state_sha256": prior_state_sha256,
+        "previous_family_state": _adaptive_family_state_json(previous_family_state),
+    }
+    if any(state.get(key) != value for key, value in expected_base.items()):
+        _blocked("benchmark_adaptive_checkpoint_drift", "Adaptive checkpoint context drifted.")
+    validated_response = state.get("validated_response")
+    if not isinstance(validated_response, dict) or turn.outcome.response_sha256 != canonical_sha256(
+        validated_response
+    ):
+        _blocked("benchmark_adaptive_checkpoint_drift", "Adaptive response hash drifted.")
+
+    policy = require_llm_arm_policy("dronedream_adaptive_1_4/v1")
+    proposals = list(proposals_before)
+    used_tools = list(used_tools_before)
+    selected_ref = selected_ref_before
+    trigger = trigger_before
+    terminal = False
+    decision: str
+    try:
+        if request.turn_index == 1:
+            decision, tools = validate_tool_action_response(
+                validated_response, policy, allow_stop=True
+            )
+            if decision == "act":
+                proposals = _run_react_local_tools(tools, observation, already_used=set())
+                used_tools = list(tools)
+            terminal = decision == "stop"
+            selected_ref = None
+        elif request.turn_index == 2:
+            selected_ref = validate_selection_response(
+                validated_response,
+                tuple(item.candidate_ref for item in proposals_before),
+            )
+            decision = "dispatch" if selected_ref is not None else "abandon"
+            if selected_ref is not None:
+                trigger = evaluate_benchmark_adaptive_triggers(
+                    observation,
+                    proposals_before,
+                    _proposal_by_ref(proposals_before, selected_ref),
+                    previous_family_state=previous_family_state,
+                )
+            terminal = selected_ref is None or (
+                trigger is not None and not trigger.diagnosis_reasons and not trigger.critic_reasons
+            )
+        elif request.turn_index == 3:
+            if trigger_before is None or not trigger_before.diagnosis_reasons:
+                raise BenchmarkLLMContractError("diagnosis turn lacks deterministic trigger")
+            selected_ref = validate_diagnosis_response(
+                validated_response,
+                tuple(item.candidate_ref for item in proposals_before),
+                selected_ref_before or "",
+            )
+            decision = str(validated_response["decision"])
+            terminal = selected_ref is None or not trigger_before.critic_reasons
+        else:
+            if trigger_before is None or not trigger_before.critic_reasons:
+                raise BenchmarkLLMContractError("critic turn lacks deterministic trigger")
+            approved = validate_critic_response(validated_response, selected_ref_before or "")
+            decision = "approve" if approved else "veto"
+            selected_ref = selected_ref_before if approved else None
+            terminal = True
+    except (
+        BenchmarkAdapterError,
+        BenchmarkAdaptiveTriggerContractError,
+        BenchmarkLLMContractError,
+    ) as exc:
+        raise BenchmarkDurableLLMBlocked(
+            "benchmark_adaptive_checkpoint_invalid",
+            "Recovered adaptive decision fails its frozen schema or trigger contract.",
+        ) from exc
+
+    stored_proposals = _react_proposals_from_state(state.get("proposals"))
+    stored_trigger_payload = state.get("trigger_decision")
+    try:
+        stored_trigger = (
+            None
+            if stored_trigger_payload is None
+            else BenchmarkAdaptiveTriggerDecisionV1.model_validate_json(
+                canonical_json_bytes(stored_trigger_payload)
+            )
+        )
+    except ValueError as exc:
+        raise BenchmarkDurableLLMBlocked(
+            "benchmark_adaptive_checkpoint_invalid",
+            "Recovered adaptive trigger decision fails its frozen schema.",
+        ) from exc
+    next_family_state = trigger.next_family_state if trigger is not None else previous_family_state
+    if (
+        checkpoint.decision != decision
+        or state.get("decision") != decision
+        or state.get("used_tool_adapter_ids") != used_tools
+        or [_safe_react_proposal_record(item) for item in stored_proposals]
+        != [_safe_react_proposal_record(item) for item in proposals]
+        or state.get("selected_proposal_ref") != selected_ref
+        or stored_trigger != trigger
+        or state.get("next_family_state") != _adaptive_family_state_json(next_family_state)
+        or state.get("terminal") is not terminal
+    ):
+        _blocked(
+            "benchmark_adaptive_checkpoint_drift",
+            "Adaptive checkpoint state is inconsistent.",
+        )
+
+    proposal: BenchmarkProposalV1 | None = None
+    safe_receipt: dict[str, Any] = {}
+    if terminal:
+        try:
+            usage = reconcile_provider_run_usage(db, context.binding.id)
+        except BenchmarkProviderUsageBlocked as exc:
+            raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
+        if usage.status != "complete":
+            _blocked(
+                "benchmark_provider_usage_incomplete",
+                "Recovered adaptive usage cannot be reconciled completely.",
+            )
+        selected = _proposal_by_ref(proposals, selected_ref) if selected_ref is not None else None
+        proposal, safe_receipt = _adaptive_terminal_receipt(
+            context=context,
+            observation=observation,
+            selected=selected,
+            turn_bindings=turn_bindings,
+            trigger_decision=trigger,
+            usage_reconciliation_sha256=canonical_sha256(usage),
+        )
+    if state.get("terminal_receipt") != safe_receipt or state.get("final_proposal") != (
+        None if proposal is None else proposal.model_dump(mode="json")
+    ):
+        _blocked("benchmark_adaptive_checkpoint_drift", "Adaptive terminal state drifted.")
+    return _RecoveredAdaptiveCheckpoint(
+        decision=decision,
+        proposals=stored_proposals,
+        used_tools=used_tools,
+        selected_ref=selected_ref,
+        trigger_decision=trigger,
+        terminal=terminal,
+        proposal=proposal,
+        safe_receipt=safe_receipt,
+        state_sha256=checkpoint.state_sha256,
+    )
+
+
+def execute_durable_adaptive_arm(
+    db: Session,
+    job: models.Job,
+    observation: BenchmarkObservationV2,
+    *,
+    transport: BenchmarkDirectTransport | None = None,
+    transport_factory: BenchmarkDirectTransportFactory | None = None,
+) -> BenchmarkDurableAdaptiveExecutionV1:
+    """Execute or recover the bounded adaptive plan/revision/review Harness."""
+
+    context = _load_context(
+        db,
+        job,
+        observation,
+        expected_adapter_id="dronedream_adaptive_1_4/v1",
+    )
+    policy = require_llm_arm_policy("dronedream_adaptive_1_4/v1")
+    if job.first_qualified_candidate_id is not None:
+        return BenchmarkDurableAdaptiveExecutionV1(
+            status="first_qualified_stop",
+            proposal=None,
+            provider_turns_attempted=0,
+            provider_turns_succeeded=0,
+            provider_requests_attempted=0,
+            provider_requests_succeeded=0,
+            safe_receipt={
+                "schema_id": "dronedream.benchmark-first-qualified-stop/v1",
+                "campaign_id": context.campaign.id,
+                "run_binding_id": context.binding.id,
+                "source_commit": context.source_commit,
+            },
+        )
+    if (transport is None) == (transport_factory is None):
+        _blocked(
+            "benchmark_provider_transport_binding_invalid",
+            "Adaptive execution requires exactly one transport binding.",
+        )
+    previous_family_state = _load_adaptive_previous_family_state(db, job, context, observation)
+    proposals: list[BenchmarkProposalV1] = []
+    used_tools: list[str] = []
+    selected_ref: str | None = None
+    trigger: BenchmarkAdaptiveTriggerDecisionV1 | None = None
+    prior_state_sha256: str | None = None
+    turn_bindings: list[str] = []
+    any_recovered = False
+    turn_index = 1
+
+    while turn_index in {1, 2, 3, 4}:
+        turn_role: Literal["plan", "revision", "diagnosis", "critic"]
+        if turn_index == 1:
+            turn_role = "plan"
+        elif turn_index == 2:
+            turn_role = "revision"
+        elif turn_index == 3:
+            turn_role = "diagnosis"
+        else:
+            turn_role = "critic"
+        proposal_refs = tuple(item.candidate_ref for item in proposals)
+        if turn_index == 1:
+            response_schema = tool_action_response_schema(policy, allow_stop=True)
+            tool_outputs: list[dict[str, Any]] = []
+            trigger_reasons: Sequence[str] | None = None
+        elif turn_index == 2:
+            response_schema = selection_response_schema(proposal_refs)
+            tool_outputs = [_safe_react_proposal_record(item) for item in proposals]
+            trigger_reasons = None
+        elif turn_index == 3:
+            if trigger is None or not trigger.diagnosis_reasons or selected_ref is None:
+                _blocked("benchmark_adaptive_sequence_invalid", "Diagnosis turn is not authorized.")
+            response_schema = diagnosis_response_schema(proposal_refs)
+            tool_outputs = [
+                *[_safe_react_proposal_record(item) for item in proposals],
+                {"review_trigger_reasons": list(trigger.diagnosis_reasons)},
+            ]
+            trigger_reasons = trigger.diagnosis_reasons
+        else:
+            if trigger is None or not trigger.critic_reasons or selected_ref is None:
+                _blocked("benchmark_adaptive_sequence_invalid", "Critic turn is not authorized.")
+            response_schema = critic_response_schema(selected_ref)
+            tool_outputs = [
+                *[_safe_react_proposal_record(item) for item in proposals],
+                {
+                    "review_trigger_reasons": list(trigger.critic_reasons),
+                    "selected_proposal_ref": selected_ref,
+                },
+            ]
+            trigger_reasons = trigger.critic_reasons
+        request = build_llm_turn_request(
+            policy=policy,
+            observation=observation,
+            model_snapshot=context.provider.model_snapshot,
+            turn_index=turn_index,
+            turn_role=turn_role,
+            response_schema=response_schema,
+            tool_outputs=tool_outputs,
+        )
+        turn_bindings.append(request.binding_sha256)
+        recovered = _recover_adaptive_checkpoint(
+            db,
+            job,
+            context,
+            observation,
+            request,
+            proposals_before=proposals,
+            used_tools_before=used_tools,
+            selected_ref_before=selected_ref,
+            trigger_before=trigger,
+            previous_family_state=previous_family_state,
+            prior_state_sha256=prior_state_sha256,
+            turn_bindings=turn_bindings,
+        )
+        if recovered is not None:
+            any_recovered = True
+            proposals = recovered.proposals
+            used_tools = recovered.used_tools
+            selected_ref = recovered.selected_ref
+            trigger = recovered.trigger_decision
+            prior_state_sha256 = recovered.state_sha256
+            if recovered.terminal:
+                attempted = len(turn_bindings)
+                return BenchmarkDurableAdaptiveExecutionV1(
+                    status=(
+                        "proposal_recovered"
+                        if recovered.proposal is not None
+                        else "abandoned_recovered"
+                    ),
+                    proposal=recovered.proposal,
+                    provider_turns_attempted=attempted,
+                    provider_turns_succeeded=attempted,
+                    provider_requests_attempted=attempted,
+                    provider_requests_succeeded=attempted,
+                    recovered_from_checkpoint=True,
+                    trigger_decision=trigger,
+                    safe_receipt=recovered.safe_receipt,
+                )
+            turn_index = (
+                2
+                if turn_index == 1
+                else 3
+                if turn_index == 2 and trigger is not None and trigger.diagnosis_reasons
+                else 4
+            )
+            continue
+
+        body = _request_body(request, context.provider, context.binding.provider_seed)
+        _require_prereserved_budget(db, context, body)
+        if transport is None:
+            try:
+                transport = transport_factory(context.provider)  # type: ignore[misc]
+            except BenchmarkDurableLLMBlocked:
+                raise
+            except Exception as exc:  # noqa: BLE001 - credentials remain private.
+                raise BenchmarkDurableLLMBlocked(
+                    "benchmark_provider_credential_unavailable",
+                    "The Job-bound provider credential is unavailable.",
+                ) from exc
+        raw, attempt = _call_durable_provider_turn(
+            db,
+            job,
+            context,
+            request,
+            body,
+            transport,
+            adapter_id="dronedream_adaptive_1_4/v1",
+            turn_role=turn_role,
+            maximum_turns_per_generation=4,
+            error_namespace="adaptive",
+            adaptive_trigger_reasons=trigger_reasons,
+        )
+        terminal = False
+        decision: str
+        validated_response: dict[str, Any]
+        try:
+            if turn_index == 1:
+                decision, tools = validate_tool_action_response(raw, policy, allow_stop=True)
+                if decision == "act":
+                    proposals = _run_react_local_tools(tools, observation, already_used=set())
+                    used_tools = list(tools)
+                selected_ref = None
+                terminal = decision == "stop"
+                validated_response = {
+                    "schema_version": "1.0",
+                    "decision": decision,
+                    "tool_adapter_ids": list(tools),
+                }
+            elif turn_index == 2:
+                selected_ref = validate_selection_response(raw, proposal_refs)
+                decision = "dispatch" if selected_ref is not None else "abandon"
+                validated_response = {
+                    "schema_version": "1.0",
+                    "decision": decision,
+                    "selected_proposal_ref": selected_ref,
+                }
+                if selected_ref is not None:
+                    trigger = evaluate_benchmark_adaptive_triggers(
+                        observation,
+                        proposals,
+                        _proposal_by_ref(proposals, selected_ref),
+                        previous_family_state=previous_family_state,
+                    )
+                terminal = selected_ref is None or (
+                    trigger is not None
+                    and not trigger.diagnosis_reasons
+                    and not trigger.critic_reasons
+                )
+            elif turn_index == 3:
+                if trigger is None:
+                    raise BenchmarkLLMContractError("diagnosis trigger is missing")
+                selected_ref = validate_diagnosis_response(raw, proposal_refs, selected_ref or "")
+                raw_decision = raw.get("decision") if isinstance(raw, dict) else None
+                if not isinstance(raw_decision, str):  # pragma: no cover - validator guarantee.
+                    raise BenchmarkLLMContractError("diagnosis decision is missing")
+                decision = raw_decision
+                validated_response = {
+                    "schema_version": "1.0",
+                    "decision": decision,
+                    "selected_proposal_ref": selected_ref,
+                }
+                terminal = selected_ref is None or not trigger.critic_reasons
+            else:
+                approved = validate_critic_response(raw, selected_ref or "")
+                decision = "approve" if approved else "veto"
+                selected_ref = selected_ref if approved else None
+                validated_response = {
+                    "schema_version": "1.0",
+                    "decision": decision,
+                    "selected_proposal_ref": selected_ref,
+                }
+                terminal = True
+        except (
+            BenchmarkAdapterError,
+            BenchmarkAdaptiveTriggerContractError,
+            BenchmarkLLMContractError,
+        ) as exc:
+            finish_cognitive_turn(
+                db,
+                job,
+                attempt,
+                status="invalid_schema",
+                error_code="benchmark_adaptive_state_rejected",
+            )
+            raise BenchmarkDurableLLMBlocked(
+                "benchmark_adaptive_state_rejected",
+                "Adaptive decision, trigger, or local-tool state failed closed.",
+            ) from exc
+        status = finish_cognitive_turn(
+            db,
+            job,
+            attempt,
+            status="succeeded",
+            response=validated_response,
+            commit=False,
+        )
+        if status != "succeeded":
+            db.commit()
+            db.refresh(job)
+            _blocked("benchmark_source_drift", "Source changed before adaptive finalization.")
+
+        proposal: BenchmarkProposalV1 | None = None
+        terminal_receipt: dict[str, Any] = {}
+        if terminal:
+            try:
+                usage = reconcile_provider_run_usage(db, context.binding.id)
+            except BenchmarkProviderUsageBlocked as exc:
+                db.rollback()
+                db.refresh(job)
+                finish_cognitive_turn(
+                    db,
+                    job,
+                    attempt,
+                    status="provider_failed",
+                    error_code=exc.code,
+                )
+                raise BenchmarkDurableLLMBlocked(exc.code, str(exc)) from exc
+            if usage.status != "complete":
+                db.rollback()
+                db.refresh(job)
+                finish_cognitive_turn(
+                    db,
+                    job,
+                    attempt,
+                    status="provider_failed",
+                    error_code="benchmark_provider_usage_incomplete",
+                )
+                _blocked(
+                    "benchmark_provider_usage_incomplete",
+                    "Adaptive provider usage cannot be reconciled completely.",
+                )
+            selected = (
+                _proposal_by_ref(proposals, selected_ref) if selected_ref is not None else None
+            )
+            proposal, terminal_receipt = _adaptive_terminal_receipt(
+                context=context,
+                observation=observation,
+                selected=selected,
+                turn_bindings=turn_bindings,
+                trigger_decision=trigger,
+                usage_reconciliation_sha256=canonical_sha256(usage),
+            )
+        next_family_state = (
+            trigger.next_family_state if trigger is not None else previous_family_state
+        )
+        state = {
+            "schema_id": BENCHMARK_ADAPTIVE_CHECKPOINT_SCHEMA_ID,
+            "campaign_id": context.campaign.id,
+            "run_binding_id": context.binding.id,
+            "arm_manifest_sha256": context.arm.manifest_sha256,
+            "composite_inventory_sha256": context.campaign.composite_inventory_sha256,
+            "source_commit": context.source_commit,
+            "llm_policy_registry_sha256": BENCHMARK_LLM_ARM_POLICIES_SHA256,
+            "adaptive_trigger_policy_sha256": BENCHMARK_ADAPTIVE_TRIGGER_POLICY_SHA256,
+            "observation_sha256": canonical_sha256(observation),
+            "generation_index": observation.generation_index,
+            "turn_index": turn_index,
+            "turn_role": turn_role,
+            "turn_binding_sha256": request.binding_sha256,
+            "prior_state_sha256": prior_state_sha256,
+            "decision": decision,
+            "validated_response": validated_response,
+            "used_tool_adapter_ids": list(used_tools),
+            "proposals": [_safe_react_proposal_record(item) for item in proposals],
+            "selected_proposal_ref": selected_ref,
+            "previous_family_state": _adaptive_family_state_json(previous_family_state),
+            "trigger_decision": None if trigger is None else trigger.model_dump(mode="json"),
+            "next_family_state": _adaptive_family_state_json(next_family_state),
+            "terminal": terminal,
+            "final_proposal": None if proposal is None else proposal.model_dump(mode="json"),
+            "terminal_receipt": terminal_receipt,
+        }
+        state_sha256 = canonical_sha256(state)
+        db.add(
+            models.BenchmarkLLMPlanRevisionCheckpoint(
+                job_id=job.id,
+                run_binding_id=context.binding.id,
+                cognitive_turn_receipt_id=attempt.receipt_id,
+                checkpoint_schema=BENCHMARK_ADAPTIVE_CHECKPOINT_SCHEMA_ID,
+                adapter_id="dronedream_adaptive_1_4/v1",
+                generation_index=observation.generation_index,
+                turn_index=turn_index,
+                turn_role=turn_role,
+                source_commit=context.source_commit,
+                observation_sha256=canonical_sha256(observation),
+                turn_binding_sha256=request.binding_sha256,
+                decision=decision,
+                state_json=state,
+                state_sha256=state_sha256,
+            )
+        )
+        db.commit()
+        db.refresh(job)
+        prior_state_sha256 = state_sha256
+        if terminal:
+            attempted = len(turn_bindings)
+            return BenchmarkDurableAdaptiveExecutionV1(
+                status=(
+                    "proposal_recovered"
+                    if proposal is not None and any_recovered
+                    else "abandoned_recovered"
+                    if proposal is None and any_recovered
+                    else "proposal"
+                    if proposal is not None
+                    else "abandoned"
+                ),
+                proposal=proposal,
+                provider_turns_attempted=attempted,
+                provider_turns_succeeded=attempted,
+                provider_requests_attempted=attempted,
+                provider_requests_succeeded=attempted,
+                recovered_from_checkpoint=any_recovered,
+                trigger_decision=trigger,
+                safe_receipt=terminal_receipt,
+            )
+        turn_index = (
+            2
+            if turn_index == 1
+            else 3
+            if turn_index == 2 and trigger is not None and trigger.diagnosis_reasons
+            else 4
+        )
+    _blocked("benchmark_adaptive_sequence_incomplete", "Adaptive sequence is incomplete.")
+
+
 __all__ = [
     "BENCHMARK_DIRECT_RESERVATION_REASON",
     "BENCHMARK_PROVIDER_BASE_URLS",
     "BenchmarkDirectTransport",
     "BenchmarkDirectTransportFactory",
     "BenchmarkDurableDirectExecutionV1",
+    "BenchmarkDurableAdaptiveExecutionV1",
     "BenchmarkDurableFixedTwoTurnExecutionV1",
     "BenchmarkDurableLLAMBOExecutionV1",
     "BenchmarkDurableReactExecutionV1",
@@ -2386,6 +3229,7 @@ __all__ = [
     "BenchmarkProviderExecutionConfigV1",
     "BenchmarkProviderTransportResult",
     "execute_durable_direct_arm",
+    "execute_durable_adaptive_arm",
     "execute_durable_fixed_two_turn_arm",
     "execute_durable_llambo_arm",
     "execute_durable_react_arm",
