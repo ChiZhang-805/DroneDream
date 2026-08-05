@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-manifest",
+  "manifestVersion": "1.0.0",
+  "attemptId": "lab-preview-1.0.0-89da3e4-yellow-attempt1",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "sourceCommit": "89da3e4209764e20153caeef5d588b0d11b581e7",
+  "commonCoreProductSourceCommit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+  "commonCoreProductHash": "c6bdfdb9723cacf8c402acf9a6200e7f9dda37d75af50e9b8fe308f8aceb41bb",
+  "excludedSimPreviewEvidenceCommit": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571",
+  "buildAttemptCount": 1,
+  "buildResult": "failed-before-nsis",
+  "artifact": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "exists": false,
+    "bytes": null,
+    "sha256": null,
+    "authenticode": "not-produced",
+    "tauriUpdaterSignature": "not-produced"
+  },
+  "receipt": {
+    "path": "distribution/build-receipts/lab-preview-1.0.0-89da3e4-yellow-attempt1.failed.json",
+    "sha256": "415de7ac522075b6ec7d459bba1dc6f74fac238933184560c935dd2f2872d981"
+  },
+  "promotion": {
+    "releaseBranchCreated": false,
+    "uploadedOrDeployed": false,
+    "installOrRuntimeMigrationPerformed": false
+  }
+}

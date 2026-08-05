@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-preview-1.0.0-89da3e4-yellow-attempt1",
+  "attemptOrdinalForSource": 1,
+  "auditMode": "yellow-single-build-attempt",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "89da3e4209764e20153caeef5d588b0d11b581e7",
+    "shortCommit": "89da3e4",
+    "treeStateBeforeAttempt": "clean"
+  },
+  "commonCore": {
+    "authorityName": "Universal/Core",
+    "productSourceCommit": "2aec69e88ee8844cff759a025f109e5b938d18c0",
+    "productCommonCoreHash": "c6bdfdb9723cacf8c402acf9a6200e7f9dda37d75af50e9b8fe308f8aceb41bb",
+    "excludedSimPreviewEvidenceCommit": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
+  },
+  "inputs": {
+    "buildScript": {
+      "path": "desktop/scripts/build-lab-preview.ps1",
+      "sha256": "573536b2fb4e7c47b22c02447b7c54176589c53da8a5929768a4a700785b22fb"
+    },
+    "tauriLabOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "sha256": "70951e969e4a992ab34a48a22446eaec40d84fbcaf65d61b367ade8023f16fe1"
+    },
+    "labBuildProfile": {
+      "path": "distribution/build-profiles/lab-preview.v1.json",
+      "sha256": "822ccfe605a2ed8dec006caa8e0ac03cbd1b556cc064773a82b14c0ec8df5862"
+    },
+    "labEditionManifest": {
+      "path": "distribution/editions/lab.v1.json",
+      "sha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356"
+    },
+    "executionGatePolicy": {
+      "path": "distribution/safety/edition-execution-gate.v1.json",
+      "sha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456"
+    },
+    "vehiclePackRegistry": {
+      "path": "distribution/vehicle-packs/registry.v1.json",
+      "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"
+    },
+    "selectedVehiclePack": {
+      "path": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+      "sha256": "02ba34bccd6656e6d20e8022a94db1976b9e4a849757e0f9d78927a72883ba0d"
+    },
+    "licenseNotice": {
+      "path": "runtime/THIRD_PARTY_NOTICES.md",
+      "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+    }
+  },
+  "publicSupabaseClientConfig": {
+    "source": "GitHub repository Actions variables",
+    "repository": "ChiZhang-805/DroneDream",
+    "variableNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "singleProcessInjection": true,
+    "valuesPersistedInReceipt": false,
+    "valuesHashedInReceipt": false,
+    "serviceRoleRejectedByVerifier": true,
+    "tauriSigningPrivateKeyRead": false,
+    "modelApiKeyRead": false,
+    "accountPasswordRead": false
+  },
+  "commands": {
+    "dependencyPreparation": [
+      "npm.cmd --prefix frontend ci",
+      "npm.cmd --prefix desktop ci"
+    ],
+    "singleBuildAttempt": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop\\scripts\\build-lab-preview.ps1 -Build -CargoTargetDir C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target"
+  },
+  "result": {
+    "status": "failed-before-nsis",
+    "frontendProductionBuild": "passed",
+    "frontendNpmCiAuditSummary": "npm ci completed and reported 1 moderate and 4 high advisories; no npm audit fix was applied in this Lab build attempt.",
+    "browserAuthPublicConfigVerification": "passed",
+    "rustCompilation": "failed",
+    "failureStage": "rust-msvc-linker-discovery",
+    "failureReason": "Rust default MSVC target could not find link.exe in PATH.",
+    "nsisStarted": false,
+    "installerCopiedToArtifactDirectory": false
+  },
+  "artifact": {
+    "expectedFileName": "DroneDream-Lab-1.0.0.exe",
+    "exists": false,
+    "bytes": null,
+    "sha256": null,
+    "authenticode": "not-produced",
+    "tauriUpdaterSignature": "not-produced",
+    "sigFileExists": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecisionAtZeroValidatedPacks": "deny",
+    "hardwareActionsDenied": [
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl.execute"
+    ],
+    "installed": false,
+    "runtimeMigrated": false,
+    "px4GazeboStarted": false,
+    "hardwareConnected": false,
+    "releaseBranchCreated": false,
+    "uploadedOrDeployed": false
+  },
+  "postAttemptValidation": {
+    "receiptJsonValid": true,
+    "distributionContractTests": {
+      "command": "python -m unittest discover -s distribution\\tests -q",
+      "result": "passed",
+      "tests": 130
+    },
+    "frontendGate": {
+      "command": "npm.cmd --prefix frontend run typecheck",
+      "result": "passed"
+    },
+    "backendGate": {
+      "command": "python -m pytest backend\\tests\\test_config.py backend\\tests\\test_desktop_bridge.py -q",
+      "result": "passed",
+      "tests": 30
+    },
+    "rustGate": {
+      "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)",
+      "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)",
+      "activeToolchain": "stable-x86_64-pc-windows-msvc (default)",
+      "installedTargets": [
+        "x86_64-pc-windows-gnullvm",
+        "x86_64-pc-windows-msvc"
+      ],
+      "linkExeInPath": false,
+      "result": "blocked"
+    },
+    "preinstallAcceptance": {
+      "command": "python distribution\\tools\\lab_preinstall_acceptance.py",
+      "decision": "blocked"
+    },
+    "labExeFoundAfterAttempt": false
+  },
+  "remainingGates": [
+    "Install the MSVC linker toolchain or intentionally switch the Lab Tauri build to an installed GNU/LLVM Windows target through an approved follow-up patch.",
+    "Run a new YELLOW build only after fresh authorization, because the single approved build attempt for this source was consumed.",
+    "Produce DroneDream-Lab-1.0.0.exe bytes, SHA-256, Authenticode status, and Lab artifact receipt.",
+    "Validate static PE/version/filename/edition/common-core/payload/license/NOTICE/loopback bytes after an EXE exists.",
+    "Keep hardware parameter write, arm, HITL, and flight denied while validatedVehiclePackCount is zero.",
+    "Do not create codex/release-lab until a real build and validation evidence are approved."
+  ]
+}
