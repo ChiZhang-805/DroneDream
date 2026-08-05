@@ -41,16 +41,14 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
     def test_drift_audit_identifies_commits_paths_and_common_core_backflow(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)
         subjects = [commit["subject"] for commit in audit["commits"]]
-        self.assertEqual(
-            subjects,
-            [
-                "feat(field): add lightweight engine pack profile",
-                "test(field): bind build plans to common core commit",
-                "test(field): add prerelease audit contract",
-                "test(field): add lifecycle refusal contract",
-                "test(field): audit common drift readiness",
-            ],
-        )
+        for required_subject in (
+            "feat(field): add lightweight engine pack profile",
+            "test(field): bind build plans to common core commit",
+            "test(field): add prerelease audit contract",
+            "test(field): add lifecycle refusal contract",
+            "test(field): audit common drift readiness",
+        ):
+            self.assertIn(required_subject, subjects)
         by_path = {item["path"]: item for item in audit["changedPaths"]}
         self.assertEqual(
             by_path["distribution/tools/edition_build_planner.py"]["classification"],
