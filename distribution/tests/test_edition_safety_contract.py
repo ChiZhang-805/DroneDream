@@ -322,7 +322,7 @@ class EditionSafetyContractTests(unittest.TestCase):
             [],
         )
         for path in sorted((DISTRIBUTION / "vehicle-packs").glob("*.v1.json")):
-            if path.name == "registry.v1.json":
+            if path.name.startswith("registry."):
                 continue
             manifest = contract.load_json(path)
             self.assertNotEqual(manifest["integrity"]["signature"]["state"], "verified")

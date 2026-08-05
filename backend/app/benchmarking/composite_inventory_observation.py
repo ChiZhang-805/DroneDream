@@ -75,6 +75,14 @@ _UNIFIED_ENGINE_PROFILE: Final[dict[str, Any]] = {
     "includesLargeSimulator": True,
     "excludedSourcePaths": [],
 }
+_SIM_ENGINE_PROFILE_KEYS: Final[set[str]] = {
+    "profileId",
+    "profileVersion",
+    "profileManifestPath",
+    "profileManifestSha256",
+    "includesLargeSimulator",
+    "excludedSourcePaths",
+}
 
 
 class CompositeObservationCompilationError(ValueError):
@@ -689,12 +697,31 @@ def _engine_manifest_identity(
 
 def _validate_engine_edition_profile(value: object) -> dict[str, Any]:
     profile = _mapping(value, label="Engine Pack edition profile")
+    profile_id = _safe_text(profile.get("profileId"), label="Engine Pack edition profile ID")
+    if profile_id == "sim-only":
+        _require_exact_keys(
+            profile,
+            _SIM_ENGINE_PROFILE_KEYS,
+            label="Engine Pack edition profile",
+        )
+        if (
+            profile["profileVersion"] != "1.0.0"
+            or profile["profileManifestPath"]
+            != "distribution/engine-pack-profiles/sim-only.v1.json"
+            or not isinstance(profile["profileManifestSha256"], str)
+            or _SHA256.fullmatch(profile["profileManifestSha256"]) is None
+            or profile["includesLargeSimulator"] is not True
+            or profile["excludedSourcePaths"] != ["backend/app/distribution_safety.py"]
+        ):
+            raise CompositeObservationCompilationError(
+                "Engine Pack edition profile is unsupported or internally inconsistent"
+            )
+        return profile
     _require_exact_keys(
         profile,
         {"profileId", "includesLargeSimulator", "excludedSourcePaths"},
         label="Engine Pack edition profile",
     )
-    profile_id = _safe_text(profile["profileId"], label="Engine Pack edition profile ID")
     if type(profile["includesLargeSimulator"]) is not bool:
         raise CompositeObservationCompilationError(
             "Engine Pack edition profile simulator flag is invalid"

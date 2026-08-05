@@ -19,7 +19,7 @@ REGISTRY_PATH = PACK_DIRECTORY / "registry.v1.json"
 SCHEMA_PATH = DISTRIBUTION / "schemas" / "vehicle-pack-registry.schema.json"
 JCS_VERIFIER = DISTRIBUTION / "tools" / "verify_vehicle_pack_jcs.mjs"
 PACK_PATHS = sorted(
-    path for path in PACK_DIRECTORY.glob("*.json") if path.name != REGISTRY_PATH.name
+    path for path in PACK_DIRECTORY.glob("*.json") if not path.name.startswith("registry.")
 )
 
 CONTRACT_SPEC = importlib.util.spec_from_file_location(

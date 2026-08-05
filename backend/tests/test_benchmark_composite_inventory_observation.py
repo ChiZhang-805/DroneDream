@@ -17,6 +17,7 @@ from app.benchmarking.composite_inventory_observation import (
     DesktopComponentAttestationV1,
     EnginePackManifestAttestationV1,
     RuntimeManifestAttestationV1,
+    _validate_engine_edition_profile,
     compile_composite_execution_observation,
 )
 from app.benchmarking.contracts import CompositeExecutionInventoryV1, canonical_sha256
@@ -573,6 +574,22 @@ def test_engine_pack_edition_profile_is_bound_into_pack_identity() -> None:
     )
     with pytest.raises(CompositeObservationCompilationError, match="payload identity"):
         _compile(values)
+
+
+def test_sim_only_engine_profile_is_supported_and_hash_bound() -> None:
+    profile = {
+        "profileId": "sim-only",
+        "profileVersion": "1.0.0",
+        "profileManifestPath": "distribution/engine-pack-profiles/sim-only.v1.json",
+        "profileManifestSha256": "a" * 64,
+        "includesLargeSimulator": True,
+        "excludedSourcePaths": ["backend/app/distribution_safety.py"],
+    }
+    assert _validate_engine_edition_profile(profile) == profile
+    drifted = dict(profile)
+    drifted["profileManifestSha256"] = "not-a-hash"
+    with pytest.raises(CompositeObservationCompilationError, match="internally inconsistent"):
+        _validate_engine_edition_profile(drifted)
 
 
 def test_artifact_sizes_and_release_timestamps_are_bound() -> None:
