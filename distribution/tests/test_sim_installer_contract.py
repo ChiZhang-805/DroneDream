@@ -326,6 +326,12 @@ class SimInstallerContractTests(unittest.TestCase):
         self.assertFalse(validated["brandDonor"]["iconOverridePresent"])
         self.assertFalse(validated["brandDonor"]["commonCoreBindingVerified"])
         self.assertFalse(validated["brandDonor"]["assetHashesVerified"])
+        self.assertEqual(
+            validated["brandDonor"]["approvedEditionAssetState"],
+            "vendored-exact-bytes",
+        )
+        self.assertTrue(validated["brandDonor"]["approvedEditionAssetHashesVerified"])
+        self.assertFalse(validated["brandDonor"]["approvedEditionApplicationSourceWired"])
         self.assertEqual(validated["capabilityFence"]["validatedVehiclePackCount"], 0)
         self.assertTrue(sim_contract._contains_icon_override({"bundle": {"icon": []}}))
 

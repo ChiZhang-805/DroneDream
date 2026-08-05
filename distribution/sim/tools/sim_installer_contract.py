@@ -209,6 +209,11 @@ SURFACE_BRAND_KEYS = {
     "approvedConceptHandoffSha256",
     "intakePath",
     "intakeSha256",
+    "approvedEditionAssetManifestPath",
+    "approvedEditionAssetManifestSha256",
+    "approvedEditionAssetState",
+    "approvedEditionAssetHashesVerified",
+    "approvedEditionApplicationSourceWired",
     "canonicalDonorState",
     "canonicalDonorManifestPath",
     "canonicalDonorManifestSha256",
@@ -963,6 +968,15 @@ def validate_installer_surface_contract(
         ),
         "intakePath": "distribution/sim/brand/donor-intake.v1.json",
         "intakeSha256": "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297",
+        "approvedEditionAssetManifestPath": (
+            "distribution/sim/brand/approved-edition-assets.v1.json"
+        ),
+        "approvedEditionAssetManifestSha256": (
+            "a9b868c7d174eea1568ef954246f05cc21cbae767bd26a99501f0eb285af0724"
+        ),
+        "approvedEditionAssetState": "vendored-exact-bytes",
+        "approvedEditionAssetHashesVerified": True,
+        "approvedEditionApplicationSourceWired": False,
         "canonicalDonorState": "pending-universal-common-core",
         "canonicalDonorManifestPath": None,
         "canonicalDonorManifestSha256": None,
@@ -982,6 +996,22 @@ def validate_installer_surface_contract(
     try:
         intake = brand_module.validate_donor_intake(
             brand_module.load_json(intake_path), repo_root=repo_root
+        )
+        approved_manifest_path = _resolve(
+            repo_root,
+            brand["approvedEditionAssetManifestPath"],
+            "surface.brandDonor.approvedEditionAssetManifestPath",
+        )
+        if sha256_file(approved_manifest_path) != _sha(
+            brand["approvedEditionAssetManifestSha256"],
+            "surface.brandDonor.approvedEditionAssetManifestSha256",
+        ):
+            raise SimInstallerContractError(
+                "approved SIM edition asset manifest SHA-256 drifted"
+            )
+        brand_module.validate_approved_edition_assets(
+            brand_module.load_json(approved_manifest_path),
+            repo_root=repo_root,
         )
         if donor_manifest is not None:
             brand_module.validate_canonical_donor_manifest(

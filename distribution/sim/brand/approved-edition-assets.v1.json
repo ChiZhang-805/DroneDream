@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-approved-edition-brand-assets",
+  "manifestVersion": "1.0.0",
+  "editionId": "sim",
+  "schema": {
+    "path": "distribution/sim/brand/approved-edition-assets.schema.json",
+    "sha256": "94fd921084a38bf19baa3eb68ce5ff4b88e704a393a00baeb6b824e24a362e65"
+  },
+  "authorization": {
+    "status": "chief-control-approved-byte-for-byte",
+    "sourceThreadId": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9",
+    "authorizationDate": "2026-08-05",
+    "allowedUse": ["application", "installer-input", "shortcut-input", "sim-edition-surface"],
+    "byteForByteCopyRequired": true,
+    "derivativeExportAuthorized": false
+  },
+  "identity": {
+    "masterName": "DroneDream",
+    "displayName": "DroneDream · SIM",
+    "separator": " · "
+  },
+  "palette": {
+    "start": "#00D9FF",
+    "middle": "#2671FF",
+    "end": "#744CFF"
+  },
+  "commonCoreBinding": {
+    "branchContract": {
+      "path": "distribution/branch-contracts/software-sim.v1.json",
+      "sha256": "0d3bc89a162de8263fe8b08f7ea774e4f9ff45b1c2e9e5730cc7af676f4d83cd"
+    },
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
+    "commonCorePaths": ["backend", "desktop", "engine-pack", "frontend", "runtime", "worker"],
+    "bindingScope": "sim-edition-integration-baseline",
+    "canonicalUniversalDonorIntegrated": false
+  },
+  "sourceHandoff": {
+    "path": "Z:/DroneDream/work/brand-edition-concepts-v1/BRAND_EDITION_HANDOFF_V2.md",
+    "sha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
+    "statusAtHandoff": "user-approved-visual-direction-concept-assets"
+  },
+  "assets": [
+    {
+      "role": "sim-mark-png",
+      "source": {
+        "path": "Z:/DroneDream/work/brand-edition-concepts-v1/dronedream-sim-mark-concept-v1.png",
+        "fileName": "dronedream-sim-mark-concept-v1.png",
+        "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+        "bytes": 162699,
+        "mimeType": "image/png",
+        "width": 1024,
+        "height": 1024
+      },
+      "destination": {
+        "path": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
+        "fileName": "dronedream-sim-mark.png",
+        "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+        "bytes": 162699,
+        "mimeType": "image/png",
+        "width": 1024,
+        "height": 1024
+      },
+      "exactByteCopy": true,
+      "approved": true
+    },
+    {
+      "role": "sim-dot-lockup-png",
+      "source": {
+        "path": "Z:/DroneDream/work/brand-edition-concepts-v1/dronedream-sim-dot-lockup-concept-v2.png",
+        "fileName": "dronedream-sim-dot-lockup-concept-v2.png",
+        "sha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+        "bytes": 77713,
+        "mimeType": "image/png",
+        "width": 1840,
+        "height": 340
+      },
+      "destination": {
+        "path": "frontend/src/editions/sim/assets/dronedream-sim-dot-lockup.png",
+        "fileName": "dronedream-sim-dot-lockup.png",
+        "sha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+        "bytes": 77713,
+        "mimeType": "image/png",
+        "width": 1840,
+        "height": 340
+      },
+      "exactByteCopy": true,
+      "approved": true
+    }
+  ],
+  "integrationState": {
+    "assetBytesVendored": true,
+    "applicationSourceWired": false,
+    "installerIconOverridePresent": false,
+    "windowsIcoGenerated": false,
+    "browserAcceptanceExecuted": false,
+    "productionBuildExecuted": false,
+    "installerBuilt": false,
+    "canonicalUniversalDonorIntegrated": false,
+    "promotionReady": false
+  }
+}

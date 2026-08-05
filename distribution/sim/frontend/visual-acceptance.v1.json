@@ -17,6 +17,11 @@
     "approvedConceptHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
     "intakePath": "distribution/sim/brand/donor-intake.v1.json",
     "intakeSha256": "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297",
+    "approvedEditionAssetManifestPath": "distribution/sim/brand/approved-edition-assets.v1.json",
+    "approvedEditionAssetManifestSha256": "a9b868c7d174eea1568ef954246f05cc21cbae767bd26a99501f0eb285af0724",
+    "approvedEditionAssetState": "vendored-exact-bytes",
+    "approvedEditionAssetHashesVerified": true,
+    "approvedEditionApplicationSourceWired": false,
     "canonicalDonorState": "pending-universal-common-core",
     "canonicalDonorManifestPath": null,
     "canonicalDonorManifestSha256": null,
@@ -62,7 +67,7 @@
       },
       {
         "path": "distribution/sim/desktop/installer-surface-contract.v1.json",
-        "sha256": "aa49da54da02d4895802f5c0fa1fcc4d99faab56257a4eb620c6e9a389b58a72"
+        "sha256": "a493f41897c077a792b34d900046a4b6c1b804021c9fd21593d247a5f356b9b1"
       },
       {
         "path": "distribution/sim/brand/canonical-donor-manifest.schema.json",
@@ -73,8 +78,24 @@
         "sha256": "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297"
       },
       {
+        "path": "distribution/sim/brand/approved-edition-assets.schema.json",
+        "sha256": "94fd921084a38bf19baa3eb68ce5ff4b88e704a393a00baeb6b824e24a362e65"
+      },
+      {
+        "path": "distribution/sim/brand/approved-edition-assets.v1.json",
+        "sha256": "a9b868c7d174eea1568ef954246f05cc21cbae767bd26a99501f0eb285af0724"
+      },
+      {
+        "path": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
+        "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa"
+      },
+      {
+        "path": "frontend/src/editions/sim/assets/dronedream-sim-dot-lockup.png",
+        "sha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548"
+      },
+      {
         "path": "distribution/sim/tools/sim_brand_donor.py",
-        "sha256": "430df515de163178f00639b15d3c574a90927fc98890f48086b7a9980cd5c6a6"
+        "sha256": "3e775aebab776710069ad6ef18aa15ec76f0cb6664a53546b61dc4722c8229fb"
       },
       {
         "path": "distribution/branch-contracts/software-sim.v1.json",

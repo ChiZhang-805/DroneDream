@@ -95,6 +95,11 @@ async function loadAndValidateContract() {
     approvedConceptHandoffSha256: "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
     intakePath: "distribution/sim/brand/donor-intake.v1.json",
     intakeSha256: "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297",
+    approvedEditionAssetManifestPath: "distribution/sim/brand/approved-edition-assets.v1.json",
+    approvedEditionAssetManifestSha256: "a9b868c7d174eea1568ef954246f05cc21cbae767bd26a99501f0eb285af0724",
+    approvedEditionAssetState: "vendored-exact-bytes",
+    approvedEditionAssetHashesVerified: true,
+    approvedEditionApplicationSourceWired: false,
     canonicalDonorState: "pending-universal-common-core",
     canonicalDonorManifestPath: null,
     canonicalDonorManifestSha256: null,
@@ -126,7 +131,7 @@ async function loadAndValidateContract() {
   assert.equal(contract.source.branch, "codex/software-sim");
   assert.equal(contract.source.commonCoreCommit, branchContract.syncBaseline.commonCoreCommit);
   assert.equal(contract.source.commonCoreHash, branchContract.syncBaseline.commonCoreHash);
-  assert.equal(contract.source.refs.length, 12);
+  assert.equal(contract.source.refs.length, 16);
   for (const ref of contract.source.refs) {
     assertExactKeys(ref, ["path", "sha256"], `source ref ${ref.path}`);
     assert.match(ref.sha256, /^[0-9a-f]{64}$/);
@@ -147,6 +152,13 @@ async function loadAndValidateContract() {
     "--repo-root",
     repoRoot,
     resolveRepoFile(contract.brandDonor.intakePath),
+  ], { cwd: repoRoot, stdio: "pipe" });
+  execFileSync(python, [
+    donorTool,
+    "verify-approved-assets",
+    "--repo-root",
+    repoRoot,
+    resolveRepoFile(contract.brandDonor.approvedEditionAssetManifestPath),
   ], { cwd: repoRoot, stdio: "pipe" });
   if (donorManifestArgument) {
     assert.equal(typeof donorManifestArgument, "string", "--donor-manifest requires a path");

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed validation for a future canonical DroneDream SIM brand donor."""
+"""Fail-closed validation for approved and future canonical SIM brand assets."""
 
 from __future__ import annotations
 
@@ -91,6 +91,94 @@ PRESERVATION_KEYS = {
     "masterRedrawn",
 }
 REVIEW_KEYS = {"status", "releaseUseAuthorized", "conceptOnly", "approvalReference"}
+
+APPROVED_MANIFEST_KEYS = {
+    "schemaVersion",
+    "kind",
+    "manifestVersion",
+    "editionId",
+    "schema",
+    "authorization",
+    "identity",
+    "palette",
+    "commonCoreBinding",
+    "sourceHandoff",
+    "assets",
+    "integrationState",
+}
+APPROVED_AUTHORIZATION_KEYS = {
+    "status",
+    "sourceThreadId",
+    "authorizationDate",
+    "allowedUse",
+    "byteForByteCopyRequired",
+    "derivativeExportAuthorized",
+}
+APPROVED_BINDING_KEYS = {
+    "branchContract",
+    "commonCoreCommit",
+    "commonCoreHash",
+    "commonCorePaths",
+    "bindingScope",
+    "canonicalUniversalDonorIntegrated",
+}
+APPROVED_HANDOFF_KEYS = {"path", "sha256", "statusAtHandoff"}
+APPROVED_ASSET_KEYS = {"role", "source", "destination", "exactByteCopy", "approved"}
+APPROVED_LOCATION_KEYS = {
+    "path",
+    "fileName",
+    "sha256",
+    "bytes",
+    "mimeType",
+    "width",
+    "height",
+}
+APPROVED_INTEGRATION_KEYS = {
+    "assetBytesVendored",
+    "applicationSourceWired",
+    "installerIconOverridePresent",
+    "windowsIcoGenerated",
+    "browserAcceptanceExecuted",
+    "productionBuildExecuted",
+    "installerBuilt",
+    "canonicalUniversalDonorIntegrated",
+    "promotionReady",
+}
+APPROVED_SOURCE_THREAD_ID = "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9"
+APPROVED_SCHEMA_PATH = "distribution/sim/brand/approved-edition-assets.schema.json"
+APPROVED_HANDOFF_PATH = (
+    "Z:/DroneDream/work/brand-edition-concepts-v1/BRAND_EDITION_HANDOFF_V2.md"
+)
+APPROVED_ASSET_REQUIREMENTS = {
+    "sim-mark-png": {
+        "sourcePath": (
+            "Z:/DroneDream/work/brand-edition-concepts-v1/"
+            "dronedream-sim-mark-concept-v1.png"
+        ),
+        "sourceFileName": "dronedream-sim-mark-concept-v1.png",
+        "destinationPath": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
+        "destinationFileName": "dronedream-sim-mark.png",
+        "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+        "bytes": 162699,
+        "width": 1024,
+        "height": 1024,
+    },
+    "sim-dot-lockup-png": {
+        "sourcePath": (
+            "Z:/DroneDream/work/brand-edition-concepts-v1/"
+            "dronedream-sim-dot-lockup-concept-v2.png"
+        ),
+        "sourceFileName": "dronedream-sim-dot-lockup-concept-v2.png",
+        "destinationPath": (
+            "frontend/src/editions/sim/assets/dronedream-sim-dot-lockup.png"
+        ),
+        "destinationFileName": "dronedream-sim-dot-lockup.png",
+        "sha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+        "bytes": 77713,
+        "width": 1840,
+        "height": 340,
+    },
+}
 
 
 class SimBrandDonorError(ValueError):
@@ -375,6 +463,184 @@ def validate_canonical_donor_manifest(
     return manifest
 
 
+def _png_dimensions(payload: bytes, label: str) -> tuple[int, int]:
+    _validate_asset_signature(payload, "image/png", label)
+    if len(payload) < 24 or payload[12:16] != b"IHDR":
+        raise SimBrandDonorError(f"{label} has no valid PNG IHDR")
+    return int.from_bytes(payload[16:20], "big"), int.from_bytes(payload[20:24], "big")
+
+
+def _validate_approved_location(
+    value: Any,
+    *,
+    expected: dict[str, Any],
+    source: bool,
+    label: str,
+) -> dict[str, Any]:
+    location = _exact_keys(value, APPROVED_LOCATION_KEYS, label)
+    expected_location = {
+        "path": expected["sourcePath" if source else "destinationPath"],
+        "fileName": expected["sourceFileName" if source else "destinationFileName"],
+        "sha256": expected["sha256"],
+        "bytes": expected["bytes"],
+        "mimeType": "image/png",
+        "width": expected["width"],
+        "height": expected["height"],
+    }
+    if location != expected_location:
+        raise SimBrandDonorError(f"{label} provenance drifted")
+    return location
+
+
+def validate_approved_edition_assets(
+    document: Any,
+    *,
+    repo_root: Path,
+    require_source_assets: bool = False,
+) -> dict[str, Any]:
+    manifest = _exact_keys(document, APPROVED_MANIFEST_KEYS, "approved SIM asset manifest")
+    if (
+        manifest["schemaVersion"] != 1
+        or manifest["kind"] != "dronedream-approved-edition-brand-assets"
+        or manifest["manifestVersion"] != "1.0.0"
+        or manifest["editionId"] != "sim"
+    ):
+        raise SimBrandDonorError("approved SIM asset manifest identity drifted")
+
+    schema_ref = _exact_keys(manifest["schema"], FILE_REF_KEYS, "approved.schema")
+    if schema_ref["path"] != APPROVED_SCHEMA_PATH:
+        raise SimBrandDonorError("approved SIM asset schema path drifted")
+    schema_path = _resolve(repo_root, schema_ref["path"], "approved.schema.path")
+    if sha256_file(schema_path) != _sha(schema_ref["sha256"], "approved.schema.sha256"):
+        raise SimBrandDonorError("approved SIM asset schema SHA-256 drifted")
+    schema = load_json(schema_path)
+    if schema.get("additionalProperties") is not False:
+        raise SimBrandDonorError("approved SIM asset schema must remain closed")
+
+    authorization = _exact_keys(
+        manifest["authorization"], APPROVED_AUTHORIZATION_KEYS, "approved.authorization"
+    )
+    if authorization != {
+        "status": "chief-control-approved-byte-for-byte",
+        "sourceThreadId": APPROVED_SOURCE_THREAD_ID,
+        "authorizationDate": "2026-08-05",
+        "allowedUse": [
+            "application",
+            "installer-input",
+            "shortcut-input",
+            "sim-edition-surface",
+        ],
+        "byteForByteCopyRequired": True,
+        "derivativeExportAuthorized": False,
+    }:
+        raise SimBrandDonorError("approved SIM asset authorization drifted")
+    if manifest["identity"] != SIM_IDENTITY or manifest["palette"] != SIM_PALETTE:
+        raise SimBrandDonorError("approved SIM asset identity or palette drifted")
+
+    binding = _exact_keys(
+        manifest["commonCoreBinding"], APPROVED_BINDING_KEYS, "approved.commonCoreBinding"
+    )
+    branch_ref = _exact_keys(
+        binding["branchContract"], FILE_REF_KEYS, "approved.commonCoreBinding.branchContract"
+    )
+    if branch_ref["path"] != "distribution/branch-contracts/software-sim.v1.json":
+        raise SimBrandDonorError("approved SIM branch contract path drifted")
+    branch_path = _resolve(repo_root, branch_ref["path"], "approved branch contract path")
+    if sha256_file(branch_path) != _sha(branch_ref["sha256"], "approved branch contract SHA"):
+        raise SimBrandDonorError("approved SIM branch contract SHA-256 drifted")
+    branch_contract = load_json(branch_path)
+    baseline = branch_contract.get("syncBaseline")
+    if not isinstance(baseline, dict):
+        raise SimBrandDonorError("approved SIM branch contract baseline is missing")
+    if binding != {
+        "branchContract": branch_ref,
+        "commonCoreCommit": baseline.get("commonCoreCommit"),
+        "commonCoreHash": baseline.get("commonCoreHash"),
+        "commonCorePaths": branch_contract.get("commonCorePaths"),
+        "bindingScope": "sim-edition-integration-baseline",
+        "canonicalUniversalDonorIntegrated": False,
+    }:
+        raise SimBrandDonorError("approved SIM commonCore binding drifted")
+    common_core_commit = _commit(binding["commonCoreCommit"], "approved commonCore commit")
+    common_core_paths = tuple(binding["commonCorePaths"])
+    observed_common_core_hash = _git_common_core_hash(
+        repo_root, common_core_commit, common_core_paths
+    )
+    if observed_common_core_hash != _sha(
+        binding["commonCoreHash"], "approved commonCore hash"
+    ):
+        raise SimBrandDonorError("approved SIM commonCoreHash drifted")
+
+    handoff = _exact_keys(
+        manifest["sourceHandoff"], APPROVED_HANDOFF_KEYS, "approved.sourceHandoff"
+    )
+    if handoff != {
+        "path": APPROVED_HANDOFF_PATH,
+        "sha256": CONCEPT_HANDOFF_SHA256,
+        "statusAtHandoff": "user-approved-visual-direction-concept-assets",
+    }:
+        raise SimBrandDonorError("approved SIM source handoff drifted")
+
+    raw_assets = manifest["assets"]
+    if not isinstance(raw_assets, list) or len(raw_assets) != len(APPROVED_ASSET_REQUIREMENTS):
+        raise SimBrandDonorError("approved SIM asset inventory is incomplete")
+    observed_roles: list[str] = []
+    for index, raw_asset in enumerate(raw_assets):
+        asset = _exact_keys(raw_asset, APPROVED_ASSET_KEYS, f"approved.assets[{index}]")
+        role = asset["role"]
+        if role not in APPROVED_ASSET_REQUIREMENTS or role in observed_roles:
+            raise SimBrandDonorError("approved SIM asset roles are missing or duplicated")
+        expected = APPROVED_ASSET_REQUIREMENTS[role]
+        source = _validate_approved_location(
+            asset["source"], expected=expected, source=True, label=f"{role}.source"
+        )
+        destination = _validate_approved_location(
+            asset["destination"], expected=expected, source=False, label=f"{role}.destination"
+        )
+        if asset["exactByteCopy"] is not True or asset["approved"] is not True:
+            raise SimBrandDonorError(f"{role} approval or exact-copy requirement drifted")
+        destination_path = _resolve(repo_root, destination["path"], f"{role} destination")
+        destination_payload = destination_path.read_bytes()
+        if (
+            len(destination_payload) != destination["bytes"]
+            or sha256_bytes(destination_payload) != destination["sha256"]
+            or _png_dimensions(destination_payload, role)
+            != (destination["width"], destination["height"])
+        ):
+            raise SimBrandDonorError(f"{role} destination bytes, SHA-256, or dimensions drifted")
+        if require_source_assets:
+            source_path = Path(source["path"])
+            if not source_path.is_file():
+                raise SimBrandDonorError(f"{role} approved source file is unavailable")
+            source_payload = source_path.read_bytes()
+            if source_payload != destination_payload:
+                raise SimBrandDonorError(f"{role} destination is not an exact source byte copy")
+        observed_roles.append(role)
+    if tuple(observed_roles) != tuple(APPROVED_ASSET_REQUIREMENTS):
+        raise SimBrandDonorError("approved SIM asset role ordering drifted")
+
+    integration = _exact_keys(
+        manifest["integrationState"], APPROVED_INTEGRATION_KEYS, "approved.integrationState"
+    )
+    if integration != {
+        "assetBytesVendored": True,
+        "applicationSourceWired": False,
+        "installerIconOverridePresent": False,
+        "windowsIcoGenerated": False,
+        "browserAcceptanceExecuted": False,
+        "productionBuildExecuted": False,
+        "installerBuilt": False,
+        "canonicalUniversalDonorIntegrated": False,
+        "promotionReady": False,
+    }:
+        raise SimBrandDonorError("approved SIM asset integration state overclaims execution")
+    if require_source_assets:
+        handoff_path = Path(handoff["path"])
+        if not handoff_path.is_file() or sha256_file(handoff_path) != handoff["sha256"]:
+            raise SimBrandDonorError("approved SIM source handoff bytes or SHA-256 drifted")
+    return manifest
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -393,6 +659,15 @@ def main() -> int:
     )
     donor_parser.add_argument("--require-working-tree-assets", action="store_true")
     donor_parser.add_argument("manifest", type=Path)
+    approved_parser = subparsers.add_parser("verify-approved-assets")
+    approved_parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    approved_parser.add_argument("--require-source-assets", action="store_true")
+    approved_parser.add_argument(
+        "manifest",
+        type=Path,
+        nargs="?",
+        default=Path("distribution/sim/brand/approved-edition-assets.v1.json"),
+    )
     args = parser.parse_args()
     try:
         repo_root = args.repo_root.resolve()
@@ -405,6 +680,12 @@ def main() -> int:
                 intake=intake,
                 repo_root=repo_root,
                 require_working_tree_assets=args.require_working_tree_assets,
+            )
+        elif args.command == "verify-approved-assets":
+            validate_approved_edition_assets(
+                load_json(args.manifest),
+                repo_root=repo_root,
+                require_source_assets=args.require_source_assets,
             )
         else:
             raise SimBrandDonorError(f"unsupported command: {args.command}")

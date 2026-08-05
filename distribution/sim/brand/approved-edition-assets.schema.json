@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/sim-approved-edition-assets.v1.json",
+  "title": "DroneDream SIM approved edition asset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "manifestVersion",
+    "editionId",
+    "schema",
+    "authorization",
+    "identity",
+    "palette",
+    "commonCoreBinding",
+    "sourceHandoff",
+    "assets",
+    "integrationState"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-approved-edition-brand-assets"},
+    "manifestVersion": {"const": "1.0.0"},
+    "editionId": {"const": "sim"},
+    "schema": {"$ref": "#/$defs/fileRef"},
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "sourceThreadId",
+        "authorizationDate",
+        "allowedUse",
+        "byteForByteCopyRequired",
+        "derivativeExportAuthorized"
+      ],
+      "properties": {
+        "status": {"const": "chief-control-approved-byte-for-byte"},
+        "sourceThreadId": {"const": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9"},
+        "authorizationDate": {"const": "2026-08-05"},
+        "allowedUse": {
+          "const": ["application", "installer-input", "shortcut-input", "sim-edition-surface"]
+        },
+        "byteForByteCopyRequired": {"const": true},
+        "derivativeExportAuthorized": {"const": false}
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["masterName", "displayName", "separator"],
+      "properties": {
+        "masterName": {"const": "DroneDream"},
+        "displayName": {"const": "DroneDream · SIM"},
+        "separator": {"const": " · "}
+      }
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "middle", "end"],
+      "properties": {
+        "start": {"const": "#00D9FF"},
+        "middle": {"const": "#2671FF"},
+        "end": {"const": "#744CFF"}
+      }
+    },
+    "commonCoreBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "branchContract",
+        "commonCoreCommit",
+        "commonCoreHash",
+        "commonCorePaths",
+        "bindingScope",
+        "canonicalUniversalDonorIntegrated"
+      ],
+      "properties": {
+        "branchContract": {"$ref": "#/$defs/fileRef"},
+        "commonCoreCommit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "commonCoreHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "commonCorePaths": {
+          "const": ["backend", "desktop", "engine-pack", "frontend", "runtime", "worker"]
+        },
+        "bindingScope": {"const": "sim-edition-integration-baseline"},
+        "canonicalUniversalDonorIntegrated": {"const": false}
+      }
+    },
+    "sourceHandoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "statusAtHandoff"],
+      "properties": {
+        "path": {"const": "Z:/DroneDream/work/brand-edition-concepts-v1/BRAND_EDITION_HANDOFF_V2.md"},
+        "sha256": {"const": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"},
+        "statusAtHandoff": {"const": "user-approved-visual-direction-concept-assets"}
+      }
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/asset"}
+    },
+    "integrationState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetBytesVendored",
+        "applicationSourceWired",
+        "installerIconOverridePresent",
+        "windowsIcoGenerated",
+        "browserAcceptanceExecuted",
+        "productionBuildExecuted",
+        "installerBuilt",
+        "canonicalUniversalDonorIntegrated",
+        "promotionReady"
+      ],
+      "properties": {
+        "assetBytesVendored": {"const": true},
+        "applicationSourceWired": {"const": false},
+        "installerIconOverridePresent": {"const": false},
+        "windowsIcoGenerated": {"const": false},
+        "browserAcceptanceExecuted": {"const": false},
+        "productionBuildExecuted": {"const": false},
+        "installerBuilt": {"const": false},
+        "canonicalUniversalDonorIntegrated": {"const": false},
+        "promotionReady": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "fileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "assetLocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "fileName", "sha256", "bytes", "mimeType", "width", "height"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "fileName": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "mimeType": {"const": "image/png"},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1}
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "source", "destination", "exactByteCopy", "approved"],
+      "properties": {
+        "role": {"enum": ["sim-mark-png", "sim-dot-lockup-png"]},
+        "source": {"$ref": "#/$defs/assetLocation"},
+        "destination": {"$ref": "#/$defs/assetLocation"},
+        "exactByteCopy": {"const": true},
+        "approved": {"const": true}
+      }
+    }
+  }
+}
