@@ -39,7 +39,7 @@ describe("DroneDream public website", () => {
     vi.stubGlobal("scrollTo", vi.fn());
   });
 
-  it("renders a direct, versioned Windows download and the primary product sections", async () => {
+  it("opens the edition chooser before download and renders the primary product sections", async () => {
     const { container } = renderSite();
 
     expect(document.title).toBe("DroneDream");
@@ -48,8 +48,8 @@ describe("DroneDream public website", () => {
     expect(screen.queryByText("WINDOWS RELEASE")).toBeNull();
     expect(screen.getByText(/This preview candidate is not Authenticode-signed/i)).toBeVisible();
     expect(screen.getByText(/Verify its SHA-256 before installation/i)).toBeVisible();
-    expect(screen.getByRole("link", { name: "Download Windows preview" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Download" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Download Windows preview" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Download" })).toBeVisible();
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
     expect(starflightButton).not.toHaveTextContent("+");
@@ -92,8 +92,18 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("button", { name: "Console" })).toBeVisible();
     expectContentLinksToUseIcons(container);
 
-    const downloads = screen.getAllByRole("link", { name: /Download/i });
-    expect(downloads.some((link) => link.getAttribute("href") === fallbackRelease.downloadUrl)).toBe(true);
+    const downloadTrigger = screen.getByRole("button", { name: "Download" });
+    downloadTrigger.focus();
+    fireEvent.click(downloadTrigger);
+    const editionDialog = screen.getByRole("dialog", { name: "Choose your edition" });
+    expect(editionDialog).toBeVisible();
+    expect(within(editionDialog).getAllByRole("radio")).toHaveLength(3);
+    expect(within(editionDialog).getAllByRole("button", { name: "Coming soon" })).toHaveLength(3);
+    expect(within(editionDialog).getByRole("link", { name: "Download current preview" }))
+      .toHaveAttribute("href", fallbackRelease.downloadUrl);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Choose your edition" })).toBeNull());
+    await waitFor(() => expect(downloadTrigger).toHaveFocus());
     const tabs = screen.getAllByRole("tab");
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
@@ -118,9 +128,9 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("button", { name: "Console" })).not.toHaveAttribute("title");
     expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Login" })).not.toHaveAttribute("title");
-    expect(screen.getByRole("link", { name: "Download Windows preview" }))
-      .toHaveAttribute("href", fallbackRelease.downloadUrl);
-    expect(screen.getByRole("link", { name: "Download" }))
+    expect(screen.getByRole("button", { name: "Download Windows preview" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    expect(screen.getByRole("link", { name: "Download current preview" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
   });
 
@@ -143,7 +153,8 @@ describe("DroneDream public website", () => {
     expect(document.body).not.toHaveTextContent("HTTP mirror");
     expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
-    expect(screen.getByRole("link", { name: "Download" }))
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    expect(screen.getByRole("link", { name: "Download current preview" }))
       .toHaveAttribute("href", fallbackRelease.downloadUrl);
   });
 
@@ -548,8 +559,12 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(screen.getByText(/当前为未签名的预览候选版本/)).toBeVisible();
     expect(screen.getByText(/Windows 可能显示“未知发布者”警告/)).toBeVisible();
     expect(screen.getByText(/请务必确认下载文件与本页记录一致后再安装/)).toBeVisible();
-    expect(screen.getByRole("link", { name: "下载 Windows 预览版" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "下载" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "下载 Windows 预览版" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "下载" }));
+    const editionDialog = screen.getByRole("dialog", { name: "选择使用版本" });
+    expect(within(editionDialog).getAllByRole("button", { name: "准备中" })).toHaveLength(3);
+    expect(within(editionDialog).getByRole("link", { name: "下载当前内测版" }))
+      .toHaveAttribute("href", fallbackRelease.downloadUrl);
     expect(screen.getByRole("link", { name: "代码签名政策" })).toBeVisible();
     expect(screen.getByRole("link", { name: "隐私政策" })).toBeVisible();
     expect(workflowBefore).toHaveClass("is-visible");
@@ -612,7 +627,7 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(formatBinarySize(0)).toBe("—");
   });
 
-  it("uses a valid same-origin non-downgrade release manifest for every download link", async () => {
+  it("uses a valid same-origin non-downgrade release manifest for the distinct current preview", async () => {
     const nextRelease = {
       ...fallbackRelease,
       version: "1.0.1",
@@ -630,13 +645,13 @@ title: "DroneDream 1.0.0 用户说明书"
 
     renderSite();
 
-    await waitFor(() => expect(
-      screen.getAllByRole("link", { name: /Download/i })
-        .some((link) => link.getAttribute("href") === nextRelease.downloadUrl),
-    ).toBe(true));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    expect(screen.getByRole("link", { name: "Download current preview" }))
+      .toHaveAttribute("href", nextRelease.downloadUrl);
   });
 
-  it("uses a valid GitHub Release manifest for every global download link", async () => {
+  it("uses a valid GitHub Release manifest for the distinct current preview", async () => {
     const nextRelease = {
       ...fallbackRelease,
       version: "1.0.1",
@@ -654,10 +669,10 @@ title: "DroneDream 1.0.0 用户说明书"
 
     renderSite();
 
-    await waitFor(() => expect(
-      screen.getAllByRole("link", { name: /Download/i })
-        .some((link) => link.getAttribute("href") === nextRelease.downloadUrl),
-    ).toBe(true));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    expect(screen.getByRole("link", { name: "Download current preview" }))
+      .toHaveAttribute("href", nextRelease.downloadUrl);
   });
 
   it("does not replace the embedded release with stale metadata", async () => {
@@ -677,7 +692,10 @@ title: "DroneDream 1.0.0 用户说明书"
     renderSite();
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
-    expect(screen.getAllByRole("link", { name: /Download/i })
-      .every((link) => link.getAttribute("href") !== staleRelease.downloadUrl)).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+    expect(screen.getByRole("link", { name: "Download current preview" }))
+      .toHaveAttribute("href", fallbackRelease.downloadUrl);
+    expect(screen.getByRole("link", { name: "Download current preview" }))
+      .not.toHaveAttribute("href", staleRelease.downloadUrl);
   });
 });

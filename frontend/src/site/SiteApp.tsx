@@ -11,8 +11,14 @@ import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { sensitiveCloudActionsAllowed } from "../security/sensitiveOrigin";
 import { CommunityPage } from "./CommunityPage";
+import { EditionChooser } from "./EditionChooser";
 import { ManualPage } from "./ManualPage";
 import { PricingPage } from "./PricingPage";
+import {
+  fallbackEditionAvailability,
+  isEditionAvailabilityDocument,
+  type EditionAvailabilityDocument,
+} from "./editionAvailability";
 import {
   compareReleaseVersions,
   fallbackRelease,
@@ -20,6 +26,7 @@ import {
   isWebsiteRelease,
   type WebsiteRelease,
 } from "./release";
+import { useModalFocus } from "./useModalFocus";
 import {
   type WebsiteAuthMode,
   websiteAuthReturnPath,
@@ -770,6 +777,9 @@ export function SiteApp({
   const auth = useAuthOrLocal();
   const copy = content[locale];
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
+  const [editionAvailability, setEditionAvailability] =
+    useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
+  const [editionChooserOpen, setEditionChooserOpen] = useState(false);
   const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -793,6 +803,8 @@ export function SiteApp({
   const [authError, setAuthError] = useState<string | null>(null);
   const reducedMotion = usePrefersReducedMotion();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const editionDialogRef = useRef<HTMLElement | null>(null);
+  const editionCloseButtonRef = useRef<HTMLButtonElement | null>(null);
   const droneFlightRef = useRef<(() => void) | null>(null);
   const path = currentSiteUrl.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
@@ -833,6 +845,22 @@ export function SiteApp({
           compareReleaseVersions(candidate.version, fallbackRelease.version) >= 0
         ) {
           setRelease(candidate);
+        }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/downloads/editions.json", { signal: controller.signal, cache: "no-cache" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`edition metadata: ${response.status}`);
+        return response.json() as Promise<unknown>;
+      })
+      .then((candidate) => {
+        if (isEditionAvailabilityDocument(candidate)) {
+          setEditionAvailability(candidate);
         }
       })
       .catch(() => undefined);
@@ -951,6 +979,18 @@ export function SiteApp({
   };
 
   const closeMenu = () => setMenuOpen(false);
+  const closeEditionChooser = () => setEditionChooserOpen(false);
+  const captureEditionChooserTrigger = useModalFocus({
+    open: editionChooserOpen,
+    dialogRef: editionDialogRef,
+    initialFocusRef: editionCloseButtonRef,
+    onClose: closeEditionChooser,
+  });
+  const openEditionChooser = () => {
+    captureEditionChooserTrigger();
+    setMenuOpen(false);
+    setEditionChooserOpen(true);
+  };
   const navigateWithinSite = (target: string, replace = false) => {
     if (replace) window.history.replaceState(null, "", target);
     else window.history.pushState(null, "", target);
@@ -1312,10 +1352,14 @@ export function SiteApp({
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z" /></svg>
             {copy.language}
           </button>
-          <a className="site-header-download" href={release.downloadUrl} download={release.fileName}>
+          <button
+            type="button"
+            className="site-header-download"
+            onClick={openEditionChooser}
+          >
             <DownloadIcon />
             {copy.downloadShort}
-          </a>
+          </button>
           <button
             ref={menuButtonRef}
             type="button"
@@ -1367,10 +1411,14 @@ export function SiteApp({
                 <span className="site-hero-line site-hero-line-accent">{copy.heroAccent}</span>
               </h1>
               <div className="site-hero-actions">
-                <a className="site-button site-button-primary" href={release.downloadUrl} download={release.fileName}>
+                <button
+                  type="button"
+                  className="site-button site-button-primary"
+                  onClick={openEditionChooser}
+                >
                   <DownloadIcon />
                   {copy.downloadWindows}
-                </a>
+                </button>
                 <a className="site-button site-button-ghost" href="#product">
                   <ArrowRightIcon />
                   {copy.explore}
@@ -1563,10 +1611,14 @@ export function SiteApp({
                 <p className="site-eyebrow">{copy.downloadEyebrow}</p>
                 <h2>{copy.downloadTitle}</h2>
                 <p data-copy-block data-copy-id="download-body">{copy.downloadBody}</p>
-                <a className="site-button site-button-primary" href={release.downloadUrl} download={release.fileName}>
+                <button
+                  type="button"
+                  className="site-button site-button-primary"
+                  onClick={openEditionChooser}
+                >
                   <DownloadIcon />
                   {copy.downloadAgain}
-                </a>
+                </button>
               </div>
               <div className="site-release-card">
                 <dl>
@@ -1608,6 +1660,19 @@ export function SiteApp({
           </div>
         </footer>
       ) : null}
+      <EditionChooser
+        availability={editionAvailability}
+        currentRelease={release}
+        locale={locale}
+        onClose={closeEditionChooser}
+        open={editionChooserOpen}
+        setCloseButtonRef={(node) => {
+          editionCloseButtonRef.current = node;
+        }}
+        setDialogRef={(node) => {
+          editionDialogRef.current = node;
+        }}
+      />
     </div>
   );
 }

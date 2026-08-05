@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-05",
+  "vehiclePacks": {
+    "total": 8,
+    "validated": 0,
+    "contractOnly": 5,
+    "planned": 3,
+    "selectionStage": "post-install"
+  },
+  "editions": [
+    {
+      "id": "sim",
+      "releaseStatus": "planned-not-built",
+      "version": "1.0.0",
+      "fileName": "DroneDream-Sim-1.0.0.exe",
+      "downloadUrl": null,
+      "checksumUrl": null,
+      "signatureUrl": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "sourceCommit": null,
+      "publishedAt": null
+    },
+    {
+      "id": "lab",
+      "releaseStatus": "planned-not-built",
+      "version": "1.0.0",
+      "fileName": "DroneDream-Lab-1.0.0.exe",
+      "downloadUrl": null,
+      "checksumUrl": null,
+      "signatureUrl": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "sourceCommit": null,
+      "publishedAt": null
+    },
+    {
+      "id": "field",
+      "releaseStatus": "planned-not-built",
+      "version": "1.0.0",
+      "fileName": "DroneDream-Field-1.0.0.exe",
+      "downloadUrl": null,
+      "checksumUrl": null,
+      "signatureUrl": null,
+      "sizeBytes": null,
+      "sha256": null,
+      "sourceCommit": null,
+      "publishedAt": null
+    }
+  ]
+}
