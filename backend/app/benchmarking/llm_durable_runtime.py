@@ -44,6 +44,7 @@ from app.benchmarking.provider_execution_contract import (
     BENCHMARK_DIRECT_RESERVATION_REASON,
     BENCHMARK_PROVIDER_BASE_URLS,
     BenchmarkProviderExecutionConfigV1,
+    BenchmarkProviderRequestEnvelope,
     direct_provider_run_capacity,
 )
 from app.benchmarking.provider_usage_reconciliation import (
@@ -92,7 +93,7 @@ class BenchmarkDirectTransport(Protocol):
 
     def complete(
         self,
-        request: BenchmarkLLMTurnRequestV1,
+        request: BenchmarkProviderRequestEnvelope,
         config: BenchmarkProviderExecutionConfigV1,
     ) -> BenchmarkProviderTransportResult: ...
 
@@ -444,6 +445,7 @@ def execute_durable_direct_arm(
     )
     body = _request_body(request, context.provider, context.binding.provider_seed)
     _require_prereserved_budget(db, context, body)
+    request_envelope = BenchmarkProviderRequestEnvelope.from_request_body(body)
     attempt = begin_benchmark_direct_turn(
         db,
         job,
@@ -477,7 +479,7 @@ def execute_durable_direct_arm(
     )
     started = time.monotonic()
     try:
-        result = transport.complete(request, context.provider)
+        result = transport.complete(request_envelope, context.provider)
     except Exception as exc:  # noqa: BLE001 - transport details must not enter evidence.
         latency_ms = max(0, int((time.monotonic() - started) * 1000))
         accountant.fail(

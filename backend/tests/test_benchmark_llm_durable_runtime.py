@@ -369,9 +369,11 @@ class _Transport:
     response: str | Exception | BaseException
     before_return: Callable[[], None] | None = None
     calls: int = 0
+    last_request: Any | None = None
 
     def complete(self, request: Any, config: Any) -> BenchmarkProviderTransportResult:
         self.calls += 1
+        self.last_request = request
         if self.before_return is not None:
             self.before_return()
         if isinstance(self.response, BaseException):
@@ -484,6 +486,13 @@ def test_direct_attempts_are_committed_before_transport_and_success_is_safe(
         assert result.proposal.parameters == {"kp": 1.2}
         assert result.provider_turns_attempted == result.provider_turns_succeeded == 1
         assert result.provider_requests_attempted == result.provider_requests_succeeded == 1
+        request_receipt = db.scalar(select(models.ProviderNetworkRequestReceipt))
+        assert request_receipt is not None
+        assert transport.last_request.request_body()["seed"] == 20260805
+        assert (
+            request_receipt.request_body_sha256
+            == transport.last_request.request_body_sha256
+        )
         reconciliation = reconcile_direct_provider_run_usage(db, run.id)
         assert reconciliation.status == "complete"
         assert reconciliation.actual_observed.logical_turns == 1
