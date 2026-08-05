@@ -1,0 +1,431 @@
+{
+  "auditMode": "green-read-only",
+  "brand": {
+    "assets": [
+      {
+        "matchesManifest": true,
+        "path": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
+        "sha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806"
+      },
+      {
+        "matchesManifest": true,
+        "path": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+        "sha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+      },
+      {
+        "matchesManifest": true,
+        "path": "brand/generated/lab/windows/32x32.png",
+        "sha256": "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc"
+      },
+      {
+        "matchesManifest": true,
+        "path": "brand/generated/lab/windows/128x128.png",
+        "sha256": "4dc38efa82202dc8674b1e4ed782447a041e2e8793c7615ff164501248a3b485"
+      },
+      {
+        "matchesManifest": true,
+        "path": "brand/generated/lab/windows/128x128@2x.png",
+        "sha256": "b0a38390f2f58f6f873847e6a52ab07fe26945705a9940957a746970faabb0b1"
+      },
+      {
+        "matchesManifest": true,
+        "path": "brand/generated/lab/windows/icon.ico",
+        "sha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
+      }
+    ],
+    "canonicalDonor": {
+      "commit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+      "file": {
+        "path": "brand/brand-editions.v1.json",
+        "sha256": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc"
+      },
+      "integrated": true
+    },
+    "displayName": "DroneDream �� LAB",
+    "grantsHardwareAuthority": false,
+    "palette": [
+      "#A7E84A",
+      "#20C77A",
+      "#087E69"
+    ],
+    "readyForYellowBuild": true,
+    "sourceManifest": {
+      "path": "distribution/editions/lab/brand-source-manifest.v1.json",
+      "sha256": "31e844c46973c0784f892829002c0d3672074bfd291884ed90d39d3d227a3415"
+    },
+    "tauriOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "sha256": "53d62bc0584d10b1d64d8b96549206c592302d20c586ae51a58650905eed768c"
+    }
+  },
+  "buildArtifactFileName": "DroneDream-Lab-1.0.0.exe",
+  "commonCore": {
+    "authorityBranch": "codex/software",
+    "authorityName": "Universal/Core",
+    "commonCorePaths": [
+      "backend",
+      "desktop",
+      "engine-pack",
+      "frontend",
+      "runtime",
+      "worker"
+    ],
+    "excludedSimPreviewEvidenceCommit": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571",
+    "excludedSimPreviewEvidenceHash": "c6bdfdb9723cacf8c402acf9a6200e7f9dda37d75af50e9b8fe308f8aceb41bb",
+    "observedOriginHeadIsProductSource": false,
+    "observedOriginSoftwareHead": "61e0e84ab8aacfd4809225b31260c1ec329c4171",
+    "productCommonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "productSourceExists": true,
+    "productSourceIsAncestorOfLabHead": true,
+    "sameCommonCoreInventoryAsExcludedEvidence": false
+  },
+  "editionId": "lab",
+  "kind": "dronedream-lab-yellow-readiness-audit",
+  "labManifest": {
+    "description": {
+      "en": "Unified simulation, HITL, and real-hardware laboratory workflows behind native, runtime, and backend safety fences.",
+      "zh-CN": "ͳһ�ṩ���桢HITL �����ʵ�飬�������������������ͨ�� native��Runtime �������㰲ȫ�š�"
+    },
+    "displayName": {
+      "en": "DroneDream �� LAB",
+      "zh-CN": "DroneDream �� LAB"
+    },
+    "file": {
+      "path": "distribution/editions/lab.v1.json",
+      "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+    },
+    "implementationStatus": "contract-only",
+    "validationTier": "contract-only"
+  },
+  "licenseNotice": {
+    "path": "runtime/THIRD_PARTY_NOTICES.md",
+    "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+  },
+  "postBuildAcceptance": {
+    "blockers": [
+      "No Lab preview EXE has been built by this GREEN audit.",
+      "No real Lab artifact receipt exists for installation acceptance.",
+      "Lab preview remains unsigned internal-test material until YELLOW build evidence exists.",
+      "There are zero validated Vehicle Packs; hardware write, arm, HITL, and flight stay denied.",
+      "No codex/release-lab branch or production promotion is authorized by this audit.",
+      "Website remains awaiting-exact-handoff until artifact, validation, publication, and cross-Edition evidence are complete."
+    ],
+    "installableNow": false
+  },
+  "productDisplayVersion": "1.0.0",
+  "profile": {
+    "file": {
+      "path": "distribution/build-profiles/lab-preview.v1.json",
+      "sha256": "2e84a5a482032042f74a21b8402bdd2553f9862804aae57d14ae474e660dc56d"
+    },
+    "verified": {
+      "artifactFileName": "DroneDream-Lab-1.0.0.exe",
+      "overlay": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "profile": "distribution/build-profiles/lab-preview.v1.json",
+      "script": "desktop/scripts/build-lab-preview.ps1"
+    }
+  },
+  "publicSupabaseClientConfigSource": {
+    "actualEnvironmentRead": false,
+    "clientSource": {
+      "path": "frontend/src/features/auth/supabaseClient.ts",
+      "sha256": "7f8603c6a73edff9272a2a48e02ed5392ae798857a47a2c3a3aaf295be643ed1"
+    },
+    "desktopVerifier": {
+      "path": "desktop/scripts/verify-browser-auth-config.mjs",
+      "sha256": "ff292c28141cc199a71c27b5328061163b3e65235f2923a52ec44e8563a36852"
+    },
+    "desktopVerifierRejectsServiceRole": true,
+    "envExample": {
+      "path": "frontend/.env.example",
+      "sha256": "50fe75b23a929a36beeaea8ea6f622aa7306362b7a31fc4e8b7963812e04fa99"
+    },
+    "envExampleLeavesPublicValuesBlank": true,
+    "secretMaterialRequiredForAudit": false,
+    "sourceUsesVitePublicEnv": true
+  },
+  "safety": {
+    "executionGatePolicy": {
+      "path": "distribution/safety/edition-execution-gate.v1.json",
+      "sha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456"
+    },
+    "frontendAcceptedAsAuthority": false,
+    "hardwareActionDecisionAtZeroValidatedPacks": "deny",
+    "hardwareActions": [
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl.execute"
+    ],
+    "hardwareActionsRequireValidatedSignedPack": true,
+    "preinstallDecision": "blocked",
+    "preinstallSideEffects": {
+      "buildExe": false,
+      "createReleaseBranch": false,
+      "hardwareProbe": false,
+      "install": false,
+      "px4Gazebo": false,
+      "readSecrets": false
+    },
+    "profileSafetyPolicy": {
+      "hardwareActionsFailClosedUntilValidatedPackAndQuorum": [
+        "hardware.parameter.write",
+        "hardware.arm",
+        "hardware.flight",
+        "hardware.hitl.execute"
+      ],
+      "requiredDecisionLayers": [
+        "native",
+        "backend",
+        "runtime"
+      ],
+      "uiCanAuthorizeHardwareAction": false,
+      "uiCanDisplayAndConfigureHardwareWorkflow": true,
+      "validatedVehiclePackCount": 0
+    },
+    "quorumRequiredLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "zeroValidatedPackDecision": "deny"
+  },
+  "schemaVersion": 1,
+  "sideEffects": {
+    "createReleaseBranch": false,
+    "hardwareProbe": false,
+    "install": false,
+    "nsis": false,
+    "px4Gazebo": false,
+    "readApiKey": false,
+    "readProviderSecrets": false,
+    "tauri": false
+  },
+  "source": {
+    "branch": "codex/software-lab",
+    "head": "54b669c89d3c593d49b38bfaf9c4764744ba7715",
+    "statusPorcelain": "",
+    "upstream": "origin/codex/software-lab"
+  },
+  "toolchain": {
+    "candidates": {
+      "gnullvm": {
+        "blockers": [],
+        "cargo": {
+          "available": true,
+          "error": null,
+          "matchesPin": true,
+          "output": "cargo 1.97.0 (c980f4866 2026-06-30)\nrelease: 1.97.0\ncommit-hash: c980f4866141969fab6254a680546a277789d6f0\ncommit-date: 2026-06-30\nhost: x86_64-pc-windows-gnullvm\nlibgit2: 1.9.2 (sys:0.20.4 vendored)\nlibcurl: 8.20.0-DEV (sys:0.4.88+curl-8.20.0 vendored ssl:Schannel)\nos: Windows 10.0.26200 (Windows 11 CoreCountrySpecific) [64-bit]"
+        },
+        "clangVersion": {
+          "available": true,
+          "error": null,
+          "matchesPin": true,
+          "output": "clang version 22.1.8 (https://github.com/llvm/llvm-project.git ca7933e47d3a3451d81e72ac174dcb5aa28b59d1)\nTarget: x86_64-w64-windows-gnu\nThread model: posix\nInstalledDir: C:/Users/zju20/AppData/Local/Microsoft/WinGet/Packages/MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/llvm-mingw-20260616-ucrt-x86_64/bin\nConfiguration file: C:/Users/zju20/AppData/Local/Microsoft/WinGet/Packages/MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/llvm-mingw-20260616-ucrt-x86_64/bin/x86_64-w64-windows-gnu.cfg"
+        },
+        "llvmRoot": "C:\\Users\\zju20\\AppData\\Local\\Microsoft\\WinGet\\Packages\\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\\llvm-mingw-20260616-ucrt-x86_64",
+        "llvmRootCandidates": [
+          "C:\\Users\\zju20\\AppData\\Local\\Microsoft\\WinGet\\Packages\\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\\llvm-mingw-20260616-ucrt-x86_64"
+        ],
+        "llvmTools": {
+          "ld.lld.exe": {
+            "available": true,
+            "bytes": 5219840,
+            "expectedBytes": 5219840,
+            "expectedSha256": "ebc594a240cd325f1ea8b865ee88da0d004e94ea31eb1fc3f7f8f0ff8d93f58f",
+            "matchesPin": true,
+            "path": "C:\\Users\\zju20\\AppData\\Local\\Microsoft\\WinGet\\Packages\\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\\llvm-mingw-20260616-ucrt-x86_64\\bin\\ld.lld.exe",
+            "sha256": "ebc594a240cd325f1ea8b865ee88da0d004e94ea31eb1fc3f7f8f0ff8d93f58f"
+          },
+          "llvm-dlltool.exe": {
+            "available": true,
+            "bytes": 67072,
+            "expectedBytes": 67072,
+            "expectedSha256": "9aa88ccb0a10c4d6c6f922e73cb9445ea83be29c52614726aea92b25f2c86093",
+            "matchesPin": true,
+            "path": "C:\\Users\\zju20\\AppData\\Local\\Microsoft\\WinGet\\Packages\\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\\llvm-mingw-20260616-ucrt-x86_64\\bin\\llvm-dlltool.exe",
+            "sha256": "9aa88ccb0a10c4d6c6f922e73cb9445ea83be29c52614726aea92b25f2c86093"
+          },
+          "llvm-rc.exe": {
+            "available": true,
+            "bytes": 156672,
+            "expectedBytes": 156672,
+            "expectedSha256": "255fc12528b80cade02a4f8393065221dbd1f3a7fdf930a4e21c3076399750f5",
+            "matchesPin": true,
+            "path": "C:\\Users\\zju20\\AppData\\Local\\Microsoft\\WinGet\\Packages\\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\\llvm-mingw-20260616-ucrt-x86_64\\bin\\llvm-rc.exe",
+            "sha256": "255fc12528b80cade02a4f8393065221dbd1f3a7fdf930a4e21c3076399750f5"
+          },
+          "llvm-readobj.exe": {
+            "available": true,
+            "bytes": 1611776,
+            "expectedBytes": 1611776,
+            "expectedSha256": "3088728b4588ca185687dac94aed3aca1d379b31433053d824b89b0d4d28d246",
+            "matchesPin": true,
+            "path": "C:\\Users\\zju20\\AppData\\Local\\Microsoft\\WinGet\\Packages\\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\\llvm-mingw-20260616-ucrt-x86_64\\bin\\llvm-readobj.exe",
+            "sha256": "3088728b4588ca185687dac94aed3aca1d379b31433053d824b89b0d4d28d246"
+          },
+          "x86_64-w64-mingw32-clang.exe": {
+            "available": true,
+            "bytes": 16896,
+            "expectedBytes": 16896,
+            "expectedSha256": "a8b7a614eeadd9105f814be3701a7f312cda4cea51751b75b408c16100c94e85",
+            "matchesPin": true,
+            "path": "C:\\Users\\zju20\\AppData\\Local\\Microsoft\\WinGet\\Packages\\MartinStorsjo.LLVM-MinGW.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\\llvm-mingw-20260616-ucrt-x86_64\\bin\\x86_64-w64-mingw32-clang.exe",
+            "sha256": "a8b7a614eeadd9105f814be3701a7f312cda4cea51751b75b408c16100c94e85"
+          }
+        },
+        "nsis": {
+          "available": true,
+          "bytes": 468992,
+          "expectedBytes": 468992,
+          "expectedSha256": "42850802704ecb11163f7e0329d35ee54bd288953200d4966e226d572848cfc5",
+          "invoked": false,
+          "matchesPin": true,
+          "path": "C:\\Users\\zju20\\AppData\\Local\\tauri\\NSIS\\Bin\\makensis.exe",
+          "sha256": "42850802704ecb11163f7e0329d35ee54bd288953200d4966e226d572848cfc5"
+        },
+        "requiresMsvcLinkExe": false,
+        "rustc": {
+          "available": true,
+          "error": null,
+          "matchesPin": true,
+          "output": "rustc 1.97.0 (2d8144b78 2026-07-07)\nbinary: rustc\ncommit-hash: 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3\ncommit-date: 2026-07-07\nhost: x86_64-pc-windows-gnullvm\nrelease: 1.97.0\nLLVM version: 22.1.6"
+        },
+        "rustupPath": "C:\\Users\\zju20\\.cargo\\bin\\rustup.exe",
+        "rustupToolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+        "strictlyPinnedReady": true,
+        "targetTriple": "x86_64-pc-windows-gnullvm",
+        "tauriCli": {
+          "entrypoint": {
+            "available": true,
+            "bytes": 1864,
+            "expectedBytes": 1864,
+            "expectedSha256": "0dd6ec63c7c63a993fde20955e291d833c03f3760e63e0ee21e83482f6c0b43a",
+            "matchesPin": true,
+            "path": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\desktop\\node_modules\\@tauri-apps\\cli\\tauri.js",
+            "sha256": "0dd6ec63c7c63a993fde20955e291d833c03f3760e63e0ee21e83482f6c0b43a"
+          },
+          "expectedVersion": "2.11.4",
+          "matchesPin": true,
+          "observedVersion": "2.11.4",
+          "packagePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\desktop\\node_modules\\@tauri-apps\\cli\\package.json"
+        },
+        "webView2Loader": {
+          "available": true,
+          "bytes": 160320,
+          "expectedBytes": 160320,
+          "expectedSha256": "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c",
+          "matchesPin": true,
+          "path": "C:\\Users\\zju20\\.cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\webview2-com-sys-0.38.2\\x64\\WebView2Loader.dll",
+          "sha256": "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c"
+        }
+      },
+      "msvc": {
+        "cargoAvailable": true,
+        "linkerAvailable": false,
+        "linkerPath": null,
+        "ready": false,
+        "requiredLinker": "link.exe",
+        "rustHost": "x86_64-pc-windows-msvc",
+        "rustcAvailable": true
+      }
+    },
+    "environment": {
+      "additionalConfigTransport": "TAURI_CONFIG",
+      "cargoBuildJobsMaximum": 4,
+      "cargoTargetIsRepositoryTarget": false,
+      "expectedCargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target",
+      "node": {
+        "available": true,
+        "error": null,
+        "output": "v24.14.1",
+        "path": "C:\\Program Files\\nodejs\\node.exe"
+      },
+      "npm": {
+        "available": true,
+        "error": null,
+        "output": "11.11.0",
+        "path": "C:\\Program Files\\nodejs\\npm.cmd"
+      },
+      "repositoryCargoTargetDir": "C:/Users/zju20/.codex/worktrees/b3db/DroneDream/desktop/src-tauri/target",
+      "rustflags": "-C target-feature=+crt-static"
+    },
+    "nsisInvoked": false,
+    "selectedToolchain": "gnullvm",
+    "selectionPolicy": "strict-pinned-gnullvm",
+    "strictPinnedToolchainReady": true,
+    "tauriInvoked": false
+  },
+  "vehiclePacks": {
+    "registry": {
+      "path": "distribution/vehicle-packs/registry.v1.json",
+      "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"
+    },
+    "selectedLabPackId": "holybro-s500-v2-pixhawk6c",
+    "selectedLabPackValidationStatus": "contract-only",
+    "selectedLabPackValidationTier": "contract-only",
+    "totalPacks": 8,
+    "validatedPackCount": 0,
+    "validatedPacks": []
+  },
+  "websiteExactExeHandoff": {
+    "file": {
+      "path": "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json",
+      "sha256": "9b2c0e09256fc750eedff4367620f0fd92e75a975418abb9e5c81ec3fcc2580a"
+    },
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "receiverEvidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+    "receiverSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "releaseReady": false,
+    "state": "awaiting-exact-handoff"
+  },
+  "workspaceContract": {
+    "hardwareLab": {
+      "allowedActions": [
+        "hardware.discover",
+        "hardware.parameter.read",
+        "hardware.preflight.execute",
+        "hardware.emergency-stop"
+      ],
+      "authority": "ui-workflow-only",
+      "countsTowardNativeBackendRuntimeAuthority": false,
+      "deniedHardwareActions": [
+        "hardware.parameter.write",
+        "hardware.arm",
+        "hardware.flight",
+        "hardware.hitl.execute"
+      ],
+      "displayName": "Hardware Lab Workspace",
+      "switchEffect": "changes interface and workflow only",
+      "workspaceId": "hardware-lab"
+    },
+    "simulation": {
+      "allowedActions": [
+        "qualification.simulation.issue",
+        "simulation.execute",
+        "simulation.parameter.write",
+        "simulation.vehicle.arm"
+      ],
+      "authority": "ui-workflow-only",
+      "countsTowardNativeBackendRuntimeAuthority": false,
+      "deniedHardwareActions": [
+        "hardware.parameter.write",
+        "hardware.arm",
+        "hardware.flight",
+        "hardware.hitl.execute"
+      ],
+      "displayName": "Simulation Workspace",
+      "switchEffect": "changes interface and workflow only",
+      "workspaceId": "simulation"
+    }
+  },
+  "yellowBuildRequest": {
+    "classification": "YELLOW",
+    "expectedReceiptKind": "dronedream-lab-preview-artifact-receipt",
+    "requestBlockers": [],
+    "requestable": true,
+    "requestedCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop\\scripts\\build-lab-preview.ps1 -Build -Toolchain gnullvm",
+    "requiresControllerApprovalBeforeBuild": true
+  }
+}
