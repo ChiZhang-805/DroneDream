@@ -263,7 +263,10 @@ async function verifyOverview(page, testCase) {
     const mark = element.querySelector(".sim-brand-mark");
     return {
       title: element.querySelector("h1")?.textContent?.trim(),
-      previewStatus: element.querySelector(".sim-overview-state > span")?.textContent?.trim(),
+      previewStatus: element.querySelector(
+        ".sim-overview-state > span:not(.sim-edition-badge)"
+      )?.textContent?.trim(),
+      previewStatusLabel: element.querySelector(".sim-overview-state")?.getAttribute("aria-label"),
       capabilityCount: element.querySelectorAll(".sim-capability-grid > li").length,
       dependencyCount: element.querySelectorAll(".sim-dependency-list > li").length,
       externalCount: Array.from(element.querySelectorAll(".sim-dependency-list > li > span"))
@@ -298,6 +301,7 @@ async function verifyOverview(page, testCase) {
   }, testCase.locale);
   assert.equal(metrics.title, testCase.locale.overviewTitle);
   assert.equal(metrics.previewStatus, testCase.locale.previewStatus);
+  assert.equal(metrics.previewStatusLabel, testCase.locale.previewStatus);
   assert.equal(metrics.capabilityCount, 4);
   assert.equal(metrics.dependencyCount, 2);
   assert.equal(metrics.externalCount, 2);
