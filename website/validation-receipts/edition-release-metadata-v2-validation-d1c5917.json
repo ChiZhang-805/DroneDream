@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "dronedream.edition-release-metadata-validation.v1",
+  "generatedAt": "2026-08-05T13:20:15Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "d1c5917ba5d724efacf9a578056c543665ed5e17",
+    "subjectTree": "6e57030f4288f06c916a9cab2f81efcbcab35ef5",
+    "pendingProductionDeploymentSource": "16e998b5d0754ac866e9d628bd46912aa530d05c",
+    "deploymentPerformed": false,
+    "productionTouched": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "contract": {
+    "metadataPath": "frontend/public/downloads/editions.json",
+    "schemaVersion": 2,
+    "orderedEditions": ["sim", "lab", "field", "universal"],
+    "plannedState": {
+      "releaseStatus": "planned-not-built",
+      "availability": "unavailable",
+      "signatureState": "not-provided",
+      "artifactFields": "all null",
+      "downloadReady": false
+    },
+    "publishedEnablementRequires": [
+      "releaseStatus=published",
+      "availability=downloadable",
+      "signatureState=signed",
+      "exact edition filename",
+      "downloadUrl",
+      "checksumUrl",
+      "signatureUrl",
+      "receiptUrl",
+      "positive integer sizeBytes",
+      "lowercase sha256",
+      "lowercase sourceCommit",
+      "publishedAt not later than generatedAt",
+      "one exact local or GitHub Release URL family"
+    ],
+    "crossEditionRequirements": [
+      "fixed edition order",
+      "unique download/checksum/signature/receipt URLs",
+      "unique published SHA-256 values",
+      "no preview or other edition filename substitution"
+    ],
+    "buildGate": "website/scripts/build-pages-site.ps1 invokes website/scripts/verify-edition-availability.mjs before building"
+  },
+  "currentAvailability": {
+    "sim": "unavailable",
+    "lab": "unavailable",
+    "field": "unavailable",
+    "universal": "unavailable"
+  },
+  "validation": {
+    "focusedTests": {
+      "command": "npm.cmd --prefix frontend test -- EditionAvailability.test.ts ProductPage.test.tsx PublicSite.test.tsx",
+      "files": 3,
+      "tests": 29,
+      "passed": 29,
+      "failed": 0
+    },
+    "negativeCases": [
+      "missing artifact binding",
+      "availability mismatch",
+      "unsigned published edition",
+      "missing receipt",
+      "mixed local and GitHub Release families",
+      "planned metadata leakage",
+      "cross-edition filename substitution",
+      "duplicate published SHA-256",
+      "future publication date",
+      "unsafe URL",
+      "foreign GitHub repository",
+      "uppercase SHA-256",
+      "unexpected metadata field",
+      "inconsistent vehicle-pack totals"
+    ],
+    "publicMetadataMatchesFallback": "passed",
+    "standaloneVerifier": {
+      "command": "node --experimental-strip-types website/scripts/verify-edition-availability.mjs",
+      "schemaVersion": 2,
+      "editionsChecked": 4,
+      "status": "passed"
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "siteBuild": "passed with local-only placeholder public variables",
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "gitDiffCheck": "passed",
+    "browserMatrix": "not rerun because this atomic changes metadata validation only; prior 20/20 visual evidence remains bound to source 16e998b"
+  },
+  "governance": {
+    "forcePushPerformed": false,
+    "manualAndPdfDraftsExcluded": true,
+    "workDirectoryExcluded": true,
+    "releaseAssetsModified": false,
+    "pagesModified": false,
+    "aliyunModified": false,
+    "supabaseOrSecretsModified": false,
+    "dnsOrTlsModified": false
+  }
+}
