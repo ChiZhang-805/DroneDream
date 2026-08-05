@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-preview-1.0.0-bec8cbd-yellow-attempt2",
+  "attemptOrdinalOverall": 2,
+  "attemptOrdinalForSource": 1,
+  "auditMode": "yellow-single-build-attempt",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "bec8cbd1ce7101124d4216ca6b98da15123a1b5a",
+    "shortCommit": "bec8cbd",
+    "upstream": "origin/codex/software-lab",
+    "upstreamExactBeforeAttempt": true,
+    "treeStateBeforeAttempt": "clean",
+    "treeStateAfterAttempt": "clean"
+  },
+  "commonCore": {
+    "authorityName": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "productCommonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "excludedSimPreviewEvidenceCommit": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
+  },
+  "inputs": {
+    "buildScript": {
+      "path": "desktop/scripts/build-lab-preview.ps1",
+      "sha256": "86d4e9e2333b058da96738a6f35ed7128c524ece7e53158664ce7e8319416c67"
+    },
+    "sharedLlvmBuildScript": {
+      "path": "desktop/scripts/build-windows-llvm.ps1",
+      "sha256": "d21562eaa71e8a309d3ae57bd552131163445bec628c244d48ff389b0c0bd580"
+    },
+    "tauriLabOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "sha256": "53d62bc0584d10b1d64d8b96549206c592302d20c586ae51a58650905eed768c"
+    },
+    "tauriLlvmOverlay": {
+      "path": "desktop/src-tauri/tauri.llvm.conf.json",
+      "sha256": "4af8e80d26e7c315ae3701e07ef83dd1d6a529f2c1fbbc2e21a938087f3eaca3"
+    },
+    "labBuildProfile": {
+      "path": "distribution/build-profiles/lab-preview.v1.json",
+      "sha256": "2e84a5a482032042f74a21b8402bdd2553f9862804aae57d14ae474e660dc56d"
+    },
+    "labEditionManifest": {
+      "path": "distribution/editions/lab.v1.json",
+      "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+    },
+    "executionGatePolicy": {
+      "path": "distribution/safety/edition-execution-gate.v1.json",
+      "sha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456"
+    },
+    "vehiclePackRegistry": {
+      "path": "distribution/vehicle-packs/registry.v1.json",
+      "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"
+    },
+    "licenseNotice": {
+      "path": "runtime/THIRD_PARTY_NOTICES.md",
+      "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+    }
+  },
+  "toolchain": {
+    "selection": "strict-pinned-gnullvm",
+    "rustupToolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+    "llvmMingwDirectory": "llvm-mingw-20260616-ucrt-x86_64",
+    "cargoBuildJobs": 2,
+    "cargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
+    "msvcLinkerRequired": false
+  },
+  "publicSupabaseClientConfig": {
+    "source": "GitHub repository Actions variables",
+    "repository": "ChiZhang-805/DroneDream",
+    "variableNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "singleProcessInjection": true,
+    "valuesPrinted": false,
+    "valuesPersisted": false,
+    "valuesHashed": false,
+    "modelApiKeyRead": false,
+    "accountPasswordRead": false,
+    "tauriSigningPrivateKeyRead": false
+  },
+  "attempt": {
+    "countOverall": 2,
+    "countForSource": 1,
+    "startedAtUtc": "2026-08-05T16:19:29.4190319Z",
+    "finishedAtUtc": "2026-08-05T16:28:08.6791057Z",
+    "status": "failed-after-nsis-edition-filename-gate",
+    "exitCode": 1,
+    "failureStage": "tauri-edition-config-composition",
+    "failureReason": "The Lab overlay passed through TAURI_CONFIG did not become a Tauri CLI build overlay; the explicit LLVM config merged with the Universal base and produced the Universal-style installer filename.",
+    "cargoCompilationCompleted": true,
+    "tauriCompleted": true,
+    "nsisCompleted": true,
+    "labArtifactCopyStarted": false,
+    "thirdAttemptExecuted": false
+  },
+  "evidence": {
+    "runRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-bec8cbd-attempt2",
+    "log": {
+      "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-bec8cbd-attempt2\\lab-build-attempt2.log",
+      "bytes": 27278,
+      "sha256": "91f2d3f191638181037372e160f63710cbaa45f215e6e8a9c647cf73616e85bf"
+    },
+    "result": {
+      "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-bec8cbd-attempt2\\attempt-result.json",
+      "bytes": 941,
+      "sha256": "88ab0d807792a96f2883d0f88edca24dd751ca02b6b5ef80a0a792590af44930"
+    },
+    "preserved": true
+  },
+  "artifact": {
+    "expectedLabFileName": "DroneDream-Lab-1.0.0.exe",
+    "expectedLabAbsolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-bec8cbd-attempt2\\artifact\\DroneDream-Lab-1.0.0.exe",
+    "expectedLabArtifactExists": false,
+    "rejectedGeneratedFileName": "DroneDream_1.0.0_x64-setup.exe",
+    "rejectedReason": "Universal-style filename and product configuration; must not be renamed or handed off as Lab.",
+    "originalAbsolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream_1.0.0_x64-setup.exe",
+    "evidenceCopyAbsolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-bec8cbd-attempt2\\evidence\\DroneDream_1.0.0_x64-setup.exe",
+    "bytes": 11615940,
+    "sha256": "4c900fbf6290e117c10a1c63652729b7ac1d7bc56253e1291b01c7ba99b153c7",
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0",
+    "peMachine": "0x014c",
+    "peOptionalMagic": "0x010b",
+    "peCertificateTableOffset": 0,
+    "peCertificateTableSize": 0,
+    "authenticodeStatus": "NotSigned",
+    "signerCertificatePresent": false,
+    "tauriUpdaterSignature": "not-produced",
+    "sigFileExists": false,
+    "eligibleForLabHandoff": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecisionAtZeroValidatedPacks": "deny",
+    "installed": false,
+    "runtimeMigrated": false,
+    "px4GazeboStarted": false,
+    "hardwareConnected": false,
+    "releaseBranchCreated": false,
+    "uploadedOrDeployed": false
+  },
+  "remainingGates": [
+    "Replace TAURI_CONFIG transport with ordered repeated Tauri CLI --config arguments and validate it without rebuilding.",
+    "Do not execute a third Lab build without fresh explicit YELLOW authorization.",
+    "Produce one exact DroneDream-Lab-1.0.0.exe and bind bytes, SHA-256, PE certificate table, Authenticode, updater signature state, source, common core, manifest, payload, license, and NOTICE.",
+    "Run fresh install, overlay upgrade, uninstall, shortcut, WebView2, and EN/ZH acceptance only after an eligible Lab installer exists and receives separate approval.",
+    "Keep hardware write, arm, HITL, and flight denied while validatedVehiclePackCount is zero."
+  ]
+}
