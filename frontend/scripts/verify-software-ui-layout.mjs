@@ -642,12 +642,48 @@ async function verifyFixedScenarios(page, testCase) {
     await page.locator(".app-mobile-menu-button").click();
   }
   const firstPreview = cards.first().locator(".scenario-track-preview");
-  for (const view of ["XZ", "YZ", "3D"]) {
+  assert.equal(await firstPreview.getAttribute("data-view"), "3d");
+  assert.equal(await firstPreview.locator(".scenario-track-3d-axis").count(), 3);
+  const previewCanvas = firstPreview.locator(".scenario-track-canvas");
+  const previewRoute = firstPreview.locator(".scenario-track-route");
+  const cameraYawBefore = Number(await firstPreview.getAttribute("data-camera-yaw"));
+  const cameraZoomBefore = Number(await firstPreview.getAttribute("data-camera-zoom"));
+  const routeBefore = await previewRoute.getAttribute("points");
+  const canvasBox = await previewCanvas.boundingBox();
+  assert(canvasBox, `${testCase.id}: 3D scenario canvas is not measurable`);
+  await page.mouse.move(
+    canvasBox.x + canvasBox.width * 0.5,
+    canvasBox.y + canvasBox.height * 0.62,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    canvasBox.x + canvasBox.width * 0.68,
+    canvasBox.y + canvasBox.height * 0.52,
+    { steps: 5 },
+  );
+  await page.mouse.up();
+  const cameraYawAfter = Number(await firstPreview.getAttribute("data-camera-yaw"));
+  const routeAfter = await previewRoute.getAttribute("points");
+  assert.notEqual(cameraYawAfter, cameraYawBefore);
+  assert.notEqual(routeAfter, routeBefore);
+  await page.mouse.move(
+    canvasBox.x + canvasBox.width * 0.5,
+    canvasBox.y + canvasBox.height * 0.62,
+  );
+  await page.mouse.wheel(0, -240);
+  await page.waitForFunction(
+    (before) => document.querySelector(".scenario-track-preview")?.getAttribute("data-camera-zoom") !== before,
+    cameraZoomBefore.toFixed(3),
+  );
+  const cameraZoomAfter = Number(await firstPreview.getAttribute("data-camera-zoom"));
+  assert.notEqual(cameraZoomAfter, cameraZoomBefore);
+  const viewImage = await screenshot(page, testCase.id, "fixed-scenarios-3d");
+  for (const view of ["XY", "XZ", "YZ"]) {
     await firstPreview.getByRole("button", { name: new RegExp(`^${view}`, "u") }).click();
     assert.equal(await firstPreview.getAttribute("data-view"), view.toLowerCase());
   }
-  const viewImage = await screenshot(page, testCase.id, "fixed-scenarios-3d");
-  await firstPreview.getByRole("button", { name: /^XY/u }).click();
+  await firstPreview.getByRole("button", { name: /^3D/u }).click();
+  assert.equal(await firstPreview.getAttribute("data-view"), "3d");
   const image = await screenshot(page, testCase.id, "fixed-scenarios");
   const nextGroup = page.getByRole("button", {
     name: testCase.locale === "zh-CN" ? "查看下一组场景" : "Show next scenarios",
@@ -696,6 +732,10 @@ async function verifyFixedScenarios(page, testCase) {
     keyboardScenarioSelection: true,
     freshNameRequired: true,
     createRequests,
+    defaultThreeDimensional: true,
+    threeDimensionalAxes: 3,
+    cameraRotationChanged: true,
+    cameraZoomChanged: true,
     mobileMenu: mobileMenuMetrics,
     mobileMenuImage,
     image,

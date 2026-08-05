@@ -70,8 +70,38 @@ describe("fixed scenario library", () => {
     expect(within(hoverCard as HTMLElement).getAllByRole("term")).toHaveLength(6);
     expect(within(hoverCard as HTMLElement).getAllByRole("definition")).toHaveLength(6);
     const preview = (hoverCard as HTMLElement).querySelector(".scenario-track-preview");
-    expect(preview).toHaveAttribute("data-view", "xy");
-    for (const view of ["XZ", "YZ", "3D"] as const) {
+    expect(preview).toHaveAttribute("data-view", "3d");
+    expect(within(hoverCard as HTMLElement).getByRole("button", {
+      name: "3D view",
+    })).toHaveAttribute("aria-pressed", "true");
+    expect((hoverCard as HTMLElement).querySelectorAll(".scenario-track-3d-axis"))
+      .toHaveLength(3);
+
+    const canvas = (hoverCard as HTMLElement).querySelector(".scenario-track-canvas");
+    const route = (hoverCard as HTMLElement).querySelector(".scenario-track-route");
+    expect(canvas).not.toBeNull();
+    expect(route).not.toBeNull();
+    const initialPoints = route?.getAttribute("points");
+    const initialYaw = preview?.getAttribute("data-camera-yaw");
+    fireEvent.pointerDown(canvas as SVGElement, {
+      pointerId: 7,
+      clientX: 120,
+      clientY: 100,
+    });
+    fireEvent.pointerMove(canvas as SVGElement, {
+      pointerId: 7,
+      clientX: 180,
+      clientY: 125,
+    });
+    fireEvent.pointerUp(canvas as SVGElement, { pointerId: 7 });
+    expect(preview?.getAttribute("data-camera-yaw")).not.toBe(initialYaw);
+    expect(route?.getAttribute("points")).not.toBe(initialPoints);
+
+    const zoomBefore = preview?.getAttribute("data-camera-zoom");
+    fireEvent.wheel(canvas as SVGElement, { deltaY: -120 });
+    expect(preview?.getAttribute("data-camera-zoom")).not.toBe(zoomBefore);
+
+    for (const view of ["XY", "XZ", "YZ"] as const) {
       const button = within(hoverCard as HTMLElement).getByRole("button", {
         name: `${view} view`,
       });
@@ -79,6 +109,10 @@ describe("fixed scenario library", () => {
       expect(preview).toHaveAttribute("data-view", view.toLowerCase());
       expect(button).toHaveAttribute("aria-pressed", "true");
     }
+    fireEvent.click(within(hoverCard as HTMLElement).getByRole("button", {
+      name: "3D view",
+    }));
+    expect(preview).toHaveAttribute("data-view", "3d");
 
     fireEvent.click(screen.getByRole("button", { name: "Show next scenarios" }));
     expect(document.querySelectorAll("[data-template-key]")).toHaveLength(4);

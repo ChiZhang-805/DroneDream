@@ -2996,6 +2996,21 @@ a {
   background: #190d2d;
 }
 
+.scenario-track-canvas-3d {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.scenario-track-canvas-3d.is-rotating {
+  cursor: grabbing;
+}
+
+.scenario-track-canvas-3d:focus-visible {
+  outline: 2px solid #6eddf3;
+  outline-offset: -3px;
+}
+
 .scenario-track-bg {
   fill: #190d2d;
 }
@@ -3010,6 +3025,62 @@ a {
   fill: none;
   stroke: rgba(214, 187, 231, 0.28);
   stroke-width: 1.25;
+}
+
+.scenario-track-3d-ground {
+  fill: rgba(81, 43, 117, 0.22);
+  stroke: rgba(204, 160, 232, 0.18);
+  stroke-width: 1;
+}
+
+.scenario-track-3d-grid-line {
+  stroke: rgba(202, 160, 232, 0.2);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.scenario-track-3d-axis line {
+  stroke-width: 2.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.scenario-track-3d-axis text {
+  font-size: 12px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #190d2d;
+  stroke-width: 3px;
+}
+
+.scenario-track-3d-axis-x line,
+.scenario-track-3d-axis-x text {
+  fill: #ff77ad;
+  stroke: #ff77ad;
+}
+
+.scenario-track-3d-axis-y line,
+.scenario-track-3d-axis-y text {
+  fill: #78e2bd;
+  stroke: #78e2bd;
+}
+
+.scenario-track-3d-axis-z line,
+.scenario-track-3d-axis-z text {
+  fill: #78e9ff;
+  stroke: #78e9ff;
+}
+
+.scenario-track-3d-axis text {
+  stroke: #190d2d;
+}
+
+.scenario-track-3d-shadow {
+  fill: none;
+  stroke: rgba(129, 97, 155, 0.5);
+  stroke-width: 2.2;
+  stroke-dasharray: 5 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .scenario-track-route,
