@@ -1,0 +1,60 @@
+{
+  "schema_id": "dronedream.software-test-receipt/v1",
+  "created_at_utc": "2026-08-05T11:38:17.8340502Z",
+  "subject_commit": "00a37f9266d2f25c2372b8344101f818b28210b4",
+  "branch": "codex/software",
+  "closure": "benchmark-p3-direct-proposal-crash-recovery",
+  "resource_state": "GREEN",
+  "provider_calls": 0,
+  "px4_gazebo_runs": 0,
+  "credentials_read": false,
+  "tests": [
+    {
+      "command": "python -m pytest -q tests/test_benchmark_llm_durable_runtime.py tests/test_cognitive_budget.py tests/test_provider_request_accounting.py",
+      "working_directory": "backend",
+      "result": "passed",
+      "passed": 49,
+      "failed": 0,
+      "duration_seconds": 66.08
+    },
+    {
+      "command": "python -m pytest -q tests/test_db_migrations.py::test_alembic_has_one_schema_head tests/test_db_migrations.py::test_first_qualified_migration_round_trips_on_sqlite tests/test_db_migrations.py::test_postgresql_direct_handoff_migration_emits_immutable_guard",
+      "working_directory": "backend",
+      "result": "passed",
+      "passed": 3,
+      "failed": 0,
+      "duration_seconds": 10.30
+    },
+    {
+      "command": "python -m ruff check app/models.py app/orchestration/cognitive_budget.py app/benchmarking/llm_durable_runtime.py tests/test_benchmark_llm_durable_runtime.py tests/test_db_migrations.py alembic/versions/20260805_0031_benchmark_direct_proposal_handoff.py",
+      "working_directory": "backend",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "working_directory": "repository",
+      "result": "passed"
+    },
+    {
+      "command": "python -m mypy app/benchmarking/llm_durable_runtime.py app/orchestration/cognitive_budget.py app/models.py",
+      "working_directory": "backend",
+      "result": "known_residual",
+      "changed_path_errors": 0,
+      "residuals": [
+        "app/benchmarking/coordinator.py:104 existing Any | None argument mismatch"
+      ]
+    }
+  ],
+  "verified_contracts": [
+    "successful cognitive outcome and validated direct proposal handoff commit atomically",
+    "schema-validated numeric parameters recover without replaying provider I/O",
+    "handoff excludes raw prompt, raw response, credentials, and provider request identifiers",
+    "cross-field provenance drift fails closed before transport",
+    "SQLite migration round-trip and SQLite/PostgreSQL immutability guards"
+  ],
+  "remaining_scope": [
+    "JobSecret-backed strict transport assembly",
+    "llm_direct dispatch integration and registry promotion",
+    "other LLM benchmark arms remain blocked"
+  ]
+}
