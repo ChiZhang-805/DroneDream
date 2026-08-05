@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-execution-plan",
+  "planVersion": "1.0.0",
+  "editionId": "sim",
+  "executionClass": "GREEN-plan-only",
+  "state": "pre-registered-not-authorized",
+  "authorization": {
+    "yellow1Approved": false,
+    "yellow2Approved": false,
+    "yellow3Approved": false,
+    "separateApprovalRequiredForEachStage": true,
+    "redRuntimeOrSimulatorApproved": false
+  },
+  "yellow1VisualBinding": {
+    "path": "distribution/sim/frontend/visual-acceptance.v1.json",
+    "sha256": "bea85d2faa1cab5b736e1ae54c400ff2d571c2d39d8522bae89d4ecfb3a8f246",
+    "requiredCaseIds": [
+      "desktop-en",
+      "desktop-zh-CN",
+      "tablet-en",
+      "tablet-zh-CN",
+      "mobile-en",
+      "mobile-zh-CN"
+    ],
+    "browserStarted": false,
+    "productionBuildExecuted": false
+  },
+  "artifactGate": {
+    "yellow2OutputFileName": "DroneDream-Sim-1.0.0.exe",
+    "yellow2ReceiptKind": "dronedream-sim-yellow-build-receipt",
+    "yellow3RequiresExactYellow2Receipt": true,
+    "requiredReceiptFields": [
+      "sourceCommit",
+      "sourceTreeState",
+      "commonCoreCommit",
+      "commonCoreHash",
+      "donorCommit",
+      "donorManifestSha256",
+      "artifact.fileName",
+      "artifact.sha256",
+      "artifact.bytes",
+      "artifact.authenticodeState",
+      "artifact.peCertificateTableEmpty",
+      "overlay.sha256",
+      "licenseNotice.sha256"
+    ],
+    "ineligiblePreview": {
+      "path": "Z:/DroneDream-worktrees/aurora-20260728/artifacts/test-runs/sim-preview-1.0.0-2aec69e/DroneDream-Sim-1.0.0.exe",
+      "sha256": "b7d8481a6bf79678b7ca80ead7c4bf01a7a65bbeb81e93e6e4f28d0cea205863",
+      "reason": "unified-core preview was not built from the canonical donor and Sim overlay"
+    },
+    "unsignedAllowedWithDisclosure": true,
+    "validatedVehiclePackCount": 0
+  },
+  "staging": {
+    "runIdPattern": "^sim-y(?:2|3)-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{8}$",
+    "yellow2": {
+      "hostIsolation": "authorized-local-build-host",
+      "sourceRoot": "C:/Users/zju20/.codex/worktrees/d47f/DroneDream",
+      "runRootTemplate": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/{runId}",
+      "bundleOutputTemplate": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/{runId}/bundle",
+      "receiptOutputTemplate": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/{runId}/receipt",
+      "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target",
+      "cargoTargetOwnership": "persistent-cache-protected-not-owned-residue",
+      "cleanupCargoTargetAllowed": false
+    },
+    "yellow3": {
+      "hostIsolation": "dedicated-disposable-windows-sandbox-or-vm",
+      "hostSnapshotRequired": true,
+      "networkMode": "offline-except-local-fixtures",
+      "runtimeSelection": "install-app-only",
+      "runRootTemplate": "%LOCALAPPDATA%/DroneDream-Codex/Sim-Yellow-3/{runId}",
+      "installRootTemplate": "%LOCALAPPDATA%/Programs/DroneDream-SIM-{runId}",
+      "evidenceRootTemplate": "%LOCALAPPDATA%/DroneDream-Codex/Sim-Yellow-3/{runId}/evidence",
+      "sourceArtifactCopyTemplate": "%LOCALAPPDATA%/DroneDream-Codex/Sim-Yellow-3/{runId}/input/DroneDream-Sim-1.0.0.exe",
+      "runtimeStartAllowed": false,
+      "px4StartAllowed": false,
+      "gazeboStartAllowed": false
+    }
+  },
+  "protectedInventory": {
+    "hostPaths": [
+      "C:/Users/zju20/.codex/worktrees/d47f/DroneDream",
+      "Z:/DroneDream",
+      "Z:/DroneDream-worktrees/aurora-20260728/artifacts/test-runs",
+      "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target"
+    ],
+    "guestPathTemplates": [
+      "{selectedFixedDrive}:/DroneDream",
+      "{selectedFixedDrive}:/DroneDream.download-cache"
+    ],
+    "guestRegistryKeys": [
+      "HKCU/Software/Microsoft/EdgeUpdate/Clients",
+      "HKLM/Software/Microsoft/EdgeUpdate/Clients"
+    ],
+    "wslDistributions": ["DroneDreamRuntime"],
+    "protectionRule": "never-delete-never-move-never-overwrite"
+  },
+  "ownedResiduePolicy": {
+    "allowedKinds": ["run-root", "install-root", "file", "shortcut", "registry-key"],
+    "runRootDescendantsRequireExactRunId": true,
+    "externalFilesRequireObservedSha256": true,
+    "shortcutsRequireObservedSha256AndExpectedTarget": true,
+    "registryKeysRequireExpectedValues": true,
+    "allowedGuestRegistryKeys": [
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream · SIM",
+      "HKCU/Software/DroneDream/DroneDream · SIM"
+    ],
+    "allowedGuestShortcutTemplates": [
+      "%APPDATA%/Microsoft/Windows/Start Menu/Programs/{startMenuFolder}/DroneDream · SIM.lnk",
+      "%APPDATA%/Microsoft/Windows/Start Menu/Programs/DroneDream · SIM.lnk",
+      "%USERPROFILE%/Desktop/DroneDream · SIM.lnk"
+    ],
+    "allowedExternalFileTemplates": [
+      "%TEMP%/DroneDream/installer-diagnostics.log"
+    ],
+    "expectedShortcutTargetTemplate": "%LOCALAPPDATA%/Programs/DroneDream-SIM-{runId}/DroneDream.exe",
+    "diagnosticsPreservedUntilReceiptFrozen": true,
+    "expectedYellow2Entries": [
+      {
+        "kind": "run-root",
+        "pathTemplate": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/{runId}",
+        "disposition": "candidate-after-reverification"
+      },
+      {
+        "kind": "file",
+        "pathTemplate": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/{runId}/bundle/DroneDream-Sim-1.0.0.exe",
+        "disposition": "candidate-after-reverification"
+      },
+      {
+        "kind": "file",
+        "pathTemplate": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/{runId}/receipt/yellow-build-receipt.json",
+        "disposition": "preserve"
+      },
+      {
+        "kind": "file",
+        "pathTemplate": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/{runId}/receipt/build.log",
+        "disposition": "preserve"
+      }
+    ],
+    "expectedYellow3Entries": [
+      {
+        "kind": "run-root",
+        "pathTemplate": "%LOCALAPPDATA%/DroneDream-Codex/Sim-Yellow-3/{runId}",
+        "disposition": "candidate-after-reverification"
+      },
+      {
+        "kind": "install-root",
+        "pathTemplate": "%LOCALAPPDATA%/Programs/DroneDream-SIM-{runId}",
+        "disposition": "candidate-after-reverification"
+      },
+      {
+        "kind": "file",
+        "pathTemplate": "%LOCALAPPDATA%/DroneDream-Codex/Sim-Yellow-3/{runId}/input/DroneDream-Sim-1.0.0.exe",
+        "disposition": "candidate-after-reverification"
+      },
+      {
+        "kind": "file",
+        "pathTemplate": "%LOCALAPPDATA%/DroneDream-Codex/Sim-Yellow-3/{runId}/evidence/install-lifecycle-receipt.json",
+        "disposition": "preserve"
+      },
+      {
+        "kind": "file",
+        "pathTemplate": "%TEMP%/DroneDream/installer-diagnostics.log",
+        "disposition": "preserve"
+      },
+      {
+        "kind": "shortcut",
+        "pathTemplate": "%APPDATA%/Microsoft/Windows/Start Menu/Programs/DroneDream · SIM.lnk",
+        "disposition": "candidate-after-reverification"
+      },
+      {
+        "kind": "shortcut",
+        "pathTemplate": "%USERPROFILE%/Desktop/DroneDream · SIM.lnk",
+        "disposition": "candidate-after-reverification"
+      },
+      {
+        "kind": "registry-key",
+        "pathTemplate": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream · SIM",
+        "disposition": "candidate-after-reverification"
+      },
+      {
+        "kind": "registry-key",
+        "pathTemplate": "HKCU/Software/DroneDream/DroneDream · SIM",
+        "disposition": "candidate-after-reverification"
+      }
+    ]
+  },
+  "yellow3Matrix": [
+    {
+      "caseId": "fresh-en-webview-present-no-desktop-shortcut",
+      "phase": "fresh",
+      "locale": "en",
+      "webView2Fixture": "present",
+      "desktopShortcut": false,
+      "priorInstall": "absent",
+      "expected": "install-app-only-success",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "fresh-en-webview-missing-desktop-shortcut",
+      "phase": "fresh",
+      "locale": "en",
+      "webView2Fixture": "missing",
+      "desktopShortcut": true,
+      "priorInstall": "absent",
+      "expected": "localized-webview2-recovery-or-success",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "fresh-zh-webview-present-no-desktop-shortcut",
+      "phase": "fresh",
+      "locale": "zh-CN",
+      "webView2Fixture": "present",
+      "desktopShortcut": false,
+      "priorInstall": "absent",
+      "expected": "install-app-only-success",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "fresh-zh-webview-missing-desktop-shortcut",
+      "phase": "fresh",
+      "locale": "zh-CN",
+      "webView2Fixture": "missing",
+      "desktopShortcut": true,
+      "priorInstall": "absent",
+      "expected": "localized-webview2-recovery-or-success",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "overlay-en-exact-source",
+      "phase": "overlay",
+      "locale": "en",
+      "webView2Fixture": "present",
+      "desktopShortcut": false,
+      "priorInstall": "exact-yellow2-receipt",
+      "expected": "same-source-maintenance-success",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "overlay-zh-exact-source",
+      "phase": "overlay",
+      "locale": "zh-CN",
+      "webView2Fixture": "present",
+      "desktopShortcut": false,
+      "priorInstall": "exact-yellow2-receipt",
+      "expected": "same-source-maintenance-success",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "overlay-en-foreign-source-rejected",
+      "phase": "overlay",
+      "locale": "en",
+      "webView2Fixture": "present",
+      "desktopShortcut": false,
+      "priorInstall": "foreign-source-receipt",
+      "expected": "fail-closed-before-replacement",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "overlay-zh-foreign-source-rejected",
+      "phase": "overlay",
+      "locale": "zh-CN",
+      "webView2Fixture": "present",
+      "desktopShortcut": false,
+      "priorInstall": "foreign-source-receipt",
+      "expected": "fail-closed-before-replacement",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "uninstall-en-preserve-diagnostics",
+      "phase": "uninstall",
+      "locale": "en",
+      "webView2Fixture": "present",
+      "desktopShortcut": true,
+      "priorInstall": "exact-yellow2-receipt",
+      "expected": "owned-app-residue-removed-diagnostics-preserved",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "uninstall-zh-preserve-diagnostics",
+      "phase": "uninstall",
+      "locale": "zh-CN",
+      "webView2Fixture": "present",
+      "desktopShortcut": true,
+      "priorInstall": "exact-yellow2-receipt",
+      "expected": "owned-app-residue-removed-diagnostics-preserved",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "rollback-no-prior-promotion",
+      "phase": "rollback",
+      "locale": "en",
+      "webView2Fixture": "present",
+      "desktopShortcut": false,
+      "priorInstall": "absent",
+      "expected": "explicit-no-prior-release-and-snapshot-restore",
+      "status": "planned-not-executed"
+    },
+    {
+      "caseId": "rollback-interrupted-maintenance",
+      "phase": "rollback",
+      "locale": "zh-CN",
+      "webView2Fixture": "present",
+      "desktopShortcut": false,
+      "priorInstall": "exact-yellow2-receipt",
+      "expected": "snapshot-restore-without-runtime-start",
+      "status": "planned-not-executed"
+    }
+  ],
+  "rollback": {
+    "authoritativeMechanism": "restore-disposable-guest-snapshot",
+    "ownedResidueTool": "distribution/sim/tools/sim_yellow_lifecycle.py",
+    "toolMode": "validate-and-plan-only-never-delete",
+    "inventoryRequired": true,
+    "protectedInventoryMustBeRechecked": true,
+    "historicalEvidenceDeletionAllowed": false,
+    "cargoCacheDeletionAllowed": false,
+    "runtimeDeletionAllowed": false,
+    "webView2DeletionAllowed": false
+  },
+  "nonClaims": {
+    "browserStarted": false,
+    "productionBuildExecuted": false,
+    "installerBuilt": false,
+    "installerExecuted": false,
+    "overlayExecuted": false,
+    "uninstallerExecuted": false,
+    "rollbackExecuted": false,
+    "shortcutsObserved": false,
+    "registryResidueObserved": false,
+    "runtimeStarted": false,
+    "px4Started": false,
+    "gazeboStarted": false,
+    "validated": false,
+    "promotionReady": false
+  }
+}
