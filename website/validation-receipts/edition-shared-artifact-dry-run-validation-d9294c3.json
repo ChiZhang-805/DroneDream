@@ -1,0 +1,117 @@
+{
+  "schemaVersion": "dronedream.edition-shared-artifact-dry-run-validation.v1",
+  "generatedAt": "2026-08-05T15:42:37Z",
+  "scope": {
+    "branch": "codex/website",
+    "subjectCommit": "d9294c37767600cdfbaf6621ef68168f435c36de",
+    "subjectTree": "b8c89e2f5150896cb040c2a200b3d3ba96766356",
+    "previousHandoffContractCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "deploymentPerformed": false,
+    "productionMetadataModified": false,
+    "productionTouched": false,
+    "browserMatrixPerformed": false,
+    "secretsOrApiKeysRead": false,
+    "technicalReportModified": false
+  },
+  "auditFinding": {
+    "result": "real-contract-gap-fixed",
+    "gap": "The Pages builder verified the four-edition registry but did not stage accepted edition bytes into the shared artifact.",
+    "risk": "Four accepted metadata entries could unlock downloads without proving that both public origins received the exact installer, checksum, signature, and receipt bytes."
+  },
+  "implementation": {
+    "publicationPlan": "frontend/src/site/editionReleaseRegistry.ts",
+    "stagingTool": "website/scripts/stage-edition-release-assets.mjs",
+    "syntheticDryRun": "website/scripts/test-stage-edition-release-assets.mjs",
+    "pagesBuilder": "website/scripts/build-pages-site.ps1",
+    "parityVerifier": "website/scripts/verify-site-parity.ps1",
+    "workflow": ".github/workflows/pages.yml",
+    "acceptedHandoffCompanionFields": [
+      "checksumSha256",
+      "checksumSizeBytes",
+      "signatureSha256",
+      "signatureSizeBytes",
+      "receiptSha256",
+      "receiptSizeBytes"
+    ],
+    "sharedArtifactFilesPerAcceptedEdition": [
+      "exact installer",
+      "exact checksum",
+      "exact signature",
+      "exact receipt"
+    ],
+    "websiteGenerationPolicy": "copy or HTTPS-fetch exact handed-off bytes; never rebuild, rename, or synthesize edition assets"
+  },
+  "syntheticDryRun": {
+    "fixture": "SYNTHETIC-NON-PUBLISHABLE",
+    "command": "node --experimental-strip-types website/scripts/test-stage-edition-release-assets.mjs",
+    "awaitingPublicationInputs": 0,
+    "editionsAccepted": 4,
+    "filesVerified": 16,
+    "negativeCases": [
+      "missing-field",
+      "cross-edition",
+      "preview-not-accepted",
+      "duplicate-installer-sha",
+      "different-url-family",
+      "staging-byte-mismatch"
+    ],
+    "status": "passed"
+  },
+  "sharedArtifactContract": {
+    "singleBuild": "Pages produces one commit-pinned dronedream-shared-static-site artifact.",
+    "editionManifest": "downloads/edition-artifacts.json is embedded in build-manifest.json with JSON depth 8.",
+    "integrity": "SHA256SUMS covers every staged edition file and every other shared-artifact file.",
+    "pagesAndAliyun": "Aliyun consumes the downloaded commit-pinned Pages artifact; it does not rebuild the site or installers.",
+    "publicRedownload": "verify-site-parity.ps1 downloads every edition manifest path from both origins and checks it against the identical SHA256SUMS.",
+    "currentProductionState": "All four editions remain awaiting-exact-handoff and produce zero edition publication inputs."
+  },
+  "rollbackChecklist": {
+    "githubPages": [
+      "retain the formal commit-pinned artifact for 30 days",
+      "redeploy the prior known-good source and artifact through the Pages workflow",
+      "rerun public manifest and file parity"
+    ],
+    "aliyun": [
+      "keep releases/<release-id> directories",
+      "activate through an atomic current symlink",
+      "restore the previous symlink automatically when activation probes fail",
+      "run the two-origin parity verifier after any rollback"
+    ]
+  },
+  "validation": {
+    "focusedTests": {
+      "command": "npm.cmd --prefix frontend test -- EditionAvailability.test.ts EditionReleaseRegistry.test.ts ProductPage.test.tsx PublicSite.test.tsx",
+      "files": 4,
+      "tests": 41,
+      "passed": 41,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "lint": "passed",
+    "productionRegistryVerifier": "passed; four awaiting, four downloadReady=false",
+    "deploymentContract": {
+      "tests": 13,
+      "passed": 13,
+      "failed": 0
+    },
+    "powershellParse": {
+      "scripts": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "fullPagesBuild": "not run; this bounded GREEN audit exercised the edition staging path with local synthetic bytes and performed no network release fetch",
+    "gitDiffCheck": "passed"
+  },
+  "repositoryGovernance": {
+    "forcePushPerformed": false,
+    "manualAndPdfDraftsExcluded": true,
+    "workDirectoryExcluded": true,
+    "historicalDirtyStatePreserved": true,
+    "runtimeDependencyOnWorkDirectory": false,
+    "releaseAssetsModified": false,
+    "githubPagesModified": false,
+    "aliyunModified": false,
+    "supabaseOrSecretsModified": false,
+    "dnsOrTlsModified": false
+  }
+}
