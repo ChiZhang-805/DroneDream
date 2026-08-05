@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/field-prerelease-audit.v1.json",
+  "title": "DroneDream Field prerelease audit and readonly discovery contract",
+  "unevaluatedProperties": false,
+  "oneOf": [
+    {"$ref": "#/$defs/fieldPrereleaseAuditReceipt"},
+    {"$ref": "#/$defs/readonlyDeviceObservation"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "safePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "instant": {"type": "string", "format": "date-time"},
+    "readonlyTransport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "mode",
+        "openedDevice",
+        "writeAttempted",
+        "writeOperations"
+      ],
+      "properties": {
+        "kind": {"const": "fake"},
+        "mode": {"const": "read-only"},
+        "openedDevice": {"const": false},
+        "writeAttempted": {"const": false},
+        "writeOperations": {
+          "type": "array",
+          "maxItems": 0,
+          "items": false
+        }
+      }
+    },
+    "deviceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deviceId",
+        "hardwareIdentityHash",
+        "controllerModel",
+        "firmwareFamily",
+        "firmwareVersion",
+        "firmwareIdentityHash"
+      ],
+      "properties": {
+        "deviceId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "hardwareIdentityHash": {"$ref": "#/$defs/sha256"},
+        "controllerModel": {"type": "string", "minLength": 1, "maxLength": 128},
+        "firmwareFamily": {"enum": ["px4", "ardupilot", "crazyflie", "unknown"]},
+        "firmwareVersion": {"type": "string", "minLength": 1, "maxLength": 128},
+        "firmwareIdentityHash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "observedVehiclePack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packId",
+        "manifestSha256",
+        "registrySha256",
+        "validationStatus",
+        "validationTier",
+        "signatureState"
+      ],
+      "properties": {
+        "packId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "manifestSha256": {
+          "oneOf": [{"const": ""}, {"$ref": "#/$defs/sha256"}]
+        },
+        "registrySha256": {
+          "oneOf": [{"const": ""}, {"$ref": "#/$defs/sha256"}]
+        },
+        "validationStatus": {
+          "enum": ["validated", "contract-only", "planned", "unknown"]
+        },
+        "validationTier": {
+          "enum": [
+            "hardware-validated",
+            "sim-validated",
+            "contract-only",
+            "planned",
+            "unknown"
+          ]
+        },
+        "signatureState": {"enum": ["verified", "not-issued", "unknown"]}
+      }
+    },
+    "readonlyAuthorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["discoveryIsAuthorization", "decision", "reasonCodes"],
+      "properties": {
+        "discoveryIsAuthorization": {"const": false},
+        "decision": {"const": "deny"},
+        "reasonCodes": {
+          "type": "array",
+          "minItems": 1,
+          "contains": {"const": "discovery.not-authorization"},
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "readonlyDeviceObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "observationId",
+        "observedAt",
+        "transport",
+        "device",
+        "vehiclePack",
+        "source",
+        "authorization"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-readonly-device-observation"},
+        "observationId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "observedAt": {"$ref": "#/$defs/instant"},
+        "transport": {"$ref": "#/$defs/readonlyTransport"},
+        "device": {"$ref": "#/$defs/deviceIdentity"},
+        "vehiclePack": {"$ref": "#/$defs/observedVehiclePack"},
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commonCoreCommit", "commonCoreHash", "fieldManifestSha256"],
+          "properties": {
+            "commonCoreCommit": {"$ref": "#/$defs/commit"},
+            "commonCoreHash": {"$ref": "#/$defs/sha256"},
+            "fieldManifestSha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "authorization": {"$ref": "#/$defs/readonlyAuthorization"}
+      }
+    },
+    "payloadResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sizeBytes", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/safePath"},
+        "sizeBytes": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "readonlyPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["planId", "state", "executed", "hash"],
+      "properties": {
+        "planId": {"type": "string", "minLength": 1, "maxLength": 128},
+        "state": {
+          "enum": [
+            "planned-not-executed",
+            "planned-not-installable",
+            "rollback-contract-only"
+          ]
+        },
+        "executed": {"const": false},
+        "hash": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "fieldPrereleaseAuditReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "kind",
+        "editionId",
+        "issuedAt",
+        "decision",
+        "reasonCodes",
+        "source",
+        "bindings",
+        "payloadAudit",
+        "deviceObservation",
+        "validation",
+        "installPlan",
+        "rollbackPlan",
+        "receiptSha256"
+      ],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-prerelease-audit-receipt"},
+        "editionId": {"const": "field"},
+        "issuedAt": {"$ref": "#/$defs/instant"},
+        "decision": {"enum": ["deny", "allow"]},
+        "reasonCodes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 128}
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "commonCoreCommit",
+            "commonCoreHash",
+            "enginePackSourceCommit",
+            "enginePackManifestSha256"
+          ],
+          "properties": {
+            "commonCoreCommit": {"$ref": "#/$defs/commit"},
+            "commonCoreHash": {"$ref": "#/$defs/sha256"},
+            "enginePackSourceCommit": {"$ref": "#/$defs/commit"},
+            "enginePackManifestSha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fieldManifestSha256",
+            "controllerFirmwareRegistrySha256",
+            "executionGatePolicySha256",
+            "licenseSha256",
+            "noticeSha256",
+            "installPlanSha256",
+            "rollbackPlanSha256"
+          ],
+          "properties": {
+            "fieldManifestSha256": {"$ref": "#/$defs/sha256"},
+            "controllerFirmwareRegistrySha256": {"$ref": "#/$defs/sha256"},
+            "executionGatePolicySha256": {"$ref": "#/$defs/sha256"},
+            "licenseSha256": {"$ref": "#/$defs/sha256"},
+            "noticeSha256": {"$ref": "#/$defs/sha256"},
+            "installPlanSha256": {"$ref": "#/$defs/sha256"},
+            "rollbackPlanSha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "payloadAudit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "profileId",
+            "includesLargeSimulator",
+            "forbiddenPayloads",
+            "requiredResources"
+          ],
+          "properties": {
+            "profileId": {"const": "field-lightweight"},
+            "includesLargeSimulator": {"const": false},
+            "forbiddenPayloads": {
+              "type": "array",
+              "maxItems": 0,
+              "items": false
+            },
+            "requiredResources": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"$ref": "#/$defs/payloadResource"}
+            }
+          }
+        },
+        "deviceObservation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "observationHash",
+            "discoveryIsAuthorization",
+            "transport",
+            "device",
+            "vehiclePack"
+          ],
+          "properties": {
+            "observationHash": {"$ref": "#/$defs/sha256"},
+            "discoveryIsAuthorization": {"const": false},
+            "transport": {"$ref": "#/$defs/readonlyTransport"},
+            "device": {"$ref": "#/$defs/deviceIdentity"},
+            "vehiclePack": {"$ref": "#/$defs/observedVehiclePack"}
+          }
+        },
+        "validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "registryValidatedHardwarePackCount",
+            "signatureState",
+            "validationStatus",
+            "validationTier",
+            "requiredQuorumLayers",
+            "observedQuorumLayers"
+          ],
+          "properties": {
+            "registryValidatedHardwarePackCount": {"type": "integer", "minimum": 0},
+            "signatureState": {"enum": ["verified", "not-issued", "unknown"]},
+            "validationStatus": {
+              "enum": ["validated", "contract-only", "planned", "unknown"]
+            },
+            "validationTier": {
+              "enum": [
+                "hardware-validated",
+                "sim-validated",
+                "contract-only",
+                "planned",
+                "unknown"
+              ]
+            },
+            "requiredQuorumLayers": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {"enum": ["native", "backend", "runtime"]}
+            },
+            "observedQuorumLayers": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {"enum": ["native", "backend", "runtime"]}
+            }
+          }
+        },
+        "installPlan": {"$ref": "#/$defs/readonlyPlan"},
+        "rollbackPlan": {"$ref": "#/$defs/readonlyPlan"},
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

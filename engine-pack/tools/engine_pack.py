@@ -38,8 +38,10 @@ RUNTIME_DISTRIBUTION_PATHS = (
     "distribution/safety/edition-execution-gate.v1.json",
     "distribution/schemas/edition-execution-authorization.schema.json",
     "distribution/schemas/edition-execution-gate-policy.schema.json",
+    "distribution/schemas/field-prerelease-audit.schema.json",
     "distribution/tools/distribution_contract.py",
     "distribution/tools/edition_safety_contract.py",
+    "distribution/tools/field_prerelease_audit.py",
     "distribution/upstream-sources.v1.json",
     "distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
     "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
@@ -61,7 +63,7 @@ SOURCE_PATHS = (
     "scripts/simulators",
     *RUNTIME_DISTRIBUTION_PATHS,
 )
-FIELD_EXCLUDED_SOURCE_PATHS = ("scripts/simulators",)
+FIELD_EXCLUDED_SOURCE_PATHS = ("backend/app/simulator", "scripts/simulators")
 IGNORED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -168,6 +170,15 @@ def source_paths_for_profile(edition_profile: str) -> tuple[str, ...]:
     return SOURCE_PATHS
 
 
+def is_excluded_for_profile(path: str, edition_profile: str) -> bool:
+    if edition_profile != FIELD_EDITION_PROFILE:
+        return False
+    return any(
+        path == excluded or path.startswith(f"{excluded}/")
+        for excluded in FIELD_EXCLUDED_SOURCE_PATHS
+    )
+
+
 def production_files(
     repository_root: Path,
     *,
@@ -190,6 +201,8 @@ def production_files(
             if path.suffix.lower() in IGNORED_SUFFIXES:
                 continue
             posix = inner.as_posix()
+            if is_excluded_for_profile(posix, edition_profile):
+                continue
             if posix in collected:
                 raise EnginePackError(f"duplicate Engine Pack path: {posix}")
             collected[posix] = path
