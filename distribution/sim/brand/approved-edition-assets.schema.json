@@ -120,7 +120,7 @@
       ],
       "properties": {
         "assetBytesVendored": {"const": true},
-        "applicationSourceWired": {"const": false},
+        "applicationSourceWired": {"const": true},
         "installerIconOverridePresent": {"const": false},
         "windowsIcoGenerated": {"const": false},
         "browserAcceptanceExecuted": {"const": false},

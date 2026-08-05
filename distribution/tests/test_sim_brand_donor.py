@@ -206,6 +206,7 @@ class SimBrandDonorTests(unittest.TestCase):
             ["sim-mark-png", "sim-dot-lockup-png"],
         )
         self.assertTrue(manifest["integrationState"]["assetBytesVendored"])
+        self.assertTrue(manifest["integrationState"]["applicationSourceWired"])
         self.assertFalse(manifest["integrationState"]["canonicalUniversalDonorIntegrated"])
 
     def test_approved_edition_assets_reject_provenance_or_common_core_drift(self) -> None:
@@ -219,9 +220,13 @@ class SimBrandDonorTests(unittest.TestCase):
         with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "commonCore binding"):
             sim_brand.validate_approved_edition_assets(invalid, repo_root=ROOT)
 
+        invalid = load_json(APPROVED_MANIFEST_PATH)
+        invalid["integrationState"]["applicationSourceWired"] = False
+        with self.assertRaisesRegex(sim_brand.SimBrandDonorError, "integration state"):
+            sim_brand.validate_approved_edition_assets(invalid, repo_root=ROOT)
+
     def test_approved_edition_assets_reject_execution_or_release_overclaim(self) -> None:
         for key in (
-            "applicationSourceWired",
             "windowsIcoGenerated",
             "browserAcceptanceExecuted",
             "installerBuilt",

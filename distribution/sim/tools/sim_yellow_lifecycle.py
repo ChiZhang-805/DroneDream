@@ -25,6 +25,7 @@ PLAN_KEYS = {
     "state",
     "authorization",
     "yellow1VisualBinding",
+    "approvedEditionAssetGate",
     "artifactGate",
     "staging",
     "protectedInventory",
@@ -47,10 +48,20 @@ VISUAL_BINDING_KEYS = {
     "browserStarted",
     "productionBuildExecuted",
 }
+APPROVED_ASSET_GATE_KEYS = {
+    "manifestPath",
+    "manifestSha256",
+    "requiredAssetRoles",
+    "requiredAssetSha256",
+    "applicationSourceWired",
+    "installerDerivativeReady",
+    "canonicalUniversalDonorIntegrated",
+}
 ARTIFACT_GATE_KEYS = {
     "yellow2OutputFileName",
     "yellow2ReceiptKind",
     "yellow3RequiresExactYellow2Receipt",
+    "yellow2BlockedUntilInstallerDerivativeContract",
     "requiredReceiptFields",
     "ineligiblePreview",
     "unsignedAllowedWithDisclosure",
@@ -260,16 +271,53 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
     ):
         raise SimYellowLifecycleError("YELLOW-1 six-case registration drifted")
 
+    approved_assets = _exact_keys(
+        plan["approvedEditionAssetGate"],
+        APPROVED_ASSET_GATE_KEYS,
+        "approvedEditionAssetGate",
+    )
+    approved_manifest_path = _repo_file(
+        repo_root, approved_assets["manifestPath"], "approved edition asset manifest"
+    )
+    if sha256_file(approved_manifest_path) != _sha(
+        approved_assets["manifestSha256"], "approved edition asset manifest SHA-256"
+    ):
+        raise SimYellowLifecycleError("approved edition asset manifest SHA-256 drifted")
+    approved_manifest = load_json(approved_manifest_path)
+    approved_manifest_assets = approved_manifest.get("assets")
+    if not isinstance(approved_manifest_assets, list):
+        raise SimYellowLifecycleError("approved edition asset inventory is missing")
+    manifest_hashes: dict[str, str] = {}
+    for asset in approved_manifest_assets:
+        if not isinstance(asset, dict) or not isinstance(asset.get("destination"), dict):
+            raise SimYellowLifecycleError("approved edition asset inventory drifted")
+        role = asset.get("role")
+        sha256 = asset["destination"].get("sha256")
+        if not isinstance(role, str) or role in manifest_hashes:
+            raise SimYellowLifecycleError("approved edition asset roles drifted")
+        manifest_hashes[role] = _sha(sha256, f"approved asset {role} SHA-256")
+    if (
+        approved_assets["requiredAssetRoles"] != ["sim-mark-png", "sim-dot-lockup-png"]
+        or approved_assets["requiredAssetSha256"] != manifest_hashes
+        or approved_assets["applicationSourceWired"] is not True
+        or approved_assets["installerDerivativeReady"] is not False
+        or approved_assets["canonicalUniversalDonorIntegrated"] is not False
+        or approved_manifest.get("integrationState", {}).get("applicationSourceWired") is not True
+        or approved_manifest.get("integrationState", {}).get("windowsIcoGenerated") is not False
+    ):
+        raise SimYellowLifecycleError("approved edition asset gate drifted")
+
     artifact = _exact_keys(plan["artifactGate"], ARTIFACT_GATE_KEYS, "artifactGate")
     if (
         artifact["yellow2OutputFileName"] != "DroneDream-Sim-1.0.0.exe"
         or artifact["yellow2ReceiptKind"] != "dronedream-sim-yellow-build-receipt"
         or artifact["yellow3RequiresExactYellow2Receipt"] is not True
+        or artifact["yellow2BlockedUntilInstallerDerivativeContract"] is not True
         or artifact["unsignedAllowedWithDisclosure"] is not True
         or artifact["validatedVehiclePackCount"] != 0
     ):
         raise SimYellowLifecycleError("YELLOW artifact gate drifted")
-    _string_list(artifact["requiredReceiptFields"], "artifact required fields", expected_count=13)
+    _string_list(artifact["requiredReceiptFields"], "artifact required fields", expected_count=17)
     ineligible = artifact["ineligiblePreview"]
     if (
         not isinstance(ineligible, dict)
@@ -412,6 +460,7 @@ def create_stage_plan(contract: dict[str, Any], *, stage: str, run_id: str) -> d
         "runId": run_id,
         "executionAuthorized": False,
         "paths": expanded,
+        "approvedEditionAssetGate": contract["approvedEditionAssetGate"],
         "artifactGate": contract["artifactGate"],
         "protectedInventory": contract["protectedInventory"],
         "yellow3Matrix": contract["yellow3Matrix"] if stage == "yellow-3" else [],

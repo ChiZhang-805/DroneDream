@@ -972,11 +972,11 @@ def validate_installer_surface_contract(
             "distribution/sim/brand/approved-edition-assets.v1.json"
         ),
         "approvedEditionAssetManifestSha256": (
-            "a9b868c7d174eea1568ef954246f05cc21cbae767bd26a99501f0eb285af0724"
+            "e2e61b676dadd8f8f37e370aa14382e2bff2a52307a820f82e42381498814296"
         ),
         "approvedEditionAssetState": "vendored-exact-bytes",
         "approvedEditionAssetHashesVerified": True,
-        "approvedEditionApplicationSourceWired": False,
+        "approvedEditionApplicationSourceWired": True,
         "canonicalDonorState": "pending-universal-common-core",
         "canonicalDonorManifestPath": None,
         "canonicalDonorManifestSha256": None,

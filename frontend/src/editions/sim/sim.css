@@ -1,21 +1,72 @@
+.app-shell-sim {
+  --sim-brand-start: #00d9ff;
+  --sim-brand-middle: #2671ff;
+  --sim-brand-end: #744cff;
+  --bg: #071b31;
+  --bg-elev: #0c2542;
+  --bg-elev-2: #12345a;
+  --border: rgba(38, 113, 255, 0.34);
+  --border-strong: rgba(0, 217, 255, 0.52);
+  --text: #f4fbff;
+  --text-muted: #a8bfd6;
+  --text-dim: #d4e8fa;
+  --primary: var(--sim-brand-middle);
+  --primary-strong: var(--sim-brand-end);
+  --active: var(--sim-brand-start);
+  --focus-ring: 0 0 0 2px rgba(0, 217, 255, 0.58);
+  background: var(--bg);
+}
+
+.app-shell-sim .app-sidebar,
+.app-shell-sim .launcher-chrome {
+  border-color: var(--border);
+  background: #071b31;
+  box-shadow: none;
+}
+
+.app-shell-sim .app-nav a:hover {
+  background: rgba(0, 217, 255, 0.08);
+}
+
+.app-shell-sim .app-nav a.active {
+  border-color: rgba(0, 217, 255, 0.28);
+  background: #12345a;
+}
+
+.sim-brand-lockup {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.sim-launcher-lockup {
+  height: 30px;
+}
+
+.sim-sidebar-lockup {
+  height: 28px;
+}
+
 .sim-edition-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.42rem;
   min-height: 30px;
   padding: 0.35rem 0.58rem;
-  border: 1px solid color-mix(in srgb, var(--primary, #c642ad) 42%, var(--border, #ded5e2));
+  border: 1px solid color-mix(in srgb, var(--sim-brand-start, #00d9ff) 42%, var(--border));
   border-radius: 6px;
-  color: var(--primary-strong, #8d43cc);
-  background: color-mix(in srgb, var(--primary, #c642ad) 7%, white);
+  color: var(--sim-brand-middle, #2671ff);
+  background: color-mix(in srgb, var(--sim-brand-start, #00d9ff) 8%, var(--bg-elev));
   font-size: 0.68rem;
   font-weight: 760;
   line-height: 1;
 }
 
-.sim-edition-badge svg {
+.sim-brand-mark {
   width: 15px;
   height: 15px;
+  object-fit: contain;
 }
 
 .sim-edition-badge-compact {
@@ -25,9 +76,9 @@
 }
 
 .app-shell-launcher .sim-edition-badge {
-  border-color: rgba(208, 177, 255, 0.36);
-  color: #ead9ff;
-  background: rgba(128, 76, 192, 0.16);
+  border-color: rgba(0, 217, 255, 0.36);
+  color: #dffaff;
+  background: rgba(38, 113, 255, 0.16);
 }
 
 .launcher-brand-edition {
@@ -68,7 +119,7 @@
 .sim-settings-kicker,
 .sim-overview-eyebrow,
 .sim-setup-preview > div > span {
-  color: var(--primary-strong, #8d43cc);
+  color: var(--sim-brand-start, #00d9ff);
   font-size: 0.68rem;
   font-weight: 760;
   text-transform: uppercase;
@@ -104,12 +155,18 @@
   line-height: 1.65;
 }
 
+.sim-overview-lockup {
+  height: auto;
+  max-height: 84px;
+  margin-top: 0.6rem;
+}
+
 .sim-overview-state {
   display: grid;
   justify-items: start;
   gap: 0.58rem;
   padding-left: 1rem;
-  border-left: 3px solid var(--primary);
+  border-left: 3px solid var(--sim-brand-start, #00d9ff);
 }
 
 .sim-overview-state > span {
@@ -293,8 +350,8 @@
 }
 
 @media (max-width: 620px) {
-  .launcher-brand-edition .sim-edition-badge {
-    display: none;
+  .sim-launcher-lockup {
+    height: 24px;
   }
 
   .sim-overview-header {
@@ -303,6 +360,10 @@
 
   .sim-overview-header h1 {
     font-size: 2.15rem;
+  }
+
+  .sim-overview-lockup {
+    max-height: 62px;
   }
 
   .sim-capability-grid,

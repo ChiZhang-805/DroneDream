@@ -624,7 +624,7 @@ def validate_approved_edition_assets(
     )
     if integration != {
         "assetBytesVendored": True,
-        "applicationSourceWired": False,
+        "applicationSourceWired": True,
         "installerIconOverridePresent": False,
         "windowsIcoGenerated": False,
         "browserAcceptanceExecuted": False,

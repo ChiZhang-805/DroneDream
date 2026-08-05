@@ -1,6 +1,5 @@
 import {
   Boxes,
-  BoxIcon,
   ChevronRight,
   Cpu,
   Database,
@@ -10,15 +9,22 @@ import {
 import { Link, useLocation } from "react-router-dom";
 
 import { useI18n } from "../../i18n/I18nProvider";
+import simDotLockup from "./assets/dronedream-sim-dot-lockup.png";
+import simMark from "./assets/dronedream-sim-mark.png";
 import { SIM_EDITION, simCopy } from "./profile";
 import "./sim.css";
+
+export function SimBrandLockup({ className = "" }: { className?: string }) {
+  const classes = ["sim-brand-lockup", className].filter(Boolean).join(" ");
+  return <img className={classes} src={simDotLockup} alt="" aria-hidden="true" />;
+}
 
 export function SimEditionBadge({ compact = false }: { compact?: boolean }) {
   const { locale } = useI18n();
   const copy = simCopy(locale);
   return (
     <span className={`sim-edition-badge${compact ? " sim-edition-badge-compact" : ""}`}>
-      <BoxIcon aria-hidden="true" />
+      <img className="sim-brand-mark" src={simMark} alt="" aria-hidden="true" />
       {copy.editionBadge}
     </span>
   );
@@ -72,7 +78,8 @@ export function SimOverview() {
       <header className="sim-overview-header">
         <div>
           <span className="sim-overview-eyebrow">{copy.overviewEyebrow}</span>
-          <h1>{copy.overviewTitle}</h1>
+          <SimBrandLockup className="sim-overview-lockup" />
+          <h1 className="sr-only">{copy.overviewTitle}</h1>
           <p>{copy.overviewBody}</p>
         </div>
         <div className="sim-overview-state" aria-label={copy.previewStatus}>

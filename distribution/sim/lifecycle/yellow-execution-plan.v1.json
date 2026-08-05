@@ -14,7 +14,7 @@
   },
   "yellow1VisualBinding": {
     "path": "distribution/sim/frontend/visual-acceptance.v1.json",
-    "sha256": "0a023278bb7e3b8c84ad3e441f46cb4d6d8eda946ae66ee627b4c879a0fa2a13",
+    "sha256": "7e4ab24064cdc7095b2c7b517266e7240cc41186ecff040665a342ec3ee51118",
     "requiredCaseIds": [
       "desktop-en",
       "desktop-zh-CN",
@@ -26,10 +26,23 @@
     "browserStarted": false,
     "productionBuildExecuted": false
   },
+  "approvedEditionAssetGate": {
+    "manifestPath": "distribution/sim/brand/approved-edition-assets.v1.json",
+    "manifestSha256": "e2e61b676dadd8f8f37e370aa14382e2bff2a52307a820f82e42381498814296",
+    "requiredAssetRoles": ["sim-mark-png", "sim-dot-lockup-png"],
+    "requiredAssetSha256": {
+      "sim-mark-png": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+      "sim-dot-lockup-png": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548"
+    },
+    "applicationSourceWired": true,
+    "installerDerivativeReady": false,
+    "canonicalUniversalDonorIntegrated": false
+  },
   "artifactGate": {
     "yellow2OutputFileName": "DroneDream-Sim-1.0.0.exe",
     "yellow2ReceiptKind": "dronedream-sim-yellow-build-receipt",
     "yellow3RequiresExactYellow2Receipt": true,
+    "yellow2BlockedUntilInstallerDerivativeContract": true,
     "requiredReceiptFields": [
       "sourceCommit",
       "sourceTreeState",
@@ -37,6 +50,10 @@
       "commonCoreHash",
       "donorCommit",
       "donorManifestSha256",
+      "approvedEditionAssets.manifestSha256",
+      "approvedEditionAssets.markSha256",
+      "approvedEditionAssets.dotLockupSha256",
+      "approvedEditionAssets.installerDerivativeSha256",
       "artifact.fileName",
       "artifact.sha256",
       "artifact.bytes",

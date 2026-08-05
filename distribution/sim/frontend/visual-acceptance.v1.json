@@ -18,10 +18,10 @@
     "intakePath": "distribution/sim/brand/donor-intake.v1.json",
     "intakeSha256": "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297",
     "approvedEditionAssetManifestPath": "distribution/sim/brand/approved-edition-assets.v1.json",
-    "approvedEditionAssetManifestSha256": "a9b868c7d174eea1568ef954246f05cc21cbae767bd26a99501f0eb285af0724",
+    "approvedEditionAssetManifestSha256": "e2e61b676dadd8f8f37e370aa14382e2bff2a52307a820f82e42381498814296",
     "approvedEditionAssetState": "vendored-exact-bytes",
     "approvedEditionAssetHashesVerified": true,
-    "approvedEditionApplicationSourceWired": false,
+    "approvedEditionApplicationSourceWired": true,
     "canonicalDonorState": "pending-universal-common-core",
     "canonicalDonorManifestPath": null,
     "canonicalDonorManifestSha256": null,
@@ -29,7 +29,7 @@
     "commonCoreBindingVerified": false,
     "assetHashesVerified": false,
     "approvedPalette": ["#00D9FF", "#2671FF", "#744CFF"],
-    "paletteApplied": false,
+    "paletteApplied": true,
     "iconIntegrated": false
   },
   "source": {
@@ -39,7 +39,7 @@
     "refs": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "d6d9610747465f0e7118a52804b867a4de14dd770846a00989ebc6da5cd22a8d"
+        "sha256": "0b9994d6eb3df7ef1ea18f082d28d584ea443cf105530bd2842a1361b7ed163f"
       },
       {
         "path": "frontend/src/components/DistributionSetupPanel.tsx",
@@ -47,7 +47,7 @@
       },
       {
         "path": "frontend/src/editions/sim/SimEditionExperience.tsx",
-        "sha256": "5682838ceb5fab87404ea0d5965b99be4050f233d07f42e7c378a9dd26a7e20c"
+        "sha256": "69b0157371060dbb451f0ab95b66adcf0498dd96b3f1d85d46011620730f37cb"
       },
       {
         "path": "frontend/src/editions/sim/profile.ts",
@@ -55,7 +55,7 @@
       },
       {
         "path": "frontend/src/editions/sim/sim.css",
-        "sha256": "b4a0bf7035b300f9088e565df33dc0aae1b2811ad95f36386cb549da52e7cb27"
+        "sha256": "575a520ddbeebc310f0649811efa2413fdb49d63605191645399ff493f9493d8"
       },
       {
         "path": "frontend/src/router.tsx",
@@ -67,7 +67,7 @@
       },
       {
         "path": "distribution/sim/desktop/installer-surface-contract.v1.json",
-        "sha256": "a493f41897c077a792b34d900046a4b6c1b804021c9fd21593d247a5f356b9b1"
+        "sha256": "641a67810c3188fa0d1a5ba65054d233b418b7c80aaa47604f8005f7f57145d2"
       },
       {
         "path": "distribution/sim/brand/canonical-donor-manifest.schema.json",
@@ -79,11 +79,11 @@
       },
       {
         "path": "distribution/sim/brand/approved-edition-assets.schema.json",
-        "sha256": "94fd921084a38bf19baa3eb68ce5ff4b88e704a393a00baeb6b824e24a362e65"
+        "sha256": "39960b5061651a5f4a9cc09225459d2d5e22a07a78e93e678ddedcb3a4a31db8"
       },
       {
         "path": "distribution/sim/brand/approved-edition-assets.v1.json",
-        "sha256": "a9b868c7d174eea1568ef954246f05cc21cbae767bd26a99501f0eb285af0724"
+        "sha256": "e2e61b676dadd8f8f37e370aa14382e2bff2a52307a820f82e42381498814296"
       },
       {
         "path": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
@@ -95,7 +95,7 @@
       },
       {
         "path": "distribution/sim/tools/sim_brand_donor.py",
-        "sha256": "3e775aebab776710069ad6ef18aa15ec76f0cb6664a53546b61dc4722c8229fb"
+        "sha256": "1915b3f575c86a5fd9d707b114931d4ea4fdc33734a30959f7416335aa6aafd5"
       },
       {
         "path": "distribution/branch-contracts/software-sim.v1.json",
@@ -135,6 +135,8 @@
   "requiredAssertions": [
     "no-horizontal-document-overflow",
     "exact-sim-identity",
+    "approved-sim-byte-assets-rendered",
+    "exact-sim-palette-tokens",
     "four-simulation-capabilities",
     "two-external-dependencies",
     "preview-state-visible",

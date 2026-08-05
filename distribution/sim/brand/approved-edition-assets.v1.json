@@ -5,7 +5,7 @@
   "editionId": "sim",
   "schema": {
     "path": "distribution/sim/brand/approved-edition-assets.schema.json",
-    "sha256": "94fd921084a38bf19baa3eb68ce5ff4b88e704a393a00baeb6b824e24a362e65"
+    "sha256": "39960b5061651a5f4a9cc09225459d2d5e22a07a78e93e678ddedcb3a4a31db8"
   },
   "authorization": {
     "status": "chief-control-approved-byte-for-byte",
@@ -91,7 +91,7 @@
   ],
   "integrationState": {
     "assetBytesVendored": true,
-    "applicationSourceWired": false,
+    "applicationSourceWired": true,
     "installerIconOverridePresent": false,
     "windowsIcoGenerated": false,
     "browserAcceptanceExecuted": false,

@@ -96,10 +96,10 @@ async function loadAndValidateContract() {
     intakePath: "distribution/sim/brand/donor-intake.v1.json",
     intakeSha256: "a68d02430de5c1aebc42faed6f9e087731b6d94e6f0a7fa15c558b44e5b93297",
     approvedEditionAssetManifestPath: "distribution/sim/brand/approved-edition-assets.v1.json",
-    approvedEditionAssetManifestSha256: "a9b868c7d174eea1568ef954246f05cc21cbae767bd26a99501f0eb285af0724",
+    approvedEditionAssetManifestSha256: "e2e61b676dadd8f8f37e370aa14382e2bff2a52307a820f82e42381498814296",
     approvedEditionAssetState: "vendored-exact-bytes",
     approvedEditionAssetHashesVerified: true,
-    approvedEditionApplicationSourceWired: false,
+    approvedEditionApplicationSourceWired: true,
     canonicalDonorState: "pending-universal-common-core",
     canonicalDonorManifestPath: null,
     canonicalDonorManifestSha256: null,
@@ -107,7 +107,7 @@ async function loadAndValidateContract() {
     commonCoreBindingVerified: false,
     assetHashesVerified: false,
     approvedPalette: ["#00D9FF", "#2671FF", "#744CFF"],
-    paletteApplied: false,
+    paletteApplied: true,
     iconIntegrated: false,
   });
   assert.deepEqual(contract.viewports, [
@@ -239,6 +239,10 @@ async function verifyOverview(page, testCase) {
     const interactive = Array.from(
       document.querySelectorAll("a, button, input, select, [role='button'], [role='radio']"),
     );
+    const shell = document.querySelector(".app-shell-sim");
+    const theme = shell ? getComputedStyle(shell) : null;
+    const lockup = element.querySelector(".sim-overview-lockup");
+    const mark = element.querySelector(".sim-brand-mark");
     return {
       title: element.querySelector("h1")?.textContent?.trim(),
       previewStatus: element.querySelector(".sim-overview-state > span")?.textContent?.trim(),
@@ -260,6 +264,17 @@ async function verifyOverview(page, testCase) {
         return /(?:^|[\s/])(lab|field|hitl|hardware)(?:$|[\s/?-])/i.test(signature);
       }).length,
       setupHref: element.querySelector(".sim-setup-preview a")?.getAttribute("href"),
+      lockupSrc: lockup?.getAttribute("src"),
+      lockupReady: lockup instanceof HTMLImageElement && lockup.complete && lockup.naturalWidth > 0,
+      lockupAriaHidden: lockup?.getAttribute("aria-hidden"),
+      markSrc: mark?.getAttribute("src"),
+      markReady: mark instanceof HTMLImageElement && mark.complete && mark.naturalWidth > 0,
+      markAriaHidden: mark?.getAttribute("aria-hidden"),
+      palette: theme ? [
+        theme.getPropertyValue("--sim-brand-start").trim(),
+        theme.getPropertyValue("--sim-brand-middle").trim(),
+        theme.getPropertyValue("--sim-brand-end").trim(),
+      ] : [],
       expected,
     };
   }, testCase.locale);
@@ -273,6 +288,16 @@ async function verifyOverview(page, testCase) {
   assert.equal(metrics.documentScrollWidth, metrics.documentWidth);
   assert.equal(metrics.forbiddenInteractiveCount, 0);
   assert.equal(metrics.setupHref, contract.routes.setup);
+  assert.match(metrics.lockupSrc || "", /dronedream-sim-dot-lockup\.png/);
+  assert.equal(metrics.lockupReady, true);
+  assert.equal(metrics.lockupAriaHidden, "true");
+  assert.match(metrics.markSrc || "", /dronedream-sim-mark\.png/);
+  assert.equal(metrics.markReady, true);
+  assert.equal(metrics.markAriaHidden, "true");
+  assert.deepEqual(
+    metrics.palette,
+    contract.brandDonor.approvedPalette.map((color) => color.toLowerCase()),
+  );
   const image = await screenshot(page, testCase.id, "overview");
 
   const setupLink = page.getByRole("link", { name: testCase.locale.setupLink });

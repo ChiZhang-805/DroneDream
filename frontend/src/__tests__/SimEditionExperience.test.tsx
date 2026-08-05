@@ -23,10 +23,16 @@ afterEach(() => window.localStorage.clear());
 describe("DroneDream Sim experience", () => {
   it("shows only simulation surfaces and external dependencies", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
-    renderOverview();
+    const { container } = renderOverview();
 
     expect(screen.getByRole("heading", { level: 1, name: "DroneDream \u00b7 SIM" }))
       .toBeInTheDocument();
+    const lockup = container.querySelector(".sim-overview-lockup");
+    const mark = container.querySelector(".sim-brand-mark");
+    expect(lockup?.getAttribute("src")).toContain("dronedream-sim-dot-lockup.png");
+    expect(lockup).toHaveAttribute("aria-hidden", "true");
+    expect(mark?.getAttribute("src")).toContain("dronedream-sim-mark.png");
+    expect(mark).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByRole("list", { name: "Simulation workspace" }))
       .toHaveTextContent("PX4 SITL");
     expect(screen.getByRole("list", { name: "External dependencies" }))

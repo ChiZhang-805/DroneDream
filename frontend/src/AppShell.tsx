@@ -100,7 +100,7 @@ import type {
   UserExperiencePreferences,
 } from "./types/api";
 import {
-  SimEditionBadge,
+  SimBrandLockup,
   SimEditionSettingsPanel,
 } from "./editions/sim/SimEditionExperience";
 import { SIM_EDITION, simCopy } from "./editions/sim/profile";
@@ -2506,7 +2506,7 @@ function AppShellContent() {
 
   if (launcherMode) {
     return (
-      <div className="app-shell app-shell-launcher">
+      <div className="app-shell app-shell-sim app-shell-launcher">
         <a
           className="skip-link"
           href="#main-content"
@@ -2523,8 +2523,7 @@ function AppShellContent() {
             className="launcher-brand launcher-brand-edition"
             aria-label={SIM_EDITION.productName}
           >
-            <BrandLockup variant="compact" />
-            <SimEditionBadge compact />
+            <SimBrandLockup className="sim-launcher-lockup" />
           </Link>
           <div className="launcher-chrome-actions">
             <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
@@ -2573,7 +2572,7 @@ function AppShellContent() {
   }
 
   return (
-    <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}>
+    <div className={`app-shell app-shell-sim${experimentWizardMode ? " app-shell-wizard" : ""}`}>
       <a
         className="skip-link"
         href="#main-content"
@@ -2587,7 +2586,7 @@ function AppShellContent() {
       <aside className="app-sidebar">
         {desktopRuntime ? (
           <Link to="/sim" className="app-title" aria-label={SIM_EDITION.productName}>
-            <BrandLockup variant="compact" />
+            <SimBrandLockup className="sim-sidebar-lockup" />
           </Link>
         ) : (
           <a href="/" className="app-title" aria-label="DroneDream">

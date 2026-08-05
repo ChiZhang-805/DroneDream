@@ -148,6 +148,19 @@ class SimYellowLifecycleTests(unittest.TestCase):
         self.assertFalse(self.contract["authorization"]["yellow1Approved"])
         self.assertFalse(self.contract["authorization"]["yellow2Approved"])
         self.assertFalse(self.contract["authorization"]["yellow3Approved"])
+        asset_gate = self.contract["approvedEditionAssetGate"]
+        self.assertEqual(
+            asset_gate["requiredAssetRoles"],
+            ["sim-mark-png", "sim-dot-lockup-png"],
+        )
+        self.assertTrue(asset_gate["applicationSourceWired"])
+        self.assertFalse(asset_gate["installerDerivativeReady"])
+        self.assertFalse(asset_gate["canonicalUniversalDonorIntegrated"])
+        self.assertTrue(
+            self.contract["artifactGate"][
+                "yellow2BlockedUntilInstallerDerivativeContract"
+            ]
+        )
 
     def test_stage_plans_expand_only_owned_run_paths_without_execution(self) -> None:
         yellow2 = sim_yellow.create_stage_plan(
@@ -158,6 +171,7 @@ class SimYellowLifecycleTests(unittest.TestCase):
         self.assertIn("sim-y2-20260805T120000Z-1234abcd", yellow2["paths"]["runRootTemplate"])
         self.assertFalse(yellow2["executionAuthorized"])
         self.assertTrue(all(value is False for value in yellow2["nonClaims"].values()))
+        self.assertFalse(yellow2["approvedEditionAssetGate"]["installerDerivativeReady"])
 
         yellow3 = sim_yellow.create_stage_plan(
             self.contract,
@@ -197,6 +211,13 @@ class SimYellowLifecycleTests(unittest.TestCase):
         invalid = deepcopy(load_json(PLAN_PATH))
         invalid["yellow1VisualBinding"]["sha256"] = "0" * 64
         with self.assertRaisesRegex(sim_yellow.SimYellowLifecycleError, "visual contract"):
+            self.validate(invalid)
+
+        invalid = deepcopy(load_json(PLAN_PATH))
+        invalid["approvedEditionAssetGate"]["manifestSha256"] = "0" * 64
+        with self.assertRaisesRegex(
+            sim_yellow.SimYellowLifecycleError, "asset manifest SHA-256"
+        ):
             self.validate(invalid)
 
         invalid = deepcopy(load_json(PLAN_PATH))
