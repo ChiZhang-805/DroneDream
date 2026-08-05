@@ -21,13 +21,14 @@ SPEC.loader.exec_module(engine_pack)
 
 class EnginePackTests(unittest.TestCase):
     def test_runtime_distribution_contract_whitelist_is_exact_and_hashed(self) -> None:
+        engine_paths = engine_pack.runtime_distribution_paths(ROOT)
         files = engine_pack.production_files(ROOT)
         distribution_files = {
             path for path, _source in files if path.startswith("distribution/")
         }
         expected_distribution = {
             path
-            for path in engine_pack.RUNTIME_DISTRIBUTION_PATHS
+            for path in engine_paths
             if path.startswith("distribution/")
         }
         self.assertEqual(distribution_files, expected_distribution)
@@ -44,7 +45,7 @@ class EnginePackTests(unittest.TestCase):
             )
         )
         records = {record["path"]: record for record in engine_pack.file_records(files)}
-        for relative in engine_pack.RUNTIME_DISTRIBUTION_PATHS:
+        for relative in engine_paths:
             self.assertIn(relative, records)
             self.assertEqual(records[relative]["sha256"], engine_pack.sha256_file(ROOT / relative))
 
@@ -56,10 +57,53 @@ class EnginePackTests(unittest.TestCase):
         runtime_gate = importlib.util.module_from_spec(runtime_spec)
         sys.modules[runtime_spec.name] = runtime_gate
         runtime_spec.loader.exec_module(runtime_gate)
-        self.assertEqual(
-            engine_pack.RUNTIME_DISTRIBUTION_PATHS,
-            runtime_gate.RUNTIME_DISTRIBUTION_PATHS,
+        self.assertEqual(engine_paths, runtime_gate.runtime_distribution_paths(ROOT))
+
+    def test_runtime_contract_registry_rejects_non_contract_and_drift(self) -> None:
+        runtime_spec = importlib.util.spec_from_file_location(
+            "engine_pack_runtime_registry_negative_test",
+            ROOT / "runtime/scripts/edition-safety-gate.py",
         )
+        assert runtime_spec and runtime_spec.loader
+        runtime_gate = importlib.util.module_from_spec(runtime_spec)
+        sys.modules[runtime_spec.name] = runtime_gate
+        runtime_spec.loader.exec_module(runtime_gate)
+        original = json.loads(
+            (ROOT / engine_pack.RUNTIME_CONTRACT_REGISTRY_PATH).read_text(encoding="utf-8")
+        )
+        cases = (
+            ({**original, "unexpected": True}, "fields"),
+            ({**original, "contractPaths": ["distribution/tests/test_fake.py"]}, "allowlist"),
+            (
+                {
+                    **original,
+                    "contractPaths": [
+                        "distribution/tools/distribution_contract.py",
+                        "distribution/tools/distribution_contract.py",
+                    ],
+                },
+                "unique and sorted",
+            ),
+            (
+                {**original, "contractPaths": ["distribution/tools/missing_contract.py"]},
+                "unavailable",
+            ),
+        )
+        for document, message in cases:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                registry = root / engine_pack.RUNTIME_CONTRACT_REGISTRY_PATH
+                registry.parent.mkdir(parents=True)
+                registry.write_text(json.dumps(document), encoding="utf-8")
+                for relative in original["contractPaths"]:
+                    source = ROOT / relative
+                    destination = root / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(source.read_bytes())
+                with self.assertRaisesRegex(engine_pack.EnginePackError, message):
+                    engine_pack.runtime_distribution_paths(root)
+                with self.assertRaisesRegex(runtime_gate.RuntimeEditionSafetyError, message):
+                    runtime_gate.runtime_distribution_paths(root)
 
     def build(
         self,
@@ -227,6 +271,7 @@ class EnginePackTests(unittest.TestCase):
         )
         paths = [path for path, _source in files]
         self.assertFalse(any(path.startswith("scripts/simulators/") for path in paths))
+        self.assertFalse(any(path.startswith("backend/app/simulator/") for path in paths))
         self.assertIn("distribution/editions/field.v1.json", paths)
 
         with tempfile.TemporaryDirectory() as temporary:
@@ -235,6 +280,9 @@ class EnginePackTests(unittest.TestCase):
             with tarfile.open(output / engine_pack.ARCHIVE_FILENAME, mode="r:gz") as archive:
                 names = [member.name for member in archive.getmembers()]
             self.assertFalse(any(name.startswith("payload/scripts/simulators/") for name in names))
+            self.assertFalse(
+                any(name.startswith("payload/backend/app/simulator/") for name in names)
+            )
             manifest = json.loads(
                 (output / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
             )
