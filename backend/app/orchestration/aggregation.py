@@ -122,6 +122,12 @@ _ITERATIVE_OPTIMIZERS = {
 }
 
 
+def _is_benchmark_bound(job: models.Job) -> bool:
+    """Return whether immutable campaign provenance owns proposal routing."""
+
+    return job.benchmark_run_binding is not None
+
+
 class FinalizationClaimLost(RuntimeError):
     """Raised when a reclaimed finalizer reaches a persistence boundary."""
 
@@ -1861,9 +1867,8 @@ def finalize_job_if_ready(
     # Iterative optimizer loop (GPT / CMA-ES-style): possibly dispatch another
     # generation instead of finalizing.
     if (
-        job.optimizer_strategy in _ITERATIVE_OPTIMIZERS
-        and job.first_qualified_candidate_id is None
-    ):
+        _is_benchmark_bound(job) or job.optimizer_strategy in _ITERATIVE_OPTIMIZERS
+    ) and job.first_qualified_candidate_id is None:
         if _try_continue_iterative_optimizer(
             db,
             job,
@@ -2078,7 +2083,7 @@ def _determine_terminal_state(
     # No criteria set → treat completion as success by convention.
     if not any_criterion_set(criteria) and criteria.min_pass_rate <= (result.pass_rate + 1e-9):
         return "success", "COMPLETED", None
-    if job.optimizer_strategy in _ITERATIVE_OPTIMIZERS:
+    if _is_benchmark_bound(job) or job.optimizer_strategy in _ITERATIVE_OPTIMIZERS:
         # Iterative optimizer exhausted iteration/trial budget without finding
         # a passing candidate — report best-so-far as a completed run.
         if job.current_generation >= job.max_iterations:
@@ -2113,10 +2118,15 @@ def _try_continue_iterative_optimizer(
     passed = any_criterion_set(criteria) and any(
         evaluate_candidate(c, criteria).passed for c in scored
     )
-    needs_verified_optimizer = job.optimizer_strategy in {
-        "llm_harness",
-        *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
-    } and not any(
+    benchmark_bound = _is_benchmark_bound(job)
+    needs_verified_optimizer = (
+        benchmark_bound
+        or job.optimizer_strategy
+        in {
+            "llm_harness",
+            *EXPERIMENTAL_OPTIMIZER_STRATEGIES,
+        }
+    ) and not any(
         candidate.source_type == "optimizer" and candidate_is_publishable(candidate)
         for candidate in candidates
     )
@@ -2132,6 +2142,7 @@ def _try_continue_iterative_optimizer(
     if job.current_generation >= job.max_iterations:
         return False
     from app.orchestration.job_manager import (
+        dispatch_next_benchmark_generation,
         dispatch_next_cma_es_generation,
         dispatch_next_experimental_generation,
         dispatch_next_harness_generation,
@@ -2143,7 +2154,27 @@ def _try_continue_iterative_optimizer(
     if llm_client is not None:
         client_cast = llm_client  # type: ignore[assignment]
 
-    if job.optimizer_strategy == "gpt":
+    if benchmark_bound:
+        benchmark_dispatch = dispatch_next_benchmark_generation(db, job)
+        if benchmark_dispatch.status in {"benchmark_blocked", "proposal_failed"}:
+            _fail_job(
+                db,
+                job,
+                finalization_claim=finalization_claim,
+                code=(benchmark_dispatch.error_code or "BENCHMARK_DISPATCH_FAILED").upper(),
+                message=benchmark_dispatch.error or "Benchmark proposal dispatch failed.",
+                outcome="benchmark_dispatch_failed",
+            )
+            return False
+        if benchmark_dispatch.status in {
+            "budget_exhausted",
+            "first_qualified_stop",
+            "max_iterations_reached",
+            "search_space_exhausted",
+            "wall_time_exhausted",
+        }:
+            return False
+    elif job.optimizer_strategy == "gpt":
         llm_dispatch = dispatch_next_llm_generation(db, job, client=client_cast)
         if llm_dispatch.status == "llm_error":
             _fail_job(

@@ -21,6 +21,15 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app import models, schemas
+from app.benchmarking.adapters import BenchmarkAdapterError
+from app.benchmarking.contracts import BenchmarkProposalContextV1, canonical_sha256
+from app.benchmarking.job_runtime import (
+    BenchmarkJobRuntimeBlocked,
+    benchmark_run_binding,
+    build_benchmark_job_observation,
+    require_benchmark_job_runtime_context,
+)
+from app.benchmarking.registry import create_benchmark_adapter
 from app.optimization.experimental_types import ExperimentalOptimizerStrategy
 from app.optimization.scenarios import (
     ScenarioRun,
@@ -102,6 +111,16 @@ class AdaptiveDispatchResult:
     status: str
     dispatched_candidates: int = 0
     planned_candidates: int = 0
+
+
+@dataclass(frozen=True)
+class BenchmarkDispatchResult:
+    """Outcome of one server-bound benchmark proposal attempt."""
+
+    status: str
+    dispatched_candidates: int = 0
+    error_code: str | None = None
+    error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -955,6 +974,11 @@ def _claim_and_initialize_job(db: Session, job: models.Job) -> bool:
             "the persisted optimization outcome contract no longer matches "
             "the queued Job configuration"
         )
+    run_binding = benchmark_run_binding(db, job)
+    if run_binding is not None:
+        # Validate the complete immutable graph before claiming the Job.  A
+        # benchmark label can never fall through to ``optimizer_strategy``.
+        require_benchmark_job_runtime_context(db, job)
 
     now = _now()
     claimed = db.execute(
@@ -983,7 +1007,22 @@ def _claim_and_initialize_job(db: Session, job: models.Job) -> bool:
 
     total_trials = len(baseline_trials)
 
-    if job.optimizer_strategy == "none":
+    if run_binding is not None:
+        logger.debug(
+            "job %s is bound to benchmark run %s; baseline-only initialization",
+            job.id,
+            run_binding.id,
+        )
+        record_event(
+            db,
+            job.id,
+            "benchmark_baseline_dispatched",
+            {
+                "run_binding_id": run_binding.id,
+                "benchmark_arm_record_id": run_binding.benchmark_arm_id,
+            },
+        )
+    elif job.optimizer_strategy == "none":
         logger.debug("job %s requested baseline-only execution", job.id)
     elif job.optimizer_strategy == "heuristic":
         configured_runs = _configured_scenario_runs(job, generation_index=1)
@@ -1070,6 +1109,102 @@ def _require_current_outcome_contract(
         raise OutcomeContractDriftError(
             "the persisted optimization outcome contract no longer matches the Job configuration"
         )
+
+
+def dispatch_next_benchmark_generation(
+    db: Session,
+    job: models.Job,
+) -> BenchmarkDispatchResult:
+    """Dispatch exactly one proposal from the immutable benchmark arm.
+
+    This path intentionally ignores ``job.optimizer_strategy``.  Local
+    numerical adapters consume the same holdout-free observation, while LLM
+    arms remain blocked until their separate durable transport is promoted.
+    """
+
+    if _first_qualified_dispatch_stopped(job):
+        return BenchmarkDispatchResult(status="first_qualified_stop")
+    _require_current_outcome_contract(db, job)
+    try:
+        context, observation = build_benchmark_job_observation(db, job)
+        adapter = create_benchmark_adapter(context.arm.proposal_adapter_id)
+    except BenchmarkJobRuntimeBlocked as exc:
+        return BenchmarkDispatchResult(
+            status="benchmark_blocked",
+            error_code=exc.code,
+            error=str(exc),
+        )
+    except ValueError as exc:
+        return BenchmarkDispatchResult(
+            status="benchmark_blocked",
+            error_code="benchmark_adapter_unavailable",
+            error=str(exc),
+        )
+    if observation.generation_index > job.max_iterations:
+        return BenchmarkDispatchResult(status="max_iterations_reached")
+    if observation.simulator_budget_remaining < 1:
+        return BenchmarkDispatchResult(status="budget_exhausted")
+    if observation.wall_time_remaining_ms < 1:
+        return BenchmarkDispatchResult(status="wall_time_exhausted")
+    try:
+        proposal = adapter.propose(observation)
+    except BenchmarkAdapterError as exc:
+        message = str(exc)
+        return BenchmarkDispatchResult(
+            status=("search_space_exhausted" if "exhausted" in message else "proposal_failed"),
+            error_code="benchmark_proposal_failed",
+            error=message,
+        )
+    proposal_context = BenchmarkProposalContextV1(
+        proposal_adapter_id=adapter.adapter_id,
+        reason_code=proposal.reason_code,
+        proposal_receipt_sha256=canonical_sha256(proposal.proposal_receipt),
+        optimizer_metadata={"proposal_receipt": proposal.proposal_receipt},
+    )
+    metadata: dict[str, Any] = {
+        "schema_id": "dronedream.benchmark-candidate-metadata/v1",
+        "benchmark_proposal_context": proposal_context.model_dump(mode="json"),
+        "effective_fidelity": 1.0,
+        "requested_fidelity": 1.0,
+    }
+    if _is_duplicate_proposal(job, proposal.parameters, optimizer_metadata=metadata):
+        return BenchmarkDispatchResult(status="search_space_exhausted")
+    candidate_proposal = CandidateProposal(
+        generation_index=observation.generation_index,
+        label=proposal.candidate_ref,
+        strategy=f"benchmark:{adapter.adapter_id}",
+        parameters=proposal.parameters,
+        metadata=metadata,
+    )
+    candidate = _create_optimizer_candidate(
+        db,
+        job,
+        candidate_proposal,
+        trial_count=0,
+    )
+    trials = _dispatch_optimizer_trials(db, job, candidate)
+    if not trials:
+        raise RuntimeError("benchmark proposal dispatched no screening Trials")
+    job.current_generation = observation.generation_index
+    job.current_phase = f"benchmark_generation_{observation.generation_index}"
+    job.progress_total_trials += len(trials)
+    record_event(
+        db,
+        job.id,
+        "benchmark_generation_dispatched",
+        {
+            "benchmark_arm_id": context.arm.benchmark_arm_id,
+            "proposal_adapter_id": adapter.adapter_id,
+            "run_binding_id": context.binding.id,
+            "generation_index": observation.generation_index,
+            "candidate_id": candidate.id,
+            "candidate_dispatch_ordinal": candidate.dispatch_ordinal,
+            "trial_count": len(trials),
+            "observation_sha256": canonical_sha256(observation),
+            "proposal_receipt_sha256": proposal_context.proposal_receipt_sha256,
+        },
+    )
+    return BenchmarkDispatchResult(status="dispatched", dispatched_candidates=1)
 
 
 def _first_qualified_dispatch_stopped(job: models.Job) -> bool:
