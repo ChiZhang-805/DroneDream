@@ -89,14 +89,6 @@ def sha256_canonical(document: object) -> str:
     return sha256_bytes(canonical_bytes(document))
 
 
-def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def _run_git(repo_root: Path, *args: str) -> str:
     completed = subprocess.run(
         ["git", "-C", str(repo_root), *args],
@@ -155,11 +147,11 @@ def _path_map(records: object, label: str) -> dict[str, dict[str, Any]]:
     return mapped
 
 
-def field_path_hashes(repo_root: Path = ROOT) -> dict[str, str]:
+def field_path_hashes(repo_root: Path = ROOT, ref: str = "HEAD") -> dict[str, str]:
     paths = sorted(
         set().union(*BACKFLOW_GROUPS.values()).union(FIELD_SPECIFIC_PATHS)
     )
-    return {path: sha256_file(repo_root / path) for path in paths}
+    return {path: git_blob_sha256(repo_root, ref, path) for path in paths}
 
 
 def protected_evidence_base_hashes(
@@ -170,7 +162,87 @@ def protected_evidence_base_hashes(
     return {path: git_blob_sha256(repo_root, base_ref, path) for path in PROTECTED_EVIDENCE_PATHS}
 
 
-def validate_acceptance_request(request: dict[str, Any], *, repo_root: Path = ROOT) -> dict[str, Any]:
+def build_repository_acceptance_request(
+    *,
+    universal_commit: str,
+    universal_common_core_hash: str,
+    field_commit: str,
+    drift_audit_sha256: str,
+    repo_root: Path = ROOT,
+) -> dict[str, Any]:
+    _require_commit(universal_commit, "universal commit")
+    _require_commit(field_commit, "Field commit")
+    _require_sha256(universal_common_core_hash, "Universal common-core hash")
+    _require_sha256(drift_audit_sha256, "Field drift audit hash")
+    field_hashes = field_path_hashes(repo_root, field_commit)
+    universal_hashes = {
+        path: git_blob_sha256(repo_root, universal_commit, path)
+        for path in sorted(set().union(*BACKFLOW_GROUPS.values()))
+    }
+    protected_hashes = {
+        path: git_blob_sha256(repo_root, universal_commit, path)
+        for path in PROTECTED_EVIDENCE_PATHS
+    }
+    return {
+        "schemaVersion": 1,
+        "kind": REQUEST_KIND,
+        "universalSource": {
+            "branch": UNIVERSAL_BRANCH,
+            "commit": universal_commit,
+            "commonCoreHash": universal_common_core_hash,
+        },
+        "fieldSource": {
+            "branch": FIELD_BRANCH,
+            "commit": field_commit,
+            "driftAuditSha256": drift_audit_sha256,
+        },
+        "backflowGroups": [
+            {
+                "path": group_id,
+                "universalStatus": "present",
+                "pathObservations": [
+                    {
+                        "path": path,
+                        "fieldSha256": field_hashes[path],
+                        "universalSha256": universal_hashes[path],
+                        "universalStatus": "present",
+                    }
+                    for path in paths
+                ],
+            }
+            for group_id, paths in BACKFLOW_GROUPS.items()
+        ],
+        "fieldSpecificIsolation": [
+            {
+                "path": path,
+                "fieldSha256": field_hashes[path],
+                "universalStatus": "absent",
+            }
+            for path in FIELD_SPECIFIC_PATHS
+        ],
+        "protectedEvidence": [
+            {
+                "path": path,
+                "baseSha256": protected_hashes[path],
+                "universalSha256": protected_hashes[path],
+                "universalStatus": "present",
+            }
+            for path in PROTECTED_EVIDENCE_PATHS
+        ],
+        "safetyGates": {
+            "validatedHardwarePackCount": 0,
+            "threeLayerQuorum": "missing",
+            "buildAllowed": False,
+            "installAllowed": False,
+            "deviceEnumerationAllowed": False,
+            "hardwareActionsAllowed": False,
+        },
+    }
+
+
+def validate_acceptance_request(
+    request: dict[str, Any], *, repo_root: Path = ROOT
+) -> dict[str, Any]:
     if set(request) != REQUIRED_TOP_LEVEL_KEYS:
         raise FieldCommonCoreSyncAcceptanceError("sync acceptance request fields drifted")
     if request["schemaVersion"] != 1 or request["kind"] != REQUEST_KIND:
@@ -189,10 +261,10 @@ def validate_acceptance_request(request: dict[str, Any], *, repo_root: Path = RO
         raise FieldCommonCoreSyncAcceptanceError("field source binding drifted")
     if field["branch"] != FIELD_BRANCH:
         raise FieldCommonCoreSyncAcceptanceError("field source must be codex/software-field")
-    _require_commit(field["commit"], "fieldSource.commit")
+    field_commit = _require_commit(field["commit"], "fieldSource.commit")
     _require_sha256(field["driftAuditSha256"], "fieldSource.driftAuditSha256")
 
-    field_hashes = field_path_hashes(repo_root)
+    field_hashes = field_path_hashes(repo_root, field_commit)
     groups = _path_map(request["backflowGroups"], "backflowGroups")
     if set(groups) != set(BACKFLOW_GROUPS):
         raise FieldCommonCoreSyncAcceptanceError("backflow group set drifted")
@@ -213,7 +285,9 @@ def validate_acceptance_request(request: dict[str, Any], *, repo_root: Path = RO
             if observation["fieldSha256"] != field_hashes[path]:
                 raise FieldCommonCoreSyncAcceptanceError(f"{path} Field hash drifted")
             if observation["universalSha256"] != observation["fieldSha256"]:
-                raise FieldCommonCoreSyncAcceptanceError(f"{path} Universal hash does not match Field")
+                raise FieldCommonCoreSyncAcceptanceError(
+                    f"{path} Universal hash does not match Field"
+                )
 
     isolation = _path_map(request["fieldSpecificIsolation"], "fieldSpecificIsolation")
     if tuple(sorted(isolation)) != tuple(sorted(FIELD_SPECIFIC_PATHS)):

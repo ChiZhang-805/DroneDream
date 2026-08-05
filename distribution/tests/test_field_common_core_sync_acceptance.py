@@ -4,7 +4,6 @@ import importlib.util
 import json
 import sys
 import unittest
-from copy import deepcopy
 from pathlib import Path
 from types import ModuleType
 
@@ -20,7 +19,9 @@ acceptance: ModuleType = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = acceptance
 SPEC.loader.exec_module(acceptance)
 
-DRIFT_SPEC = importlib.util.spec_from_file_location("field_sync_acceptance_drift_tests", DRIFT_TOOL_PATH)
+DRIFT_SPEC = importlib.util.spec_from_file_location(
+    "field_sync_acceptance_drift_tests", DRIFT_TOOL_PATH
+)
 assert DRIFT_SPEC and DRIFT_SPEC.loader
 drift_tool: ModuleType = importlib.util.module_from_spec(DRIFT_SPEC)
 sys.modules[DRIFT_SPEC.name] = drift_tool
@@ -131,6 +132,28 @@ class FieldCommonCoreSyncAcceptanceTests(unittest.TestCase):
             set(receipt["acceptedBackflowGroups"]),
             set(acceptance.BACKFLOW_GROUPS),
         )
+
+    def test_actual_universal_backflow_source_is_accepted(self) -> None:
+        request = acceptance.build_repository_acceptance_request(
+            universal_commit="e374d3f8d96b1265fcdb06864208b676566e94d9",
+            universal_common_core_hash=(
+                "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b"
+            ),
+            field_commit=self.field_head,
+            drift_audit_sha256=self.drift_audit["auditSha256"],
+            repo_root=ROOT,
+        )
+        receipt = acceptance.evaluate_sync_acceptance(request, repo_root=ROOT)
+
+        self.assertEqual(receipt["acceptanceDecision"], "accept")
+        self.assertFalse(receipt["commonCoreBackflowPending"])
+        self.assertEqual(
+            receipt["source"]["universalCommit"],
+            "e374d3f8d96b1265fcdb06864208b676566e94d9",
+        )
+        self.assertNotIn("field.common-core-backflow.pending", receipt["blockers"])
+        self.assertFalse(receipt["buildAllowed"])
+        self.assertEqual(receipt["validatedHardwarePackCount"], 0)
 
     def test_public_patch_drift_keeps_common_core_backflow_pending(self) -> None:
         request = self.theoretical_pass_fixture()
