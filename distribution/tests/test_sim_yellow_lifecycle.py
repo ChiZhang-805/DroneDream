@@ -20,12 +20,33 @@ WEBSITE_OBSERVATION_PATH = (
     / "website-availability-observation.v1.json"
 )
 TOOL_PATH = ROOT / "distribution" / "sim" / "tools" / "sim_yellow_lifecycle.py"
+YELLOW1_RECORD_PATH = (
+    ROOT / "distribution" / "sim" / "frontend" / "yellow-1-evidence-record.v1.json"
+)
+YELLOW1_TOOL_PATH = (
+    ROOT / "distribution" / "sim" / "tools" / "sim_yellow1_evidence.py"
+)
+YELLOW1_RUN_ROOT = (
+    ROOT
+    / "frontend"
+    / "artifacts"
+    / "test-runs"
+    / "sim-yellow-1-20260805T141813Z-1af8952"
+)
 
 SPEC = importlib.util.spec_from_file_location("sim_yellow_lifecycle", TOOL_PATH)
 assert SPEC and SPEC.loader
 sim_yellow = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = sim_yellow
 SPEC.loader.exec_module(sim_yellow)
+
+YELLOW1_SPEC = importlib.util.spec_from_file_location(
+    "sim_yellow1_evidence", YELLOW1_TOOL_PATH
+)
+assert YELLOW1_SPEC and YELLOW1_SPEC.loader
+sim_yellow1 = importlib.util.module_from_spec(YELLOW1_SPEC)
+sys.modules[YELLOW1_SPEC.name] = sim_yellow1
+YELLOW1_SPEC.loader.exec_module(sim_yellow1)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -43,6 +64,15 @@ class SimYellowLifecycleTests(unittest.TestCase):
     def validate_observation(self, document: object) -> dict[str, Any]:
         return sim_yellow.validate_cross_line_test_observation(
             document, repo_root=ROOT
+        )
+
+    def validate_yellow1(
+        self, document: object, *, require_local_artifacts: bool = False
+    ) -> dict[str, Any]:
+        return sim_yellow1.validate_yellow1_evidence_record(
+            document,
+            repo_root=ROOT,
+            require_local_artifacts=require_local_artifacts,
         )
 
     def inventory(self, *, stage: str = "yellow-3") -> dict[str, Any]:
@@ -377,6 +407,60 @@ class SimYellowLifecycleTests(unittest.TestCase):
             sim_yellow.SimYellowLifecycleError, "must remain false"
         ):
             self.validate_observation(invalid)
+
+    def test_yellow1_record_is_metadata_verifiable_without_host_artifacts(self) -> None:
+        record = self.validate_yellow1(load_json(YELLOW1_RECORD_PATH))
+        self.assertEqual(
+            record["source"]["productSourceCommit"],
+            "1af895287c2c8249acfa581919446e24ec16f575",
+        )
+        self.assertFalse(record["source"]["evidenceRecordCommitIsProductSource"])
+        self.assertFalse(record["releaseBoundary"]["promotionReady"])
+
+    @unittest.skipUnless(
+        YELLOW1_RUN_ROOT.is_dir(), "host-local YELLOW-1 evidence is not mounted"
+    )
+    def test_yellow1_record_rehashes_all_local_build_and_visual_artifacts(self) -> None:
+        record = self.validate_yellow1(
+            load_json(YELLOW1_RECORD_PATH), require_local_artifacts=True
+        )
+        self.assertEqual(record["results"]["buildFileCount"], 54)
+        self.assertEqual(record["results"]["screenshotCount"], 18)
+        self.assertEqual(record["results"]["screenshotTotalBytes"], 5460376)
+
+    def test_yellow1_rejects_source_relabel_or_readiness_overclaim(self) -> None:
+        invalid = deepcopy(load_json(YELLOW1_RECORD_PATH))
+        invalid["source"]["evidenceRecordCommitIsProductSource"] = True
+        with self.assertRaisesRegex(
+            sim_yellow1.SimYellow1EvidenceError, "source/evidence binding"
+        ):
+            self.validate_yellow1(invalid)
+
+        for section, key in (
+            ("authorization", "yellow2Authorized"),
+            ("releaseBoundary", "releaseAssetClaimed"),
+            ("releaseBoundary", "promotionReady"),
+        ):
+            with self.subTest(section=section, key=key):
+                invalid = deepcopy(load_json(YELLOW1_RECORD_PATH))
+                invalid[section][key] = True
+                with self.assertRaises(sim_yellow1.SimYellow1EvidenceError):
+                    self.validate_yellow1(invalid)
+
+    def test_yellow1_rejects_tracked_or_artifact_hash_drift(self) -> None:
+        invalid = deepcopy(load_json(YELLOW1_RECORD_PATH))
+        invalid["bindings"]["contract"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(
+            sim_yellow1.SimYellow1EvidenceError, "contract SHA-256 drifted"
+        ):
+            self.validate_yellow1(invalid)
+
+        invalid = deepcopy(load_json(YELLOW1_RECORD_PATH))
+        invalid["artifactEvidence"]["completionReceipt"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(
+            sim_yellow1.SimYellow1EvidenceError, "completionReceipt binding drifted"
+        ):
+            self.validate_yellow1(invalid)
 
 
 if __name__ == "__main__":

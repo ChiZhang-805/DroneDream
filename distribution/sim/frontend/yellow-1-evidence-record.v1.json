@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-1-evidence-record",
+  "recordVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "yellow-1-passed-not-promotion-ready",
+  "source": {
+    "productSourceCommit": "1af895287c2c8249acfa581919446e24ec16f575",
+    "branch": "codex/software-sim",
+    "upstream": "origin/codex/software-sim",
+    "sourceTreeStateAtExecution": "clean",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b",
+    "evidenceRecordCommitIsProductSource": false
+  },
+  "authorization": {
+    "sourceThreadId": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9",
+    "class": "YELLOW-1",
+    "scope": "production-frontend-build-and-microsoft-edge-six-case-visual-acceptance",
+    "apiKeyUseAuthorized": false,
+    "deploymentAuthorized": false,
+    "installationAuthorized": false,
+    "yellow2Authorized": false,
+    "yellow3Authorized": false,
+    "redAuthorized": false
+  },
+  "bindings": {
+    "contract": {
+      "path": "distribution/sim/frontend/visual-acceptance.v1.json",
+      "sha256": "6cb6bd065079112d2accc7b3a54a93dc7a6430ad3767af32f8068924e97ce2d7"
+    },
+    "visualTool": {
+      "path": "distribution/sim/tools/verify_sim_frontend_visual.mjs",
+      "sha256": "f30fd2886a705dbb8119b614ea16162aa2a9081c4be1dd891241bfa4b9838e10"
+    }
+  },
+  "artifactEvidence": {
+    "availability": "branch-local-host-evidence-not-git-payload",
+    "runRoot": "frontend/artifacts/test-runs/sim-yellow-1-20260805T141813Z-1af8952",
+    "completionReceipt": {
+      "path": "frontend/artifacts/test-runs/sim-yellow-1-20260805T141813Z-1af8952/sim-yellow-1-completion-receipt.json",
+      "sha256": "04cd0437c4b7b4ff587ec2472fee1d5eea5d8e15a15ab1bd10c22b479a0fa4ff"
+    },
+    "productionBuildReceipt": {
+      "path": "frontend/artifacts/test-runs/sim-yellow-1-20260805T141813Z-1af8952/sim-frontend-production-build-receipt.json",
+      "sha256": "8630c753257f489f4582dcd63549d1546b27c6ae69abba54b48850b000056496"
+    },
+    "visualReceipt": {
+      "path": "frontend/artifacts/test-runs/sim-yellow-1-20260805T141813Z-1af8952/sim-frontend-visual-acceptance-receipt.json",
+      "sha256": "e64c065be43bb735c217e51e762ce6854bae59a63f08058bfe1d504b5ca5016c"
+    },
+    "screenshotInventory": {
+      "path": "frontend/artifacts/test-runs/sim-yellow-1-20260805T141813Z-1af8952/sim-frontend-screenshot-inventory.json",
+      "sha256": "f7b16606a710c995ec3bc0cf462f812ef920c719361519f33ac8fbf12a223254"
+    },
+    "manualReview": {
+      "path": "frontend/artifacts/test-runs/sim-yellow-1-20260805T141813Z-1af8952/manual-visual-review.v1.json",
+      "sha256": "5f43bcfd891c40cf68a8f483713d72f1eccca5522606bce8556e8337cc9b75ee"
+    }
+  },
+  "results": {
+    "productionBuildExecuted": true,
+    "productionBuildExitCode": 0,
+    "buildFileCount": 54,
+    "buildTotalBytes": 7312435,
+    "buildInventoryAggregateSha256": "6861a1bcba97f9e317794759804a694cf736c33edfdba304fe97f2208be94b17",
+    "edgeCaseCount": 6,
+    "screenshotCount": 18,
+    "screenshotTotalBytes": 5460376,
+    "screenshotAggregateSha256": "ae3dcf725addaa97262453b6c15d8c2ed54c6a19920d601e5b37d3ddfde7cca2",
+    "manualVisualAcceptance": true,
+    "allForbiddenInteractiveCountsZero": true,
+    "allSetupCommandControlCountsZero": true,
+    "allBlockedRoutesDenied": true,
+    "allDocumentWidthsExact": true,
+    "normalStateSkipLinksOutsideViewport": true
+  },
+  "preservedAttempts": [
+    {
+      "sourceCommit": "8f99fed22ea03846c26ed5184eaa8b2f7982741b",
+      "classification": "playwright-import-failed-before-browser-start",
+      "evidenceDeleted": false
+    },
+    {
+      "sourceCommit": "ae371194e3d3c46e990b6517c93e1981e74dd970",
+      "classification": "preview-status-selector-failed-after-one-case",
+      "evidenceDeleted": false
+    },
+    {
+      "sourceCommit": "9dbff76b1411b0d31ae59c8ca7ad103a1a394d92",
+      "classification": "tool-pass-manual-review-rejected-focused-skip-link",
+      "evidenceDeleted": false
+    }
+  ],
+  "resourceClosure": {
+    "port5198Released": true,
+    "browserClosed": true,
+    "viteServerClosed": true,
+    "apiKeyRead": false,
+    "deploymentExecuted": false,
+    "installerBuilt": false,
+    "installerExecuted": false,
+    "runtimeStarted": false,
+    "px4Started": false,
+    "gazeboStarted": false
+  },
+  "releaseBoundary": {
+    "validatedVehiclePackCount": 0,
+    "releaseAssetClaimed": false,
+    "promotionReady": false,
+    "yellow2BlockedPendingFormalDonorAndIcoSync": true,
+    "yellow3Authorized": false,
+    "redAuthorized": false
+  }
+}
