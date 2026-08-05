@@ -64,6 +64,12 @@ const COPY = {
     unavailable: "Unavailable",
     registryTitle: "Vehicle Pack registry",
     registryBody: "Field-compatible entries projected from the source-bound 8-pack registry.",
+    compatibilityDraft: "Compatibility draft",
+    selectedPack: "Selected Vehicle Pack",
+    selectedController: "Selected controller",
+    firmwareEvidence: "Firmware evidence",
+    firmwareEvidenceMissing: "No signed compatibility evidence",
+    draftBoundary: "Selection is local preview data and does not grant authority.",
     packName: "Vehicle Pack",
     controllers: "Controller contract",
     tier: "Validation tier",
@@ -136,6 +142,12 @@ const COPY = {
     unavailable: "不可用",
     registryTitle: "机型包注册表",
     registryBody: "来自源绑定 8-pack 注册表的 Field 兼容条目。",
+    compatibilityDraft: "兼容性草稿",
+    selectedPack: "所选机型包",
+    selectedController: "所选飞控",
+    firmwareEvidence: "固件证据",
+    firmwareEvidenceMissing: "缺少签名兼容性证据",
+    draftBoundary: "选择结果仅为本地预览数据，不授予任何控制权限。",
     packName: "机型包",
     controllers: "飞控合同",
     tier: "验证层级",
@@ -182,6 +194,13 @@ const NAVIGATION = [
   ["control", "control", ShieldAlert],
 ] as const;
 
+const FIRST_FIELD_PACK = FIELD_CATALOG.vehiclePacks[0];
+if (!FIRST_FIELD_PACK) throw new Error("Field catalog has no compatible Vehicle Pack");
+
+function fieldControllerKey(vendor: string, model: string): string {
+  return `${vendor}::${model}`;
+}
+
 interface FieldAppProps {
   initialLocale?: FieldLocale;
   initialObservationState?: FieldObservationState;
@@ -205,9 +224,19 @@ export function FieldApp({
   const [observationState, setObservationState] =
     useState<FieldObservationState>(initialObservationState);
   const [activeSection, setActiveSection] = useState("overview");
+  const [selectedPackId, setSelectedPackId] = useState(FIRST_FIELD_PACK.packId);
+  const [selectedControllerKey, setSelectedControllerKey] = useState(
+    fieldControllerKey(
+      FIRST_FIELD_PACK.controllers[0]?.vendor ?? "missing",
+      FIRST_FIELD_PACK.controllers[0]?.model ?? "missing",
+    ),
+  );
   const copy = COPY[locale];
   const observation = FIELD_OBSERVATION_FIXTURES[observationState];
   const decision = useMemo(() => evaluateFieldSafety(observation), [observation]);
+  const selectedPack = FIELD_CATALOG.vehiclePacks.find(
+    (pack) => pack.packId === selectedPackId,
+  ) ?? FIRST_FIELD_PACK;
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -312,6 +341,54 @@ export function FieldApp({
 
           <section id="compatibility" className="field-section" aria-labelledby="field-registry-title">
             <header><div><h2 id="field-registry-title">{copy.registryTitle}</h2><p>{copy.registryBody}</p></div><PackageCheck /></header>
+            <div className="field-compatibility-draft" data-authority="false">
+              <div className="field-draft-heading">
+                <strong>{copy.compatibilityDraft}</strong>
+                <span>{copy.draftBoundary}</span>
+              </div>
+              <label>
+                <span>{copy.selectedPack}</span>
+                <select
+                  value={selectedPackId}
+                  onChange={(event) => {
+                    const pack = FIELD_CATALOG.vehiclePacks.find(
+                      (candidate) => candidate.packId === event.target.value,
+                    ) ?? FIRST_FIELD_PACK;
+                    const controller = pack.controllers[0];
+                    setSelectedPackId(pack.packId);
+                    setSelectedControllerKey(controller
+                      ? fieldControllerKey(controller.vendor, controller.model)
+                      : "missing");
+                  }}
+                >
+                  {FIELD_CATALOG.vehiclePacks.map((pack) => (
+                    <option key={pack.packId} value={pack.packId}>
+                      {pack.displayName[locale]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>{copy.selectedController}</span>
+                <select
+                  value={selectedControllerKey}
+                  onChange={(event) => setSelectedControllerKey(event.target.value)}
+                >
+                  {selectedPack.controllers.map((controller) => (
+                    <option
+                      key={fieldControllerKey(controller.vendor, controller.model)}
+                      value={fieldControllerKey(controller.vendor, controller.model)}
+                    >
+                      {controller.vendor} {controller.model}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="field-evidence-status">
+                <span>{copy.firmwareEvidence}</span>
+                <strong><CircleOff />{copy.firmwareEvidenceMissing}</strong>
+              </div>
+            </div>
             <div className="field-table-scroll">
               <table>
                 <thead><tr><th>{copy.packName}</th><th>{copy.controllers}</th><th>{copy.tier}</th><th>{copy.adapter}</th></tr></thead>

@@ -447,6 +447,68 @@ select:focus-visible {
   border-radius: 6px;
 }
 
+.field-compatibility-draft {
+  display: grid;
+  align-items: end;
+  grid-template-columns: minmax(210px, 1fr) minmax(190px, 0.7fr) minmax(190px, 0.8fr);
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 14px;
+  background: var(--field-surface);
+  border: 1px solid #efd8bf;
+  border-radius: 6px;
+}
+
+.field-draft-heading {
+  grid-column: 1 / -1;
+}
+
+.field-draft-heading,
+.field-compatibility-draft label,
+.field-evidence-status {
+  display: grid;
+  gap: 5px;
+}
+
+.field-draft-heading span,
+.field-compatibility-draft label > span,
+.field-evidence-status > span {
+  color: var(--field-muted);
+  font-size: 12px;
+}
+
+.field-compatibility-draft select {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 32px 7px 10px;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid #cfc8c3;
+  border-radius: 5px;
+}
+
+.field-evidence-status {
+  min-height: 38px;
+  align-content: center;
+  padding: 7px 10px;
+  background: #ffffff;
+  border: 1px solid #e7c6bd;
+  border-radius: 5px;
+}
+
+.field-evidence-status strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--field-danger);
+  font-size: 12px;
+}
+
+.field-evidence-status svg {
+  width: 14px;
+  height: 14px;
+}
+
 .field-table-scroll table {
   width: 100%;
   min-width: 760px;
@@ -629,6 +691,14 @@ select:focus-visible {
     padding: 32px 28px 22px;
   }
 
+  .field-compatibility-draft {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-evidence-status {
+    grid-column: 1 / -1;
+  }
+
   .field-overview {
     align-items: stretch;
     flex-direction: column;
@@ -705,8 +775,13 @@ select:focus-visible {
   .field-overview-metrics,
   .field-two-column,
   .field-control-buttons,
-  .field-observation-toolbar {
+  .field-observation-toolbar,
+  .field-compatibility-draft {
     grid-template-columns: 1fr;
+  }
+
+  .field-evidence-status {
+    grid-column: auto;
   }
 
   .field-section {

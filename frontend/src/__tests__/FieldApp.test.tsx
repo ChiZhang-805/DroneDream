@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import postcss from "postcss";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -65,9 +65,26 @@ describe("FieldApp", () => {
     render(<FieldApp initialLocale="en" />);
 
     expect(screen.getAllByRole("row")).toHaveLength(8);
-    expect(screen.getByText("Holybro X500 v2 with Pixhawk 6")).toBeInTheDocument();
-    expect(screen.getByText("Bitcraze Crazyflie 2.1+")).toBeInTheDocument();
+    const table = within(screen.getByRole("table"));
+    expect(table.getByText("Holybro X500 v2 with Pixhawk 6")).toBeInTheDocument();
+    expect(table.getByText("Bitcraze Crazyflie 2.1+")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /arm|flight/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps compatibility selections local and fail-closed", () => {
+    const { container } = render(<FieldApp initialLocale="en" />);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Selected Vehicle Pack" }), {
+      target: { value: "bitcraze-crazyflie-2-1-plus" },
+    });
+
+    expect(screen.getByRole("combobox", { name: "Selected controller" })).toHaveValue(
+      "Bitcraze::Crazyflie 2.1+",
+    );
+    expect(screen.getByText("No signed compatibility evidence")).toBeInTheDocument();
+    expect(container.querySelector(".field-compatibility-draft[data-authority='false']"))
+      .toBeTruthy();
+    expect(container.querySelector("[data-authority='false']")).toBeTruthy();
   });
 
   it("provides independent Simplified Chinese safety copy", () => {
