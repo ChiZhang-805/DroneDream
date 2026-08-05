@@ -77,7 +77,7 @@ describe("DistributionSetupPanel", () => {
   it("starts with the simulation reference and exposes no install action", () => {
     const { container } = renderPanel();
 
-    expect(screen.getByText("DroneDream Sim")).toBeInTheDocument();
+    expect(screen.getByText("DroneDream · SIM")).toBeInTheDocument();
     expect(screen.queryByText(/DroneDream Lab/)).not.toBeInTheDocument();
     expect(screen.queryByText(/DroneDream Field/)).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Vehicle Pack/ })).toHaveValue(
@@ -141,7 +141,7 @@ describe("DistributionSetupPanel", () => {
 
     renderPanel();
 
-    expect(screen.getByText("DroneDream Sim")).toBeInTheDocument();
+    expect(screen.getByText("DroneDream · SIM")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Vehicle Pack/ })).toHaveValue(
       "px4-gazebo-x500-reference",
     );

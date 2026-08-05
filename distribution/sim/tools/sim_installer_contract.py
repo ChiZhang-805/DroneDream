@@ -917,7 +917,7 @@ def validate_installer_surface_contract(
                     "title": SIM_DISPLAY_NAME,
                     "width": 1440,
                     "height": 900,
-                    "minWidth": 1100,
+                    "minWidth": 390,
                     "minHeight": 700,
                     "resizable": True,
                     "fullscreen": False,

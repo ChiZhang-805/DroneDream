@@ -9,7 +9,7 @@ export type SimLocale = "en" | "zh-CN";
 
 export const SIM_EDITION = {
   editionId: "sim",
-  productName: "DroneDream Sim",
+  productName: "DroneDream \u00b7 SIM",
   displayVersion: "1.0.0",
   artifactFileName: "DroneDream-Sim-1.0.0.exe",
   releaseState: "internal-preview",
@@ -52,7 +52,7 @@ export function simCapabilityDecision(capability: string): "allow" | "deny" {
 
 export function assertSimCapability(capability: string): void {
   if (simCapabilityDecision(capability) === "deny") {
-    throw new Error(`DroneDream Sim denies capability: ${capability}`);
+    throw new Error(`${SIM_EDITION.productName} denies capability: ${capability}`);
   }
 }
 
@@ -79,7 +79,7 @@ export const SIM_COPY = {
     navOverview: "Sim Overview",
     workspaceTitle: "Simulation workspace",
     overviewEyebrow: "Simulation-only internal preview",
-    overviewTitle: "DroneDream Sim",
+    overviewTitle: "DroneDream \u00b7 SIM",
     overviewBody:
       "Tune and compare PX4 SITL runs in Gazebo with versioned simulation vehicle profiles. This edition has no physical-aircraft control path.",
     setupPreview: "Setup preview",
@@ -114,7 +114,7 @@ export const SIM_COPY = {
     navOverview: "Sim 概览",
     workspaceTitle: "纯仿真工作区",
     overviewEyebrow: "纯仿真内测预览",
-    overviewTitle: "DroneDream Sim",
+    overviewTitle: "DroneDream \u00b7 SIM",
     overviewBody:
       "使用版本化仿真机型配置，在 Gazebo 中调优并比较 PX4 SITL 运行。本版本不存在任何真机控制路径。",
     setupPreview: "安装设置预览",

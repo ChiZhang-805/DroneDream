@@ -9,7 +9,7 @@
         "title": "DroneDream · SIM",
         "width": 1440,
         "height": 900,
-        "minWidth": 1100,
+        "minWidth": 390,
         "minHeight": 700,
         "resizable": true,
         "fullscreen": false

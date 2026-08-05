@@ -103,7 +103,7 @@ import {
   SimEditionBadge,
   SimEditionSettingsPanel,
 } from "./editions/sim/SimEditionExperience";
-import { simCopy } from "./editions/sim/profile";
+import { SIM_EDITION, simCopy } from "./editions/sim/profile";
 
 const NAV_ITEMS: {
   to: string;
@@ -2521,7 +2521,7 @@ function AppShellContent() {
           <Link
             to="/desktop/setup"
             className="launcher-brand launcher-brand-edition"
-            aria-label="DroneDream Sim"
+            aria-label={SIM_EDITION.productName}
           >
             <BrandLockup variant="compact" />
             <SimEditionBadge compact />
@@ -2586,7 +2586,7 @@ function AppShellContent() {
       </a>
       <aside className="app-sidebar">
         {desktopRuntime ? (
-          <Link to="/sim" className="app-title" aria-label="DroneDream Sim">
+          <Link to="/sim" className="app-title" aria-label={SIM_EDITION.productName}>
             <BrandLockup variant="compact" />
           </Link>
         ) : (
@@ -2784,7 +2784,7 @@ function AppShellContent() {
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">
-            DroneDream Sim — {simUi.workspaceTitle}
+            {SIM_EDITION.productName}: {simUi.workspaceTitle}
           </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">

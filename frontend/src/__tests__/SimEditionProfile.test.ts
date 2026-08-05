@@ -7,7 +7,7 @@ import {
   simCapabilityDecision,
 } from "../editions/sim/profile";
 
-describe("DroneDream Sim edition profile", () => {
+describe("DroneDream · SIM edition profile", () => {
   it("allows only the explicit simulation capability whitelist", () => {
     for (const capability of SIM_EDITION.allowedCapabilities) {
       expect(simCapabilityDecision(capability)).toBe("allow");
@@ -17,7 +17,7 @@ describe("DroneDream Sim edition profile", () => {
     for (const capability of SIM_EDITION.forbiddenCapabilities) {
       expect(simCapabilityDecision(capability)).toBe("deny");
       expect(() => assertSimCapability(capability)).toThrow(
-        `DroneDream Sim denies capability: ${capability}`,
+        `DroneDream · SIM denies capability: ${capability}`,
       );
     }
   });

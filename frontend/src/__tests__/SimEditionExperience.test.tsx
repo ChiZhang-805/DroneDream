@@ -25,8 +25,13 @@ describe("DroneDream Sim experience", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     renderOverview();
 
-    expect(screen.getByRole("heading", { level: 1, name: "DroneDream Sim" }))
+    expect(screen.getByRole("heading", { level: 1, name: "DroneDream \u00b7 SIM" }))
       .toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Simulation workspace" }))
+      .toHaveTextContent("PX4 SITL");
+    expect(screen.getByRole("list", { name: "External dependencies" }))
+      .toHaveTextContent("Runtime Base");
+    expect(screen.getAllByRole("listitem")).toHaveLength(6);
     for (const label of [
       "Simulation",
       "PX4 SITL",
@@ -48,6 +53,8 @@ describe("DroneDream Sim experience", () => {
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
     renderOverview();
 
+    expect(screen.getByRole("heading", { level: 1, name: "DroneDream \u00b7 SIM" }))
+      .toBeInTheDocument();
     expect(screen.getByText("纯仿真内测预览")).toBeInTheDocument();
     expect(screen.getByText("Sim 仿真机型包")).toBeInTheDocument();
     expect(screen.getAllByText("外置")).toHaveLength(2);

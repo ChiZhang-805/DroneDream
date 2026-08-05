@@ -162,6 +162,9 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .sim-capability-item {
@@ -189,9 +192,12 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.sim-dependency-list > div {
+.sim-dependency-list > li {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;

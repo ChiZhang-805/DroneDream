@@ -86,14 +86,14 @@ export function SimOverview() {
         <div className="sim-band-heading">
           <h2 id="sim-capability-title">{copy.capabilityTitle}</h2>
         </div>
-        <div className="sim-capability-grid">
+        <ul className="sim-capability-grid" aria-label={copy.capabilityTitle}>
           {SIMULATION_ITEMS.map(({ key, icon: Icon }) => (
-            <div className="sim-capability-item" key={key}>
+            <li className="sim-capability-item" key={key}>
               <Icon aria-hidden="true" />
               <strong>{copy.items[key]}</strong>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
       <section className="sim-overview-band sim-dependency-band" aria-labelledby="sim-dependency-title">
@@ -101,15 +101,15 @@ export function SimOverview() {
           <h2 id="sim-dependency-title">{copy.dependencyTitle}</h2>
           <p>{copy.setupBody}</p>
         </div>
-        <div className="sim-dependency-list">
+        <ul className="sim-dependency-list" aria-label={copy.dependencyTitle}>
           {DEPENDENCY_ITEMS.map(({ key, icon: Icon }) => (
-            <div key={key}>
+            <li key={key}>
               <Icon aria-hidden="true" />
               <strong>{copy.items[key]}</strong>
               <span>{copy.external}</span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </section>
 
       <section className="sim-overview-band sim-boundary-band" aria-labelledby="sim-boundary-title">

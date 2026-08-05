@@ -33,7 +33,7 @@ type DistributionSetupVariant = "settings" | "setup";
 const COPY = {
   en: {
     title: "Simulation & Vehicle Pack",
-    description: "Choose a region and a versioned simulation vehicle profile for DroneDream Sim.",
+    description: "Choose a region and a versioned simulation vehicle profile for DroneDream · SIM.",
     previewOnly: "Selection preview",
     edition: "Edition",
     region: "Region",
@@ -71,7 +71,7 @@ const COPY = {
   },
   "zh-CN": {
     title: "仿真与机型包",
-    description: "为 DroneDream Sim 选择使用地区和版本化仿真机型配置。",
+    description: "为 DroneDream · SIM 选择使用地区和版本化仿真机型配置。",
     previewOnly: "仅选择预览",
     edition: "产品版本",
     region: "使用地区",
@@ -212,7 +212,7 @@ export function DistributionSetupPanel({
       <div className="distribution-sim-locked-edition" aria-label={copy.edition}>
         <span>
           <strong>
-            {localizedDistributionText(preview.edition.displayName, localeKey)}
+            {SIM_EDITION.productName}
           </strong>
           <small>
             {localizedDistributionText(preview.edition.description, localeKey)}
