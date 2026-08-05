@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "receiptKind": "website-source-validation-attestation",
+  "subjectCommit": "794dc0e535b26db86a1ed1e223bc294caf7e806a",
+  "validatedAt": "2026-08-05T06:46:32.060Z",
+  "scope": "Fail-closed Sim, Lab, and Field edition chooser for public-site download entry points",
+  "environment": {
+    "os": "Microsoft Windows NT 10.0.26200.0",
+    "powershell": "5.1.26100.8875",
+    "node": "v24.14.1",
+    "npm": "11.11.0",
+    "edge": "151.0.4129.59"
+  },
+  "sourceContract": {
+    "editionMetadata": "frontend/public/downloads/editions.json",
+    "editions": [
+      {
+        "id": "sim",
+        "fileName": "DroneDream-Sim-1.0.0.exe",
+        "releaseStatus": "planned-not-built",
+        "artifactMetadataPresent": false
+      },
+      {
+        "id": "lab",
+        "fileName": "DroneDream-Lab-1.0.0.exe",
+        "releaseStatus": "planned-not-built",
+        "artifactMetadataPresent": false
+      },
+      {
+        "id": "field",
+        "fileName": "DroneDream-Field-1.0.0.exe",
+        "releaseStatus": "planned-not-built",
+        "artifactMetadataPresent": false
+      }
+    ],
+    "vehiclePacks": {
+      "total": 8,
+      "validated": 0,
+      "contractOnly": 5,
+      "planned": 3,
+      "selectionStage": "post-install"
+    },
+    "publishedEditionEnablementRequires": [
+      "releaseStatus=published",
+      "version",
+      "fileName",
+      "downloadUrl",
+      "checksumUrl",
+      "signatureUrl",
+      "sizeBytes",
+      "sha256",
+      "sourceCommit",
+      "publishedAt"
+    ],
+    "currentPreviewRemainsSeparatelyDiscoverable": {
+      "version": "1.0.0",
+      "fileName": "DroneDream_1.0.0_x64-setup.exe",
+      "sizeBytes": 11115267,
+      "sha256": "f7e9f95ba044c729319cbd532eb071a37aad3e16294388c438e9e4f12045a5c4",
+      "publishedAt": "2026-08-04"
+    }
+  },
+  "validation": [
+    {
+      "name": "focused edition chooser tests",
+      "command": "npm test -- EditionAvailability.test.ts EditionChooser.test.tsx PublicSite.test.tsx",
+      "result": "pass",
+      "testFiles": 3,
+      "tests": 26
+    },
+    {
+      "name": "frontend full test suite",
+      "command": "npm test -- --maxWorkers=1",
+      "result": "pass",
+      "testFiles": 62,
+      "tests": 424,
+      "durationSeconds": 80.35,
+      "logSha256": "dc450e6fe5ce66e5049e81641c1e70b219683d649e90e38993dbc9328f194c66"
+    },
+    {
+      "name": "frontend typecheck",
+      "command": "npm run typecheck",
+      "result": "pass",
+      "logSha256": "70b3c3927615afdf5f5a277b682ce10528f9baed352029eb1ad9b1146db47acd"
+    },
+    {
+      "name": "frontend lint",
+      "command": "npm run lint",
+      "result": "pass",
+      "logSha256": "0a0909db1fb8b2a2edb14bdc5a7992cbb6d02839f44caf6fdd98bd1d27c4afed"
+    },
+    {
+      "name": "frontend application build",
+      "command": "npm run build",
+      "result": "pass",
+      "logSha256": "f710514e6e64c5474d7d76b4fed029e6162af996e35a5be854ed218359807605"
+    },
+    {
+      "name": "shared site and console build",
+      "command": "powershell -File website/scripts/build-pages-site.ps1",
+      "result": "pass",
+      "sourceCommit": "794dc0e535b26db86a1ed1e223bc294caf7e806a",
+      "fileCount": 163,
+      "sha256SumsEntries": 162,
+      "buildManifestSha256": "dbe1a8e5b911f65119b4f040053c0bd4f1fde317568f7bfbc6aa42bc79727b24",
+      "sha256SumsSha256": "d3380961f7fb3ff739d1d3d7928eb27640b7cdd349a65d28f23adf3a2a1ea558",
+      "logSha256": "ace537645893c01a7fc33aa5ed391a89d36154ac3ac109d9f33e4316d5dc9b3c"
+    },
+    {
+      "name": "website deployment contract",
+      "command": "python -m unittest runtime.tests.test_website_deployment",
+      "result": "pass",
+      "tests": 13,
+      "logSha256": "894de59b6f631a021dd5be357b5fb3c780be94dd444bd2e7117fe9c0deb67334"
+    },
+    {
+      "name": "Edge bilingual responsive visual audit",
+      "command": "node website/scripts/audit-edition-chooser.mjs",
+      "result": "pass",
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "viewports": [
+        "1440x1000",
+        "390x844"
+      ],
+      "desktopDialogWidth": 840,
+      "desktopCardHeightSpread": 0,
+      "desktopActionBaselineSpread": 0,
+      "plannedDownloadLinks": 0,
+      "disabledPlannedActions": 3,
+      "documentWidthParity": true,
+      "mobileScrollableBottomSheet": true,
+      "focusRestoredAfterClose": true,
+      "pageErrors": 0
+    },
+    {
+      "name": "git whitespace validation",
+      "command": "git diff --check",
+      "result": "pass"
+    }
+  ],
+  "rerunClassification": {
+    "initialParallelFullSuite": "61/62 files and 423/424 tests; one NewJob timeout while other validation commands competed for resources",
+    "focusedNewJobRerun": "41/41 tests passed",
+    "authoritativeSerialFullSuite": "62/62 files and 424/424 tests passed",
+    "classification": "resource-contention timeout, not a product regression"
+  },
+  "visualEvidence": [
+    {
+      "path": "website/validation-receipts/assets/edition-chooser-794dc0e/edition-chooser-audit.json",
+      "bytes": 5823,
+      "sha256": "dc4f546b4e626f8e4f4930586acf28c308e49fef7f3522bab8f82005b5b71583"
+    },
+    {
+      "path": "website/validation-receipts/assets/edition-chooser-794dc0e/en-desktop.png",
+      "bytes": 268058,
+      "sha256": "869ce44572571d0c46c8baf1189883cbe5a5f28f142fa6034edcf004a3cdc04e"
+    },
+    {
+      "path": "website/validation-receipts/assets/edition-chooser-794dc0e/en-mobile.png",
+      "bytes": 102255,
+      "sha256": "3ddde3c91de2bb31f2f4be03d3f537671f3645e0d061df82162021696514fa04"
+    },
+    {
+      "path": "website/validation-receipts/assets/edition-chooser-794dc0e/zh-CN-desktop.png",
+      "bytes": 255865,
+      "sha256": "43724a27236121b35ee14692851515cfa758ad6a73f153b41cc88e2d26bf3108"
+    },
+    {
+      "path": "website/validation-receipts/assets/edition-chooser-794dc0e/zh-CN-mobile.png",
+      "bytes": 94729,
+      "sha256": "c88890b8f910257fbb9db564fe1edae3e5e480068bbc7694849829326b04ca82"
+    }
+  ],
+  "manualVisualReview": {
+    "performed": true,
+    "result": "pass",
+    "notes": "All four screenshots were inspected. Desktop cards are equal-height with aligned action baselines. Mobile uses a one-column scrollable bottom sheet without horizontal overflow. English and Chinese copy remain independently concise."
+  },
+  "boundaries": {
+    "deploymentPerformed": false,
+    "releaseModified": false,
+    "serverModified": false,
+    "dnsOrTlsModified": false,
+    "supabaseModified": false,
+    "technicalReportModified": false,
+    "editionBinariesAvailable": false,
+    "unrelatedManualPdfWorkIncluded": false
+  }
+}
