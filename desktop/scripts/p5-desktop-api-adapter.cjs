@@ -8,13 +8,18 @@
 const crypto = require("node:crypto");
 
 const MAX_JSON_RESPONSE_BYTES = 16 * 1024 * 1024;
-const P5_IDEMPOTENCY_KEY = /^p5-[0-9a-f]{16}-[0-9]{2}-[0-9a-f]{16}$/;
+const P5_IDEMPOTENCY_KEY =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const PACK_ID = /^sha256:[0-9a-f]{64}$/;
 const GIT_COMMIT = /^[0-9a-f]{40}$/;
 const IDENTIFIER = "[a-z0-9][a-z0-9._-]{0,127}";
 const ROUTES = [
   { method: "GET", pattern: /^\/api\/v1\/session$/ },
   { method: "POST", pattern: /^\/api\/v1\/jobs$/ },
+  {
+    method: "GET",
+    pattern: new RegExp(`^/api/v1/jobs/physical-stability-dispatches/${IDENTIFIER}$`),
+  },
   { method: "GET", pattern: new RegExp(`^/api/v1/jobs/${IDENTIFIER}$`) },
   {
     method: "GET",
@@ -83,6 +88,39 @@ function canonicalJson(value) {
 function canonicalSha256(value) {
   rejectSensitiveFields(value);
   return crypto.createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
+}
+
+function sha256Text(value) {
+  return crypto.createHash("sha256").update(value, "ascii").digest("hex");
+}
+
+function sha256Utf8(value) {
+  return crypto.createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function verifyFrozenRequest({ requestPayload, requestCanonicalJson, requestSha256 }) {
+  if (typeof requestCanonicalJson !== "string" || Buffer.byteLength(requestCanonicalJson, "utf8") > 1024 * 1024) {
+    fail("P5 Job canonical request is missing or exceeds one MiB");
+  }
+  if (!/^[0-9a-f]{64}$/.test(requestSha256 || "") || sha256Utf8(requestCanonicalJson) !== requestSha256) {
+    fail("P5 Job canonical request SHA does not recompute");
+  }
+  let parsedPayload;
+  try {
+    parsedPayload = JSON.parse(requestCanonicalJson);
+  } catch {
+    fail("P5 Job canonical request is not valid JSON");
+  }
+  rejectSensitiveFields(parsedPayload);
+  if (canonicalJson(parsedPayload) !== canonicalJson(requestPayload)) {
+    fail("P5 Job canonical request does not match its payload");
+  }
+  return Object.freeze({
+    parsedPayload,
+    mutationRequestSha256: sha256Utf8(
+      `{"operation":"jobs.create","payload":${requestCanonicalJson}}`,
+    ),
+  });
 }
 
 function validateRoute(method, apiPath, body, idempotencyKey) {
@@ -252,17 +290,21 @@ function createP5DesktopApiAdapter(page, expectedEnginePack) {
   return Object.freeze({
     verifyEnginePack: () => verifyEnginePack(page, expected),
     getSession: () => localApi(page, "GET", "/api/v1/session"),
-    async createJob({ requestPayload, idempotencyKey, requestSha256, scenarioId }) {
+    async createJob({
+      requestPayload,
+      requestCanonicalJson,
+      idempotencyKey,
+      requestSha256,
+      scenarioId,
+    }) {
       encodeIdentifier(scenarioId, "scenario ID");
-      if (canonicalSha256(requestPayload) !== requestSha256) {
-        fail("P5 Job request payload SHA does not recompute");
-      }
+      const frozen = verifyFrozenRequest({ requestPayload, requestCanonicalJson, requestSha256 });
       await verifyEnginePack(page, expected);
       const result = await localApi(
         page,
         "POST",
         "/api/v1/jobs",
-        requestPayload,
+        frozen.parsedPayload,
         idempotencyKey,
       );
       if (!result || !new RegExp(`^${IDENTIFIER}$`).test(result.id || "")) {
@@ -275,6 +317,52 @@ function createP5DesktopApiAdapter(page, expectedEnginePack) {
         idempotency_key: idempotencyKey,
         request_sha256: requestSha256,
       };
+    },
+    async inspectJobCreation({
+      requestPayload,
+      requestCanonicalJson,
+      idempotencyKey,
+      requestSha256,
+      scenarioId,
+    }) {
+      encodeIdentifier(scenarioId, "scenario ID");
+      if (!P5_IDEMPOTENCY_KEY.test(idempotencyKey || "")) {
+        fail("P5 dispatch inspection requires its frozen idempotency key");
+      }
+      const frozen = verifyFrozenRequest({ requestPayload, requestCanonicalJson, requestSha256 });
+      const result = await localApi(
+        page,
+        "GET",
+        `/api/v1/jobs/physical-stability-dispatches/${idempotencyKey}`,
+      );
+      if (
+        !result
+        || result.schema_id !== "dronedream.physical-stability-dispatch-inspection/v1"
+        || result.idempotency_key_sha256 !== sha256Text(idempotencyKey)
+        || !new Set(["not_found", "in_progress", "completed"]).has(result.state)
+        || (result.state === "not_found" && result.mutation_request_sha256 !== null)
+        || (result.state !== "not_found"
+          && result.mutation_request_sha256 !== frozen.mutationRequestSha256)
+      ) {
+        fail("P5 dispatch inspection response is invalid");
+      }
+      if (result.state !== "completed") {
+        if (result.observed_job_id !== null) fail("unresolved P5 dispatch cannot claim a Job");
+        return Object.freeze({ state: result.state });
+      }
+      if (!new RegExp(`^${IDENTIFIER}$`).test(result.observed_job_id || "")) {
+        fail("completed P5 dispatch inspection omitted a valid Job ID");
+      }
+      return Object.freeze({
+        state: "completed",
+        observation: {
+          schema_id: "dronedream.physical-stability-job-create-observation/v1",
+          scenario_id: scenarioId,
+          observed_job_id: result.observed_job_id,
+          idempotency_key: idempotencyKey,
+          request_sha256: requestSha256,
+        },
+      });
     },
     getJob(jobId) {
       return localApi(page, "GET", `/api/v1/jobs/${encodeIdentifier(jobId, "Job ID")}`);

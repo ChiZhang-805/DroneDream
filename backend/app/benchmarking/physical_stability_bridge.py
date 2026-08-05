@@ -15,6 +15,7 @@ import json
 from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated, Any, Final, Literal, Protocol, runtime_checkable
+from uuid import UUID, uuid5
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -43,6 +44,7 @@ PHYSICAL_STABILITY_EXECUTION_BUNDLE_SCHEMA_ID: Final[
 PHYSICAL_STABILITY_TERMINAL_OBSERVATION_SCHEMA_ID: Final[
     Literal["dronedream.physical-stability-terminal-observation/v1"]
 ] = "dronedream.physical-stability-terminal-observation/v1"
+_P5_JOB_CREATE_NAMESPACE: Final[UUID] = UUID("6f8d75be-59fd-5f9f-a4a2-f0436f20dbbb")
 
 TrialTerminalStatus = Literal["completed", "failed", "timeout", "cancelled", "indeterminate"]
 JobTerminalStatus = Literal["completed", "failed", "timeout", "cancelled", "indeterminate"]
@@ -79,13 +81,33 @@ class PhysicalStabilityExecutionJobV1(_StrictFrozen):
     scenario_ordinal: Annotated[int, Field(ge=1, le=6)]
     scenario_id: Identifier
     planned_job_id: Identifier
-    idempotency_key: Annotated[str, Field(pattern=r"^p5-[0-9a-f]{16}-[0-9]{2}-[0-9a-f]{16}$")]
+    idempotency_key: Annotated[
+        str,
+        Field(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"),
+    ]
     request_payload: dict[str, Any]
+    request_canonical_json: str
     request_sha256: Sha256Hex
+    mutation_request_sha256: Sha256Hex
     trials: tuple[PhysicalStabilityExecutionTrialBindingV1, ...]
 
     @model_validator(mode="after")
     def _validate_job(self) -> PhysicalStabilityExecutionJobV1:
+        try:
+            canonical_payload = json.loads(self.request_canonical_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError("P5 Job canonical request is not valid JSON") from exc
+        if canonical_payload != self.request_payload:
+            raise ValueError("P5 Job canonical request does not match its payload")
+        if _canonical_json(canonical_payload) != self.request_canonical_json:
+            raise ValueError("P5 Job canonical request bytes are not canonical")
+        if _sha256_utf8(self.request_canonical_json) != self.request_sha256:
+            raise ValueError("P5 Job canonical request SHA does not recompute")
+        expected_mutation_sha = _sha256_utf8(
+            _canonical_json({"operation": "jobs.create", "payload": canonical_payload})
+        )
+        if expected_mutation_sha != self.mutation_request_sha256:
+            raise ValueError("P5 Job mutation request SHA does not recompute")
         request = schemas.JobCreateRequest.model_validate(self.request_payload)
         if canonical_sha256(request) != self.request_sha256:
             raise ValueError("P5 Job request hash does not recompute")
@@ -154,6 +176,28 @@ def _binding(item: PhysicalStabilityTrialPlanItemV1) -> PhysicalStabilityExecuti
     )
 
 
+def _canonical_json(value: object) -> str:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    )
+
+
+def _sha256_utf8(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _p5_idempotency_key(*, plan_sha256: str, scenario_ordinal: int, request_sha256: str) -> str:
+    name = (
+        "dronedream.p5.job-create/v1\0"
+        f"{plan_sha256}\0{scenario_ordinal:02d}\0{request_sha256}"
+    )
+    return str(uuid5(_P5_JOB_CREATE_NAMESPACE, name))
+
+
 def build_physical_stability_execution_bundle(
     manifest: PhysicalStabilityManifestV1,
     plan: PhysicalStabilityTrialPlanV1,
@@ -175,7 +219,12 @@ def build_physical_stability_execution_bundle(
     jobs: list[PhysicalStabilityExecutionJobV1] = []
     for ordinal, scenario in enumerate(manifest.scenarios, start=1):
         request = compile_physical_stability_job_request(manifest, scenario)
-        request_sha = canonical_sha256(request)
+        request_payload = request.model_dump(mode="json", exclude_none=False)
+        request_canonical_json = _canonical_json(request_payload)
+        request_sha = _sha256_utf8(request_canonical_json)
+        mutation_request_sha = _sha256_utf8(
+            _canonical_json({"operation": "jobs.create", "payload": request_payload})
+        )
         planned = tuple(item for item in plan.trials if item.scenario_id == scenario.scenario_id)
         planned_job_ids = {item.job_id for item in planned}
         if len(planned_job_ids) != 1:
@@ -185,9 +234,15 @@ def build_physical_stability_execution_bundle(
                 scenario_ordinal=ordinal,
                 scenario_id=scenario.scenario_id,
                 planned_job_id=next(iter(planned_job_ids)),
-                idempotency_key=f"p5-{plan_sha[:16]}-{ordinal:02d}-{request_sha[:16]}",
-                request_payload=request.model_dump(mode="json", exclude_none=False),
+                idempotency_key=_p5_idempotency_key(
+                    plan_sha256=plan_sha,
+                    scenario_ordinal=ordinal,
+                    request_sha256=request_sha,
+                ),
+                request_payload=request_payload,
+                request_canonical_json=request_canonical_json,
                 request_sha256=request_sha,
+                mutation_request_sha256=mutation_request_sha,
                 trials=tuple(_binding(item) for item in planned),
             )
         )
@@ -343,12 +398,7 @@ def dispatch_next_physical_stability_job(
         request_sha256=job.request_sha256,
         scenario_id=job.scenario_id,
     )
-    if (
-        observation.scenario_id != job.scenario_id
-        or observation.idempotency_key != job.idempotency_key
-        or observation.request_sha256 != job.request_sha256
-    ):
-        raise ValueError("P5 create observation does not bind the dispatched request")
+    _require_create_observation(job, observation)
     observed_at = observed_at_utc() if callable(observed_at_utc) else observed_at_utc
     after_observed, observed_transition = record_physical_stability_job_observed(
         after_attempt,
@@ -358,6 +408,45 @@ def dispatch_next_physical_stability_job(
     )
     checkpoint_store.persist(after_observed, observed_transition)
     return after_observed, (attempt_transition, observed_transition)
+
+
+def _require_create_observation(
+    job: PhysicalStabilityExecutionJobV1,
+    observation: PhysicalStabilityJobCreateObservationV1,
+) -> None:
+    if (
+        observation.scenario_id != job.scenario_id
+        or observation.idempotency_key != job.idempotency_key
+        or observation.request_sha256 != job.request_sha256
+    ):
+        raise ValueError("P5 create observation does not bind the dispatched request")
+
+
+def reconcile_physical_stability_dispatch(
+    bundle: PhysicalStabilityExecutionBundleV1,
+    ledger: PhysicalStabilityExecutionLedgerV1,
+    observation: PhysicalStabilityJobCreateObservationV1,
+    *,
+    checkpoint_store: PhysicalStabilityCheckpointStore,
+    observed_at_utc: datetime,
+) -> tuple[PhysicalStabilityExecutionLedgerV1, PhysicalStabilityLedgerTransitionV1]:
+    """Record one manually inspected Job without replaying its create request."""
+
+    _require_bundle_ledger_alignment(bundle, ledger)
+    attempted = tuple(item for item in ledger.scenarios if item.status == "dispatch_attempted")
+    if len(attempted) != 1:
+        raise ValueError("P5 reconciliation requires exactly one unobserved dispatch")
+    scenario = attempted[0]
+    job = bundle.jobs[scenario.scenario_ordinal - 1]
+    _require_create_observation(job, observation)
+    after_observed, observed_transition = record_physical_stability_job_observed(
+        ledger,
+        scenario_ordinal=scenario.scenario_ordinal,
+        observed_job_id=observation.observed_job_id,
+        observed_at_utc=observed_at_utc,
+    )
+    checkpoint_store.persist(after_observed, observed_transition)
+    return after_observed, observed_transition
 
 
 def close_physical_stability_job(
@@ -525,5 +614,6 @@ __all__ = [
     "build_physical_stability_execution_bundle",
     "close_physical_stability_job",
     "dispatch_next_physical_stability_job",
+    "reconcile_physical_stability_dispatch",
     "require_manual_reconciliation_after_unobserved_dispatch",
 ]

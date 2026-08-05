@@ -1,10 +1,10 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const test = require("node:test");
 
 const {
-  canonicalSha256,
   connectToDesktop,
   createP5DesktopApiAdapter,
   decodeJsonResponse,
@@ -17,13 +17,28 @@ const {
 const packId = `sha256:${"a".repeat(64)}`;
 const sourceCommit = "b".repeat(40);
 const requestPayload = {
-  display_name: "P5 unit",
+  altitude_m: 3,
+  display_name: "P5 单元",
   llm: null,
   openai: null,
   provider_request_cap: 0,
   provider_turn_cap: 0,
 };
-const idempotencyKey = `p5-${"c".repeat(16)}-01-${"d".repeat(16)}`;
+const requestCanonicalJson =
+  '{"altitude_m":3.0,"display_name":"P5 单元","llm":null,"openai":null,"provider_request_cap":0,"provider_turn_cap":0}';
+const requestSha256 = crypto
+  .createHash("sha256")
+  .update(requestCanonicalJson, "utf8")
+  .digest("hex");
+const mutationRequestSha256 = crypto
+  .createHash("sha256")
+  .update(`{"operation":"jobs.create","payload":${requestCanonicalJson}}`, "utf8")
+  .digest("hex");
+const idempotencyKey = "12345678-1234-5abc-8def-1234567890ab";
+const idempotencyKeySha256 = crypto
+  .createHash("sha256")
+  .update(idempotencyKey, "ascii")
+  .digest("hex");
 
 function jsonResponse(data, overrides = {}) {
   return {
@@ -96,13 +111,21 @@ test("adapter creates one source-bound observation and exposes read-only evidenc
       };
     }
     if (argument?.methodValue === "POST") return jsonResponse({ id: "job-p5-unit" });
+    if (argument?.pathValue?.includes("/physical-stability-dispatches/")) {
+      return jsonResponse({
+        schema_id: "dronedream.physical-stability-dispatch-inspection/v1",
+        state: "completed",
+        idempotency_key_sha256: idempotencyKeySha256,
+        mutation_request_sha256: mutationRequestSha256,
+        observed_job_id: "job-p5-unit",
+      });
+    }
     return jsonResponse([]);
   });
   const adapter = createP5DesktopApiAdapter(page, { packId, sourceCommit });
-  const requestSha256 = canonicalSha256(requestPayload);
-
   const observation = await adapter.createJob({
     requestPayload,
+    requestCanonicalJson,
     idempotencyKey,
     requestSha256,
     scenarioId: "hover-mild-crosswind",
@@ -114,6 +137,17 @@ test("adapter creates one source-bound observation and exposes read-only evidenc
     idempotency_key: idempotencyKey,
     request_sha256: requestSha256,
   });
+  const inspected = await adapter.inspectJobCreation({
+    requestPayload,
+    requestCanonicalJson,
+    idempotencyKey,
+    requestSha256,
+    scenarioId: "hover-mild-crosswind",
+  });
+  assert.deepEqual(inspected, {
+    state: "completed",
+    observation,
+  });
   await adapter.getJob("job-p5-unit");
   await adapter.getTrials("job-p5-unit");
   await adapter.getTrial("trial-p5-unit");
@@ -121,7 +155,7 @@ test("adapter creates one source-bound observation and exposes read-only evidenc
   await adapter.getReport("job-p5-unit");
   await adapter.getPhysicalStabilityEvidence("job-p5-unit");
   assert.deepEqual(
-    page.calls.filter((call) => call?.pathValue).slice(1).map((call) => call.pathValue),
+    page.calls.filter((call) => call?.pathValue).slice(2).map((call) => call.pathValue),
     [
       "/api/v1/jobs/job-p5-unit",
       "/api/v1/jobs/job-p5-unit/trials?page=1&page_size=100",
@@ -134,11 +168,55 @@ test("adapter creates one source-bound observation and exposes read-only evidenc
   await assert.rejects(
     adapter.createJob({
       requestPayload,
+      requestCanonicalJson,
       idempotencyKey,
       requestSha256: "0".repeat(64),
       scenarioId: "hover-mild-crosswind",
     }),
     /SHA does not recompute/,
+  );
+});
+
+test("dispatch inspection retains unresolved states and rejects a mismatched key hash", async () => {
+  const unresolvedPage = fakePage(
+    jsonResponse({
+      schema_id: "dronedream.physical-stability-dispatch-inspection/v1",
+      state: "in_progress",
+      idempotency_key_sha256: idempotencyKeySha256,
+      mutation_request_sha256: mutationRequestSha256,
+      observed_job_id: null,
+    }),
+  );
+  const unresolved = await createP5DesktopApiAdapter(unresolvedPage, {
+    packId,
+    sourceCommit,
+  }).inspectJobCreation({
+    requestPayload,
+    requestCanonicalJson,
+    idempotencyKey,
+    requestSha256,
+    scenarioId: "hover-mild-crosswind",
+  });
+  assert.deepEqual(unresolved, { state: "in_progress" });
+
+  const driftedPage = fakePage(
+    jsonResponse({
+      schema_id: "dronedream.physical-stability-dispatch-inspection/v1",
+      state: "completed",
+      idempotency_key_sha256: "0".repeat(64),
+      mutation_request_sha256: mutationRequestSha256,
+      observed_job_id: "job-p5-unit",
+    }),
+  );
+  await assert.rejects(
+    createP5DesktopApiAdapter(driftedPage, { packId, sourceCommit }).inspectJobCreation({
+      requestPayload,
+      requestCanonicalJson,
+      idempotencyKey,
+      requestSha256,
+      scenarioId: "hover-mild-crosswind",
+    }),
+    /inspection response is invalid/,
   );
 });
 

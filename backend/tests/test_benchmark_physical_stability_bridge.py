@@ -3,8 +3,10 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import UUID
 
 import pytest
+from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app import schemas
@@ -23,6 +25,7 @@ from app.benchmarking.physical_stability_bridge import (
     build_physical_stability_terminal_observation,
     close_physical_stability_job,
     dispatch_next_physical_stability_job,
+    reconcile_physical_stability_dispatch,
     require_manual_reconciliation_after_unobserved_dispatch,
 )
 from app.benchmarking.physical_stability_checkpoint import (
@@ -223,7 +226,11 @@ def test_compiles_six_complete_source_bound_zero_provider_job_requests() -> None
     assert len(bundle.jobs) == 6
     assert sum(len(job.trials) for job in bundle.jobs) == 60
     assert len({job.idempotency_key for job in bundle.jobs}) == 6
+    assert bundle.jobs[0].idempotency_key == "60e9e6a6-410b-5154-9885-a62dca4f53b7"
     for job, scenario in zip(bundle.jobs, manifest.scenarios, strict=True):
+        parsed_key = UUID(job.idempotency_key)
+        assert parsed_key.version == 5
+        assert str(parsed_key) == job.idempotency_key
         request = job.request_payload
         assert request["display_name"].endswith(scenario.scenario_id)
         assert request["simulator_backend"] == "real_cli"
@@ -237,6 +244,21 @@ def test_compiles_six_complete_source_bound_zero_provider_job_requests() -> None
         _validate_real_cli_scenario_effect_contract(
             schemas.JobCreateRequest.model_validate(request)
         )
+
+
+def test_compiled_p5_idempotency_key_is_accepted_and_replayed_by_job_api(
+    client: TestClient,
+) -> None:
+    _manifest, _plan, bundle, _ledger = _contracts()
+    job = bundle.jobs[0]
+    headers = {"Idempotency-Key": job.idempotency_key}
+
+    first = client.post("/api/v1/jobs", json=job.request_payload, headers=headers)
+    replay = client.post("/api/v1/jobs", json=job.request_payload, headers=headers)
+
+    assert first.status_code == 200, first.text
+    assert replay.status_code == 200, replay.text
+    assert replay.json() == first.json()
 
 
 def test_bundle_is_reproducible_and_rejects_plan_or_payload_tamper() -> None:
@@ -256,7 +278,7 @@ def test_bundle_is_reproducible_and_rejects_plan_or_payload_tamper() -> None:
     jobs[0] = deepcopy(jobs[0])
     jobs[0]["request_payload"]["provider_turn_cap"] = 1
     bundle_payload["jobs"] = tuple(jobs)
-    with pytest.raises(ValidationError, match="hash|zero-provider"):
+    with pytest.raises(ValidationError, match="canonical request does not match"):
         PhysicalStabilityExecutionBundleV1.model_validate(bundle_payload)
 
     manifest_payload = manifest.model_dump(mode="python")
@@ -292,6 +314,47 @@ def test_dispatch_persists_reservation_before_single_fake_transport_call() -> No
     assert running.attempted_trial_count == 10
     assert running.scenarios[0].status == "running"
     assert running.scenarios[0].observed_job_id == "job-hover-mild-crosswind"
+
+
+def test_manual_read_only_reconciliation_observes_job_without_replaying_create() -> None:
+    _manifest, _plan, bundle, ledger = _contracts()
+    attempted, attempt_transition = record_physical_stability_dispatch_attempt(
+        ledger,
+        scenario_ordinal=1,
+        attempted_at_utc=_NOW,
+    )
+    store = _Store()
+    store.persist(attempted, attempt_transition)
+    job = bundle.jobs[0]
+    observation = PhysicalStabilityJobCreateObservationV1(
+        scenario_id=job.scenario_id,
+        observed_job_id="job-read-only-reconciled",
+        idempotency_key=job.idempotency_key,
+        request_sha256=job.request_sha256,
+    )
+
+    running, transition = reconcile_physical_stability_dispatch(
+        bundle,
+        attempted,
+        observation,
+        checkpoint_store=store,
+        observed_at_utc=_NOW + timedelta(seconds=1),
+    )
+
+    assert transition.action == "job_observed"
+    assert running.scenarios[0].status == "running"
+    assert running.scenarios[0].observed_job_id == "job-read-only-reconciled"
+    assert len(store.checkpoints) == 2
+
+    drifted = observation.model_copy(update={"request_sha256": "0" * 64})
+    with pytest.raises(ValueError, match="does not bind"):
+        reconcile_physical_stability_dispatch(
+            bundle,
+            attempted,
+            drifted,
+            checkpoint_store=_Store(),
+            observed_at_utc=_NOW + timedelta(seconds=1),
+        )
 
 
 def test_checkpoint_failure_prevents_any_transport_io() -> None:

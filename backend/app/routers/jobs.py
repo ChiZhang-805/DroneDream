@@ -6,13 +6,14 @@ import csv
 import io
 import json
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 
 from app import models, schemas
-from app.api_idempotency import begin_mutation
+from app.api_idempotency import begin_mutation, inspect_mutation
 from app.auth import get_current_user
 from app.benchmarking.physical_stability_job_evidence import (
     compile_physical_stability_job_evidence,
@@ -83,6 +84,60 @@ def create_job(
         _raise(err)
     response = ok(_job_payload_with_alias(job_service.to_job_schema(job)))
     return gate.complete(response, resource_type="job", resource_id=job.id)
+
+
+@router.get("/jobs/physical-stability-dispatches/{idempotency_key}")
+def inspect_physical_stability_dispatch(
+    idempotency_key: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Inspect a P5 create receipt without replaying the original POST."""
+
+    try:
+        parsed_key = UUID(idempotency_key)
+    except ValueError:
+        parsed_key = None
+    if parsed_key is None or parsed_key.version != 5 or str(parsed_key) != idempotency_key:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "PHYSICAL_STABILITY_IDEMPOTENCY_KEY_INVALID",
+                "message": "The dispatch key is not a canonical P5 version-5 UUID.",
+            },
+        )
+    inspection = inspect_mutation(
+        db,
+        user=user,
+        operation="jobs.create",
+        idempotency_key=idempotency_key,
+    )
+    payload: dict[str, object] = {
+        "schema_id": "dronedream.physical-stability-dispatch-inspection/v1",
+        "state": inspection.state,
+        "idempotency_key_sha256": inspection.idempotency_key_sha256,
+        "mutation_request_sha256": inspection.request_hash,
+        "observed_job_id": None,
+    }
+    if inspection.state == "completed":
+        if (
+            inspection.resource_type != "job"
+            or inspection.resource_id is None
+            or inspection.response_status != 200
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "PHYSICAL_STABILITY_DISPATCH_RECEIPT_INVALID",
+                    "message": "The dispatch receipt does not bind a Job.",
+                },
+            )
+        try:
+            job = job_service.get_job(db, inspection.resource_id, user=user)
+        except job_service.JobServiceError as err:
+            _raise(err)
+        payload["observed_job_id"] = job.id
+    return ok(payload)
 
 
 @router.get("/jobs")
