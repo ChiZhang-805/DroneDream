@@ -17,6 +17,7 @@
     "commonCoreHash",
     "editionManifest",
     "profile",
+    "websiteHandoffContract",
     "brand",
     "workspaces",
     "moduleGraph",
@@ -40,6 +41,7 @@
     "commonCoreHash": {"$ref": "#/$defs/sha256"},
     "editionManifest": {"$ref": "#/$defs/fileRef"},
     "profile": {"$ref": "#/$defs/fileRef"},
+    "websiteHandoffContract": {"$ref": "#/$defs/fileRef"},
     "brand": {
       "type": "object",
       "additionalProperties": false,

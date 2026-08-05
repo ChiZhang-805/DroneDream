@@ -25,6 +25,13 @@ VEHICLE_PACK_PATH = ROOT / "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c
 LICENSE_NOTICE_PATH = ROOT / "runtime/THIRD_PARTY_NOTICES.md"
 PAYLOAD_PATH = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
 SCHEMA_PATH = ROOT / "distribution/schemas/lab-preview-artifact-receipt.schema.json"
+WEBSITE_HANDOFF_PATH = (
+    ROOT
+    / "distribution"
+    / "editions"
+    / "lab"
+    / "website-exact-exe-handoff.awaiting.v1.json"
+)
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -175,6 +182,7 @@ def fake_lab_preview_receipt(
         "commonCoreHash": common_core_hash_value,
         "editionManifest": _file_ref(EDITION_PATH),
         "profile": _file_ref(PROFILE_PATH),
+        "websiteHandoffContract": _file_ref(WEBSITE_HANDOFF_PATH),
         "brand": {
             "displayName": "DroneDream · LAB",
             "canonicalDonor": _file_ref(BRAND_DONOR_PATH),
@@ -264,6 +272,7 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
             "commonCoreHash",
             "editionManifest",
             "profile",
+            "websiteHandoffContract",
             "brand",
             "workspaces",
             "moduleGraph",
@@ -303,6 +312,7 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
     for label, path in (
         ("editionManifest", EDITION_PATH),
         ("profile", PROFILE_PATH),
+        ("websiteHandoffContract", WEBSITE_HANDOFF_PATH),
         ("payload", PAYLOAD_PATH),
         ("licenseNotice", LICENSE_NOTICE_PATH),
     ):

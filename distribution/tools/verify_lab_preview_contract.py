@@ -11,6 +11,13 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 TAURI_OVERLAY = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
 BUILD_SCRIPT = ROOT / "desktop/scripts/build-lab-preview.ps1"
+WEBSITE_HANDOFF = (
+    ROOT
+    / "distribution"
+    / "editions"
+    / "lab"
+    / "website-exact-exe-handoff.awaiting.v1.json"
+)
 
 
 class LabPreviewContractError(ValueError):
@@ -27,6 +34,7 @@ def _load_json(path: Path) -> dict[str, object]:
 def verify_lab_preview_contract() -> dict[str, object]:
     profile = _load_json(PROFILE)
     overlay = _load_json(TAURI_OVERLAY)
+    website_handoff = _load_json(WEBSITE_HANDOFF)
     script = BUILD_SCRIPT.read_text(encoding="utf-8")
 
     if profile.get("kind") != "dronedream-lab-preview-build-profile":
@@ -40,8 +48,29 @@ def verify_lab_preview_contract() -> dict[str, object]:
         != "brand/brand-editions.v1.json"
         or authority.get("labBrandSourceManifest")
         != "distribution/editions/lab/brand-source-manifest.v1.json"
+        or authority.get("websiteExactExeHandoff")
+        != "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json"
     ):
-        raise LabPreviewContractError("Lab preview brand source authority is missing")
+        raise LabPreviewContractError("Lab preview source or Website handoff authority is missing")
+
+    receiver = website_handoff.get("receiver")
+    edition = website_handoff.get("edition")
+    if (
+        website_handoff.get("state") != "awaiting-exact-handoff"
+        or website_handoff.get("releaseReady") is not False
+        or not isinstance(receiver, dict)
+        or receiver.get("websiteSourceCommit")
+        != "afdcdee5b60883290c9d1cc0c036141920066659"
+        or receiver.get("websiteEvidenceCommit")
+        != "1a82e36b362c95983473c4a0d0d967d8c7415f92"
+        or receiver.get("mode") != "read-only-receiver"
+        or receiver.get("rebuildAllowed") is not False
+        or receiver.get("renameAllowed") is not False
+        or not isinstance(edition, dict)
+        or edition.get("editionId") != "lab"
+        or edition.get("fileName") != "DroneDream-Lab-1.0.0.exe"
+    ):
+        raise LabPreviewContractError("Website exact EXE receiving contract drifted")
 
     common_core = profile.get("commonCore")
     if not isinstance(common_core, dict):
@@ -80,12 +109,15 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "distribution/editions/lab.v1.json",
         "distribution/editions/lab",
         "distribution/schemas/lab-preview-artifact-receipt.schema.json",
+        "distribution/schemas/lab-website-exact-exe-handoff.schema.json",
         "distribution/tests/test_lab_brand_assets.py",
         "distribution/tests/test_lab_preview_contract.py",
+        "distribution/tests/test_lab_website_handoff.py",
         "distribution/tools/lab_yellow_readiness_audit.py",
         "distribution/tools/lab_preinstall_acceptance.py",
         "distribution/tools/verify_lab_preview_artifact.py",
         "distribution/tools/verify_lab_preview_contract.py",
+        "distribution/tools/verify_lab_website_handoff.py",
         "frontend/package.json",
         "frontend/scripts/verify-lab-ui.mjs",
         "frontend/src/AppShell.tsx",
@@ -149,6 +181,12 @@ def verify_lab_preview_contract() -> dict[str, object]:
         payload.get("artifactReceiptSchema")
         != "distribution/schemas/lab-preview-artifact-receipt.schema.json"
         or payload.get("artifactVerifier") != "distribution/tools/verify_lab_preview_artifact.py"
+        or payload.get("websiteHandoffContract")
+        != "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json"
+        or payload.get("websiteHandoffSchema")
+        != "distribution/schemas/lab-website-exact-exe-handoff.schema.json"
+        or payload.get("websiteHandoffVerifier")
+        != "distribution/tools/verify_lab_website_handoff.py"
         or payload.get("preinstallAcceptanceTool")
         != "distribution/tools/lab_preinstall_acceptance.py"
         or payload.get("yellowReadinessAuditTool")
@@ -183,6 +221,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "forbidForcePush",
         "forbidSigningSecretRead",
         "doNotOverwritePublicAssets",
+        "websiteReceiverReadOnly",
+        "forbidWebsiteRebuild",
+        "forbidWebsiteRename",
     ):
         if guards.get(key) is not True:
             raise LabPreviewContractError(f"Lab preview guard is not enforced: {key}")
@@ -268,6 +309,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         '$tauriProductName = "DroneDream · LAB"',
         'brand-source-manifest.v1.json',
         'canonicalDonor = New-RepoFileRef "brand\\brand-editions.v1.json"',
+        'websiteHandoffContract = New-RepoFileRef "distribution\\editions\\lab\\website-exact-exe-handoff.awaiting.v1.json"',
         'grantsHardwareAuthority = $false',
     )
     for fragment in required_script_fragments:

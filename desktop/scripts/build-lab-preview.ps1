@@ -149,6 +149,7 @@ $receipt = [ordered]@{
     commonCoreHash = $commonCoreHash
     editionManifest = New-RepoFileRef "distribution\editions\lab.v1.json"
     profile = New-RepoFileRef "distribution\build-profiles\lab-preview.v1.json"
+    websiteHandoffContract = New-RepoFileRef "distribution\editions\lab\website-exact-exe-handoff.awaiting.v1.json"
     brand = [ordered]@{
         displayName = $tauriProductName
         canonicalDonor = New-RepoFileRef "brand\brand-editions.v1.json"

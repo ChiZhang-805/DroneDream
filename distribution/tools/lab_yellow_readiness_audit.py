@@ -20,6 +20,7 @@ from typing import Any
 import lab_preinstall_acceptance as preinstall
 import verify_lab_preview_artifact as artifact_verifier
 import verify_lab_preview_contract as profile_verifier
+import verify_lab_website_handoff as website_handoff_verifier
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +34,7 @@ GATE_POLICY_PATH = ROOT / "distribution/safety/edition-execution-gate.v1.json"
 NOTICE_PATH = ROOT / "runtime/THIRD_PARTY_NOTICES.md"
 SUPABASE_CLIENT_PATH = ROOT / "frontend/src/features/auth/supabaseClient.ts"
 SUPABASE_ENV_EXAMPLE_PATH = ROOT / "frontend/.env.example"
+WEBSITE_HANDOFF_PATH = website_handoff_verifier.CONTRACT_PATH
 SUPABASE_DESKTOP_VERIFIER_PATH = ROOT / "desktop/scripts/verify-browser-auth-config.mjs"
 
 COMMON_CORE_PRODUCT_SOURCE_COMMIT = artifact_verifier.COMMON_CORE_PRODUCT_SOURCE_COMMIT
@@ -336,6 +338,11 @@ def evaluate_readiness(
     toolchain = toolchain_state if toolchain_state is not None else _toolchain_state()
     safety = _safety_state(profile)
     profile_result = profile_verifier.verify_lab_preview_contract()
+    website_handoff = website_handoff_verifier.validate_handoff(
+        _load_json(WEBSITE_HANDOFF_PATH),
+        verify_files=False,
+        require_release_ready=False,
+    )
 
     request_blockers: list[str] = []
     if source["branch"] != "codex/software-lab":
@@ -369,6 +376,7 @@ def evaluate_readiness(
         "Lab preview remains unsigned internal-test material until YELLOW build evidence exists.",
         "There are zero validated Vehicle Packs; hardware write, arm, HITL, and flight stay denied.",
         "No codex/release-lab branch or production promotion is authorized by this audit.",
+        "Website remains awaiting-exact-handoff until artifact, validation, publication, and cross-Edition evidence are complete.",
     ]
 
     return {
@@ -388,6 +396,14 @@ def evaluate_readiness(
             "validationTier": manifest["validationTier"],
         },
         "profile": {"file": _file_ref(PROFILE_PATH), "verified": profile_result},
+        "websiteExactExeHandoff": {
+            "file": _file_ref(WEBSITE_HANDOFF_PATH),
+            "receiverSourceCommit": website_handoff["receiver"]["websiteSourceCommit"],
+            "receiverEvidenceCommit": website_handoff["receiver"]["websiteEvidenceCommit"],
+            "state": website_handoff["state"],
+            "fileName": website_handoff["edition"]["fileName"],
+            "releaseReady": website_handoff["releaseReady"],
+        },
         "brand": brand,
         "toolchain": toolchain,
         "workspaceContract": profile["workspaces"],

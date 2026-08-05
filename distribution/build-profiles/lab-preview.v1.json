@@ -14,7 +14,8 @@
     "capabilityPolicy": "distribution/capabilities/core-capabilities.v1.json",
     "executionGatePolicy": "distribution/safety/edition-execution-gate.v1.json",
     "vehiclePackRegistry": "distribution/vehicle-packs/registry.v1.json",
-    "licenseNotice": "runtime/THIRD_PARTY_NOTICES.md"
+    "licenseNotice": "runtime/THIRD_PARTY_NOTICES.md",
+    "websiteExactExeHandoff": "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json"
   },
   "commonCore": {
     "authorityName": "Universal/Core",
@@ -47,12 +48,15 @@
     "distribution/editions/lab.v1.json",
     "distribution/editions/lab",
     "distribution/schemas/lab-preview-artifact-receipt.schema.json",
+    "distribution/schemas/lab-website-exact-exe-handoff.schema.json",
     "distribution/tests/test_lab_brand_assets.py",
     "distribution/tests/test_lab_preview_contract.py",
+    "distribution/tests/test_lab_website_handoff.py",
     "distribution/tools/lab_yellow_readiness_audit.py",
     "distribution/tools/lab_preinstall_acceptance.py",
     "distribution/tools/verify_lab_preview_artifact.py",
     "distribution/tools/verify_lab_preview_contract.py",
+    "distribution/tools/verify_lab_website_handoff.py",
     "frontend/package.json",
     "frontend/scripts/verify-lab-ui.mjs",
     "frontend/src/AppShell.tsx",
@@ -111,6 +115,9 @@
     "buildScript": "desktop/scripts/build-lab-preview.ps1",
     "artifactReceiptSchema": "distribution/schemas/lab-preview-artifact-receipt.schema.json",
     "artifactVerifier": "distribution/tools/verify_lab_preview_artifact.py",
+    "websiteHandoffContract": "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json",
+    "websiteHandoffSchema": "distribution/schemas/lab-website-exact-exe-handoff.schema.json",
+    "websiteHandoffVerifier": "distribution/tools/verify_lab_website_handoff.py",
     "preinstallAcceptanceTool": "distribution/tools/lab_preinstall_acceptance.py",
     "yellowReadinessAuditTool": "distribution/tools/lab_yellow_readiness_audit.py",
     "selectedVehiclePack": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
@@ -172,7 +179,10 @@
     "forbidReleaseBranchCreation": true,
     "forbidForcePush": true,
     "forbidSigningSecretRead": true,
-    "doNotOverwritePublicAssets": true
+    "doNotOverwritePublicAssets": true,
+    "websiteReceiverReadOnly": true,
+    "forbidWebsiteRebuild": true,
+    "forbidWebsiteRename": true
   },
   "signaturePolicy": {
     "authenticode": "not-signed",
@@ -208,6 +218,7 @@
     "All Vehicle Packs remain planned or contract-only; zero are validated.",
     "Hardware writes, unlocking, arming, HITL, and flight remain denied by native, backend, and runtime safety gates.",
     "The preview is unsigned and must not be represented as Authenticode-signed.",
+    "Website remains awaiting-exact-handoff until one clean-source EXE, receipt, manifest, validation boundary, and URL-family inventory are verified.",
     "No release branch may be created from this profile."
   ]
 }

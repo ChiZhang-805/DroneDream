@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/lab-website-exact-exe-handoff.v1.json",
+  "title": "DroneDream · LAB exact EXE handoff to Website",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "handoffVersion",
+    "state",
+    "receiver",
+    "edition",
+    "productSource",
+    "artifact",
+    "receipt",
+    "manifest",
+    "build",
+    "validation",
+    "publication",
+    "crossEditionValidation",
+    "releaseReady",
+    "releaseConclusion",
+    "blockers"
+  ],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "kind": {"const": "dronedream-lab-website-exact-exe-handoff"},
+    "handoffVersion": {"const": "1.0.0"},
+    "state": {"enum": ["awaiting-exact-handoff", "exact-artifact", "release-ready"]},
+    "receiver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["websiteSourceCommit", "websiteEvidenceCommit", "mode", "rebuildAllowed", "renameAllowed"],
+      "properties": {
+        "websiteSourceCommit": {"const": "afdcdee5b60883290c9d1cc0c036141920066659"},
+        "websiteEvidenceCommit": {"const": "1a82e36b362c95983473c4a0d0d967d8c7415f92"},
+        "mode": {"const": "read-only-receiver"},
+        "rebuildAllowed": {"const": false},
+        "renameAllowed": {"const": false}
+      }
+    },
+    "edition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["editionId", "displayName", "version", "fileName"],
+      "properties": {
+        "editionId": {"const": "lab"},
+        "displayName": {"const": "DroneDream · LAB"},
+        "version": {"const": "1.0.0"},
+        "fileName": {"const": "DroneDream-Lab-1.0.0.exe"}
+      }
+    },
+    "productSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["branch", "commit", "clean", "commonCoreCommit", "commonCoreHash"],
+      "properties": {
+        "branch": {"const": "codex/software-lab"},
+        "commit": {"anyOf": [{"$ref": "#/$defs/commit"}, {"type": "null"}]},
+        "clean": {"type": ["boolean", "null"]},
+        "commonCoreCommit": {"const": "e374d3f8d96b1265fcdb06864208b676566e94d9"},
+        "commonCoreHash": {"const": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["absolutePath", "fileName", "version", "bytes", "sha256", "authenticode", "updaterSignature"],
+      "properties": {
+        "absolutePath": {"anyOf": [{"$ref": "#/$defs/absolutePath"}, {"type": "null"}]},
+        "fileName": {"const": "DroneDream-Lab-1.0.0.exe"},
+        "version": {"const": "1.0.0"},
+        "bytes": {"type": ["integer", "null"], "minimum": 1},
+        "sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "authenticode": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["signatureState", "subject", "timestamp"],
+          "properties": {
+            "signatureState": {"enum": ["awaiting", "NotSigned", "Valid", "Invalid"]},
+            "subject": {"type": ["string", "null"], "minLength": 1},
+            "timestamp": {"type": ["string", "null"], "minLength": 1}
+          }
+        },
+        "updaterSignature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "absolutePath", "bytes", "sha256"],
+          "properties": {
+            "state": {"enum": ["awaiting", "not-issued", "issued"]},
+            "absolutePath": {"anyOf": [{"$ref": "#/$defs/absolutePath"}, {"type": "null"}]},
+            "bytes": {"type": ["integer", "null"], "minimum": 1},
+            "sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+          }
+        }
+      }
+    },
+    "receipt": {"$ref": "#/$defs/nullableFileRef"},
+    "manifest": {"$ref": "#/$defs/nullableFileRef"},
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptCount", "successfulArtifactCount", "uniqueExe"],
+      "properties": {
+        "attemptCount": {"type": ["integer", "null"], "minimum": 1},
+        "successfulArtifactCount": {"type": ["integer", "null"], "minimum": 1},
+        "uniqueExe": {"type": ["boolean", "null"]}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["freshInstall", "overlayInstall", "uninstall", "shortcuts", "webView2", "localization", "boundaryNotes"],
+      "properties": {
+        "freshInstall": {"$ref": "#/$defs/validationState"},
+        "overlayInstall": {"$ref": "#/$defs/validationState"},
+        "uninstall": {"$ref": "#/$defs/validationState"},
+        "shortcuts": {"$ref": "#/$defs/validationState"},
+        "webView2": {"$ref": "#/$defs/validationState"},
+        "localization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["en", "zhCN"],
+          "properties": {
+            "en": {"$ref": "#/$defs/validationState"},
+            "zhCN": {"$ref": "#/$defs/validationState"}
+          }
+        },
+        "boundaryNotes": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["urlFamily", "releaseTag", "downloadUrl", "checksumUrl", "receiptUrl", "manifestUrl", "signatureUrl"],
+      "properties": {
+        "urlFamily": {"anyOf": [{"$ref": "#/$defs/httpsUrl"}, {"type": "null"}]},
+        "releaseTag": {"type": ["string", "null"], "minLength": 1},
+        "downloadUrl": {"anyOf": [{"$ref": "#/$defs/httpsUrl"}, {"type": "null"}]},
+        "checksumUrl": {"anyOf": [{"$ref": "#/$defs/httpsUrl"}, {"type": "null"}]},
+        "receiptUrl": {"anyOf": [{"$ref": "#/$defs/httpsUrl"}, {"type": "null"}]},
+        "manifestUrl": {"anyOf": [{"$ref": "#/$defs/httpsUrl"}, {"type": "null"}]},
+        "signatureUrl": {"anyOf": [{"$ref": "#/$defs/httpsUrl"}, {"type": "null"}]}
+      }
+    },
+    "crossEditionValidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["comparedEditions", "distinctArtifactSha256", "distinctDownloadUrl", "distinctReleaseTag"],
+      "properties": {
+        "comparedEditions": {
+          "type": "array",
+          "prefixItems": [
+            {"$ref": "#/$defs/universalSibling"},
+            {"$ref": "#/$defs/simSibling"},
+            {"$ref": "#/$defs/fieldSibling"}
+          ],
+          "items": false
+        },
+        "distinctArtifactSha256": {"type": "boolean"},
+        "distinctDownloadUrl": {"type": "boolean"},
+        "distinctReleaseTag": {"type": "boolean"}
+      }
+    },
+    "releaseReady": {"type": "boolean"},
+    "releaseConclusion": {"type": "string", "minLength": 1},
+    "blockers": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "absolutePath": {"type": "string", "pattern": "^(?:[A-Za-z]:\\\\|/).+"},
+    "httpsUrl": {"type": "string", "pattern": "^https://[^/]+/.+"},
+    "nullableFileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["absolutePath", "sha256"],
+      "properties": {
+        "absolutePath": {"anyOf": [{"$ref": "#/$defs/absolutePath"}, {"type": "null"}]},
+        "sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "validationState": {"enum": ["not-run", "passed", "failed", "blocked", "not-applicable"]},
+    "siblingBase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["editionId", "artifactSha256", "downloadUrl", "releaseTag"],
+      "properties": {
+        "editionId": {"enum": ["universal", "sim", "field"]},
+        "artifactSha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "downloadUrl": {"anyOf": [{"$ref": "#/$defs/httpsUrl"}, {"type": "null"}]},
+        "releaseTag": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "universalSibling": {"allOf": [{"$ref": "#/$defs/siblingBase"}, {"properties": {"editionId": {"const": "universal"}}}]},
+    "simSibling": {"allOf": [{"$ref": "#/$defs/siblingBase"}, {"properties": {"editionId": {"const": "sim"}}}]},
+    "fieldSibling": {"allOf": [{"$ref": "#/$defs/siblingBase"}, {"properties": {"editionId": {"const": "field"}}}]}
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-website-exact-exe-handoff",
+  "handoffVersion": "1.0.0",
+  "state": "awaiting-exact-handoff",
+  "receiver": {
+    "websiteSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "websiteEvidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+    "mode": "read-only-receiver",
+    "rebuildAllowed": false,
+    "renameAllowed": false
+  },
+  "edition": {
+    "editionId": "lab",
+    "displayName": "DroneDream · LAB",
+    "version": "1.0.0",
+    "fileName": "DroneDream-Lab-1.0.0.exe"
+  },
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": null,
+    "clean": null,
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9"
+  },
+  "artifact": {
+    "absolutePath": null,
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": null,
+    "sha256": null,
+    "authenticode": {
+      "signatureState": "awaiting",
+      "subject": null,
+      "timestamp": null
+    },
+    "updaterSignature": {
+      "state": "awaiting",
+      "absolutePath": null,
+      "bytes": null,
+      "sha256": null
+    }
+  },
+  "receipt": {"absolutePath": null, "sha256": null},
+  "manifest": {"absolutePath": null, "sha256": null},
+  "build": {
+    "attemptCount": null,
+    "successfulArtifactCount": null,
+    "uniqueExe": null
+  },
+  "validation": {
+    "freshInstall": "not-run",
+    "overlayInstall": "not-run",
+    "uninstall": "not-run",
+    "shortcuts": "not-run",
+    "webView2": "not-run",
+    "localization": {"en": "not-run", "zhCN": "not-run"},
+    "boundaryNotes": [
+      "No Lab EXE exists; install and runtime-affecting validation require separate approval.",
+      "Zero Vehicle Packs are validated; hardware write, arm, flight, and HITL remain denied."
+    ]
+  },
+  "publication": {
+    "urlFamily": null,
+    "releaseTag": null,
+    "downloadUrl": null,
+    "checksumUrl": null,
+    "receiptUrl": null,
+    "manifestUrl": null,
+    "signatureUrl": null
+  },
+  "crossEditionValidation": {
+    "comparedEditions": [
+      {"editionId": "universal", "artifactSha256": null, "downloadUrl": null, "releaseTag": null},
+      {"editionId": "sim", "artifactSha256": null, "downloadUrl": null, "releaseTag": null},
+      {"editionId": "field", "artifactSha256": null, "downloadUrl": null, "releaseTag": null}
+    ],
+    "distinctArtifactSha256": false,
+    "distinctDownloadUrl": false,
+    "distinctReleaseTag": false
+  },
+  "releaseReady": false,
+  "releaseConclusion": "awaiting-exact-handoff",
+  "blockers": [
+    "DroneDream-Lab-1.0.0.exe does not exist.",
+    "The required MSVC Rust host linker link.exe is unavailable.",
+    "Fresh install, overlay install, uninstall, shortcut, WebView2, and EN/ZH acceptance are not complete.",
+    "Publication URL-family and cross-Edition uniqueness evidence do not exist."
+  ]
+}

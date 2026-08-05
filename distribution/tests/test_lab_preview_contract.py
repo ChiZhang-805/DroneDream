@@ -85,6 +85,12 @@ class LabPreviewContractTests(unittest.TestCase):
         with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "installerIcon"):
             lab_artifact.validate_receipt(receipt)
 
+    def test_lab_artifact_receipt_rejects_website_handoff_contract_drift(self) -> None:
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["websiteHandoffContract"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "websiteHandoffContract"):
+            lab_artifact.validate_receipt(receipt)
+
     def test_lab_artifact_receipt_rejects_field_or_universal_bootstrapper_mixing(self) -> None:
         receipt = lab_artifact.fake_lab_preview_receipt()
         receipt["moduleGraph"]["gatedHardwareAdapter"].append("runtime-base-field-lightweight")
@@ -260,6 +266,11 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertFalse(result["postBuildAcceptance"]["installableNow"])
         self.assertTrue(result["brand"]["readyForYellowBuild"])
         self.assertFalse(result["brand"]["grantsHardwareAuthority"])
+        self.assertEqual(
+            result["websiteExactExeHandoff"]["state"],
+            "awaiting-exact-handoff",
+        )
+        self.assertFalse(result["websiteExactExeHandoff"]["releaseReady"])
         self.assertTrue(all(value is False for value in result["sideEffects"].values()))
 
     def test_lab_yellow_readiness_blocks_when_required_linker_is_missing(self) -> None:
