@@ -129,7 +129,7 @@ def _sealed_job_contract(
     return contract_payload, scenario_suite_sha256, contract_sha256
 
 
-def _run_binding_sha256(
+def run_binding_sha256(
     run: BenchmarkRunBindingRequestV1,
     *,
     scenario_suite_sha256: str,
@@ -627,7 +627,7 @@ def bind_batch(
                 qualification_policy_version=SEALED_QUALIFICATION_POLICY_VERSION,
                 scenario_suite_sha256=scenario_sha256,
                 qualification_contract_sha256=qualification_sha256,
-                binding_sha256=_run_binding_sha256(
+                binding_sha256=run_binding_sha256(
                     run,
                     scenario_suite_sha256=scenario_sha256,
                     qualification_contract_sha256=qualification_sha256,
@@ -819,6 +819,7 @@ __all__ = [
     "release_lease",
     "renew_lease",
     "reserve_budget",
+    "run_binding_sha256",
     "to_reservation_record",
     "to_batch_binding_record",
     "to_usage",

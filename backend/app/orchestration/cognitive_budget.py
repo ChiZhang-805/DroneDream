@@ -50,6 +50,7 @@ MAX_PROVIDER_TURNS_PER_GENERATION = 4
 MAX_PROVIDER_TURNS_PER_JOB = 128
 
 TurnRole = Literal["plan", "revision", "diagnosis", "critic"]
+BenchmarkTurnRole = Literal["direct_proposal"]
 TurnOutcomeStatus = Literal[
     "succeeded",
     "provider_failed",
@@ -320,13 +321,14 @@ def _strict_sha256(value: str, *, field: str) -> str:
     return normalized
 
 
-def begin_cognitive_turn(
+def _commit_cognitive_turn(
     db: Session,
     job: models.Job,
     *,
     generation_index: int,
     turn_index: int,
-    turn_role: TurnRole,
+    turn_role: str,
+    trigger_policy_version: str,
     trigger_reasons: Sequence[str],
     model_snapshot: str,
     prompt_sha256: str,
@@ -334,50 +336,20 @@ def begin_cognitive_turn(
     schema_sha256: str,
     tool_outputs_sha256: str,
 ) -> CognitiveTurnAttempt:
-    """Commit one attempted turn before the caller performs network I/O."""
+    """Commit an already-authorized turn without relaxing its caller's policy."""
 
-    if job.cognitive_policy_version != COGNITIVE_POLICY_VERSION:
+    if not turn_role or len(turn_role) > 32:
+        raise CognitiveTurnBlocked("turn_role_invalid", "Cognitive turn role is invalid.")
+    if not trigger_policy_version or len(trigger_policy_version) > 32:
         raise CognitiveTurnBlocked(
-            "unsupported_cognitive_policy",
-            "The Job cognitive policy is not supported by this Engine Pack.",
-        )
-    if job.first_qualified_candidate_id is not None:
-        raise CognitiveTurnBlocked(
-            "first_qualified_stop",
-            "A first-qualified parent never resumes provider turns; exploration uses a child Job.",
-        )
-    if generation_index != job.current_generation + 1:
-        raise CognitiveTurnBlocked(
-            "generation_drift",
-            "Cognitive generation no longer matches Job state.",
-        )
-    if _ROLE_BY_INDEX.get(turn_index) != turn_role:
-        raise CognitiveTurnBlocked("turn_role_mismatch", "Cognitive turn index and role disagree.")
-    if not 1 <= turn_index <= MAX_PROVIDER_TURNS_PER_GENERATION:
-        raise CognitiveTurnBlocked(
-            "turn_limit_exceeded",
-            "Per-generation cognitive turn cap exceeded.",
+            "trigger_policy_invalid",
+            "Cognitive trigger policy version is invalid.",
         )
     if not model_snapshot or len(model_snapshot) > 128:
         raise CognitiveTurnBlocked(
             "invalid_model_snapshot",
             "Model snapshot is missing or too long.",
         )
-    required_prior_index = {2: 1, 3: 2, 4: 2}.get(turn_index)
-    if required_prior_index is not None:
-        prior_turn = db.scalar(
-            select(models.HarnessCognitiveTurnReceipt.id).where(
-                models.HarnessCognitiveTurnReceipt.job_id == job.id,
-                models.HarnessCognitiveTurnReceipt.generation_index == generation_index,
-                models.HarnessCognitiveTurnReceipt.turn_index == required_prior_index,
-            )
-        )
-        if prior_turn is None:
-            raise CognitiveTurnBlocked(
-                "cognitive_predecessor_missing",
-                "The required earlier cognitive turn was not attempted.",
-            )
-
     prompt_hash = _strict_sha256(prompt_sha256, field="prompt_sha256")
     evidence_hash = _strict_sha256(evidence_sha256, field="evidence_sha256")
     schema_hash = _strict_sha256(schema_sha256, field="schema_sha256")
@@ -441,7 +413,7 @@ def begin_cognitive_turn(
         generation_index=generation_index,
         turn_index=turn_index,
         turn_role=turn_role,
-        trigger_policy_version=COGNITIVE_TRIGGER_POLICY_VERSION,
+        trigger_policy_version=trigger_policy_version,
         trigger_reasons_json=list(reasons),
         source_commit=source_commit,
         model_snapshot=model_snapshot,
@@ -455,6 +427,124 @@ def begin_cognitive_turn(
     db.refresh(job)
     db.refresh(receipt)
     return CognitiveTurnAttempt(receipt_id=receipt.id, source_commit=source_commit)
+
+
+def begin_cognitive_turn(
+    db: Session,
+    job: models.Job,
+    *,
+    generation_index: int,
+    turn_index: int,
+    turn_role: TurnRole,
+    trigger_reasons: Sequence[str],
+    model_snapshot: str,
+    prompt_sha256: str,
+    evidence_sha256: str,
+    schema_sha256: str,
+    tool_outputs_sha256: str,
+) -> CognitiveTurnAttempt:
+    """Commit one product-Harness turn before the caller performs network I/O."""
+
+    if job.cognitive_policy_version != COGNITIVE_POLICY_VERSION:
+        raise CognitiveTurnBlocked(
+            "unsupported_cognitive_policy",
+            "The Job cognitive policy is not supported by this Engine Pack.",
+        )
+    if job.first_qualified_candidate_id is not None:
+        raise CognitiveTurnBlocked(
+            "first_qualified_stop",
+            "A first-qualified parent never resumes provider turns; exploration uses a child Job.",
+        )
+    if generation_index != job.current_generation + 1:
+        raise CognitiveTurnBlocked(
+            "generation_drift",
+            "Cognitive generation no longer matches Job state.",
+        )
+    if _ROLE_BY_INDEX.get(turn_index) != turn_role:
+        raise CognitiveTurnBlocked("turn_role_mismatch", "Cognitive turn index and role disagree.")
+    if not 1 <= turn_index <= MAX_PROVIDER_TURNS_PER_GENERATION:
+        raise CognitiveTurnBlocked(
+            "turn_limit_exceeded",
+            "Per-generation cognitive turn cap exceeded.",
+        )
+    required_prior_index = {2: 1, 3: 2, 4: 2}.get(turn_index)
+    if required_prior_index is not None:
+        prior_turn = db.scalar(
+            select(models.HarnessCognitiveTurnReceipt.id).where(
+                models.HarnessCognitiveTurnReceipt.job_id == job.id,
+                models.HarnessCognitiveTurnReceipt.generation_index == generation_index,
+                models.HarnessCognitiveTurnReceipt.turn_index == required_prior_index,
+            )
+        )
+        if prior_turn is None:
+            raise CognitiveTurnBlocked(
+                "cognitive_predecessor_missing",
+                "The required earlier cognitive turn was not attempted.",
+            )
+    return _commit_cognitive_turn(
+        db,
+        job,
+        generation_index=generation_index,
+        turn_index=turn_index,
+        turn_role=turn_role,
+        trigger_policy_version=COGNITIVE_TRIGGER_POLICY_VERSION,
+        trigger_reasons=trigger_reasons,
+        model_snapshot=model_snapshot,
+        prompt_sha256=prompt_sha256,
+        evidence_sha256=evidence_sha256,
+        schema_sha256=schema_sha256,
+        tool_outputs_sha256=tool_outputs_sha256,
+    )
+
+
+def begin_benchmark_direct_turn(
+    db: Session,
+    job: models.Job,
+    *,
+    generation_index: int,
+    turn_role: BenchmarkTurnRole,
+    model_snapshot: str,
+    prompt_sha256: str,
+    evidence_sha256: str,
+    schema_sha256: str,
+    tool_outputs_sha256: str,
+) -> CognitiveTurnAttempt:
+    """Persist one preregistered benchmark-direct turn without changing Job policy."""
+
+    if job.first_qualified_candidate_id is not None:
+        raise CognitiveTurnBlocked(
+            "first_qualified_stop",
+            "A first-qualified benchmark run cannot spend another provider turn.",
+        )
+    if generation_index != job.current_generation + 1:
+        raise CognitiveTurnBlocked(
+            "generation_drift",
+            "Benchmark generation no longer matches Job state.",
+        )
+    if turn_role != "direct_proposal":
+        raise CognitiveTurnBlocked(
+            "turn_role_mismatch",
+            "The direct benchmark adapter permits only direct_proposal.",
+        )
+    if job.provider_max_retries != 0:
+        raise CognitiveTurnBlocked(
+            "benchmark_retry_policy_drift",
+            "Formal benchmark provider retries must be zero.",
+        )
+    return _commit_cognitive_turn(
+        db,
+        job,
+        generation_index=generation_index,
+        turn_index=1,
+        turn_role=turn_role,
+        trigger_policy_version="benchmark-llm-direct-v1",
+        trigger_reasons=("preregistered-direct-turn",),
+        model_snapshot=model_snapshot,
+        prompt_sha256=prompt_sha256,
+        evidence_sha256=evidence_sha256,
+        schema_sha256=schema_sha256,
+        tool_outputs_sha256=tool_outputs_sha256,
+    )
 
 
 def finish_cognitive_turn(
@@ -788,6 +878,7 @@ __all__ = [
     "CognitiveTurnAttempt",
     "CognitiveTurnBlocked",
     "CognitiveTurnPending",
+    "begin_benchmark_direct_turn",
     "begin_cognitive_turn",
     "cancel_cognitive_turn_if_job_terminal",
     "canonical_json",
