@@ -513,10 +513,21 @@ def bind_batch(
         (arm.benchmark_arm_id, arm.arm_version): arm for arm in campaign.arms
     }
     for run in request.runs:
-        if (run.benchmark_arm_id, run.arm_version) not in arm_by_semantic_id:
+        arm = arm_by_semantic_id.get((run.benchmark_arm_id, run.arm_version))
+        if arm is None:
             raise BenchmarkCoordinatorError(
                 "BENCHMARK_RUN_ARM_NOT_IN_CAMPAIGN",
                 "Every run must reference an arm and version frozen in this campaign.",
+                http_status=422,
+            )
+        if not arm.execution_enabled:
+            raise BenchmarkCoordinatorError(
+                "BENCHMARK_RUN_ARM_EXECUTION_DISABLED",
+                (
+                    "A Job cannot be bound to a preregistered arm whose immutable "
+                    "manifest keeps execution_enabled=false. Promote and version the "
+                    "reviewed adapter before creating executable run bindings."
+                ),
                 http_status=422,
             )
 

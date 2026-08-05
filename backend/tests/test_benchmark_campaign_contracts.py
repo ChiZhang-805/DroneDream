@@ -165,6 +165,28 @@ def _manifest() -> dict[str, object]:
     }
 
 
+def _executable_pair_manifest(*, version: str) -> dict[str, object]:
+    """Return two reviewed local arms for executable Batch-binding tests."""
+
+    manifest = _manifest()
+    manifest["campaign_version"] = version
+    random_arm = manifest["arms"][0]
+    random_arm["execution_enabled"] = True
+    manifest["arms"][1] = {
+        "schema_id": "dronedream.benchmark-arm/v1",
+        "benchmark_arm_id": "seeded-halton",
+        "arm_version": "v1",
+        "arm_family": "traditional",
+        "proposal_adapter_id": "seeded_halton/v1",
+        "evaluator_contract_id": "dronedream.candidate-evaluator/v1",
+        "intervention": {"algorithm_seed_policy": "paired-block-v1"},
+        "provider_contract_sha256": None,
+        "dependencies": [],
+        "execution_enabled": True,
+    }
+    return manifest
+
+
 def test_unified_observation_excludes_holdout_and_sensitive_payloads() -> None:
     v1_schema = BenchmarkObservationV1.model_json_schema()
     v2_schema = BenchmarkObservationV2.model_json_schema()
@@ -563,7 +585,7 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
 ) -> None:
     created = client.post(
         "/api/v1/benchmark-campaigns",
-        json={"manifest": _manifest()},
+        json={"manifest": _executable_pair_manifest(version="binding-freeze-v1")},
     ).json()["data"]
     batch = client.post(
         "/api/v1/batches",
@@ -595,14 +617,14 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
         "batch_id": batch["id"],
         "runs": [
             {
-                "run_key": "run-02-adaptive",
+                "run_key": "run-02-halton",
                 "job_id": jobs[1]["id"],
-                "benchmark_arm_id": "dronedream-adaptive",
+                "benchmark_arm_id": "seeded-halton",
                 "arm_version": "v1",
                 "algorithm_seed": 102,
                 "simulator_seed_block": "crn-block-01",
-                "provider_randomness_policy": "fixed_seed",
-                "provider_seed": 20260804,
+                "provider_randomness_policy": "not_applicable",
+                "provider_seed": None,
             },
             {
                 "run_key": "run-01-random",
@@ -628,12 +650,12 @@ def test_campaign_batch_binding_freezes_all_jobs_ordinals_arms_and_seeds(
     assert binding["job_count"] == 2
     assert [run["run_key"] for run in binding["runs"]] == [
         "run-01-random",
-        "run-02-adaptive",
+        "run-02-halton",
     ]
     assert [run["run_ordinal"] for run in binding["runs"]] == [1, 2]
     assert [run["batch_run_ordinal"] for run in binding["runs"]] == [1, 2]
     assert binding["runs"][0]["simulator_seed_block"] == "crn-block-01"
-    assert binding["runs"][1]["provider_seed"] == 20260804
+    assert binding["runs"][1]["provider_seed"] is None
     frozen_contract = compile_sealed_qualification_contract(
         ScenarioSuiteConfig(**_BENCHMARK_SCENARIO_SUITE)
     )
@@ -741,7 +763,7 @@ def test_campaign_batch_binding_rejects_partial_started_or_unknown_arm(
 ) -> None:
     created = client.post(
         "/api/v1/benchmark-campaigns",
-        json={"manifest": _manifest()},
+        json={"manifest": _executable_pair_manifest(version="binding-rejections-v1")},
     ).json()["data"]
     batch = client.post(
         "/api/v1/batches",
@@ -828,6 +850,67 @@ def test_campaign_batch_binding_rejects_partial_started_or_unknown_arm(
     assert started.json()["error"]["code"] == "BENCHMARK_BATCH_ALREADY_STARTED"
 
 
+def test_campaign_binding_rejects_preregistered_but_execution_disabled_arm(
+    client: TestClient,
+) -> None:
+    created = client.post(
+        "/api/v1/benchmark-campaigns",
+        json={"manifest": _manifest()},
+    ).json()["data"]
+    batch = client.post(
+        "/api/v1/batches",
+        json={"name": "disabled-arm", "jobs": [_BENCHMARK_JOB_PAYLOAD]},
+    ).json()["data"]
+    job = client.get(f"/api/v1/batches/{batch['id']}/jobs").json()["data"][0]
+
+    from app import models
+    from app.db import SessionLocal
+
+    with SessionLocal() as db:
+        db.execute(
+            text("UPDATE benchmark_campaigns SET status='ACTIVE' WHERE id=:id"),
+            {"id": created["id"]},
+        )
+        db.commit()
+    claimed = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/coordinator/claim",
+        json={"owner_id": "campaign-coordinator", "lease_seconds": 120},
+    ).json()["data"]
+    response = client.post(
+        f"/api/v1/benchmark-campaigns/{created['id']}/batch-bindings",
+        json={
+            "binding_key": "disabled-arm",
+            "lease_generation": claimed["lease_generation"],
+            "batch_id": batch["id"],
+            "runs": [
+                {
+                    "run_key": "run-disabled",
+                    "job_id": job["id"],
+                    "benchmark_arm_id": "random-search",
+                    "arm_version": "v1",
+                    "algorithm_seed": 101,
+                    "simulator_seed_block": "crn-disabled",
+                    "provider_randomness_policy": "not_applicable",
+                    "provider_seed": None,
+                }
+            ],
+        },
+        headers={"X-Benchmark-Lease-Token": claimed["lease_token"]},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == (
+        "BENCHMARK_RUN_ARM_EXECUTION_DISABLED"
+    )
+    usage = client.get(f"/api/v1/benchmark-campaigns/{created['id']}/usage")
+    assert usage.json()["data"]["used"]["jobs"] == 0
+    with SessionLocal() as db:
+        stored = db.get(models.Job, job["id"])
+        assert stored is not None
+        assert stored.holdout_policy_version == "legacy-visible-v0"
+        assert stored.holdout_contract_json is None
+
+
 @pytest.mark.parametrize(
     ("job_payload", "expected_error"),
     [
@@ -845,7 +928,11 @@ def test_campaign_binding_rejects_a_job_without_exact_sealed_contract(
 ) -> None:
     created = client.post(
         "/api/v1/benchmark-campaigns",
-        json={"manifest": _manifest()},
+        json={
+            "manifest": _executable_pair_manifest(
+                version="invalid-sealed-matrix-v1"
+            )
+        },
     ).json()["data"]
     batch = client.post(
         "/api/v1/batches",
@@ -900,8 +987,7 @@ def test_campaign_binding_rejects_a_job_without_exact_sealed_contract(
 def test_campaign_binding_rolls_back_job_sealing_when_global_cap_rejects(
     client: TestClient,
 ) -> None:
-    manifest = _manifest()
-    manifest["campaign_version"] = "atomic-cap-rejection"
+    manifest = _executable_pair_manifest(version="atomic-cap-rejection")
     manifest["budget_caps"]["jobs"] = 1
     created = client.post(
         "/api/v1/benchmark-campaigns",
@@ -947,14 +1033,14 @@ def test_campaign_binding_rolls_back_job_sealing_when_global_cap_rejects(
                     "provider_seed": None,
                 },
                 {
-                    "run_key": "run-adaptive",
+                    "run_key": "run-halton",
                     "job_id": jobs[1]["id"],
-                    "benchmark_arm_id": "dronedream-adaptive",
+                    "benchmark_arm_id": "seeded-halton",
                     "arm_version": "v1",
                     "algorithm_seed": 102,
                     "simulator_seed_block": "crn-cap",
-                    "provider_randomness_policy": "fixed_seed",
-                    "provider_seed": 20260804,
+                    "provider_randomness_policy": "not_applicable",
+                    "provider_seed": None,
                 },
             ],
         },
@@ -981,7 +1067,7 @@ def test_campaign_binding_rejects_paired_arms_with_scenario_drift(
 ) -> None:
     created = client.post(
         "/api/v1/benchmark-campaigns",
-        json={"manifest": _manifest()},
+        json={"manifest": _executable_pair_manifest(version="scenario-drift-v1")},
     ).json()["data"]
     drifted = deepcopy(_BENCHMARK_JOB_PAYLOAD)
     drifted["scenario_suite"]["cases"][1]["config"] = {"wind_mps": 4.0}
@@ -1025,14 +1111,14 @@ def test_campaign_binding_rejects_paired_arms_with_scenario_drift(
                     "provider_seed": None,
                 },
                 {
-                    "run_key": "run-adaptive",
+                    "run_key": "run-halton",
                     "job_id": jobs[1]["id"],
-                    "benchmark_arm_id": "dronedream-adaptive",
+                    "benchmark_arm_id": "seeded-halton",
                     "arm_version": "v1",
                     "algorithm_seed": 102,
                     "simulator_seed_block": "crn-shared",
-                    "provider_randomness_policy": "fixed_seed",
-                    "provider_seed": 20260804,
+                    "provider_randomness_policy": "not_applicable",
+                    "provider_seed": None,
                 },
             ],
         },
