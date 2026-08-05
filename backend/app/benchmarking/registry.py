@@ -79,14 +79,14 @@ _DESCRIPTORS = (
         "reference_turbo/v1",
         "traditional",
         "contract_only",
-        "botorch-turbo-reference-adapter-pending",
+        "botorch-0.17.0-turbo1-ts-tutorial-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
         "reference_scbo/v1",
         "traditional",
         "contract_only",
-        "botorch-scbo-reference-adapter-pending",
+        "botorch-0.17.0-scbo-ts-tutorial-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(

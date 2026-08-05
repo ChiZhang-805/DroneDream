@@ -77,15 +77,18 @@ def test_external_references_are_pinned_candidates_but_fail_closed_until_locked(
     assert entry.environment_boundary == "isolated_benchmark"
     assert entry.execution_readiness == "blocked"
     assert "isolated_environment_missing" in entry.blocker_codes
-    if adapter_id in {"bipop_cma_es/v1", "optuna_tpe/v1"}:
+    if adapter_id in {
+        "bipop_cma_es/v1",
+        "optuna_tpe/v1",
+        "reference_turbo/v1",
+        "reference_scbo/v1",
+    }:
         assert "source_archive_hash_pending" not in entry.blocker_codes
         package_sources = [
             source for source in entry.sources if source.source_kind == "python_package"
         ]
         assert package_sources
         assert all(source.distribution_sha256 for source in package_sources)
-    else:
-        assert "source_archive_hash_pending" in entry.blocker_codes
     assert any(source.version_candidate == version for source in entry.sources)
     assert any(source.license_spdx == license_spdx for source in entry.sources)
     with pytest.raises(ValueError, match="benchmark method is blocked"):

@@ -303,16 +303,54 @@ _ENTRIES = (
     BenchmarkMethodInventoryEntryV1(
         adapter_id="reference_turbo/v1",
         method_classification="standard_reference",
-        implementation_label="botorch-turbo-reference-adapter-pending",
+        implementation_label="botorch-0.17.0-turbo1-ts-tutorial-contract",
         execution_readiness="blocked",
         environment_boundary="isolated_benchmark",
         sources=(
             BenchmarkMethodSourceV1(
-                source_id="botorch-v0.17.0-turbo",
+                source_id="botorch-0.17.0-wheel",
                 source_kind="python_package",
-                locator="https://github.com/meta-pytorch/botorch/tree/v0.17.0",
+                locator=(
+                    "https://files.pythonhosted.org/packages/07/9e/"
+                    "ce611d8c5619dfc1a5f0a66cd9d1df3da219151d31027f530c8f92f3547c/"
+                    "botorch-0.17.0-py3-none-any.whl"
+                ),
                 version_candidate="0.17.0",
                 dependency_name="botorch",
+                distribution_filename="botorch-0.17.0-py3-none-any.whl",
+                distribution_sha256=(
+                    "fb8610cbf43a48746aa5935141b12063723abf0f8c353132cfcd9757703d02c2"
+                ),
+                upstream_commit="1855320f0bbef1766b5a010ebaad6253e8cf072b",
+                license_status="verified",
+                license_spdx="MIT",
+                license_locator=("https://github.com/meta-pytorch/botorch/blob/v0.17.0/LICENSE"),
+            ),
+            BenchmarkMethodSourceV1(
+                source_id="botorch-0.17.0-sdist",
+                source_kind="python_package",
+                locator=(
+                    "https://files.pythonhosted.org/packages/f1/e9/"
+                    "077ae6a4f14a09fd6564ca1325f3061d27450649fd380f1c308bedc22634/"
+                    "botorch-0.17.0.tar.gz"
+                ),
+                version_candidate="0.17.0",
+                dependency_name="botorch",
+                distribution_filename="botorch-0.17.0.tar.gz",
+                distribution_sha256=(
+                    "32e5c3ee99504b909d3a495e35c0b193566a5851e6a50e761b67338d11086749"
+                ),
+                upstream_commit="1855320f0bbef1766b5a010ebaad6253e8cf072b",
+                license_status="verified",
+                license_spdx="MIT",
+                license_locator=("https://github.com/meta-pytorch/botorch/blob/v0.17.0/LICENSE"),
+            ),
+            BenchmarkMethodSourceV1(
+                source_id="botorch-0.17.0-turbo1-tutorial",
+                source_kind="upstream_documentation",
+                locator="https://botorch.org/docs/v0.17.0/tutorials/turbo_1",
+                version_candidate="0.17.0",
+                upstream_commit="1855320f0bbef1766b5a010ebaad6253e8cf072b",
                 license_status="verified",
                 license_spdx="MIT",
                 license_locator=("https://github.com/meta-pytorch/botorch/blob/v0.17.0/LICENSE"),
@@ -320,26 +358,67 @@ _ENTRIES = (
         ),
         blocker_codes=(
             "adapter_not_implemented",
+            "compatibility_unverified",
             "isolated_environment_missing",
-            "source_archive_hash_pending",
         ),
         reproducibility_notes=(
             "The repository native_turbo implementation remains a product-inspired arm.",
+            "The upstream tutorial is a recipe, not a packaged TuRBO adapter class.",
+            "Tutorial batch-size four and product sequential proposals remain unresolved.",
+            "Hard safety constraints remain evaluator gates and are not modelled by TuRBO-1.",
         ),
     ),
     BenchmarkMethodInventoryEntryV1(
         adapter_id="reference_scbo/v1",
         method_classification="standard_reference",
-        implementation_label="botorch-scbo-reference-adapter-pending",
+        implementation_label="botorch-0.17.0-scbo-ts-tutorial-contract",
         execution_readiness="blocked",
         environment_boundary="isolated_benchmark",
         sources=(
             BenchmarkMethodSourceV1(
-                source_id="botorch-v0.17.0-scbo",
+                source_id="botorch-0.17.0-wheel-scbo",
                 source_kind="python_package",
-                locator="https://github.com/meta-pytorch/botorch/tree/v0.17.0",
+                locator=(
+                    "https://files.pythonhosted.org/packages/07/9e/"
+                    "ce611d8c5619dfc1a5f0a66cd9d1df3da219151d31027f530c8f92f3547c/"
+                    "botorch-0.17.0-py3-none-any.whl"
+                ),
                 version_candidate="0.17.0",
                 dependency_name="botorch",
+                distribution_filename="botorch-0.17.0-py3-none-any.whl",
+                distribution_sha256=(
+                    "fb8610cbf43a48746aa5935141b12063723abf0f8c353132cfcd9757703d02c2"
+                ),
+                upstream_commit="1855320f0bbef1766b5a010ebaad6253e8cf072b",
+                license_status="verified",
+                license_spdx="MIT",
+                license_locator=("https://github.com/meta-pytorch/botorch/blob/v0.17.0/LICENSE"),
+            ),
+            BenchmarkMethodSourceV1(
+                source_id="botorch-0.17.0-sdist-scbo",
+                source_kind="python_package",
+                locator=(
+                    "https://files.pythonhosted.org/packages/f1/e9/"
+                    "077ae6a4f14a09fd6564ca1325f3061d27450649fd380f1c308bedc22634/"
+                    "botorch-0.17.0.tar.gz"
+                ),
+                version_candidate="0.17.0",
+                dependency_name="botorch",
+                distribution_filename="botorch-0.17.0.tar.gz",
+                distribution_sha256=(
+                    "32e5c3ee99504b909d3a495e35c0b193566a5851e6a50e761b67338d11086749"
+                ),
+                upstream_commit="1855320f0bbef1766b5a010ebaad6253e8cf072b",
+                license_status="verified",
+                license_spdx="MIT",
+                license_locator=("https://github.com/meta-pytorch/botorch/blob/v0.17.0/LICENSE"),
+            ),
+            BenchmarkMethodSourceV1(
+                source_id="botorch-0.17.0-scbo-tutorial",
+                source_kind="upstream_documentation",
+                locator=("https://botorch.org/docs/v0.17.0/tutorials/scalable_constrained_bo"),
+                version_candidate="0.17.0",
+                upstream_commit="1855320f0bbef1766b5a010ebaad6253e8cf072b",
                 license_status="verified",
                 license_spdx="MIT",
                 license_locator=("https://github.com/meta-pytorch/botorch/blob/v0.17.0/LICENSE"),
@@ -347,8 +426,17 @@ _ENTRIES = (
         ),
         blocker_codes=(
             "adapter_not_implemented",
+            "compatibility_unverified",
             "isolated_environment_missing",
-            "source_archive_hash_pending",
+        ),
+        reproducibility_notes=(
+            "The upstream tutorial is a recipe, not a packaged SCBO adapter class.",
+            "Tutorial batch-size four and product sequential proposals remain unresolved.",
+            "The tutorial fixes ten initial points only for its ten-dimensional example.",
+            (
+                "SCBO fits only real objective and constraint observations; "
+                "failures stay in the denominator."
+            ),
         ),
     ),
     BenchmarkMethodInventoryEntryV1(
