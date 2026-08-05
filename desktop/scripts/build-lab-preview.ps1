@@ -1,7 +1,9 @@
 param(
     [switch]$Build,
     [string]$OutputRoot,
-    [string]$CargoTargetDir
+    [string]$CargoTargetDir,
+    [ValidateSet("gnullvm")]
+    [string]$Toolchain = "gnullvm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -101,8 +103,33 @@ if ($LASTEXITCODE -ne 0 -or -not $coreListing.Trim()) {
 $commonCoreHash = Get-Sha256Text $coreListing.Trim()
 
 if (-not $Build) {
-    Write-Host "Lab preview contract verified for $sourceCommit; no EXE was built. Pass -Build to create the unsigned internal preview."
+    Write-Host "Lab preview contract verified for $sourceCommit with pinned $Toolchain; no EXE was built. Pass -Build to create the unsigned internal preview."
     exit 0
+}
+
+$python = Get-Command python.exe -ErrorAction SilentlyContinue
+if (-not $python) {
+    throw "Python is required for the read-only Lab toolchain readiness gate."
+}
+$readinessTool = Join-Path $repoRoot "distribution\tools\lab_yellow_readiness_audit.py"
+$readinessJson = (& $python.Source $readinessTool | Out-String)
+if ($LASTEXITCODE -ne 0) {
+    throw "The Lab YELLOW readiness audit failed before the build."
+}
+try {
+    $readiness = $readinessJson | ConvertFrom-Json
+} catch {
+    throw "The Lab YELLOW readiness audit returned invalid JSON."
+}
+if (-not $readiness.yellowBuildRequest.requestable) {
+    throw "The Lab YELLOW readiness gate is closed: $($readiness.yellowBuildRequest.requestBlockers -join '; ')"
+}
+if ($readiness.toolchain.selectedToolchain -cne $Toolchain) {
+    throw "The Lab YELLOW readiness audit did not select the required pinned $Toolchain toolchain."
+}
+$gnullvm = $readiness.toolchain.candidates.gnullvm
+if (-not $gnullvm.strictlyPinnedReady -or $gnullvm.requiresMsvcLinkExe) {
+    throw "The pinned Lab gnullvm toolchain is not ready or unexpectedly requires MSVC link.exe."
 }
 
 $env:CARGO_TARGET_DIR = $cargoTargetFull
@@ -110,8 +137,13 @@ $env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $sourceCommit
 $env:DRONEDREAM_LAB_PREVIEW = "1"
 $env:VITE_DRONEDREAM_EDITION = "lab"
 
-& npm.cmd --prefix (Join-Path $repoRoot "desktop") run build -- `
-    --config src-tauri/tauri.lab-preview.conf.json
+& (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
+    -AdditionalConfigPath (Join-Path $repoRoot "desktop\src-tauri\tauri.lab-preview.conf.json") `
+    -CargoTargetDir $cargoTargetFull `
+    -LlvmRoot $gnullvm.llvmRoot `
+    -ExpectedProductName $tauriProductName `
+    -AllowUnsignedUpdater `
+    -PreserveBundleHistory
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
@@ -122,13 +154,14 @@ if ($postBuildCommit -cne $sourceCommit -or $postBuildStatus) {
     throw "Lab preview source changed while building."
 }
 
-$bundleDirectory = Join-Path $repoRoot "desktop\src-tauri\target\release\bundle\nsis"
-$candidate = Get-ChildItem -LiteralPath $bundleDirectory -File -Filter "*.exe" |
-    Where-Object { $_.Name -match ("^{0}_1\.0\.0_.*setup\.exe$" -f [regex]::Escape($tauriProductName)) } |
-    Sort-Object LastWriteTimeUtc -Descending |
-    Select-Object -First 1
-if (-not $candidate) {
+$bundleDirectory = Join-Path $cargoTargetFull "x86_64-pc-windows-gnullvm\release\bundle\nsis"
+$candidatePath = Join-Path $bundleDirectory "${tauriProductName}_1.0.0_x64-setup.exe"
+if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
     throw "The Lab preview build completed without a Tauri NSIS installer."
+}
+$candidate = Get-Item -LiteralPath $candidatePath
+if (Test-Path -LiteralPath "${candidatePath}.sig" -PathType Leaf) {
+    throw "The unsigned Lab preview unexpectedly has an updater signature."
 }
 
 New-Item -ItemType Directory -Force -Path $outputRootFull | Out-Null

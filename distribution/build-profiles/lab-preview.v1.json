@@ -41,6 +41,13 @@
       "commonCoreHash"
     ]
   },
+  "portableCommonCorePatch": {
+    "path": "desktop/scripts/build-windows-llvm.ps1",
+    "purpose": "parameterize the existing Universal gnullvm build for an edition overlay, external Cargo target, expected product name, unsigned preview, and evidence-preserving bundle policy",
+    "universalDefaultsPreserved": true,
+    "mustReturnToUniversal": true,
+    "mayRemainAsLabFork": false
+  },
   "labDeltaPaths": [
     "desktop/scripts/build-lab-preview.ps1",
     "desktop/src-tauri/tauri.lab-preview.conf.json",
@@ -168,6 +175,84 @@
     "workspaceSwitchCountsAsAuthority": false,
     "hardwareActionDecisionAtZeroValidatedPacks": "deny"
   },
+  "toolchainPolicy": {
+    "selection": "strict-pinned-gnullvm",
+    "targetTriple": "x86_64-pc-windows-gnullvm",
+    "requiresMsvcLinkExe": false,
+    "sharedBuildScript": "desktop/scripts/build-windows-llvm.ps1",
+    "rust": {
+      "rustupToolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+      "rustcVersion": "1.97.0",
+      "rustcCommitHash": "2d8144b7880597b6e6d3dfd63a9a9efae3f533d3",
+      "rustcCommitDate": "2026-07-07",
+      "llvmVersion": "22.1.6",
+      "cargoVersion": "1.97.0",
+      "cargoCommitHash": "c980f4866141969fab6254a680546a277789d6f0",
+      "cargoCommitDate": "2026-06-30"
+    },
+    "llvmMingw": {
+      "wingetPackageId": "MartinStorsjo.LLVM-MinGW.UCRT",
+      "packageDirectoryName": "llvm-mingw-20260616-ucrt-x86_64",
+      "clangVersion": "22.1.8",
+      "clangTarget": "x86_64-w64-windows-gnu",
+      "requiredTools": [
+        {
+          "name": "x86_64-w64-mingw32-clang.exe",
+          "bytes": 16896,
+          "sha256": "a8b7a614eeadd9105f814be3701a7f312cda4cea51751b75b408c16100c94e85"
+        },
+        {
+          "name": "llvm-dlltool.exe",
+          "bytes": 67072,
+          "sha256": "9aa88ccb0a10c4d6c6f922e73cb9445ea83be29c52614726aea92b25f2c86093"
+        },
+        {
+          "name": "llvm-rc.exe",
+          "bytes": 156672,
+          "sha256": "255fc12528b80cade02a4f8393065221dbd1f3a7fdf930a4e21c3076399750f5"
+        },
+        {
+          "name": "llvm-readobj.exe",
+          "bytes": 1611776,
+          "sha256": "3088728b4588ca185687dac94aed3aca1d379b31433053d824b89b0d4d28d246"
+        },
+        {
+          "name": "ld.lld.exe",
+          "bytes": 5219840,
+          "sha256": "ebc594a240cd325f1ea8b865ee88da0d004e94ea31eb1fc3f7f8f0ff8d93f58f"
+        }
+      ]
+    },
+    "webView2Loader": {
+      "cargoPackage": "webview2-com-sys",
+      "cargoPackageVersion": "0.38.2",
+      "relativePath": "x64/WebView2Loader.dll",
+      "bytes": 160320,
+      "sha256": "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c"
+    },
+    "tauriCli": {
+      "version": "2.11.4",
+      "packagePath": "desktop/node_modules/@tauri-apps/cli/package.json",
+      "entrypointPath": "desktop/node_modules/@tauri-apps/cli/tauri.js",
+      "entrypointBytes": 1864,
+      "entrypointSha256": "0dd6ec63c7c63a993fde20955e291d833c03f3760e63e0ee21e83482f6c0b43a"
+    },
+    "nsis": {
+      "cacheRelativeToLocalAppData": "tauri/NSIS",
+      "executableRelativePath": "Bin/makensis.exe",
+      "executableBytes": 468992,
+      "executableSha256": "42850802704ecb11163f7e0329d35ee54bd288953200d4966e226d572848cfc5",
+      "invocationForbiddenDuringGreenAudit": true
+    },
+    "environment": {
+      "cargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
+      "cargoBuildJobsMaximum": 4,
+      "rustflags": "-C target-feature=+crt-static",
+      "additionalConfigTransport": "TAURI_CONFIG",
+      "preserveBundleHistory": true,
+      "allowUnsignedUpdater": true
+    }
+  },
   "buildGuards": {
     "requiresExactCleanSource": true,
     "requiresUniversalCoreAncestor": true,
@@ -182,7 +267,10 @@
     "doNotOverwritePublicAssets": true,
     "websiteReceiverReadOnly": true,
     "forbidWebsiteRebuild": true,
-    "forbidWebsiteRename": true
+    "forbidWebsiteRename": true,
+    "requiresStrictPinnedGnullvm": true,
+    "forbidMsvcLinkerDependency": true,
+    "requireUnsignedUpdaterSlotEmpty": true
   },
   "signaturePolicy": {
     "authenticode": "not-signed",

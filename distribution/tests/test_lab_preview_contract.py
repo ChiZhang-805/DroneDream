@@ -38,6 +38,35 @@ import lab_preinstall_acceptance as lab_preinstall  # noqa: E402
 import lab_yellow_readiness_audit as lab_readiness  # noqa: E402
 
 
+def fake_gnullvm_toolchain(*blockers: str) -> dict[str, object]:
+    ready = not blockers
+    return {
+        "selectedToolchain": "gnullvm" if ready else None,
+        "selectionPolicy": "strict-pinned-gnullvm",
+        "strictPinnedToolchainReady": ready,
+        "candidates": {
+            "gnullvm": {
+                "requiresMsvcLinkExe": False,
+                "strictlyPinnedReady": ready,
+                "llvmRoot": "fixture/llvm-mingw-20260616-ucrt-x86_64",
+                "blockers": list(blockers),
+            },
+            "msvc": {
+                "requiredLinker": "link.exe",
+                "linkerAvailable": False,
+                "linkerPath": None,
+                "ready": False,
+            },
+        },
+        "environment": {
+            "expectedCargoTargetDir": "fixture/lab-cargo-target",
+            "cargoTargetIsRepositoryTarget": False,
+        },
+        "tauriInvoked": False,
+        "nsisInvoked": False,
+    }
+
+
 class LabPreviewContractTests(unittest.TestCase):
     def test_lab_preview_profile_is_unsigned_source_bound_and_fail_closed(self) -> None:
         result = lab_preview.verify_lab_preview_contract()
@@ -241,17 +270,7 @@ class LabPreviewContractTests(unittest.TestCase):
     def test_lab_yellow_readiness_audit_is_read_only_and_requestable(self) -> None:
         result = lab_readiness.evaluate_readiness(
             require_clean=False,
-            toolchain_state={
-                "rustcAvailable": True,
-                "cargoAvailable": True,
-                "rustHost": "x86_64-pc-windows-msvc",
-                "requiredLinker": "link.exe",
-                "linkerAvailable": True,
-                "linkerPath": "fixture/link.exe",
-                "expectedCargoTargetDir": "fixture/lab-cargo-target",
-                "tauriInvoked": False,
-                "nsisInvoked": False,
-            },
+            toolchain_state=fake_gnullvm_toolchain(),
         )
         self.assertEqual(result["kind"], "dronedream-lab-yellow-readiness-audit")
         self.assertTrue(result["yellowBuildRequest"]["requestable"])
@@ -277,30 +296,52 @@ class LabPreviewContractTests(unittest.TestCase):
             "awaiting-exact-handoff",
         )
         self.assertFalse(result["websiteExactExeHandoff"]["releaseReady"])
+        self.assertEqual(result["toolchain"]["selectedToolchain"], "gnullvm")
+        self.assertFalse(
+            result["toolchain"]["candidates"]["gnullvm"]["requiresMsvcLinkExe"]
+        )
+        self.assertFalse(
+            result["toolchain"]["candidates"]["msvc"]["linkerAvailable"]
+        )
         self.assertTrue(all(value is False for value in result["sideEffects"].values()))
 
-    def test_lab_yellow_readiness_blocks_when_required_linker_is_missing(self) -> None:
+    def test_lab_yellow_readiness_blocks_when_pinned_gnullvm_bytes_drift(self) -> None:
         result = lab_readiness.evaluate_readiness(
             require_clean=False,
-            toolchain_state={
-                "rustcAvailable": True,
-                "cargoAvailable": True,
-                "rustHost": "x86_64-pc-windows-msvc",
-                "requiredLinker": "link.exe",
-                "linkerAvailable": False,
-                "linkerPath": None,
-                "expectedCargoTargetDir": "fixture/lab-cargo-target",
-                "tauriInvoked": False,
-                "nsisInvoked": False,
-            },
+            toolchain_state=fake_gnullvm_toolchain(
+                "one or more pinned LLVM-MinGW tool bytes drifted"
+            ),
         )
         self.assertFalse(result["yellowBuildRequest"]["requestable"])
         self.assertIn(
-            "required Rust host linker is unavailable: link.exe",
+            "strict pinned gnullvm: one or more pinned LLVM-MinGW tool bytes drifted",
             result["yellowBuildRequest"]["requestBlockers"],
         )
         self.assertFalse(result["toolchain"]["tauriInvoked"])
         self.assertFalse(result["toolchain"]["nsisInvoked"])
+
+    def test_lab_yellow_readiness_blocks_when_cached_nsis_is_missing(self) -> None:
+        result = lab_readiness.evaluate_readiness(
+            require_clean=False,
+            toolchain_state=fake_gnullvm_toolchain(
+                "pinned cached NSIS executable is unavailable or drifted"
+            ),
+        )
+        self.assertFalse(result["yellowBuildRequest"]["requestable"])
+        self.assertIn(
+            "strict pinned gnullvm: pinned cached NSIS executable is unavailable or drifted",
+            result["yellowBuildRequest"]["requestBlockers"],
+        )
+
+    @unittest.skipUnless(sys.platform == "win32", "real toolchain probe is Windows-only")
+    def test_real_toolchain_probe_is_green_read_only(self) -> None:
+        toolchain = lab_readiness._toolchain_state()
+        self.assertFalse(toolchain["tauriInvoked"])
+        self.assertFalse(toolchain["nsisInvoked"])
+        self.assertFalse(
+            toolchain["candidates"]["gnullvm"]["requiresMsvcLinkExe"]
+        )
+        self.assertIsInstance(toolchain["candidates"]["gnullvm"]["blockers"], list)
 
     def test_real_readiness_receipt_preserves_the_linker_blocker(self) -> None:
         receipt = json.loads(READINESS_RECEIPT.read_text(encoding="utf-8"))

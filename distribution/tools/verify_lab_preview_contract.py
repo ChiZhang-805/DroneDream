@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 TAURI_OVERLAY = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
 BUILD_SCRIPT = ROOT / "desktop/scripts/build-lab-preview.ps1"
+SHARED_LLVM_BUILD_SCRIPT = ROOT / "desktop/scripts/build-windows-llvm.ps1"
 WEBSITE_HANDOFF = (
     ROOT
     / "distribution"
@@ -36,6 +37,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
     overlay = _load_json(TAURI_OVERLAY)
     website_handoff = _load_json(WEBSITE_HANDOFF)
     script = BUILD_SCRIPT.read_text(encoding="utf-8")
+    shared_llvm_script = SHARED_LLVM_BUILD_SCRIPT.read_text(encoding="utf-8")
 
     if profile.get("kind") != "dronedream-lab-preview-build-profile":
         raise LabPreviewContractError("Lab preview profile identity is unsupported")
@@ -101,6 +103,16 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError("Lab preview common-core path set drifted")
     if tuple(common_core.get("receiptFields", ())) != ("commonCoreCommit", "commonCoreHash"):
         raise LabPreviewContractError("Lab preview receipts must bind the common core commit and hash")
+
+    portable_patch = profile.get("portableCommonCorePatch")
+    if (
+        not isinstance(portable_patch, dict)
+        or portable_patch.get("path") != "desktop/scripts/build-windows-llvm.ps1"
+        or portable_patch.get("universalDefaultsPreserved") is not True
+        or portable_patch.get("mustReturnToUniversal") is not True
+        or portable_patch.get("mayRemainAsLabFork") is not False
+    ):
+        raise LabPreviewContractError("Lab shared LLVM parameterization is not portable to Universal")
 
     if tuple(profile.get("labDeltaPaths", ())) != (
         "desktop/scripts/build-lab-preview.ps1",
@@ -205,6 +217,82 @@ def verify_lab_preview_contract() -> dict[str, object]:
     ):
         raise LabPreviewContractError("Lab preview payload dependency graph drifted")
 
+    toolchain = profile.get("toolchainPolicy")
+    if not isinstance(toolchain, dict):
+        raise LabPreviewContractError("Lab pinned gnullvm toolchain policy is missing")
+    rust = toolchain.get("rust")
+    llvm = toolchain.get("llvmMingw")
+    loader = toolchain.get("webView2Loader")
+    tauri_cli = toolchain.get("tauriCli")
+    nsis = toolchain.get("nsis")
+    environment = toolchain.get("environment")
+    if (
+        toolchain.get("selection") != "strict-pinned-gnullvm"
+        or toolchain.get("targetTriple") != "x86_64-pc-windows-gnullvm"
+        or toolchain.get("requiresMsvcLinkExe") is not False
+        or toolchain.get("sharedBuildScript") != "desktop/scripts/build-windows-llvm.ps1"
+        or not isinstance(rust, dict)
+        or rust.get("rustupToolchain") != "1.97.0-x86_64-pc-windows-gnullvm"
+        or rust.get("rustcCommitHash")
+        != "2d8144b7880597b6e6d3dfd63a9a9efae3f533d3"
+        or rust.get("cargoCommitHash")
+        != "c980f4866141969fab6254a680546a277789d6f0"
+        or not isinstance(llvm, dict)
+        or llvm.get("wingetPackageId") != "MartinStorsjo.LLVM-MinGW.UCRT"
+        or llvm.get("packageDirectoryName") != "llvm-mingw-20260616-ucrt-x86_64"
+        or llvm.get("clangVersion") != "22.1.8"
+        or llvm.get("clangTarget") != "x86_64-w64-windows-gnu"
+        or not isinstance(loader, dict)
+        or loader.get("cargoPackage") != "webview2-com-sys"
+        or loader.get("cargoPackageVersion") != "0.38.2"
+        or loader.get("sha256")
+        != "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c"
+        or not isinstance(tauri_cli, dict)
+        or tauri_cli.get("version") != "2.11.4"
+        or not isinstance(nsis, dict)
+        or nsis.get("executableSha256")
+        != "42850802704ecb11163f7e0329d35ee54bd288953200d4966e226d572848cfc5"
+        or nsis.get("invocationForbiddenDuringGreenAudit") is not True
+        or not isinstance(environment, dict)
+        or environment.get("cargoTargetDir")
+        != "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target"
+        or environment.get("cargoBuildJobsMaximum") != 4
+        or environment.get("rustflags") != "-C target-feature=+crt-static"
+        or environment.get("additionalConfigTransport") != "TAURI_CONFIG"
+        or environment.get("preserveBundleHistory") is not True
+        or environment.get("allowUnsignedUpdater") is not True
+    ):
+        raise LabPreviewContractError("Lab pinned gnullvm toolchain policy drifted")
+    expected_llvm_tools = {
+        "x86_64-w64-mingw32-clang.exe": (
+            16896,
+            "a8b7a614eeadd9105f814be3701a7f312cda4cea51751b75b408c16100c94e85",
+        ),
+        "llvm-dlltool.exe": (
+            67072,
+            "9aa88ccb0a10c4d6c6f922e73cb9445ea83be29c52614726aea92b25f2c86093",
+        ),
+        "llvm-rc.exe": (
+            156672,
+            "255fc12528b80cade02a4f8393065221dbd1f3a7fdf930a4e21c3076399750f5",
+        ),
+        "llvm-readobj.exe": (
+            1611776,
+            "3088728b4588ca185687dac94aed3aca1d379b31433053d824b89b0d4d28d246",
+        ),
+        "ld.lld.exe": (
+            5219840,
+            "ebc594a240cd325f1ea8b865ee88da0d004e94ea31eb1fc3f7f8f0ff8d93f58f",
+        ),
+    }
+    observed_llvm_tools = {
+        entry.get("name"): (entry.get("bytes"), entry.get("sha256"))
+        for entry in llvm.get("requiredTools", ())
+        if isinstance(entry, dict)
+    }
+    if observed_llvm_tools != expected_llvm_tools:
+        raise LabPreviewContractError("Lab pinned LLVM-MinGW tool inventory drifted")
+
     guards = profile.get("buildGuards")
     signature = profile.get("signaturePolicy")
     safety = profile.get("safetyPolicy")
@@ -224,6 +312,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "websiteReceiverReadOnly",
         "forbidWebsiteRebuild",
         "forbidWebsiteRename",
+        "requiresStrictPinnedGnullvm",
+        "forbidMsvcLinkerDependency",
+        "requireUnsignedUpdaterSlotEmpty",
     ):
         if guards.get(key) is not True:
             raise LabPreviewContractError(f"Lab preview guard is not enforced: {key}")
@@ -311,6 +402,17 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'canonicalDonor = New-RepoFileRef "brand\\brand-editions.v1.json"',
         'websiteHandoffContract = New-RepoFileRef "distribution\\editions\\lab\\website-exact-exe-handoff.awaiting.v1.json"',
         'grantsHardwareAuthority = $false',
+        '[ValidateSet("gnullvm")]',
+        '$readiness.toolchain.selectedToolchain',
+        '$gnullvm.strictlyPinnedReady',
+        'build-windows-llvm.ps1',
+        '-AdditionalConfigPath',
+        '-CargoTargetDir $cargoTargetFull',
+        '-LlvmRoot $gnullvm.llvmRoot',
+        '-AllowUnsignedUpdater',
+        '-PreserveBundleHistory',
+        'x86_64-pc-windows-gnullvm\\release\\bundle\\nsis',
+        'unexpectedly has an updater signature',
     )
     for fragment in required_script_fragments:
         if fragment not in script:
@@ -321,10 +423,30 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "git push",
         "codex/release-lab",
         "--force",
+        "npm.cmd --prefix",
     )
     for fragment in forbidden_script_fragments:
         if fragment in script:
             raise LabPreviewContractError(f"Lab build script contains forbidden text: {fragment}")
+
+    required_shared_fragments = (
+        '[string]$AdditionalConfigPath',
+        '[string]$CargoTargetDir',
+        '[string]$LlvmRoot',
+        '[string]$ExpectedProductName = "DroneDream"',
+        '[switch]$AllowUnsignedUpdater',
+        '[switch]$PreserveBundleHistory',
+        '$env:TAURI_CONFIG = $additionalConfigText',
+        '$env:CARGO_TARGET_DIR = $cargoTargetRoot',
+        'invoke-tauri-updater-signer.ps1',
+        'if (-not $AllowUnsignedUpdater)',
+        'if (-not $PreserveBundleHistory)',
+    )
+    for fragment in required_shared_fragments:
+        if fragment not in shared_llvm_script:
+            raise LabPreviewContractError(
+                f"Shared LLVM build parameterization is missing: {fragment}"
+            )
 
     return {
         "profile": PROFILE.relative_to(ROOT).as_posix(),

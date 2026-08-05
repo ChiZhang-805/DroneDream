@@ -1,3 +1,12 @@
+param(
+    [string]$AdditionalConfigPath,
+    [string]$CargoTargetDir,
+    [string]$LlvmRoot,
+    [string]$ExpectedProductName = "DroneDream",
+    [switch]$AllowUnsignedUpdater,
+    [switch]$PreserveBundleHistory
+)
+
 $ErrorActionPreference = "Stop"
 
 & (Join-Path $PSScriptRoot "verify-updater-signing-contract.ps1")
@@ -25,10 +34,19 @@ if (Test-Path -LiteralPath $cargoBin) {
 }
 
 $packageRoot = Join-Path $env:LOCALAPPDATA "Microsoft\WinGet\Packages"
-$llvmPackage = Get-ChildItem -LiteralPath $packageRoot -Directory -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -like "MartinStorsjo.LLVM-MinGW.UCRT_*" } |
-    Sort-Object LastWriteTime -Descending |
-    Select-Object -First 1
+$llvmPackage = if ($LlvmRoot) {
+    $resolvedLlvmRoot = Resolve-Path -LiteralPath $LlvmRoot -ErrorAction SilentlyContinue
+    if (-not $resolvedLlvmRoot -or
+        -not (Test-Path -LiteralPath $resolvedLlvmRoot.Path -PathType Container)) {
+        throw "The requested LLVM-MinGW root does not exist: $LlvmRoot"
+    }
+    Get-Item -LiteralPath $resolvedLlvmRoot.Path
+} else {
+    Get-ChildItem -LiteralPath $packageRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "MartinStorsjo.LLVM-MinGW.UCRT_*" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
 
 $clang = if ($llvmPackage) {
     Get-ChildItem -LiteralPath $llvmPackage.FullName -Recurse -Filter "x86_64-w64-mingw32-clang.exe" -File -ErrorAction SilentlyContinue |
@@ -80,6 +98,17 @@ if (-not $env:CARGO_BUILD_JOBS) {
     $env:CARGO_BUILD_JOBS = "4"
 }
 
+$defaultCargoTarget = Join-Path $PSScriptRoot "..\src-tauri\target"
+$cargoTargetRoot = if ($CargoTargetDir) {
+    [IO.Path]::GetFullPath($CargoTargetDir)
+} elseif ($env:CARGO_TARGET_DIR) {
+    [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)
+} else {
+    [IO.Path]::GetFullPath($defaultCargoTarget)
+}
+$env:CARGO_TARGET_DIR = $cargoTargetRoot
+$targetOutputRoot = Join-Path $cargoTargetRoot "x86_64-pc-windows-gnullvm\release"
+
 # The gnullvm target otherwise links libunwind.dll dynamically. Tauri's NSIS
 # bundler does not discover that toolchain DLL, so the installed application
 # would fail before Rust can start. Keep this fallback build deterministic and
@@ -128,6 +157,24 @@ if (-not (Test-Path -LiteralPath $llvmBundleConfig -PathType Leaf)) {
     throw "The LLVM bundle configuration was not found at $llvmBundleConfig"
 }
 
+if ($AdditionalConfigPath) {
+    if ($env:TAURI_CONFIG) {
+        throw "Clear TAURI_CONFIG before supplying an additional edition config."
+    }
+    $additionalConfig = (Resolve-Path -LiteralPath $AdditionalConfigPath -ErrorAction Stop).Path
+    $additionalConfigText = Get-Content -LiteralPath $additionalConfig -Raw -Encoding UTF8
+    try {
+        $additionalConfigObject = $additionalConfigText | ConvertFrom-Json
+    } catch {
+        throw "The additional edition config is not valid JSON: $AdditionalConfigPath"
+    }
+    if ($additionalConfigObject.productName -cne $ExpectedProductName) {
+        throw "The additional edition config productName does not match $ExpectedProductName."
+    }
+    # Tauri merges TAURI_CONFIG with the explicit LLVM resource config.
+    $env:TAURI_CONFIG = $additionalConfigText
+}
+
 & (Join-Path $PSScriptRoot "verify-desktop-version.ps1")
 & (Join-Path $PSScriptRoot "verify-nsis-template.ps1")
 
@@ -148,7 +195,7 @@ if ($LASTEXITCODE -ne 0 -or
     throw "The release source changed while the desktop installer was building."
 }
 
-$application = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\drone-dream-desktop.exe"
+$application = Join-Path $targetOutputRoot "drone-dream-desktop.exe"
 if (-not (Test-Path -LiteralPath $application -PathType Leaf)) {
     throw "The LLVM build completed without producing $application"
 }
@@ -188,7 +235,7 @@ if ($importReport -notmatch "(?im)^\s*Name:\s*WebView2Loader\.dll\s*$") {
 }
 Write-Host "Verified static LLVM runtime linkage and the bundled WebView2 loader."
 
-$generatedNsi = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\nsis\x64\installer.nsi"
+$generatedNsi = Join-Path $targetOutputRoot "nsis\x64\installer.nsi"
 if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
     throw "The LLVM build completed without producing $generatedNsi"
 }
@@ -201,8 +248,8 @@ if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
 
 $tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
     ConvertFrom-Json
-$bundleDirectory = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\bundle\nsis"
-$installer = Join-Path $bundleDirectory "DroneDream_$($tauriConfig.version)_x64-setup.exe"
+$bundleDirectory = Join-Path $targetOutputRoot "bundle\nsis"
+$installer = Join-Path $bundleDirectory "${ExpectedProductName}_$($tauriConfig.version)_x64-setup.exe"
 if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
     throw "The LLVM build completed without producing the versioned installer $installer"
 }
@@ -211,26 +258,33 @@ if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
 # signature is separate from Authenticode. The helper keeps a complete, typed
 # argv vector so PowerShell cannot unwrap a one-item password array and splat
 # it character by character.
-$updaterKeyPath = $env:TAURI_SIGNING_PRIVATE_KEY_PATH
-if (-not $updaterKeyPath) {
-    $localUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
-    if (Test-Path -LiteralPath $localUpdaterKey -PathType Leaf) {
-        $updaterKeyPath = $localUpdaterKey
+$updaterSignature = "${installer}.sig"
+if ($AllowUnsignedUpdater) {
+    if (Test-Path -LiteralPath $updaterSignature -PathType Leaf) {
+        throw "Unsigned builds require an empty updater-signature slot: $updaterSignature"
     }
+} else {
+    $updaterKeyPath = $env:TAURI_SIGNING_PRIVATE_KEY_PATH
+    if (-not $updaterKeyPath) {
+        $localUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
+        if (Test-Path -LiteralPath $localUpdaterKey -PathType Leaf) {
+            $updaterKeyPath = $localUpdaterKey
+        }
+    }
+    if (-not $updaterKeyPath -or
+        -not (Test-Path -LiteralPath $updaterKeyPath -PathType Leaf)) {
+        throw "Set TAURI_SIGNING_PRIVATE_KEY_PATH before signing the updater artifact."
+    }
+    $tauriCli = Join-Path $PSScriptRoot "..\node_modules\@tauri-apps\cli\tauri.js"
+    if (-not (Test-Path -LiteralPath $tauriCli -PathType Leaf)) {
+        throw "The installed Tauri CLI was not found at $tauriCli"
+    }
+    & (Join-Path $PSScriptRoot "invoke-tauri-updater-signer.ps1") `
+        -NodeExecutable "node.exe" `
+        -TauriCliPath $tauriCli `
+        -UpdaterKeyPath $updaterKeyPath `
+        -InstallerPath $installer
 }
-if (-not $updaterKeyPath -or
-    -not (Test-Path -LiteralPath $updaterKeyPath -PathType Leaf)) {
-    throw "Set TAURI_SIGNING_PRIVATE_KEY_PATH before signing the updater artifact."
-}
-$tauriCli = Join-Path $PSScriptRoot "..\node_modules\@tauri-apps\cli\tauri.js"
-if (-not (Test-Path -LiteralPath $tauriCli -PathType Leaf)) {
-    throw "The installed Tauri CLI was not found at $tauriCli"
-}
-& (Join-Path $PSScriptRoot "invoke-tauri-updater-signer.ps1") `
-    -NodeExecutable "node.exe" `
-    -TauriCliPath $tauriCli `
-    -UpdaterKeyPath $updaterKeyPath `
-    -InstallerPath $installer
 
 $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $installer
 $checksumPath = "$installer.sha256"
@@ -238,14 +292,15 @@ $checksumPath = "$installer.sha256"
     Set-Content -Encoding ascii -LiteralPath $checksumPath
 Write-Host "Wrote verified installer checksum to $checksumPath"
 
-$updaterSignature = "${installer}.sig"
-if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
-    throw "The signed Tauri updater artifact is missing: $updaterSignature"
+if (-not $AllowUnsignedUpdater) {
+    if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
+        throw "The signed Tauri updater artifact is missing: $updaterSignature"
+    }
+    & (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
+        -BundleDirectory $bundleDirectory `
+        -SourceCommit $releaseSourceCommit `
+        -BuildNumber ([UInt64]$releaseBuildNumber)
 }
-& (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
-    -BundleDirectory $bundleDirectory `
-    -SourceCommit $releaseSourceCommit `
-    -BuildNumber ([UInt64]$releaseBuildNumber)
 
 # A developer bundle directory otherwise accumulates every historical setup
 # executable, which makes manual testing error-prone. Prune only versioned
@@ -254,7 +309,7 @@ if (-not (Test-Path -LiteralPath $updaterSignature -PathType Leaf)) {
 # output directory.
 $bundleDirectoryFull = [IO.Path]::GetFullPath($bundleDirectory).TrimEnd('\', '/')
 $expectedBundleRoot = [IO.Path]::GetFullPath(
-    (Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\bundle\nsis")
+    (Join-Path $targetOutputRoot "bundle\nsis")
 ).TrimEnd('\', '/')
 if (-not $bundleDirectoryFull.Equals($expectedBundleRoot, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Refusing to prune installer artifacts outside the LLVM NSIS bundle directory."
@@ -264,12 +319,14 @@ $currentArtifacts = @(
     [IO.Path]::GetFullPath($checksumPath),
     [IO.Path]::GetFullPath($updaterSignature)
 )
-Get-ChildItem -LiteralPath $bundleDirectoryFull -File |
-    Where-Object {
-        $_.Name -match '^DroneDream_.+_x64-setup\.exe(?:\.sha256|\.sig)?$' -and
-        $_.FullName -notin $currentArtifacts
-    } |
-    ForEach-Object {
-        Remove-Item -LiteralPath $_.FullName -Force
-        Write-Host "Removed stale local installer artifact $($_.Name)"
-    }
+if (-not $PreserveBundleHistory) {
+    Get-ChildItem -LiteralPath $bundleDirectoryFull -File |
+        Where-Object {
+            $_.Name -match '^DroneDream_.+_x64-setup\.exe(?:\.sha256|\.sig)?$' -and
+            $_.FullName -notin $currentArtifacts
+        } |
+        ForEach-Object {
+            Remove-Item -LiteralPath $_.FullName -Force
+            Write-Host "Removed stale local installer artifact $($_.Name)"
+        }
+}
