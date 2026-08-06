@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-frontend-dist-sync-receipt",
+  "editionId": "field",
+  "productSource": {
+    "branch": "codex/software-field",
+    "commit": "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+    "tree": "a1abe6ad5c608a8db07c1733657179dd46b6ae3f",
+    "cleanAndPushed": true
+  },
+  "commonCore": {
+    "branch": "codex/software",
+    "donorCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+    "donorParent": "f2858e3d2e39f493baab28368b77230e45dd199f",
+    "donorTree": "2ea2f4336274f4d7e432550834a5d2c3350494bf",
+    "syncMethod": "whole-isolated-two-path-cherry-pick",
+    "unrelatedUniversalHistoryConsumed": false
+  },
+  "paths": [
+    {
+      "path": "desktop/scripts/release-build-driver.psm1",
+      "gitBlob": "81b41137febb7a4ef8bdf86b97360b88f0904873",
+      "canonicalSha256": "c176773d35a789d54570620bc109364aa8ecf5004b41e6a5abdc149da839df57",
+      "workingTreeSha256": "1cfc49006ac9e6913b85aef7c59241e30e4d274509e35011dfaa5b990f9e89a2",
+      "workingTreeDifference": "windows-checkout-line-endings-only",
+      "exactDonorBlob": true
+    },
+    {
+      "path": "distribution/tests/test_shared_windows_build_contract.py",
+      "gitBlob": "8f19fe61ae00c8d2358527fee87237da0a227bd7",
+      "canonicalSha256": "db6ca9f8459980c50bec870f91b72417c44e2aa85031f51c37a6a349a97cc957",
+      "workingTreeSha256": "db6ca9f8459980c50bec870f91b72417c44e2aa85031f51c37a6a349a97cc957",
+      "exactDonorBlob": true
+    }
+  ],
+  "frontendDistContract": {
+    "canonicalFieldValue": "../../frontend/field-dist",
+    "canonicalResolvedRelativePath": "frontend/field-dist",
+    "overlayLocationsDoNotChangeSemantics": [
+      "repository",
+      "desktop/src-tauri/target",
+      "external-owned-directory"
+    ],
+    "externalCanonicalOverlay": {
+      "result": "allow",
+      "resolvedAbsolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\frontend\\field-dist"
+    },
+    "failedRelocatedValue": "../../../frontend/field-dist",
+    "failedRelocatedValueDecision": "deny",
+    "failedRelocatedValueMessage": "The frontend build output must remain inside the repository.",
+    "absoluteExactEditionDirectory": "allow",
+    "absoluteOutsideRepository": "deny",
+    "arbitraryRepositoryPath": "deny",
+    "unknownEdition": "deny"
+  },
+  "tests": [
+    {
+      "suite": "shared-driver-coexistence-field-profile",
+      "passed": 31
+    },
+    {
+      "suite": "shared-windows-build-contract",
+      "passed": 7,
+      "coversExternalOverlayAndNegativePaths": true
+    },
+    {
+      "suite": "field-product-and-safety-contracts",
+      "passed": 64,
+      "subtestsPassed": 9
+    },
+    {
+      "suite": "engine-pack-and-field-profile-contracts",
+      "passed": 34,
+      "subtestsPassed": 4
+    },
+    {
+      "suite": "release-source-policy",
+      "passed": true,
+      "trackedFiles": 1970,
+      "npmPackages": 390,
+      "rustPackages": 532
+    },
+    {
+      "suite": "updater-signing-contract",
+      "passed": true,
+      "emptyPassword": "pass",
+      "nonemptyPasswordEnvOnly": "pass",
+      "signerFailure": "pass-fail-closed",
+      "missingOutput": "pass-fail-closed"
+    },
+    {
+      "suite": "powershell-ast",
+      "passed": 3
+    },
+    {
+      "suite": "ruff-scoped",
+      "passed": true
+    },
+    {
+      "suite": "git-diff-check",
+      "passed": true
+    }
+  ],
+  "historicalReceiptTestDebt": {
+    "broadFieldSuiteResult": {
+      "passed": 90,
+      "failed": 5,
+      "subtestsPassed": 9
+    },
+    "productOrSafetyRegressionObserved": false,
+    "classifications": [
+      "old 6f25 and coexistence receipts compare current HEAD blobs instead of their frozen integration commits",
+      "common drift audit treats subsequently added immutable failure evidence as forbidden protected-evidence drift"
+    ],
+    "historicalEvidenceModifiedOrDeleted": false,
+    "gatingForFrontendDistDonor": false
+  },
+  "historicalAttempts": [
+    {
+      "productSource": "323fd05313527c0edec481d7e09acb5ac4735d22",
+      "tauriBuildInvocations": 1,
+      "frontendBuildInvocations": 1,
+      "cargoBuildInvocations": 0,
+      "nsisInvocations": 0,
+      "installerProduced": false,
+      "retryAllowed": false
+    },
+    {
+      "productSource": "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+      "frozenArtifactSha256": "90d867aedf728a70e55d6df349da1ce96b80e6f37b4689224eebdc4fd8cfa2c3",
+      "installOrHandoffAllowed": false,
+      "retryAllowed": false
+    }
+  ],
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "threeLayerHardwareDecision": "deny",
+    "buildPerformedForProductSource": false,
+    "installPerformed": false,
+    "runtimeMigrationPerformed": false,
+    "deviceTouched": false,
+    "simulationExecuted": false,
+    "providerOrApiKeyUsed": false,
+    "deploymentPerformed": false
+  },
+  "readiness": {
+    "decision": "ready-to-request-fresh-yellow",
+    "productBlockers": [],
+    "artifactProducedForProductSource": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "nextGate": "submit a fresh exact single-attempt YELLOW application bound to product source edc7aa124e058fda3bb143dc66cd7c208a601cef"
+  }
+}
