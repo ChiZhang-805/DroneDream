@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-red-lifecycle-preflight",
+  "recordVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "blocked-before-execution",
+  "sourceSeparation": {
+    "productSourceCommit": "f24eb3a1e383c83b8a0b5bed4c044148146f4153",
+    "yellow2EvidenceCommit": "a35ef3227fb20843a92a36c087423cbb03f26cab",
+    "recordCommitPolicy": "commit-containing-this-record",
+    "recordCommitExpectedParent": "a35ef3227fb20843a92a36c087423cbb03f26cab",
+    "recordCommitIsProductSource": false
+  },
+  "artifact": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/bundle/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11686921,
+    "sha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "buildReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/receipt/build-receipt.json",
+    "buildReceiptSha256": "9e2d20c42bcc8ea6c39c0db8f61f0fa3b3568fff7d84b3c96b4682a0b095589a",
+    "identityMatched": true
+  },
+  "planOnly": {
+    "runId": "sim-y3-20260806T123500Z-f23987ba",
+    "contractPath": "distribution/sim/lifecycle/yellow-execution-plan.v1.json",
+    "contractSha256": "297e51740f9eb8f06139d2887990a5f35ccd02234f4c8e35c98f7937561071f9",
+    "verifyPlanPassed": true,
+    "stagePlanRendered": true,
+    "stagePlanPersisted": false,
+    "runRootCreated": false,
+    "hostIsolationRequired": "dedicated-disposable-windows-sandbox-or-vm",
+    "hostSnapshotRequired": true,
+    "networkMode": "offline-except-local-fixtures",
+    "runtimeSelection": "install-app-only"
+  },
+  "providerAudit": {
+    "windowsSandboxExecutablePresent": false,
+    "hyperVVmManagementAvailable": false,
+    "hyperVVmServicePresent": false,
+    "existingVmCount": 0,
+    "dockerAvailable": false,
+    "podmanAvailable": false,
+    "virtualBoxAvailable": false,
+    "vmwareAvailable": false,
+    "compliantDisposableProviderCount": 0,
+    "hostContainedPathRedirectionAcceptedAsDisposableProvider": false
+  },
+  "installerIdentity": {
+    "productName": "DroneDream-Sim",
+    "displayName": "DroneDream \u00b7 SIM",
+    "bundleId": "io.dronedream.sim",
+    "defaultInstallRoot": "%LOCALAPPDATA%/DroneDream-Sim",
+    "plannedOverrideInstallRoot": "%LOCALAPPDATA%/Programs/DroneDream-SIM-sim-y3-20260806T123500Z-f23987ba",
+    "uninstallKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+    "mainBinaryName": "drone-dream-desktop.exe",
+    "shortcutDisplayName": "DroneDream \u00b7 SIM",
+    "appUserModelId": "io.dronedream.sim",
+    "runtimeProfile": "sim-only",
+    "generatedNsiSha256": "3211992f9d04af0bd51fde5b4fb219c68186c308f374c2b527120dcb7a905003",
+    "editionIdentityBlob": "b08c552a6b54f1b74535ee5994cc863b88eb1ed8",
+    "editionIdentitySha256": "9e361a39c044ec5ae5c87a63000962acde597f672034510de434c2053525e95b"
+  },
+  "hostBaseline": {
+    "existingLegacyInstallRoot": "C:/Users/zju20/AppData/Local/DroneDream",
+    "existingLegacyInstallRootPresent": true,
+    "existingLegacyUninstallKeyPresent": true,
+    "existingLegacyDesktopShortcutPresent": true,
+    "existingLegacyStartMenuShortcutPresent": true,
+    "simDefaultInstallPresent": false,
+    "simUninstallKeyPresent": false,
+    "simDesktopShortcutPresent": false,
+    "simStartMenuShortcutPresent": false,
+    "droneDreamApplicationProcessCount": 0,
+    "oauthCallback49211ListenerCount": 0,
+    "droneDreamRuntimeObservedState": "Stopped",
+    "runtimeStartedByAudit": false
+  },
+  "planDrift": [
+    {
+      "code": "sim.lifecycle.uninstall-key-stale",
+      "contractValue": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream \u00b7 SIM",
+      "artifactValue": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+      "classification": "validation-plan-only-not-product-nsis"
+    },
+    {
+      "code": "sim.lifecycle.main-binary-stale",
+      "contractValue": "DroneDream.exe",
+      "artifactValue": "drone-dream-desktop.exe",
+      "classification": "validation-plan-only-not-product-nsis"
+    }
+  ],
+  "plannedExactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 1,
+    "uninstallerInvocations": 1,
+    "pkceBoundaryChecks": 1,
+    "realTokenExchanges": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "rebuilds": 0
+  },
+  "executedExactCounts": {
+    "freshInstallerInvocations": 0,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "pkceBoundaryChecks": 0,
+    "realTokenExchanges": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "rebuilds": 0
+  },
+  "rollback": {
+    "required": false,
+    "executed": false,
+    "reason": "preflight failed before any owned or protected state mutation",
+    "protectedExistingInstallModified": false,
+    "runtimeModified": false
+  },
+  "verification": {
+    "artifactAndReceiptRehash": "pass",
+    "planOnlyRender": "pass",
+    "providerInventory": "pass-zero-providers",
+    "simBranchContract": "pass",
+    "lifecycleContractExcludingHistoricalYellow1LocalDistRehash": "pass",
+    "historicalYellow1LocalDistRehash": "not-applicable-current-frontend-dist-was-replaced-by-authorized-yellow2-production-build"
+  },
+  "blockers": [
+    "No compliant disposable Windows sandbox or VM is available.",
+    "The Sim lifecycle validation plan must be reconciled to the internal uninstall key and current main binary name before execution."
+  ],
+  "resumeEntry": {
+    "requiredProvider": "disposable Windows sandbox or snapshot-restorable Windows VM",
+    "requiredPlanCorrections": [
+      "Use DroneDream-Sim as the internal uninstall and product registry identity.",
+      "Use drone-dream-desktop.exe as the expected shortcut target."
+    ],
+    "artifactRebuildRequired": false,
+    "newRedAuthorizationRequired": true
+  },
+  "nonClaims": {
+    "installerExecuted": false,
+    "overlayExecuted": false,
+    "applicationLaunched": false,
+    "webView2LiveValidated": false,
+    "pkceBoundaryValidated": false,
+    "uninstallerExecuted": false,
+    "residueValidated": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}
