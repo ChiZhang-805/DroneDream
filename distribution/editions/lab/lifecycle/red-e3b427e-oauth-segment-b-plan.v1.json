@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-oauth-segment-b-plan",
+  "planVersion": "1.0.0",
+  "editionId": "lab",
+  "productSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+  "artifact": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12081900,
+    "sha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4",
+    "authenticodeStatus": "NotSigned"
+  },
+  "sourceAuditPath": "distribution/editions/lab/lifecycle/oauth-segment-b-source-audit.v1.json",
+  "authorizationModel": {
+    "currentState": "green-plan-only-no-execute",
+    "segmentAMayBeReplayed": false,
+    "b0AndB1RequireSeparateExactRedSignals": true,
+    "b0SuccessDoesNotAuthorizeB1": true,
+    "b1MustBindExactB0ReceiptSha256": true,
+    "automaticRetryMaximumPerStage": 0
+  },
+  "ownedRoots": {
+    "allowedBase": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED",
+    "b0": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b0-runtime-red1",
+    "b1": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b1-transaction-red1",
+    "mustBeAbsentBeforeAuthorizedInvocation": true,
+    "priorLifecycleRootsMayBeMutated": false
+  },
+  "b0RuntimePrerequisite": {
+    "purpose": "install the owned Lab app and prove the product's Runtime readiness gate without opening a browser or starting or mutating Runtime",
+    "successLeavesLabInstalledForB1": true,
+    "exactCounts": {
+      "installerInvocations": 1,
+      "applicationLaunches": 1,
+      "applicationCloses": 1,
+      "runtimeReadinessInspections": 1,
+      "runtimeStartsOrMigrations": 0,
+      "browserLaunches": 0,
+      "oauthTransactions": 0,
+      "providerCalls": 0,
+      "accountReads": 0,
+      "tokenOrCookieReads": 0
+    },
+    "failureRollbackMaximums": {
+      "uninstallerInvocations": 1,
+      "ownedPreferenceCleanupInvocations": 1,
+      "runtimeMutations": 0
+    },
+    "failClosedIf": [
+      "the Lab app or registration exists before B0",
+      "the fixed 49212 listener is occupied",
+      "the Runtime readiness UI is not at 100 percent",
+      "the explicit Lab sign-in action is absent or disabled",
+      "any browser, OAuth, provider, account, token, or Runtime mutation is observed"
+    ]
+  },
+  "b1OAuthTransaction": {
+    "purpose": "perform one explicit Lab browser authorization after a separately accepted B0 receipt",
+    "exactCounts": {
+      "applicationLaunches": 1,
+      "applicationCloses": 1,
+      "explicitLabLoginGestures": 1,
+      "loopbackListenerBindings": 1,
+      "browserLaunches": 1,
+      "oauthTransactions": 1,
+      "providerAuthorizationTransactions": 1,
+      "consentDecisionsMaximum": 1,
+      "acceptedCallbacksMaximum": 1,
+      "tokenExchangesMaximum": 1,
+      "labVaultSessionWritesMaximum": 1,
+      "labLocalSessionAdoptionsMaximum": 1,
+      "postAuthStartupGateChecksMaximum": 1,
+      "localLabLogoutAndVaultClear": 1,
+      "uninstallerInvocations": 1,
+      "ownedPreferenceCleanupInvocations": 1,
+      "otherEditionSessionImports": 0,
+      "rawPasswordTokenCookieOrBrowserStoreReads": 0,
+      "runtimeStartsOrMigrations": 0,
+      "px4Starts": 0,
+      "gazeboStarts": 0,
+      "hardwareActions": 0,
+      "uploadsOrDeployments": 0
+    },
+    "evidenceAllowlist": [
+      "editionId",
+      "authClientId",
+      "attemptIdHash",
+      "stateHash",
+      "subjectHash",
+      "result",
+      "failureCode",
+      "issuedAt",
+      "completedAt",
+      "callbackTransport",
+      "brokerOrigin",
+      "boolean UI and cleanup assertions",
+      "file hashes and counts"
+    ],
+    "evidenceForbidden": [
+      "password",
+      "access token",
+      "refresh token",
+      "authorization code",
+      "PKCE verifier",
+      "raw state or nonce",
+      "cookie",
+      "email",
+      "raw callback",
+      "browser password-store data",
+      "request headers or query"
+    ],
+    "failureRollbackMaximums": {
+      "applicationLaunchesForVaultCleanup": 1,
+      "labVaultClearInvocations": 1,
+      "uninstallerInvocations": 1,
+      "ownedPreferenceCleanupInvocations": 1
+    },
+    "failClosedIf": [
+      "the exact accepted B0 receipt hash is absent or mismatched",
+      "the Lab app identity or callback port is mismatched",
+      "a callback is uninitiated, replayed, cross-edition, cross-port, expired, or carries raw tokens",
+      "the authorization page is not the exact registered Lab client and callback",
+      "more than one consent decision, callback, or token exchange is observed",
+      "Lab local logout and vault cleanup cannot be confirmed",
+      "other Edition, Runtime, hardware, or deployment state changes"
+    ]
+  },
+  "protectedState": {
+    "namespaces": [
+      "DroneDream base app",
+      "DroneDream Universal",
+      "DroneDream SIM",
+      "DroneDream FIELD",
+      "global Runtime and WSL",
+      "other Edition credential vault entries",
+      "WebView2 installation"
+    ],
+    "parityRequiredBeforeAndAfterEachStage": true
+  },
+  "remainingSequence": [
+    "obtain one exact RED signal for B0 only",
+    "freeze B0 receipt and rollback or retained-install state",
+    "in a new GREEN atom bind the exact B0 receipt SHA into the B1 application and command",
+    "obtain a separate exact RED signal for B1",
+    "freeze B1 receipt before Website handoff"
+  ],
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}

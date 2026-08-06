@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-oauth-segment-b-source-audit",
+  "auditVersion": "1.0.0",
+  "editionId": "lab",
+  "auditMode": "green-source-and-committed-website-blobs-only",
+  "productSource": {
+    "commit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+    "tree": "eec24c0f1d3d537c8f0da5ef1b015bd129c6d39a",
+    "artifactSha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4"
+  },
+  "preparationBase": {
+    "commit": "903a75a298dcf52c32fac552c127c24ce891b711",
+    "a3SuccessReceiptPath": "distribution/build-receipts/lab-e3b427e-red-segment-a3-success.json",
+    "a3SuccessReceiptBytes": 9594,
+    "a3SuccessReceiptSha256": "c90d586dfc05797f02ff807a6822bc6fd708b2d6eebcefeeeb0ae63d18bbb863",
+    "segmentAMayBeReplayed": false
+  },
+  "publicRegistration": {
+    "clientId": "0b9e7a8d-2c90-4b76-8842-511363f555bd",
+    "clientIdSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+    "clientType": "public",
+    "tokenEndpointAuthMethod": "none",
+    "clientSecretAllowed": false,
+    "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "redirectUriSha256": "89b7f8cded951255ec63f1dbd1676f769242f258559752c57318f97f266038cb",
+    "registrationReceipt": {
+      "path": "distribution/build-receipts/lab-oauth-public-registration-1.0.0-fb3afee.controller-confirmed.json",
+      "bytes": 2967,
+      "sha256": "f8c12308c577399a1d73e4e4cec0a6bdae0c504aaa0745f4266641bedaf3194e",
+      "state": "controller-confirmed-offline-evidence-only"
+    }
+  },
+  "softwareSources": [
+    {
+      "path": "distribution/desktop/edition-browser-auth.v1.json",
+      "bytes": 6061,
+      "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+      "gitBlob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40"
+    },
+    {
+      "path": "frontend/src/pages/DesktopSetup.tsx",
+      "bytes": 107431,
+      "sha256": "9dbd64fd69fef5c42d5b7bb4fcdcf7bb80fb19e8a9840bcf47c5634736b0c06b",
+      "gitBlob": "ca36a754d7a4cf545643d62373922ac02e36ea89"
+    },
+    {
+      "path": "frontend/src/features/auth/browserAuth.ts",
+      "bytes": 1436,
+      "sha256": "dea8cbed34fce670b39e6e392f1a86e8b7e40eff89e6a1b032267cf383458af3",
+      "gitBlob": "e24649785db0a536d52216d7b505c2651dd30c38"
+    },
+    {
+      "path": "frontend/src/features/auth/AuthContext.tsx",
+      "bytes": 12588,
+      "sha256": "77af299cd6e327612cd0914ca651a1fbc7699e5f44b9331c37a7580842d04033",
+      "gitBlob": "04a26c1efd48dc15ec22170af875803ee7677c71"
+    },
+    {
+      "path": "frontend/src/desktop/bridge.ts",
+      "bytes": 57939,
+      "sha256": "29ce18d2929077d910af2c4cb9406796a7e32c778cf38a14a4537f75deaf1c2d",
+      "gitBlob": "2e1e1b264b50ef8a589879c9cbb12a0fd779b2f8"
+    },
+    {
+      "path": "desktop/src-tauri/src/browser_auth.rs",
+      "bytes": 56099,
+      "sha256": "3f3bbd3192acf50a366a4ee261177526b35ef80646f7c8ae76f6d5a5847bba2c",
+      "gitBlob": "fcd44440704d0c30e1b07a84dde3bd3b29e8d665"
+    },
+    {
+      "path": "desktop/src-tauri/src/browser_auth_audit.rs",
+      "bytes": 11946,
+      "sha256": "cf81288f15ea3912db24f42c2936cde814e5167d454207153a3624f7e309dd6c",
+      "gitBlob": "a233c394d96d25b01e7cd0e0a621282f9dfb3d7e"
+    },
+    {
+      "path": "desktop/src-tauri/src/browser_auth_vault.rs",
+      "bytes": 15395,
+      "sha256": "ee87c3d12cd03dabc51f1076087986cbd28b1af29cf0f4e285e4b884d3a79ab4",
+      "gitBlob": "75afeecc0a12e6170b01f1b6061266303972b3ac"
+    },
+    {
+      "path": "desktop/src-tauri/src/lib.rs",
+      "bytes": 3773,
+      "sha256": "0e059d353a56639b67927be601f529c324470af8b40b4902256105cbaa180a5c",
+      "gitBlob": "b81ac7a0aaf15951b7ccb365ea5540b3889c870d"
+    }
+  ],
+  "runtimePrerequisite": {
+    "exists": true,
+    "sourcePath": "frontend/src/pages/DesktopSetup.tsx",
+    "loginGestureRequires": [
+      "localRuntimeReady",
+      "fresh prerequisite and Runtime probes",
+      "desktop Runtime access status ready",
+      "browser auth status idle"
+    ],
+    "nativeOAuthDependsOnRuntimeApi": false,
+    "nativeOwner": "Tauri browser_auth command and fixed loopback listener",
+    "decision": "split runtime-readiness-only B0 from OAuth transaction B1"
+  },
+  "nativeProtocol": {
+    "protocolVersion": "desktop-browser-auth-pkce-v1",
+    "pkceMethod": "S256",
+    "stateBytes": 32,
+    "nonceBytes": 32,
+    "verifierBytes": 32,
+    "singleActiveAttemptPerEdition": true,
+    "callbackOneTime": true,
+    "tokenExchangeOneTime": true,
+    "replayDenied": true,
+    "crossEditionDenied": true,
+    "crossPortDenied": true,
+    "exactHostRequired": "127.0.0.1:49212",
+    "callbackAllowedFields": ["code", "state"],
+    "rawTokenCallbackDenied": true,
+    "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
+    "localSessionNamespace": "io.dronedream.desktop.lab"
+  },
+  "websiteCommittedSource": {
+    "checkout": "Z:/DroneDream-worktrees/website-20260728",
+    "branch": "codex/website",
+    "commit": "fe427096cf7e94f27973218f90853bafa220aaa0",
+    "tree": "1693f249e645365c591dd0fa67213589e7e14b68",
+    "worktreeWasDirty": true,
+    "dirtyPathsWereOAuthRelated": false,
+    "auditReadMode": "git committed blobs only",
+    "authorizationUiEndpoint": "https://getdronedream.com/oauth/consent",
+    "files": [
+      {"path": "frontend/src/site/oauthConsent.ts", "bytes": 4700, "gitBlob": "08a5a8851cb480a1d2e1b68a11e9069f0697665e"},
+      {"path": "frontend/src/site/OAuthConsentPage.tsx", "bytes": 6970, "gitBlob": "be26325878c1c438d5b26890ef3d21b09736c92a"},
+      {"path": "frontend/src/site/SiteApp.tsx", "bytes": 76303, "gitBlob": "84281c013cc9b3064625b70dc43b6aa9cdae29cb"},
+      {"path": "frontend/src/__tests__/OAuthConsent.test.tsx", "bytes": 7714, "gitBlob": "f784599ce2a71dd1ea65ad474f4b8944975b2520"},
+      {"path": "website/scripts/audit-oauth-consent.mjs", "bytes": 25185, "gitBlob": "256804c96d7e9f5fbb3714b15e4ce84bd146c4bf"}
+    ],
+    "observedSemantics": [
+      "exact Lab public client and redirect registration",
+      "authorization_id is single and bounded",
+      "openid email profile scope is exact",
+      "client and redirect must match one registration",
+      "approve or deny returns only to an allowlisted loopback redirect",
+      "user must explicitly decide on the consent page"
+    ],
+    "liveEndpointOrProviderVerifiedByThisAudit": false
+  },
+  "greenObservation": {
+    "listener49212Count": 0,
+    "appInstallerBrowserRuntimeProviderInvocations": 0,
+    "passwordTokenCookieOrBrowserPasswordStoreReads": 0
+  },
+  "conclusion": {
+    "offlineContractReady": true,
+    "runtimePrerequisiteMustBeSeparate": true,
+    "b0MayBeFrozenExactlyNow": true,
+    "b1ExactCommandRequiresB0ReceiptSha256": true,
+    "providerExecutionReady": false,
+    "releaseReady": false
+  }
+}

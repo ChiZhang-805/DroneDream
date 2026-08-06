@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-oauth-segment-b-green-preparation-receipt",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "classification": "GREEN",
+  "result": "offline-contract-and-b0-plan-only-passed-no-execute",
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+    "preparationBaseCommit": "903a75a298dcf52c32fac552c127c24ce891b711",
+    "evidenceSourcePolicy": "commit containing this receipt and its bound contracts",
+    "evidenceSourceIsArtifactSource": false,
+    "artifactInvalidated": false
+  },
+  "artifact": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12081900,
+    "sha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4",
+    "authenticodeStatus": "NotSigned",
+    "rebuiltRelabeledOrExecuted": false
+  },
+  "publicOAuth": {
+    "clientId": "0b9e7a8d-2c90-4b76-8842-511363f555bd",
+    "clientIdSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+    "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "redirectUriSha256": "89b7f8cded951255ec63f1dbd1676f769242f258559752c57318f97f266038cb",
+    "clientType": "public",
+    "tokenEndpointAuthMethod": "none",
+    "clientSecretPresentOrRead": false
+  },
+  "boundFiles": [
+    {
+      "path": "distribution/editions/lab/lifecycle/oauth-segment-b-source-audit.v1.json",
+      "bytes": 6732,
+      "sha256": "89a6f6ed65945031ec4245b29102f9d78fb871443b9688802c8ffca21e435d97"
+    },
+    {
+      "path": "distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-plan.v1.json",
+      "bytes": 5348,
+      "sha256": "f7194b1e71c3075fb283b1f84b3d85f70e157dc9c9c7847925ad8ec7e4efdccd"
+    },
+    {
+      "path": "distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-application.v1.json",
+      "bytes": 6417,
+      "sha256": "3dd4032712a443ddc9fa18491f40e1439be65e750d98b5875e97a69080af4cc3"
+    },
+    {
+      "path": "distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-command.v1.json",
+      "bytes": 5947,
+      "sha256": "8c3a6ba8dd8f4ee78846bb199a0f609f5f47123755005061efa31a43940df000"
+    },
+    {
+      "path": "distribution/editions/lab/lifecycle/run-lab-e3b427e-oauth-segment-b.ps1",
+      "bytes": 17362,
+      "sha256": "f14283c578b1d21e60e646f326a195047aae6355aa53332f810c27fb1f9cbb6e",
+      "hashMode": "lf-normalized"
+    },
+    {
+      "path": "distribution/editions/lab/lifecycle/inspect-lab-e3b427e-oauth-segment-b.mjs",
+      "bytes": 5296,
+      "sha256": "6bf33590bcbd98d233408cc948d2a2ce668d3cff67f0ac422a37cd551e3cbbbe"
+    }
+  ],
+  "runtimeSplit": {
+    "prerequisiteExists": true,
+    "b0Purpose": "owned Lab install and read-only Runtime readiness proof",
+    "b0RuntimeStartOrMutationMaximum": 0,
+    "b0BrowserOauthProviderMaximum": 0,
+    "b1Purpose": "one explicit Lab browser OAuth transaction",
+    "separateExactRedSignalsRequired": true,
+    "b0SuccessDoesNotAuthorizeB1": true
+  },
+  "commandReadiness": {
+    "b0ExactFutureRedCommandFrozen": true,
+    "b0ExecutionAuthorized": false,
+    "b0MaximumExecutionInvocations": 1,
+    "b0AutomaticRetryMaximum": 0,
+    "b0OwnedRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b0-runtime-red1",
+    "b1DeterministicCommandTemplateFrozen": true,
+    "b1ExactFutureRedCommandFrozen": false,
+    "b1OnlyUnresolvedField": "ExpectedRuntimePrerequisiteReceiptSha256",
+    "b1ExecutionAuthorized": false,
+    "b1MaximumExecutionInvocations": 1,
+    "b1AutomaticRetryMaximum": 0,
+    "b1OwnedRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b1-transaction-red1"
+  },
+  "greenPlanOnly": {
+    "observedAtUtc": "2026-08-06T21:59:15.3289309Z",
+    "invocations": 1,
+    "result": "green-plan-only-preflight-passed-no-execute",
+    "ownedB0RootAbsentBeforeAndAfter": true,
+    "listener49212CountAfter": 0,
+    "droneDreamProcessCountAfter": 0,
+    "labInstallRootAbsentAfter": true,
+    "installerApplicationBrowserOauthProviderRuntimeInvocations": 0
+  },
+  "offlineValidation": {
+    "distributionTests": 56,
+    "frontendTestFiles": 3,
+    "frontendTests": 70,
+    "desktopBrowserAuthStaticEditionLocaleViewports": 4,
+    "desktopBrowserAuthStaticCredentialFields": 0,
+    "releaseSourcePolicy": "passed",
+    "nodeSyntax": "passed",
+    "powerShellAst": "passed",
+    "ruff": "passed",
+    "gitDiffCheck": "passed"
+  },
+  "sideEffects": {
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "browserLaunches": 0,
+    "oauthTransactions": 0,
+    "providerCalls": 0,
+    "accountReads": 0,
+    "passwordTokenCookieOrBrowserPasswordStoreReads": 0,
+    "runtimeOrWslStartsOrMutations": 0,
+    "px4GazeboHardwareActions": 0,
+    "buildsUploadsOrDeployments": 0
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "frontendLoginCountsAsAuthority": false
+  },
+  "nextGate": {
+    "state": "awaiting-separate-exact-b0-red-signal",
+    "b0FailureDecision": "freeze receipt, run only owned rollback, stop without retry",
+    "afterB0": "freeze exact B0 receipt SHA in a new GREEN atom before requesting B1",
+    "providerExecutionOccurred": false
+  },
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}

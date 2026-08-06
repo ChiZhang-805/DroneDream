@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-oauth-segment-b-command-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "green-plan-only-validated-awaiting-separate-b0-red-signal",
+  "productSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe",
+    "bytes": 12081900,
+    "sha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4"
+  },
+  "application": {
+    "path": "distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-application.v1.json",
+    "bytes": 6417,
+    "sha256": "3dd4032712a443ddc9fa18491f40e1439be65e750d98b5875e97a69080af4cc3"
+  },
+  "plan": {
+    "path": "distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-plan.v1.json",
+    "bytes": 5348,
+    "sha256": "f7194b1e71c3075fb283b1f84b3d85f70e157dc9c9c7847925ad8ec7e4efdccd"
+  },
+  "tool": {
+    "path": "distribution/editions/lab/lifecycle/run-lab-e3b427e-oauth-segment-b.ps1",
+    "lfNormalizedBytes": 17362,
+    "lfNormalizedSha256": "f14283c578b1d21e60e646f326a195047aae6355aa53332f810c27fb1f9cbb6e"
+  },
+  "b0": {
+    "ordinal": 1,
+    "maximumExecutionInvocations": 1,
+    "automaticRetryMaximum": 0,
+    "ownedRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b0-runtime-red1",
+    "planOnlyCommand": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File distribution/editions/lab/lifecycle/run-lab-e3b427e-oauth-segment-b.ps1 -Installer C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe -ExpectedInstallerSha256 e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4 -ExpectedInstallerBytes 12081900 -Application distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-application.v1.json -ExpectedApplicationSha256 3dd4032712a443ddc9fa18491f40e1439be65e750d98b5875e97a69080af4cc3 -Plan distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-plan.v1.json -ExpectedPlanSha256 f7194b1e71c3075fb283b1f84b3d85f70e157dc9c9c7847925ad8ec7e4efdccd -Phase RuntimePrerequisite -OutputRoot C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b0-runtime-red1",
+    "exactFutureRedCommand": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File distribution/editions/lab/lifecycle/run-lab-e3b427e-oauth-segment-b.ps1 -Installer C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe -ExpectedInstallerSha256 e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4 -ExpectedInstallerBytes 12081900 -Application distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-application.v1.json -ExpectedApplicationSha256 3dd4032712a443ddc9fa18491f40e1439be65e750d98b5875e97a69080af4cc3 -Plan distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-plan.v1.json -ExpectedPlanSha256 f7194b1e71c3075fb283b1f84b3d85f70e157dc9c9c7847925ad8ec7e4efdccd -Phase RuntimePrerequisite -OutputRoot C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b0-runtime-red1 -Execute",
+    "executionAuthorizedNow": false,
+    "browserOauthProviderRuntimeMutationCounts": 0
+  },
+  "b1": {
+    "ordinal": 1,
+    "maximumExecutionInvocations": 1,
+    "automaticRetryMaximum": 0,
+    "ownedRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b1-transaction-red1",
+    "runtimePrerequisiteReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b0-runtime-red1/lab-oauth-segment-b-receipt.json",
+    "runtimePrerequisiteReceiptSha256": null,
+    "deterministicCommandTemplate": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File distribution/editions/lab/lifecycle/run-lab-e3b427e-oauth-segment-b.ps1 -Installer C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe -ExpectedInstallerSha256 e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4 -ExpectedInstallerBytes 12081900 -Application distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-application.v1.json -ExpectedApplicationSha256 3dd4032712a443ddc9fa18491f40e1439be65e750d98b5875e97a69080af4cc3 -Plan distribution/editions/lab/lifecycle/red-e3b427e-oauth-segment-b-plan.v1.json -ExpectedPlanSha256 f7194b1e71c3075fb283b1f84b3d85f70e157dc9c9c7847925ad8ec7e4efdccd -Phase OAuthTransaction -RuntimePrerequisiteReceipt C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b0-runtime-red1/lab-oauth-segment-b-receipt.json -ExpectedRuntimePrerequisiteReceiptSha256 <EXACT_B0_RECEIPT_SHA256> -OutputRoot C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-oauth-b1-transaction-red1 -Execute",
+    "exactFutureRedCommandFrozen": false,
+    "onlyUnresolvedField": "ExpectedRuntimePrerequisiteReceiptSha256",
+    "executionAuthorizedNow": false,
+    "reason": "B1 cannot be exact or authorized until the separately authorized B0 execution produces an accepted receipt whose SHA-256 can be frozen."
+  },
+  "greenValidation": {
+    "planOnlyInvocationMaximum": 1,
+    "planOnlyInvocationActual": 1,
+    "observedAtUtc": "2026-08-06T21:59:15.3289309Z",
+    "result": "green-plan-only-preflight-passed-no-execute",
+    "ownedB0RootAbsentBeforeAndAfter": true,
+    "listener49212CountAfter": 0,
+    "droneDreamProcessCountAfter": 0,
+    "labInstallRootAbsentAfter": true,
+    "installerApplicationBrowserOauthProviderRuntimeInvocations": 0
+  },
+  "forbiddenNow": [
+    "installer or application execution",
+    "browser or OAuth execution",
+    "provider or account access",
+    "password token cookie or browser password-store reads",
+    "Runtime or WSL start or mutation",
+    "PX4 Gazebo or hardware",
+    "build upload or deployment"
+  ]
+}
