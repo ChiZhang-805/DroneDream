@@ -41,6 +41,10 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
 
     def test_drift_audit_identifies_field_only_paths_after_common_core_backflow(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)
+        self.assertEqual(
+            audit["source"]["baseRef"],
+            "cabcde3903ccceaf19119824af227bebeb7dd5be",
+        )
         subjects = [commit["subject"] for commit in audit["commits"]]
         for required_subject in (
             "feat(field): add lightweight engine pack profile",
@@ -63,6 +67,15 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         )
         self.assertEqual(audit["summary"]["universalCommonCorePathCount"], 0)
         self.assertEqual(audit["summary"]["protectedEvidenceDriftCount"], 0)
+        field_evidence = [
+            item
+            for item in audit["changedPaths"]
+            if item["path"].startswith("artifacts/test-runs/field-")
+        ]
+        self.assertTrue(field_evidence)
+        self.assertTrue(
+            all(item["classification"] == "field-specific-contract" for item in field_evidence)
+        )
 
     def test_backflow_plan_excludes_field_specific_contract_implementations(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)

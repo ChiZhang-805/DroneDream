@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-isolated-install-acceptance-plan",
+  "editionId": "field",
+  "state": "blocked-no-isolated-provider",
+  "source": {
+    "productSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "evidenceHead": "0f86ba8f6e125aa95ff3bb0a4a5357843786fad8",
+    "commonCoreCommit": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+    "commonCoreHash": "c6e480dfd2cf4eccb07ee34cd836f096843afab375b03a5fb2d57ab964b5c94a",
+    "artifactManifestSha256": "4f0904bd84abe56797dbf74fe51cd372aa73965a816ff9a326b7d1dba699b430",
+    "buildReceiptSha256": "de0ec8c9d2ce50b5d431e7e6b933952f6dc2c25a4bb1c55744e05b95e0430846",
+    "toolSha256": "a6e2ad4868db254ebec148811dec7fdfb32ae0d787ec26db5008ae39b3152356",
+    "schemaSha256": "31c6bab8e583d630fa3e20710ef58c3cac5f48f61482ff60d6e6ea819e58e099"
+  },
+  "artifact": {
+    "absolutePath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": 11267482,
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "authenticodeStatus": "NotSigned",
+    "peCertificateTableBytes": 0,
+    "buildCount": 1,
+    "nsisInvocationCount": 1
+  },
+  "authorization": {
+    "currentClass": "GREEN",
+    "requestedExecutionClass": "YELLOW",
+    "authorizationSourceThreadId": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9",
+    "unsignedInternalDistributionAuthorized": true,
+    "planOnly": true,
+    "installationAuthorized": false,
+    "rebuildAuthorized": false,
+    "uploadAuthorized": false,
+    "deviceAccessAuthorized": false,
+    "releaseBranchAuthorized": false
+  },
+  "environment": {
+    "requiredClass": "disposable-windows-guest",
+    "host": {
+      "osCaption": "Microsoft Windows 11 家庭版 中文版",
+      "osVersion": "10.0.26200",
+      "osBuild": "26200",
+      "osArchitecture": "64-bit",
+      "totalPhysicalMemoryBytes": 16907100160
+    },
+    "providers": [
+      {
+        "providerId": "windows-sandbox",
+        "available": false,
+        "path": null,
+        "version": null,
+        "sha256": null
+      },
+      {
+        "providerId": "hyper-v",
+        "available": false,
+        "path": null,
+        "version": null,
+        "sha256": null
+      },
+      {
+        "providerId": "vmware",
+        "available": false,
+        "path": null,
+        "version": null,
+        "sha256": null
+      },
+      {
+        "providerId": "virtualbox",
+        "available": false,
+        "path": null,
+        "version": null,
+        "sha256": null
+      },
+      {
+        "providerId": "qemu",
+        "available": false,
+        "path": null,
+        "version": null,
+        "sha256": null
+      }
+    ],
+    "probeSha256": "9da4a9123444110a43a36e64797004b1f1ce3bf5866c58f39a691463a42628e8",
+    "selectedProvider": null,
+    "available": false,
+    "guestIdentityMustBeCaptured": true,
+    "networkMode": "disabled",
+    "clipboardRedirection": "disabled",
+    "deviceRedirection": "disabled",
+    "rollbackMode": "discard-entire-guest"
+  },
+  "ownedPaths": {
+    "hostArtifact": {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\artifact\\DroneDream-Field-1.0.0.exe",
+      "mode": "read-only"
+    },
+    "hostOwnedRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-test\\field-install-acceptance-c7e25b3",
+    "hostEvidenceRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-test\\field-install-acceptance-c7e25b3\\evidence",
+    "guestOwnedRoot": "C:\\FieldAcceptance",
+    "guestInstallDirectory": "%LOCALAPPDATA%\\DroneDream · FIELD",
+    "guestBundleData": [
+      "%APPDATA%\\io.dronedream.desktop.field",
+      "%LOCALAPPDATA%\\io.dronedream.desktop.field"
+    ],
+    "guestShortcuts": [
+      "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk",
+      "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk"
+    ],
+    "guestRegistryKeys": [
+      "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · FIELD",
+      "HKCU\\Software\\DroneDream\\DroneDream · FIELD"
+    ],
+    "writesOutsideDisposableGuestAllowed": false
+  },
+  "invocationBudget": {
+    "installerExe": 2,
+    "uninstaller": 1,
+    "applicationLaunch": 2,
+    "rebuild": 0,
+    "networkRequest": 0,
+    "deviceEnumeration": 0,
+    "hardwareAction": 0
+  },
+  "upgradeSemantics": {
+    "coveredScenario": "same-version-overwrite-reinstall",
+    "semanticVersionUpgradeCovered": false,
+    "semanticVersionUpgradeClaimAllowed": false,
+    "priorFieldInstallerRequiredForSemanticUpgrade": true
+  },
+  "phases": [
+    {
+      "phaseId": "guest-baseline",
+      "state": "planned-not-executed",
+      "locale": null,
+      "assertions": [
+        "filesystem-registry-process-baseline"
+      ],
+      "evidenceRequired": true
+    },
+    {
+      "phaseId": "fresh-install-en",
+      "state": "planned-not-executed",
+      "locale": "en",
+      "assertions": [
+        "current-user-install",
+        "app-only",
+        "desktop-shortcut-selected"
+      ],
+      "evidenceRequired": true
+    },
+    {
+      "phaseId": "fresh-launch-en",
+      "state": "planned-not-executed",
+      "locale": "en",
+      "assertions": [
+        "app-starts",
+        "field-brand-visible",
+        "hardware-actions-denied"
+      ],
+      "evidenceRequired": true
+    },
+    {
+      "phaseId": "same-version-overwrite-zh-CN",
+      "state": "planned-not-executed",
+      "locale": "zh-CN",
+      "assertions": [
+        "maintenance-reinstall",
+        "source-sha-unchanged",
+        "shortcut-icon-refreshed"
+      ],
+      "evidenceRequired": true
+    },
+    {
+      "phaseId": "shortcut-launch-zh-CN",
+      "state": "planned-not-executed",
+      "locale": "zh-CN",
+      "assertions": [
+        "start-menu-target",
+        "desktop-target",
+        "field-icon",
+        "app-starts"
+      ],
+      "evidenceRequired": true
+    },
+    {
+      "phaseId": "uninstall-delete-app-data",
+      "state": "planned-not-executed",
+      "locale": "zh-CN",
+      "assertions": [
+        "uninstaller-success",
+        "delete-app-data-selected"
+      ],
+      "evidenceRequired": true
+    },
+    {
+      "phaseId": "residue-audit",
+      "state": "planned-not-executed",
+      "locale": null,
+      "assertions": [
+        "no-unexpected-field-residue"
+      ],
+      "evidenceRequired": true
+    },
+    {
+      "phaseId": "guest-discard-rollback",
+      "state": "planned-not-executed",
+      "locale": null,
+      "assertions": [
+        "guest-discarded",
+        "evidence-preserved"
+      ],
+      "evidenceRequired": true
+    }
+  ],
+  "shortcutGate": {
+    "target": "%LOCALAPPDATA%\\DroneDream · FIELD\\drone-dream-desktop.exe",
+    "icon": "%LOCALAPPDATA%\\DroneDream · FIELD\\icons\\DroneDream.ico",
+    "startMenuRequired": true,
+    "desktopRequiredWhenSelected": true,
+    "appUserModelIdRequired": true
+  },
+  "webView2Gate": {
+    "networkAllowed": false,
+    "embeddedBootstrapperSha256": "f91077e2c116dcf6377e555d0d4a3a564d242351ad6718b6954658d4f74819c1",
+    "runtimeExecutableHealthRequired": true,
+    "sharedRuntimeMayRemainAfterUninstall": true
+  },
+  "localizationGate": {
+    "locales": [
+      "en",
+      "zh-CN"
+    ],
+    "installerUiRequired": true,
+    "applicationUiRequired": true,
+    "keyboardTraversalRequired": true,
+    "screenReaderNamesRequired": true
+  },
+  "residueGate": {
+    "mustBeAbsent": [
+      "guestInstallDirectory",
+      "guestBundleData",
+      "guestShortcuts",
+      "guestRegistryKeys",
+      "drone-dream-desktop-process",
+      "uninstall-process"
+    ],
+    "allowedResidue": [
+      "shared-microsoft-webview2-runtime",
+      "hostEvidenceRoot"
+    ],
+    "unexpectedProductResidueDecision": "fail"
+  },
+  "rollbackGate": {
+    "method": "discard-entire-guest",
+    "rollbackRequiredOnPass": true,
+    "rollbackRequiredOnFailure": true,
+    "evidenceMustBeCopiedBeforeDiscard": true,
+    "evidenceDeletionAllowed": false,
+    "hostProductStateMutationAllowed": false
+  },
+  "safetyBoundary": {
+    "validatedHardwarePackCount": 0,
+    "deviceEnumerationAllowed": false,
+    "usbSerialOpenAllowed": false,
+    "parameterWriteAllowed": false,
+    "unlockArmFlightAllowed": false,
+    "simulationAllowed": false,
+    "frontendIsAuthority": false
+  },
+  "websiteHandoffPrecheck": {
+    "websiteSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "websiteEvidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+    "state": "blocked",
+    "previewSubstitutionAllowed": false,
+    "crossEditionAttachmentAllowed": false,
+    "signatureState": "NotSigned",
+    "unsignedInternalDistributionAuthorized": true,
+    "websiteReady": false,
+    "blockers": [
+      "field.website.isolated-environment-unavailable",
+      "field.website.fresh-install-not-passed",
+      "field.website.overwrite-not-passed",
+      "field.website.uninstall-not-passed",
+      "field.website.shortcut-not-passed",
+      "field.website.webview2-not-passed",
+      "field.website.en-zh-not-passed",
+      "field.website.residue-not-passed",
+      "field.website.rollback-not-passed",
+      "field.website.url-family-not-frozen",
+      "field.website.redownload-not-verified"
+    ]
+  },
+  "planSha256": "ae3b052fae9c5684890fadd1de20aa24d9dc3f444f7b090d8b9bdc370dec1866"
+}

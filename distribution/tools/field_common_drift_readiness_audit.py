@@ -13,7 +13,7 @@ DISTRIBUTION = ROOT / "distribution"
 
 AUDIT_KIND = "dronedream-field-common-drift-readiness-audit"
 RECEIPT_KIND = "dronedream-field-preview-build-readiness-receipt"
-DEFAULT_BASE_REF = "origin/codex/software"
+DEFAULT_BASE_REF = "cabcde3903ccceaf19119824af227bebeb7dd5be"
 FIELD_BRANCH = "codex/software-field"
 FIELD_RELEASE_BRANCH = "codex/release-field"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -56,6 +56,10 @@ FIELD_EDITION_PATHS = {
     "frontend/package.json",
 }
 PROTECTED_EVIDENCE_PREFIXES = ("artifacts/test-runs/",)
+FIELD_EVIDENCE_PREFIXES = (
+    "artifacts/test-runs/field-preview-",
+    "artifacts/test-runs/field-install-acceptance-",
+)
 FIELD_BRANDING_MANIFEST = Path("distribution/editions/field/branding/source-manifest.v1.json")
 FIELD_TAURI_CONFIG = Path("desktop/src-tauri/tauri.field.conf.json")
 FIELD_FRONTEND_APP = Path("frontend/src/field/FieldApp.tsx")
@@ -178,7 +182,11 @@ def classify_path(path: str) -> dict[str, str]:
             "topic": "engine-pack-edition-profile-and-runtime-whitelist",
             "action": "extract-minimal-shared-core-patch",
         }
-    if path in FIELD_EDITION_PATHS or path.startswith(FIELD_CONTRACT_PREFIXES):
+    if (
+        path in FIELD_EDITION_PATHS
+        or path.startswith(FIELD_CONTRACT_PREFIXES)
+        or path.startswith(FIELD_EVIDENCE_PREFIXES)
+    ):
         return {
             "classification": "field-specific-contract",
             "topic": "field-edition-contract-and-product-surface",

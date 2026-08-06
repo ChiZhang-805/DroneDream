@@ -1,0 +1,46 @@
+{
+    "host":  {
+                 "osCaption":  "Microsoft Windows 11 家庭版 中文版",
+                 "osVersion":  "10.0.26200",
+                 "osBuild":  "26200",
+                 "osArchitecture":  "64-bit",
+                 "totalPhysicalMemoryBytes":  16907100160
+             },
+    "providers":  [
+                      {
+                          "providerId":  "windows-sandbox",
+                          "available":  false,
+                          "path":  null,
+                          "version":  null,
+                          "sha256":  null
+                      },
+                      {
+                          "providerId":  "hyper-v",
+                          "available":  false,
+                          "path":  null,
+                          "version":  null,
+                          "sha256":  null
+                      },
+                      {
+                          "providerId":  "vmware",
+                          "available":  false,
+                          "path":  null,
+                          "version":  null,
+                          "sha256":  null
+                      },
+                      {
+                          "providerId":  "virtualbox",
+                          "available":  false,
+                          "path":  null,
+                          "version":  null,
+                          "sha256":  null
+                      },
+                      {
+                          "providerId":  "qemu",
+                          "available":  false,
+                          "path":  null,
+                          "version":  null,
+                          "sha256":  null
+                      }
+                  ]
+}

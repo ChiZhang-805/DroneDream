@@ -1,0 +1,473 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/field-install-acceptance-evidence.v1.json",
+  "title": "DroneDream Field isolated install acceptance evidence",
+  "oneOf": [
+    {"$ref": "#/$defs/plan"},
+    {"$ref": "#/$defs/readinessReceipt"},
+    {"$ref": "#/$defs/executionReceipt"}
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["productSourceCommit", "evidenceHead", "commonCoreCommit", "commonCoreHash", "artifactManifestSha256", "buildReceiptSha256", "toolSha256", "schemaSha256"],
+      "properties": {
+        "productSourceCommit": {"$ref": "#/$defs/commit"},
+        "evidenceHead": {"$ref": "#/$defs/commit"},
+        "commonCoreCommit": {"$ref": "#/$defs/commit"},
+        "commonCoreHash": {"$ref": "#/$defs/sha256"},
+        "artifactManifestSha256": {"$ref": "#/$defs/sha256"},
+        "buildReceiptSha256": {"$ref": "#/$defs/sha256"},
+        "toolSha256": {"$ref": "#/$defs/sha256"},
+        "schemaSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["absolutePath", "filename", "version", "bytes", "sha256", "authenticodeStatus", "peCertificateTableBytes", "buildCount", "nsisInvocationCount"],
+      "properties": {
+        "absolutePath": {"type": "string", "minLength": 1},
+        "filename": {"const": "DroneDream-Field-1.0.0.exe"},
+        "version": {"const": "1.0.0"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "authenticodeStatus": {"type": "string", "minLength": 1},
+        "peCertificateTableBytes": {"type": "integer", "minimum": 0},
+        "buildCount": {"const": 1},
+        "nsisInvocationCount": {"const": 1}
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerId", "available", "path", "version", "sha256"],
+      "properties": {
+        "providerId": {"enum": ["windows-sandbox", "hyper-v", "vmware", "virtualbox", "qemu"]},
+        "available": {"type": "boolean"},
+        "path": {"type": ["string", "null"]},
+        "version": {"type": ["string", "null"]},
+        "sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiredClass", "host", "providers", "probeSha256", "selectedProvider", "available", "guestIdentityMustBeCaptured", "networkMode", "clipboardRedirection", "deviceRedirection", "rollbackMode"],
+      "properties": {
+        "requiredClass": {"const": "disposable-windows-guest"},
+        "host": {"$ref": "#/$defs/hostProbe"},
+        "providers": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/provider"}},
+        "probeSha256": {"$ref": "#/$defs/sha256"},
+        "selectedProvider": {"type": ["string", "null"]},
+        "available": {"type": "boolean"},
+        "guestIdentityMustBeCaptured": {"const": true},
+        "networkMode": {"const": "disabled"},
+        "clipboardRedirection": {"const": "disabled"},
+        "deviceRedirection": {"const": "disabled"},
+        "rollbackMode": {"const": "discard-entire-guest"}
+      }
+    },
+    "invocationBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["installerExe", "uninstaller", "applicationLaunch", "rebuild", "networkRequest", "deviceEnumeration", "hardwareAction"],
+      "properties": {
+        "installerExe": {"const": 2},
+        "uninstaller": {"const": 1},
+        "applicationLaunch": {"const": 2},
+        "rebuild": {"const": 0},
+        "networkRequest": {"const": 0},
+        "deviceEnumeration": {"const": 0},
+        "hardwareAction": {"const": 0}
+      }
+    },
+    "zeroCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["installerExe", "uninstaller", "applicationLaunch", "rebuild", "networkRequest", "deviceEnumeration", "hardwareAction"],
+      "properties": {
+        "installerExe": {"const": 0},
+        "uninstaller": {"const": 0},
+        "applicationLaunch": {"const": 0},
+        "rebuild": {"const": 0},
+        "networkRequest": {"const": 0},
+        "deviceEnumeration": {"const": 0},
+        "hardwareAction": {"const": 0}
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currentClass", "requestedExecutionClass", "authorizationSourceThreadId", "unsignedInternalDistributionAuthorized", "planOnly", "installationAuthorized", "rebuildAuthorized", "uploadAuthorized", "deviceAccessAuthorized", "releaseBranchAuthorized"],
+      "properties": {
+        "currentClass": {"const": "GREEN"},
+        "requestedExecutionClass": {"const": "YELLOW"},
+        "authorizationSourceThreadId": {"const": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9"},
+        "unsignedInternalDistributionAuthorized": {"const": true},
+        "planOnly": {"const": true},
+        "installationAuthorized": {"const": false},
+        "rebuildAuthorized": {"const": false},
+        "uploadAuthorized": {"const": false},
+        "deviceAccessAuthorized": {"const": false},
+        "releaseBranchAuthorized": {"const": false}
+      }
+    },
+    "hostProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["osCaption", "osVersion", "osBuild", "osArchitecture", "totalPhysicalMemoryBytes"],
+      "properties": {
+        "osCaption": {"type": "string", "minLength": 1},
+        "osVersion": {"type": "string", "minLength": 1},
+        "osBuild": {"type": "string", "minLength": 1},
+        "osArchitecture": {"type": "string", "minLength": 1},
+        "totalPhysicalMemoryBytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "ownedPaths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostArtifact", "hostOwnedRoot", "hostEvidenceRoot", "guestOwnedRoot", "guestInstallDirectory", "guestBundleData", "guestShortcuts", "guestRegistryKeys", "writesOutsideDisposableGuestAllowed"],
+      "properties": {
+        "hostArtifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "mode"],
+          "properties": {"path": {"type": "string", "minLength": 1}, "mode": {"const": "read-only"}}
+        },
+        "hostOwnedRoot": {"type": "string", "minLength": 1},
+        "hostEvidenceRoot": {"type": "string", "minLength": 1},
+        "guestOwnedRoot": {"const": "C:\\FieldAcceptance"},
+        "guestInstallDirectory": {"type": "string", "minLength": 1},
+        "guestBundleData": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
+        "guestShortcuts": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
+        "guestRegistryKeys": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
+        "writesOutsideDisposableGuestAllowed": {"const": false}
+      }
+    },
+    "phasePlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phaseId", "state", "locale", "assertions", "evidenceRequired"],
+      "properties": {
+        "phaseId": {"type": "string", "minLength": 1},
+        "state": {"const": "planned-not-executed"},
+        "locale": {"type": ["string", "null"]},
+        "assertions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "evidenceRequired": {"const": true}
+      }
+    },
+    "upgradeSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coveredScenario", "semanticVersionUpgradeCovered", "semanticVersionUpgradeClaimAllowed", "priorFieldInstallerRequiredForSemanticUpgrade"],
+      "properties": {
+        "coveredScenario": {"const": "same-version-overwrite-reinstall"},
+        "semanticVersionUpgradeCovered": {"const": false},
+        "semanticVersionUpgradeClaimAllowed": {"const": false},
+        "priorFieldInstallerRequiredForSemanticUpgrade": {"const": true}
+      }
+    },
+    "shortcutGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "icon", "startMenuRequired", "desktopRequiredWhenSelected", "appUserModelIdRequired"],
+      "properties": {
+        "target": {"type": "string", "minLength": 1},
+        "icon": {"type": "string", "minLength": 1},
+        "startMenuRequired": {"const": true},
+        "desktopRequiredWhenSelected": {"const": true},
+        "appUserModelIdRequired": {"const": true}
+      }
+    },
+    "webView2Gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["networkAllowed", "embeddedBootstrapperSha256", "runtimeExecutableHealthRequired", "sharedRuntimeMayRemainAfterUninstall"],
+      "properties": {
+        "networkAllowed": {"const": false},
+        "embeddedBootstrapperSha256": {"$ref": "#/$defs/sha256"},
+        "runtimeExecutableHealthRequired": {"const": true},
+        "sharedRuntimeMayRemainAfterUninstall": {"const": true}
+      }
+    },
+    "localizationGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["locales", "installerUiRequired", "applicationUiRequired", "keyboardTraversalRequired", "screenReaderNamesRequired"],
+      "properties": {
+        "locales": {"type": "array", "prefixItems": [{"const": "en"}, {"const": "zh-CN"}], "minItems": 2, "maxItems": 2},
+        "installerUiRequired": {"const": true},
+        "applicationUiRequired": {"const": true},
+        "keyboardTraversalRequired": {"const": true},
+        "screenReaderNamesRequired": {"const": true}
+      }
+    },
+    "residueGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mustBeAbsent", "allowedResidue", "unexpectedProductResidueDecision"],
+      "properties": {
+        "mustBeAbsent": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "allowedResidue": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "unexpectedProductResidueDecision": {"const": "fail"}
+      }
+    },
+    "rollbackGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "rollbackRequiredOnPass", "rollbackRequiredOnFailure", "evidenceMustBeCopiedBeforeDiscard", "evidenceDeletionAllowed", "hostProductStateMutationAllowed"],
+      "properties": {
+        "method": {"const": "discard-entire-guest"},
+        "rollbackRequiredOnPass": {"const": true},
+        "rollbackRequiredOnFailure": {"const": true},
+        "evidenceMustBeCopiedBeforeDiscard": {"const": true},
+        "evidenceDeletionAllowed": {"const": false},
+        "hostProductStateMutationAllowed": {"const": false}
+      }
+    },
+    "safetyBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validatedHardwarePackCount", "deviceEnumerationAllowed", "usbSerialOpenAllowed", "parameterWriteAllowed", "unlockArmFlightAllowed", "simulationAllowed", "frontendIsAuthority"],
+      "properties": {
+        "validatedHardwarePackCount": {"const": 0},
+        "deviceEnumerationAllowed": {"const": false},
+        "usbSerialOpenAllowed": {"const": false},
+        "parameterWriteAllowed": {"const": false},
+        "unlockArmFlightAllowed": {"const": false},
+        "simulationAllowed": {"const": false},
+        "frontendIsAuthority": {"const": false}
+      }
+    },
+    "websitePrecheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["websiteSourceCommit", "websiteEvidenceCommit", "state", "previewSubstitutionAllowed", "crossEditionAttachmentAllowed", "signatureState", "unsignedInternalDistributionAuthorized", "websiteReady", "blockers"],
+      "properties": {
+        "websiteSourceCommit": {"const": "afdcdee5b60883290c9d1cc0c036141920066659"},
+        "websiteEvidenceCommit": {"const": "1a82e36b362c95983473c4a0d0d967d8c7415f92"},
+        "state": {"enum": ["blocked", "ready-for-exact-handoff"]},
+        "previewSubstitutionAllowed": {"const": false},
+        "crossEditionAttachmentAllowed": {"const": false},
+        "signatureState": {"type": "string", "minLength": 1},
+        "unsignedInternalDistributionAuthorized": {"type": "boolean"},
+        "websiteReady": {"type": "boolean"},
+        "blockers": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "editionId", "state", "source", "artifact", "authorization", "environment", "ownedPaths", "invocationBudget", "upgradeSemantics", "phases", "shortcutGate", "webView2Gate", "localizationGate", "residueGate", "rollbackGate", "safetyBoundary", "websiteHandoffPrecheck", "planSha256"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-isolated-install-acceptance-plan"},
+        "editionId": {"const": "field"},
+        "state": {"enum": ["blocked-no-isolated-provider", "yellow-approval-required"]},
+        "source": {"$ref": "#/$defs/source"},
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "authorization": {"$ref": "#/$defs/authorization"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "ownedPaths": {"$ref": "#/$defs/ownedPaths"},
+        "invocationBudget": {"$ref": "#/$defs/invocationBudget"},
+        "upgradeSemantics": {"$ref": "#/$defs/upgradeSemantics"},
+        "phases": {"type": "array", "minItems": 8, "maxItems": 8, "items": {"$ref": "#/$defs/phasePlan"}},
+        "shortcutGate": {"$ref": "#/$defs/shortcutGate"},
+        "webView2Gate": {"$ref": "#/$defs/webView2Gate"},
+        "localizationGate": {"$ref": "#/$defs/localizationGate"},
+        "residueGate": {"$ref": "#/$defs/residueGate"},
+        "rollbackGate": {"$ref": "#/$defs/rollbackGate"},
+        "safetyBoundary": {"$ref": "#/$defs/safetyBoundary"},
+        "websiteHandoffPrecheck": {"$ref": "#/$defs/websitePrecheck"},
+        "planSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "readinessReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "editionId", "decision", "planSha256", "source", "artifact", "environment", "invocationBudget", "impact", "rollback", "executionCounts", "executionPerformed", "websiteHandoffPrecheck", "blockers", "receiptSha256"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-isolated-install-green-readiness-receipt"},
+        "editionId": {"const": "field"},
+        "decision": {"enum": ["deny-before-yellow", "request-yellow-approval"]},
+        "planSha256": {"$ref": "#/$defs/sha256"},
+        "source": {"$ref": "#/$defs/source"},
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "invocationBudget": {"$ref": "#/$defs/invocationBudget"},
+        "impact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hostInstallerExecution", "guestInstallerExecutionPlanned", "guestRegistryAndFilesystemMutationPlanned", "sharedWebView2RepairMayExecuteInsideGuest", "network", "deviceAccess", "hostProductState"],
+          "properties": {
+            "hostInstallerExecution": {"const": false},
+            "guestInstallerExecutionPlanned": {"const": true},
+            "guestRegistryAndFilesystemMutationPlanned": {"const": true},
+            "sharedWebView2RepairMayExecuteInsideGuest": {"const": true},
+            "network": {"const": "disabled"},
+            "deviceAccess": {"const": "denied"},
+            "hostProductState": {"const": "must-remain-unchanged"}
+          }
+        },
+        "rollback": {"$ref": "#/$defs/rollbackGate"},
+        "executionCounts": {"$ref": "#/$defs/zeroCounts"},
+        "executionPerformed": {"const": false},
+        "websiteHandoffPrecheck": {"$ref": "#/$defs/websitePrecheck"},
+        "blockers": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "phaseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phaseId", "result", "evidenceSha256"],
+      "properties": {
+        "phaseId": {"type": "string", "minLength": 1},
+        "result": {"enum": ["pass", "fail"]},
+        "evidenceSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "executionEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerId", "providerPath", "providerVersion", "providerSha256", "hostOsBuild", "guestOsBuild", "guestSnapshotId", "networkMode", "deviceRedirection"],
+      "properties": {
+        "providerId": {"enum": ["windows-sandbox", "hyper-v", "vmware", "virtualbox", "qemu"]},
+        "providerPath": {"type": "string", "minLength": 1},
+        "providerVersion": {"type": "string", "minLength": 1},
+        "providerSha256": {"$ref": "#/$defs/sha256"},
+        "hostOsBuild": {"type": "string", "minLength": 1},
+        "guestOsBuild": {"type": "string", "minLength": 1},
+        "guestSnapshotId": {"type": "string", "minLength": 1},
+        "networkMode": {"const": "disabled"},
+        "deviceRedirection": {"const": "disabled"}
+      }
+    },
+    "signatureEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authenticodeStatus", "signerThumbprint", "peCertificateTableBytes"],
+      "properties": {
+        "authenticodeStatus": {"type": "string", "minLength": 1},
+        "signerThumbprint": {"type": ["string", "null"]},
+        "peCertificateTableBytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "shortcutEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "startMenuTargetMatched", "desktopTargetMatched", "iconMatched", "appUserModelIdPresent", "evidenceSha256"],
+      "properties": {
+        "result": {"enum": ["pass", "fail"]},
+        "startMenuTargetMatched": {"type": "boolean"},
+        "desktopTargetMatched": {"type": "boolean"},
+        "iconMatched": {"type": "boolean"},
+        "appUserModelIdPresent": {"type": "boolean"},
+        "evidenceSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "webView2Evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "runtimeVersion", "runtimeExecutableHealthy", "repairExecuted", "networkRequests", "evidenceSha256"],
+      "properties": {
+        "result": {"enum": ["pass", "fail"]},
+        "runtimeVersion": {"type": "string", "minLength": 1},
+        "runtimeExecutableHealthy": {"type": "boolean"},
+        "repairExecuted": {"type": "boolean"},
+        "networkRequests": {"const": 0},
+        "evidenceSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "localizationEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "englishInstallerPassed", "chineseInstallerPassed", "englishApplicationPassed", "chineseApplicationPassed", "keyboardPassed", "screenReaderNamesPassed", "evidenceSha256"],
+      "properties": {
+        "result": {"enum": ["pass", "fail"]},
+        "englishInstallerPassed": {"type": "boolean"},
+        "chineseInstallerPassed": {"type": "boolean"},
+        "englishApplicationPassed": {"type": "boolean"},
+        "chineseApplicationPassed": {"type": "boolean"},
+        "keyboardPassed": {"type": "boolean"},
+        "screenReaderNamesPassed": {"type": "boolean"},
+        "evidenceSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "residueEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "unexpectedResidue", "allowedResidue", "evidenceSha256"],
+      "properties": {
+        "result": {"enum": ["pass", "fail"]},
+        "unexpectedResidue": {"type": "array", "items": {"type": "string"}},
+        "allowedResidue": {"type": "array", "items": {"type": "string"}},
+        "evidenceSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "rollbackEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "guestDiscarded", "evidencePreserved", "hostProductStateUnchanged", "evidenceSha256"],
+      "properties": {
+        "result": {"enum": ["pass", "fail"]},
+        "guestDiscarded": {"type": "boolean"},
+        "evidencePreserved": {"type": "boolean"},
+        "hostProductStateUnchanged": {"type": "boolean"},
+        "evidenceSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "safetyEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deviceEnumerationExecuted", "usbSerialOpened", "hardwareActionExecuted", "simulationExecuted"],
+      "properties": {
+        "deviceEnumerationExecuted": {"const": false},
+        "usbSerialOpened": {"const": false},
+        "hardwareActionExecuted": {"const": false},
+        "simulationExecuted": {"const": false}
+      }
+    },
+    "websiteMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["urlFamilyFrozen", "redownloadSha256Matched"],
+      "properties": {
+        "urlFamilyFrozen": {"type": "boolean"},
+        "redownloadSha256Matched": {"type": "boolean"}
+      }
+    },
+    "executionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "editionId", "planSha256", "artifactSha256", "environment", "invocationCounts", "phases", "signatureEvidence", "shortcutEvidence", "webView2Evidence", "localizationEvidence", "residueEvidence", "rollbackEvidence", "safetyEvidence", "websiteMetadata", "websiteHandoffPrecheck", "receiptSha256"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-isolated-install-execution-receipt"},
+        "editionId": {"const": "field"},
+        "planSha256": {"$ref": "#/$defs/sha256"},
+        "artifactSha256": {"$ref": "#/$defs/sha256"},
+        "environment": {"$ref": "#/$defs/executionEnvironment"},
+        "invocationCounts": {"$ref": "#/$defs/invocationBudget"},
+        "phases": {"type": "array", "minItems": 8, "maxItems": 8, "items": {"$ref": "#/$defs/phaseResult"}},
+        "signatureEvidence": {"$ref": "#/$defs/signatureEvidence"},
+        "shortcutEvidence": {"$ref": "#/$defs/shortcutEvidence"},
+        "webView2Evidence": {"$ref": "#/$defs/webView2Evidence"},
+        "localizationEvidence": {"$ref": "#/$defs/localizationEvidence"},
+        "residueEvidence": {"$ref": "#/$defs/residueEvidence"},
+        "rollbackEvidence": {"$ref": "#/$defs/rollbackEvidence"},
+        "safetyEvidence": {"$ref": "#/$defs/safetyEvidence"},
+        "websiteMetadata": {"$ref": "#/$defs/websiteMetadata"},
+        "websiteHandoffPrecheck": {"$ref": "#/$defs/websitePrecheck"},
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
