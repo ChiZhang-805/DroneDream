@@ -26,7 +26,7 @@ class SimUniversalHandoffTests(unittest.TestCase):
     def test_exact_handoff_and_sim_adapter_validate(self) -> None:
         receipt = validate_handoff(load_receipt(), ROOT)
         self.assertEqual(receipt["pathSync"]["canonicalBrandPathCount"], 94)
-        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 49)
+        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 52)
         self.assertFalse(receipt["execution"]["buildAuthorized"])
 
     def test_observed_head_cannot_be_relabelled_whole_product_source(self) -> None:
@@ -62,6 +62,12 @@ class SimUniversalHandoffTests(unittest.TestCase):
             SimUniversalHandoffError,
             "lifecycle registration verifier",
         ):
+            validate_handoff(receipt, ROOT)
+
+    def test_release_build_driver_path_drift_is_rejected(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["releaseBuildDriver"]["paths"][0]["blob"] = "0" * 40
+        with self.assertRaisesRegex(SimUniversalHandoffError, "release build driver blob"):
             validate_handoff(receipt, ROOT)
 
     def test_auth_verifier_migration_order_drift_is_rejected(self) -> None:

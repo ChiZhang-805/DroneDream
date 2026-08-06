@@ -15,6 +15,7 @@ OBSERVED_TREE = "5d9b060d14e758ba558bb7d4c7a1c04822bde28d"
 AUTH_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 RUNTIME_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 NSIS_IDENTITY_FIX_COMMIT = "a11fe7d09fceafaecf102a0cbfba49abb066a557"
+RELEASE_BUILD_DRIVER_COMMIT = "f2858e3d2e39f493baab28368b77230e45dd199f"
 BRAND_PRODUCT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
 
 EXACT_GROUPS = {
@@ -65,14 +66,12 @@ EXACT_GROUPS = {
         "distribution/tools/desktop_runtime_update_families.py",
     ),
     "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d": (
-        "desktop/scripts/build-windows-llvm.ps1",
         "desktop/scripts/verify-updater-build-contract.ps1",
         "desktop/scripts/write-updater-manifest.ps1",
         "desktop/src-tauri/src/app_update.rs",
         "desktop/src-tauri/src/lib.rs",
         "desktop/src-tauri/tauri.conf.json",
         "desktop/src-tauri/tauri.universal.conf.json",
-        "distribution/tests/test_shared_windows_build_contract.py",
     ),
     "c322cda1c968d15b09e8ac93364f885777b619e8": (
         "distribution/desktop/edition-browser-auth.v1.json",
@@ -90,6 +89,13 @@ EXACT_GROUPS = {
         "desktop/scripts/verify-edition-identity-nsis.ps1",
         "desktop/scripts/verify-universal-installer-lifecycle.ps1",
         "distribution/tests/test_desktop_edition_coexistence.py",
+    ),
+    RELEASE_BUILD_DRIVER_COMMIT: (
+        "desktop/scripts/build-windows-llvm.ps1",
+        "desktop/scripts/release-build-driver.psm1",
+        "desktop/scripts/verify-release-source-policy.mjs",
+        "desktop/scripts/verify-updater-signing-contract.ps1",
+        "distribution/tests/test_shared_windows_build_contract.py",
     ),
 }
 
@@ -205,13 +211,13 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     for path in brand_paths:
         _validate_exact_path(root, BRAND_PRODUCT, path)
     common_paths = [path for paths in EXACT_GROUPS.values() for path in paths]
-    _require(len(common_paths) == len(set(common_paths)) == 49, "common path inventory drifted")
+    _require(len(common_paths) == len(set(common_paths)) == 52, "common path inventory drifted")
     for commit, paths in EXACT_GROUPS.items():
         for path in paths:
             _validate_exact_path(root, commit, path)
     path_sync = document.get("pathSync", {})
     _require(path_sync.get("canonicalBrandPathCount") == 94, "brand count receipt drifted")
-    _require(path_sync.get("exactCommonPathCount") == 49, "common count receipt drifted")
+    _require(path_sync.get("exactCommonPathCount") == 52, "common count receipt drifted")
     _require(path_sync.get("unrelatedBenchmarkPathsAdopted") is False, "Benchmark overclaim")
     _require(path_sync.get("hardwareAuthorityGranted") is False, "hardware authority overclaim")
 
@@ -396,6 +402,63 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         },
         "lifecycle registration verifier receipt drifted",
     )
+    build_driver = corrections.get("releaseBuildDriver", {})
+    _require(
+        build_driver.get("sourceCommit") == RELEASE_BUILD_DRIVER_COMMIT,
+        "release build driver source drifted",
+    )
+    _require(
+        build_driver.get("parentCommit")
+        == "350253f8c17def231d81d39860846d1eb4ab1a94",
+        "release build driver parent drifted",
+    )
+    expected_build_driver_rows = {
+        "desktop/scripts/build-windows-llvm.ps1": (
+            "f4287f19e96d734dd257ac1421b13677e53e208e",
+            "4ac9b141b08aae39275d8538d06e11c711b0ce71c3f74ab7baccf11839d2f6dc",
+        ),
+        "desktop/scripts/release-build-driver.psm1": (
+            "7a8bc527c1bd0be82dbf2ef1624947300543140a",
+            "9a403da6c8e6ce226dfec1544af418117235a65286a0ceecaf1e197c6887ea4b",
+        ),
+        "desktop/scripts/verify-release-source-policy.mjs": (
+            "7a0407872f7f24505b376ebfdd1e9f1646acf5ff",
+            "97f643d67348ea11e80506e898302210dece51de1aee9cbf66ee55f839cf0d29",
+        ),
+        "desktop/scripts/verify-updater-signing-contract.ps1": (
+            "b95edd472f9b328a92a279547aafca454aa201e1",
+            "7a8b480f3fa268fd474c992b1a4d812f3221f4deb76ee06d37692aab3d785117",
+        ),
+        "distribution/tests/test_shared_windows_build_contract.py": (
+            "07d4e7b47f8c995790686d0d1906ed8c6eb164ff",
+            "e936ff7b24edb6be34a707bb7cd8a8c03a23e883fc7af6ff94ba68c05e965807",
+        ),
+    }
+    build_driver_rows = build_driver.get("paths", [])
+    _require(
+        [row.get("path") for row in build_driver_rows]
+        == list(expected_build_driver_rows),
+        "release build driver path inventory drifted",
+    )
+    for row in build_driver_rows:
+        path = row["path"]
+        blob, object_sha256 = expected_build_driver_rows[path]
+        _require(row.get("blob") == blob, f"release build driver blob drifted: {path}")
+        _require(
+            row.get("objectSha256") == object_sha256,
+            f"release build driver object SHA drifted: {path}",
+        )
+        _require(
+            _git(root, "rev-parse", f"{RELEASE_BUILD_DRIVER_COMMIT}:{path}") == blob,
+            f"historical release build driver blob drifted: {path}",
+        )
+        _require(
+            hashlib.sha256(
+                _git_bytes(root, "cat-file", "blob", f"{RELEASE_BUILD_DRIVER_COMMIT}:{path}")
+            ).hexdigest()
+            == object_sha256,
+            f"historical release build driver bytes drifted: {path}",
+        )
 
     _require(document.get("upstreamBlockers") == [], "resolved blocker was retained")
 
@@ -434,7 +497,7 @@ def main() -> int:
             {
                 "valid": True,
                 "brandPaths": 94,
-                "commonPaths": 49,
+                "commonPaths": 52,
                 "yellow2Ready": True,
             },
             sort_keys=True,
