@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-coexistence-auth-green-receipt",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "auditMode": "green-source-only",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "7181b4ff2e8f0aeae20aee4138022181f6f82330",
+    "upstream": "origin/codex/software-lab",
+    "cleanAtTest": true,
+    "upstreamExactAtTest": true
+  },
+  "commonCore": {
+    "authority": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "productSourceHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "observedAuthorityHead": "39d19414e4ac6649288726195f74afaf6dc58123",
+    "sharedCorePathsChangedByThisSource": [],
+    "sharedFixesRepresentedOnlyAsDonorRequests": true
+  },
+  "contracts": {
+    "coexistenceAndAuth": {
+      "path": "distribution/editions/lab/coexistence-and-auth.v1.json",
+      "sha256": "2b60b2e923b2d8e4b0c8c74145da5b381562addfecc0ab0bfd4062c67ec5e96a"
+    },
+    "universalDonorRequests": {
+      "path": "distribution/editions/lab/universal-donor-requests.v1.json",
+      "sha256": "4eaf0e96dd87435c7a56a6b0e6b111d14177ce2ca523ce2d8f1eec479199d8dd"
+    },
+    "verifier": {
+      "path": "distribution/tools/verify_lab_coexistence_contract.py",
+      "sha256": "bc712952bc4ec2dfe09224c2d2c0f0848c51ae8ce45aa40a857377e8d0051aef"
+    },
+    "negativeTests": {
+      "path": "distribution/tests/test_lab_coexistence_contract.py",
+      "sha256": "c775cacf55928c4fafd812d23105f88bdcd06777903df82ae34f28ae0458fef4"
+    }
+  },
+  "labIdentity": {
+    "displayName": "DroneDream · LAB",
+    "separatorCodePoint": "U+00B7",
+    "identifier": "io.dronedream.desktop.lab",
+    "artifactFileName": "DroneDream-Lab-1.0.0.exe",
+    "updaterManifest": "lab-latest.json",
+    "enginePackEditionProfile": "unified-sim-lab",
+    "installRoot": "%LOCALAPPDATA%\\DroneDream · LAB",
+    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · LAB",
+    "appUserModelId": "io.dronedream.desktop.lab",
+    "appDataNamespace": "io.dronedream.desktop.lab"
+  },
+  "canonicalBrand": {
+    "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+    "dotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+    "gradient": ["#A7E84A", "#20C77A", "#087E69"],
+    "light": "#F3FCEF",
+    "dark": "#092019",
+    "grantsHardwareAuthority": false
+  },
+  "authentication": {
+    "sameWebsiteAccountSubjectAllowed": true,
+    "explicitLabLoginGestureRequired": true,
+    "browserSessionMayAvoidPasswordEntry": true,
+    "browserSessionMaySilentlyAuthenticateLab": false,
+    "requiredFlow": "authorization-code-pkce-s256",
+    "requiredVaultNamespace": "io.dronedream.desktop.lab/auth",
+    "requiredSessionNamespace": "io.dronedream.desktop.lab/session",
+    "currentUniversalDonorReady": false,
+    "state": "awaiting-exact-universal-auth-donor"
+  },
+  "frozenArtifact": {
+    "sourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
+    "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe",
+    "bytes": 11815002,
+    "sha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
+    "signatureState": "NotSigned",
+    "updaterSignature": "not-issued",
+    "sigFileExists": false,
+    "overlayInstall": "failed-exit-2",
+    "releaseReady": false,
+    "modifiedOrRelabeledByThisAudit": false
+  },
+  "tests": {
+    "distributionUnitTests": {
+      "command": "python -m unittest discover -s distribution/tests -p test_*.py",
+      "passed": 166,
+      "failed": 0
+    },
+    "coexistenceVerifier": "passed",
+    "labPreviewVerifier": "passed",
+    "diffCheck": "passed",
+    "fakeAndNegativeOnly": true,
+    "tauriInvoked": false,
+    "nsisInvoked": false,
+    "installerInvoked": false,
+    "hardwareConnected": false,
+    "px4GazeboStarted": false,
+    "credentialsRead": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "workspaceThemeOrAuthGrantsHardwareAuthority": false
+  },
+  "remainingGates": [
+    "Universal must deliver and validate the shared NSIS existing-install/quiesce donor before Lab forward-sync and any new YELLOW build request.",
+    "Universal must deliver an exact Edition-aware auth donor with callback, PKCE, state, nonce, vault, and local-session isolation before Lab forward-sync.",
+    "Sim still shares Universal latest.json and needs an edition-owned updater endpoint before four-Edition update isolation is complete.",
+    "A future exact Lab build must include this source contract and pass fresh, overlay/upgrade, uninstall, shortcut, taskbar, EN/ZH, WebView2, rollback, brand-surface, and Website handoff acceptance.",
+    "The frozen unsigned Lab EXE remains exact evidence only and may not be presented as final delivery bytes."
+  ],
+  "contractReady": true,
+  "releaseReady": false
+}
