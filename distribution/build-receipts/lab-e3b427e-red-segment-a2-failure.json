@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-red-segment-a-failure-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-e3b427e-segment-a-red2",
+  "attemptOrdinal": 2,
+  "editionId": "lab",
+  "result": "segment-a-failed-no-retry",
+  "timing": {
+    "ownedRootCreatedAtUtc": "2026-08-06T20:14:14.4477549Z",
+    "externalReceiptFrozenAtUtc": "2026-08-06T20:17:33.8834651Z"
+  },
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+    "executionEvidenceCommit": "88eeeeedbe31baae6c590992390056363fc262d0",
+    "executionEvidenceIsArtifactSource": false,
+    "artifactInvalidatedByThisFailure": false
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12081900,
+    "sha256BeforeAndAfter": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4",
+    "updaterSignatureSha256BeforeAndAfter": "722be7a85928c7b601917418fab7899170bd5bd855b88d4db7b17f0093c109c9",
+    "rebuiltRelabeledOverwrittenOrDeleted": false
+  },
+  "authorization": {
+    "classification": "RED",
+    "segment": "A",
+    "maximumInvocations": 1,
+    "actualInvocations": 1,
+    "automaticRetryMaximum": 0,
+    "automaticRetryActual": 0,
+    "commandContractSha256": "05d9ba741720f765bccaf53d9432270ebf09aee12fc57be3b89cbed5697bafe2",
+    "applicationSha256": "fee5d48b759fbc9f4c6ef43698ff2c46343a62135bed90b13be7c7a503d329e2",
+    "planSha256": "e9b1f1a12d5ebb5fe311d9a88c34fc093da09bd72bd73c3c1aee167a9f1233c5",
+    "targetReceiptSha256": "c16327e43f45c5b9e0b0dd89ebc224ccdfe0241bad23d36f9623527060f8339c"
+  },
+  "externalEvidence": {
+    "ownedRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-segment-a-red2",
+    "preserveWithoutDeletionOrMutation": true,
+    "files": [
+      {
+        "relativePath": "fresh-live-webview2.stderr.log",
+        "bytes": 466,
+        "sha256": "81f03dd1b0bb9e0a927b5c2fc3b42b18c1cebe4c7dcfd8ec5180c0af0fbe8fd3"
+      },
+      {
+        "relativePath": "fresh-live-webview2.stdout.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "relativePath": "lab-red-segment-a-lifecycle-receipt.json",
+        "bytes": 41765,
+        "sha256": "3d2b13887b1f5b2c7214b5b98c1650148ccf522d7cf08e00f737dbf1db96243e"
+      },
+      {
+        "relativePath": "temp/DroneDream/installer-diagnostics.log",
+        "bytes": 30,
+        "sha256": "d9b574711f8020e050916757214c0510ba34ae93c9a6876baf4416a017517bdd"
+      },
+      {
+        "relativePath": "temp/~nsu1.tmp/Un.exe",
+        "bytes": 82796,
+        "sha256": "c166ee095e633389d78fc4ebf8b29e7dcc4428f43740a3db428baaf2afc3f315"
+      }
+    ]
+  },
+  "passedBeforeFailure": {
+    "freshInstallerExitCode": 0,
+    "labInstallIdentityRegistrationAndShortcuts": "passed",
+    "protectedBaseUniversalSimFieldRuntimeAndWebView2Parity": "passed",
+    "applicationLaunchCount": 1,
+    "applicationCloseCount": 1,
+    "inspectorReachedPostUiNetworkBoundary": true,
+    "successfulLiveInspectionReceiptWritten": false
+  },
+  "failure": {
+    "stage": "fresh-live-webview2",
+    "runnerMessage": "The fresh live WebView2 inspection failed with exit code 1.",
+    "inspectorMessage": "Segment A observed a forbidden non-local provider request.",
+    "classification": "forbidden-non-local-request-unidentified",
+    "observedRequestUrlPersisted": false,
+    "productOrInspectorDefectProven": false,
+    "reasonClassificationIsFailClosed": "The inspector did not persist the observed URL before throwing, so the request cannot be attributed without a new offline diagnostic change and a separately authorized RED attempt.",
+    "settingsThemeThreeDAndAuthorityControlFlowPassedBeforeNetworkBoundary": true,
+    "successfulLiveAssertionReceiptWritten": false
+  },
+  "actualCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 1,
+    "applicationCloses": 1,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "liveWebView2Inspections": 0,
+    "languageTransitions": 0,
+    "languageSurfaceAssertions": 0,
+    "settingsSingleScreenChecks": 0,
+    "labThemeChecks": 0,
+    "authorityFalseChecks": 0,
+    "shortcutIdentityChecks": 1,
+    "protectedStateSnapshots": 2,
+    "protectedStateParityChecks": 1,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "accountReads": 0,
+    "artifactBuilds": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "rollback": {
+    "failureRollbackUninstallerInvocations": 1,
+    "failureRollbackUninstallerExitCode": 0,
+    "ownedPreferenceCleanupInvocations": 1,
+    "ownedPreferenceExactValuesAccepted": true,
+    "sharedRegistryParentPreserved": true,
+    "labInstallRootAbsent": true,
+    "labUninstallKeyAbsent": true,
+    "labProductKeyAbsent": true,
+    "labRoamingAndLocalAppDataAbsent": true,
+    "labDesktopAndStartMenuShortcutsAbsent": true,
+    "droneDreamProcessCount": 0,
+    "oauthPort49212ListenerCount": 0,
+    "protectedStateBeforeSha256": "ff6fde2768c78ba1fde161350bdab20e6708d54fab5f136296c26124608b34a6",
+    "protectedStateAfterSha256": "ff6fde2768c78ba1fde161350bdab20e6708d54fab5f136296c26124608b34a6",
+    "protectedStateByteEquivalent": true
+  },
+  "forbiddenBoundaries": {
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "accountReads": 0,
+    "runtimePx4GazeboHardware": 0,
+    "systemComponentInstall": 0,
+    "artifactBuildOrMutation": 0,
+    "uploadOrDeploy": 0
+  },
+  "retry": {
+    "performed": false,
+    "authorized": false,
+    "sameCommandMayBeRunAgain": false,
+    "requiresOfflineDiagnosticPatchNewApplicationAndNewExactRedSignal": true
+  },
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}

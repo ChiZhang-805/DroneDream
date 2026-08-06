@@ -18,6 +18,11 @@ FAILURE_RECEIPT = (
     / "distribution/build-receipts/"
     "lab-e3b427e-red-segment-a1-failure.json"
 )
+SECOND_FAILURE_RECEIPT = (
+    ROOT
+    / "distribution/build-receipts/"
+    "lab-e3b427e-red-segment-a2-failure.json"
+)
 
 
 def _load(path: Path) -> dict:
@@ -326,6 +331,57 @@ def test_first_red_attempt_is_frozen_failed_without_retry_and_rolled_back() -> N
         "authorized": False,
         "sameCommandMayBeRunAgain": False,
         "requiresPatchedAdapterNewApplicationAndNewExactRedSignal": True,
+    }
+    assert receipt["releaseReady"] is False
+    assert receipt["websiteHandoffReady"] is False
+
+
+def test_second_red_attempt_is_frozen_at_provider_boundary_and_rolled_back() -> None:
+    receipt = _load(SECOND_FAILURE_RECEIPT)
+
+    assert receipt["attemptId"] == "lab-e3b427e-segment-a-red2"
+    assert receipt["attemptOrdinal"] == 2
+    assert receipt["result"] == "segment-a-failed-no-retry"
+    assert receipt["sourceSeparation"] == {
+        "artifactProductSourceCommit": (
+            "e3b427e9d1d6209495d629c399a1962913f2d00c"
+        ),
+        "executionEvidenceCommit": "88eeeeedbe31baae6c590992390056363fc262d0",
+        "executionEvidenceIsArtifactSource": False,
+        "artifactInvalidatedByThisFailure": False,
+    }
+    assert receipt["authorization"]["commandContractSha256"] == (
+        "05d9ba741720f765bccaf53d9432270ebf09aee12fc57be3b89cbed5697bafe2"
+    )
+    assert receipt["failure"]["classification"] == (
+        "forbidden-non-local-request-unidentified"
+    )
+    assert receipt["failure"]["observedRequestUrlPersisted"] is False
+    assert receipt["failure"]["productOrInspectorDefectProven"] is False
+    assert receipt["failure"][
+        "settingsThemeThreeDAndAuthorityControlFlowPassedBeforeNetworkBoundary"
+    ] is True
+    assert receipt["failure"]["successfulLiveAssertionReceiptWritten"] is False
+    assert receipt["actualCounts"]["freshInstallerInvocations"] == 1
+    assert receipt["actualCounts"]["overlayInstallerInvocations"] == 0
+    assert receipt["actualCounts"]["applicationLaunches"] == 1
+    assert receipt["actualCounts"]["applicationCloses"] == 1
+    assert receipt["actualCounts"]["uninstallerInvocations"] == 1
+    assert receipt["actualCounts"]["ownedPreferenceKeyCleanupInvocations"] == 1
+    assert receipt["actualCounts"]["browserLaunches"] == 0
+    assert receipt["actualCounts"]["providerTokenExchanges"] == 0
+    assert receipt["actualCounts"]["runtimeStartsOrMigrations"] == 0
+    assert receipt["actualCounts"]["hardwareActions"] == 0
+    assert receipt["rollback"]["protectedStateByteEquivalent"] is True
+    assert receipt["rollback"]["labInstallRootAbsent"] is True
+    assert receipt["rollback"]["labProductKeyAbsent"] is True
+    assert receipt["rollback"]["droneDreamProcessCount"] == 0
+    assert receipt["rollback"]["oauthPort49212ListenerCount"] == 0
+    assert receipt["retry"] == {
+        "performed": False,
+        "authorized": False,
+        "sameCommandMayBeRunAgain": False,
+        "requiresOfflineDiagnosticPatchNewApplicationAndNewExactRedSignal": True,
     }
     assert receipt["releaseReady"] is False
     assert receipt["websiteHandoffReady"] is False
