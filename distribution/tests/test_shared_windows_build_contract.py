@@ -130,15 +130,22 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
         encoding="utf-8",
     )
 
+    external_overlays = tmp_path / "approved-overlays"
+    external_overlays.mkdir()
     cases = {
-        "universal": "../../frontend/dist",
-        "sim": "../../frontend/sim-dist",
-        "lab": "../../frontend/lab-dist",
-        "field": "../../frontend/field-dist",
+        "universal": config_dir / "tauri.universal.conf.json",
+        "sim": config_dir / "target" / "tauri.sim.authorized.json",
+        "lab": external_overlays / "tauri.lab.authorized.json",
+        "field": external_overlays / "tauri.field.authorized.json",
     }
     module = str(DRIVER).replace("'", "''")
-    for edition, frontend_dist in cases.items():
-        overlay = config_dir / f"tauri.{edition}.conf.json"
+    for edition, overlay in cases.items():
+        overlay.parent.mkdir(parents=True, exist_ok=True)
+        frontend_dist = (
+            "../../frontend/dist"
+            if edition == "universal"
+            else f"../../frontend/{edition}-dist"
+        )
         overlay.write_text(
             json.dumps({"build": {"frontendDist": frontend_dist}}),
             encoding="utf-8",
@@ -179,6 +186,49 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
         assert status_payload["allowedGeneratedCount"] == 1
         assert status_payload["unexpectedCount"] == 0
 
+    absolute = external_overlays / "tauri.field.absolute.json"
+    absolute.write_text(
+        json.dumps(
+            {"build": {"frontendDist": str(repo / "frontend" / "field-dist")}}
+        ),
+        encoding="utf-8",
+    )
+    absolute_result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Resolve-EditionGeneratedFrontendContract `
+              -RepoRoot '{repo}' -BaseConfigPath '{base}' `
+              -AdditionalConfigPath '{absolute}' -EditionId 'field' |
+              ConvertTo-Json -Compress
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert absolute_result.returncode == 0, absolute_result.stderr
+    assert json.loads(absolute_result.stdout)["relativePath"] == "frontend/field-dist"
+
+    absolute_outside = external_overlays / "tauri.field.absolute-outside.json"
+    absolute_outside.write_text(
+        json.dumps({"build": {"frontendDist": str(tmp_path / "outside-dist")}}),
+        encoding="utf-8",
+    )
+    absolute_outside_result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Resolve-EditionGeneratedFrontendContract `
+              -RepoRoot '{repo}' -BaseConfigPath '{base}' `
+              -AdditionalConfigPath '{absolute_outside}' -EditionId 'field'
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert absolute_outside_result.returncode != 0
+    assert "inside the repository" in absolute_outside_result.stderr
+
     invalid = config_dir / "tauri.field.invalid.conf.json"
     invalid.write_text(
         json.dumps({"build": {"frontendDist": "../../artifacts/field-dist"}}),
@@ -198,6 +248,41 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
     )
     assert result.returncode != 0
     assert "outside the explicit generated-output contract" in result.stderr
+
+    escaped = external_overlays / "tauri.field.escape.json"
+    escaped.write_text(
+        json.dumps({"build": {"frontendDist": "../../../frontend/field-dist"}}),
+        encoding="utf-8",
+    )
+    escape_result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Resolve-EditionGeneratedFrontendContract `
+              -RepoRoot '{repo}' -BaseConfigPath '{base}' `
+              -AdditionalConfigPath '{escaped}' -EditionId 'field'
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert escape_result.returncode != 0
+    assert "inside the repository" in escape_result.stderr
+
+    unknown_result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Resolve-EditionGeneratedFrontendContract `
+              -RepoRoot '{repo}' -BaseConfigPath '{base}' `
+              -AdditionalConfigPath '{absolute}' -EditionId 'unknown'
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert unknown_result.returncode != 0
+    assert "ValidateSet" in unknown_result.stderr
 
 
 def test_postbuild_status_allows_only_exact_untracked_generated_files(tmp_path: Path) -> None:
