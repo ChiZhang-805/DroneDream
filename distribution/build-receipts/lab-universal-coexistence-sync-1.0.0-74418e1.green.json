@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-universal-coexistence-sync-receipt",
+  "state": "green-source-static-verified",
+  "editionId": "lab",
+  "version": "1.0.0",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "74418e1ccd4d1cbc90c77b55e19b4497a3b7cc93",
+    "statusAtFinalVerification": "clean"
+  },
+  "commonCore": {
+    "authority": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "coexistenceDonorIsCommonCoreProductSource": false
+  },
+  "universalDonors": {
+    "coexistenceContractPrerequisite": {
+      "commit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+      "labIntegrationCommit": "3c108a60fb00292cede529127cbb8890d687af2a",
+      "integration": "audited-prerequisite-cherry-pick",
+      "pathCount": 4
+    },
+    "installerIdentityProduct": {
+      "commit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+      "parent": "7482647f1c2fcb92f58aaef009efc99764792297",
+      "labIntegrationCommit": "28db5928371aa58eb918e1554a87c0ae4b14444c",
+      "integration": "audited-eight-path-cherry-pick",
+      "changedPathCount": 8,
+      "changedPathsExactAtSource": true
+    },
+    "brandProductSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "brandEvidenceCommit": "7482647f1c2fcb92f58aaef009efc99764792297",
+    "brandEvidenceCommitIsBrandProductSource": false
+  },
+  "commonCoexistenceContract": {
+    "manifest": {
+      "path": "distribution/desktop/edition-coexistence.v1.json",
+      "bytes": 6064,
+      "sha256": "1af65a86d4f77add7d16d21fe257b7052cb5138de68b6eb3f111f0a32d17bd38"
+    },
+    "schema": {
+      "path": "distribution/schemas/desktop-edition-coexistence.schema.json",
+      "bytes": 6395,
+      "sha256": "e953f06fdbaa178a7ad5e66575636b996c18f118e1467ae207413751bba1e9ad"
+    },
+    "validator": {
+      "path": "distribution/tools/desktop_edition_coexistence.py",
+      "bytes": 8851,
+      "sha256": "96859b73fdbf38bd09c21c4c3cf2d7e3ecc8e175e5b8b6dfc2d8ec235a5f3799"
+    },
+    "tests": {
+      "path": "distribution/tests/test_desktop_edition_coexistence.py",
+      "bytes": 8806,
+      "sha256": "be264b7a5d0c88e0988be6b80e770389c948997dfefe7c85f375199aab3fe15a"
+    }
+  },
+  "labIdentity": {
+    "installerProductName": "DroneDream-Lab",
+    "displayName": "DroneDream · LAB",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "installRoot": "%LOCALAPPDATA%/DroneDream-Lab",
+    "uninstallRegistryKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Lab",
+    "productRegistryKey": "HKCU/Software/DroneDream/DroneDream-Lab",
+    "desktopShortcutName": "DroneDream · LAB",
+    "appUserModelId": "io.dronedream.desktop.lab",
+    "webViewDataNamespace": "io.dronedream.desktop.lab",
+    "artifactFileName": "DroneDream-Lab-1.0.0.exe",
+    "tauriOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "bytes": 2925,
+      "sha256": "725d88e25e37f4798199710c7129fdf2caa383a7761c7ccd58c0adefd0f9850c"
+    }
+  },
+  "nsisPolicy": {
+    "unknownProductDecision": "deny",
+    "internalIdentityOwnsInstallRootRegistryAndAppData": true,
+    "canonicalDisplayNameOwnsShortcutsAndUninstallDisplay": true,
+    "legacyInternalShortcutMigrationRequiresOwnedTarget": true,
+    "crossEditionShortcutConflictOverwritten": false,
+    "uninstallRemovesOnlyOwnedShortcutTargets": true,
+    "vendoredTauriVersion": "2.11.4"
+  },
+  "verification": {
+    "universalCoexistenceAndInstallerTests": "23 passed",
+    "labBrandCoexistenceAndPreviewTests": "41 passed",
+    "labUiTests": "25 passed",
+    "nsisPinnedTemplate": "passed",
+    "ruffUniversalDonorPaths": "passed",
+    "ruffLabLogicPaths": "passed",
+    "gitDiffCheck": "passed",
+    "unicodeSeparatorCodePoint": "U+00B7",
+    "cleanSourceUiLayout": {
+      "absoluteReportPath": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-lab-coexistence-74418e1-ui\\lab-ui-verification.json",
+      "bytes": 9445,
+      "sha256": "4871f80680efde55df0453f15575a37500a468efe59d4ed9b16c3d98b9e98a57",
+      "cases": 6,
+      "screenshots": 24,
+      "hardwareActionDecision": "deny",
+      "hostLocalGreenEvidenceOnly": true,
+      "releaseLifecycleEvidence": false
+    }
+  },
+  "frozenArtifact": {
+    "sourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 11815002,
+    "sha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
+    "signatureState": "NotSigned",
+    "overlayInstall": "failed-exit-2",
+    "mayBeRelabeled": false,
+    "releaseReady": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "workspaceThemeOrInstallerIdentityGrantsAuthority": false,
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "hardwareWriteArmHitlFlightDecision": "deny"
+  },
+  "sideEffects": {
+    "exeBuilt": false,
+    "installerRun": false,
+    "runtimeMigrated": false,
+    "simulationStarted": false,
+    "hardwareConnected": false,
+    "providerCalled": false,
+    "apiKeyRead": false,
+    "releaseBranchCreated": false,
+    "deployed": false
+  },
+  "remainingGates": [
+    "consume exact Universal authentication isolation donor",
+    "consume remaining shared runtime, updater, and edition-safety fixture donors",
+    "obtain a new YELLOW approval for final Lab EXE build",
+    "execute isolated fresh, overlay, uninstall, shortcut, WebView2, EN/ZH, residue, and rollback lifecycle acceptance",
+    "freeze and deliver the exact Website four-file handoff family"
+  ],
+  "releaseReady": false
+}

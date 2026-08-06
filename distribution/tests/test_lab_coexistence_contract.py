@@ -14,6 +14,12 @@ if str(TOOLS) not in sys.path:
 
 import verify_lab_coexistence_contract as coexistence  # noqa: E402
 
+SYNC_RECEIPT_PATH = (
+    ROOT
+    / "distribution/build-receipts"
+    / "lab-universal-coexistence-sync-1.0.0-74418e1.green.json"
+)
+
 
 def load_inputs() -> tuple[dict[str, object], ...]:
     return (
@@ -178,6 +184,45 @@ class LabCoexistenceContractTests(unittest.TestCase):
         self.assertNotIn(b"\xef\xbb\xbf", raw[:3])
         parsed = json.loads(raw.decode("utf-8"))
         self.assertEqual(parsed["brandContinuity"]["displayName"], "DroneDream · LAB")
+
+    def test_sync_receipt_binds_exact_donors_without_claiming_lifecycle(self) -> None:
+        receipt = coexistence._load_json(SYNC_RECEIPT_PATH)
+        self.assertEqual(
+            receipt["universalDonors"]["installerIdentityProduct"]["commit"],
+            "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+        )
+        self.assertEqual(
+            receipt["universalDonors"]["coexistenceContractPrerequisite"][
+                "labIntegrationCommit"
+            ],
+            "3c108a60fb00292cede529127cbb8890d687af2a",
+        )
+        self.assertEqual(
+            receipt["universalDonors"]["installerIdentityProduct"][
+                "labIntegrationCommit"
+            ],
+            "28db5928371aa58eb918e1554a87c0ae4b14444c",
+        )
+        self.assertTrue(
+            receipt["universalDonors"]["installerIdentityProduct"][
+                "changedPathsExactAtSource"
+            ]
+        )
+        self.assertEqual(receipt["labIdentity"]["installerProductName"], "DroneDream-Lab")
+        self.assertEqual(receipt["labIdentity"]["displayName"], "DroneDream · LAB")
+        for key in ("manifest", "schema", "validator", "tests"):
+            reference = receipt["commonCoexistenceContract"][key]
+            payload = (ROOT / reference["path"]).read_bytes()
+            self.assertEqual(len(payload), reference["bytes"])
+            self.assertEqual(coexistence._sha256(ROOT / reference["path"]), reference["sha256"])
+        self.assertTrue(
+            receipt["verification"]["cleanSourceUiLayout"]["hostLocalGreenEvidenceOnly"]
+        )
+        self.assertFalse(
+            receipt["verification"]["cleanSourceUiLayout"]["releaseLifecycleEvidence"]
+        )
+        self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
+        self.assertFalse(receipt["releaseReady"])
 
 
 if __name__ == "__main__":
