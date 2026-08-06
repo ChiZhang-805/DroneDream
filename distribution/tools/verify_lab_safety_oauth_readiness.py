@@ -69,12 +69,13 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     authority = _mapping(contract.get("universalAuthority"), "universalAuthority")
     if (
         authority.get("branch") != "codex/software"
-        or authority.get("verificationSourceCommit") != "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
-        or authority.get("verificationSourceTree") != "418d165f0ed031458c23f3c54f4f6707b4ca73db"
+        or authority.get("verificationSourceCommit") != "57b74f59ed4164ebefde623fa7f5102e5c24363f"
+        or authority.get("verificationSourceTree") != "5d9b060d14e758ba558bb7d4c7a1c04822bde28d"
         or authority.get("consumedExactPublicDonors")
         != [
             "a11fe7d09fceafaecf102a0cbfba49abb066a557",
             "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+            "57b74f59ed4164ebefde623fa7f5102e5c24363f",
         ]
         or authority.get("unrelatedCommitConsumptionAuthorized") is not False
     ):
@@ -161,6 +162,26 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         or nsis.get("repeatedExpansionCompileVerified") is not True
     ):
         raise LabSafetyOauthReadinessError("NSIS duplicate-label donor drifted")
+
+    lifecycle = _mapping(
+        contract.get("lifecycleRegistrationValidatorDonor"),
+        "lifecycleRegistrationValidatorDonor",
+    )
+    if (
+        lifecycle.get("commit") != "57b74f59ed4164ebefde623fa7f5102e5c24363f"
+        or lifecycle.get("parent") != "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
+        or lifecycle.get("integrationCommit") != "e9f6a4232d350d2dcc70deeffe62cef3dfad37bc"
+        or lifecycle.get("state") != "delivered-public-donor-forward-synced"
+        or lifecycle.get("productPayloadChanged") is not False
+        or lifecycle.get("internalProductIdentityDistinctFromDisplayName") is not True
+        or lifecycle.get("uninstallRegistrationFieldsVerified")
+        != ["DisplayName", "DisplayVersion", "InstallLocation", "MainBinaryName"]
+        or lifecycle.get("legacyDisplayShortcutCollisionProtected") is not True
+        or lifecycle.get("unknownProductMustFailClosed") is not True
+    ):
+        raise LabSafetyOauthReadinessError(
+            "lifecycle registration validator donor drifted"
+        )
 
     oauth = _mapping(contract.get("oauthSourceContract"), "oauthSourceContract")
     auth_contract = _load_json(AUTH_CONTRACT_PATH)

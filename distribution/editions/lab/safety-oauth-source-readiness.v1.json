@@ -6,11 +6,12 @@
   "auditMode": "green-offline-only",
   "universalAuthority": {
     "branch": "codex/software",
-    "verificationSourceCommit": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
-    "verificationSourceTree": "418d165f0ed031458c23f3c54f4f6707b4ca73db",
+    "verificationSourceCommit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
+    "verificationSourceTree": "5d9b060d14e758ba558bb7d4c7a1c04822bde28d",
     "consumedExactPublicDonors": [
       "a11fe7d09fceafaecf102a0cbfba49abb066a557",
-      "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
+      "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+      "57b74f59ed4164ebefde623fa7f5102e5c24363f"
     ],
     "unrelatedCommitConsumptionAuthorized": false
   },
@@ -54,6 +55,22 @@
     "nestedShortcutSuffixRequired": true,
     "unknownProductMustFailClosed": true,
     "repeatedExpansionCompileVerified": true
+  },
+  "lifecycleRegistrationValidatorDonor": {
+    "commit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
+    "parent": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+    "integrationCommit": "e9f6a4232d350d2dcc70deeffe62cef3dfad37bc",
+    "state": "delivered-public-donor-forward-synced",
+    "productPayloadChanged": false,
+    "internalProductIdentityDistinctFromDisplayName": true,
+    "uninstallRegistrationFieldsVerified": [
+      "DisplayName",
+      "DisplayVersion",
+      "InstallLocation",
+      "MainBinaryName"
+    ],
+    "legacyDisplayShortcutCollisionProtected": true,
+    "unknownProductMustFailClosed": true
   },
   "oauthSourceContract": {
     "path": "distribution/desktop/edition-browser-auth.v1.json",

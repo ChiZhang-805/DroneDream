@@ -73,6 +73,24 @@ def test_rejects_nsis_duplicate_label_donor_downgrade() -> None:
         readiness.validate_contract(contract)
 
 
+def test_rejects_lifecycle_registration_validator_donor_downgrade() -> None:
+    contract = copy.deepcopy(inputs())
+    contract["lifecycleRegistrationValidatorDonor"]["state"] = "requested-not-delivered"
+    with pytest.raises(
+        readiness.LabSafetyOauthReadinessError,
+        match="lifecycle registration validator",
+    ):
+        readiness.validate_contract(contract)
+
+    contract = copy.deepcopy(inputs())
+    contract["lifecycleRegistrationValidatorDonor"]["productPayloadChanged"] = True
+    with pytest.raises(
+        readiness.LabSafetyOauthReadinessError,
+        match="lifecycle registration validator",
+    ):
+        readiness.validate_contract(contract)
+
+
 def test_rejects_private_key_or_unregistered_oauth_input_policy() -> None:
     contract = copy.deepcopy(inputs())
     publishable = next(
