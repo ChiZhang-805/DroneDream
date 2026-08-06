@@ -32,8 +32,8 @@
   },
   "verificationTool": {
     "path": "distribution/editions/lab/lifecycle/verify-lab-e3b427e-lifecycle-plan.ps1",
-    "bytes": 9029,
-    "sha256": "882a8961e4808ab4f1a15bd74a4e470d79b9dfcd4789c4ffc93551306d5f01f1",
+    "lfNormalizedBytes": 9029,
+    "lfNormalizedSha256": "882a8961e4808ab4f1a15bd74a4e470d79b9dfcd4789c4ffc93551306d5f01f1",
     "executeParameterPresent": false,
     "mutationCapabilityPresent": false,
     "purpose": "read-only exact artifact, plan, target, provider, fresh-state, and protected-state verification"

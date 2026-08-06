@@ -23,6 +23,11 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _lf_sha256(path: Path) -> str:
+    normalized = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(normalized).hexdigest()
+
+
 def test_plan_binds_exact_artifact_build_receipt_and_non_product_evidence() -> None:
     plan = _load(PLAN)
     receipt_path = ROOT / plan["buildReceipt"]["path"]
@@ -43,7 +48,7 @@ def test_plan_binds_exact_artifact_build_receipt_and_non_product_evidence() -> N
 def test_plan_binds_read_only_verifier_and_target_contract() -> None:
     plan = _load(PLAN)
 
-    assert _sha256(VERIFIER) == plan["verificationTool"]["sha256"]
+    assert _lf_sha256(VERIFIER) == plan["verificationTool"]["lfNormalizedSha256"]
     assert _sha256(TARGET) == plan["targetReceipt"]["sha256"]
     assert plan["verificationTool"]["executeParameterPresent"] is False
     assert plan["verificationTool"]["mutationCapabilityPresent"] is False
