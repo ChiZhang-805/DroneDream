@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-red-app-only-lifecycle-application",
+  "applicationVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "green-frozen-awaiting-exact-red-start-signal",
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+    "artifactProductSourceTree": "eec24c0f1d3d537c8f0da5ef1b015bd129c6d39a",
+    "planEvidenceCommit": "9cee3344a63baba498049f38f519fe84b4f4b935",
+    "applicationEvidenceCommitPolicy": "commit-containing-this-application-command-tools-and-tests",
+    "applicationEvidenceIsArtifactSource": false,
+    "productRuntimeSemanticsChanged": false
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12081900,
+    "sha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4",
+    "version": "1.0.0",
+    "authenticodeStatus": "NotSigned",
+    "updaterSignatureSha256": "722be7a85928c7b601917418fab7899170bd5bd855b88d4db7b17f0093c109c9",
+    "mayBeRebuiltRelabeledOverwrittenOrDeletedByThisApplication": false
+  },
+  "buildReceipt": {
+    "path": "distribution/build-receipts/lab-preview-1.0.0-e3b427e-yellow-attempt7.exact-artifact.json",
+    "sha256": "63d3577c614d7e839e22ed8a57e6ffdec9eb36cdbdfae82581454c2e7853b4cd"
+  },
+  "editionManifest": {
+    "path": "distribution/editions/lab.v1.json",
+    "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+  },
+  "plan": {
+    "path": "distribution/editions/lab/lifecycle/red-e3b427e-app-only-plan.v1.json",
+    "bytes": 12339,
+    "sha256": "e9b1f1a12d5ebb5fe311d9a88c34fc093da09bd72bd73c3c1aee167a9f1233c5"
+  },
+  "targetReceipt": {
+    "path": "distribution/editions/lab/lifecycle/red-e3b427e-app-only-target-receipt.v1.json",
+    "bytes": 3169,
+    "sha256": "c16327e43f45c5b9e0b0dd89ebc224ccdfe0241bad23d36f9623527060f8339c",
+    "state": "target-only-no-execution-evidence"
+  },
+  "executionTools": {
+    "adapter": {
+      "path": "distribution/editions/lab/lifecycle/run-lab-e3b427e-app-only-lifecycle.ps1",
+      "lfNormalizedBytes": 31092,
+      "lfNormalizedSha256": "274ee9482669c9925d7a9213b626b11c7b8dbea2ed8be1d106eb9c75dbd382d1"
+    },
+    "liveInspector": {
+      "path": "distribution/editions/lab/lifecycle/inspect-lab-e3b427e-live-webview2.mjs",
+      "lfNormalizedBytes": 11200,
+      "lfNormalizedSha256": "19a17705221a365d9db5c4954b44694b984905a74614408ae93786ec438c98dd"
+    },
+    "historicalDebd064ToolsMayBeReusedOrRelabeled": false
+  },
+  "identity": {
+    "internalProductName": "DroneDream-Lab",
+    "displayName": "DroneDream · LAB",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "appUserModelId": "io.dronedream.desktop.lab",
+    "installRoot": "C:/Users/zju20/AppData/Local/DroneDream-Lab",
+    "uninstallRegistryKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Lab",
+    "productPreferenceKey": "HKCU/Software/DroneDream/DroneDream-Lab",
+    "desktopShortcut": "C:/Users/zju20/Desktop/DroneDream · LAB.lnk",
+    "startMenuShortcut": "C:/Users/zju20/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/DroneDream · LAB.lnk",
+    "roamingAppData": "C:/Users/zju20/AppData/Roaming/io.dronedream.desktop.lab",
+    "localAppData": "C:/Users/zju20/AppData/Local/io.dronedream.desktop.lab"
+  },
+  "ownedIsolation": {
+    "providerClass": "current-user-owned-app-namespace",
+    "ownedBase": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED",
+    "runId": "lab-e3b427e-segment-a-red1",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-segment-a-red1",
+    "runRootMustBeAbsentBeforeExecution": true,
+    "runRootReuseAllowed": false,
+    "systemVirtualizationInstallAllowed": false,
+    "userExistingLabInstallOverwriteAllowed": false,
+    "mutationAllowedOnlyForExactLabIdentity": true
+  },
+  "protectedState": {
+    "baselineSource": "read-only-A0-snapshot-immediately-before-any-mutation",
+    "snapshotCount": 5,
+    "parityCheckCount": 4,
+    "protectedScopes": [
+      "base DroneDream install tree, uninstall and product keys, and shortcuts",
+      "DroneDream Universal install tree, uninstall and product keys, and shortcuts",
+      "DroneDream SIM install tree, uninstall and product keys, and shortcuts",
+      "DroneDream FIELD install tree, uninstall and product keys, and shortcuts",
+      "C:/DroneDream and Z:/DroneDream Runtime root records",
+      "existing system WebView2 registry location and version"
+    ],
+    "otherEditionOrRuntimeMutationAllowed": false,
+    "webView2InstallRepairOrUpdateAllowed": false,
+    "driftDecision": "fail-closed-stop-without-retry"
+  },
+  "segments": {
+    "a": {
+      "ids": ["A1", "A2", "A3"],
+      "orderedStages": [
+        "A1-fresh-install-identity-protected-parity-live-ui-close",
+        "A2-overlay-install-identity-protected-parity-live-ui-close-protected-parity",
+        "A3-uninstall-owned-preference-cleanup-owned-data-cleanup-identity-protected-parity"
+      ],
+      "exactCounts": {
+        "freshInstallerInvocations": 1,
+        "overlayInstallerInvocations": 1,
+        "applicationLaunches": 2,
+        "applicationCloses": 2,
+        "uninstallerInvocations": 1,
+        "ownedPreferenceKeyCleanupInvocations": 1,
+        "shortcutIdentityChecks": 3,
+        "liveWebView2Inspections": 2,
+        "languageTransitions": 2,
+        "languageSurfaceAssertions": 4,
+        "settingsSingleScreenChecks": 2,
+        "labThemeChecks": 2,
+        "authorityFalseChecks": 2,
+        "protectedStateSnapshots": 5,
+        "protectedStateParityChecks": 4,
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "providerTokenExchanges": 0,
+        "accountReads": 0,
+        "artifactBuilds": 0,
+        "runtimeStartsOrMigrations": 0,
+        "px4Starts": 0,
+        "gazeboStarts": 0,
+        "hardwareActions": 0,
+        "uploadsOrDeployments": 0
+      }
+    },
+    "b": {
+      "name": "independent-browser-oauth-boundary",
+      "state": "fail-closed-not-authorized-not-executed",
+      "blocksSegmentA": false,
+      "browserLaunches": 0,
+      "oauthBoundaryChecks": 0,
+      "providerTokenExchanges": 0,
+      "accountReads": 0
+    }
+  },
+  "liveAssertions": {
+    "languageSequencePerLaunch": "current-locale-then-other-of-en-and-zh-CN",
+    "languageSurfaceAssertionsPerLaunch": 2,
+    "settingsDialogAndPanelClientHeightMustEqualOrExceedScrollHeightWithinOnePixel": true,
+    "themeEdition": "lab",
+    "themePalette": ["#A7E84A", "#20C77A", "#087E69"],
+    "threeDCanvasMustBeNonblank": true,
+    "threeDCanvasMustChangeAcrossPointerAndTimeObservation": true,
+    "themeAndSettingsPresentationOnly": true,
+    "themeSettingsAndThreeDGrantHardwareAuthority": false,
+    "webView2Provider": "existing-system-runtime-read-only",
+    "webView2NetworkInstallRepairOrUpdateAllowed": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "frontendSettingsThemeOrWorkspaceCountsAsAuthority": false,
+    "browserOauthProviderRuntimePx4GazeboHardwareAllowed": false
+  },
+  "rollback": {
+    "uninstallerMaximumInvocations": 1,
+    "ownedPreferenceCleanupMaximumInvocations": 1,
+    "ownedPreferenceKey": "HKCU/Software/DroneDream/DroneDream-Lab",
+    "ownedPreferenceExactValues": {
+      "(default)": "C:/Users/zju20/AppData/Local/DroneDream-Lab",
+      "DroneDreamRuntimeDrive": "",
+      "DroneDreamRuntimeInstallMode": "install-app-only",
+      "DroneDreamRuntimeOperationProtocol": "2"
+    },
+    "missingOrExtraValueDecision": "deny",
+    "sharedParentDeletionAllowed": false,
+    "stopAfterFirstFailureWithoutRetry": true
+  },
+  "authorization": {
+    "applicationPreparationAuthorized": true,
+    "executionAuthorized": false,
+    "segmentAExecutionDecision": "prepared-awaiting-new-exact-red-authorization",
+    "segmentBExecutionDecision": "deny-before-real-auth-boundary",
+    "newExactRedStartSignalRequired": true,
+    "installerApplicationOrUninstallerExecutionAllowedNow": false,
+    "browserOauthProviderRuntimePx4GazeboHardwareAllowed": false
+  },
+  "executedCounts": {
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "applicationCloses": 0,
+    "uninstallerInvocations": 0,
+    "browserLaunches": 0,
+    "providerCalls": 0,
+    "runtimeStarts": 0,
+    "hardwareActions": 0
+  },
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}
