@@ -149,6 +149,22 @@ function Restore-Environment([object]$Saved) {
     }
 }
 
+function Invoke-BoundedOwnedProcess([string]$FilePath, [string[]]$Arguments, [string]$Label) {
+    $fullPath = [IO.Path]::GetFullPath($FilePath)
+    $allowedPaths = @(
+        [IO.Path]::GetFullPath($ArtifactPath),
+        [IO.Path]::GetFullPath((Join-Path $InstallRoot "uninstall.exe"))
+    )
+    if ($fullPath -notin $allowedPaths) { throw "refusing unapproved process path: $fullPath" }
+    $process = Start-Process -FilePath $fullPath -ArgumentList $Arguments -PassThru -WindowStyle Hidden
+    if (-not $process.WaitForExit(120000)) {
+        if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force }
+        throw "$Label process exceeded the 120 second timeout"
+    }
+    $process.Refresh()
+    return [int]$process.ExitCode
+}
+
 function Get-ShortcutState([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return [ordered]@{ exists = $false } }
     $shell = New-Object -ComObject WScript.Shell
@@ -186,11 +202,11 @@ function Invoke-Installer([string[]]$Arguments, [string]$PhaseId) {
     if ($Counts.installerExe -ge 2) { throw "installer invocation budget exhausted" }
     Set-OwnedEnvironment
     try {
-        $process = Start-Process -FilePath $ArtifactPath -ArgumentList $Arguments -Wait -PassThru -WindowStyle Hidden
+        $exitCode = Invoke-BoundedOwnedProcess $ArtifactPath $Arguments $PhaseId
         $Counts.installerExe++
         $evidence = [ordered]@{
             arguments = $Arguments
-            exitCode = $process.ExitCode
+            exitCode = $exitCode
             diagnostic = $null
         }
         $diagnostic = Join-Path $RedirectedTemp "DroneDream\installer-diagnostics.log"
@@ -199,7 +215,7 @@ function Invoke-Installer([string[]]$Arguments, [string]$PhaseId) {
             Copy-Item -LiteralPath $diagnostic -Destination $copy -Force
             $evidence.diagnostic = [ordered]@{ path = $copy; sha256 = Get-Sha256 $copy; text = Get-Content -LiteralPath $copy -Raw }
         }
-        if ($process.ExitCode -ne 0) { throw "$PhaseId installer exit code $($process.ExitCode)" }
+        if ($exitCode -ne 0) { throw "$PhaseId installer exit code $exitCode" }
         Add-Phase $PhaseId "pass" $evidence
     } finally {
         Restore-Environment $SavedEnvironment
@@ -447,11 +463,11 @@ try {
     try {
         $uninstaller = Join-Path $InstallRoot "uninstall.exe"
         if (-not (Test-Path -LiteralPath $uninstaller)) { throw "uninstaller is missing" }
-        $uninstall = Start-Process -FilePath $uninstaller -ArgumentList @("/S") -Wait -PassThru -WindowStyle Hidden
+        $uninstallExitCode = Invoke-BoundedOwnedProcess $uninstaller @("/S") "uninstall"
         $Counts.uninstaller++
-        if ($uninstall.ExitCode -ne 0) { throw "uninstaller exit code $($uninstall.ExitCode)" }
+        if ($uninstallExitCode -ne 0) { throw "uninstaller exit code $uninstallExitCode" }
         $UninstallObserved = $true
-        Add-Phase "uninstall" "pass" ([ordered]@{ exitCode = $uninstall.ExitCode })
+        Add-Phase "uninstall" "pass" ([ordered]@{ exitCode = $uninstallExitCode })
     } finally {
         Restore-Environment $SavedEnvironment
     }
@@ -498,9 +514,9 @@ try {
             if ((Test-Path -LiteralPath $uninstaller) -and $Counts.uninstaller -lt 1) {
                 Set-OwnedEnvironment
                 try {
-                    $cleanupUninstall = Start-Process -FilePath $uninstaller -ArgumentList @("/S") -Wait -PassThru -WindowStyle Hidden
+                    $cleanupExitCode = Invoke-BoundedOwnedProcess $uninstaller @("/S") "cleanup-uninstall"
                     $Counts.uninstaller++
-                    if ($cleanupUninstall.ExitCode -ne 0) { throw "cleanup uninstaller exit code $($cleanupUninstall.ExitCode)" }
+                    if ($cleanupExitCode -ne 0) { throw "cleanup uninstaller exit code $cleanupExitCode" }
                 } finally {
                     Restore-Environment $SavedEnvironment
                 }
