@@ -13,6 +13,10 @@ RECEIPT_PATH = (
     ROOT
     / "distribution/sim/lifecycle/red-f23987ba-app-only-readiness.v1.json"
 )
+ABORT_RECEIPT_PATH = (
+    ROOT
+    / "distribution/sim/lifecycle/red-f23987ba-execution-attempt-1-aborted.v1.json"
+)
 TOOL_PATH = ROOT / "distribution/sim/tools/sim_red_lifecycle_readiness.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_red_lifecycle_readiness", TOOL_PATH)
@@ -94,6 +98,21 @@ class SimRedLifecycleReadinessTests(unittest.TestCase):
         plan["authorization"]["redExecutionAuthorizedByThisRecord"] = True
         with self.assertRaisesRegex(readiness.SimRedReadinessError, "authorization"):
             readiness.validate_plan(plan, ROOT)
+
+    def test_aborted_attempt_is_frozen_before_mutation_and_requires_reauthorization(self) -> None:
+        receipt = load(ABORT_RECEIPT_PATH)
+        self.assertEqual(
+            receipt["state"],
+            "aborted-before-owned-root-or-installer-mutation",
+        )
+        self.assertFalse(receipt["sourceSeparation"]["receiptCommitIsProductSource"])
+        self.assertTrue(
+            all(value == 0 for value in receipt["executedExactCounts"].values())
+        )
+        self.assertFalse(receipt["runner"]["automaticRetryExecuted"])
+        self.assertFalse(receipt["failurePolicy"]["sameAuthorizationMayBeRetried"])
+        self.assertTrue(receipt["failurePolicy"]["newChiefControlRedSignalRequired"])
+        self.assertFalse(receipt["rollback"]["required"])
 
 
 if __name__ == "__main__":
