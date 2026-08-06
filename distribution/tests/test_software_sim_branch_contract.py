@@ -160,6 +160,9 @@ YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_8_APPLICATION_PATH
 LOCKFILE_OFFLINE_CACHE_TOOL = (
     DISTRIBUTION / "sim" / "desktop" / "lockfile-offline-cache.mjs"
 )
+PUBLIC_BUILD_CONFIG_LAUNCHER = (
+    DISTRIBUTION / "sim" / "desktop" / "invoke-github-public-build-config.ps1"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -1551,6 +1554,54 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(gate["executeMayProceedFromThisReceipt"])
         self.assertTrue(gate["newExactApplicationRequired"])
         self.assertTrue(gate["newExactYellowAuthorizationRequired"])
+
+    def test_public_build_config_launcher_is_exact_name_and_fail_closed(self) -> None:
+        launcher = PUBLIC_BUILD_CONFIG_LAUNCHER.read_text(encoding="utf-8")
+        allowed = ("VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY")
+        self.assertIn('$Repository = "ChiZhang-805/DroneDream"', launcher)
+        for name in allowed:
+            self.assertIn(f'actions/variables/{name}', launcher)
+        self.assertNotIn("actions/secrets", launcher)
+        self.assertNotIn("service_role", launcher.lower())
+        self.assertNotIn(".env.local", launcher)
+        self.assertNotIn("gh.exe variable", launcher)
+        self.assertIn('[string]$response.name -ceq $Name', launcher)
+        self.assertIn('$Name -cin $AllowedVariableNames', launcher)
+        self.assertIn("ProcessStartInfo", launcher)
+        self.assertIn('$startInfo.EnvironmentVariables[$name]', launcher)
+        self.assertIn('$startInfo.EnvironmentVariables.Remove($name)', launcher)
+        self.assertIn('Remove-Item "Env:$name"', launcher)
+        self.assertNotIn("RedirectStandardOutput", launcher)
+        self.assertNotIn("RedirectStandardError", launcher)
+
+    def test_public_build_config_launcher_plan_is_provider_free(self) -> None:
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(PUBLIC_BUILD_CONFIG_LAUNCHER),
+                "-Mode",
+                "Plan",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan["state"], "green-plan-only-no-provider-no-child")
+        self.assertEqual(
+            plan["allowedVariableNames"],
+            ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"],
+        )
+        self.assertEqual(plan["providerInvocations"], 0)
+        self.assertEqual(plan["childInvocations"], 0)
+        self.assertFalse(plan["valuesRead"])
+        self.assertFalse(plan["valuesPrinted"])
+        self.assertFalse(plan["valuesPersisted"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
