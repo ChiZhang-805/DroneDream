@@ -17,6 +17,7 @@ import {
   childProcessExited,
   collectFailureDiagnostic,
   createPageEventJournal,
+  localPreviewLatestFixture,
   redactDiagnosticText,
 } from "./oauth-consent-audit-diagnostics.mjs";
 
@@ -256,6 +257,21 @@ async function installNetworkBoundary(context, baseUrl) {
   });
 }
 
+async function installLocalPreviewFixtures(page, baseUrl) {
+  await page.route("**/downloads/latest.json", async (route) => {
+    const fixture = localPreviewLatestFixture({
+      baseUrl,
+      requestUrl: route.request().url(),
+      method: route.request().method(),
+    });
+    if (fixture) {
+      await route.fulfill(fixture);
+      return;
+    }
+    await route.fallback();
+  });
+}
+
 async function installFixtureRoutes(page, responseMode = "valid") {
   const calls = [];
   await page.route(`${fixtureOrigin}/**`, async (route) => {
@@ -337,6 +353,7 @@ async function withCase({ browser, browserName, locale, profile, baseUrl, authen
   });
   await installNetworkBoundary(context, baseUrl);
   const page = await context.newPage();
+  await installLocalPreviewFixtures(page, baseUrl);
   await page.addInitScript(({ key }) => {
     window.__droneDreamOAuthAuditBootstrap = {
       sessionPresent: window.localStorage.getItem(key) !== null,

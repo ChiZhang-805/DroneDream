@@ -9,9 +9,34 @@ import {
   childProcessExited,
   collectFailureDiagnostic,
   createPageEventJournal,
+  localPreviewLatestFixture,
   redactDiagnosticText,
   safeRequestSummary,
 } from "./oauth-consent-audit-diagnostics.mjs";
+
+const localLatestRequest = {
+  baseUrl: "http://127.0.0.1:4174/",
+  requestUrl: "http://127.0.0.1:4174/downloads/latest.json",
+  method: "GET",
+};
+assert.deepEqual(localPreviewLatestFixture(localLatestRequest), {
+  status: 200,
+  contentType: "application/json",
+  body: "{}",
+});
+for (const request of [
+  { ...localLatestRequest, method: "POST" },
+  { ...localLatestRequest, requestUrl: "https://127.0.0.1:4174/downloads/latest.json" },
+  { ...localLatestRequest, requestUrl: "http://localhost:4174/downloads/latest.json" },
+  { ...localLatestRequest, requestUrl: "http://127.0.0.1:4175/downloads/latest.json" },
+  { ...localLatestRequest, requestUrl: "https://external.invalid/downloads/latest.json" },
+  { ...localLatestRequest, requestUrl: "http://127.0.0.1:4174/downloads/latest-universal.json" },
+  { ...localLatestRequest, requestUrl: "http://127.0.0.1:4174/downloads/latest.json?edition=sim" },
+  { ...localLatestRequest, baseUrl: "https://local-preview.invalid/" },
+  { ...localLatestRequest, baseUrl: "not-a-url" },
+]) {
+  assert.equal(localPreviewLatestFixture(request), null);
+}
 
 assert.equal(
   redactDiagnosticText("Authorization: Bearer secret-value"),

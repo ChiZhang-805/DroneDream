@@ -4,6 +4,39 @@ import path from "node:path";
 
 const MAX_EVENT_COUNT = 40;
 
+const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "[::1]"]);
+
+export function localPreviewLatestFixture({ baseUrl, requestUrl, method }) {
+  let base;
+  let request;
+  try {
+    base = new URL(baseUrl);
+    request = new URL(requestUrl);
+  } catch {
+    return null;
+  }
+
+  if (
+    !["http:", "https:"].includes(base.protocol)
+    || !LOOPBACK_HOSTNAMES.has(base.hostname)
+    || base.username
+    || base.password
+    || method !== "GET"
+    || request.origin !== base.origin
+    || request.pathname !== "/downloads/latest.json"
+    || request.search
+    || request.hash
+  ) {
+    return null;
+  }
+
+  return {
+    status: 200,
+    contentType: "application/json",
+    body: "{}",
+  };
+}
+
 export function redactDiagnosticText(value, limit = 1_200) {
   const text = String(value ?? "")
     .replace(/authorization\s*[:=]\s*(?:Bearer\s+)?[^\s,;]+/giu, "Authorization=[redacted]")
