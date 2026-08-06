@@ -73,6 +73,12 @@ YELLOW_ATTEMPT_4_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-4-2bffcb0-checkout-failed.v1.json"
 )
+YELLOW_ATTEMPT_5_PREFLIGHT_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-5-2bffcb0-preflight-ready.v1.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -297,6 +303,33 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             "artifactBuilds",
         ):
             self.assertEqual(receipt["execution"][key], 0, key)
+
+    def test_yellow_attempt_5_preflight_is_ready_without_execution(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_5_PREFLIGHT_PATH)
+        application = ROOT / receipt["application"]["path"]
+        entry_script = ROOT / receipt["entryScript"]["path"]
+        prior_failure = ROOT / receipt["priorCheckoutFailure"]["receiptPath"]
+        self.assertEqual(
+            hashlib.sha256(application.read_bytes()).hexdigest(),
+            receipt["application"]["sha256"],
+        )
+        self.assertEqual(
+            hashlib.sha256(entry_script.read_bytes()).hexdigest(),
+            receipt["entryScript"]["sha256"],
+        )
+        self.assertEqual(
+            hashlib.sha256(prior_failure.read_bytes()).hexdigest(),
+            receipt["priorCheckoutFailure"]["receiptSha256"],
+        )
+        self.assertEqual(receipt["application"]["priorSourceBuildInvocationCount"], 0)
+        self.assertEqual(receipt["application"]["sourceBuildInvocationOrdinal"], 1)
+        self.assertEqual(receipt["application"]["sourceBuildInvocationMaximum"], 1)
+        self.assertEqual(receipt["checkout"]["longestCandidateAbsolutePathChars"], 175)
+        self.assertFalse(receipt["checkout"]["globalGitConfigModified"])
+        self.assertTrue(receipt["preflight"]["runRootAbsent"])
+        self.assertTrue(receipt["preflight"]["sourceRootAbsent"])
+        self.assertFalse(receipt["authorization"]["yellowBuildExecutionAuthorizedByThisReceipt"])
+        self.assertTrue(all(value == 0 for value in receipt["executedCounts"].values()))
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
