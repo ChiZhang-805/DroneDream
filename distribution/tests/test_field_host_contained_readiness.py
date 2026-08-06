@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 import unittest
 from copy import deepcopy
@@ -28,6 +29,9 @@ SNAPSHOT_TOOL_PATH = (
 )
 EXECUTOR_PATH = (
     ROOT / "distribution" / "tools" / "execute_field_host_contained_acceptance.ps1"
+)
+PHASE_SERIALIZATION_FIXTURE = (
+    ROOT / "distribution" / "tools" / "test_field_phase_evidence_serialization.ps1"
 )
 PREVIOUS_EVIDENCE = (
     ROOT / "artifacts" / "test-runs" / "field-install-acceptance-readiness-0f86ba8"
@@ -407,6 +411,7 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertIn("System.AppUserModel.ID", source)
         self.assertIn("$FieldIconSha256", source)
         self.assertIn("[IO.File]::ReadAllText", source)
+        self.assertNotIn("text = Get-Content", source)
         self.assertIn("@($Snapshot.processes).Count", source)
         self.assertIn("@($plan.blockers).Count", source)
         self.assertIn("@(git status --porcelain).Count", source)
@@ -420,6 +425,32 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertNotIn("New-NetFirewallRule", source)
         self.assertNotIn("Start-Service", source)
         self.assertNotIn("Get-PnpDevice", source)
+
+    def test_phase_evidence_serializes_plain_text_with_bounded_memory(self) -> None:
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(PHASE_SERIALIZATION_FIXTURE),
+            ],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        evidence = json.loads(result.stdout.lstrip("\ufeff"))
+        self.assertTrue(evidence["passed"])
+        self.assertEqual(evidence["textType"], "System.String")
+        self.assertFalse(evidence["hasPsPath"])
+        self.assertLess(evidence["jsonLength"], 4096)
+        self.assertLess(evidence["privateMemoryGrowthBytes"], 16 * 1024 * 1024)
+        self.assertEqual(evidence["installerInvocations"], 0)
+        self.assertEqual(evidence["deviceEnumerations"], 0)
+        self.assertEqual(evidence["networkRequests"], 0)
 
     def test_schema_is_closed_and_covers_plan_readiness_and_execution(self) -> None:
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))

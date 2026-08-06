@@ -213,7 +213,11 @@ function Invoke-Installer([string[]]$Arguments, [string]$PhaseId) {
         if (Test-Path -LiteralPath $diagnostic) {
             $copy = Join-Path $OutputRoot "$PhaseId-installer-diagnostics.log"
             Copy-Item -LiteralPath $diagnostic -Destination $copy -Force
-            $evidence.diagnostic = [ordered]@{ path = $copy; sha256 = Get-Sha256 $copy; text = Get-Content -LiteralPath $copy -Raw }
+            $evidence.diagnostic = [ordered]@{
+                path = $copy
+                sha256 = Get-Sha256 $copy
+                text = [IO.File]::ReadAllText($copy, [Text.Encoding]::UTF8)
+            }
         }
         if ($exitCode -ne 0) { throw "$PhaseId installer exit code $exitCode" }
         Add-Phase $PhaseId "pass" $evidence
