@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-prepare-dependency-attestation-failure",
+  "editionId": "sim",
+  "state": "failed-frozen-no-retry",
+  "observedAtUtc": "2026-08-06T23:45:18.8314062Z",
+  "authorizationBinding": {
+    "globalCommandApplicationOrdinal": 9,
+    "productSourceCommit": "77f471845d2eda0c4a1e3dc1e4eee239905ba248",
+    "productSourceTree": "912dea80920a30ac2a85d684ab1a6ac8523da6f4",
+    "evidenceHeadAtStart": "c4f7aafc1c98c123db8096f1bcc7531501bee9b5",
+    "launcherPath": "distribution/sim/desktop/invoke-github-public-build-config.ps1",
+    "launcherBytes": 5947,
+    "launcherSha256": "28b67dd1611a47dd30f9f6b4a4be426951e03f095660991fa0af38d36cd249ec",
+    "applicationPath": "distribution/sim/desktop/yellow-build-attempt-9-77f4718-application.v1.json",
+    "applicationBytes": 12600,
+    "applicationSha256": "6649bc4d769aa793eabef489890831c0eab17c8003138c47e1b35a4531dfdba5",
+    "entryScriptPath": "distribution/sim/desktop/invoke-yellow-build-attempt-9-77f4718.ps1",
+    "entryScriptBytes": 23134,
+    "entryScriptSha256": "30b8132107899400baaf300788e5e258c9a6fa2d113e4dfc36883a1d8e24883c",
+    "planReceiptPath": "distribution/sim/desktop/yellow-build-attempt-9-77f4718-plan-ready.v1.json",
+    "planReceiptBytes": 6714,
+    "planReceiptSha256": "022ec5f378b173295037f5c1e8ffef319f55d2a2eb5c52b82d416b13994b313f",
+    "exactCommand": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-github-public-build-config.ps1 -Mode ExecuteSequence -EntryScript C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-9-77f4718.ps1 -EntryScriptSha256 30b8132107899400baaf300788e5e258c9a6fa2d113e4dfc36883a1d8e24883c",
+    "sameAuthorizationReusable": false,
+    "retryAllowed": false
+  },
+  "publicConfigurationCapture": {
+    "requestedVariableNames": ["VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY"],
+    "repositoryVariableFetches": 2,
+    "responseNamesValidated": true,
+    "valuesCapturedInMemory": true,
+    "valuesPrinted": false,
+    "valuesPersisted": false,
+    "valuesPlacedOnCommandLine": false,
+    "publicVariableNameMentionsInNpmLogs": 0,
+    "secretOrServiceRoleMarkersInNpmLogs": 0,
+    "launchingProcessValuesPresentAfterFinally": false,
+    "secretServiceRoleAccountOrModelKeyRead": false
+  },
+  "failure": {
+    "phase": "prepare-dependency-inventory-attestation",
+    "preflightPassed": true,
+    "snapshotCreated": true,
+    "desktopNpmCiExitCode": 0,
+    "frontendNpmCiExitCode": 0,
+    "preparationReceiptCreated": false,
+    "dependencyManifestCreated": false,
+    "classification": "offline-npm-ci-tree-differs-from-frozen-attested-dependency-inventory",
+    "expectedInventory": {
+      "treeFingerprint": "7f4dc4d394ca98a8458f84f7cc5dfe40603f9fe662e1610d910651d04fbe6aea",
+      "entryCount": 18851,
+      "fileCount": 17339,
+      "directoryCount": 1512,
+      "reparsePointCount": 0,
+      "totalFileBytes": 263384543
+    },
+    "actualInventory": {
+      "treeFingerprint": "96f97b507d5eb15001933d6b22faa1e5e2c8289aa40dc78e4641a5095aacdb88",
+      "entryCount": 18789,
+      "fileCount": 17285,
+      "directoryCount": 1504,
+      "reparsePointCount": 0,
+      "totalFileBytes": 245458213
+    },
+    "automaticRepairAttempted": false,
+    "executeStarted": false
+  },
+  "stableCacheEvidence": {
+    "semanticFingerprint": "fa7523cb1a93b4b3626a3b9132139fea8ed7e2c165097a03545b2e58eaf68a91",
+    "contentObjectCount": 323,
+    "indexKeyCount": 323,
+    "selectedContentBytes": 55560694,
+    "snapshotFileCount": 646,
+    "snapshotFingerprint": "79e5fc0a869acf44a470e63c84bd66e5575f369534ba7445eeeeaeeff18a8622",
+    "wholeGlobalCacheCopied": false,
+    "dependencyNetworkInvocations": 0
+  },
+  "executionCounts": {
+    "launcherInvocations": 1,
+    "publicRepositoryVariableFetches": 2,
+    "controlledChildInvocations": 2,
+    "preflightInvocations": 1,
+    "prepareInvocations": 1,
+    "executeInvocations": 0,
+    "snapshotsCreated": 1,
+    "selectedCacheFilesCopied": 646,
+    "npmCiInvocations": 2,
+    "dependencyNetworkInvocations": 0,
+    "junctionsCreated": 0,
+    "buildScriptInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0,
+    "automaticRetries": 0
+  },
+  "ownedEvidence": {
+    "sourceRoot": "C:/Users/zju20/dds9",
+    "sourceRootExists": true,
+    "sourceHead": "77f471845d2eda0c4a1e3dc1e4eee239905ba248",
+    "sourceTree": "912dea80920a30ac2a85d684ab1a6ac8523da6f4",
+    "sourceClean": true,
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal9-77f4718",
+    "runRootExists": true,
+    "snapshotRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm-snapshots/npm-snapshot-ordinal9-77f4718",
+    "snapshotRootExists": true,
+    "dependencyRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-116d84c133f43e7d",
+    "dependencyRootExists": true,
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-77f4718-ordinal9",
+    "cargoTargetDirExists": false,
+    "outputRootExists": false,
+    "cleanupExecuted": false,
+    "rootsFrozenReadOnly": true
+  },
+  "externalEvidence": {
+    "attemptLock": {
+      "bytes": 119,
+      "sha256": "92123a1f8f9854878716b7b0fbd63c1c48d0c68f5cf349d1644776e2199117bc"
+    },
+    "snapshotReceipt": {
+      "bytes": 2300,
+      "sha256": "b5489e63ceabffbd60964581ab99bff95484b819b51fddcb5a683fd295909208"
+    },
+    "desktopNpmLog": {
+      "bytes": 1838,
+      "sha256": "21b6004bd940b7ee5930a7aac327814de3f732e77b732f2c55b935df8bf095a7"
+    },
+    "frontendNpmLog": {
+      "bytes": 53820,
+      "sha256": "a56c3ce8a714309ef3057dc7bb9369dd610e81d1f7619010d84cf2f7dcff2968"
+    }
+  },
+  "protectedHistory": {
+    "ordinalEightPermanentlyConsumed": true,
+    "priorRootsOrReceiptsMutated": false,
+    "frozenArtifactSha256Expected": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "frozenArtifactSha256AfterFailure": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "frozenArtifactMutated": false
+  },
+  "nonClaims": {
+    "dependencyBundleAttested": false,
+    "executeStarted": false,
+    "artifactCreated": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  },
+  "nextGate": {
+    "requiresGreenDependencyTreeRootCauseAndNewExactSource": true,
+    "sameOrdinalOrAuthorizationReusable": false,
+    "prepareMayResumeFromFrozenRoot": false,
+    "executeMayProceed": false,
+    "newExactYellowApplicationRequired": true,
+    "newExactChiefControlSignalRequired": true
+  }
+}

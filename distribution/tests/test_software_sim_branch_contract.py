@@ -153,6 +153,12 @@ YELLOW_ATTEMPT_9_PLAN_PATH = (
     / "desktop"
     / "yellow-build-attempt-9-77f4718-plan-ready.v1.json"
 )
+YELLOW_ATTEMPT_9_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-9-77f4718-dependency-attestation-prepare-failed.v1.json"
+)
 DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     DISTRIBUTION
     / "sim"
@@ -1684,7 +1690,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertNotIn("sb_", command)
         self.assertFalse(plan["exactFutureCommand"]["executionAuthorizedByThisReceipt"])
 
-    def test_yellow_attempt_9_plans_are_provider_free_and_roots_absent(self) -> None:
+    def test_yellow_attempt_9_plans_are_provider_free_and_root_timeline_is_exact(self) -> None:
         application = load_json(YELLOW_ATTEMPT_9_APPLICATION_PATH)
         entry = ROOT / application["executionPlan"]["entryScript"]["path"]
         plan_commands = (
@@ -1717,22 +1723,27 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-        roots = application["ownedBuildSurface"]
-        snapshot = application["attemptOwnedCacheSnapshot"]["snapshotRoot"]
-        dependency = application["dependencyBundle"]["dependencyRoot"]
-        for path in (
-            roots["sourceRoot"],
-            roots["runRoot"],
-            roots["cargoTargetDir"],
-            snapshot,
-            dependency,
-        ):
-            self.assertFalse(Path(path).exists(), path)
         plan = load_json(YELLOW_ATTEMPT_9_PLAN_PATH)
         self.assertEqual(plan["planVerification"]["newRootCount"], 0)
         self.assertEqual(plan["planVerification"]["providerInvocations"], 0)
         self.assertFalse(plan["planVerification"]["valuesRead"])
         self.assertTrue(all(value == 0 for value in plan["executedCounts"].values()))
+        for key, value in plan["ownedRoots"].items():
+            if key.endswith("AbsentAfterPlan"):
+                self.assertTrue(value, key)
+
+        failure = load_json(YELLOW_ATTEMPT_9_FAILURE_PATH)
+        owned = failure["ownedEvidence"]
+        for key in (
+            "sourceRootExists",
+            "runRootExists",
+            "snapshotRootExists",
+            "dependencyRootExists",
+        ):
+            self.assertTrue(owned[key], key)
+        self.assertFalse(owned["cargoTargetDirExists"])
+        self.assertFalse(owned["outputRootExists"])
+        self.assertFalse(owned["cleanupExecuted"])
 
     def test_yellow_attempt_9_counts_and_history_are_fail_closed(self) -> None:
         application = load_json(YELLOW_ATTEMPT_9_APPLICATION_PATH)
@@ -1771,6 +1782,74 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(authorization["preflightAuthorizedByThisApplication"])
         self.assertFalse(authorization["prepareAuthorizedByThisApplication"])
         self.assertFalse(authorization["executeAuthorizedByThisApplication"])
+
+    def test_yellow_attempt_9_prepare_failure_freezes_before_execute(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_9_FAILURE_PATH)
+        self.assertEqual(receipt["state"], "failed-frozen-no-retry")
+        binding = receipt["authorizationBinding"]
+        self.assertEqual(binding["globalCommandApplicationOrdinal"], 9)
+        self.assertFalse(binding["sameAuthorizationReusable"])
+        self.assertFalse(binding["retryAllowed"])
+        failure = receipt["failure"]
+        self.assertEqual(failure["phase"], "prepare-dependency-inventory-attestation")
+        self.assertTrue(failure["preflightPassed"])
+        self.assertEqual(failure["desktopNpmCiExitCode"], 0)
+        self.assertEqual(failure["frontendNpmCiExitCode"], 0)
+        self.assertFalse(failure["preparationReceiptCreated"])
+        self.assertFalse(failure["dependencyManifestCreated"])
+        self.assertFalse(failure["automaticRepairAttempted"])
+        self.assertFalse(failure["executeStarted"])
+        self.assertNotEqual(
+            failure["actualInventory"]["treeFingerprint"],
+            failure["expectedInventory"]["treeFingerprint"],
+        )
+        self.assertEqual(failure["actualInventory"]["fileCount"], 17285)
+        self.assertEqual(failure["expectedInventory"]["fileCount"], 17339)
+
+    def test_yellow_attempt_9_failure_counts_and_public_values_are_redacted(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_9_FAILURE_PATH)
+        public = receipt["publicConfigurationCapture"]
+        self.assertEqual(public["repositoryVariableFetches"], 2)
+        self.assertTrue(public["responseNamesValidated"])
+        self.assertTrue(public["valuesCapturedInMemory"])
+        self.assertFalse(public["valuesPrinted"])
+        self.assertFalse(public["valuesPersisted"])
+        self.assertFalse(public["valuesPlacedOnCommandLine"])
+        self.assertEqual(public["publicVariableNameMentionsInNpmLogs"], 0)
+        self.assertEqual(public["secretOrServiceRoleMarkersInNpmLogs"], 0)
+        self.assertFalse(public["launchingProcessValuesPresentAfterFinally"])
+        counts = receipt["executionCounts"]
+        self.assertEqual(counts["launcherInvocations"], 1)
+        self.assertEqual(counts["publicRepositoryVariableFetches"], 2)
+        self.assertEqual(counts["controlledChildInvocations"], 2)
+        self.assertEqual(counts["preflightInvocations"], 1)
+        self.assertEqual(counts["prepareInvocations"], 1)
+        self.assertEqual(counts["snapshotsCreated"], 1)
+        self.assertEqual(counts["selectedCacheFilesCopied"], 646)
+        self.assertEqual(counts["npmCiInvocations"], 2)
+        for key in (
+            "executeInvocations",
+            "dependencyNetworkInvocations",
+            "junctionsCreated",
+            "buildScriptInvocations",
+            "frontendBuilds",
+            "tauriBuilds",
+            "cargoBuilds",
+            "nsisBuilds",
+            "artifactBuilds",
+            "installations",
+            "runtimeStarts",
+            "px4GazeboStarts",
+            "hardwareActions",
+            "deployments",
+            "automaticRetries",
+        ):
+            self.assertEqual(counts[key], 0, key)
+        self.assertFalse(receipt["protectedHistory"]["frozenArtifactMutated"])
+        self.assertFalse(receipt["nonClaims"]["artifactCreated"])
+        self.assertFalse(receipt["nonClaims"]["releaseReady"])
+        self.assertFalse(receipt["nextGate"]["executeMayProceed"])
+        self.assertTrue(receipt["nextGate"]["newExactYellowApplicationRequired"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
