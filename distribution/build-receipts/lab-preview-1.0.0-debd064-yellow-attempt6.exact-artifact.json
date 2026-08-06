@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-preview-1.0.0-debd064-yellow-attempt6",
+  "editionId": "lab",
+  "result": "build-and-static-artifact-validation-passed",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "debd0647c5883ffe5c9c52037d35a6b567d9fd62",
+    "tree": "fa28c390a33835f30d1d7bf88e2b36e68df7f340",
+    "statusAtAttemptStart": "clean",
+    "upstreamExactAtAttemptStart": true
+  },
+  "commonCore": {
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "productSourceHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "lifecycleValidatorDonor": "57b74f59ed4164ebefde623fa7f5102e5c24363f"
+  },
+  "attempt": {
+    "historicalLabYellowAttemptNumber": 6,
+    "exactSourceAttemptNumber": 1,
+    "classification": "YELLOW",
+    "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+    "cargoBuildJobs": 2,
+    "serializedWithOtherEditionBuilds": true,
+    "tauriAttemptCount": 1,
+    "cargoReleaseAttemptCount": 1,
+    "nsisBundleAttemptCount": 1,
+    "artifactWriteCount": 1,
+    "receiptWriteCount": 1,
+    "buildExitCode": 0,
+    "automaticRetryAllowed": false
+  },
+  "resourceGate": {
+    "memoryUsedPercent": 50.8,
+    "memoryFreeGiB": 7.75,
+    "cpuPercent": 0.0,
+    "cDriveFreeGiB": 92.42,
+    "heavyProcessCount": 0,
+    "passed": true
+  },
+  "driverAndCleanPreflight": {
+    "stdoutAndStderrSeparated": true,
+    "normalDriverStderrPromotedToFailure": false,
+    "frontendDistIgnored": true,
+    "cargoTargetIgnored": true,
+    "fieldDistPathUsed": false,
+    "postBuildSourceClean": true
+  },
+  "inputs": {
+    "publicSupabaseActionsVariablesInjected": true,
+    "publicSupabaseValuesRecorded": false,
+    "publicOauthClientInjected": true,
+    "publicOauthClientValueRecorded": false,
+    "publicOauthClientValueSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+    "approvedUpdaterKeyId": "BA3FDCAF71CE2FF5",
+    "privateKeyContentRecorded": false,
+    "productionNamingKeyUsed": false,
+    "providerCalled": false,
+    "modelApiKeyRead": false,
+    "accountPasswordRead": false,
+    "serviceRoleRead": false
+  },
+  "evidence": {
+    "attemptRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\debd064-yellow-attempt6",
+    "attemptStart": {
+      "fileName": "attempt-start.json",
+      "bytes": 1386,
+      "sha256": "7bdc93fedc525b1fa24b953b35d94125d284eedd7f2fcd9819d7bfa583d6c1b9"
+    },
+    "stdout": {
+      "fileName": "build.stdout.log",
+      "bytes": 9072,
+      "sha256": "f5081352de9392786d6f618c329f1c5e71ec10f184a2233052a7e0ed72ca63fe"
+    },
+    "stderr": {
+      "fileName": "build.stderr.log",
+      "bytes": 1632,
+      "sha256": "786c99590f2659251fcd40ae9d6f22659278b25ed04706829f4ff79c02ff1129",
+      "containedExpectedDriverOrCompilerInformation": true,
+      "causedFailure": false
+    },
+    "attemptEnd": {
+      "fileName": "attempt-end.json",
+      "bytes": 372,
+      "sha256": "c78cc90536eda48f588255aee93fbde0992eaf527f3e3bcdbf01b67715ee939e"
+    },
+    "artifactReceipt": {
+      "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\debd064-yellow-attempt6\\artifact\\lab-preview-receipt.json",
+      "bytes": 9183,
+      "sha256": "85cf862870bb9ece1ac5561517aea2b87704cd6b38a2ef5bfa1960028f2b3876",
+      "schemaVersion": 2,
+      "receiptVersion": "1.1.0",
+      "artifactRootRepresentation": "relative-to-receipt-parent",
+      "artifactRootOwnership": "edition-owned-output-root",
+      "verified": true
+    }
+  },
+  "artifact": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\debd064-yellow-attempt6\\artifact\\DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "uniqueAttemptArtifactCount": 1,
+    "bytes": 12080017,
+    "sha256": "b5969f2f287cf729450618e6d3a8232f426b1ac4cbe5c3662904d31bab215a48",
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0",
+    "productName": "DroneDream · LAB",
+    "peMachine": "0x014C",
+    "peCertificateTableOffset": 0,
+    "peCertificateTableSize": 0,
+    "authenticodeStatus": "NotSigned",
+    "staticPreviewReady": true,
+    "installAuthorized": false,
+    "websiteHandoffReady": false
+  },
+  "updaterSignature": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\debd064-yellow-attempt6\\artifact\\DroneDream-Lab-1.0.0.exe.sig",
+    "bytes": 428,
+    "sha256": "1034d2f0223ac23795fdc258bb03015c7e4b3e91b11973070daa1d59a56cd233",
+    "state": "issued",
+    "keyId": "BA3FDCAF71CE2FF5"
+  },
+  "internalBundleEvidence": {
+    "checksumBytes": 102,
+    "checksumSha256": "3170c26c9ac80e314cc6444884ce1a0bd5f6d7f8e89d1f9f967a3128a387148e",
+    "updaterManifestBytes": 1016,
+    "updaterManifestSha256": "a9c337d50d1994f2b35de68b80bcff747bc2533a71f00d3b5ee36cf062b1500e",
+    "updaterManifestUrlFamily": "desktop-lab-v1.0.0-build-759",
+    "updaterManifestSourceCommitMatches": true,
+    "updaterManifestSignaturePresent": true
+  },
+  "offlineAcceptance": {
+    "artifactVerifier": "passed",
+    "artifactVerifierPath": "distribution/tools/verify_lab_preview_artifact.py",
+    "preinstallReceiptAccepted": true,
+    "preinstallDecision": "blocked-expected-policy",
+    "preinstallBlockers": [
+      "Lab preview remains unsigned internal-test material.",
+      "There are zero validated Vehicle Packs.",
+      "Hardware parameter write, arm, HITL, and flight actions are denied.",
+      "No release-lab promotion is authorized by pre-install acceptance."
+    ]
+  },
+  "sideEffects": {
+    "installerRun": false,
+    "runtimeMigration": false,
+    "px4OrGazeboStarted": false,
+    "hardwareAccess": false,
+    "releaseBranchCreated": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "remainingGates": [
+    "A separate lifecycle authorization is required before fresh, overlay, launch, shortcut, WebView2, EN/ZH, login-entry, uninstall, residue, or rollback execution.",
+    "Release delivery still requires an accepted Authenticode policy outcome and Website exact four-file handoff.",
+    "Zero validated Vehicle Packs keep hardware write, arm, HITL, and flight denied through native, backend, and runtime authority."
+  ],
+  "releaseReady": false
+}
