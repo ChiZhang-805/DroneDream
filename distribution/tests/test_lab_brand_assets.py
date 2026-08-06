@@ -204,7 +204,7 @@ class LabBrandAssetTests(unittest.TestCase):
 
     def test_tauri_overlay_binds_lab_installer_and_shortcut_identity(self) -> None:
         overlay = json.loads(TAURI_OVERLAY_PATH.read_text(encoding="utf-8"))
-        self.assertEqual(overlay["productName"], "DroneDream · LAB")
+        self.assertEqual(overlay["productName"], "DroneDream-Lab")
         self.assertEqual(overlay["app"]["windows"][0]["title"], "DroneDream · LAB")
 
         expected_by_path = {
@@ -228,6 +228,10 @@ class LabBrandAssetTests(unittest.TestCase):
             resources,
         )
         self.assertIn("../../brand/generated/lab/lockup-compact.png", resources)
+        self.assertIn(
+            "../../distribution/desktop/edition-coexistence.v1.json",
+            resources,
+        )
         self.assertNotIn(
             "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
             resources,

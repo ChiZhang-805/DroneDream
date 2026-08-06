@@ -8,10 +8,26 @@
     "labBranch": "codex/software-lab",
     "labCommit": "a62111eee2b7dc5d64475b9ac207bb599fe13669",
     "universalBranch": "codex/software",
-    "universalObservedCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "universalObservedCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "simObservedCommit": "c8630332cdad1c1a94155d13d1981c83bdec0d1c",
     "fieldObservedCommit": "452eed9c7b018d97beec3cd3d61ee182b6e67330"
+  },
+  "commonCoexistenceContract": {
+    "prerequisiteCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+    "productDonorCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "manifest": {
+      "path": "distribution/desktop/edition-coexistence.v1.json",
+      "bytes": 6064,
+      "sha256": "1af65a86d4f77add7d16d21fe257b7052cb5138de68b6eb3f111f0a32d17bd38"
+    },
+    "schema": {
+      "path": "distribution/schemas/desktop-edition-coexistence.schema.json",
+      "bytes": 6395,
+      "sha256": "e953f06fdbaa178a7ad5e66575636b996c18f118e1467ae207413751bba1e9ad"
+    },
+    "unknownProductDecision": "deny",
+    "lifecycleExecutionEvidenceRequired": true
   },
   "frozenArtifact": {
     "sourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
@@ -25,9 +41,9 @@
     "releaseReady": false
   },
   "identityDerivation": {
-    "defaultInstallRoot": "%LOCALAPPDATA%\\{productName}",
-    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{productName}",
-    "manufacturerProductKey": "HKCU\\Software\\DroneDream\\{productName}",
+    "defaultInstallRoot": "%LOCALAPPDATA%\\{installerProductName}",
+    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{installerProductName}",
+    "manufacturerProductKey": "HKCU\\Software\\DroneDream\\{installerProductName}",
     "desktopShortcut": "%USERPROFILE%\\Desktop\\{productName}.lnk",
     "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{productName}.lnk",
     "appUserModelId": "{identifier}",
@@ -43,12 +59,13 @@
   "identities": [
     {
       "editionId": "universal",
-      "sourceCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
-      "configPath": "desktop/src-tauri/tauri.conf.json",
-      "configGitObjectId": "08e6e6959849f073db594310c07b136ddaac5f84",
+      "sourceCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+      "configPath": "desktop/src-tauri/tauri.universal.conf.json",
+      "configGitObjectId": "e789292b92d037893f29e23086a681bfb9c12f54",
       "productName": "DroneDream",
-      "identifier": "io.dronedream.desktop",
-      "artifactFileName": "DroneDream-1.0.0.exe",
+      "installerProductName": "DroneDream-Universal",
+      "identifier": "io.dronedream.desktop.universal",
+      "artifactFileName": "DroneDream-Universal-1.0.0.exe",
       "updaterManifest": "latest.json",
       "enginePackEditionProfile": "unified-sim-lab"
     },
@@ -58,7 +75,8 @@
       "configPath": "distribution/sim/desktop/tauri.sim.conf.json",
       "configGitObjectId": "6145e4b260bc1591ba63be3adc448d51e08ebe0b",
       "productName": "DroneDream · SIM",
-      "identifier": "io.dronedream.sim",
+      "installerProductName": "DroneDream-Sim",
+      "identifier": "io.dronedream.desktop.sim",
       "artifactFileName": "DroneDream-Sim-1.0.0.exe",
       "updaterManifest": "latest.json",
       "enginePackEditionProfile": "sim-only"
@@ -69,6 +87,7 @@
       "configPath": "desktop/src-tauri/tauri.lab-preview.conf.json",
       "configGitObjectIdAtAuditBase": "3a00314b5cd75d1cc965f9f493cf6c640e6f9f8a",
       "productName": "DroneDream · LAB",
+      "installerProductName": "DroneDream-Lab",
       "identifier": "io.dronedream.desktop.lab",
       "artifactFileName": "DroneDream-Lab-1.0.0.exe",
       "updaterManifest": "lab-latest.json",
@@ -83,6 +102,7 @@
       "configPath": "desktop/src-tauri/tauri.field.conf.json",
       "configGitObjectId": "512fed1fb1cc7dcedf512d7846821a43968fc7d9",
       "productName": "DroneDream · FIELD",
+      "installerProductName": "DroneDream-Field",
       "identifier": "io.dronedream.desktop.field",
       "artifactFileName": "DroneDream-Field-1.0.0.exe",
       "updaterManifest": "field-latest.json",
@@ -185,7 +205,7 @@
   "crossEditionBlockers": [
     "Universal and Sim currently resolve the same latest.json updater manifest; Sim needs an edition-owned endpoint before four-Edition update isolation is accepted.",
     "Universal has not delivered the exact edition-aware authentication donor required by this contract.",
-    "The exact Universal existing-install/quiesce donor b099ed0 is forward-synced, but rebuilt Lab bytes and same-version /UPDATE acceptance remain gated.",
+    "The exact Universal existing-install/quiesce donor b099ed0 and installer identity donor 8a8ad6c are forward-synced, but rebuilt Lab bytes and same-version /UPDATE acceptance remain gated.",
     "The exact large LAB suffix brand donor b8e0d0c is forward-synced, but the frozen Lab EXE predates it and future release bytes require a new gated build.",
     "Universal edition-safety allow-fixture tests pin the Universal Lab manifest hash and need a canonical parameterized fixture before the branded Lab manifest can pass the test-only allow path.",
     "The frozen Lab EXE predates this contract and remains an exact unsigned non-release artifact."

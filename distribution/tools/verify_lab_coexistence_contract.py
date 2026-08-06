@@ -14,6 +14,8 @@ DONOR_PATH = ROOT / "distribution/editions/lab/universal-donor-requests.v1.json"
 OVERLAY_PATH = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
 BUILD_SCRIPT_PATH = ROOT / "desktop/scripts/build-lab-preview.ps1"
 PROFILE_PATH = ROOT / "distribution/build-profiles/lab-preview.v1.json"
+COMMON_CONTRACT_PATH = ROOT / "distribution/desktop/edition-coexistence.v1.json"
+COMMON_SCHEMA_PATH = ROOT / "distribution/schemas/desktop-edition-coexistence.schema.json"
 BUILD_RECEIPT_PATH = (
     ROOT
     / "distribution/build-receipts"
@@ -73,16 +75,38 @@ def validate_contract(
     by_edition = {item.get("editionId"): item for item in identities}
     if set(by_edition) != {"universal", "sim", "lab", "field"}:
         raise LabCoexistenceContractError("four Edition identity set drifted")
-    for key in ("productName", "identifier", "artifactFileName"):
+    for key in ("productName", "installerProductName", "identifier", "artifactFileName"):
         values = [item.get(key) for item in identities]
         if any(not isinstance(value, str) or not value for value in values):
             raise LabCoexistenceContractError(f"Edition {key} is missing")
         if len(set(values)) != 4:
             raise LabCoexistenceContractError(f"Edition {key} values must be unique")
 
+    common_document = _load_json(COMMON_CONTRACT_PATH)
+    common_editions = _sequence(common_document.get("editions"), "common editions")
+    common_by_edition = {
+        item.get("editionId"): item for item in common_editions if isinstance(item, dict)
+    }
+    if set(common_by_edition) != set(by_edition):
+        raise LabCoexistenceContractError("common desktop Edition identity set drifted")
+    common_identity_fields = {
+        "productName": "displayName",
+        "installerProductName": "installerProductName",
+        "identifier": "bundleIdentifier",
+        "artifactFileName": "artifactFileName",
+    }
+    for edition_id, local_identity in by_edition.items():
+        common_identity = common_by_edition[edition_id]
+        for local_field, common_field in common_identity_fields.items():
+            if local_identity.get(local_field) != common_identity.get(common_field):
+                raise LabCoexistenceContractError(
+                    f"{edition_id} {local_field} drifted from common coexistence contract"
+                )
+
     lab = by_edition["lab"]
     expected_lab = {
         "productName": "DroneDream · LAB",
+        "installerProductName": "DroneDream-Lab",
         "identifier": "io.dronedream.desktop.lab",
         "artifactFileName": "DroneDream-Lab-1.0.0.exe",
         "updaterManifest": "lab-latest.json",
@@ -100,9 +124,9 @@ def validate_contract(
 
     derivation = _mapping(contract.get("identityDerivation"), "identityDerivation")
     expected_derivation = {
-        "defaultInstallRoot": "%LOCALAPPDATA%\\{productName}",
-        "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{productName}",
-        "manufacturerProductKey": "HKCU\\Software\\DroneDream\\{productName}",
+        "defaultInstallRoot": "%LOCALAPPDATA%\\{installerProductName}",
+        "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{installerProductName}",
+        "manufacturerProductKey": "HKCU\\Software\\DroneDream\\{installerProductName}",
         "desktopShortcut": "%USERPROFILE%\\Desktop\\{productName}.lnk",
         "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{productName}.lnk",
         "appUserModelId": "{identifier}",
@@ -115,6 +139,30 @@ def validate_contract(
     deletion_scope = _sequence(derivation.get("uninstallDeletionScope"), "uninstallDeletionScope")
     if not any("exact identifier" in str(item) for item in deletion_scope):
         raise LabCoexistenceContractError("Lab uninstall app-data deletion is not identifier scoped")
+
+    common_contract = _mapping(
+        contract.get("commonCoexistenceContract"),
+        "commonCoexistenceContract",
+    )
+    common_manifest = _mapping(common_contract.get("manifest"), "common contract manifest")
+    common_schema = _mapping(common_contract.get("schema"), "common contract schema")
+    if (
+        common_contract.get("prerequisiteCommit")
+        != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
+        or common_contract.get("productDonorCommit")
+        != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
+        or common_contract.get("unknownProductDecision") != "deny"
+        or common_contract.get("lifecycleExecutionEvidenceRequired") is not True
+        or common_manifest.get("path")
+        != "distribution/desktop/edition-coexistence.v1.json"
+        or common_manifest.get("bytes") != COMMON_CONTRACT_PATH.stat().st_size
+        or common_manifest.get("sha256") != _sha256(COMMON_CONTRACT_PATH)
+        or common_schema.get("path")
+        != "distribution/schemas/desktop-edition-coexistence.schema.json"
+        or common_schema.get("bytes") != COMMON_SCHEMA_PATH.stat().st_size
+        or common_schema.get("sha256") != _sha256(COMMON_SCHEMA_PATH)
+    ):
+        raise LabCoexistenceContractError("common desktop coexistence donor drifted")
 
     runtime = _mapping(contract.get("sharedRuntimeCoordination"), "sharedRuntimeCoordination")
     if (
@@ -238,7 +286,14 @@ def validate_contract(
     ):
         raise LabCoexistenceContractError("frozen Lab failure evidence or readiness drifted")
 
-    if overlay.get("productName") != expected_lab["productName"] or overlay.get("identifier") != expected_lab["identifier"]:
+    windows = overlay.get("app", {}).get("windows", [])
+    if (
+        overlay.get("productName") != expected_lab["installerProductName"]
+        or overlay.get("identifier") != expected_lab["identifier"]
+        or not isinstance(windows, list)
+        or not windows
+        or windows[0].get("title") != expected_lab["productName"]
+    ):
         raise LabCoexistenceContractError("Lab Tauri product identity drifted")
     plugins = _mapping(overlay.get("plugins"), "Lab overlay plugins")
     updater = _mapping(plugins.get("updater"), "Lab updater")
@@ -248,6 +303,8 @@ def validate_contract(
         raise LabCoexistenceContractError("Lab updater endpoint is not edition scoped")
     resources = _mapping(_mapping(overlay.get("bundle"), "Lab bundle").get("resources"), "Lab resources")
     for source in (
+        "../../distribution/desktop/edition-coexistence.v1.json",
+        "../../distribution/schemas/desktop-edition-coexistence.schema.json",
         "../../distribution/editions/lab/coexistence-and-auth.v1.json",
         "../../distribution/editions/lab/universal-donor-requests.v1.json",
     ):
@@ -266,6 +323,12 @@ def validate_contract(
     authority = _mapping(donor.get("authority"), "donor authority")
     if (
         authority.get("branch") != "codex/software"
+        or authority.get("observedHead")
+        != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
+        or authority.get("observedProductSource")
+        != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
+        or authority.get("canonicalBrandProductSource")
+        != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
         or authority.get("labMayCarrySharedFixLongTerm") is not False
         or "without hand-copying or blindly cherry-picking" not in str(authority.get("integrationRule"))
     ):
@@ -292,10 +355,25 @@ def validate_contract(
             raise LabCoexistenceContractError("shared donor request points into Lab ownership")
         if item.get("requestId") == "universal-nsis-existing-install-quiesce-v1":
             exact_donor = _mapping(item.get("exactDonor"), "NSIS exact donor")
+            coexistence_donor = _mapping(
+                item.get("coexistenceContractDonor"),
+                "coexistence contract donor",
+            )
+            identity_donor = _mapping(
+                item.get("installerIdentityDonor"),
+                "installer identity donor",
+            )
             if (
                 exact_donor.get("commit") != "b099ed00923e9f2b833f812ad79f1614529038de"
                 or exact_donor.get("parent") != "39d19414e4ac6649288726195f74afaf6dc58123"
                 or exact_donor.get("integration") != "merge-parent-preserved"
+                or coexistence_donor.get("commit")
+                != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
+                or identity_donor.get("commit")
+                != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
+                or identity_donor.get("unknownProductDecision") != "deny"
+                or identity_donor.get("labInstallerProductName") != "DroneDream-Lab"
+                or identity_donor.get("labDisplayName") != "DroneDream · LAB"
             ):
                 raise LabCoexistenceContractError("NSIS donor provenance drifted")
         if item.get("requestId") == "universal-large-edition-lockup-brand-v1":

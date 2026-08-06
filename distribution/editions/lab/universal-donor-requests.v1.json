@@ -5,8 +5,9 @@
   "requestingEdition": "lab",
   "authority": {
     "branch": "codex/software",
-    "observedHead": "7482647f1c2fcb92f58aaef009efc99764792297",
-    "observedProductSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "observedHead": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "observedProductSource": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "canonicalBrandProductSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "labMayCarrySharedFixLongTerm": false,
     "integrationRule": "review exact donor ancestry and diff, then forward-sync the canonical change without hand-copying or blindly cherry-picking"
@@ -26,16 +27,48 @@
         ],
         "integration": "merge-parent-preserved"
       },
+      "coexistenceContractDonor": {
+        "commit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+        "integration": "audited-prerequisite-cherry-pick",
+        "paths": [
+          "distribution/desktop/edition-coexistence.v1.json",
+          "distribution/schemas/desktop-edition-coexistence.schema.json",
+          "distribution/tests/test_desktop_edition_coexistence.py",
+          "distribution/tools/desktop_edition_coexistence.py"
+        ]
+      },
+      "installerIdentityDonor": {
+        "commit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+        "parent": "7482647f1c2fcb92f58aaef009efc99764792297",
+        "integration": "audited-eight-path-cherry-pick",
+        "unknownProductDecision": "deny",
+        "labInstallerProductName": "DroneDream-Lab",
+        "labDisplayName": "DroneDream · LAB",
+        "changedPaths": [
+          "desktop/scripts/verify-nsis-template.ps1",
+          "desktop/src-tauri/nsis/edition-identity.nsh",
+          "desktop/src-tauri/nsis/installer-languages.nsh",
+          "desktop/src-tauri/nsis/installer.nsi",
+          "desktop/src-tauri/nsis/languages/English.nsh",
+          "desktop/src-tauri/nsis/languages/SimpChinese.nsh",
+          "desktop/src-tauri/nsis/webview2-health.nsh",
+          "distribution/tests/test_desktop_edition_coexistence.py"
+        ]
+      },
       "evidence": {
         "labArtifactSourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
         "artifactSha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
         "freshInstall": "passed",
         "nativeQuiesceDirectSequence": "passed-recover-begin-status-end",
         "sameVersionUpdate": "failed-exit-2",
-        "failedAttemptMayBeDeletedOrRelabeled": false
+        "failedAttemptMayBeDeletedOrRelabeled": false,
+        "installerIdentitySourceVerified": true,
+        "installerLifecycleExecutedForIdentityDonor": false
       },
       "candidatePaths": [
         "desktop/src-tauri/nsis/installer.nsi",
+        "desktop/src-tauri/nsis/edition-identity.nsh",
+        "desktop/src-tauri/nsis/installer-languages.nsh",
         "desktop/src-tauri/nsis/runtime-mode.nsh",
         "desktop/src-tauri/nsis/webview2-health.nsh",
         "desktop/src-tauri/src/installer_handoff.rs",
@@ -177,7 +210,7 @@
     }
   ],
   "labRecovery": {
-    "nextStep": "keep the exact brand and NSIS donors frozen, then wait for exact Universal auth, runtime, updater, and edition-safety fixture donors before requesting a new gated Lab build",
+    "nextStep": "keep the exact brand, coexistence, NSIS identity, and quiesce donors frozen, then wait for exact Universal auth, runtime, updater, and edition-safety fixture donors before requesting a new gated Lab build",
     "rebuildAuthorizedByThisRequest": false,
     "installAuthorizedByThisRequest": false,
     "frozenArtifactMayBecomeFinalWithoutRebuild": false

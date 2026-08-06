@@ -107,7 +107,7 @@ assert.equal(
 );
 assert.deepEqual(brandManifest.theme.palette, ["#A7E84A", "#20C77A", "#087E69"]);
 assert.equal(brandManifest.theme.grantsHardwareAuthority, false);
-assert.equal(tauriOverlay.productName, brandManifest.displayName);
+assert.equal(tauriOverlay.productName, "DroneDream-Lab");
 assert.equal(tauriOverlay.app.windows[0].title, brandManifest.displayName);
 
 for (const asset of brandManifest.assets) {

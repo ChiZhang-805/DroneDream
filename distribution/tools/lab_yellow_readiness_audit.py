@@ -300,7 +300,9 @@ def _brand_state() -> dict[str, Any]:
         and theme.get("palette") == ["#A7E84A", "#20C77A", "#087E69"]
         and theme.get("grantsHardwareAuthority") is False
         and all(ref["matchesManifest"] for ref in refs)
-        and overlay.get("productName") == "DroneDream · LAB"
+        and overlay.get("productName") == "DroneDream-Lab"
+        and overlay.get("app", {}).get("windows", [{}])[0].get("title")
+        == "DroneDream · LAB"
         and overlay.get("bundle", {}).get("icon") == expected_icons
         and isinstance(integration, dict)
         and integration.get("application")

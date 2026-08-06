@@ -52,6 +52,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         != "distribution/editions/lab/brand-source-manifest.v1.json"
         or authority.get("websiteExactExeHandoff")
         != "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json"
+        or authority.get("desktopEditionCoexistence")
+        != "distribution/desktop/edition-coexistence.v1.json"
         or authority.get("coexistenceAndAuth")
         != "distribution/editions/lab/coexistence-and-auth.v1.json"
         or authority.get("universalDonorRequests")
@@ -363,8 +365,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
     ):
         raise LabPreviewContractError("Lab preview frontend boundary drifted")
 
-    if overlay.get("productName") != "DroneDream · LAB":
-        raise LabPreviewContractError("Lab Tauri overlay must create a distinct product name")
+    if overlay.get("productName") != "DroneDream-Lab":
+        raise LabPreviewContractError("Lab Tauri overlay must use its internal installer identity")
     if overlay.get("identifier") == "io.dronedream.desktop":
         raise LabPreviewContractError("Lab Tauri overlay must not reuse the base app identifier")
     resources = overlay.get("bundle", {}).get("resources", {}) if isinstance(overlay.get("bundle"), dict) else {}
@@ -382,6 +384,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "../../distribution/editions/lab/brand-source-manifest.v1.json",
         "../../distribution/editions/lab/coexistence-and-auth.v1.json",
         "../../distribution/editions/lab/universal-donor-requests.v1.json",
+        "../../distribution/desktop/edition-coexistence.v1.json",
+        "../../distribution/schemas/desktop-edition-coexistence.schema.json",
         "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
         "../../brand/generated/lab/lockup-compact.png",
         "../../brand/brand-editions.v1.json",
@@ -429,6 +433,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         '$tauriOverlayPath = Join-Path $repoRoot "desktop\\src-tauri\\tauri.lab-preview.conf.json"',
         'Get-Content -LiteralPath $tauriOverlayPath -Raw -Encoding UTF8',
         '$tauriProductName = [string]$tauriOverlay.productName',
+        '$tauriDisplayName = [string]$tauriOverlay.app.windows[0].title',
         'brand-source-manifest.v1.json',
         'canonicalDonor = New-RepoFileRef "brand\\brand-editions.v1.json"',
         'websiteHandoffContract = New-RepoFileRef "distribution\\schemas\\lab-website-exact-exe-handoff.schema.json"',

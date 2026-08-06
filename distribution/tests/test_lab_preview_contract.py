@@ -82,7 +82,7 @@ class LabPreviewContractTests(unittest.TestCase):
             ),
         )
 
-    def test_lab_build_reads_unicode_product_name_from_utf8_overlay(self) -> None:
+    def test_lab_build_separates_internal_product_and_unicode_display_names(self) -> None:
         script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(
             encoding="utf-8"
         )
@@ -91,6 +91,11 @@ class LabPreviewContractTests(unittest.TestCase):
             script,
         )
         self.assertIn("$tauriProductName = [string]$tauriOverlay.productName", script)
+        self.assertIn(
+            "$tauriDisplayName = [string]$tauriOverlay.app.windows[0].title",
+            script,
+        )
+        self.assertIn("displayName = $tauriDisplayName", script)
         self.assertNotIn('"DroneDream · LAB"', script)
 
     def test_lab_build_writes_python_compatible_receipt_bytes(self) -> None:

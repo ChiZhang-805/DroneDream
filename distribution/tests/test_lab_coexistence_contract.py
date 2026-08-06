@@ -33,6 +33,10 @@ class LabCoexistenceContractTests(unittest.TestCase):
         self.assertTrue(result["contractReady"])
         self.assertFalse(result["releaseReady"])
         self.assertEqual(result["labIdentity"]["productName"], "DroneDream · LAB")
+        self.assertEqual(
+            result["labIdentity"]["installerProductName"],
+            "DroneDream-Lab",
+        )
         self.assertEqual(result["universalDonorRequestCount"], 4)
         contract = coexistence._load_json(coexistence.CONTRACT_PATH)
         self.assertEqual(
@@ -65,6 +69,16 @@ class LabCoexistenceContractTests(unittest.TestCase):
         contract["identities"][2]["productName"] = "DroneDream · FIELD"
         inputs[0] = contract
         with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "productName"):
+            coexistence.validate_contract(*inputs)
+
+        inputs = list(load_inputs())
+        contract = copy.deepcopy(inputs[0])
+        contract["identities"][2]["installerProductName"] = "DroneDream-Field"
+        inputs[0] = contract
+        with self.assertRaisesRegex(
+            coexistence.LabCoexistenceContractError,
+            "installerProductName",
+        ):
             coexistence.validate_contract(*inputs)
 
     def test_rejects_cross_edition_updater_channel(self) -> None:

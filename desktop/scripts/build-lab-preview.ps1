@@ -102,6 +102,10 @@ $tauriProductName = [string]$tauriOverlay.productName
 if (-not $tauriProductName) {
     throw "The Lab Tauri overlay productName is missing."
 }
+$tauriDisplayName = [string]$tauriOverlay.app.windows[0].title
+if (-not $tauriDisplayName) {
+    throw "The Lab Tauri overlay display title is missing."
+}
 $artifactPath = Join-Path $outputRootFull $artifactName
 $receiptPath = Join-Path $outputRootFull "lab-preview-receipt.json"
 
@@ -196,7 +200,7 @@ $receipt = [ordered]@{
     profile = New-RepoFileRef "distribution\build-profiles\lab-preview.v1.json"
     websiteHandoffContract = New-RepoFileRef "distribution\schemas\lab-website-exact-exe-handoff.schema.json"
     brand = [ordered]@{
-        displayName = $tauriProductName
+        displayName = $tauriDisplayName
         canonicalDonor = New-RepoFileRef "brand\brand-editions.v1.json"
         sourceManifest = New-RepoFileRef "distribution\editions\lab\brand-source-manifest.v1.json"
         mark = New-RepoFileRef "distribution\editions\lab\assets\dronedream-lab-mark-v2.png"
