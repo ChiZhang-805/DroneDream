@@ -32,7 +32,7 @@
     },
     {
       "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
-      "sha256": "c6f99b0b6627703030aef0637e68a045ccda7fd4aa28ccb0c2c4b3d430c4dfaa",
+      "sha256": "daa73c6e7f6ea4e4cc05fda1c8602ef358d5e42e7daabf711d357144c600cbfa",
       "coverage": ["runtime-external", "rollback", "fresh-install", "overlay-upgrade", "uninstall"]
     },
     {

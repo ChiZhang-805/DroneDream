@@ -10,7 +10,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-OBSERVED_HEAD = "528ecf39ef7c4f2a85b88af73a76057f87184e35"
+OBSERVED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+OBSERVED_TREE = "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d"
 BRAND_PRODUCT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
 
 EXACT_GROUPS = {
@@ -19,7 +20,6 @@ EXACT_GROUPS = {
         "distribution/tools/desktop_edition_coexistence.py",
     ),
     "8a8ad6ce0ea619a52ec087b7f55142c24311165a": (
-        "desktop/scripts/verify-nsis-template.ps1",
         "desktop/src-tauri/nsis/edition-identity.nsh",
         "desktop/src-tauri/nsis/installer-languages.nsh",
         "desktop/src-tauri/nsis/installer.nsi",
@@ -29,7 +29,6 @@ EXACT_GROUPS = {
         "distribution/tests/test_desktop_edition_coexistence.py",
     ),
     "6355aad351370178a7171b504a5d2f235fb12ceb": (
-        "distribution/desktop/edition-browser-auth.v1.json",
         "distribution/schemas/desktop-edition-browser-auth.schema.json",
         "distribution/tests/test_desktop_edition_browser_auth.py",
         "distribution/tools/desktop_edition_browser_auth.py",
@@ -74,6 +73,16 @@ EXACT_GROUPS = {
         "desktop/src-tauri/tauri.conf.json",
         "desktop/src-tauri/tauri.universal.conf.json",
         "distribution/tests/test_shared_windows_build_contract.py",
+    ),
+    "c322cda1c968d15b09e8ac93364f885777b619e8": (
+        "distribution/desktop/edition-browser-auth.v1.json",
+    ),
+    "b099ed00923e9f2b833f812ad79f1614529038de": (
+        "desktop/src-tauri/nsis/runtime-mode.nsh",
+        "desktop/src-tauri/src/installer_handoff.rs",
+    ),
+    OBSERVED_HEAD: (
+        "desktop/scripts/verify-nsis-template.ps1",
     ),
 }
 
@@ -147,7 +156,12 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     _require(document.get("editionId") == "sim", "editionId must be sim")
     source = document.get("source", {})
     _require(source.get("observedHead") == OBSERVED_HEAD, "observed head drifted")
-    _require(source.get("observedHeadIsEvidenceOnly") is True, "evidence head relabelled")
+    _require(source.get("observedTree") == OBSERVED_TREE, "observed tree drifted")
+    _require(source.get("observedHeadIsEvidenceOnly") is False, "product head relabelled")
+    _require(
+        source.get("observedHeadUsedAsWholeProductSource") is False,
+        "whole Universal head overclaim",
+    )
     _require(source.get("evidenceCommitUsedAsProductSource") is False, "evidence overclaim")
     observed_head_is_ancestor = subprocess.run(
         [
@@ -164,7 +178,11 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     ).returncode == 0
     _require(
         observed_head_is_ancestor,
-        "observed Universal evidence head is not reachable from its branch",
+        "observed Universal product head is not reachable from its branch",
+    )
+    _require(
+        _git(root, "show", "-s", "--format=%T", OBSERVED_HEAD) == OBSERVED_TREE,
+        "observed Universal tree identity drifted",
     )
 
     brand_paths = _brand_paths(root)
@@ -172,13 +190,13 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     for path in brand_paths:
         _validate_exact_path(root, BRAND_PRODUCT, path)
     common_paths = [path for paths in EXACT_GROUPS.values() for path in paths]
-    _require(len(common_paths) == len(set(common_paths)) == 45, "common path inventory drifted")
+    _require(len(common_paths) == len(set(common_paths)) == 47, "common path inventory drifted")
     for commit, paths in EXACT_GROUPS.items():
         for path in paths:
             _validate_exact_path(root, commit, path)
     path_sync = document.get("pathSync", {})
     _require(path_sync.get("canonicalBrandPathCount") == 94, "brand count receipt drifted")
-    _require(path_sync.get("exactCommonPathCount") == 45, "common count receipt drifted")
+    _require(path_sync.get("exactCommonPathCount") == 47, "common count receipt drifted")
     _require(path_sync.get("unrelatedBenchmarkPathsAdopted") is False, "Benchmark overclaim")
     _require(path_sync.get("hardwareAuthorityGranted") is False, "hardware authority overclaim")
 
@@ -234,42 +252,122 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     ):
         _require(required in adapter, f"SIM auth adapter drifted: {required}")
 
-    blockers = document.get("upstreamBlockers", [])
-    _require([item.get("id") for item in blockers] == [
-        "AUTH-COEXISTENCE-SHA-DRIFT",
-        "NSIS-RUNTIME-MODE-DONOR-OMITTED",
-    ], "upstream blockers drifted")
+    corrections = document.get("corrections", {})
+    auth_correction = corrections.get("authBinding", {})
+    _require(
+        auth_correction == {
+            "sourceCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+            "path": "distribution/desktop/edition-browser-auth.v1.json",
+            "blob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+            "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+            "identityBindingContractSha256": (
+                "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a"
+            ),
+        },
+        "auth correction receipt drifted",
+    )
     coexistence_sha = _sha256(root / "distribution/desktop/edition-coexistence.v1.json")
     auth = json.loads(
         (root / "distribution/desktop/edition-browser-auth.v1.json").read_text(encoding="utf-8")
     )
     _require(
-        blockers[0].get("boundCoexistenceSha256")
-        == auth.get("identityBinding", {}).get("contractSha256"),
-        "auth bound SHA receipt drifted",
+        auth_correction["identityBindingContractSha256"]
+        == auth.get("identityBinding", {}).get("contractSha256")
+        == coexistence_sha,
+        "auth binding correction is not exact",
+    )
+
+    runtime_correction = corrections.get("runtimeModeAtomicReview", {})
+    _require(
+        runtime_correction.get("sourceCommit")
+        == "b099ed00923e9f2b833f812ad79f1614529038de",
+        "runtime correction source drifted",
     )
     _require(
-        blockers[0].get("currentCoexistenceSha256") == coexistence_sha,
-        "coexistence SHA receipt drifted",
+        runtime_correction.get("exactTreeCommit") == OBSERVED_HEAD,
+        "runtime correction exact tree drifted",
+    )
+    expected_runtime_rows = {
+        "desktop/scripts/verify-nsis-template.ps1": (
+            "0e1d94e8de358057cfd0d95bcc0ae332f8d71cf1",
+            "d23770d685b3ac41679857e37d3c5e127929ad14b5eef5fc80de139f4dc83432",
+        ),
+        "desktop/src-tauri/nsis/runtime-mode.nsh": (
+            "9af1787fa8607e725c4495fa14a5763de781a5a3",
+            "daa73c6e7f6ea4e4cc05fda1c8602ef358d5e42e7daabf711d357144c600cbfa",
+        ),
+        "desktop/src-tauri/src/installer_handoff.rs": (
+            "d6ed51beb4730264c835d0b77f10cd14ee448b89",
+            "cee0a2cd6bbf889ed07951cfc640e52cb70dee91239237b77c5cec897e2e1663",
+        ),
+    }
+    rows = runtime_correction.get("paths", [])
+    _require(len(rows) == 3, "runtime correction path count drifted")
+    for row in rows:
+        path = row.get("path")
+        _require(path in expected_runtime_rows, "runtime correction path drifted")
+        blob, sha256 = expected_runtime_rows[path]
+        _require(row.get("blob") == blob, f"runtime correction blob drifted: {path}")
+        _require(row.get("sha256") == sha256, f"runtime correction SHA drifted: {path}")
+        _require(_git(root, "hash-object", "--", path) == blob, f"runtime blob drifted: {path}")
+        _require(_sha256(root / path) == sha256, f"runtime bytes drifted: {path}")
+
+    blockers = document.get("upstreamBlockers", [])
+    _require(
+        len(blockers) == 1
+        and blockers[0].get("id") == "AUTH-CONTRACT-VERIFIER-DONOR-OMITTED",
+        "upstream auth verifier blocker drifted",
+    )
+    blocker = blockers[0]
+    _require(blocker.get("owner") == "codex/software", "auth blocker owner drifted")
+    _require(
+        blocker.get("contractSourceCommit")
+        == "c322cda1c968d15b09e8ac93364f885777b619e8",
+        "auth blocker contract source drifted",
     )
     _require(
-        blockers[0]["boundCoexistenceSha256"] != coexistence_sha,
-        "auth blocker silently resolved",
+        blocker.get("observedVerifierCommit")
+        == "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
+        "auth blocker observed verifier source drifted",
     )
-    runtime_path = blockers[1]["path"]
+    expected_observed = {
+        "distribution/schemas/desktop-edition-browser-auth.schema.json": (
+            "e128362bf6ec2f71ed20e4ccb7c7843a63334de8",
+            "57087ee0f3bd5d3f9fd99d69fbcf8a29b6d4b09e",
+        ),
+        "distribution/tools/desktop_edition_browser_auth.py": (
+            "03dfc8f00ec3b487df65c173c105ce2738f57e8a",
+            "be2d864e7cd8db2c3a5788f515364c7cb0517bbf",
+        ),
+        "distribution/tests/test_desktop_edition_browser_auth.py": (
+            "52815b8a755d87551c786ec81b84ddb8a7070a52",
+            "4a922be5189e7690b5bf1da4f21ed649ede292f9",
+        ),
+    }
+    observed_rows = blocker.get("observedNotAdoptedPaths", [])
+    _require(len(observed_rows) == 3, "auth blocker path count drifted")
+    for row in observed_rows:
+        path = row.get("path")
+        _require(path in expected_observed, "auth blocker path drifted")
+        current_blob, observed_blob = expected_observed[path]
+        _require(row.get("currentBlob") == current_blob, f"auth current blob drifted: {path}")
+        _require(row.get("observedBlob") == observed_blob, f"auth observed blob drifted: {path}")
+        _require(
+            _git(root, "hash-object", "--", path) == current_blob,
+            f"auth path drifted: {path}",
+        )
+        _require(
+            _git(root, "rev-parse", f"{OBSERVED_HEAD}:{path}") == observed_blob,
+            f"observed auth path drifted: {path}",
+        )
     _require(
-        _git(root, "hash-object", "--", runtime_path)
-        == blockers[1]["currentBlob"],
-        "runtime blocker drifted",
-    )
-    _require(
-        blockers[1]["currentBlob"] != blockers[1]["requiredObservedBlob"],
-        "runtime blocker silently resolved",
+        blocker.get("simMayImportWithoutExactHandoff") is False,
+        "auth handoff boundary drifted",
     )
 
     verification = document.get("verification", {})
     for key, value in verification.items():
-        expected = key not in {"authContractBindingPassed", "nsisTemplateGatePassed"}
+        expected = key != "authContractSuitePassed"
         _require(value is expected, f"verification claim drifted: {key}")
     classification = document.get("commonCoreClassification", {})
     _require(classification.get("baselineUpdated") is False, "commonCore update overclaim")
@@ -283,10 +381,9 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "execution overclaim",
     )
     non_claims = document.get("nonClaims", {})
-    _require(
-        non_claims and all(value is False for value in non_claims.values()),
-        "release overclaim",
-    )
+    expected_validated = {"nsisTemplateValidated"}
+    for key, value in non_claims.items():
+        _require(value is (key in expected_validated), f"release overclaim: {key}")
     return document
 
 
@@ -302,7 +399,7 @@ def main() -> int:
             {
                 "valid": True,
                 "brandPaths": 94,
-                "commonPaths": 45,
+                "commonPaths": 47,
                 "yellow2Ready": False,
             },
             sort_keys=True,

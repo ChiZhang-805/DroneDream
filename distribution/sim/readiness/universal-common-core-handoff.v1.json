@@ -3,17 +3,19 @@
   "kind": "dronedream-sim-universal-common-core-handoff",
   "receiptVersion": "1.0.0",
   "editionId": "sim",
-  "state": "green-path-sync-complete-upstream-contract-blocked",
+  "state": "green-path-sync-complete-upstream-auth-verifier-blocked",
   "source": {
     "branch": "origin/codex/software",
-    "observedHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
-    "observedHeadIsEvidenceOnly": true,
+    "observedHead": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "observedTree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d",
+    "observedHeadIsEvidenceOnly": false,
+    "observedHeadUsedAsWholeProductSource": false,
     "brandBaseCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
     "brandProductCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
     "brandEvidenceCommit": "7482647f1c2fcb92f58aaef009efc99764792297",
     "coexistenceContractCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
     "coexistenceImplementationCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
-    "authContractCommit": "6355aad351370178a7171b504a5d2f235fb12ceb",
+    "authContractCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
     "authImplementationCommit": "2f1dbc5fef092ae4cf58366e1178684672ae26c2",
     "credentialVaultCommit": "bed637c726462e1a38b74eba46915543d007869d",
     "authAuditCommit": "4c779b7ca316c0953f94f7ef3f4f850881ef2d58",
@@ -21,12 +23,13 @@
     "runtimeOwnershipCommit": "8a0828c258782fa77506ee32c7c016e5b18ad292",
     "updaterProductCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
     "updaterEvidenceCommit": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+    "runtimeModeFixCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
     "wholeLineageMerged": false,
     "evidenceCommitUsedAsProductSource": false
   },
   "pathSync": {
     "canonicalBrandPathCount": 94,
-    "exactCommonPathCount": 45,
+    "exactCommonPathCount": 47,
     "simSemanticAdapterPath": "frontend/src/pages/DesktopSetup.tsx",
     "unrelatedBenchmarkPathsAdopted": false,
     "hardwareAuthorityGranted": false
@@ -60,31 +63,71 @@
     "updaterStaticGatePassed": true,
     "offlineBrowserAuthConfigGatePassed": true,
     "cargoFormatCheckPassed": true,
-    "authContractBindingPassed": false,
-    "nsisTemplateGatePassed": false
+    "authContractBindingPassed": true,
+    "authContractSuitePassed": false,
+    "nsisTemplateGatePassed": true
+  },
+  "corrections": {
+    "authBinding": {
+      "sourceCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+      "path": "distribution/desktop/edition-browser-auth.v1.json",
+      "blob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+      "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+      "identityBindingContractSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a"
+    },
+    "runtimeModeAtomicReview": {
+      "sourceCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
+      "exactTreeCommit": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+      "paths": [
+        {
+          "path": "desktop/scripts/verify-nsis-template.ps1",
+          "blob": "0e1d94e8de358057cfd0d95bcc0ae332f8d71cf1",
+          "sha256": "d23770d685b3ac41679857e37d3c5e127929ad14b5eef5fc80de139f4dc83432"
+        },
+        {
+          "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
+          "blob": "9af1787fa8607e725c4495fa14a5763de781a5a3",
+          "sha256": "daa73c6e7f6ea4e4cc05fda1c8602ef358d5e42e7daabf711d357144c600cbfa"
+        },
+        {
+          "path": "desktop/src-tauri/src/installer_handoff.rs",
+          "blob": "d6ed51beb4730264c835d0b77f10cd14ee448b89",
+          "sha256": "cee0a2cd6bbf889ed07951cfc640e52cb70dee91239237b77c5cec897e2e1663"
+        }
+      ]
+    }
   },
   "upstreamBlockers": [
     {
-      "id": "AUTH-COEXISTENCE-SHA-DRIFT",
+      "id": "AUTH-CONTRACT-VERIFIER-DONOR-OMITTED",
       "owner": "codex/software",
-      "contractPath": "distribution/desktop/edition-browser-auth.v1.json",
-      "boundCoexistenceSha256": "1af65a86d4f77add7d16d21fe257b7052cb5138de68b6eb3f111f0a32d17bd38",
-      "currentCoexistenceSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
-      "simMayPatchCommonContract": false
-    },
-    {
-      "id": "NSIS-RUNTIME-MODE-DONOR-OMITTED",
-      "owner": "codex/software",
-      "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
-      "currentBlob": "d33b2c059cf7f076fcda94011ff7d86a2601d0ab",
-      "requiredObservedBlob": "9af1787fa8607e725c4495fa14a5763de781a5a3",
-      "simMayImportUnlistedParentCommit": false
+      "contractSourceCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+      "observedVerifierCommit": "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
+      "reason": "The corrected contract changes callback and registered-port semantics, while the handed-off 6355 verifier still enforces the superseded callback template.",
+      "observedNotAdoptedPaths": [
+        {
+          "path": "distribution/schemas/desktop-edition-browser-auth.schema.json",
+          "currentBlob": "e128362bf6ec2f71ed20e4ccb7c7843a63334de8",
+          "observedBlob": "57087ee0f3bd5d3f9fd99d69fbcf8a29b6d4b09e"
+        },
+        {
+          "path": "distribution/tools/desktop_edition_browser_auth.py",
+          "currentBlob": "03dfc8f00ec3b487df65c173c105ce2738f57e8a",
+          "observedBlob": "be2d864e7cd8db2c3a5788f515364c7cb0517bbf"
+        },
+        {
+          "path": "distribution/tests/test_desktop_edition_browser_auth.py",
+          "currentBlob": "52815b8a755d87551c786ec81b84ddb8a7070a52",
+          "observedBlob": "4a922be5189e7690b5bf1da4f21ed649ede292f9"
+        }
+      ],
+      "simMayImportWithoutExactHandoff": false
     }
   ],
   "commonCoreClassification": {
     "recordedCommonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
     "recordedCommonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
-    "candidateProductCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "candidateProductCommit": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
     "baselineUpdated": false,
     "candidateClaimedAsValidatedCommonCore": false
   },
@@ -101,7 +144,7 @@
   },
   "nonClaims": {
     "authContractValidated": false,
-    "nsisTemplateValidated": false,
+    "nsisTemplateValidated": true,
     "lifecycleValidated": false,
     "websiteHandoffReady": false,
     "releaseReady": false

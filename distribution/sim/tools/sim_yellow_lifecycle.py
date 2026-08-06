@@ -441,7 +441,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         or plan["executionClass"]
         != "GREEN-static-integration-blocked-yellow2-not-authorized"
         or plan["state"]
-        != "common-core-sync-blocked-awaiting-auth-binding-and-nsis-runtime-donor"
+        != "common-core-sync-blocked-awaiting-auth-verifier-donor"
     ):
         raise SimYellowLifecycleError("Sim YELLOW execution plan identity drifted")
 
@@ -737,7 +737,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         (
             "installerSurfaceContract",
             "distribution/sim/desktop/installer-surface-contract.v1.json",
-            "0e5e717e3b3e36a1147a4ac9f753e1b0349aa31728f7e2afb84342bca35a4c3d",
+            "fb94b2529d686bd66b25e8a0ba967e384fda3174bfe716379995ecd4a774e32a",
         ),
         (
             "websiteHandoffContract",

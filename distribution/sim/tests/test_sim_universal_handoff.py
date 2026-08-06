@@ -26,25 +26,37 @@ class SimUniversalHandoffTests(unittest.TestCase):
     def test_exact_handoff_and_sim_adapter_validate(self) -> None:
         receipt = validate_handoff(load_receipt(), ROOT)
         self.assertEqual(receipt["pathSync"]["canonicalBrandPathCount"], 94)
-        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 45)
+        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 47)
         self.assertFalse(receipt["execution"]["buildAuthorized"])
 
-    def test_evidence_head_cannot_be_relabelled_product_source(self) -> None:
+    def test_observed_head_cannot_be_relabelled_whole_product_source(self) -> None:
         receipt = load_receipt()
-        receipt["source"]["evidenceCommitUsedAsProductSource"] = True
-        with self.assertRaisesRegex(SimUniversalHandoffError, "evidence overclaim"):
+        receipt["source"]["observedHeadUsedAsWholeProductSource"] = True
+        with self.assertRaisesRegex(SimUniversalHandoffError, "whole Universal head"):
             validate_handoff(receipt, ROOT)
 
-    def test_auth_binding_blocker_cannot_be_hidden(self) -> None:
+    def test_auth_binding_correction_cannot_be_hidden(self) -> None:
         receipt = load_receipt()
-        receipt["verification"]["authContractBindingPassed"] = True
+        receipt["verification"]["authContractBindingPassed"] = False
         with self.assertRaisesRegex(SimUniversalHandoffError, "verification claim"):
             validate_handoff(receipt, ROOT)
 
-    def test_nsis_parent_chain_blocker_cannot_be_hidden(self) -> None:
+    def test_nsis_runtime_correction_cannot_be_hidden(self) -> None:
         receipt = load_receipt()
-        receipt["verification"]["nsisTemplateGatePassed"] = True
+        receipt["verification"]["nsisTemplateGatePassed"] = False
         with self.assertRaisesRegex(SimUniversalHandoffError, "verification claim"):
+            validate_handoff(receipt, ROOT)
+
+    def test_auth_verifier_blocker_cannot_be_hidden(self) -> None:
+        receipt = load_receipt()
+        receipt["upstreamBlockers"] = []
+        with self.assertRaisesRegex(SimUniversalHandoffError, "auth verifier blocker"):
+            validate_handoff(receipt, ROOT)
+
+    def test_runtime_atomic_path_drift_is_rejected(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["runtimeModeAtomicReview"]["paths"][0]["blob"] = "0" * 40
+        with self.assertRaisesRegex(SimUniversalHandoffError, "runtime correction blob"):
             validate_handoff(receipt, ROOT)
 
     def test_common_core_candidate_cannot_be_claimed_validated(self) -> None:

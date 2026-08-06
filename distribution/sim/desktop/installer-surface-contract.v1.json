@@ -126,7 +126,7 @@
   },
   "lifecycleReadiness": {
     "path": "distribution/sim/lifecycle/sim-preview-1.0.0-2aec69e.install-readiness-audit.v1.json",
-    "sha256": "9668e88ea3df634f874ef55cccd2d84969585b323a254045deadb467b24800de",
+    "sha256": "35b7b03ba99af23c8a7683a8d709fbbe6a702b36c1eb59f98394cbad2a3dbb7e",
     "requiredPlannedScenarios": [
       "freshInstall",
       "overlayUpgrade",
