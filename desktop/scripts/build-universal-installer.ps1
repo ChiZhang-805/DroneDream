@@ -1,0 +1,281 @@
+param(
+    [switch]$Build,
+    [string]$OutputRoot,
+    [string]$CargoTargetDir,
+    [string]$LlvmRoot
+)
+
+$ErrorActionPreference = "Stop"
+
+function Invoke-GitText([string[]]$Arguments) {
+    $output = (& git -C $repoRoot @Arguments | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw "git $($Arguments -join ' ') failed"
+    }
+    return $output
+}
+
+function Get-FileSha256Lower([string]$Path) {
+    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+}
+
+function New-RepoFileRef([string]$RelativePath) {
+    $path = Join-Path $repoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Required Universal build input is missing: $RelativePath"
+    }
+    return [ordered]@{
+        path = $RelativePath.Replace('\', '/')
+        sha256 = Get-FileSha256Lower $path
+    }
+}
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$sourceCommit = Invoke-GitText @("rev-parse", "--verify", "HEAD")
+if ($sourceCommit -cnotmatch "^[0-9a-f]{40}$") {
+    throw "Unable to freeze an exact Universal source commit."
+}
+$branch = Invoke-GitText @("branch", "--show-current")
+if ($branch -cne "codex/software") {
+    throw "Universal builds must run from codex/software."
+}
+$sourceStatus = Invoke-GitText @("status", "--porcelain=v1", "--untracked-files=all")
+if ($sourceStatus) {
+    throw "Universal builds require an exact clean source tree."
+}
+
+$profilePath = Join-Path $repoRoot "distribution\build-profiles\universal-1.0.0.v1.json"
+$overlayPath = Join-Path $repoRoot "desktop\src-tauri\tauri.universal.conf.json"
+$profile = Get-Content -LiteralPath $profilePath -Raw -Encoding UTF8 | ConvertFrom-Json
+$overlay = Get-Content -LiteralPath $overlayPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
+    $overlay.productName -cne "DroneDream-Universal" -or
+    $profile.enginePackProfile -cne "unified-sim-lab" -or
+    $profile.brand.presentationOnly -ne $true -or
+    $profile.brand.grantsHardwareAuthority -ne $false -or
+    $profile.capabilityAuthority.frontendCanAuthorize -ne $false -or
+    $profile.capabilityAuthority.hardwareActionDecision -cne "deny") {
+    throw "Universal build identity or safety policy drifted."
+}
+
+if (-not $CargoTargetDir) {
+    $CargoTargetDir = Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache\universal-cargo-target"
+}
+$cargoTargetFull = [IO.Path]::GetFullPath($CargoTargetDir)
+$repositoryTargetFull = [IO.Path]::GetFullPath((Join-Path $repoRoot "desktop\src-tauri\target"))
+if ($cargoTargetFull.StartsWith($repositoryTargetFull, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Universal builds must not write the large Cargo target into the repository."
+}
+
+if (-not $OutputRoot) {
+    $OutputRoot = Join-Path $env:LOCALAPPDATA (
+        "DroneDream\handoffs\universal-1.0.0-{0}" -f $sourceCommit.Substring(0, 7)
+    )
+}
+$outputRootFull = [IO.Path]::GetFullPath($OutputRoot)
+$artifactName = "DroneDream-Universal-1.0.0.exe"
+$artifactPath = Join-Path $outputRootFull $artifactName
+$checksumPath = "${artifactPath}.sha256"
+$signaturePath = "${artifactPath}.sig"
+$buildReceiptPath = "${artifactPath}.receipt.json"
+$manifestPath = Join-Path $outputRootFull "handoff-manifest.json"
+
+if (-not $Build) {
+    [ordered]@{
+        sourceCommit = $sourceCommit
+        branch = $branch
+        artifactFileName = $artifactName
+        profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
+        overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
+        websiteHandoff = New-RepoFileRef "distribution\universal\release\website-exact-exe-handoff.v1.json"
+        enginePackProfile = "unified-sim-lab"
+        enginePackPayloadContract = "dronedream-universal-engine-payload/v1"
+        workspaceModes = @("universal", "sim", "lab", "field")
+        presentationSwitchGrantsAuthority = $false
+        validatedVehiclePackCount = 0
+        hardwareActionDecision = "deny"
+        buildInvoked = $false
+    } | ConvertTo-Json -Depth 6
+    exit 0
+}
+
+if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PATH -or
+    -not (Test-Path -LiteralPath $env:TAURI_SIGNING_PRIVATE_KEY_PATH -PathType Leaf)) {
+    throw "Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH."
+}
+if (Test-Path -LiteralPath $outputRootFull) {
+    throw "Refusing to replace an existing Universal handoff directory: $outputRootFull"
+}
+
+$env:CARGO_TARGET_DIR = $cargoTargetFull
+$env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $sourceCommit
+$env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"
+$env:VITE_DRONEDREAM_EDITION = "universal"
+
+if ($LlvmRoot) {
+    & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
+        -AdditionalConfigPath $overlayPath `
+        -CargoTargetDir $cargoTargetFull `
+        -LlvmRoot $LlvmRoot `
+        -ExpectedProductName ([string]$overlay.productName) `
+        -PreserveBundleHistory
+} else {
+    & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
+        -AdditionalConfigPath $overlayPath `
+        -CargoTargetDir $cargoTargetFull `
+        -ExpectedProductName ([string]$overlay.productName) `
+        -PreserveBundleHistory
+}
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
+$postBuildCommit = Invoke-GitText @("rev-parse", "--verify", "HEAD")
+$postBuildStatus = Invoke-GitText @("status", "--porcelain=v1", "--untracked-files=all")
+if ($postBuildCommit -cne $sourceCommit -or $postBuildStatus) {
+    throw "Universal source changed while building."
+}
+
+$bundleDirectory = Join-Path $cargoTargetFull "x86_64-pc-windows-gnullvm\release\bundle\nsis"
+$candidatePath = Join-Path $bundleDirectory "DroneDream-Universal_1.0.0_x64-setup.exe"
+$candidateSignaturePath = "${candidatePath}.sig"
+if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $candidateSignaturePath -PathType Leaf)) {
+    throw "Universal build completed without the NSIS installer and updater signature pair."
+}
+
+$engineManifestCandidates = @(Get-ChildItem -LiteralPath $cargoTargetFull -Recurse `
+    -Filter "engine-pack-manifest.json" -File -ErrorAction SilentlyContinue)
+$matchingEngineManifests = @()
+foreach ($candidate in $engineManifestCandidates) {
+    try {
+        $document = Get-Content -LiteralPath $candidate.FullName -Raw -Encoding UTF8 |
+            ConvertFrom-Json
+    } catch {
+        continue
+    }
+    if ($document.source.gitCommit -ceq $sourceCommit -and
+        $document.editionProfile.profileId -ceq "unified-sim-lab") {
+        $matchingEngineManifests += [pscustomobject]@{
+            Path = $candidate.FullName
+            Sha256 = Get-FileSha256Lower $candidate.FullName
+            Document = $document
+        }
+    }
+}
+if ($matchingEngineManifests.Count -eq 0) {
+    throw "The Universal build did not leave a source-bound Engine Pack manifest."
+}
+$engineManifestDigests = @($matchingEngineManifests.Sha256 | Sort-Object -Unique)
+if ($engineManifestDigests.Count -ne 1) {
+    throw "Multiple incompatible Universal Engine Pack manifests were produced."
+}
+$engineManifestMatch = $matchingEngineManifests[0]
+$enginePayloadPaths = @($engineManifestMatch.Document.files.path)
+$requiredEnginePayloadPaths = @(
+    "distribution/editions/field.v1.json",
+    "distribution/editions/lab.v1.json",
+    "distribution/editions/sim.v1.json",
+    "distribution/safety/edition-execution-gate.v1.json",
+    "distribution/vehicle-packs/registry.v1.json"
+)
+$missingEnginePayloadPaths = @($requiredEnginePayloadPaths | Where-Object {
+    $_ -notin $enginePayloadPaths
+})
+$forbiddenEnginePayloadPaths = @($enginePayloadPaths | Where-Object {
+    $_ -eq "distribution/build-planning" -or
+    $_.StartsWith("distribution/build-planning/", [StringComparison]::Ordinal) -or
+    $_ -eq "distribution/build-plans" -or
+    $_.StartsWith("distribution/build-plans/", [StringComparison]::Ordinal) -or
+    $_ -eq "distribution/tests" -or
+    $_.StartsWith("distribution/tests/", [StringComparison]::Ordinal)
+})
+if ($missingEnginePayloadPaths.Count -gt 0 -or $forbiddenEnginePayloadPaths.Count -gt 0) {
+    throw "The Universal Engine Pack payload contract failed closed."
+}
+
+New-Item -ItemType Directory -Path $outputRootFull | Out-Null
+Copy-Item -LiteralPath $candidatePath -Destination $artifactPath
+Copy-Item -LiteralPath $candidateSignaturePath -Destination $signaturePath
+$artifactSha = Get-FileSha256Lower $artifactPath
+"$artifactSha  $artifactName" | Set-Content -Encoding ascii -LiteralPath $checksumPath
+$authenticode = Get-AuthenticodeSignature -LiteralPath $artifactPath
+
+$buildReceipt = [ordered]@{
+    schemaVersion = 1
+    kind = "dronedream-universal-build-receipt"
+    sourceCommit = $sourceCommit
+    branch = $branch
+    buildCount = 1
+    productDisplayVersion = "1.0.0"
+    artifact = [ordered]@{
+        fileName = $artifactName
+        absolutePath = $artifactPath
+        bytes = (Get-Item -LiteralPath $artifactPath).Length
+        sha256 = $artifactSha
+        authenticodeStatus = [string]$authenticode.Status
+    }
+    checksum = [ordered]@{
+        absolutePath = $checksumPath
+        bytes = (Get-Item -LiteralPath $checksumPath).Length
+        sha256 = Get-FileSha256Lower $checksumPath
+    }
+    updaterSignature = [ordered]@{
+        absolutePath = $signaturePath
+        bytes = (Get-Item -LiteralPath $signaturePath).Length
+        sha256 = Get-FileSha256Lower $signaturePath
+        state = "issued"
+    }
+    profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
+    overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
+    brand = New-RepoFileRef "brand\brand-editions.v1.json"
+    enginePack = [ordered]@{
+        profileCompatibilityId = [string]$engineManifestMatch.Document.editionProfile.profileId
+        payloadContractId = "dronedream-universal-engine-payload/v1"
+        packId = [string]$engineManifestMatch.Document.packId
+        sourceCommit = [string]$engineManifestMatch.Document.source.gitCommit
+        manifestPath = [string]$engineManifestMatch.Path
+        manifestSha256 = [string]$engineManifestMatch.Sha256
+        fileCount = $enginePayloadPaths.Count
+        requiredEditionContractsPresent = $true
+        buildPlanningPayloadExcluded = $true
+    }
+    modeSwitch = [ordered]@{
+        modes = @("universal", "sim", "lab", "field")
+        presentationOnly = $true
+        grantsHardwareAuthority = $false
+    }
+    safety = [ordered]@{
+        validatedVehiclePackCount = 0
+        hardwareActionDecision = "deny"
+        requiredDecisionLayers = @("native", "backend", "runtime")
+    }
+    lifecycle = [ordered]@{
+        freshInstall = "pending-isolated-red-validation"
+        overlay = "pending-isolated-red-validation"
+        uninstall = "pending-isolated-red-validation"
+        shortcut = "pending-isolated-red-validation"
+        webView2 = "pending-isolated-red-validation"
+        locales = "pending-en-zh-red-validation"
+    }
+    releaseReady = $false
+}
+$buildReceipt | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath $buildReceiptPath
+
+$manifest = [ordered]@{
+    schemaVersion = 1
+    kind = "dronedream-universal-handoff-manifest"
+    sourceCommit = $sourceCommit
+    buildCount = 1
+    state = "built-awaiting-isolated-lifecycle-validation"
+    files = @(
+        [ordered]@{ path = $artifactPath; sha256 = $artifactSha; bytes = (Get-Item $artifactPath).Length },
+        [ordered]@{ path = $checksumPath; sha256 = Get-FileSha256Lower $checksumPath; bytes = (Get-Item $checksumPath).Length },
+        [ordered]@{ path = $signaturePath; sha256 = Get-FileSha256Lower $signaturePath; bytes = (Get-Item $signaturePath).Length },
+        [ordered]@{ path = $buildReceiptPath; sha256 = Get-FileSha256Lower $buildReceiptPath; bytes = (Get-Item $buildReceiptPath).Length }
+    )
+    releaseReady = $false
+}
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath $manifestPath
+Write-Host "Wrote source-bound Universal installer candidate to $artifactPath"
+Write-Host "Lifecycle validation remains pending; this build is not release-ready."

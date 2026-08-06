@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-installer-prebuild-failure-receipt",
+  "recordedAt": "2026-08-06T02:31:45.401Z",
+  "executionSubject": "d4f6417bed9285e60d744538a3b54397788550cc",
+  "branch": "codex/software",
+  "resourceClass": "YELLOW",
+  "requestedArtifactFileName": "DroneDream-Universal-1.0.0.exe",
+  "outcome": "failed_closed_before_cargo_tauri_nsis",
+  "failureStage": "shared-build-script-parameter-binding",
+  "failureSummary": "The Universal wrapper splatted an array of apparent named arguments positionally. The shared build script therefore received -CargoTargetDir as LlvmRoot and rejected it before Cargo, Tauri, or NSIS started.",
+  "observedErrorClass": "requested-llvm-root-does-not-exist",
+  "consumption": {
+    "cargoBuildStarted": false,
+    "tauriBuildStarted": false,
+    "nsisBuildStarted": false,
+    "installerBuildCount": 0,
+    "installerArtifactsProduced": 0,
+    "handoffOutputDirectoryCreated": false
+  },
+  "credentialBoundary": {
+    "supabasePublishableConfigurationPrinted": false,
+    "updaterPrivateKeyPrinted": false,
+    "modelApiKeysRead": false,
+    "accountCredentialsRead": false,
+    "temporaryProcessEnvironmentCleared": true
+  },
+  "safetyBoundary": {
+    "installedApplicationChanged": false,
+    "runtimeChanged": false,
+    "px4OrGazeboStarted": false,
+    "websiteOrReleaseChanged": false
+  },
+  "retryDisposition": "Fix and independently test named parameter forwarding before a new exact-source build attempt. This receipt does not authorize a retry or claim a built artifact."
+}

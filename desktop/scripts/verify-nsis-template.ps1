@@ -164,6 +164,13 @@ foreach ($required in @(
 if ($runtimeMode -notmatch '(?ms)dronedream_revalidate_without_binary:\s+.*?Push "error"\s+FunctionEnd') {
     throw "Runtime quiesce revalidation must fail closed when the old binary disappears"
 }
+if (-not $runtimeMode.Contains(
+        "      Push `"ok`"`r`n      Return`r`n    dronedream_revalidate_without_binary:"
+    ) -and -not $runtimeMode.Contains(
+        "      Push `"ok`"`n      Return`n    dronedream_revalidate_without_binary:"
+    )) {
+    throw "Runtime quiesce revalidation must return ok before the missing-binary failure label"
+}
 
 $pathGuard = Get-Content -LiteralPath $pathGuardPath -Raw
 foreach ($required in @(

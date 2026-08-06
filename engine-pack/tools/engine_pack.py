@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -17,6 +18,7 @@ import tarfile
 import tempfile
 from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
+from types import ModuleType
 from typing import Any
 
 ARCHIVE_FILENAME = "DroneDreamEnginePack.tar.gz"
@@ -27,7 +29,13 @@ SCHEMA_VERSION = 1
 ENGINE_API_VERSION = 1
 DEFAULT_EDITION_PROFILE = "unified-sim-lab"
 FIELD_EDITION_PROFILE = "field-lightweight"
-EDITION_PROFILES = {DEFAULT_EDITION_PROFILE, FIELD_EDITION_PROFILE}
+SIM_EDITION_PROFILE = "sim-only"
+SIM_PROFILE_PATH = "distribution/engine-pack-profiles/sim-only.v1.json"
+EDITION_PROFILES = {
+    DEFAULT_EDITION_PROFILE,
+    FIELD_EDITION_PROFILE,
+    SIM_EDITION_PROFILE,
+}
 RUNTIME_CONTRACT_REGISTRY_PATH = "distribution/runtime-contract-registry.v1.json"
 RUNTIME_DISTRIBUTION_BASE_PATHS = (
     "LICENSE",
@@ -63,10 +71,129 @@ IGNORED_PARTS = {"__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 IGNORED_SUFFIXES = {".pyc", ".pyo"}
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
+SIM_PROFILE_MANIFEST_KEYS = {
+    "profileId",
+    "profileVersion",
+    "profileManifestPath",
+    "profileManifestSha256",
+    "includesLargeSimulator",
+    "excludedSourcePaths",
+}
+SIM_FORBIDDEN_PAYLOAD_PATHS = {
+    "backend/app/distribution_safety.py",
+    "distribution/editions/field.v1.json",
+    "distribution/editions/lab.v1.json",
+    "distribution/runtime-contract-registry.sim-only.v1.json",
+    "distribution/safety/edition-execution-gate.v1.json",
+    "distribution/schemas/edition-execution-authorization.schema.json",
+    "distribution/schemas/edition-execution-gate-policy.schema.json",
+    "distribution/schemas/vehicle-pack-registry.schema.json",
+    "distribution/tools/edition_safety_contract.py",
+    "distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
+    "distribution/vehicle-packs/amovlab-p450-px4.v1.json",
+    "distribution/vehicle-packs/bitcraze-crazyflie-2-1-plus.v1.json",
+    "distribution/vehicle-packs/holybro-qav250-pixhawk6c-mini.v1.json",
+    "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+    "distribution/vehicle-packs/holybro-x500-v2-pixhawk6.v1.json",
+    "distribution/vehicle-packs/holybro-x650-pixhawk6.v1.json",
+    "distribution/vehicle-packs/registry.sim-only.v1.json",
+}
 
 
 class EnginePackError(RuntimeError):
     """Raised when an Engine Pack cannot be trusted."""
+
+
+def _load_module(path: Path, name: str) -> ModuleType:
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise EnginePackError(f"Engine Pack contract is unavailable: {path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_profile_contract(repository_root: Path) -> ModuleType:
+    return _load_module(
+        repository_root / "distribution/tools/engine_pack_profile_contract.py",
+        "dronedream_engine_pack_profile_contract",
+    )
+
+
+def _load_distribution_contract(repository_root: Path) -> ModuleType:
+    return _load_module(
+        repository_root / "distribution/tools/distribution_contract.py",
+        "dronedream_engine_pack_distribution_contract",
+    )
+
+
+def _load_json(path: Path, label: str) -> dict[str, Any]:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise EnginePackError(f"unable to read {label}") from error
+    if not isinstance(document, dict):
+        raise EnginePackError(f"{label} must be an object")
+    return document
+
+
+def _sim_profile(repository_root: Path) -> tuple[ModuleType, dict[str, Any]]:
+    profile_contract = _load_profile_contract(repository_root)
+    try:
+        profile = profile_contract.load_profile(repository_root)
+        profile_contract.verify_profile_files(
+            repository_root,
+            profile,
+            active_payload=False,
+        )
+    except profile_contract.EnginePackProfileError as error:
+        raise EnginePackError("Sim-only Engine Pack profile failed closed") from error
+
+    distribution_contract = _load_distribution_contract(repository_root)
+    try:
+        upstream = distribution_contract.validate_upstream_source_inventory(
+            _load_json(
+                repository_root / "distribution/upstream-sources.v1.json",
+                "upstream source inventory",
+            )
+        )
+        capability_path = repository_root / "distribution/capabilities/core-capabilities.v1.json"
+        capability = distribution_contract.validate_capability_policy(
+            _load_json(capability_path, "capability policy")
+        )
+        pack_path = repository_root / "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json"
+        pack_relative = pack_path.relative_to(repository_root).as_posix()
+        pack = distribution_contract.validate_vehicle_pack_manifest(
+            _load_json(pack_path, "X500 Vehicle Pack"),
+            upstream_inventory=upstream,
+            capability_policy_sha256=sha256_file(capability_path),
+        )
+        source_registry_path = repository_root / "distribution/vehicle-packs/registry.v1.json"
+        distribution_contract.validate_vehicle_pack_registry(
+            _load_json(
+                repository_root / "distribution/vehicle-packs/registry.sim-only.v1.json",
+                "Sim-only Vehicle Pack registry",
+            ),
+            vehicle_packs_by_path={pack_relative: pack},
+            vehicle_pack_manifest_sha256={pack_relative: sha256_file(pack_path)},
+            source_registry_document=_load_json(
+                source_registry_path,
+                "source Vehicle Pack registry",
+            ),
+            source_registry_sha256=sha256_file(source_registry_path),
+        )
+        distribution_contract.validate_edition_manifest(
+            _load_json(
+                repository_root / "distribution/editions/sim.v1.json",
+                "Sim edition",
+            ),
+            policy=capability,
+            policy_sha256=sha256_file(capability_path),
+        )
+    except distribution_contract.DistributionContractError as error:
+        raise EnginePackError("Sim-only distribution projection failed closed") from error
+    return profile_contract, profile
 
 
 def canonical_json(payload: Any) -> bytes:
@@ -169,10 +296,7 @@ def runtime_distribution_paths(repository_root: Path) -> tuple[str, ...]:
         "contractPaths",
     }:
         raise EnginePackError("Runtime contract registry fields are invalid")
-    if (
-        registry["schemaVersion"] != 1
-        or registry["kind"] != "dronedream-runtime-contract-registry"
-    ):
+    if registry["schemaVersion"] != 1 or registry["kind"] != "dronedream-runtime-contract-registry":
         raise EnginePackError("Runtime contract registry identity is unsupported")
     paths = registry["contractPaths"]
     if (
@@ -202,16 +326,15 @@ def runtime_distribution_paths(repository_root: Path) -> tuple[str, ...]:
     return combined
 
 
-def source_paths_for_profile(
-    repository_root: Path, edition_profile: str
-) -> tuple[str, ...]:
+def source_paths_for_profile(repository_root: Path, edition_profile: str) -> tuple[str, ...]:
     if edition_profile not in EDITION_PROFILES:
         raise EnginePackError(f"unsupported Engine Pack edition profile: {edition_profile}")
+    if edition_profile == SIM_EDITION_PROFILE:
+        _profile_contract, profile = _sim_profile(repository_root)
+        return tuple((*profile["sourceRoots"], *profile["directPayloadPaths"]))
     source_paths = (*SOURCE_BASE_PATHS, *runtime_distribution_paths(repository_root))
     if edition_profile == FIELD_EDITION_PROFILE:
-        return tuple(
-            path for path in source_paths if path not in FIELD_EXCLUDED_SOURCE_PATHS
-        )
+        return tuple(path for path in source_paths if path not in FIELD_EXCLUDED_SOURCE_PATHS)
     return source_paths
 
 
@@ -230,6 +353,12 @@ def production_files(
     edition_profile: str = DEFAULT_EDITION_PROFILE,
 ) -> list[tuple[str, Path]]:
     collected: dict[str, Path] = {}
+    profile_contract: ModuleType | None = None
+    profile: dict[str, Any] | None = None
+    excluded_paths: tuple[str, ...] = ()
+    if edition_profile == SIM_EDITION_PROFILE:
+        profile_contract, profile = _sim_profile(repository_root)
+        excluded_paths = tuple(profile["excludedSourcePaths"])
     for relative in source_paths_for_profile(repository_root, edition_profile):
         candidate = repository_root / relative
         if not candidate.exists():
@@ -246,11 +375,24 @@ def production_files(
             if path.suffix.lower() in IGNORED_SUFFIXES:
                 continue
             posix = inner.as_posix()
-            if is_excluded_for_profile(posix, edition_profile):
+            if is_excluded_for_profile(posix, edition_profile) or any(
+                posix == excluded or posix.startswith(f"{excluded}/") for excluded in excluded_paths
+            ):
                 continue
             if posix in collected:
                 raise EnginePackError(f"duplicate Engine Pack path: {posix}")
             collected[posix] = path
+    if profile is not None and profile_contract is not None:
+        for mapping in profile["sourceMappings"]:
+            payload_path = mapping["payloadPath"]
+            source = repository_root / mapping["sourcePath"]
+            if payload_path in collected:
+                raise EnginePackError(f"duplicate Engine Pack path: {payload_path}")
+            collected[payload_path] = source
+        try:
+            profile_contract.validate_payload_paths(profile, sorted(collected))
+        except profile_contract.EnginePackProfileError as error:
+            raise EnginePackError("Sim-only payload inventory failed closed") from error
     return sorted(collected.items())
 
 
@@ -306,13 +448,17 @@ def build_manifest(
     pins = read_pins(repository_root / "runtime" / "pins.env")
     lock = repository_root / "runtime" / "locks" / "python-requirements.lock"
     source = {"gitCommit": source_commit, "sourceDateEpoch": epoch}
-    edition_profile = {
-        "profileId": edition_profile_id,
-        "includesLargeSimulator": edition_profile_id != FIELD_EDITION_PROFILE,
-        "excludedSourcePaths": list(FIELD_EXCLUDED_SOURCE_PATHS)
-        if edition_profile_id == FIELD_EDITION_PROFILE
-        else [],
-    }
+    if edition_profile_id == SIM_EDITION_PROFILE:
+        profile_contract, profile = _sim_profile(repository_root)
+        edition_profile = profile_contract.profile_manifest_binding(profile, repository_root)
+    else:
+        edition_profile = {
+            "profileId": edition_profile_id,
+            "includesLargeSimulator": edition_profile_id != FIELD_EDITION_PROFILE,
+            "excludedSourcePaths": list(FIELD_EXCLUDED_SOURCE_PATHS)
+            if edition_profile_id == FIELD_EDITION_PROFILE
+            else [],
+        }
     compatibility = {
         # This is the stable product/distribution identity. The Runtime
         # manifest's `runtimeId` is a build-specific UUID and must not be used
@@ -366,9 +512,7 @@ def write_archive(
         with (
             temporary.open("wb") as raw,
             gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed,
-            tarfile.open(
-                fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
-            ) as archive,
+            tarfile.open(fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT) as archive,
         ):
             archive.addfile(
                 _tar_info(MANIFEST_FILENAME, manifest_bytes, epoch),
@@ -480,15 +624,18 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
     if type(source["sourceDateEpoch"]) is not int or source["sourceDateEpoch"] < 0:
         raise EnginePackError("Engine Pack source timestamp is invalid")
     edition_profile = manifest["editionProfile"]
-    if not isinstance(edition_profile, dict) or set(edition_profile) != {
-        "profileId",
-        "includesLargeSimulator",
-        "excludedSourcePaths",
-    }:
+    if not isinstance(edition_profile, dict) or "profileId" not in edition_profile:
         raise EnginePackError("Engine Pack edition profile identity is invalid")
     profile_id = edition_profile["profileId"]
     if profile_id not in EDITION_PROFILES:
         raise EnginePackError("Engine Pack edition profile is unsupported")
+    expected_profile_keys = (
+        SIM_PROFILE_MANIFEST_KEYS
+        if profile_id == SIM_EDITION_PROFILE
+        else {"profileId", "includesLargeSimulator", "excludedSourcePaths"}
+    )
+    if set(edition_profile) != expected_profile_keys:
+        raise EnginePackError("Engine Pack edition profile identity is invalid")
     if type(edition_profile["includesLargeSimulator"]) is not bool:
         raise EnginePackError("Engine Pack simulator inclusion flag is invalid")
     excluded_paths = edition_profile["excludedSourcePaths"]
@@ -499,10 +646,21 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
     ):
         raise EnginePackError("Engine Pack excluded source paths are invalid")
     if profile_id == FIELD_EDITION_PROFILE:
-        if edition_profile["includesLargeSimulator"] is not False or tuple(
-            excluded_paths
-        ) != FIELD_EXCLUDED_SOURCE_PATHS:
+        if (
+            edition_profile["includesLargeSimulator"] is not False
+            or tuple(excluded_paths) != FIELD_EXCLUDED_SOURCE_PATHS
+        ):
             raise EnginePackError("Field Engine Pack profile does not exclude simulator payloads")
+    elif profile_id == SIM_EDITION_PROFILE:
+        if (
+            edition_profile["includesLargeSimulator"] is not True
+            or tuple(excluded_paths) != ("backend/app/distribution_safety.py",)
+            or edition_profile["profileVersion"] != "1.0.0"
+            or edition_profile["profileManifestPath"] != SIM_PROFILE_PATH
+            or not isinstance(edition_profile["profileManifestSha256"], str)
+            or not SHA256_RE.fullmatch(edition_profile["profileManifestSha256"])
+        ):
+            raise EnginePackError("Sim-only Engine Pack profile binding drifted")
     elif edition_profile["includesLargeSimulator"] is not True or excluded_paths:
         raise EnginePackError("default Engine Pack profile drifted")
     compatibility = manifest["runtimeCompatibility"]
@@ -541,6 +699,36 @@ def validate_manifest(manifest: Any) -> dict[str, Any]:
         paths.append(record["path"])
     if paths != sorted(set(paths)):
         raise EnginePackError("Engine Pack files are not unique and sorted")
+    if profile_id == SIM_EDITION_PROFILE:
+        path_set = set(paths)
+        if path_set & SIM_FORBIDDEN_PAYLOAD_PATHS:
+            raise EnginePackError("Sim-only Engine Pack contains a forbidden payload")
+        if {path for path in path_set if path.startswith("distribution/editions/")} != {
+            "distribution/editions/sim.v1.json"
+        }:
+            raise EnginePackError("Sim-only Engine Pack edition inventory drifted")
+        if {
+            path
+            for path in path_set
+            if path.startswith("distribution/vehicle-packs/") and path.endswith(".json")
+        } != {
+            "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+            "distribution/vehicle-packs/registry.v1.json",
+        }:
+            raise EnginePackError("Sim-only Engine Pack Vehicle Pack inventory drifted")
+        profile_record = next(
+            (record for record in manifest["files"] if record["path"] == SIM_PROFILE_PATH),
+            None,
+        )
+        if (
+            profile_record is None
+            or profile_record["sha256"] != edition_profile["profileManifestSha256"]
+        ):
+            raise EnginePackError("Sim-only Engine Pack profile hash drifted")
+        if not any(path.startswith("backend/app/simulator/") for path in path_set) or not any(
+            path.startswith("scripts/simulators/") for path in path_set
+        ):
+            raise EnginePackError("Sim-only Engine Pack lost simulator execution payloads")
     expected_pack_id = "sha256:" + manifest_identity(
         manifest["source"],
         manifest["editionProfile"],

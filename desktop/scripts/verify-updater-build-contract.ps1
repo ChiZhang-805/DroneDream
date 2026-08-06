@@ -88,6 +88,29 @@ try {
         $manifest.platforms.'windows-x86_64'.url -ceq
             "https://github.com/example/DroneDream/releases/download/desktop-v1.0.0/$installerName"
     ) "Updater metadata changed the public 1.0.0 filename or tag."
+
+    $universalInstallerName = "DroneDream-Universal_1.0.0_x64-setup.exe"
+    [IO.File]::WriteAllBytes(
+        (Join-Path $bundle $universalInstallerName),
+        [byte[]](4, 5, 6)
+    )
+    [IO.File]::WriteAllText(
+        (Join-Path $bundle "$universalInstallerName.sig"),
+        "test-universal-updater-signature`n",
+        (New-Object Text.UTF8Encoding($false))
+    )
+    & (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
+        -BundleDirectory $bundle `
+        -Repository "example/DroneDream" `
+        -InstallerProductName "DroneDream-Universal" `
+        -SourceCommit $sourceCommit `
+        -BuildNumber 43
+    $universalManifest = Get-Content -LiteralPath (Join-Path $bundle "latest.json") -Raw |
+        ConvertFrom-Json
+    Assert-Contract (
+        $universalManifest.platforms.'windows-x86_64'.url -ceq
+            "https://github.com/example/DroneDream/releases/download/desktop-v1.0.0/$universalInstallerName"
+    ) "Updater metadata must preserve an explicitly validated edition product name."
 } finally {
     if (Test-Path -LiteralPath $temporaryRoot) {
         Remove-Item -LiteralPath $temporaryRoot -Recurse -Force

@@ -29,12 +29,15 @@ from app.benchmarking.contracts import (
     canonical_json_bytes,
     canonical_sha256,
 )
-from app.benchmarking.llm_arm_contracts import BENCHMARK_LLM_ARM_POLICIES_SHA256
+from app.benchmarking.llm_arm_contracts import (
+    BENCHMARK_LLM_ARM_POLICIES_SHA256,
+    require_llm_arm_policy,
+)
 from app.benchmarking.provider_execution_contract import (
     BENCHMARK_DIRECT_RESERVATION_REASON,
     BENCHMARK_PROVIDER_BASE_URLS,
     BenchmarkProviderExecutionConfigV1,
-    direct_provider_run_capacity,
+    provider_run_capacity,
 )
 from app.orchestration.qualification import (
     SEALED_QUALIFICATION_POLICY_VERSION,
@@ -91,22 +94,25 @@ def _batch_binding_request_sha256(request: BenchmarkBatchBindingRequestV1) -> st
     return canonical_sha256(payload)
 
 
-def _direct_provider_capacity(
+def _llm_provider_capacity(
     arm: models.BenchmarkArm,
     run: BenchmarkRunBindingRequestV1,
     job: models.Job,
 ) -> BenchmarkUsageDeltaV1 | None:
-    if arm.proposal_adapter_id != "llm_direct/v1":
+    if arm.proposal_adapter_id not in {"llm_direct/v1", "llm_react/v1"}:
         return None
     try:
         arm_manifest = BenchmarkArmManifestV1.model_validate(arm.manifest_json)
+        provider_payload = arm_manifest.intervention.get("provider_execution")
+        if not isinstance(provider_payload, (dict, list)):
+            raise ValueError("provider execution contract is missing")
         provider = BenchmarkProviderExecutionConfigV1.model_validate_json(
-            canonical_json_bytes(arm_manifest.intervention.get("provider_execution"))
+            canonical_json_bytes(provider_payload)
         )
     except ValueError as exc:
         raise BenchmarkCoordinatorError(
             "BENCHMARK_PROVIDER_CONTRACT_INVALID",
-            "The direct-arm provider execution contract is invalid.",
+            "The LLM-arm provider execution contract is invalid.",
             http_status=422,
         ) from exc
     if canonical_sha256(arm_manifest) != arm.manifest_sha256:
@@ -120,22 +126,22 @@ def _direct_provider_capacity(
         or arm.arm_family != "llm_harness"
         or not arm_manifest.execution_enabled
         or arm_manifest.arm_family != "llm_harness"
-        or arm_manifest.proposal_adapter_id != "llm_direct/v1"
-        or arm_manifest.provider_contract_sha256
-        != BENCHMARK_LLM_ARM_POLICIES_SHA256
+        or arm_manifest.proposal_adapter_id != arm.proposal_adapter_id
+        or arm_manifest.provider_contract_sha256 != BENCHMARK_LLM_ARM_POLICIES_SHA256
     ):
         raise BenchmarkCoordinatorError(
-            "BENCHMARK_DIRECT_CONTRACT_MISMATCH",
-            "The arm is not the reviewed executable direct-provider contract.",
+            "BENCHMARK_LLM_CONTRACT_MISMATCH",
+            "The arm is not a reviewed executable LLM-provider contract.",
             http_status=422,
         )
-    if (
-        run.provider_randomness_policy != provider.randomness_policy
-        or (provider.randomness_policy == "fixed_seed") != (run.provider_seed is not None)
-    ):
+    policy = require_llm_arm_policy(arm.proposal_adapter_id)
+    total_turn_cap = provider.maximum_generations * policy.maximum_turns_per_generation
+    if run.provider_randomness_policy != provider.randomness_policy or (
+        provider.randomness_policy == "fixed_seed"
+    ) != (run.provider_seed is not None):
         raise BenchmarkCoordinatorError(
             "BENCHMARK_PROVIDER_RANDOMNESS_MISMATCH",
-            "Run randomness differs from the direct-arm provider contract.",
+            "Run randomness differs from the LLM-arm provider contract.",
             http_status=422,
         )
     job_base_url = job.llm_base_url
@@ -147,16 +153,19 @@ def _direct_provider_capacity(
         or job_base_url != provider.base_url
         or job.openai_model != provider.model_snapshot
         or job.provider_max_retries != 0
-        or job.provider_turn_cap != provider.maximum_generations
-        or job.provider_request_cap != provider.maximum_generations
+        or job.provider_turn_cap != total_turn_cap
+        or job.provider_request_cap != total_turn_cap
         or job.max_iterations != provider.maximum_generations
     ):
         raise BenchmarkCoordinatorError(
             "BENCHMARK_PROVIDER_JOB_MISMATCH",
-            "Job provider identity or hard caps differ from the direct-arm contract.",
+            "Job provider identity or hard caps differ from the LLM-arm contract.",
             http_status=422,
         )
-    return direct_provider_run_capacity(provider)
+    return provider_run_capacity(
+        provider,
+        maximum_turns_per_generation=policy.maximum_turns_per_generation,
+    )
 
 
 def _sealed_job_contract(
@@ -286,9 +295,7 @@ def claim_lease(
         .values(
             lease_owner=owner_id,
             lease_token_hash=token_hash,
-            lease_generation=(
-                models.BenchmarkCampaignCoordinatorState.lease_generation + 1
-            ),
+            lease_generation=(models.BenchmarkCampaignCoordinatorState.lease_generation + 1),
             lease_expires_at=expires_at,
             updated_at=now,
         )
@@ -370,8 +377,7 @@ def release_lease(
         update(models.BenchmarkCampaignCoordinatorState)
         .where(
             models.BenchmarkCampaignCoordinatorState.campaign_id == campaign.id,
-            models.BenchmarkCampaignCoordinatorState.lease_token_hash
-            == _token_hash(lease_token),
+            models.BenchmarkCampaignCoordinatorState.lease_token_hash == _token_hash(lease_token),
             models.BenchmarkCampaignCoordinatorState.lease_generation == lease_generation,
         )
         .values(
@@ -434,8 +440,7 @@ def reserve_budget(
     conditions: list[Any] = [
         models.BenchmarkCampaignCoordinatorState.campaign_id == campaign.id,
         models.BenchmarkCampaignCoordinatorState.lease_token_hash == token_hash,
-        models.BenchmarkCampaignCoordinatorState.lease_generation
-        == request.lease_generation,
+        models.BenchmarkCampaignCoordinatorState.lease_generation == request.lease_generation,
         models.BenchmarkCampaignCoordinatorState.lease_expires_at > now,
     ]
     values: dict[str, Any] = {"updated_at": now}
@@ -488,8 +493,7 @@ def reserve_budget(
         replay = db.scalar(
             select(models.BenchmarkBudgetReservation).where(
                 models.BenchmarkBudgetReservation.campaign_id == campaign_id_value,
-                models.BenchmarkBudgetReservation.reservation_key
-                == request.reservation_key,
+                models.BenchmarkBudgetReservation.reservation_key == request.reservation_key,
             )
         )
         if replay is not None and replay.reservation_sha256 == request_sha256:
@@ -586,9 +590,7 @@ def bind_batch(
             http_status=409,
         )
 
-    arm_by_semantic_id = {
-        (arm.benchmark_arm_id, arm.arm_version): arm for arm in campaign.arms
-    }
+    arm_by_semantic_id = {(arm.benchmark_arm_id, arm.arm_version): arm for arm in campaign.arms}
     for run in request.runs:
         arm = arm_by_semantic_id.get((run.benchmark_arm_id, run.arm_version))
         if arm is None:
@@ -660,13 +662,10 @@ def bind_batch(
         .where(
             models.BenchmarkCampaignCoordinatorState.campaign_id == campaign.id,
             models.BenchmarkCampaignCoordinatorState.lease_token_hash == token_hash,
-            models.BenchmarkCampaignCoordinatorState.lease_generation
-            == request.lease_generation,
+            models.BenchmarkCampaignCoordinatorState.lease_generation == request.lease_generation,
             models.BenchmarkCampaignCoordinatorState.lease_expires_at > now,
-            models.BenchmarkCampaignCoordinatorState.next_batch_ordinal
-            == batch_ordinal,
-            models.BenchmarkCampaignCoordinatorState.next_run_ordinal
-            == first_run_ordinal,
+            models.BenchmarkCampaignCoordinatorState.next_batch_ordinal == batch_ordinal,
+            models.BenchmarkCampaignCoordinatorState.next_run_ordinal == first_run_ordinal,
         )
         .values(
             next_batch_ordinal=batch_ordinal + 1,
@@ -731,7 +730,7 @@ def bind_batch(
         persisted_runs.append((persisted_run, arm, run))
     db.flush()
     for persisted_run, arm, run in persisted_runs:
-        provider_capacity = _direct_provider_capacity(
+        provider_capacity = _llm_provider_capacity(
             arm,
             run,
             child_by_id[run.job_id],

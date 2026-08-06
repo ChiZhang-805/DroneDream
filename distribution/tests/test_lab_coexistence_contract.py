@@ -33,7 +33,16 @@ class LabCoexistenceContractTests(unittest.TestCase):
         self.assertTrue(result["contractReady"])
         self.assertFalse(result["releaseReady"])
         self.assertEqual(result["labIdentity"]["productName"], "DroneDream · LAB")
-        self.assertEqual(result["universalDonorRequestCount"], 2)
+        self.assertEqual(result["universalDonorRequestCount"], 4)
+        contract = coexistence._load_json(coexistence.CONTRACT_PATH)
+        self.assertEqual(
+            contract["brandContinuity"]["dotLockupState"],
+            "superseded-awaiting-exact-large-suffix-donor",
+        )
+        self.assertEqual(
+            contract["brandContinuity"]["approvedEditionSuffixCapHeightRatio"],
+            0.9,
+        )
 
     def test_rejects_product_and_app_identity_collision(self) -> None:
         inputs = list(load_inputs())

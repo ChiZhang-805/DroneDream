@@ -8,10 +8,10 @@
     "labBranch": "codex/software-lab",
     "labCommit": "a62111eee2b7dc5d64475b9ac207bb599fe13669",
     "universalBranch": "codex/software",
-    "universalObservedCommit": "39d19414e4ac6649288726195f74afaf6dc58123",
+    "universalObservedCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "simObservedCommit": "c8630332cdad1c1a94155d13d1981c83bdec0d1c",
-    "fieldObservedCommit": "76efd0683c79361cbb7f0e7fc0c8bb66a9569305"
+    "fieldObservedCommit": "452eed9c7b018d97beec3cd3d61ee182b6e67330"
   },
   "frozenArtifact": {
     "sourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
@@ -43,7 +43,7 @@
   "identities": [
     {
       "editionId": "universal",
-      "sourceCommit": "39d19414e4ac6649288726195f74afaf6dc58123",
+      "sourceCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
       "configPath": "desktop/src-tauri/tauri.conf.json",
       "configGitObjectId": "08e6e6959849f073db594310c07b136ddaac5f84",
       "productName": "DroneDream",
@@ -79,7 +79,7 @@
     },
     {
       "editionId": "field",
-      "sourceCommit": "76efd0683c79361cbb7f0e7fc0c8bb66a9569305",
+      "sourceCommit": "452eed9c7b018d97beec3cd3d61ee182b6e67330",
       "configPath": "desktop/src-tauri/tauri.field.conf.json",
       "configGitObjectId": "512fed1fb1cc7dcedf512d7846821a43968fc7d9",
       "productName": "DroneDream · FIELD",
@@ -105,6 +105,9 @@
     "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
     "dotLockupPath": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
     "dotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+    "dotLockupState": "superseded-awaiting-exact-large-suffix-donor",
+    "approvedEditionSuffixCapHeightRatio": 0.9,
+    "futureReleaseMustUsePendingDonor": true,
     "windowsIconPath": "brand/generated/lab/windows/icon.ico",
     "tokens": {
       "gradient": ["#A7E84A", "#20C77A", "#087E69"],
@@ -147,7 +150,7 @@
       "frontendMayAssertEditionIdentity": false
     },
     "currentCommonCoreObservation": {
-      "sourceCommit": "39d19414e4ac6649288726195f74afaf6dc58123",
+      "sourceCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
       "nativePath": "desktop/src-tauri/src/browser_auth.rs",
       "nativeGitObjectId": "8bec964e39a9fed851746d2f35285f8c17e7ce62",
       "frontendStoragePath": "frontend/src/features/auth/supabaseClient.ts",
@@ -173,7 +176,9 @@
   "crossEditionBlockers": [
     "Universal and Sim currently resolve the same latest.json updater manifest; Sim needs an edition-owned endpoint before four-Edition update isolation is accepted.",
     "Universal has not delivered the exact edition-aware authentication donor required by this contract.",
-    "Universal has not delivered the shared NSIS existing-install/quiesce repair proven against same-version /UPDATE.",
+    "The exact Universal existing-install/quiesce donor b099ed0 is forward-synced, but rebuilt Lab bytes and same-version /UPDATE acceptance remain gated.",
+    "The approved large LAB suffix has no exact Universal canonical donor commit, manifest, or hash yet; the current dot lockup is superseded for future release bytes.",
+    "Universal edition-safety allow-fixture tests pin the Universal Lab manifest hash and need a canonical parameterized fixture before the branded Lab manifest can pass the test-only allow path.",
     "The frozen Lab EXE predates this contract and remains an exact unsigned non-release artifact."
   ],
   "contractReady": true,

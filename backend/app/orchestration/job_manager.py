@@ -31,7 +31,11 @@ from app.benchmarking.job_runtime import (
 )
 from app.benchmarking.llm_durable_runtime import (
     BenchmarkDurableLLMBlocked,
+    execute_durable_adaptive_arm,
     execute_durable_direct_arm,
+    execute_durable_fixed_two_turn_arm,
+    execute_durable_llambo_arm,
+    execute_durable_react_arm,
 )
 from app.benchmarking.method_inventory import require_execution_ready_method
 from app.benchmarking.provider_transport import build_job_secret_benchmark_transport
@@ -170,17 +174,13 @@ def _claim_candidate_dispatch_ordinal(db: Session, job: models.Job) -> int:
                 models.Job.first_qualified_candidate_id.is_(None),
             )
             .values(
-                next_candidate_dispatch_ordinal=(
-                    models.Job.next_candidate_dispatch_ordinal + 1
-                )
+                next_candidate_dispatch_ordinal=(models.Job.next_candidate_dispatch_ordinal + 1)
             )
             .returning(models.Job.next_candidate_dispatch_ordinal)
             .execution_options(synchronize_session=False)
         )
     if next_value is None:
-        raise CandidateDispatchStopped(
-            f"Job {job.id} already froze a first-qualified candidate"
-        )
+        raise CandidateDispatchStopped(f"Job {job.id} already froze a first-qualified candidate")
     db.expire(
         job,
         ["next_candidate_dispatch_ordinal", "first_qualified_candidate_id"],
@@ -1136,7 +1136,18 @@ def dispatch_next_benchmark_generation(
         adapter_id = context.arm.proposal_adapter_id
         require_registered_adapter(adapter_id)
         require_execution_ready_method(adapter_id)
-        adapter = None if adapter_id == "llm_direct/v1" else create_benchmark_adapter(adapter_id)
+        adapter = (
+            None
+            if adapter_id
+            in {
+                "llm_direct/v1",
+                "llm_react/v1",
+                "llambo_uav/v1",
+                "dronedream_fixed_two_turn/v1",
+                "dronedream_adaptive_1_4/v1",
+            }
+            else create_benchmark_adapter(adapter_id)
+        )
     except BenchmarkJobRuntimeBlocked as exc:
         return BenchmarkDispatchResult(
             status="benchmark_blocked",
@@ -1170,6 +1181,80 @@ def dispatch_next_benchmark_generation(
             if direct.proposal is None:  # pragma: no cover - strict result contract.
                 raise RuntimeError("durable direct execution returned no proposal")
             proposal = direct.proposal
+        elif adapter_id == "llambo_uav/v1":
+            llambo = execute_durable_llambo_arm(
+                db,
+                job,
+                observation,
+                transport_factory=lambda provider: build_job_secret_benchmark_transport(
+                    db, job, provider
+                ),
+            )
+            if llambo.status == "first_qualified_stop":
+                return BenchmarkDispatchResult(status="first_qualified_stop")
+            if llambo.proposal is None:  # pragma: no cover - strict result contract.
+                raise RuntimeError("durable LLAMBO execution returned no proposal")
+            proposal = llambo.proposal
+        elif adapter_id == "llm_react/v1":
+            react = execute_durable_react_arm(
+                db,
+                job,
+                observation,
+                transport_factory=lambda provider: build_job_secret_benchmark_transport(
+                    db, job, provider
+                ),
+            )
+            if react.status == "first_qualified_stop":
+                return BenchmarkDispatchResult(status="first_qualified_stop")
+            if react.status.startswith("abandoned"):
+                return BenchmarkDispatchResult(
+                    status="proposal_failed",
+                    error_code="benchmark_react_abandoned",
+                    error="The bounded ReAct arm abandoned this generation.",
+                )
+            if react.proposal is None:  # pragma: no cover - strict result contract.
+                raise RuntimeError("durable ReAct execution returned no proposal")
+            proposal = react.proposal
+        elif adapter_id == "dronedream_fixed_two_turn/v1":
+            fixed = execute_durable_fixed_two_turn_arm(
+                db,
+                job,
+                observation,
+                transport_factory=lambda provider: build_job_secret_benchmark_transport(
+                    db, job, provider
+                ),
+            )
+            if fixed.status == "first_qualified_stop":
+                return BenchmarkDispatchResult(status="first_qualified_stop")
+            if fixed.status.startswith("abandoned"):
+                return BenchmarkDispatchResult(
+                    status="proposal_failed",
+                    error_code="benchmark_fixed_two_turn_abandoned",
+                    error="The fixed plan/revision arm abandoned this generation.",
+                )
+            if fixed.proposal is None:  # pragma: no cover - strict result contract.
+                raise RuntimeError("durable fixed two-turn execution returned no proposal")
+            proposal = fixed.proposal
+        elif adapter_id == "dronedream_adaptive_1_4/v1":
+            adaptive = execute_durable_adaptive_arm(
+                db,
+                job,
+                observation,
+                transport_factory=lambda provider: build_job_secret_benchmark_transport(
+                    db, job, provider
+                ),
+            )
+            if adaptive.status == "first_qualified_stop":
+                return BenchmarkDispatchResult(status="first_qualified_stop")
+            if adaptive.status.startswith("abandoned"):
+                return BenchmarkDispatchResult(
+                    status="proposal_failed",
+                    error_code="benchmark_adaptive_abandoned",
+                    error="The adaptive Harness safely abandoned this generation.",
+                )
+            if adaptive.proposal is None:  # pragma: no cover - strict result contract.
+                raise RuntimeError("durable adaptive execution returned no proposal")
+            proposal = adaptive.proposal
         else:
             if adapter is None:  # pragma: no cover - exhaustive registry routing.
                 raise RuntimeError("benchmark adapter routing is incomplete")

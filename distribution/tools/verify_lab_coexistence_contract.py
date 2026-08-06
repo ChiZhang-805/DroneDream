@@ -130,6 +130,9 @@ def validate_contract(
     if (
         brand.get("displayName") != "DroneDream · LAB"
         or brand.get("separatorCodePoint") != "U+00B7"
+        or brand.get("dotLockupState") != "superseded-awaiting-exact-large-suffix-donor"
+        or brand.get("approvedEditionSuffixCapHeightRatio") != 0.9
+        or brand.get("futureReleaseMustUsePendingDonor") is not True
         or brand.get("copyPolicy")
         != "exact canonical bytes and tokens; no redraw or concept-directory dependency"
         or brand.get("grantsHardwareAuthority") is not False
@@ -258,18 +261,29 @@ def validate_contract(
     if request_ids != {
         "universal-nsis-existing-install-quiesce-v1",
         "universal-edition-auth-isolation-v1",
+        "universal-large-edition-lockup-brand-v1",
+        "universal-edition-safety-fixture-binding-v1",
     }:
         raise LabCoexistenceContractError("required Universal donor requests are incomplete")
     for request in requests:
         item = _mapping(request, "donor request")
         if item.get("ownership") != "Universal/Core" or item.get("state") not in {
-            "requested-not-delivered",
+            "delivered-exact-donor-forward-synced",
             "awaiting-exact-donor",
+            "requested-not-delivered",
         }:
             raise LabCoexistenceContractError("donor request overstates delivery")
         paths = _sequence(item.get("candidatePaths"), "donor candidate paths")
         if any(str(path).startswith("distribution/editions/lab/") for path in paths):
             raise LabCoexistenceContractError("shared donor request points into Lab ownership")
+        if item.get("requestId") == "universal-nsis-existing-install-quiesce-v1":
+            exact_donor = _mapping(item.get("exactDonor"), "NSIS exact donor")
+            if (
+                exact_donor.get("commit") != "b099ed00923e9f2b833f812ad79f1614529038de"
+                or exact_donor.get("parent") != "39d19414e4ac6649288726195f74afaf6dc58123"
+                or exact_donor.get("integration") != "merge-parent-preserved"
+            ):
+                raise LabCoexistenceContractError("NSIS donor provenance drifted")
     recovery = _mapping(donor.get("labRecovery"), "labRecovery")
     if (
         recovery.get("rebuildAuthorizedByThisRequest") is not False
@@ -280,7 +294,14 @@ def validate_contract(
 
     blockers = _sequence(contract.get("crossEditionBlockers"), "crossEditionBlockers")
     blocker_text = " ".join(str(item) for item in blockers)
-    for required in ("same latest.json", "authentication donor", "existing-install/quiesce", "predates this contract"):
+    for required in (
+        "same latest.json",
+        "authentication donor",
+        "existing-install/quiesce",
+        "large LAB suffix",
+        "edition-safety allow-fixture",
+        "predates this contract",
+    ):
         if required not in blocker_text:
             raise LabCoexistenceContractError(f"cross-Edition blocker is missing: {required}")
 

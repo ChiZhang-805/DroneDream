@@ -41,6 +41,7 @@ import {
 } from "./components/AvatarCropDialog";
 import { BrandLockup } from "./components/BrandLockup";
 import { DistributionSetupPanel } from "./components/DistributionSetupPanel";
+import { UniversalModeSwitch } from "./components/UniversalModeSwitch";
 import {
   getDesktopWindowHandle,
   isDesktopRuntime,
@@ -91,6 +92,11 @@ import {
   hasExperimentDraft,
   persistExperimentDraftsForExit,
 } from "./features/experiment/draftStorage";
+import {
+  applyUniversalMode,
+  loadUniversalMode,
+  persistUniversalMode,
+} from "./features/distribution/universalMode";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
 import type {
@@ -2036,6 +2042,11 @@ function AppShellContent() {
     () => false,
   );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
+  const [universalMode, setUniversalMode] = useState(() =>
+    labEditionEnabled ? appEdition : loadUniversalMode()
+  );
+  const shellBrandEdition = labEditionEnabled ? appEdition : universalMode;
+  const shellDisplayName = labEditionEnabled ? appDisplayName : "DroneDream";
   const [accountOpen, setAccountOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
@@ -2088,6 +2099,15 @@ function AppShellContent() {
     "installing",
     "reconcilingEngine",
   ].includes(updater.status);
+
+  useEffect(() => {
+    if (labEditionEnabled) {
+      applyUniversalMode(appEdition);
+      return;
+    }
+    applyUniversalMode(universalMode);
+    persistUniversalMode(universalMode);
+  }, [universalMode]);
   const sidebarUpdateLabel = updater.status === "available"
     ? updater.error
       ? t("updater.sidebarDeferred")
@@ -2515,7 +2535,7 @@ function AppShellContent() {
 
   if (launcherMode) {
     return (
-      <div className="app-shell app-shell-launcher" data-brand-edition={appEdition}>
+      <div className="app-shell app-shell-launcher" data-brand-edition={shellBrandEdition}>
         <a
           className="skip-link"
           href="#main-content"
@@ -2527,8 +2547,8 @@ function AppShellContent() {
           {t("app.skipToContent")}
         </a>
         <header className="launcher-chrome">
-          <Link to="/desktop/setup" className="launcher-brand" aria-label={appDisplayName}>
-            <BrandLockup variant="compact" edition={appEdition} />
+          <Link to="/desktop/setup" className="launcher-brand" aria-label={shellDisplayName}>
+            <BrandLockup variant="compact" edition={shellBrandEdition} />
           </Link>
           <div className="launcher-chrome-actions">
             <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
@@ -2579,7 +2599,7 @@ function AppShellContent() {
   return (
     <div
       className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}
-      data-brand-edition={appEdition}
+      data-brand-edition={shellBrandEdition}
     >
       <a
         className="skip-link"
@@ -2596,13 +2616,13 @@ function AppShellContent() {
           <Link
             to={labEditionEnabled ? "/lab/setup" : "/assistant"}
             className="app-title"
-            aria-label={appDisplayName}
+            aria-label={shellDisplayName}
           >
-            <BrandLockup variant="compact" edition={appEdition} />
+            <BrandLockup variant="compact" edition={shellBrandEdition} />
           </Link>
         ) : (
-          <a href="/" className="app-title" aria-label={appDisplayName}>
-            <BrandLockup variant="compact" edition={appEdition} />
+          <a href="/" className="app-title" aria-label={shellDisplayName}>
+            <BrandLockup variant="compact" edition={shellBrandEdition} />
           </a>
         )}
         {mobileNavigationEnabled ? (
@@ -2624,6 +2644,13 @@ function AppShellContent() {
           className={`app-mobile-menu-panel${mobileMenuExpanded ? " is-open" : ""}`}
           hidden={mobileNavigationEnabled && !mobileMenuExpanded}
         >
+          {!labEditionEnabled ? (
+            <UniversalModeSwitch
+              mode={universalMode}
+              locale={locale}
+              onChange={setUniversalMode}
+            />
+          ) : null}
           <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">
             {runtimeNavDescription}
@@ -2789,7 +2816,7 @@ function AppShellContent() {
       <div className={`app-body${experimentWizardMode ? " app-body-wizard" : ""}`}>
         <header className="app-header">
           <div className="app-header-title">
-            {appDisplayName} — {t("app.platform")}
+            {shellDisplayName} — {t("app.platform")}
           </div>
           {!mobileNavigationEnabled ? (
             <div className="app-header-meta">

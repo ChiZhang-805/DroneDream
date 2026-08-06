@@ -58,14 +58,14 @@ _DESCRIPTORS = (
         "bipop_cma_es/v1",
         "traditional",
         "contract_only",
-        "pycma-bipop-reference-adapter-pending",
+        "pycma-4.4.4-bipop-coordinator-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
         "optuna_tpe/v1",
         "traditional",
         "contract_only",
-        "optuna-multivariate-tpe-reference-adapter-pending",
+        "optuna-4.9.0-multivariate-tpe-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
@@ -79,21 +79,21 @@ _DESCRIPTORS = (
         "reference_turbo/v1",
         "traditional",
         "contract_only",
-        "botorch-turbo-reference-adapter-pending",
+        "botorch-0.17.0-turbo1-ts-tutorial-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
         "reference_scbo/v1",
         "traditional",
         "contract_only",
-        "botorch-scbo-reference-adapter-pending",
+        "botorch-0.17.0-scbo-ts-tutorial-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
         "hebo/v1",
         "traditional",
         "contract_only",
-        "hebo-reference-adapter-pending",
+        "hebo-0.3.6-sequential-scalar-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(
@@ -134,29 +134,29 @@ _DESCRIPTORS = (
     BenchmarkAdapterDescriptor(
         "llm_react/v1",
         "llm_harness",
-        "contract_only",
-        "bounded-react-adapter-pending",
+        "implemented",
+        "durable-bounded-react-v1",
         "adapted_reference",
     ),
     BenchmarkAdapterDescriptor(
         "llambo_uav/v1",
         "llm_harness",
-        "contract_only",
-        "noisy-uav-adaptation-pending",
+        "implemented",
+        "durable-noisy-constrained-uav-llambo-adaptation-v1",
         "adapted_reference",
     ),
     BenchmarkAdapterDescriptor(
         "dronedream_fixed_two_turn/v1",
         "llm_harness",
-        "contract_only",
-        "fixed-two-turn-pending",
+        "implemented",
+        "durable-fixed-plan-revision-v1",
         "product_native",
     ),
     BenchmarkAdapterDescriptor(
         "dronedream_adaptive_1_4/v1",
         "llm_harness",
-        "contract_only",
-        "adaptive-one-four-pending",
+        "implemented",
+        "durable-adaptive-one-four-v1",
         "product_native",
     ),
 )
@@ -195,9 +195,15 @@ def create_benchmark_adapter(adapter_id: str) -> BenchmarkProposalAdapter:
     if descriptor.availability != "implemented":
         raise ValueError(f"benchmark proposal adapter is not implemented: {adapter_id}")
     require_execution_ready_method(adapter_id)
-    if adapter_id == "llm_direct/v1":
+    if adapter_id in {
+        "llm_direct/v1",
+        "llm_react/v1",
+        "llambo_uav/v1",
+        "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
+    }:
         raise ValueError(
-            "benchmark proposal adapter is server-managed by the durable provider runtime: "
+            "benchmark proposal adapter is server-managed by a durable provider runtime: "
             f"{adapter_id}"
         )
     from app.benchmarking.adapters import (

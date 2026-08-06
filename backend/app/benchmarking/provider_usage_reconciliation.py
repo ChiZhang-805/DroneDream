@@ -11,6 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import models
+from app.benchmarking.adaptive_triggers import (
+    BENCHMARK_ADAPTIVE_TRIGGER_POLICY_VERSION,
+    BenchmarkAdaptiveTriggerDecisionV1,
+)
 from app.benchmarking.contracts import (
     BenchmarkArmManifestV1,
     BenchmarkBudgetReservationRequestV1,
@@ -21,9 +25,11 @@ from app.benchmarking.contracts import (
     BenchmarkRunBindingRequestV1,
     BenchmarkUsageDeltaV1,
     CompositeExecutionInventoryV1,
+    canonical_json_bytes,
     canonical_sha256,
 )
 from app.benchmarking.coordinator import run_binding_sha256
+from app.benchmarking.llm_arm_contracts import require_llm_arm_policy
 from app.benchmarking.provider_execution_contract import (
     BENCHMARK_DIRECT_RESERVATION_REASON,
 )
@@ -120,16 +126,20 @@ def _validate_run_graph(
             "benchmark_provider_run_graph_drift",
             "Provider run binding graph is inconsistent.",
         )
-    if arm.proposal_adapter_id != "llm_direct/v1":
+    if arm.proposal_adapter_id not in {
+        "llm_direct/v1",
+        "llm_react/v1",
+        "llambo_uav/v1",
+        "dronedream_fixed_two_turn/v1",
+        "dronedream_adaptive_1_4/v1",
+    }:
         _blocked(
             "benchmark_provider_reconciliation_arm_unsupported",
-            "This reconciliation contract currently supports only llm_direct/v1.",
+            "This reconciliation contract does not support the bound provider arm.",
         )
     try:
         arm_manifest = BenchmarkArmManifestV1.model_validate(arm.manifest_json)
-        campaign_manifest = BenchmarkCampaignManifestV1.model_validate(
-            campaign.manifest_json
-        )
+        campaign_manifest = BenchmarkCampaignManifestV1.model_validate(campaign.manifest_json)
         inventory = CompositeExecutionInventoryV1.model_validate(campaign.composite_inventory_json)
     except ValidationError as exc:
         raise BenchmarkProviderUsageBlocked(
@@ -153,8 +163,7 @@ def _validate_run_graph(
     matching_arms = [
         item
         for item in campaign_manifest.arms
-        if item.benchmark_arm_id == arm.benchmark_arm_id
-        and item.arm_version == arm.arm_version
+        if item.benchmark_arm_id == arm.benchmark_arm_id and item.arm_version == arm.arm_version
     ]
     if len(matching_arms) != 1 or matching_arms[0] != arm_manifest:
         _blocked(
@@ -162,11 +171,11 @@ def _validate_run_graph(
             "Run arm differs from the frozen campaign manifest.",
         )
     if (
-        arm_manifest.proposal_adapter_id != "llm_direct/v1"
+        arm_manifest.proposal_adapter_id != arm.proposal_adapter_id
         or arm_manifest.benchmark_arm_id != arm.benchmark_arm_id
         or arm_manifest.arm_version != arm.arm_version
     ):
-        _blocked("benchmark_direct_contract_mismatch", "Run arm differs from its manifest.")
+        _blocked("benchmark_llm_contract_mismatch", "Run arm differs from its manifest.")
     scenario_sha256 = run.scenario_suite_sha256
     qualification_sha256 = run.qualification_contract_sha256
     if scenario_sha256 is None or qualification_sha256 is None:
@@ -281,7 +290,7 @@ def _attempt_counts(statuses: list[str | None]) -> BenchmarkProviderAttemptCount
     )
 
 
-def reconcile_direct_provider_run_usage(
+def reconcile_provider_run_usage(
     db: Session,
     run_binding_id: str,
 ) -> BenchmarkProviderRunUsageReconciliationV1:
@@ -314,18 +323,99 @@ def reconcile_direct_provider_run_usage(
             )
         )
     )
-    if any(
-        turn.turn_role != "direct_proposal"
-        or turn.turn_index != 1
-        or turn.trigger_policy_version != "benchmark-llm-direct-v1"
-        or turn.trigger_reasons_json != ["preregistered-direct-turn"]
-        or turn.source_commit != source_commit
-        or turn.model_snapshot != run.job.openai_model
-        for turn in turns
-    ):
+    policy = require_llm_arm_policy(arm.proposal_adapter_id)
+    static_expected_role: str | None = {
+        "llm_direct/v1": "direct_proposal",
+        "llm_react/v1": "react_action",
+        "llambo_uav/v1": "llambo_proposal",
+        "dronedream_fixed_two_turn/v1": None,
+        "dronedream_adaptive_1_4/v1": None,
+    }[arm.proposal_adapter_id]
+    expected_trigger = {
+        "llm_direct/v1": "benchmark-llm-direct-v1",
+        "llm_react/v1": "benchmark-llm-react-v1",
+        "llambo_uav/v1": "benchmark-llambo-uav-v1",
+        "dronedream_fixed_two_turn/v1": "benchmark-fixed-two-turn-v1",
+        "dronedream_adaptive_1_4/v1": BENCHMARK_ADAPTIVE_TRIGGER_POLICY_VERSION,
+    }[arm.proposal_adapter_id]
+    static_expected_reason: list[str] | None = {
+        "llm_direct/v1": ["preregistered-direct-turn"],
+        "llm_react/v1": ["bounded-react-turn"],
+        "llambo_uav/v1": ["preregistered-llambo-uav-turn"],
+        "dronedream_fixed_two_turn/v1": None,
+        "dronedream_adaptive_1_4/v1": None,
+    }[arm.proposal_adapter_id]
+
+    def _adaptive_review_reasons(
+        turn: models.HarnessCognitiveTurnReceipt,
+    ) -> list[str] | None:
+        if turn.turn_index == 1:
+            return ["adaptive-plan-turn"]
+        if turn.turn_index == 2:
+            return ["adaptive-revision-turn"]
+        if turn.turn_index not in {3, 4}:
+            return None
+        revision = db.scalar(
+            select(models.BenchmarkLLMPlanRevisionCheckpoint).where(
+                models.BenchmarkLLMPlanRevisionCheckpoint.job_id == turn.job_id,
+                models.BenchmarkLLMPlanRevisionCheckpoint.run_binding_id == run.id,
+                models.BenchmarkLLMPlanRevisionCheckpoint.adapter_id
+                == "dronedream_adaptive_1_4/v1",
+                models.BenchmarkLLMPlanRevisionCheckpoint.generation_index == turn.generation_index,
+                models.BenchmarkLLMPlanRevisionCheckpoint.turn_index == 2,
+                models.BenchmarkLLMPlanRevisionCheckpoint.turn_role == "revision",
+            )
+        )
+        if (
+            revision is None
+            or canonical_sha256(revision.state_json) != revision.state_sha256
+            or not isinstance(revision.state_json, dict)
+        ):
+            return None
+        trigger_payload = revision.state_json.get("trigger_decision")
+        if not isinstance(trigger_payload, dict):
+            return None
+        try:
+            trigger = BenchmarkAdaptiveTriggerDecisionV1.model_validate_json(
+                canonical_json_bytes(trigger_payload)
+            )
+        except ValidationError:
+            return None
+        return list(trigger.diagnosis_reasons if turn.turn_index == 3 else trigger.critic_reasons)
+
+    def _turn_contract_matches(turn: models.HarnessCognitiveTurnReceipt) -> bool:
+        turn_expected_role: str | None
+        turn_expected_reason: list[str] | None
+        if arm.proposal_adapter_id == "dronedream_fixed_two_turn/v1":
+            turn_expected_role = "plan" if turn.turn_index == 1 else "revision"
+            turn_expected_reason = [
+                "fixed-plan-turn" if turn.turn_index == 1 else "fixed-revision-turn"
+            ]
+        elif arm.proposal_adapter_id == "dronedream_adaptive_1_4/v1":
+            turn_expected_role = {
+                1: "plan",
+                2: "revision",
+                3: "diagnosis",
+                4: "critic",
+            }.get(turn.turn_index)
+            turn_expected_reason = _adaptive_review_reasons(turn)
+        else:
+            turn_expected_role = static_expected_role
+            turn_expected_reason = static_expected_reason
+        return bool(
+            turn.turn_role == turn_expected_role
+            and 1 <= turn.turn_index <= policy.maximum_turns_per_generation
+            and turn.trigger_policy_version == expected_trigger
+            and turn_expected_reason is not None
+            and turn.trigger_reasons_json == turn_expected_reason
+            and turn.source_commit == source_commit
+            and turn.model_snapshot == run.job.openai_model
+        )
+
+    if any(not _turn_contract_matches(turn) for turn in turns):
         _blocked(
             "benchmark_provider_turn_contract_drift",
-            "Cognitive ledger contains work outside the direct arm contract.",
+            "Cognitive ledger contains work outside the bound LLM arm contract.",
         )
     requests = list(
         db.scalars(
@@ -442,9 +532,25 @@ def reconcile_direct_provider_run_usage(
         ) from exc
 
 
+def reconcile_direct_provider_run_usage(
+    db: Session,
+    run_binding_id: str,
+) -> BenchmarkProviderRunUsageReconciliationV1:
+    """Backward-compatible direct-arm entry point."""
+
+    run = db.get(models.BenchmarkCampaignRunBinding, run_binding_id)
+    if run is None or run.arm.proposal_adapter_id != "llm_direct/v1":
+        _blocked(
+            "benchmark_provider_reconciliation_arm_unsupported",
+            "The direct reconciliation entry point requires llm_direct/v1.",
+        )
+    return reconcile_provider_run_usage(db, run_binding_id)
+
+
 __all__ = [
     "BENCHMARK_DIRECT_RESERVATION_REASON",
     "BenchmarkProviderUsageBlocked",
     "reconcile_direct_provider_run_usage",
+    "reconcile_provider_run_usage",
     "validate_provider_run_reservation",
 ]

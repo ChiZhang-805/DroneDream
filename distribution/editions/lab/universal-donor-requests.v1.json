@@ -5,7 +5,7 @@
   "requestingEdition": "lab",
   "authority": {
     "branch": "codex/software",
-    "observedHead": "39d19414e4ac6649288726195f74afaf6dc58123",
+    "observedHead": "b099ed00923e9f2b833f812ad79f1614529038de",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "labMayCarrySharedFixLongTerm": false,
     "integrationRule": "review exact donor ancestry and diff, then forward-sync the canonical change without hand-copying or blindly cherry-picking"
@@ -14,7 +14,17 @@
     {
       "requestId": "universal-nsis-existing-install-quiesce-v1",
       "ownership": "Universal/Core",
-      "state": "requested-not-delivered",
+      "state": "delivered-exact-donor-forward-synced",
+      "exactDonor": {
+        "commit": "b099ed00923e9f2b833f812ad79f1614529038de",
+        "parent": "39d19414e4ac6649288726195f74afaf6dc58123",
+        "changedPaths": [
+          "desktop/scripts/verify-nsis-template.ps1",
+          "desktop/src-tauri/nsis/runtime-mode.nsh",
+          "desktop/src-tauri/src/installer_handoff.rs"
+        ],
+        "integration": "merge-parent-preserved"
+      },
       "evidence": {
         "labArtifactSourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
         "artifactSha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
@@ -43,7 +53,7 @@
       "ownership": "Universal/Core",
       "state": "awaiting-exact-donor",
       "evidence": {
-        "observedUniversalHead": "39d19414e4ac6649288726195f74afaf6dc58123",
+        "observedUniversalHead": "b099ed00923e9f2b833f812ad79f1614529038de",
         "browserAuthPath": "desktop/src-tauri/src/browser_auth.rs",
         "browserAuthGitObjectId": "8bec964e39a9fed851746d2f35285f8c17e7ce62",
         "currentCallbackIsEditionBound": false,
@@ -67,10 +77,64 @@
         "Reject callback, state, nonce, verifier, vault, or session material issued for another Edition.",
         "Add cross-Edition fake tests for Universal, Sim, Lab, and Field plus replay, mismatch, cancellation, and missing-identity negatives."
       ]
+    },
+    {
+      "requestId": "universal-large-edition-lockup-brand-v1",
+      "ownership": "Universal/Core",
+      "state": "awaiting-exact-donor",
+      "evidence": {
+        "approvedDisplayName": "DroneDream · LAB",
+        "separatorCodePoint": "U+00B7",
+        "approvedEditionSuffixCapHeightRatio": 0.9,
+        "currentDotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+        "currentDotLockupState": "superseded-for-future-release",
+        "markAndIconRemainCanonical": true,
+        "labPaletteRemainsCanonical": true,
+        "universalStylesContractFailure": "edition-brand.generated.css defines the tokens, but stylesContract.test.ts scans styles.css alone"
+      },
+      "candidatePaths": [
+        "brand/brand-editions.v1.json",
+        "brand/generated/brand-assets.v1.json",
+        "brand/generated/brand-visual-receipt.v1.json",
+        "brand/generated/lab/lockup-primary.png",
+        "brand/generated/lab/lockup-compact.png",
+        "frontend/src/brand/edition-brand.generated.css",
+        "frontend/src/__tests__/stylesContract.test.ts"
+      ],
+      "acceptance": [
+        "Publish an exact clean canonical donor commit, manifest, per-file SHA-256 values, and render receipt for the approved large Edition suffix.",
+        "Keep the LAB mark, generated Windows icon, #A7E84A/#20C77A/#087E69 gradient, #F3FCEF light surface, and #092019 dark surface unchanged.",
+        "Use the exact canonical lockup bytes across sidebar, launcher, login, browser callback, installer-facing resources, taskbar, shortcuts, Website cards, and download metadata.",
+        "Make the public stylesheet contract validate imported generated Edition tokens without duplicating token definitions into Lab-owned CSS.",
+        "Do not source from visualizations or concept directories, redraw geometry, replace U+00B7, or let visual mode grant hardware authority."
+      ]
+    },
+    {
+      "requestId": "universal-edition-safety-fixture-binding-v1",
+      "ownership": "Universal/Core",
+      "state": "requested-not-delivered",
+      "evidence": {
+        "universalFixtureEditionManifestSha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356",
+        "labEditionManifestSha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67",
+        "runtimeTestResult": "215-passed-2-failed",
+        "failureReason": "runtime.edition.hash-mismatch",
+        "productionDecision": "deny",
+        "zeroValidatedPackBoundaryPreserved": true
+      },
+      "candidatePaths": [
+        "distribution/tests/fixtures/edition-safety-cases.v1.json",
+        "runtime/tests/test_edition_safety_gate.py",
+        "backend/tests/test_distribution_safety.py"
+      ],
+      "acceptance": [
+        "Parameterize the test-only allow fixture with the exact active Edition manifest hash and refresh every dependent context hash.",
+        "Keep a separate negative test proving that a mismatched Edition manifest hash is denied.",
+        "Do not change production validation, permit frontend authority, or create an allow path for the zero-validated-pack catalog."
+      ]
     }
   ],
   "labRecovery": {
-    "nextStep": "wait for exact clean Universal donor commits, audit ancestry and changed paths, then forward-sync and request a new gated Lab build",
+    "nextStep": "validate the synced NSIS donor offline, then wait for exact Universal auth and large-suffix brand donors before requesting a new gated Lab build",
     "rebuildAuthorizedByThisRequest": false,
     "installAuthorizedByThisRequest": false,
     "frozenArtifactMayBecomeFinalWithoutRebuild": false
