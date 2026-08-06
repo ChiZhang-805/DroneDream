@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/universal-1.0.0.v1.json"
 OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
+FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
 HANDOFF = ROOT / "distribution/universal/release/website-exact-exe-handoff.v1.json"
 ENGINE_PACK_TOOL = ROOT / "engine-pack/tools/engine_pack.py"
 
@@ -114,3 +115,22 @@ def test_website_contract_publishes_exact_four_files_without_rename() -> None:
         "DroneDream-Universal-1.0.0.exe.receipt.json",
     ]
     assert handoff["consistency"]["updaterSignatureRequired"] is True  # type: ignore[index]
+
+
+def test_existing_candidate_finalizer_preserves_product_source_and_never_rebuilds() -> None:
+    finalizer = FINALIZER.read_text(encoding="utf-8-sig")
+    for fragment in (
+        'ValidatePattern("^[0-9a-f]{40}$")',
+        'DroneDream-Universal_1.0.0_x64-setup.exe',
+        'DroneDream-Universal-1.0.0.exe',
+        'finalizerToolHeadIsProductSource = $false',
+        'candidate-awaiting-isolated-red-lifecycle-validation',
+        'rebuildProhibited -ne $true',
+        'exactCleanProductSourceCommit = $ProductSourceCommit',
+        'buildCount = 1',
+        'releaseReady = $false',
+    ):
+        assert fragment in finalizer
+    assert "tauri build" not in finalizer
+    assert "npm.cmd" not in finalizer
+    assert "engine_pack.py" not in finalizer

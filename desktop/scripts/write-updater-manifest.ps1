@@ -2,6 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$BundleDirectory,
     [string]$Repository = "ChiZhang-805/DroneDream",
+    [ValidatePattern("^[A-Za-z0-9.-]+$")]
+    [string]$InstallerProductName = "DroneDream",
     [string]$SourceCommit,
     [UInt64]$BuildNumber
 )
@@ -32,7 +34,7 @@ if ($BuildNumber -eq 0) {
     }
     $BuildNumber = [UInt64]$rawBuildNumber
 }
-$installerName = "DroneDream_${version}_x64-setup.exe"
+$installerName = "${InstallerProductName}_${version}_x64-setup.exe"
 $installerPath = Join-Path $bundleDirectoryFull $installerName
 $signaturePath = "$installerPath.sig"
 

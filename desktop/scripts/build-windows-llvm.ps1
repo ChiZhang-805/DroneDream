@@ -302,6 +302,7 @@ if (-not $AllowUnsignedUpdater) {
     }
     & (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
         -BundleDirectory $bundleDirectory `
+        -InstallerProductName $ExpectedProductName `
         -SourceCommit $releaseSourceCommit `
         -BuildNumber ([UInt64]$releaseBuildNumber)
 }
