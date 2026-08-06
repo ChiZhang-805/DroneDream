@@ -26,11 +26,17 @@ CONTRACT_PATH = (
 SNAPSHOT_TOOL_PATH = (
     ROOT / "distribution" / "tools" / "capture_field_host_snapshot.ps1"
 )
+EXECUTOR_PATH = (
+    ROOT / "distribution" / "tools" / "execute_field_host_contained_acceptance.ps1"
+)
 PREVIOUS_EVIDENCE = (
     ROOT / "artifacts" / "test-runs" / "field-install-acceptance-readiness-0f86ba8"
 )
 CURRENT_EVIDENCE = (
-    ROOT / "artifacts" / "test-runs" / "field-host-contained-readiness-8a767e0"
+    ROOT
+    / "artifacts"
+    / "test-runs"
+    / "field-host-contained-readiness-76efd06-coexistence"
 )
 
 SPEC = importlib.util.spec_from_file_location("field_host_contained_readiness_tests", TOOL_PATH)
@@ -76,6 +82,7 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
             },
             "paths": {
                 "universalInstall": path(True),
+                "simDefaultInstall": path(False),
                 "labDefaultInstall": path(False),
                 "fieldDefaultInstall": path(False),
                 "ownedRoot": path(False),
@@ -93,6 +100,7 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
             },
             "registry": {
                 "universalUninstall": self.registry(True, {"DisplayName": "DroneDream"}),
+                "simUninstall": self.registry(False),
                 "labUninstall": self.registry(False),
                 "fieldUninstall": self.registry(False),
                 "fieldProduct": self.registry(False),
@@ -101,6 +109,8 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
             "shortcuts": {
                 "universalStartMenu": self.shortcut(True),
                 "universalDesktop": self.shortcut(True),
+                "simStartMenu": self.shortcut(False),
+                "simDesktop": self.shortcut(False),
                 "labStartMenu": self.shortcut(False),
                 "labDesktop": self.shortcut(False),
                 "fieldStartMenu": self.shortcut(False),
@@ -144,8 +154,12 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         ):
             values = [item[key].casefold() for item in identities]
             self.assertEqual(len(values), len(set(values)), key)
-        self.assertEqual(identities[2]["productName"], "DroneDream · FIELD")
-        self.assertEqual(identities[2]["bundleId"], "io.dronedream.desktop.field")
+        self.assertEqual([item["editionId"] for item in identities], ["universal", "sim", "lab", "field"])
+        self.assertEqual(identities[-1]["productName"], "DroneDream · FIELD")
+        self.assertEqual(identities[-1]["bundleId"], "io.dronedream.desktop.field")
+        self.assertEqual(contract["fieldNamespaces"]["appUserModelId"], "io.dronedream.desktop.field")
+        self.assertTrue(contract["fieldNamespaces"]["updaterEndpoint"].endswith("/field-latest.json"))
+        self.assertEqual(contract["fieldNamespaces"]["enginePackProfileId"], "field-lightweight")
 
     def test_source_audit_enumerates_writes_and_absent_system_surfaces(self) -> None:
         audit = host_readiness.audit_source(self.contract())
@@ -155,6 +169,10 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertTrue(checks["no-service-task-autorun-create"])
         self.assertTrue(checks["shared-handoff-identified"])
         self.assertTrue(checks["field-ui-no-device-api"])
+        self.assertTrue(checks["field-updater-endpoint"])
+        self.assertTrue(checks["field-profile-and-icon"])
+        self.assertTrue(checks["executor-owned-environment"])
+        self.assertTrue(checks["executor-budget-and-rollback"])
 
     def test_requestable_plan_preserves_vm_evidence_and_claims_no_vm_isolation(self) -> None:
         plan = self.plan()
@@ -205,6 +223,10 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
             },
         )
         self.assertEqual(contract["processEnvironment"]["HTTP_PROXY"], "http://127.0.0.1:9")
+        self.assertIn(
+            "--disable-background-networking",
+            contract["processEnvironment"]["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"],
+        )
         self.assertFalse(contract["preconditions"]["hardwareAndDeviceAccessAllowed"])
 
     def test_old_vm_evidence_is_byte_preserved(self) -> None:
@@ -243,6 +265,19 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertNotIn("Start-Service", source)
         self.assertIn("--runtime-operation-status", source)
         self.assertIn("--installer-handoff-status", source)
+
+    def test_executor_has_exact_budget_cleanup_and_protected_state_gates(self) -> None:
+        source = EXECUTOR_PATH.read_text(encoding="utf-8")
+        self.assertIn("installer invocation budget exhausted", source)
+        self.assertIn("application launch budget exhausted", source)
+        self.assertIn("Assert-ProtectedState", source)
+        self.assertIn("Remove-ProvenNewPath", source)
+        self.assertIn("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", source)
+        self.assertIn("System.AppUserModel.ID", source)
+        self.assertIn("$FieldIconSha256", source)
+        self.assertNotIn("New-NetFirewallRule", source)
+        self.assertNotIn("Start-Service", source)
+        self.assertNotIn("Get-PnpDevice", source)
 
     def test_schema_is_closed_and_covers_plan_readiness_and_execution(self) -> None:
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))

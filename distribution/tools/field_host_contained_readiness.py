@@ -28,6 +28,16 @@ NSIS_PATH = ROOT / "desktop" / "src-tauri" / "nsis" / "installer.nsi"
 HANDOFF_PATH = ROOT / "desktop" / "src-tauri" / "src" / "installer_handoff.rs"
 FIELD_APP_PATH = ROOT / "frontend" / "src" / "field" / "FieldApp.tsx"
 FIELD_SAFETY_PATH = ROOT / "frontend" / "src" / "field" / "safety.ts"
+EXECUTOR_PATH = (
+    ROOT / "distribution" / "tools" / "execute_field_host_contained_acceptance.ps1"
+)
+ARTIFACT_MANIFEST_PATH = (
+    ROOT
+    / "artifacts"
+    / "test-runs"
+    / "field-preview-1.0.0-c7e25b3"
+    / "artifact-manifest.json"
+)
 
 PLAN_KIND = "dronedream-field-host-contained-install-plan"
 READINESS_KIND = "dronedream-field-host-contained-green-readiness-receipt"
@@ -110,6 +120,7 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
             "claimsVmLevelIsolation",
             "artifact",
             "productIdentities",
+            "fieldNamespaces",
             "ownedPaths",
             "writeSurfaces",
             "absentWriteSurfaces",
@@ -142,7 +153,7 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     }:
         raise FieldHostContainedError("frozen Field artifact binding drifted")
     identities = contract["productIdentities"]
-    if [item["editionId"] for item in identities] != ["universal", "lab", "field"]:
+    if [item["editionId"] for item in identities] != ["universal", "sim", "lab", "field"]:
         raise FieldHostContainedError("edition identity order drifted")
     for key in (
         "productName",
@@ -156,8 +167,18 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         values = [item[key].casefold() for item in identities]
         if len(values) != len(set(values)):
             raise FieldHostContainedError(f"edition identity collision: {key}")
-    if identities[2]["productName"] != FIELD_PRODUCT or identities[2]["bundleId"] != FIELD_BUNDLE_ID:
+    if identities[-1]["productName"] != FIELD_PRODUCT or identities[-1]["bundleId"] != FIELD_BUNDLE_ID:
         raise FieldHostContainedError("Field product identity drifted")
+    if contract["fieldNamespaces"] != {
+        "windowAndDisplayName": FIELD_PRODUCT,
+        "appUserModelId": FIELD_BUNDLE_ID,
+        "updaterEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json",
+        "enginePackProfileId": "field-lightweight",
+        "dataNamespace": FIELD_BUNDLE_ID,
+        "installedIconRelativePath": "icons\\DroneDream.ico",
+        "canonicalIconSha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",
+    }:
+        raise FieldHostContainedError("Field updater/profile/data/icon namespace drifted")
     absent = contract["absentWriteSurfaces"]
     if not all(absent.values()):
         raise FieldHostContainedError("forbidden write surface was enabled")
@@ -179,6 +200,15 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
             raise FieldHostContainedError(f"{key} must redirect to an owned path")
     if environment["HTTP_PROXY"] != "http://127.0.0.1:9" or environment["HTTPS_PROXY"] != "http://127.0.0.1:9":
         raise FieldHostContainedError("external network proxy deny drifted")
+    browser_arguments = environment["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"]
+    for marker in (
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--proxy-server=127.0.0.1:9",
+        "--proxy-bypass-list=<-loopback>",
+    ):
+        if marker not in browser_arguments:
+            raise FieldHostContainedError("WebView2 network deny arguments drifted")
     if contract["preconditions"]["webView2RepairAllowed"] is not False:
         raise FieldHostContainedError("shared WebView2 repair cannot be allowed")
     if contract["rollback"]["evidenceDeletionAllowed"] is not False:
@@ -196,6 +226,8 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
     handoff = HANDOFF_PATH.read_text(encoding="utf-8")
     field_app = FIELD_APP_PATH.read_text(encoding="utf-8")
     field_safety = FIELD_SAFETY_PATH.read_text(encoding="utf-8")
+    executor = EXECUTOR_PATH.read_text(encoding="utf-8")
+    artifact_manifest = load_json(ARTIFACT_MANIFEST_PATH)
 
     checks: list[dict[str, Any]] = []
 
@@ -204,6 +236,12 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
 
     check("field-product-name", field.get("productName") == FIELD_PRODUCT, "tauri.field.conf.json:productName")
     check("field-bundle-id", field.get("identifier") == FIELD_BUNDLE_ID, "tauri.field.conf.json:identifier")
+    check(
+        "field-updater-endpoint",
+        field.get("plugins", {}).get("updater", {}).get("endpoints")
+        == [contract["fieldNamespaces"]["updaterEndpoint"]],
+        "tauri.field.conf.json:plugins.updater.endpoints",
+    )
     check(
         "current-user-install",
         base.get("bundle", {}).get("windows", {}).get("nsis", {}).get("installMode") == "currentUser",
@@ -226,6 +264,35 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
     check("field-ui-no-native-invoke", "invoke(" not in field_app and "@tauri-apps/api" not in field_app, "FieldApp.tsx")
     check("field-ui-no-device-api", all(marker not in (field_app + field_safety).lower() for marker in ("navigator.serial", "navigator.usb", "serialport", "webusb")), "Field frontend sources")
     check("field-controls-disabled", "disabled" in field_app and "FIELD_HARDWARE_ACTIONS" in field_app, "FieldApp.tsx controls")
+    check(
+        "field-profile-and-icon",
+        artifact_manifest.get("payload", {}).get("enginePack", {}).get("profileId")
+        == contract["fieldNamespaces"]["enginePackProfileId"]
+        and artifact_manifest.get("branding", {}).get("fieldIconSha256")
+        == contract["fieldNamespaces"]["canonicalIconSha256"],
+        "frozen artifact manifest profile and branding",
+    )
+    check(
+        "executor-owned-environment",
+        all(
+            marker in executor
+            for marker in (
+                "$env:LOCALAPPDATA = $RedirectedLocal",
+                "$env:APPDATA = $RedirectedRoaming",
+                "$env:TEMP = $RedirectedTemp",
+                "$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+            )
+        ),
+        "execute_field_host_contained_acceptance.ps1 environment",
+    )
+    check(
+        "executor-budget-and-rollback",
+        "installer invocation budget exhausted" in executor
+        and "application launch budget exhausted" in executor
+        and "Remove-ProvenNewPath" in executor
+        and "Assert-ProtectedState" in executor,
+        "execute_field_host_contained_acceptance.ps1 execution gates",
+    )
     return {
         "passed": all(item["passed"] for item in checks),
         "checks": checks,
@@ -238,6 +305,8 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
                 HANDOFF_PATH,
                 FIELD_APP_PATH,
                 FIELD_SAFETY_PATH,
+                EXECUTOR_PATH,
+                ARTIFACT_MANIFEST_PATH,
             )
         },
     }
@@ -325,6 +394,7 @@ def create_plan(
             "ownedPaths": deepcopy(contract["ownedPaths"]),
             "protectedState": deepcopy(contract["protectedState"]),
         },
+        "fieldNamespaces": deepcopy(contract["fieldNamespaces"]),
         "sourceAudit": source_audit,
         "writeSurfaces": deepcopy(contract["writeSurfaces"]),
         "absentWriteSurfaces": deepcopy(contract["absentWriteSurfaces"]),
@@ -381,6 +451,8 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
         raise FieldHostContainedError("previous VM evidence binding drifted")
     if plan["artifact"]["sha256"] != ARTIFACT_SHA256:
         raise FieldHostContainedError("artifact binding drifted")
+    if plan["fieldNamespaces"] != validate_contract(load_json(CONTRACT_PATH))["fieldNamespaces"]:
+        raise FieldHostContainedError("Field namespace binding drifted")
     if plan["environment"]["claimsVmLevelIsolation"] is not False:
         raise FieldHostContainedError("host-contained plan cannot claim VM isolation")
     if plan["authorization"]["executionPerformed"] is not False:

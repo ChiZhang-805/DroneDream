@@ -59,6 +59,7 @@ PROTECTED_EVIDENCE_PREFIXES = ("artifacts/test-runs/",)
 FIELD_EVIDENCE_PREFIXES = (
     "artifacts/test-runs/field-preview-",
     "artifacts/test-runs/field-install-acceptance-",
+    "artifacts/test-runs/field-host-contained-",
 )
 FIELD_BRANDING_MANIFEST = Path("distribution/editions/field/branding/source-manifest.v1.json")
 FIELD_TAURI_CONFIG = Path("desktop/src-tauri/tauri.field.conf.json")

@@ -76,6 +76,9 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertTrue(
             all(item["classification"] == "field-specific-contract" for item in field_evidence)
         )
+        self.assertTrue(
+            any("field-host-contained-" in item["path"] for item in field_evidence)
+        )
 
     def test_backflow_plan_excludes_field_specific_contract_implementations(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)

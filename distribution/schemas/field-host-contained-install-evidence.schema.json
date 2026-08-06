@@ -63,7 +63,7 @@
     "processEnvironment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["LOCALAPPDATA", "APPDATA", "TEMP", "TMP", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"],
+      "required": ["LOCALAPPDATA", "APPDATA", "TEMP", "TMP", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"],
       "properties": {
         "LOCALAPPDATA": {"const": "ownedPaths.redirectedLocalAppData"},
         "APPDATA": {"const": "ownedPaths.redirectedRoamingAppData"},
@@ -71,7 +71,8 @@
         "TMP": {"const": "ownedPaths.redirectedTemp"},
         "HTTP_PROXY": {"const": "http://127.0.0.1:9"},
         "HTTPS_PROXY": {"const": "http://127.0.0.1:9"},
-        "NO_PROXY": {"const": "127.0.0.1,localhost"}
+        "NO_PROXY": {"const": "127.0.0.1,localhost"},
+        "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": {"const": "--disable-background-networking --disable-component-update --disable-domain-reliability --disable-sync --metrics-recording-only --no-first-run --proxy-server=127.0.0.1:9 --proxy-bypass-list=<-loopback>"}
       }
     },
     "ownedPaths": {
@@ -85,6 +86,20 @@
         "redirectedRoamingAppData": {"type": "string", "minLength": 1},
         "redirectedTemp": {"type": "string", "minLength": 1},
         "evidenceRoot": {"type": "string", "minLength": 1}
+      }
+    },
+    "fieldNamespaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["windowAndDisplayName", "appUserModelId", "updaterEndpoint", "enginePackProfileId", "dataNamespace", "installedIconRelativePath", "canonicalIconSha256"],
+      "properties": {
+        "windowAndDisplayName": {"const": "DroneDream · FIELD"},
+        "appUserModelId": {"const": "io.dronedream.desktop.field"},
+        "updaterEndpoint": {"const": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json"},
+        "enginePackProfileId": {"const": "field-lightweight"},
+        "dataNamespace": {"const": "io.dronedream.desktop.field"},
+        "installedIconRelativePath": {"const": "icons\\DroneDream.ico"},
+        "canonicalIconSha256": {"const": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559"}
       }
     },
     "absentWriteSurfaces": {
@@ -232,7 +247,7 @@
     "plan": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schemaVersion", "kind", "editionId", "state", "source", "previousVmEvidence", "artifact", "environment", "sourceAudit", "writeSurfaces", "absentWriteSurfaces", "invocationBudget", "phases", "preconditions", "rollback", "safetyBoundary", "authorization", "websiteGate", "blockers", "planSha256"],
+      "required": ["schemaVersion", "kind", "editionId", "state", "source", "previousVmEvidence", "artifact", "environment", "fieldNamespaces", "sourceAudit", "writeSurfaces", "absentWriteSurfaces", "invocationBudget", "phases", "preconditions", "rollback", "safetyBoundary", "authorization", "websiteGate", "blockers", "planSha256"],
       "properties": {
         "schemaVersion": {"const": 1},
         "kind": {"const": "dronedream-field-host-contained-install-plan"},
@@ -242,6 +257,7 @@
         "previousVmEvidence": {"$ref": "#/$defs/previousVmEvidence"},
         "artifact": {"$ref": "#/$defs/artifact"},
         "environment": {"$ref": "#/$defs/environment"},
+        "fieldNamespaces": {"$ref": "#/$defs/fieldNamespaces"},
         "sourceAudit": {"$ref": "#/$defs/sourceAudit"},
         "writeSurfaces": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/writeSurface"}},
         "absentWriteSurfaces": {"$ref": "#/$defs/absentWriteSurfaces"},

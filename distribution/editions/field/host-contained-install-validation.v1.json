@@ -25,6 +25,16 @@
       "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream.lnk"
     },
     {
+      "editionId": "sim",
+      "productName": "DroneDream · SIM",
+      "bundleId": "io.dronedream.sim",
+      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream · SIM",
+      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · SIM",
+      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream · SIM",
+      "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · SIM.lnk",
+      "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · SIM.lnk"
+    },
+    {
       "editionId": "lab",
       "productName": "DroneDream · LAB",
       "bundleId": "io.dronedream.desktop.lab",
@@ -45,6 +55,15 @@
       "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk"
     }
   ],
+  "fieldNamespaces": {
+    "windowAndDisplayName": "DroneDream · FIELD",
+    "appUserModelId": "io.dronedream.desktop.field",
+    "updaterEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json",
+    "enginePackProfileId": "field-lightweight",
+    "dataNamespace": "io.dronedream.desktop.field",
+    "installedIconRelativePath": "icons\\DroneDream.ico",
+    "canonicalIconSha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559"
+  },
   "ownedPaths": {
     "hostRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3",
     "installRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\install",
@@ -136,13 +155,17 @@
   },
   "protectedState": [
     "%LOCALAPPDATA%\\DroneDream",
+    "%LOCALAPPDATA%\\DroneDream · SIM",
     "%LOCALAPPDATA%\\DroneDream · LAB",
     "%LOCALAPPDATA%\\DroneDream · FIELD",
     "E:\\DroneDream",
     "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream",
+    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · SIM",
     "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · LAB",
     "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream.lnk",
     "%USERPROFILE%\\Desktop\\DroneDream.lnk",
+    "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · SIM.lnk",
+    "%USERPROFILE%\\Desktop\\DroneDream · SIM.lnk",
     "Microsoft Edge WebView2 shared runtime"
   ],
   "processEnvironment": {
@@ -152,7 +175,8 @@
     "TMP": "ownedPaths.redirectedTemp",
     "HTTP_PROXY": "http://127.0.0.1:9",
     "HTTPS_PROXY": "http://127.0.0.1:9",
-    "NO_PROXY": "127.0.0.1,localhost"
+    "NO_PROXY": "127.0.0.1,localhost",
+    "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": "--disable-background-networking --disable-component-update --disable-domain-reliability --disable-sync --metrics-recording-only --no-first-run --proxy-server=127.0.0.1:9 --proxy-bypass-list=<-loopback>"
   },
   "invocationBudget": {
     "installerExe": 2,
