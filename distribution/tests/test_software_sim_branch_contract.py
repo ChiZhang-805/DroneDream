@@ -115,6 +115,12 @@ YELLOW_ATTEMPT_7_PLAN_PATH = (
     / "desktop"
     / "yellow-build-attempt-7-e181d02-plan-ready.v1.json"
 )
+YELLOW_ATTEMPT_7_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-7-e181d02-cache-drift-preflight-failed.v1.json"
+)
 DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     DISTRIBUTION
     / "sim"
@@ -1023,6 +1029,60 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
         )
         self.assertFalse(protected["frozenArtifact"]["websiteHandoffAllowed"])
+
+    def test_yellow_attempt_7_cache_drift_failure_is_frozen_before_mutation(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_7_FAILURE_PATH)
+        self.assertEqual(receipt["state"], "failed-frozen-no-retry")
+        binding = receipt["authorizationBinding"]
+        self.assertEqual(binding["globalCommandApplicationOrdinal"], 7)
+        self.assertFalse(binding["sameAuthorizationReusable"])
+        self.assertFalse(binding["retryAllowed"])
+        for path_key, bytes_key, sha_key in (
+            ("applicationPath", "applicationBytes", "applicationSha256"),
+            ("entryScriptPath", "entryScriptBytes", "entryScriptSha256"),
+            ("planReceiptPath", "planReceiptBytes", "planReceiptSha256"),
+        ):
+            path = ROOT / binding[path_key]
+            self.assertEqual(path.stat().st_size, binding[bytes_key], path_key)
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                binding[sha_key],
+                path_key,
+            )
+
+        drift = receipt["cacheDrift"]
+        self.assertEqual(drift["fileCountDelta"], -2)
+        self.assertEqual(drift["totalBytesDelta"], -4416)
+        self.assertNotEqual(drift["expectedFingerprint"], drift["observedFingerprint"])
+        self.assertFalse(drift["matchesExpected"])
+        self.assertFalse(drift["cacheWriteBySimObserved"])
+        self.assertFalse(drift["cacheCleanupBySimObserved"])
+
+        counts = receipt["executionCounts"]
+        self.assertEqual(counts["preflightInvocations"], 1)
+        for key, value in counts.items():
+            if key != "preflightInvocations":
+                self.assertEqual(value, 0, key)
+        roots = receipt["ownedRootsAfterFailure"]
+        self.assertEqual(roots["newOwnedRootCount"], 0)
+        self.assertFalse(roots["sourceRootExists"])
+        self.assertFalse(roots["dependencyRootExists"])
+        self.assertFalse(roots["runRootExists"])
+        self.assertFalse(roots["cargoTargetDirExists"])
+        self.assertFalse(roots["cleanupExecuted"])
+
+        protected = receipt["protectedHistory"]
+        self.assertFalse(protected["priorRootsOrReceiptsMutated"])
+        self.assertFalse(protected["frozenArtifactMutated"])
+        self.assertEqual(
+            protected["frozenArtifactSha256AfterFailure"],
+            "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+        )
+        gate = receipt["nextGate"]
+        self.assertFalse(gate["prepareMayProceedFromThisReceipt"])
+        self.assertFalse(gate["executeMayProceedFromThisReceipt"])
+        self.assertTrue(gate["newExactApplicationRequired"])
+        self.assertTrue(gate["newExactYellowAuthorizationRequired"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(

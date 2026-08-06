@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-detached-dependency-yellow-preflight-failure",
+  "editionId": "sim",
+  "state": "failed-frozen-no-retry",
+  "observedAtUtc": "2026-08-06T22:03:54.6150994Z",
+  "authorizationBinding": {
+    "globalCommandApplicationOrdinal": 7,
+    "productSourceCommit": "e181d029278e50788afe8460ec0cafd9c78a6623",
+    "productSourceTree": "bd864336aeb7ecfc3e5f9aa30c779840a4c2cf04",
+    "evidenceHeadAtStart": "46a57f682b1ddb74c1f60f04de6b6f3ca410da2c",
+    "applicationPath": "distribution/sim/desktop/yellow-build-attempt-7-e181d02-application.v1.json",
+    "applicationBytes": 15357,
+    "applicationSha256": "c68b71cc05de01106fe8982287d1dd4ffc8210dafe6c5caadf3833efb8ae018e",
+    "entryScriptPath": "distribution/sim/desktop/invoke-yellow-build-attempt-7-e181d02.ps1",
+    "entryScriptBytes": 22954,
+    "entryScriptSha256": "e698d0744f677b70fb1a566a912a1860cc73f6c43ecd6a7ac6681c464741f72d",
+    "planReceiptPath": "distribution/sim/desktop/yellow-build-attempt-7-e181d02-plan-ready.v1.json",
+    "planReceiptBytes": 5399,
+    "planReceiptSha256": "5c0af56a8edc9a14a3174664d16f17160543897dc7e14a5fb33bfef05aa3fbc7",
+    "sameAuthorizationReusable": false,
+    "retryAllowed": false
+  },
+  "command": {
+    "mode": "Preflight",
+    "exact": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-7-e181d02.ps1 -Mode Preflight",
+    "exitCode": 1,
+    "elapsedSeconds": 32.2,
+    "failureMessage": "The offline npm cache fingerprint drifted."
+  },
+  "cacheDrift": {
+    "root": "C:/Users/zju20/AppData/Local/npm-cache",
+    "algorithm": "sha256-file-lines-v1",
+    "expectedFileCount": 23297,
+    "observedFileCount": 23295,
+    "fileCountDelta": -2,
+    "expectedTotalBytes": 3589712689,
+    "observedTotalBytes": 3589708273,
+    "totalBytesDelta": -4416,
+    "expectedFingerprint": "ddd06a60a0345bf03c6f045efa6a7641f316229e0f1186979fc15a0f3b47480d",
+    "observedFingerprint": "171143c14ca18123dd4057145389777b8c8fbeb43987cc0dbe2249b760249c51",
+    "matchesExpected": false,
+    "cacheWriteBySimObserved": false,
+    "cacheCleanupBySimObserved": false
+  },
+  "executionCounts": {
+    "preflightInvocations": 1,
+    "dependencyPreparations": 0,
+    "npmCiInvocations": 0,
+    "networkInvocations": 0,
+    "dependencyDirectoriesCopied": 0,
+    "junctionsCreated": 0,
+    "buildScriptInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0
+  },
+  "ownedRootsAfterFailure": {
+    "sourceRoot": "C:/Users/zju20/dds7",
+    "sourceRootExists": false,
+    "dependencyRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-f6cd1f826b44b604",
+    "dependencyRootExists": false,
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal7-e181d02",
+    "runRootExists": false,
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-e181d02-ordinal7",
+    "cargoTargetDirExists": false,
+    "newOwnedRootCount": 0,
+    "cleanupExecuted": false
+  },
+  "resourceSnapshotAfterFailure": {
+    "memoryUsedPercent": 58.2,
+    "memoryFreeBytes": 7064547328,
+    "cFreeBytes": 91345186816,
+    "zFreeBytes": 23540088832,
+    "heavyProcessCount": 0
+  },
+  "protectedHistory": {
+    "ordinalFiveSourceRoot": "C:/Users/zju20/dds5",
+    "ordinalSixSourceRoot": "C:/Users/zju20/dds6",
+    "priorRootsOrReceiptsMutated": false,
+    "frozenArtifactPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/bundle/DroneDream-Sim-1.0.0.exe",
+    "frozenArtifactSha256Expected": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "frozenArtifactSha256AfterFailure": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "frozenArtifactMutated": false
+  },
+  "nonClaims": {
+    "dependencyBundlePrepared": false,
+    "junctionCreated": false,
+    "buildStarted": false,
+    "artifactCreated": false,
+    "releaseReady": false
+  },
+  "nextGate": {
+    "prepareMayProceedFromThisReceipt": false,
+    "executeMayProceedFromThisReceipt": false,
+    "cacheDriftMustBeReconciledWithoutMutatingHistoricalEvidence": true,
+    "newExactApplicationRequired": true,
+    "newExactYellowAuthorizationRequired": true
+  }
+}
