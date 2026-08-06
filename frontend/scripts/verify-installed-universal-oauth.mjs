@@ -20,10 +20,13 @@ const cdpEndpoint = required("--cdp-endpoint");
 const outputPath = path.resolve(required("--output"));
 const runtimeReadyTimeoutMs = Number(required("--runtime-ready-timeout-ms"));
 const oauthTimeoutMs = Number(required("--oauth-timeout-ms"));
+const mode = required("--mode");
 
 assert(/^http:\/\/127\.0\.0\.1:\d+$/u.test(cdpEndpoint), "CDP must remain loopback-only");
 assert(Number.isInteger(runtimeReadyTimeoutMs) && runtimeReadyTimeoutMs <= 300_000);
 assert(Number.isInteger(oauthTimeoutMs) && oauthTimeoutMs <= 600_000);
+assert(["oauth", "runtime-diagnosis"].includes(mode), "Unknown installed-app observer mode");
+const runtimeDiagnosisOnly = mode === "runtime-diagnosis";
 
 async function atomicJson(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true });
@@ -51,6 +54,7 @@ const evidence = {
   runtimeReadyObserved: false,
   runtimeActionSettled: false,
   runtimeFailureCode: null,
+  diagnosisComplete: false,
   callbackSessionObserved: false,
   accountSurfaceObserved: false,
   localLogoutObserved: false,
@@ -108,8 +112,10 @@ try {
     await persist("runtime-start-attempted");
     await primary.focus();
     await primary.press("Enter");
-    const runtimeOutcomeHandle = await page.waitForFunction(
-      () => {
+    let runtimeOutcome = "runtime_start_pending_timeout";
+    try {
+      const runtimeOutcomeHandle = await page.waitForFunction(
+        () => {
         const button = document.querySelector(".launcher-primary-action");
         const text = button?.textContent?.replace(/\s+/gu, " ").trim().toLowerCase();
         if (
@@ -137,20 +143,26 @@ try {
         if (normalized.includes("runtime-internal backend")) return "runtime_service_unhealthy";
         if (normalized.includes("did not become healthy")) return "runtime_health_unknown";
         return "runtime_error_unclassified";
-      },
-      undefined,
-      { timeout: runtimeReadyTimeoutMs },
-    );
-    const runtimeOutcome = await runtimeOutcomeHandle.jsonValue();
-    evidence.runtimeActionSettled = true;
+        },
+        undefined,
+        { timeout: runtimeReadyTimeoutMs },
+      );
+      runtimeOutcome = await runtimeOutcomeHandle.jsonValue();
+      evidence.runtimeActionSettled = true;
+    } catch (error) {
+      if (error?.name !== "TimeoutError") throw error;
+    }
     if (runtimeOutcome !== "ready") {
       evidence.runtimeFailureCode = runtimeOutcome;
       await persist("runtime-start-failed");
-      throw new Error("Runtime start failed before browser authentication became available.");
+      if (!runtimeDiagnosisOnly) {
+        throw new Error("Runtime start failed before browser authentication became available.");
+      }
+    } else {
+      evidence.runtimeReadyObserved = true;
+      await persist("runtime-ready");
+      primaryText = normalizedButtonText(await primary.innerText());
     }
-    evidence.runtimeReadyObserved = true;
-    await persist("runtime-ready");
-    primaryText = normalizedButtonText(await primary.innerText());
   } else if (isSignIn(primaryText)) {
     evidence.runtimeReadyObserved = true;
     evidence.runtimeActionSettled = true;
@@ -159,44 +171,50 @@ try {
     throw new Error("Launcher did not expose the bounded Runtime-start or Universal sign-in action");
   }
 
-  assert(isSignIn(primaryText), "Runtime became ready without exposing the Universal sign-in action");
-  counts.loginButton += 1;
-  counts.oauthTransaction += 1;
-  await persist("oauth-attempted");
-  await primary.focus();
-  await primary.press("Enter");
+  if (runtimeDiagnosisOnly) {
+    evidence.diagnosisComplete = true;
+    evidence.passed = true;
+    await persist("runtime-diagnosis-completed");
+  } else {
+    assert(isSignIn(primaryText), "Runtime became ready without exposing the Universal sign-in action");
+    counts.loginButton += 1;
+    counts.oauthTransaction += 1;
+    await persist("oauth-attempted");
+    await primary.focus();
+    await primary.press("Enter");
 
-  await page.waitForFunction(
-    () => window.location.pathname === "/assistant" && Boolean(document.querySelector(".app-account-button")),
-    undefined,
-    { timeout: oauthTimeoutMs },
-  );
-  evidence.callbackSessionObserved = true;
-  evidence.accountSurfaceObserved = true;
-  evidence.postCallbackPath = await page.evaluate(() => window.location.pathname);
+    await page.waitForFunction(
+      () => window.location.pathname === "/assistant" && Boolean(document.querySelector(".app-account-button")),
+      undefined,
+      { timeout: oauthTimeoutMs },
+    );
+    evidence.callbackSessionObserved = true;
+    evidence.accountSurfaceObserved = true;
+    evidence.postCallbackPath = await page.evaluate(() => window.location.pathname);
 
-  const accountButton = page.locator(".app-account-button:visible").first();
-  await accountButton.focus();
-  await accountButton.press("Enter");
-  const accountDialog = page.locator(".account-dialog");
-  await accountDialog.waitFor({ state: "visible" });
-  const signOut = accountDialog.locator(".account-sign-out");
-  await signOut.waitFor({ state: "visible" });
-  counts.localLogout += 1;
-  await persist("local-logout-attempted");
-  await signOut.focus();
-  await signOut.press("Enter");
-  await signOut.waitFor({ state: "hidden", timeout: 30_000 });
-  evidence.localLogoutObserved = true;
+    const accountButton = page.locator(".app-account-button:visible").first();
+    await accountButton.focus();
+    await accountButton.press("Enter");
+    const accountDialog = page.locator(".account-dialog");
+    await accountDialog.waitFor({ state: "visible" });
+    const signOut = accountDialog.locator(".account-sign-out");
+    await signOut.waitFor({ state: "visible" });
+    counts.localLogout += 1;
+    await persist("local-logout-attempted");
+    await signOut.focus();
+    await signOut.press("Enter");
+    await signOut.waitFor({ state: "hidden", timeout: 30_000 });
+    evidence.localLogoutObserved = true;
 
-  assert.deepEqual(counts, {
-    runtimeStart: counts.runtimeStart,
-    loginButton: 1,
-    oauthTransaction: 1,
-    localLogout: 1,
-  });
-  evidence.passed = true;
-  await persist("completed");
+    assert.deepEqual(counts, {
+      runtimeStart: counts.runtimeStart,
+      loginButton: 1,
+      oauthTransaction: 1,
+      localLogout: 1,
+    });
+    evidence.passed = true;
+    await persist("completed");
+  }
 } catch (error) {
   if (counts.runtimeStart === 1 && !evidence.runtimeActionSettled) {
     evidence.runtimeFailureCode = "runtime_start_pending_timeout";

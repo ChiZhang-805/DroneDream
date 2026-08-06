@@ -10,6 +10,7 @@ param(
     [Parameter(Mandatory = $true)][string]$InstalledAppReceipt,
     [Parameter(Mandatory = $true)][ValidatePattern("^[0-9a-f]{64}$")][string]$ExpectedInstalledAppReceiptSha256,
     [Parameter(Mandatory = $true)][string]$OutputRoot,
+    [ValidateSet("oauth", "runtime-diagnosis")][string]$Mode = "oauth",
     [ValidateRange(49152, 65535)][int]$CdpPort = 49321,
     [ValidatePattern("^$|^[0-9a-f]{64}$")][string]$ExpectedPlanSha256 = "",
     [switch]$Execute
@@ -25,8 +26,9 @@ $visibleInstallerPath = (Resolve-Path -LiteralPath $VisibleInstallerReceipt).Pat
 $installedAppPath = (Resolve-Path -LiteralPath $InstalledAppReceipt).Path
 $outputRootPath = [IO.Path]::GetFullPath($OutputRoot)
 $validationRoot = Join-Path (Split-Path -Parent $installerPath) "validation"
-$planPath = Join-Path $outputRootPath "universal-real-oauth-plan.json"
-$executionRoot = Join-Path $outputRootPath "universal-real-oauth-red1"
+$runtimeDiagnosisOnly = $Mode -ceq "runtime-diagnosis"
+$planPath = Join-Path $outputRootPath $(if ($runtimeDiagnosisOnly) { "universal-runtime-diagnosis-plan.json" } else { "universal-real-oauth-plan.json" })
+$executionRoot = Join-Path $outputRootPath $(if ($runtimeDiagnosisOnly) { "universal-runtime-diagnosis-red1" } else { "universal-real-oauth-red1" })
 $receiptPath = Join-Path $executionRoot "receipt.json"
 $observerPath = Join-Path $executionRoot "app-observation.json"
 $webViewProfileRoot = Join-Path $executionRoot "webview2-profile"
@@ -100,7 +102,7 @@ function Import-ObserverCheckpoint([string]$Path, $Counts, $Receipt) {
         }
         $Counts[$key] = [int]$value
     }
-    $allowedStages = @("initialized", "connected", "runtime-start-attempted", "runtime-ready", "runtime-already-ready", "runtime-start-failed", "oauth-attempted", "local-logout-attempted", "completed")
+    $allowedStages = @("initialized", "connected", "runtime-start-attempted", "runtime-ready", "runtime-already-ready", "runtime-start-failed", "runtime-diagnosis-completed", "oauth-attempted", "local-logout-attempted", "completed")
     if ($observation.stage -notin $allowedStages) { throw "Installed-app OAuth observer checkpoint has an unknown stage." }
     $allowedRuntimeFailures = @($null, "runtime_service_unhealthy", "runtime_host_connectivity", "runtime_health_unknown", "runtime_operation_busy", "runtime_update_quiesce_active", "runtime_not_installed", "runtime_error_unclassified", "runtime_start_pending_timeout")
     if ($observation.runtimeFailureCode -notin $allowedRuntimeFailures) {
@@ -239,8 +241,9 @@ $runtime = @($runtimeInventory | Where-Object { $_.name -ceq "DroneDreamRuntime"
 $runtimeRequired = $true
 if ($runtime.Count -ne 1) { throw "The existing DroneDreamRuntime WSL distribution is unavailable; this plan cannot install or register one." }
 $plan = [ordered]@{
-    schemaVersion = 1
-    kind = "dronedream-universal-real-oauth-plan"
+    schemaVersion = 2
+    kind = if ($runtimeDiagnosisOnly) { "dronedream-universal-runtime-diagnosis-plan" } else { "dronedream-universal-real-oauth-plan" }
+    mode = $Mode
     resourceClass = "RED"
     executionAuthorized = $false
     productSourceCommit = $ProductSourceCommit
@@ -256,6 +259,7 @@ $plan = [ordered]@{
         appObservation = $observerPath
     }
     auth = [ordered]@{
+        executionAllowed = (-not $runtimeDiagnosisOnly)
         editionId = "universal"
         authClientId = "dronedream-desktop-universal"
         protocolVersion = "desktop-browser-auth-pkce-v1"
@@ -263,7 +267,7 @@ $plan = [ordered]@{
         existingBrowserCookieMayBeUsed = $true
         browserCredentialInputCap = 0
         browserPasswordStoreReadCap = 0
-        nonCredentialAccountOrConsentActionCap = 1
+        nonCredentialAccountOrConsentActionCap = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
         providerRetryCap = 0
         rawCallbackLoggingAllowed = $false
         tokenCookiePasswordPersistenceAllowed = $false
@@ -284,12 +288,14 @@ $plan = [ordered]@{
         installerFreshSilentNoShortcut = 1
         appLaunch = 1
         runtimeStartMax = 1
-        credentialVaultRestoreProbeMax = 1
-        loginButton = 1
-        oauthTransaction = 1
-        callback = 1
-        authorizationCodeExchange = 1
-        localLogout = 1
+        diagnosisSettlementMax = 1
+        credentialVaultRestoreProbeMax = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
+        loginButton = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
+        oauthTransaction = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
+        callback = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
+        authorizationCodeExchange = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
+        browserAction = 0
+        localLogout = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
         appClose = 1
         isolatedUninstaller = 1
         ownedCleanupMax = 1
@@ -302,25 +308,29 @@ $plan = [ordered]@{
         stopBeforeAnyCredentialInput = $true
         stopOnInstallOrMigrationSurface = $true
         stopOnUnexpectedBrowserOrCallback = $true
+        browserAuthenticationForbidden = $runtimeDiagnosisOnly
+        rawRuntimeErrorPersistenceAllowed = $false
         rollbackWithOwnUninstallerOnly = $true
         preserveFailureEvidence = $true
     }
 }
 
 if (-not $Execute) {
-    if (Test-Path -LiteralPath $outputRootPath) { throw "Refusing to overwrite an existing OAuth plan root." }
+    if (Test-Path -LiteralPath $outputRootPath) { throw "Refusing to overwrite an existing validation plan root." }
     Write-AtomicJson $planPath $plan
-    Write-Host "Universal real OAuth plan frozen; no installer, app, Runtime, browser, auth, PX4, or Gazebo action ran."
+    Write-Host "Universal $Mode plan frozen; no installer, app, Runtime, browser, auth, PX4, or Gazebo action ran."
     exit 0
 }
 
 if (-not $ExpectedPlanSha256) { throw "Execute requires ExpectedPlanSha256." }
 $actualPlanSha = (Get-FileHash -LiteralPath $planPath -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($actualPlanSha -cne $ExpectedPlanSha256) { throw "Frozen OAuth plan SHA drifted." }
-if (Test-Path -LiteralPath $executionRoot) { throw "Refusing to overwrite an existing OAuth execution root." }
+if ($actualPlanSha -cne $ExpectedPlanSha256) { throw "Frozen validation plan SHA drifted." }
+$frozenPlan = Get-Content -LiteralPath $planPath -Raw | ConvertFrom-Json
+if ($frozenPlan.schemaVersion -ne 2 -or $frozenPlan.mode -cne $Mode) { throw "Frozen validation plan mode drifted." }
+if (Test-Path -LiteralPath $executionRoot) { throw "Refusing to overwrite an existing validation execution root." }
 
-$counts = [ordered]@{ installerFreshSilentNoShortcut = 0; appLaunch = 0; runtimeStart = 0; credentialVaultRestoreProbe = 0; loginButton = 0; oauthTransaction = 0; callback = 0; authorizationCodeExchange = 0; localLogout = 0; appClose = 0; isolatedUninstaller = 0; ownedCleanup = 0 }
-$receipt = [ordered]@{ schemaVersion = 1; kind = "dronedream-universal-real-oauth-receipt"; planSha256 = $ExpectedPlanSha256; productSourceCommit = $ProductSourceCommit; toolSourceCommit = $head; artifact = $artifact; startedAt = [DateTime]::UtcNow.ToString("O"); passed = $false; counts = $counts }
+$counts = [ordered]@{ installerFreshSilentNoShortcut = 0; appLaunch = 0; runtimeStart = 0; diagnosisSettlement = 0; credentialVaultRestoreProbe = 0; loginButton = 0; oauthTransaction = 0; callback = 0; authorizationCodeExchange = 0; browserAction = 0; localLogout = 0; appClose = 0; isolatedUninstaller = 0; ownedCleanup = 0 }
+$receipt = [ordered]@{ schemaVersion = 2; kind = if ($runtimeDiagnosisOnly) { "dronedream-universal-runtime-diagnosis-receipt" } else { "dronedream-universal-real-oauth-receipt" }; mode = $Mode; planSha256 = $ExpectedPlanSha256; productSourceCommit = $ProductSourceCommit; toolSourceCommit = $head; artifact = $artifact; startedAt = [DateTime]::UtcNow.ToString("O"); passed = $false; counts = $counts }
 $app = $null
 $installed = $false
 $uninstalled = $false
@@ -355,30 +365,46 @@ try {
         [Environment]::SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", $oldProfile, "Process")
     }
     Wait-Until { (Get-PortRecord $CdpPort).listenerCount -eq 1 } 45 "Installed app did not open loopback CDP."
-    & node $nodeVerifier "--cdp-endpoint=http://127.0.0.1:$CdpPort" "--output=$observerPath" "--runtime-ready-timeout-ms=300000" "--oauth-timeout-ms=600000"
-    if ($LASTEXITCODE -ne 0) { throw "Installed-app OAuth observer failed or stopped before authorization." }
+    & node $nodeVerifier "--cdp-endpoint=http://127.0.0.1:$CdpPort" "--output=$observerPath" "--runtime-ready-timeout-ms=300000" "--oauth-timeout-ms=600000" "--mode=$Mode"
+    if ($LASTEXITCODE -ne 0) { throw "Installed-app $Mode observer failed before its bounded outcome." }
     $observation = Import-ObserverCheckpoint $observerPath $counts $receipt
-    if (-not $observation.passed -or -not $observation.callbackSessionObserved -or -not $observation.localLogoutObserved) { throw "OAuth observer did not prove callback session and local logout." }
+    if ($runtimeDiagnosisOnly) {
+        if (-not $observation.passed -or -not $observation.diagnosisComplete) { throw "Runtime observer did not produce one bounded diagnosis." }
+        $counts.diagnosisSettlement = 1
+        if ($counts.loginButton -ne 0 -or $counts.oauthTransaction -ne 0 -or $counts.callback -ne 0 -or $counts.authorizationCodeExchange -ne 0 -or $counts.browserAction -ne 0 -or $counts.localLogout -ne 0) {
+            throw "Runtime diagnosis attempted a forbidden browser authentication action."
+        }
+        $receipt.runtimeEvidence = [ordered]@{
+            runtimeReadyObserved = [bool]$observation.runtimeReadyObserved
+            runtimeActionSettled = [bool]$observation.runtimeActionSettled
+            runtimeFailureCode = $observation.runtimeFailureCode
+            rawRuntimeErrorRecorded = $false
+            credentialsRecorded = $false
+        }
+    }
+    elseif (-not $observation.passed -or -not $observation.callbackSessionObserved -or -not $observation.localLogoutObserved) { throw "OAuth observer did not prove callback session and local logout." }
 
-    $auditAfter = @(Get-AuditRecords)
-    $oldHashes = @{}; foreach ($entry in $auditBefore) { $oldHashes[$entry.lineSha256] = $true }
-    $newAudit = @($auditAfter | Where-Object { -not $oldHashes.ContainsKey($_.lineSha256) })
-    $vaultProbe = @($newAudit | Where-Object { $_.value.result -ceq "no_saved_session" -and $_.value.callbackTransport -ceq "credential-vault" })
-    $authorized = @($newAudit | Where-Object { $_.value.result -ceq "authorized" -and $_.value.callbackTransport -ceq "loopback-http" })
-    $logout = @($newAudit | Where-Object { $_.value.result -ceq "local_logout" -and $_.value.callbackTransport -ceq "native-command" })
-    if ($vaultProbe.Count -ne 1 -or $authorized.Count -ne 1 -or $logout.Count -ne 1) { throw "Native audit did not prove one empty-vault probe, authorized callback, and local logout." }
-    $counts.credentialVaultRestoreProbe = 1
-    if (-not $authorized[0].value.subjectHash) { throw "Authorized callback omitted the non-sensitive subject hash." }
-    $counts.callback = 1
-    $counts.authorizationCodeExchange = 1
-    $receipt.authEvidence = [ordered]@{
-        subjectHash = $authorized[0].value.subjectHash
-        attemptIdHash = $authorized[0].value.attemptIdHash
-        stateHash = $authorized[0].value.stateHash
-        authorizedReceiptLineSha256 = $authorized[0].lineSha256
-        logoutReceiptLineSha256 = $logout[0].lineSha256
-        rawCallbackRecorded = $false
-        credentialsRecorded = $false
+    if (-not $runtimeDiagnosisOnly) {
+        $auditAfter = @(Get-AuditRecords)
+        $oldHashes = @{}; foreach ($entry in $auditBefore) { $oldHashes[$entry.lineSha256] = $true }
+        $newAudit = @($auditAfter | Where-Object { -not $oldHashes.ContainsKey($_.lineSha256) })
+        $vaultProbe = @($newAudit | Where-Object { $_.value.result -ceq "no_saved_session" -and $_.value.callbackTransport -ceq "credential-vault" })
+        $authorized = @($newAudit | Where-Object { $_.value.result -ceq "authorized" -and $_.value.callbackTransport -ceq "loopback-http" })
+        $logout = @($newAudit | Where-Object { $_.value.result -ceq "local_logout" -and $_.value.callbackTransport -ceq "native-command" })
+        if ($vaultProbe.Count -ne 1 -or $authorized.Count -ne 1 -or $logout.Count -ne 1) { throw "Native audit did not prove one empty-vault probe, authorized callback, and local logout." }
+        $counts.credentialVaultRestoreProbe = 1
+        if (-not $authorized[0].value.subjectHash) { throw "Authorized callback omitted the non-sensitive subject hash." }
+        $counts.callback = 1
+        $counts.authorizationCodeExchange = 1
+        $receipt.authEvidence = [ordered]@{
+            subjectHash = $authorized[0].value.subjectHash
+            attemptIdHash = $authorized[0].value.attemptIdHash
+            stateHash = $authorized[0].value.stateHash
+            authorizedReceiptLineSha256 = $authorized[0].lineSha256
+            logoutReceiptLineSha256 = $logout[0].lineSha256
+            rawCallbackRecorded = $false
+            credentialsRecorded = $false
+        }
     }
 
     if ($app.HasExited) { throw "App exited before the bounded close action." }
@@ -406,12 +432,14 @@ try {
     if ($counts.installerFreshSilentNoShortcut -ne 1 -or
         $counts.appLaunch -ne 1 -or
         $counts.runtimeStart -gt 1 -or
-        $counts.credentialVaultRestoreProbe -ne 1 -or
-        $counts.loginButton -ne 1 -or
-        $counts.oauthTransaction -ne 1 -or
-        $counts.callback -ne 1 -or
-        $counts.authorizationCodeExchange -ne 1 -or
-        $counts.localLogout -ne 1 -or
+        $counts.diagnosisSettlement -gt 1 -or
+        $counts.credentialVaultRestoreProbe -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
+        $counts.loginButton -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
+        $counts.oauthTransaction -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
+        $counts.callback -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
+        $counts.authorizationCodeExchange -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
+        $counts.browserAction -ne 0 -or
+        $counts.localLogout -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.appClose -ne 1 -or
         $counts.isolatedUninstaller -ne 1 -or
         $counts.ownedCleanup -gt 1) {
@@ -454,4 +482,9 @@ finally {
     Write-AtomicJson $receiptPath $receipt
 }
 
-Write-Host "Universal real browser PKCE roundtrip passed with local-only logout; no credentials were read or recorded."
+if ($runtimeDiagnosisOnly) {
+    Write-Host "Universal Runtime diagnosis completed without browser authentication; no credentials or raw Runtime errors were recorded."
+}
+else {
+    Write-Host "Universal real browser PKCE roundtrip passed with local-only logout; no credentials were read or recorded."
+}

@@ -12,7 +12,7 @@ def test_oauth_tool_is_source_bound_and_plan_only_by_default() -> None:
     assert "executionAuthorized = $false" in text
     assert 'Get-GitText @("status", "--porcelain")' in text
     assert "ExpectedPlanSha256" in text
-    assert "Refusing to overwrite an existing OAuth execution root" in text
+    assert "Refusing to overwrite an existing validation execution root" in text
     assert "Product source is not an ancestor" in text
 
 
@@ -24,12 +24,6 @@ def test_oauth_plan_binds_all_prior_success_gates_and_exact_caps() -> None:
         "installerFreshSilentNoShortcut = 1",
         "appLaunch = 1",
         "runtimeStartMax = 1",
-        "credentialVaultRestoreProbeMax = 1",
-        "loginButton = 1",
-        "oauthTransaction = 1",
-        "callback = 1",
-        "authorizationCodeExchange = 1",
-        "localLogout = 1",
         "appClose = 1",
         "isolatedUninstaller = 1",
         "ownedCleanupMax = 1",
@@ -38,6 +32,15 @@ def test_oauth_plan_binds_all_prior_success_gates_and_exact_caps() -> None:
     assert "providerRetryCap = 0" in text
     assert "browserCredentialInputCap = 0" in text
     assert "browserPasswordStoreReadCap = 0" in text
+    for exact in (
+        "credentialVaultRestoreProbeMax",
+        "loginButton",
+        "oauthTransaction",
+        "callback",
+        "authorizationCodeExchange",
+        "localLogout",
+    ):
+        assert f"{exact} = if ($runtimeDiagnosisOnly) {{ 0 }} else {{ 1 }}" in text
     assert "Universal OAuth execution counts drifted from the frozen bounded plan" in text
 
 
@@ -114,6 +117,30 @@ def test_native_runtime_maintenance_preserves_machine_failure_code() -> None:
     assert '.map_err(runtime_maintenance_error_for_ipc)?' in text
     assert 'format!("{}: {}", error.code, error.message)' in text
     assert "runtime_maintenance_ipc_error_preserves_bounded_machine_code" in text
+
+
+def test_runtime_diagnosis_mode_is_frozen_and_cannot_consume_oauth() -> None:
+    powershell = POWERSHELL.read_text(encoding="utf-8")
+    observer = OBSERVER.read_text(encoding="utf-8")
+
+    assert '[ValidateSet("oauth", "runtime-diagnosis")]' in powershell
+    assert 'mode = $Mode' in powershell
+    assert 'if ($frozenPlan.schemaVersion -ne 2 -or $frozenPlan.mode -cne $Mode)' in powershell
+    assert 'executionAllowed = (-not $runtimeDiagnosisOnly)' in powershell
+    assert 'loginButton = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
+    assert 'oauthTransaction = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
+    assert 'callback = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
+    assert 'authorizationCodeExchange = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
+    assert 'browserAction = 0' in powershell
+    assert 'localLogout = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
+    assert 'Runtime diagnosis attempted a forbidden browser authentication action.' in powershell
+
+    assert 'const runtimeDiagnosisOnly = mode === "runtime-diagnosis"' in observer
+    assert 'evidence.diagnosisComplete = true' in observer
+    diagnosis_branch = observer.index("if (runtimeDiagnosisOnly)")
+    completed = observer.index('await persist("runtime-diagnosis-completed")', diagnosis_branch)
+    oauth_attempt = observer.index('await persist("oauth-attempted")', completed)
+    assert completed < oauth_attempt
 
 
 def test_receipt_uses_allowlisted_native_audit_hashes_and_local_logout() -> None:
