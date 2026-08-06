@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-red-lifecycle-green-preparation-receipt",
+  "decision": "prepared-conditional-deny-execution",
+  "productSource": {
+    "commit": "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+    "tree": "a1abe6ad5c608a8db07c1733657179dd46b6ae3f"
+  },
+  "evidenceBaseHead": "1fe3c228ab2b1ba5938a4f1afe0522749d493545",
+  "artifact": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe",
+    "bytes": 11535000,
+    "sha256": "b87a020df957aeca7b179779a2400a2dfeb0fc2d43e655aa5bf8969db7c46dbd",
+    "buildReceiptSha256": "f399fc6805e959f6acca434016a29f6348b689a43132007e5dcd02f9644e7e31",
+    "rebuilt": false,
+    "installed": false,
+    "launched": false,
+    "relabeled": false
+  },
+  "application": {
+    "path": "distribution/editions/field/lifecycle/red-edc7aa1-app-only-application.v1.json",
+    "bytes": 12420,
+    "sha256": "b6a6d1dcf8ab77f4010bc4a045adb45ef2594037db3d93f860be1b4cd076ec59",
+    "segmentA": "fresh-overlay-two-launches-shortcut-live-webview2-en-zh-uninstall-owned-residue",
+    "segmentB": "real-field-browser-oauth-loopback-separate-blocked"
+  },
+  "tools": {
+    "runner": {
+      "path": "distribution/editions/field/lifecycle/run-field-app-only-lifecycle.ps1",
+      "lfNormalizedBytes": 25944,
+      "lfNormalizedSha256": "0a998110bc191f86ff8af70268e24da14efdbed94b45875cb3bfac0090837886"
+    },
+    "liveWebView2Inspector": {
+      "path": "distribution/editions/field/lifecycle/inspect-field-live-webview2.mjs",
+      "lfNormalizedBytes": 6056,
+      "lfNormalizedSha256": "7f6facaac3aa3d118fc39a6832a28d3b3d076e6fcee8cf595b4d303dff7d77aa"
+    },
+    "contractTest": {
+      "path": "distribution/tests/test_field_red_lifecycle_application.py",
+      "sha256": "965c27ec73d4a22893059c0f11f748644aa2dcae88bf0caeb946fb0e8b82cec5"
+    }
+  },
+  "ownedPaths": {
+    "installRoot": "%LOCALAPPDATA%\\DroneDream-Field",
+    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+    "productPreferenceKey": "HKCU\\Software\\DroneDream\\DroneDream-Field",
+    "roamingData": "%APPDATA%\\io.dronedream.desktop.field",
+    "localData": "%LOCALAPPDATA%\\io.dronedream.desktop.field",
+    "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream \u00b7 FIELD.lnk",
+    "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream \u00b7 FIELD.lnk",
+    "freshEvidenceRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-RED\\edc7aa1-segment-a-attempt-1"
+  },
+  "exactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "shortcutLaunches": 1,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupAttempts": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "accountReads": 0,
+    "tokenReadsOrExchanges": 0,
+    "artifactBuilds": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "deviceEnumerationInvocations": 0,
+    "serialUsbWrites": 0,
+    "parameterWrites": 0,
+    "armCommands": 0,
+    "flightCommands": 0,
+    "hardwareActions": 0
+  },
+  "protectedSimProductKey": {
+    "registryPath": "HKCU\\Software\\DroneDream\\DroneDream-Sim",
+    "beforeObservation": {
+      "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-RED-Applications\\edc7aa1-green-prep-20260806T153502Z\\protected-sim-product-key-before.reg",
+      "bytes": 572,
+      "sha256": "ef59eb8105ccef5db3c0ba45a933ee8bbf582255d498104b2928b9f5ef8eab8d"
+    },
+    "requiredAfter": {
+      "bytes": 572,
+      "sha256": "ef59eb8105ccef5db3c0ba45a933ee8bbf582255d498104b2928b9f5ef8eab8d",
+      "observed": false
+    },
+    "sharedParentMustRemain": "HKCU\\Software\\DroneDream",
+    "otherEditionCleanupAllowed": false
+  },
+  "rollback": {
+    "onFailure": "freeze-evidence-stop-no-retry",
+    "uninstallOnlyExactFreshFieldInstall": true,
+    "preferenceCleanupOnlyAfterExactFourValueValidation": true,
+    "preferenceCleanupMaximumAttempts": 1,
+    "appDataCleanupOnlyFieldNamespaces": true,
+    "runtimeOrOtherEditionCleanupAllowed": false
+  },
+  "greenVerification": {
+    "fieldLifecycleContractTests": "9-passed",
+    "fieldCriticalPathRegression": "92-passed-9-subtests",
+    "allHistoricalFieldTests": {
+      "passed": 99,
+      "failed": 5,
+      "subtestsPassed": 9,
+      "classification": "pre-existing-stale-common-core-blob-and-protected-evidence-baseline-assertions",
+      "failedTests": [
+        "test_field_common_core_6f25_correction.py::test_corrected_auth_and_runtime_mode_paths_are_exact_to_6f25",
+        "test_field_common_core_coexistence_sync.py::FieldCommonCoreCoexistenceSyncTests::test_donor_or_safety_drift_is_rejected",
+        "test_field_common_core_coexistence_sync.py::FieldCommonCoreCoexistenceSyncTests::test_receipt_binds_exact_donor_paths_and_field_overlay",
+        "test_field_common_drift_readiness_audit.py::FieldCommonDriftReadinessAuditTests::test_drift_audit_excludes_paths_integrated_into_current_common_core",
+        "test_field_common_drift_readiness_audit.py::FieldCommonDriftReadinessAuditTests::test_protected_evidence_no_longer_differs_from_universal"
+      ],
+      "changedByThisApplication": false
+    },
+    "powershellAst": "passed",
+    "nodeSyntax": "passed",
+    "ruff": "passed",
+    "artifactRehash": "passed-unchanged",
+    "installerOrApplicationExecution": "not-executed"
+  },
+  "dynamicStartGate": {
+    "fieldInstallRootAbsent": true,
+    "fieldUninstallKeyAbsent": true,
+    "fieldProductPreferenceKeyAbsent": true,
+    "protectedSimKeyPresent": true,
+    "oauthPort49213ListenerCount": 0,
+    "webView2Version": "151.0.4129.59",
+    "requestedOwnedOutputRootAbsent": true,
+    "droneDreamDesktopProcessCount": 1,
+    "protectedProcessPath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Universal\\drone-dream-desktop.exe",
+    "protectedProcessTouchedOrStopped": false,
+    "requiredBeforeRedStart": "all-drone-dream-desktop-processes-zero"
+  },
+  "authorization": {
+    "redStartSignalRecorded": false,
+    "segmentAExecutionAllowed": false,
+    "segmentBOauthExecutionAllowed": false,
+    "rebuildAllowed": false,
+    "installOrLaunchPerformed": false
+  },
+  "nonClaims": {
+    "lifecyclePassed": false,
+    "oauthPassed": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "websiteHandoffAllowed": false
+  },
+  "generatedAtUtc": "2026-08-06T15:45:41.2890261Z"
+}

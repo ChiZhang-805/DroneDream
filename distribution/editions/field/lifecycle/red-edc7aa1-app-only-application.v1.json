@@ -1,0 +1,270 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-host-contained-red-lifecycle-application",
+  "editionId": "field",
+  "state": "prepared-not-authorized",
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+    "artifactProductSourceTree": "a1abe6ad5c608a8db07c1733657179dd46b6ae3f",
+    "evidenceHeadBeforePreparation": "1fe3c228ab2b1ba5938a4f1afe0522749d493545",
+    "commonCoreCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+    "commonCoreHash": "9836b3c876e50e4add7f2657774eeb563c4eeb57697960843e406ba1563beddd"
+  },
+  "artifact": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": 11535000,
+    "sha256": "b87a020df957aeca7b179779a2400a2dfeb0fc2d43e655aa5bf8969db7c46dbd",
+    "authenticodeState": "NotSigned",
+    "peCertificatePresent": false,
+    "buildReceipt": {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\build-receipt.json",
+      "sha256": "f399fc6805e959f6acca434016a29f6348b689a43132007e5dcd02f9644e7e31"
+    },
+    "updaterSignature": {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+      "bytes": 428,
+      "sha256": "95e2f7c26d3059aa4f14bf99b4d17483aa212706207192c7ff39e9a8f913ae03",
+      "publicKeyId": "BA3FDCAF71CE2FF5"
+    },
+    "checksumSha256": "2280dbf50db2a4b2f944e9667453cb6c521cb4be4bd52c08d7529f8b8ec74ee6",
+    "latestMetadataSha256": "a8627546443cc0e23201dfa3e6978b9d03d463308a0720c42edbc8fb500677d1",
+    "handoffManifestSha256": "42a8b98ec60e5d3a598f2ba224b35c16a9975a60f267dbe932bdb0a1006aa382"
+  },
+  "identity": {
+    "internalProductName": "DroneDream-Field",
+    "displayName": "DroneDream \u00b7 FIELD",
+    "bundleId": "io.dronedream.desktop.field",
+    "appUserModelId": "io.dronedream.desktop.field",
+    "mainBinaryName": "drone-dream-desktop.exe",
+    "installRoot": "%LOCALAPPDATA%\\DroneDream-Field",
+    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+    "productPreferenceKey": "HKCU\\Software\\DroneDream\\DroneDream-Field",
+    "roamingData": "%APPDATA%\\io.dronedream.desktop.field",
+    "localData": "%LOCALAPPDATA%\\io.dronedream.desktop.field",
+    "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream \u00b7 FIELD.lnk",
+    "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream \u00b7 FIELD.lnk"
+  },
+  "canonicalBrand": {
+    "displayNameUsesU00B7": true,
+    "fieldLargeLockupNaturalSize": "2581x218",
+    "fieldLargeLockupSha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+    "fieldMarkSha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
+    "fieldWindowsIcoSha256": "b90e343655e07fd7e534a91be6c9200da5a315801c842c63dd5cba3099829f87",
+    "palette": ["#FFC247", "#FF754B", "#D746A5"]
+  },
+  "preparationObservation": {
+    "capturedAtUtc": "2026-08-06T15:35:02.9921283Z",
+    "fieldInstallRootPresent": false,
+    "fieldUninstallKeyPresent": false,
+    "fieldProductPreferenceKeyPresent": false,
+    "sharedDroneDreamParentPresent": true,
+    "simProductPreferenceKeyPresent": true,
+    "oauthCallbackPort49213ListenerCount": 0,
+    "droneDreamDesktopProcessCount": 0,
+    "webView2Version": "151.0.4129.59",
+    "webView2Scope": "machine",
+    "greenPrepReceipt": {
+      "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-RED-Applications\\edc7aa1-green-prep-20260806T153502Z\\green-prep-receipt.json",
+      "sha256": "9482967edd2b10b8107d1b6cc1d5a09761e2f9b3714d12c1aeb51fcc9acf3a57"
+    }
+  },
+  "latestReadOnlyPreflight": {
+    "capturedAtUtc": "2026-08-06T15:45:41.2890261Z",
+    "fieldInstallRootPresent": false,
+    "fieldUninstallKeyPresent": false,
+    "fieldProductPreferenceKeyPresent": false,
+    "simProductPreferenceKeyPresent": true,
+    "sharedDroneDreamParentPresent": true,
+    "oauthCallbackPort49213ListenerCount": 0,
+    "droneDreamDesktopProcessCount": 1,
+    "protectedRunningProcess": {
+      "processIdAtObservation": 5268,
+      "executablePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Universal\\drone-dream-desktop.exe",
+      "edition": "universal",
+      "touchedOrStopped": false
+    },
+    "requestedOwnedOutputRootExists": false,
+    "webView2Version": "151.0.4129.59",
+    "decision": "deny-execution-until-all-dronedream-desktop-processes-are-zero"
+  },
+  "protectedState": {
+    "simProductPreferenceKey": "HKCU\\Software\\DroneDream\\DroneDream-Sim",
+    "simExportBefore": {
+      "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-RED-Applications\\edc7aa1-green-prep-20260806T153502Z\\protected-sim-product-key-before.reg",
+      "bytes": 572,
+      "sha256": "ef59eb8105ccef5db3c0ba45a933ee8bbf582255d498104b2928b9f5ef8eab8d"
+    },
+    "requiredSimExportAfter": {
+      "bytes": 572,
+      "sha256": "ef59eb8105ccef5db3c0ba45a933ee8bbf582255d498104b2928b9f5ef8eab8d",
+      "state": "require-dynamic-observation-not-yet-observed"
+    },
+    "sharedParent": "HKCU\\Software\\DroneDream",
+    "sharedParentDeletionAllowed": false,
+    "otherEditionMutationAllowed": false,
+    "runtimeMutationAllowed": false,
+    "webView2RepairOrMutationAllowed": false,
+    "parityChecks": [
+      "pre-install",
+      "fresh-install",
+      "fresh-live-webview2",
+      "overlay-install",
+      "overlay-live-webview2",
+      "uninstall-and-owned-cleanup"
+    ]
+  },
+  "ownedPreferenceCleanup": {
+    "strategyDonor": {
+      "branch": "codex/software-lab",
+      "applicationCommit": "a5c443b0c1320eabddf88446fab098be16670b71",
+      "successEvidenceCommit": "5c4b2263e53080274094249af541310e3d78b7fb",
+      "successReceiptSha256": "8e199bc27b02f2370c189719fcec81c9196ea8068c12296e03c6469fae940e5d"
+    },
+    "allowedKey": "HKCU\\Software\\DroneDream\\DroneDream-Field",
+    "allowedExactValues": {
+      "(default)": "%LOCALAPPDATA%\\DroneDream-Field",
+      "DroneDreamRuntimeDrive": "",
+      "DroneDreamRuntimeInstallMode": "install-app-only",
+      "DroneDreamRuntimeOperationProtocol": "2"
+    },
+    "maximumCleanupAttempts": 1,
+    "maximumSuccessfulCleanupInvocations": 1,
+    "missingValueDecision": "deny",
+    "extraValueDecision": "deny",
+    "valueDriftDecision": "deny",
+    "otherEditionKeyDecision": "deny",
+    "sharedParentDeletionDecision": "deny"
+  },
+  "executionTools": {
+    "runner": {
+      "path": "distribution/editions/field/lifecycle/run-field-app-only-lifecycle.ps1",
+      "lfNormalizedBytes": 25944,
+      "lfNormalizedSha256": "0a998110bc191f86ff8af70268e24da14efdbed94b45875cb3bfac0090837886"
+    },
+    "liveWebView2Inspector": {
+      "path": "distribution/editions/field/lifecycle/inspect-field-live-webview2.mjs",
+      "lfNormalizedBytes": 6056,
+      "lfNormalizedSha256": "7f6facaac3aa3d118fc39a6832a28d3b3d076e6fcee8cf595b4d303dff7d77aa"
+    },
+    "requestedOwnedOutputRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-RED\\edc7aa1-segment-a-attempt-1",
+    "outputRootMustNotExistBeforeStart": true,
+    "temporaryRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-RED\\edc7aa1-segment-a-attempt-1\\temp"
+  },
+  "segments": {
+    "a": {
+      "name": "host-contained-app-only-lifecycle",
+      "authorizationClass": "RED",
+      "exactCounts": {
+        "freshInstallerInvocations": 1,
+        "overlayInstallerInvocations": 1,
+        "applicationLaunches": 2,
+        "shortcutLaunches": 1,
+        "uninstallerInvocations": 1,
+        "ownedPreferenceKeyCleanupAttempts": 1,
+        "ownedPreferenceKeyCleanupInvocations": 1,
+        "liveWebView2Inspections": 2,
+        "languageTransitions": 2,
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "accountReads": 0,
+        "tokenReadsOrExchanges": 0,
+        "artifactBuilds": 0,
+        "runtimeStarts": 0,
+        "px4Starts": 0,
+        "gazeboStarts": 0,
+        "deviceEnumerationInvocations": 0,
+        "serialUsbWrites": 0,
+        "parameterWrites": 0,
+        "armCommands": 0,
+        "flightCommands": 0,
+        "hardwareActions": 0
+      },
+      "orderedSteps": [
+        "revalidate exact source, artifact, application SHA, no-process, no-port-listener, WebView2, fresh Field state, and protected Sim key",
+        "create the one fresh Field-owned output and redirected TEMP/TMP roots",
+        "export protected Sim product key before execution and require 572 bytes plus exact SHA-256",
+        "invoke exact installer silently once for fresh install",
+        "verify Field install root, uninstall registration, canonical desktop and Start Menu shortcuts",
+        "launch the installed binary once; inspect live Field WebView2, canonical brand, EN/ZH transition, and zero-pack hardware-deny surface",
+        "invoke exact installer silently once with overlay update",
+        "launch once through the canonical Field desktop shortcut and repeat live WebView2 checks",
+        "invoke exact Field uninstaller silently once",
+        "validate only the four exact Field-owned preference values and remove that exact key once",
+        "remove only Field-owned app-data roots and verify Field residue absent",
+        "export protected Sim product key after execution and require byte/hash identity with before",
+        "freeze receipt and stop; any failure is no-retry"
+      ]
+    },
+    "b": {
+      "name": "real-field-browser-oauth-loopback",
+      "authorizationClass": "separate-RED",
+      "state": "blocked-not-part-of-segment-a",
+      "publicClientIdSha256": "9859ef05e4ecd7cd192561688eb048984f7f476468c8f739decc1d3939d62a98",
+      "callback": "http://127.0.0.1:49213/desktop-auth/field/callback",
+      "callbackSha256": "95c6b73890eb5e8809dedb05126921d628ac00cb981fe3e583ce99330e9a08e2",
+      "credentialNamespace": "DroneDream/Auth/field/v1",
+      "browserCookieMayAvoidPasswordEntry": true,
+      "explicitFieldTransactionRequired": true,
+      "otherEditionSessionReuseAllowed": false,
+      "pkceStateNonceRequired": true,
+      "clientSecretAllowed": false
+    }
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "discoveryAuthorized": false,
+    "deviceEnumerationAuthorized": false,
+    "serialOrUsbOpenAuthorized": false,
+    "parameterWriteAuthorized": false,
+    "armOrFlightAuthorized": false,
+    "runtimeMigrationAuthorized": false,
+    "px4GazeboSitlHitlAuthorized": false,
+    "threeLayerHardwareDecision": "deny",
+    "frontendIsAuthority": false
+  },
+  "rollback": {
+    "failurePolicy": "freeze-evidence-stop-no-retry",
+    "ownedUninstallAllowedOnlyIfFreshInstallSucceeded": true,
+    "fieldPreferenceCleanupAllowedOnlyAfterExactValueValidation": true,
+    "fieldPreferenceCleanupMaximumAttempts": 1,
+    "fieldAppDataCleanupRoots": [
+      "%APPDATA%\\io.dronedream.desktop.field",
+      "%LOCALAPPDATA%\\io.dronedream.desktop.field"
+    ],
+    "protectedSimBeforeAfterShaMustMatch": true,
+    "otherEditionOrSharedParentCleanupAllowed": false,
+    "runtimeCleanupAllowed": false
+  },
+  "authorization": {
+    "segmentAExecutionDecision": "prepared-awaiting-new-exact-red-authorization",
+    "segmentBExecutionDecision": "deny-before-real-auth-boundary",
+    "currentMessageAuthorizesExecution": false,
+    "rebuildAuthorized": false,
+    "installAuthorized": false,
+    "applicationLaunchAuthorized": false,
+    "oauthAuthorized": false,
+    "websiteHandoffAuthorized": false,
+    "dynamicStartBlockers": [
+      "one-protected-Universal-drone-dream-desktop-process-was-running-at-latest-read-only-preflight",
+      "new-exact-red-start-signal-not-recorded"
+    ],
+    "requiredStartSignalBindings": [
+      "exact application SHA-256",
+      "exact product source and artifact SHA-256",
+      "exact fresh owned output root",
+      "exact counts",
+      "protected Sim baseline SHA-256",
+      "host resource and process preflight"
+    ]
+  },
+  "nonClaims": {
+    "lifecyclePassed": false,
+    "simAfterHashObserved": false,
+    "oauthPassed": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "websiteHandoffAllowed": false
+  }
+}
