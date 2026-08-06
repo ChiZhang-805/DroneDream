@@ -40,6 +40,7 @@ import {
 } from "./components/AvatarCropDialog";
 import { BrandLockup } from "./components/BrandLockup";
 import { DistributionSetupPanel } from "./components/DistributionSetupPanel";
+import { UniversalModeSwitch } from "./components/UniversalModeSwitch";
 import {
   getDesktopWindowHandle,
   isDesktopRuntime,
@@ -90,6 +91,11 @@ import {
   hasExperimentDraft,
   persistExperimentDraftsForExit,
 } from "./features/experiment/draftStorage";
+import {
+  applyUniversalMode,
+  loadUniversalMode,
+  persistUniversalMode,
+} from "./features/distribution/universalMode";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
 import type {
@@ -2020,6 +2026,7 @@ function AppShellContent() {
     () => false,
   );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
+  const [universalMode, setUniversalMode] = useState(loadUniversalMode);
   const [accountOpen, setAccountOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
@@ -2072,6 +2079,11 @@ function AppShellContent() {
     "installing",
     "reconcilingEngine",
   ].includes(updater.status);
+
+  useEffect(() => {
+    applyUniversalMode(universalMode);
+    persistUniversalMode(universalMode);
+  }, [universalMode]);
   const sidebarUpdateLabel = updater.status === "available"
     ? updater.error
       ? t("updater.sidebarDeferred")
@@ -2575,11 +2587,11 @@ function AppShellContent() {
       <aside className="app-sidebar">
         {desktopRuntime ? (
           <Link to="/assistant" className="app-title" aria-label="DroneDream">
-            <BrandLockup variant="compact" />
+            <BrandLockup variant="compact" edition={universalMode} />
           </Link>
         ) : (
           <a href="/" className="app-title" aria-label="DroneDream">
-            <BrandLockup variant="compact" />
+            <BrandLockup variant="compact" edition={universalMode} />
           </a>
         )}
         {mobileNavigationEnabled ? (
@@ -2601,6 +2613,11 @@ function AppShellContent() {
           className={`app-mobile-menu-panel${mobileMenuExpanded ? " is-open" : ""}`}
           hidden={mobileNavigationEnabled && !mobileMenuExpanded}
         >
+          <UniversalModeSwitch
+            mode={universalMode}
+            locale={locale}
+            onChange={setUniversalMode}
+          />
           <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">
             {runtimeNavDescription}
