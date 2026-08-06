@@ -41,6 +41,7 @@ $screenshotRoot = Join-Path $executionRoot "screenshots"
 $caseReceiptRoot = Join-Path $executionRoot "cases"
 $webViewProfileRoot = Join-Path $executionRoot "webview2-profile"
 $nodeVerifier = Join-Path $repoRoot "frontend\scripts\verify-installed-universal-ui.mjs"
+$coexistenceContractPath = Join-Path $repoRoot "distribution\desktop\edition-coexistence.v1.json"
 $installDirectory = Join-Path $env:LOCALAPPDATA "DroneDream-Universal"
 $applicationPath = Join-Path $installDirectory "drone-dream-desktop.exe"
 $uninstallerPath = Join-Path $installDirectory "uninstall.exe"
@@ -54,6 +55,20 @@ $appLaunchCountCap = 1
 $appCloseCountCap = 1
 $uninstallerCountCap = 1
 $ownedCleanupCountCap = 1
+$coexistenceContract = Get-Content -LiteralPath $coexistenceContractPath -Raw | ConvertFrom-Json
+if ([int]$coexistenceContract.schemaVersion -ne 1 -or
+    [string]$coexistenceContract.kind -cne "dronedream-desktop-edition-coexistence") {
+    throw "Desktop edition coexistence contract is missing or unsupported."
+}
+$expectedEditionIds = @("universal", "sim", "lab", "field")
+$actualEditionIds = @($coexistenceContract.editions | ForEach-Object { [string]$_.editionId })
+$editionDiff = @(Compare-Object -ReferenceObject $expectedEditionIds -DifferenceObject $actualEditionIds)
+if ($editionDiff.Count -ne 0 -or $actualEditionIds.Count -ne $expectedEditionIds.Count) {
+    throw "Desktop edition coexistence identities drifted."
+}
+$otherEditionContracts = @(
+    $coexistenceContract.editions | Where-Object { [string]$_.editionId -in @("sim", "lab", "field") }
+)
 $matrix = @(
     foreach ($viewport in @(
         [ordered]@{ id = "minimum"; width = 390; height = 700 },
@@ -138,6 +153,23 @@ function Get-ShortcutRecord {
     }
 }
 
+function Convert-CoexistenceFilePath {
+    param([string]$Path)
+    if (-not $Path.StartsWith("%LOCALAPPDATA%/", [StringComparison]::Ordinal)) {
+        throw "Edition install root escaped the LOCALAPPDATA contract."
+    }
+    $expanded = [Environment]::ExpandEnvironmentVariables($Path).Replace('/', '\')
+    return [IO.Path]::GetFullPath($expanded)
+}
+
+function Convert-CoexistenceRegistryPath {
+    param([string]$Path)
+    if (-not $Path.StartsWith("HKCU/Software/", [StringComparison]::Ordinal)) {
+        throw "Edition registry path escaped the HKCU Software contract."
+    }
+    return "HKCU:\$($Path.Substring(5).Replace('/', '\'))"
+}
+
 function Get-WebView2Record {
     $appGuid = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
     foreach ($key in @(
@@ -195,6 +227,38 @@ function Get-ProtectedState {
         existingUniversalWebViewData = Get-DirectoryRecord -Path (
             Join-Path $env:LOCALAPPDATA "io.dronedream.desktop.universal"
         )
+        otherEditions = @(
+            foreach ($edition in $otherEditionContracts) {
+                $editionId = [string]$edition.editionId
+                $editionInstallRoot = Convert-CoexistenceFilePath -Path ([string]$edition.installRoot)
+                $editionUninstallKey = Convert-CoexistenceRegistryPath -Path ([string]$edition.uninstallRegistryKey)
+                $editionProductKey = Convert-CoexistenceRegistryPath -Path ([string]$edition.productRegistryKey)
+                $webViewNamespace = [string]$edition.webViewDataNamespace
+                if ($webViewNamespace -cne "io.dronedream.desktop.$editionId") {
+                    throw "Edition WebView profile namespace drifted for $editionId."
+                }
+                [ordered]@{
+                    editionId = $editionId
+                    installRoot = Get-DirectoryRecord -Path $editionInstallRoot
+                    application = Get-FileRecord -Path (Join-Path $editionInstallRoot "drone-dream-desktop.exe")
+                    uninstaller = Get-FileRecord -Path (Join-Path $editionInstallRoot "uninstall.exe")
+                    uninstallRegistration = Get-RegistryRecord -Path $editionUninstallKey -Names @(
+                        "DisplayName", "DisplayVersion", "InstallLocation", "UninstallString", "MainBinaryName"
+                    )
+                    productRegistration = Get-RegistryRecord -Path $editionProductKey -Names @(
+                        "DroneDreamRuntimeInstallMode", "DroneDreamRuntimeDrive", "DroneDreamRuntimeOperationProtocol"
+                    )
+                    desktopShortcut = Get-ShortcutRecord -Path (
+                        Join-Path $desktop "$([string]$edition.desktopShortcutName).lnk"
+                    )
+                    startMenuShortcut = Get-ShortcutRecord -Path (
+                        Join-Path $programs "$([string]$edition.startMenuFolder).lnk"
+                    )
+                    webViewData = Get-DirectoryRecord -Path (Join-Path $env:LOCALAPPDATA $webViewNamespace)
+                    credentialVaultNamespace = [string]$edition.credentialVaultNamespace
+                }
+            }
+        )
         webView2 = Get-WebView2Record
     }
 }
@@ -208,7 +272,7 @@ function Assert-ProtectedStateUnchanged {
     param([object]$Before, [string]$Stage)
     $after = Get-ProtectedState
     if ((ConvertTo-CanonicalJson $Before) -cne (ConvertTo-CanonicalJson $after)) {
-        throw "Protected existing DroneDream, Runtime, shortcuts, registry, or WebView2 changed during '$Stage'."
+        throw "Protected existing DroneDream, other Editions, Runtime, shortcuts, registry, profiles, or WebView2 changed during '$Stage'."
     }
 }
 

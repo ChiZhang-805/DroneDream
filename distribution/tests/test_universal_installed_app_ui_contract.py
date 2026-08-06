@@ -38,6 +38,14 @@ def test_headed_verifier_has_exact_bounded_execution_contract() -> None:
         'retryAllowed = $false',
         'WEBVIEW2_USER_DATA_FOLDER',
         'webview2-profile',
+        r'distribution\desktop\edition-coexistence.v1.json',
+        '$expectedEditionIds = @("universal", "sim", "lab", "field")',
+        '$otherEditionContracts',
+        'otherEditions = @(',
+        'Convert-CoexistenceFilePath',
+        'Convert-CoexistenceRegistryPath',
+        'io.dronedream.desktop.$editionId',
+        'credentialVaultNamespace',
         'Invoke-IsolatedUninstallerOnce',
         'Invoke-OwnedCleanupOnce',
         'Close-ThisBatchAppOnce',
@@ -52,6 +60,26 @@ def test_headed_verifier_has_exact_bounded_execution_contract() -> None:
     assert "gz sim" not in script
     assert "OPENAI_API_KEY" not in script
     assert "SUPABASE_SERVICE_ROLE" not in script
+
+
+def test_headed_verifier_protects_every_non_universal_edition_namespace() -> None:
+    script = POWERSHELL.read_text(encoding="utf-8-sig")
+    for edition in ("sim", "lab", "field"):
+        assert f'"{edition}"' in script
+    for protected_surface in (
+        "installRoot = Get-DirectoryRecord",
+        "application = Get-FileRecord",
+        "uninstaller = Get-FileRecord",
+        "uninstallRegistration = Get-RegistryRecord",
+        "productRegistration = Get-RegistryRecord",
+        "desktopShortcut = Get-ShortcutRecord",
+        "startMenuShortcut = Get-ShortcutRecord",
+        "webViewData = Get-DirectoryRecord",
+    ):
+        assert protected_surface in script
+    assert "Desktop edition coexistence identities drifted." in script
+    assert "Edition install root escaped the LOCALAPPDATA contract." in script
+    assert "Edition registry path escaped the HKCU Software contract." in script
 
 
 def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -> None:
