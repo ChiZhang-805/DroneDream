@@ -98,6 +98,21 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
           $stage = Resolve-InstallerWindowStage -WindowRecord $selector -ExpectedProcessId $pidValue -ExpectedDisplayName $display -ExpectedInstallRoot $root
           if ($stage -cne 'language-selector') {{ throw "selector fixture failed: $locale" }}
         }}
+        foreach ($percent in @(0, 67, 100)) {{
+          $loadingTitle = "unpacking data: $percent%"
+          $loadingText = 'Please wait while Setup is loading...'
+          $loading = [ordered]@{{
+            processId=$pidValue; className='#32770'; title=$loadingTitle
+            visibleText=@($loadingTitle, $loadingText); controls=@(
+              [ordered]@{{processId=$pidValue;controlType='ControlType.Text';automationId='1030';name=$loadingTitle;value=''}},
+              [ordered]@{{processId=$pidValue;controlType='ControlType.Image';automationId='65535';name=$loadingTitle;value=''}},
+              [ordered]@{{processId=$pidValue;controlType='ControlType.Text';automationId='76';name=$loadingText;value=''}}
+            )
+          }}
+          if ((Resolve-InstallerWindowStage -WindowRecord $loading -ExpectedProcessId $pidValue -ExpectedDisplayName $display -ExpectedInstallRoot $root) -cne 'loading-progress') {{
+            throw "loading progress fixture failed: $percent"
+          }}
+        }}
 
         $welcome = [ordered]@{{
           processId=$pidValue; className='#32770'; title="$display Setup"
@@ -157,6 +172,9 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
           [ordered]@{{ kind='resolve'; value=[ordered]@{{processId=$pidValue;className='#32770';title='Unknown Dialog';visibleText=@();controls=@()}} }},
           [ordered]@{{ kind='resolve'; value=[ordered]@{{processId=$pidValue;className='#32770';title='Installer Language';visibleText=@('Please select a language.');controls=@()}} }},
           [ordered]@{{ kind='resolve'; value=[ordered]@{{processId=$pidValue;className='#32770';title="$display Setup";visibleText=@($display);controls=@([ordered]@{{controlType='ControlType.Edit';value='C:\\Wrong'}})}} }},
+          [ordered]@{{ kind='resolve'; value=[ordered]@{{processId=$pidValue;className='#32770';title='unpacking data: 101%';visibleText=@('Please wait while Setup is loading...');controls=@()}} }},
+          [ordered]@{{ kind='resolve'; value=[ordered]@{{processId=$pidValue;className='#32770';title='unpacking data: 67%';visibleText=@('Loading text drifted');controls=@()}} }},
+          [ordered]@{{ kind='resolve'; value=[ordered]@{{processId=$pidValue;className='#32770';title='unpacking data: 67%';visibleText=@('unpacking data: 67%','Please wait while Setup is loading...');controls=@([ordered]@{{processId=$pidValue;controlType='ControlType.Button';automationId='1';name='Continue';value=''}})}} }},
           [ordered]@{{ kind='ownership'; value=@([ordered]@{{processId=$pidValue}},[ordered]@{{processId=$pidValue}}) }},
           [ordered]@{{ kind='ownership'; value=@([ordered]@{{processId=99}}) }}
         )
@@ -173,7 +191,7 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
             $denied++
           }}
         }}
-        if ($denied -ne 6) {{ throw "expected 6 denials, got $denied" }}
+        if ($denied -ne 9) {{ throw "expected 9 denials, got $denied" }}
         Write-Output 'field-installer-observer-fixtures-passed'
         """
     )

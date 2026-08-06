@@ -62,6 +62,35 @@ function Resolve-InstallerWindowStage {
         throw "Installer window class is not the exact NSIS dialog class."
     }
     $controls = @($WindowRecord.controls)
+    $loadingTitle = [string]$WindowRecord.title
+    if ($loadingTitle -match '^unpacking data: (?:100|[1-9]?[0-9])%$') {
+        $loadingText = "Please wait while Setup is loading..."
+        $visibleText = @($WindowRecord.visibleText)
+        $progressText = @($controls | Where-Object {
+            $_.controlType -ceq "ControlType.Text" -and
+            $_.automationId -ceq "1030" -and $_.name -ceq $loadingTitle
+        })
+        $progressImage = @($controls | Where-Object {
+            $_.controlType -ceq "ControlType.Image" -and
+            $_.automationId -ceq "65535" -and $_.name -ceq $loadingTitle
+        })
+        $waitText = @($controls | Where-Object {
+            $_.controlType -ceq "ControlType.Text" -and
+            $_.automationId -ceq "76" -and $_.name -ceq $loadingText
+        })
+        $foreignControls = @($controls | Where-Object {
+            $_.processId -ne $ExpectedProcessId -or $_.value -or
+            $_.controlType -notin @("ControlType.Text", "ControlType.Image")
+        })
+        if ($controls.Count -ne 3 -or $progressText.Count -ne 1 -or
+            $progressImage.Count -ne 1 -or $waitText.Count -ne 1 -or
+            $foreignControls.Count -ne 0 -or $visibleText.Count -ne 2 -or
+            -not ($visibleText -contains $loadingTitle) -or
+            -not ($visibleText -contains $loadingText)) {
+            throw "NSIS loading progress window structure drifted."
+        }
+        return "loading-progress"
+    }
     if ([string]$WindowRecord.title -ceq "Installer Language") {
         $combo = @($controls | Where-Object { $_.controlType -ceq "ControlType.ComboBox" })
         $ok = @($controls | Where-Object {
@@ -356,11 +385,22 @@ try {
     }
     Select-ExactLanguage -Window $languageWindow -ExpectedProcessId $process.Id -ExpectedLanguageId $LanguageId
 
-    $mainWindow = Wait-SingleOwnedWindow -Process $process -DifferentFromTitle "Installer Language"
-    $welcomeRecord = Get-WindowRecord -Window $mainWindow
-    $welcomeSnapshot = Add-PreclassificationSnapshot -WindowRecord $welcomeRecord -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
-    $welcomeStage = Resolve-InstallerWindowStage -WindowRecord $welcomeRecord -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
-    $welcomeSnapshot["stage"] = $welcomeStage
+    $welcomeDeadline = [DateTime]::UtcNow.AddSeconds(30)
+    $loadingSnapshotKept = $false
+    do {
+        $mainWindow = Wait-SingleOwnedWindow -Process $process -DifferentFromTitle "Installer Language"
+        $welcomeRecord = Get-WindowRecord -Window $mainWindow
+        $welcomeSnapshot = Add-PreclassificationSnapshot -WindowRecord $welcomeRecord -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
+        $welcomeStage = Resolve-InstallerWindowStage -WindowRecord $welcomeRecord -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
+        $welcomeSnapshot["stage"] = $welcomeStage
+        if ($welcomeStage -cne "loading-progress") { break }
+        if ($loadingSnapshotKept) { $snapshots.Remove($welcomeSnapshot) | Out-Null }
+        else { $loadingSnapshotKept = $true }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $welcomeDeadline)
+    if ($welcomeStage -ceq "loading-progress") {
+        throw "Timed out waiting for the exact branded Field window after NSIS loading progress."
+    }
     if ($welcomeStage -ne "branded") { throw "Expected the branded Field welcome stage." }
 
     foreach ($step in 1..2) {
