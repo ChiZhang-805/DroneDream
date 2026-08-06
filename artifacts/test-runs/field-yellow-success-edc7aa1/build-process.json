@@ -1,0 +1,70 @@
+{
+    "schemaVersion":  1,
+    "kind":  "dronedream-field-replacement-yellow-build-process",
+    "sourceCommit":  "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+    "upstreamEvidenceCommit":  "6219e731ebe70dbb1e550de9156437f30bf1e648",
+    "startedAt":  "2026-08-06T15:03:52.8914494Z",
+    "finishedAt":  "2026-08-06T15:08:37.9742755Z",
+    "durationSeconds":  285.083,
+    "exitCode":  0,
+    "exception":  null,
+    "cargoBuildCountMaximum":  1,
+    "nsisInvocationMaximum":  1,
+    "cargoBuildJobs":  2,
+    "stdoutPath":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\build.stdout.log",
+    "stderrPath":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\build.stderr.log",
+    "cargoTarget":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\edc7aa1",
+    "externalOutputRoot":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact",
+    "candidate":  {
+                      "installer":  {
+                                        "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\edc7aa1\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Field_1.0.0_x64-setup.exe",
+                                        "exists":  true,
+                                        "bytes":  11535000,
+                                        "sha256":  "b87a020df957aeca7b179779a2400a2dfeb0fc2d43e655aa5bf8969db7c46dbd"
+                                    },
+                      "updaterSignature":  {
+                                               "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\edc7aa1\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Field_1.0.0_x64-setup.exe.sig",
+                                               "exists":  true,
+                                               "bytes":  428,
+                                               "sha256":  "95e2f7c26d3059aa4f14bf99b4d17483aa212706207192c7ff39e9a8f913ae03"
+                                           },
+                      "checksum":  {
+                                       "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\edc7aa1\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Field_1.0.0_x64-setup.exe.sha256",
+                                       "exists":  true,
+                                       "bytes":  104,
+                                       "sha256":  "eb0d1af11a76c44a2fd9141434ba850124854c0a0f77b6d8d9bb5be34f952f15"
+                                   },
+                      "updaterMetadata":  {
+                                              "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\edc7aa1\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\latest-field.json",
+                                              "exists":  true,
+                                              "bytes":  1024,
+                                              "sha256":  "a8627546443cc0e23201dfa3e6978b9d03d463308a0720c42edbc8fb500677d1"
+                                          }
+                  },
+    "frozen":  {
+                   "installer":  {
+                                     "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe",
+                                     "exists":  true,
+                                     "bytes":  11535000,
+                                     "sha256":  "b87a020df957aeca7b179779a2400a2dfeb0fc2d43e655aa5bf8969db7c46dbd"
+                                 },
+                   "updaterSignature":  {
+                                            "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+                                            "exists":  true,
+                                            "bytes":  428,
+                                            "sha256":  "95e2f7c26d3059aa4f14bf99b4d17483aa212706207192c7ff39e9a8f913ae03"
+                                        },
+                   "checksum":  {
+                                    "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sha256",
+                                    "exists":  true,
+                                    "bytes":  94,
+                                    "sha256":  "2280dbf50db2a4b2f944e9667453cb6c521cb4be4bd52c08d7529f8b8ec74ee6"
+                                },
+                   "updaterMetadata":  {
+                                           "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\latest-field.json",
+                                           "exists":  true,
+                                           "bytes":  1024,
+                                           "sha256":  "a8627546443cc0e23201dfa3e6978b9d03d463308a0720c42edbc8fb500677d1"
+                                       }
+               }
+}

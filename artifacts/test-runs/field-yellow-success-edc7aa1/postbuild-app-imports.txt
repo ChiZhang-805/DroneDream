@@ -1,0 +1,529 @@
+﻿
+File: C:\Users\zju20\.codex\visualizations\2026\08\05\019fd0e2-71cc-7742-bfab-612510f37c39\field-yellow-build-edc7aa1-frontend-dist-replacement\payload-static\drone-dream-desktop.exe
+Format: COFF-x86-64
+Arch: x86_64
+AddressSize: 64bit
+Import {
+  Name: kernel32.dll
+  ImportLookupTableRVA: 0x10435A0
+  ImportAddressTableRVA: 0x10442A0
+  Symbol: AddVectoredExceptionHandler (0)
+  Symbol: AssignProcessToJobObject (0)
+  Symbol: CancelIoEx (0)
+  Symbol: CloseHandle (0)
+  Symbol: CompareStringOrdinal (0)
+  Symbol: CreateDirectoryW (0)
+  Symbol: CreateFileMappingA (0)
+  Symbol: CreateFileW (0)
+  Symbol: CreateIoCompletionPort (0)
+  Symbol: CreateJobObjectW (0)
+  Symbol: CreateMutexW (0)
+  Symbol: CreateProcessW (0)
+  Symbol: CreateSymbolicLinkW (0)
+  Symbol: CreateThread (0)
+  Symbol: CreateToolhelp32Snapshot (0)
+  Symbol: CreateWaitableTimerExW (0)
+  Symbol: DeleteCriticalSection (0)
+  Symbol: DeleteFileW (0)
+  Symbol: DeviceIoControl (0)
+  Symbol: DuplicateHandle (0)
+  Symbol: EnterCriticalSection (0)
+  Symbol: ExitProcess (0)
+  Symbol: FindClose (0)
+  Symbol: FindFirstFileExW (0)
+  Symbol: FindNextFileW (0)
+  Symbol: FlushFileBuffers (0)
+  Symbol: FormatMessageW (0)
+  Symbol: FreeEnvironmentStringsW (0)
+  Symbol: GetCommandLineW (0)
+  Symbol: GetConsoleMode (0)
+  Symbol: GetConsoleOutputCP (0)
+  Symbol: GetCurrentDirectoryW (0)
+  Symbol: GetCurrentProcess (0)
+  Symbol: GetCurrentProcessId (0)
+  Symbol: GetCurrentThread (0)
+  Symbol: GetCurrentThreadId (0)
+  Symbol: GetDiskFreeSpaceExW (0)
+  Symbol: GetDriveTypeW (0)
+  Symbol: GetEnvironmentStringsW (0)
+  Symbol: GetEnvironmentVariableW (0)
+  Symbol: GetExitCodeProcess (0)
+  Symbol: GetFileAttributesW (0)
+  Symbol: GetFileInformationByHandle (0)
+  Symbol: GetFileInformationByHandleEx (0)
+  Symbol: GetFinalPathNameByHandleW (0)
+  Symbol: GetFullPathNameW (0)
+  Symbol: GetLastError (0)
+  Symbol: GetModuleFileNameW (0)
+  Symbol: GetModuleHandleA (0)
+  Symbol: GetModuleHandleW (0)
+  Symbol: GetOverlappedResult (0)
+  Symbol: GetProcAddress (0)
+  Symbol: GetProcessHeap (0)
+  Symbol: GetProcessId (0)
+  Symbol: GetProcessTimes (0)
+  Symbol: GetQueuedCompletionStatusEx (0)
+  Symbol: GetStdHandle (0)
+  Symbol: GetSystemDirectoryW (0)
+  Symbol: GetSystemInfo (0)
+  Symbol: GetSystemTimePreciseAsFileTime (0)
+  Symbol: GetTempPathW (0)
+  Symbol: GetUserDefaultUILanguage (0)
+  Symbol: GetVolumeInformationW (0)
+  Symbol: GetWindowsDirectoryW (0)
+  Symbol: HeapAlloc (0)
+  Symbol: HeapFree (0)
+  Symbol: HeapReAlloc (0)
+  Symbol: InitializeCriticalSection (0)
+  Symbol: LCIDToLocaleName (0)
+  Symbol: LeaveCriticalSection (0)
+  Symbol: LoadLibraryA (0)
+  Symbol: LoadLibraryExA (0)
+  Symbol: LoadLibraryW (0)
+  Symbol: LocalFree (0)
+  Symbol: MapViewOfFile (0)
+  Symbol: Module32FirstW (0)
+  Symbol: Module32NextW (0)
+  Symbol: MoveFileExW (0)
+  Symbol: MultiByteToWideChar (0)
+  Symbol: OpenProcess (0)
+  Symbol: PostQueuedCompletionStatus (0)
+  Symbol: QueryPerformanceCounter (0)
+  Symbol: QueryPerformanceFrequency (0)
+  Symbol: RaiseException (0)
+  Symbol: ReadFile (0)
+  Symbol: ReadFileEx (0)
+  Symbol: ReleaseMutex (0)
+  Symbol: RemoveDirectoryW (0)
+  Symbol: RtlCaptureContext (0)
+  Symbol: RtlLookupFunctionEntry (0)
+  Symbol: RtlRestoreContext (0)
+  Symbol: RtlUnwindEx (0)
+  Symbol: RtlVirtualUnwind (0)
+  Symbol: SetEnvironmentVariableW (0)
+  Symbol: SetFileCompletionNotificationModes (0)
+  Symbol: SetFileInformationByHandle (0)
+  Symbol: SetFilePointerEx (0)
+  Symbol: SetFileTime (0)
+  Symbol: SetHandleInformation (0)
+  Symbol: SetInformationJobObject (0)
+  Symbol: SetLastError (0)
+  Symbol: SetNamedPipeHandleState (0)
+  Symbol: SetThreadStackGuarantee (0)
+  Symbol: SetUnhandledExceptionFilter (0)
+  Symbol: SetWaitableTimer (0)
+  Symbol: Sleep (0)
+  Symbol: SleepEx (0)
+  Symbol: SwitchToThread (0)
+  Symbol: TerminateProcess (0)
+  Symbol: TlsGetValue (0)
+  Symbol: UnmapViewOfFile (0)
+  Symbol: VirtualProtect (0)
+  Symbol: VirtualQuery (0)
+  Symbol: WaitForSingleObject (0)
+  Symbol: WriteConsoleW (0)
+  Symbol: WriteFile (0)
+  Symbol: WriteFileEx (0)
+  Symbol: lstrlenW (0)
+}
+Import {
+  Name: api-ms-win-crt-stdio-l1-1-0.dll
+  ImportLookupTableRVA: 0x1043958
+  ImportAddressTableRVA: 0x1044658
+  Symbol: __acrt_iob_func (0)
+  Symbol: __p__commode (0)
+  Symbol: __p__fmode (0)
+  Symbol: __stdio_common_vfprintf (0)
+  Symbol: fflush (0)
+  Symbol: fputc (0)
+  Symbol: setvbuf (0)
+}
+Import {
+  Name: api-ms-win-crt-runtime-l1-1-0.dll
+  ImportLookupTableRVA: 0x1043998
+  ImportAddressTableRVA: 0x1044698
+  Symbol: __p___argc (0)
+  Symbol: __p___argv (0)
+  Symbol: _cexit (0)
+  Symbol: _configure_narrow_argv (0)
+  Symbol: _crt_atexit (0)
+  Symbol: _errno (0)
+  Symbol: _exit (0)
+  Symbol: _initialize_narrow_environment (0)
+  Symbol: _initterm (0)
+  Symbol: _initterm_e (0)
+  Symbol: _seh_filter_exe (0)
+  Symbol: _set_app_type (0)
+  Symbol: _set_invalid_parameter_handler (0)
+  Symbol: abort (0)
+  Symbol: exit (0)
+  Symbol: strerror (0)
+}
+Import {
+  Name: api-ms-win-crt-locale-l1-1-0.dll
+  ImportLookupTableRVA: 0x1043A20
+  ImportAddressTableRVA: 0x1044720
+  Symbol: _configthreadlocale (0)
+  Symbol: localeconv (0)
+}
+Import {
+  Name: api-ms-win-crt-heap-l1-1-0.dll
+  ImportLookupTableRVA: 0x1043A38
+  ImportAddressTableRVA: 0x1044738
+  Symbol: _set_new_mode (0)
+  Symbol: calloc (0)
+  Symbol: free (0)
+  Symbol: malloc (0)
+}
+Import {
+  Name: api-ms-win-crt-private-l1-1-0.dll
+  ImportLookupTableRVA: 0x1043A60
+  ImportAddressTableRVA: 0x1044760
+  Symbol: memcmp (0)
+  Symbol: memcpy (0)
+  Symbol: memmove (0)
+}
+Import {
+  Name: api-ms-win-crt-string-l1-1-0.dll
+  ImportLookupTableRVA: 0x1043A80
+  ImportAddressTableRVA: 0x1044780
+  Symbol: memset (0)
+  Symbol: strlen (0)
+  Symbol: strncmp (0)
+  Symbol: strnlen (0)
+  Symbol: wcslen (0)
+  Symbol: wcsnlen (0)
+}
+Import {
+  Name: user32.dll
+  ImportLookupTableRVA: 0x1043AB8
+  ImportAddressTableRVA: 0x10447B8
+  Symbol: AdjustWindowRect (0)
+  Symbol: AdjustWindowRectEx (0)
+  Symbol: AppendMenuW (0)
+  Symbol: ChangeDisplaySettingsExW (0)
+  Symbol: CheckMenuItem (0)
+  Symbol: ClientToScreen (0)
+  Symbol: ClipCursor (0)
+  Symbol: CloseTouchInputHandle (0)
+  Symbol: CreateAcceleratorTableW (0)
+  Symbol: CreateIcon (0)
+  Symbol: CreateMenu (0)
+  Symbol: CreatePopupMenu (0)
+  Symbol: CreateWindowExW (0)
+  Symbol: DefWindowProcW (0)
+  Symbol: DestroyAcceleratorTable (0)
+  Symbol: DestroyIcon (0)
+  Symbol: DestroyMenu (0)
+  Symbol: DestroyWindow (0)
+  Symbol: DispatchMessageA (0)
+  Symbol: DispatchMessageW (0)
+  Symbol: DrawIconEx (0)
+  Symbol: DrawMenuBar (0)
+  Symbol: DrawTextW (0)
+  Symbol: EnableMenuItem (0)
+  Symbol: EnableWindow (0)
+  Symbol: EnumChildWindows (0)
+  Symbol: EnumDisplayMonitors (0)
+  Symbol: FillRect (0)
+  Symbol: FindWindowExW (0)
+  Symbol: FindWindowW (0)
+  Symbol: FlashWindowEx (0)
+  Symbol: GetActiveWindow (0)
+  Symbol: GetAsyncKeyState (0)
+  Symbol: GetClientRect (0)
+  Symbol: GetClipCursor (0)
+  Symbol: GetCursorPos (0)
+  Symbol: GetDC (0)
+  Symbol: GetForegroundWindow (0)
+  Symbol: GetKeyState (0)
+  Symbol: GetKeyboardLayout (0)
+  Symbol: GetKeyboardState (0)
+  Symbol: GetMenu (0)
+  Symbol: GetMenuBarInfo (0)
+  Symbol: GetMenuItemInfoW (0)
+  Symbol: GetMessageA (0)
+  Symbol: GetMessageW (0)
+  Symbol: GetMonitorInfoW (0)
+  Symbol: GetParent (0)
+  Symbol: GetRawInputData (0)
+  Symbol: GetSystemMenu (0)
+  Symbol: GetSystemMetrics (0)
+  Symbol: GetTouchInputInfo (0)
+  Symbol: GetUpdateRect (0)
+  Symbol: GetWindow (0)
+  Symbol: GetWindowDC (0)
+  Symbol: GetWindowLongPtrW (0)
+  Symbol: GetWindowLongW (0)
+  Symbol: GetWindowPlacement (0)
+  Symbol: GetWindowRect (0)
+  Symbol: GetWindowTextLengthW (0)
+  Symbol: GetWindowTextW (0)
+  Symbol: InsertMenuW (0)
+  Symbol: InvalidateRect (0)
+  Symbol: InvalidateRgn (0)
+  Symbol: IsIconic (0)
+  Symbol: IsProcessDPIAware (0)
+  Symbol: IsWindow (0)
+  Symbol: IsWindowEnabled (0)
+  Symbol: IsWindowVisible (0)
+  Symbol: LoadCursorW (0)
+  Symbol: MapVirtualKeyExW (0)
+  Symbol: MapVirtualKeyW (0)
+  Symbol: MapWindowPoints (0)
+  Symbol: MessageBoxW (0)
+  Symbol: MonitorFromPoint (0)
+  Symbol: MonitorFromRect (0)
+  Symbol: MonitorFromWindow (0)
+  Symbol: MsgWaitForMultipleObjectsEx (0)
+  Symbol: OffsetRect (0)
+  Symbol: PeekMessageW (0)
+  Symbol: PostMessageW (0)
+  Symbol: PostQuitMessage (0)
+  Symbol: PostThreadMessageW (0)
+  Symbol: RedrawWindow (0)
+  Symbol: RegisterClassExW (0)
+  Symbol: RegisterRawInputDevices (0)
+  Symbol: RegisterTouchWindow (0)
+  Symbol: RegisterWindowMessageA (0)
+  Symbol: ReleaseCapture (0)
+  Symbol: ReleaseDC (0)
+  Symbol: RemoveMenu (0)
+  Symbol: ScreenToClient (0)
+  Symbol: SendInput (0)
+  Symbol: SendMessageW (0)
+  Symbol: SetCapture (0)
+  Symbol: SetCursor (0)
+  Symbol: SetCursorPos (0)
+  Symbol: SetFocus (0)
+  Symbol: SetForegroundWindow (0)
+  Symbol: SetMenu (0)
+  Symbol: SetMenuItemInfoW (0)
+  Symbol: SetParent (0)
+  Symbol: SetPropW (0)
+  Symbol: SetWindowDisplayAffinity (0)
+  Symbol: SetWindowLongPtrW (0)
+  Symbol: SetWindowLongW (0)
+  Symbol: SetWindowPlacement (0)
+  Symbol: SetWindowPos (0)
+  Symbol: SetWindowRgn (0)
+  Symbol: SetWindowTextW (0)
+  Symbol: ShowCursor (0)
+  Symbol: ShowWindow (0)
+  Symbol: SystemParametersInfoA (0)
+  Symbol: SystemParametersInfoW (0)
+  Symbol: ToUnicodeEx (0)
+  Symbol: TrackMouseEvent (0)
+  Symbol: TrackPopupMenu (0)
+  Symbol: TranslateAcceleratorW (0)
+  Symbol: TranslateMessage (0)
+  Symbol: UpdateWindow (0)
+  Symbol: ValidateRect (0)
+  Symbol: VkKeyScanW (0)
+}
+Import {
+  Name: WebView2Loader.dll
+  ImportLookupTableRVA: 0x1043E90
+  ImportAddressTableRVA: 0x1044B90
+  Symbol: CreateCoreWebView2EnvironmentWithOptions (0)
+  Symbol: GetAvailableCoreWebView2BrowserVersionString (0)
+}
+Import {
+  Name: ole32.dll
+  ImportLookupTableRVA: 0x1043EA8
+  ImportAddressTableRVA: 0x1044BA8
+  Symbol: CoCreateFreeThreadedMarshaler (0)
+  Symbol: CoCreateInstance (0)
+  Symbol: CoInitialize (0)
+  Symbol: CoInitializeEx (0)
+  Symbol: CoTaskMemAlloc (0)
+  Symbol: CoTaskMemFree (0)
+  Symbol: CoUninitialize (0)
+  Symbol: OleInitialize (0)
+  Symbol: RegisterDragDrop (0)
+  Symbol: RevokeDragDrop (0)
+}
+Import {
+  Name: comctl32.dll
+  ImportLookupTableRVA: 0x1043F00
+  ImportAddressTableRVA: 0x1044C00
+  Symbol: DefSubclassProc (0)
+  Symbol: RemoveWindowSubclass (0)
+  Symbol: SetWindowSubclass (0)
+  Symbol: TaskDialogIndirect (0)
+}
+Import {
+  Name: shell32.dll
+  ImportLookupTableRVA: 0x1043F28
+  ImportAddressTableRVA: 0x1044C28
+  Symbol: DragFinish (0)
+  Symbol: DragQueryFileW (0)
+  Symbol: ILCreateFromPathW (0)
+  Symbol: ILFree (0)
+  Symbol: SHAppBarMessage (0)
+  Symbol: SHGetKnownFolderPath (0)
+  Symbol: SHOpenFolderAndSelectItems (0)
+  Symbol: ShellExecuteExW (0)
+  Symbol: ShellExecuteW (0)
+}
+Import {
+  Name: api-ms-win-core-synch-l1-2-0.dll
+  ImportLookupTableRVA: 0x1043F78
+  ImportAddressTableRVA: 0x1044C78
+  Symbol: WaitOnAddress (0)
+  Symbol: WakeByAddressAll (0)
+  Symbol: WakeByAddressSingle (0)
+}
+Import {
+  Name: ws2_32.dll
+  ImportLookupTableRVA: 0x1043F98
+  ImportAddressTableRVA: 0x1044C98
+  Symbol: WSACleanup (0)
+  Symbol: WSAGetLastError (0)
+  Symbol: WSAIoctl (0)
+  Symbol: WSASend (0)
+  Symbol: WSASocketW (0)
+  Symbol: WSAStartup (0)
+  Symbol: accept (0)
+  Symbol: bind (0)
+  Symbol: closesocket (0)
+  Symbol: connect (0)
+  Symbol: freeaddrinfo (0)
+  Symbol: getaddrinfo (0)
+  Symbol: getpeername (0)
+  Symbol: getsockname (0)
+  Symbol: getsockopt (0)
+  Symbol: ioctlsocket (0)
+  Symbol: listen (0)
+  Symbol: recv (0)
+  Symbol: select (0)
+  Symbol: send (0)
+  Symbol: setsockopt (0)
+  Symbol: shutdown (0)
+}
+Import {
+  Name: ntdll.dll
+  ImportLookupTableRVA: 0x1044050
+  ImportAddressTableRVA: 0x1044D50
+  Symbol: NtCancelIoFileEx (0)
+  Symbol: NtCreateFile (0)
+  Symbol: NtCreateNamedPipeFile (0)
+  Symbol: NtDeviceIoControlFile (0)
+  Symbol: NtOpenFile (0)
+  Symbol: NtReadFile (0)
+  Symbol: NtWriteFile (0)
+  Symbol: RtlGetVersion (0)
+  Symbol: RtlNtStatusToDosError (0)
+}
+Import {
+  Name: bcryptprimitives.dll
+  ImportLookupTableRVA: 0x10440A0
+  ImportAddressTableRVA: 0x1044DA0
+  Symbol: ProcessPrng (0)
+}
+Import {
+  Name: api-ms-win-crt-math-l1-1-0.dll
+  ImportLookupTableRVA: 0x10440B0
+  ImportAddressTableRVA: 0x1044DB0
+  Symbol: __setusermatherr (0)
+  Symbol: floor (0)
+  Symbol: pow (0)
+  Symbol: round (0)
+  Symbol: roundf (0)
+  Symbol: trunc (0)
+}
+Import {
+  Name: api-ms-win-crt-environment-l1-1-0.dll
+  ImportLookupTableRVA: 0x10440E8
+  ImportAddressTableRVA: 0x1044DE8
+  Symbol: __p__environ (0)
+  Symbol: getenv (0)
+}
+Import {
+  Name: shlwapi.dll
+  ImportLookupTableRVA: 0x1044100
+  ImportAddressTableRVA: 0x1044E00
+  Symbol: SHCreateMemStream (0)
+}
+Import {
+  Name: gdi32.dll
+  ImportLookupTableRVA: 0x1044110
+  ImportAddressTableRVA: 0x1044E10
+  Symbol: BitBlt (0)
+  Symbol: CombineRgn (0)
+  Symbol: CreateCompatibleDC (0)
+  Symbol: CreateDIBSection (0)
+  Symbol: CreateRectRgn (0)
+  Symbol: CreateSolidBrush (0)
+  Symbol: DeleteDC (0)
+  Symbol: DeleteObject (0)
+  Symbol: GetDeviceCaps (0)
+  Symbol: SelectObject (0)
+  Symbol: SetBkMode (0)
+  Symbol: SetTextColor (0)
+}
+Import {
+  Name: dwmapi.dll
+  ImportLookupTableRVA: 0x1044178
+  ImportAddressTableRVA: 0x1044E78
+  Symbol: DwmEnableBlurBehindWindow (0)
+  Symbol: DwmGetWindowAttribute (0)
+  Symbol: DwmSetWindowAttribute (0)
+}
+Import {
+  Name: advapi32.dll
+  ImportLookupTableRVA: 0x1044198
+  ImportAddressTableRVA: 0x1044E98
+  Symbol: CredDeleteW (0)
+  Symbol: CredFree (0)
+  Symbol: CredReadW (0)
+  Symbol: CredWriteW (0)
+  Symbol: RegGetValueW (0)
+  Symbol: SystemFunction036 (0)
+}
+Import {
+  Name: crypt32.dll
+  ImportLookupTableRVA: 0x10441D0
+  ImportAddressTableRVA: 0x1044ED0
+  Symbol: CertAddEncodedCertificateToStore (0)
+  Symbol: CertCloseStore (0)
+  Symbol: CertCreateCertificateChainEngine (0)
+  Symbol: CertFreeCertificateChain (0)
+  Symbol: CertFreeCertificateChainEngine (0)
+  Symbol: CertFreeCertificateContext (0)
+  Symbol: CertGetCertificateChain (0)
+  Symbol: CertOpenStore (0)
+  Symbol: CertSetCertificateContextProperty (0)
+  Symbol: CertVerifyCertificateChainPolicy (0)
+  Symbol: CryptProtectData (0)
+  Symbol: CryptUnprotectData (0)
+}
+Import {
+  Name: oleaut32.dll
+  ImportLookupTableRVA: 0x1044238
+  ImportAddressTableRVA: 0x1044F38
+  Symbol: GetErrorInfo (0)
+  Symbol: SetErrorInfo (0)
+  Symbol: SysFreeString (0)
+  Symbol: SysStringLen (0)
+}
+Import {
+  Name: api-ms-win-crt-filesystem-l1-1-0.dll
+  ImportLookupTableRVA: 0x1044260
+  ImportAddressTableRVA: 0x1044F60
+  Symbol: _lock_file (0)
+  Symbol: _unlock_file (0)
+}
+Import {
+  Name: bcrypt.dll
+  ImportLookupTableRVA: 0x1044278
+  ImportAddressTableRVA: 0x1044F78
+  Symbol: BCryptGenRandom (0)
+}
+Import {
+  Name: api-ms-win-crt-convert-l1-1-0.dll
+  ImportLookupTableRVA: 0x1044288
+  ImportAddressTableRVA: 0x1044F88
+  Symbol: mbrtowc (0)
+  Symbol: wcrtomb (0)
+}

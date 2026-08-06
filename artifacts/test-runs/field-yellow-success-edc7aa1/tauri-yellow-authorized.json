@@ -1,0 +1,61 @@
+{
+    "$schema":  "https://schema.tauri.app/config/2",
+    "productName":  "DroneDream-Field",
+    "version":  "1.0.0",
+    "identifier":  "io.dronedream.desktop.field",
+    "build":  {
+                  "beforeDevCommand":  "npm run frontend:field-dev",
+                  "beforeBuildCommand":  "npm run frontend:field-build",
+                  "devUrl":  "http://127.0.0.1:5174/field.html",
+                  "frontendDist":  "../../frontend/field-dist"
+              },
+    "app":  {
+                "windows":  [
+                                {
+                                    "label":  "main",
+                                    "title":  "DroneDream · FIELD",
+                                    "width":  1440,
+                                    "height":  900,
+                                    "minWidth":  390,
+                                    "minHeight":  620,
+                                    "resizable":  true,
+                                    "fullscreen":  false
+                                }
+                            ]
+            },
+    "bundle":  {
+                   "active":  true,
+                   "createUpdaterArtifacts":  false,
+                   "targets":  [
+                                   "nsis"
+                               ],
+                   "icon":  [
+                                "../../brand/generated/field/windows/32x32.png",
+                                "../../brand/generated/field/windows/128x128.png",
+                                "../../brand/generated/field/windows/128x128@2x.png",
+                                "../../brand/generated/field/windows/icon.ico"
+                            ],
+                   "resources":  {
+                                     "icons/icon.ico":  null,
+                                     "../../distribution/editions/field/branding/dronedream-field-mark.png":  "branding/dronedream-field-mark.png",
+                                     "../../distribution/editions/field/branding/dronedream-field-dot-lockup.png":  "branding/dronedream-field-dot-lockup.png",
+                                     "../../distribution/editions/field/branding/source-manifest.v1.json":  "branding/source-manifest.v1.json",
+                                     "../../brand/generated/brand-assets.v1.json":  "branding/canonical-brand-assets.v1.json",
+                                     "../../brand/generated/brand-visual-receipt.v1.json":  "branding/canonical-brand-visual-receipt.v1.json",
+                                     "../../brand/generated/field/windows/icon.ico":  "icons/DroneDream.ico"
+                                 },
+                   "publisher":  "DroneDream",
+                   "shortDescription":  "Fail-closed field readiness for supported aircraft",
+                   "longDescription":  "DroneDream · FIELD provides read-only device observation, compatibility review, parameter recovery planning, and preflight safety status. Hardware control remains unavailable until native safety contracts are satisfied."
+               },
+    "plugins":  {
+                    "updater":  {
+                                    "endpoints":  [
+                                                      "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-channel/latest-field.json"
+                                                  ],
+                                    "windows":  {
+                                                    "installMode":  "passive"
+                                                }
+                                }
+                }
+}

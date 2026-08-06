@@ -1,0 +1,335 @@
+{
+    "schemaVersion":  1,
+    "kind":  "dronedream-field-edc7aa1-postbuild-static-audit",
+    "editionId":  "field",
+    "decision":  "pass-static-preview-lifecycle-pending",
+    "source":  {
+                   "productCommit":  "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+                   "productTree":  "a1abe6ad5c608a8db07c1733657179dd46b6ae3f",
+                   "evidenceBaseHead":  "6219e731ebe70dbb1e550de9156437f30bf1e648",
+                   "commonCoreCommit":  "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+                   "commonCoreHash":  "9836b3c876e50e4add7f2657774eeb563c4eeb57697960843e406ba1563beddd",
+                   "productCommonPathsHash":  "127a9ea6a292d391f6aee8cbbfe2013693589ab0c761040d1d94ff54c890a4e6",
+                   "releaseDriverDonor":  "f2858e3d2e39f493baab28368b77230e45dd199f"
+               },
+    "authorization":  {
+                          "applicationPath":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-edc7aa1-frontend-dist-replacement\\yellow-build-application.json",
+                          "applicationCanonicalSha256":  "e756dc9272d2a5981a6dc674d0d2ae62cd217128876ffb70f81dcc1d611aca35",
+                          "applicationFileSha256":  "0bdb64d8b28ae91e2d05c3f169bd568b5ca577258b21752a69fc7adc4cd25e9e",
+                          "sourceAndApplicationMatched":  true,
+                          "singleTauriCargoNsisAttemptAuthorized":  true
+                      },
+    "build":  {
+                  "startedAt":  "2026-08-06T15:03:52.8914494Z",
+                  "finishedAt":  "2026-08-06T15:08:37.9742755Z",
+                  "durationSeconds":  285.083,
+                  "exitCode":  0,
+                  "tauriInvocationCount":  1,
+                  "cargoBuildCount":  1,
+                  "cargoJobs":  2,
+                  "nsisInvocationCount":  1,
+                  "retryCount":  0,
+                  "stdout":  {
+                                 "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\build.stdout.log",
+                                 "bytes":  6432,
+                                 "sha256":  "5215dc15a48568287650fa0323050b68889c243ea8879958e0a91c46730256c7"
+                             },
+                  "stderr":  {
+                                 "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\build.stderr.log",
+                                 "bytes":  0,
+                                 "sha256":  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                             },
+                  "processReceipt":  {
+                                         "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\build-process.json",
+                                         "bytes":  5708,
+                                         "sha256":  "5df8c72cebc5d1827a354de288e5db65a8d49754cd1203f1609004ae0eb910e6"
+                                     },
+                  "preflightReceipt":  {
+                                           "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\preflight-receipt.json",
+                                           "bytes":  5470,
+                                           "sha256":  "c6a9f35b96f39783e5150906a20254477ea59f63266d11b2e340f4a49668b092"
+                                       },
+                  "overlay":  {
+                                  "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\tauri-yellow-authorized.json",
+                                  "bytes":  3675,
+                                  "sha256":  "dfbfddb4dc50f856f97f3f33112a9e62f0c1359a93afbfe950970e802961d586"
+                              },
+                  "overlayFrontendDist":  "../../frontend/field-dist",
+                  "resolvedFrontendDist":  "C:\\Users\\zju20\\ddfedc7\\frontend\\field-dist"
+              },
+    "artifact":  {
+                     "file":  {
+                                  "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe",
+                                  "bytes":  11535000,
+                                  "sha256":  "b87a020df957aeca7b179779a2400a2dfeb0fc2d43e655aa5bf8969db7c46dbd"
+                              },
+                     "filename":  "DroneDream-Field-1.0.0.exe",
+                     "fileVersion":  "1.0.0",
+                     "productVersion":  "1.0.0",
+                     "productName":  "DroneDream · FIELD",
+                     "fileDescription":  "DroneDream · FIELD",
+                     "packaging":  "tauri-nsis",
+                     "authenticode":  {
+                                          "state":  "NotSigned",
+                                          "signerCertificatePresent":  false,
+                                          "timestamperCertificatePresent":  false,
+                                          "peCertificate":  {
+                                                                "peOffset":  216,
+                                                                "machine":  "0x014c",
+                                                                "sectionCount":  5,
+                                                                "optionalHeaderMagic":  "0x010b",
+                                                                "certificateTableFileOffset":  0,
+                                                                "certificateTableBytes":  0,
+                                                                "certificateTablePresent":  false
+                                                            },
+                                          "expectedUnsignedPreview":  true
+                                      }
+                 },
+    "updater":  {
+                    "sidecar":  {
+                                    "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+                                    "bytes":  428,
+                                    "sha256":  "95e2f7c26d3059aa4f14bf99b4d17483aa212706207192c7ff39e9a8f913ae03"
+                                },
+                    "checksum":  {
+                                     "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sha256",
+                                     "bytes":  94,
+                                     "sha256":  "2280dbf50db2a4b2f944e9667453cb6c521cb4be4bd52c08d7529f8b8ec74ee6"
+                                 },
+                    "metadata":  {
+                                     "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\latest-field.json",
+                                     "bytes":  1024,
+                                     "sha256":  "a8627546443cc0e23201dfa3e6978b9d03d463308a0720c42edbc8fb500677d1"
+                                 },
+                    "sidecarMatchesMetadata":  true,
+                    "artifactSignatureVerifiedOffline":  true,
+                    "trustedCommentSignatureVerifiedOffline":  true,
+                    "algorithm":  "ED",
+                    "publicKeyId":  "BA3FDCAF71CE2FF5",
+                    "privateKeyReadDuringPostbuildAudit":  false,
+                    "metadataVersion":  "1.0.0",
+                    "metadataSourceCommit":  "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+                    "metadataBuildNumber":  746,
+                    "metadataUrl":  "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-v1.0.0-build-746/DroneDream-Field-1.0.0.exe",
+                    "metadataFilename":  "DroneDream-Field-1.0.0.exe",
+                    "sameEditionUrlFamily":  true
+                },
+    "payload":  {
+                    "inventory":  {
+                                      "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-inventory.json",
+                                      "bytes":  25791,
+                                      "sha256":  "90bf06424c49b9930dddca0e0294ecbed90d54868129c6dc8a8a600b86598629"
+                                  },
+                    "profileId":  "field-lightweight",
+                    "includesLargeSimulator":  false,
+                    "excludedSourcePaths":  [
+                                                "backend/app/simulator",
+                                                "scripts/simulators"
+                                            ],
+                    "enginePackVerified":  true,
+                    "enginePackId":  "sha256:be477878d2c9e8ea273813357aa4af57e7599eb075beb790784322359018d90c",
+                    "enginePackSourceCommit":  "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+                    "enginePackForbiddenPaths":  [
+
+                                                 ],
+                    "installerForbiddenEntries":  [
+
+                                                  ],
+                    "simulatorPayloadDecision":  "pass",
+                    "compatibilityMetadataTokenNote":  "PX4/Gazebo/HITL names remain only in compatibility and fail-closed policy metadata."
+                },
+    "identity":  {
+                     "internalProductName":  "DroneDream-Field",
+                     "displayName":  "DroneDream · FIELD",
+                     "bundleId":  "io.dronedream.desktop.field",
+                     "uninstallKey":  "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+                     "shortcutName":  "DroneDream · FIELD",
+                     "appUserModelId":  "io.dronedream.desktop.field",
+                     "dataNamespace":  "io.dronedream.desktop.field",
+                     "centeredDotU00B7Verified":  true,
+                     "mojibakeRoadPresent":  false,
+                     "locales":  [
+                                     "English-1033",
+                                     "Simplified-Chinese-2052"
+                                 ]
+                 },
+    "brand":  {
+                  "canonicalManifest":  {
+                                            "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\branding\\canonical-brand-assets.v1.json",
+                                            "bytes":  16607,
+                                            "sha256":  "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471"
+                                        },
+                  "fieldMark":  {
+                                    "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\branding\\dronedream-field-mark.png",
+                                    "bytes":  161228,
+                                    "sha256":  "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5"
+                                },
+                  "fieldLargeLabelLockup":  {
+                                                "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\branding\\dronedream-field-dot-lockup.png",
+                                                "bytes":  116568,
+                                                "sha256":  "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+                                            },
+                  "fieldWindowsIcon":  {
+                                           "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\icons\\DroneDream.ico",
+                                           "bytes":  55337,
+                                           "sha256":  "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559"
+                                       },
+                  "frontendFieldLargeLabelLockup":  {
+                                                        "path":  "assets/field-lockup-compact-DXnZA5hl.png",
+                                                        "bytes":  116568,
+                                                        "sha256":  "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+                                                    },
+                  "expectedMarkSha256":  "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
+                  "expectedLockupSha256":  "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+                  "palette":  [
+                                  "#FFC247",
+                                  "#FF754B",
+                                  "#D746A5"
+                              ]
+              },
+    "licenses":  {
+                     "dronedreamLicense":  {
+                                               "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\licenses\\DroneDream-LICENSE.txt",
+                                               "bytes":  1087,
+                                               "sha256":  "d04dd6d500dfbcc5fad9a2f9695a5db8cc95ffc07591a13404fbc996b1e19e76"
+                                           },
+                     "thirdPartyNotice":  {
+                                              "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\licenses\\THIRD_PARTY_NOTICES.md",
+                                              "bytes":  4410,
+                                              "sha256":  "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+                                          },
+                     "valkeyCopying":  {
+                                           "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\licenses\\Valkey-COPYING.txt",
+                                           "bytes":  3091,
+                                           "sha256":  "1a53dca3aab7ce048e91e77b03c0342f3075366f9dede8ec4d19d0cf229e12a0"
+                                       },
+                     "decision":  "pass"
+                 },
+    "webView2":  {
+                     "loader":  {
+                                    "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\WebView2Loader.dll",
+                                    "bytes":  160320,
+                                    "sha256":  "8427b1fc58ec707813e5c0a51eb5d69397bb333250a7b891be4d3b123f1e0f1c"
+                                },
+                     "bootstrapper":  {
+                                          "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\payload-static\\$PLUGINSDIR\\MicrosoftEdgeWebview2Setup.exe",
+                                          "bytes":  1688792,
+                                          "sha256":  "f91077e2c116dcf6377e555d0d4a3a564d242351ad6718b6954658d4f74819c1"
+                                      },
+                     "loaderImportedByApplication":  true,
+                     "compiledInstallerStructureVerified":  true
+                 },
+    "auth":  {
+                 "editionId":  "field",
+                 "publicClientId":  "3140bbe2-5f0e-4699-8a9b-295d4030f853",
+                 "callback":  "http://127.0.0.1:49213/desktop-auth/field/callback",
+                 "publicClient":  true,
+                 "tokenAuthMethod":  "none",
+                 "clientIdMatchesInCompiledApplication":  1,
+                 "callbackMatchesInCompiledApplication":  1,
+                 "independentEditionTransactionContractTested":  true,
+                 "providerOrAccountUsed":  false
+             },
+    "safety":  {
+                   "registryPackCount":  8,
+                   "validatedHardwarePackCount":  0,
+                   "validatedHardwarePackIds":  [
+
+                                                ],
+                   "discoveryIsAuthorization":  false,
+                   "threeLayerHardwareDecision":  "deny",
+                   "hardwareWriteArmFlight":  "deny",
+                   "frontendIsAuthority":  false,
+                   "realDeviceTouched":  false,
+                   "simulationExecuted":  false
+               },
+    "tests":  {
+                  "fieldContracts":  {
+                                         "passed":  25,
+                                         "log":  {
+                                                     "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\postbuild-field-contract-tests.log",
+                                                     "bytes":  204,
+                                                     "sha256":  "2d1e1e4facd1cec74444ccb880fde66e56b94187fe8e4eef19eb5f9f08647600"
+                                                 }
+                                     },
+                  "coexistenceNegative":  {
+                                              "passed":  12,
+                                              "deselected":  6,
+                                              "log":  {
+                                                          "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\postbuild-coexistence-tests.log",
+                                                          "bytes":  232,
+                                                          "sha256":  "9bfeb6f1994a5e73809924aad1753f53fd8ed15c0da3423157ac8244c31c615f"
+                                                      }
+                                          },
+                  "nsisTemplate":  {
+                                       "result":  "pass",
+                                       "log":  {
+                                                   "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\postbuild-nsis-template.log",
+                                                   "bytes":  138,
+                                                   "sha256":  "7bc2dcc9f64287dee41f6684e4ac440b16117e4012ca356965d480ffea83802a"
+                                               }
+                                   },
+                  "updaterContract":  {
+                                          "result":  "pass",
+                                          "log":  {
+                                                      "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\postbuild-updater-contract.log",
+                                                      "bytes":  1492,
+                                                      "sha256":  "1784c911e6ce36d1b0fbb01510b95089049ef5a39bb8b5a9931e4341c2e78226"
+                                                  }
+                                      },
+                  "enginePack":  {
+                                     "result":  "pass",
+                                     "log":  {
+                                                 "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\postbuild-engine-pack-verify.log",
+                                                 "bytes":  212,
+                                                 "sha256":  "52b03a5844c7695529cf9f870acacc5e61f3ad75d4e391cdd29f59a099d81c16"
+                                             }
+                                 },
+                  "generatedNsi":  {
+                                       "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\edc7aa1\\x86_64-pc-windows-gnullvm\\release\\nsis\\x64\\installer.nsi",
+                                       "bytes":  35201,
+                                       "sha256":  "1d973cf879b879912912239f5186c3eb25235a2f5d57987aee897a7cf472d8c2"
+                                   },
+                  "appImports":  {
+                                     "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\postbuild-app-imports.txt",
+                                     "bytes":  15183,
+                                     "sha256":  "f2d18b0c7288c9b33a5a90c3c49b553ad9892d4f31c88ae6277bb54971fd3ef3"
+                                 },
+                  "nsisListing":  {
+                                      "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\postbuild-nsis-listing.txt",
+                                      "bytes":  4224,
+                                      "sha256":  "ccc1df823a6d3f175dd04ce9d1e3d4058e9ab96b8ccc735cf3336e144f4b6c6c"
+                                  }
+              },
+    "resources":  {
+                      "cargoTargetBytes":  1540107525,
+                      "cargoTargetMaximumBytes":  8589934592,
+                      "runRootBytesAtAudit":  65582203,
+                      "workspaceTemporaryMaximumBytes":  1073741824,
+                      "memoryPeakIndependentlyMeasured":  false,
+                      "configuredMemoryMaximumBytes":  8589934592
+                  },
+    "executionBoundary":  {
+                              "installed":  false,
+                              "launched":  false,
+                              "runtimeMigrated":  false,
+                              "deviceOrHardwareUsed":  false,
+                              "px4GazeboSitlHitlUsed":  false,
+                              "accountOrTokenUsed":  false,
+                              "deployedOrUploaded":  false,
+                              "releaseBranchCreated":  false
+                          },
+    "readiness":  {
+                      "previewReady":  true,
+                      "releaseReady":  false,
+                      "websiteReady":  false,
+                      "lifecycleAccepted":  false,
+                      "remainingGates":  [
+                                             "separate isolated lifecycle approval and fresh/overlay/launch/shortcut/WebView2/EN-ZH/uninstall/residue validation",
+                                             "Website exact four-file handoff is prohibited until lifecycle acceptance",
+                                             "Authenticode remains honestly unsigned",
+                                             "real hardware remains prohibited and 0 validated packs keep write/arm/flight denied"
+                                         ]
+                  },
+    "generatedAt":  "2026-08-06T15:27:36.1433095Z"
+}

@@ -1,0 +1,208 @@
+﻿
+7-Zip 22.01 (x64) : Copyright (c) 1999-2022 Igor Pavlov : 2022-07-15
+
+Scanning the drive for archives:
+1 file, 11535000 bytes (12 MiB)
+
+Listing archive: C:\Users\zju20\.codex\visualizations\2026\08\05\019fd0e2-71cc-7742-bfab-612510f37c39\field-yellow-build-edc7aa1-frontend-dist-replacement\artifact\DroneDream-Field-1.0.0.exe
+
+--
+Path = C:\Users\zju20\.codex\visualizations\2026\08\05\019fd0e2-71cc-7742-bfab-612510f37c39\field-yellow-build-edc7aa1-frontend-dist-replacement\artifact\DroneDream-Field-1.0.0.exe
+Type = Nsis
+Physical Size = 11535000
+Method = LZMA:23
+Solid = +
+Headers Size = 169346
+Embedded Stub Size = 54272
+SubType = NSIS-3 Unicode BadCmd=13
+
+----------
+Path = $PLUGINSDIR\System.dll
+Size = 12288
+Packed Size = 11480724
+Modified = 
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 0
+
+Path = $PLUGINSDIR\modern-wizard.bmp
+Size = 26494
+Packed Size = 
+Modified = 2026-07-10 16:47:28.0000000
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 12292
+
+Path = $PLUGINSDIR\nsDialogs.dll
+Size = 9728
+Packed Size = 
+Modified = 
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 38790
+
+Path = $PLUGINSDIR\nsis_tauri_utils.dll
+Size = 34304
+Packed Size = 
+Modified = 
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 48522
+
+Path = $PLUGINSDIR\StartMenu.dll
+Size = 7680
+Packed Size = 
+Modified = 
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 82830
+
+Path = drone-dream-desktop.exe
+Size = 24899072
+Packed Size = 
+Modified = 2026-08-06 23:08:14.0000000
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 90514
+
+Path = $PLUGINSDIR\dronedream-runtime-probe.exe
+Size = 24899072
+Packed Size = 
+Modified = 2026-08-06 23:08:14.0000000
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 90514
+
+Path = WebView2Loader.dll
+Size = 160320
+Packed Size = 
+Modified = 2006-07-24 09:21:28.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 24989590
+
+Path = $PLUGINSDIR\WebView2Loader.dll
+Size = 160320
+Packed Size = 
+Modified = 2006-07-24 09:21:28.0000000
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 24989590
+
+Path = $PLUGINSDIR\LangDLL.dll
+Size = 5632
+Packed Size = 
+Modified = 
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 25149914
+
+Path = $PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe
+Size = 1688792
+Packed Size = 
+Modified = 2026-07-12 12:34:56.0000000
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 25155550
+
+Path = $TEMP\MicrosoftEdgeWebview2Setup.exe
+Size = 1688792
+Packed Size = 
+Modified = 2026-07-12 12:34:56.0000000
+Attributes = 
+Method = LZMA:23
+Solid = +
+Offset = 25155550
+
+Path = licenses\DroneDream-LICENSE.txt
+Size = 1087
+Packed Size = 
+Modified = 2026-08-06 23:00:54.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 26844346
+
+Path = branding\canonical-brand-assets.v1.json
+Size = 16607
+Packed Size = 
+Modified = 2026-08-06 23:00:56.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 26845437
+
+Path = branding\canonical-brand-visual-receipt.v1.json
+Size = 892
+Packed Size = 
+Modified = 2026-08-06 23:00:56.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 26862048
+
+Path = icons\DroneDream.ico
+Size = 55337
+Packed Size = 
+Modified = 2026-08-06 23:00:56.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 26862944
+
+Path = branding\dronedream-field-dot-lockup.png
+Size = 116568
+Packed Size = 
+Modified = 2026-08-06 23:00:56.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 26918285
+
+Path = branding\dronedream-field-mark.png
+Size = 161228
+Packed Size = 
+Modified = 2026-08-06 23:00:56.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 27034857
+
+Path = branding\source-manifest.v1.json
+Size = 2705
+Packed Size = 
+Modified = 2026-08-06 23:00:56.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 27196089
+
+Path = licenses\THIRD_PARTY_NOTICES.md
+Size = 4410
+Packed Size = 
+Modified = 2026-08-06 23:00:56.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 27198798
+
+Path = licenses\Valkey-COPYING.txt
+Size = 
+Packed Size = 
+Modified = 2026-08-06 23:00:56.0000000
+Attributes = A
+Method = LZMA:23
+Solid = +
+Offset = 27203212
+

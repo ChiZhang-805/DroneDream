@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-frontend-dist-fresh-yellow-build-application",
+  "applicationId": "field-yellow-edc7aa1-frontend-dist-single-nsis-v1",
+  "editionId": "field",
+  "status": "pending-total-control-yellow-approval",
+  "requestedAt": "2026-08-06T13:59:13.4272482Z",
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+    "productTree": "a1abe6ad5c608a8db07c1733657179dd46b6ae3f",
+    "evidenceCommit": "6219e731ebe70dbb1e550de9156437f30bf1e648",
+    "evidenceTree": "7cefffbb1bc25ce65df5d37bd28a9be7cc694911",
+    "upstreamCommit": "6219e731ebe70dbb1e550de9156437f30bf1e648",
+    "ahead": 0,
+    "behind": 0,
+    "clean": true
+  },
+  "commonCore": {
+    "baseDriverDonor": "f2858e3d2e39f493baab28368b77230e45dd199f",
+    "frontendDistDonor": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+    "frontendDistDonorParent": "f2858e3d2e39f493baab28368b77230e45dd199f",
+    "syncReceiptPath": "distribution/editions/field/receipts/common-core-d80f5f9-frontend-dist-sync-v1.json",
+    "syncReceiptSha256": "ca1c4d11d3553dbf1553ad2ed8c865b6490276fc72871efcaec764931609e71a"
+  },
+  "historicalAttempts": [
+    {
+      "productSource": "26dd3c141f86bc9cc538336bc3cb6a8155cc88e7",
+      "installerProduced": false,
+      "state": "frozen-failed-no-retry"
+    },
+    {
+      "productSource": "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+      "frozenArtifactSha256": "90d867aedf728a70e55d6df349da1ce96b80e6f37b4689224eebdc4fd8cfa2c3",
+      "state": "frozen-failed-no-install-no-handoff-no-retry"
+    },
+    {
+      "productSource": "323fd05313527c0edec481d7e09acb5ac4735d22",
+      "tauriBuildInvocations": 1,
+      "frontendBuildInvocations": 1,
+      "cargoBuildInvocations": 0,
+      "nsisInvocations": 0,
+      "installerProduced": false,
+      "state": "frozen-failed-no-retry"
+    }
+  ],
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "authenticodeStateRequested": "unsigned",
+    "updaterSignatureRequested": true,
+    "cargoBuildCountMaximum": 1,
+    "nsisInvocationMaximum": 1,
+    "freshBuildAttemptMaximum": 1,
+    "installDuringBuildAllowed": false,
+    "uploadAllowed": false,
+    "websiteHandoffAllowedBeforeLifecycleAcceptance": false
+  },
+  "ownedPaths": {
+    "sourceRoot": "C:\\Users\\zju20\\ddfedc7",
+    "cargoTarget": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\edc7aa1",
+    "runRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement",
+    "artifactRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact",
+    "reuseHistoricalSourceTargetOrOutputAllowed": false,
+    "allExecutionPathsAbsentAtApplication": true
+  },
+  "frontendDistExecutionContract": {
+    "overlayLocation": "new owned runRoot",
+    "canonicalValue": "../../frontend/field-dist",
+    "expectedResolvedPath": "C:\\Users\\zju20\\ddfedc7\\frontend\\field-dist",
+    "relocatedValueProhibited": "../../../frontend/field-dist",
+    "driverCanonicalSha256": "c176773d35a789d54570620bc109364aa8ecf5004b41e6a5abdc149da839df57",
+    "driverGitBlob": "81b41137febb7a4ef8bdf86b97360b88f0904873",
+    "externalCanonicalOverlayVerified": true,
+    "escapeAndUnknownNegativeVerified": true
+  },
+  "publicConfiguration": {
+    "oauthClientId": "3140bbe2-5f0e-4699-8a9b-295d4030f853",
+    "oauthCallback": "http://127.0.0.1:49213/desktop-auth/field/callback",
+    "oauthClientType": "public",
+    "oauthTokenAuthMethod": "none",
+    "oauthClientSecretPresent": false,
+    "supabasePublicVariablesSource": "tracked-frontend-production-environment",
+    "supabasePrivateOrServiceRoleAllowed": false,
+    "updaterPrivateKeyPathReference": "C:\\Users\\zju20\\.tauri\\dronedream-updater.key",
+    "updaterPrivateKeyPasswordMode": "empty",
+    "updaterMatchingKeyId": "BA3FDCAF71CE2FF5",
+    "privateKeyReadDuringGreen": false
+  },
+  "greenVerification": {
+    "sharedDriverCoexistenceFieldProfilePassed": 31,
+    "sharedWindowsBuildContractPassed": 7,
+    "fieldProductAndSafetyPassed": 64,
+    "fieldProductAndSafetySubtestsPassed": 9,
+    "enginePackAndProfilePassed": 34,
+    "enginePackSubtestsPassed": 4,
+    "releaseSourceTrackedFiles": 1970,
+    "releaseSourceNpmPackages": 390,
+    "releaseSourceRustPackages": 532,
+    "updaterSigningContractPassed": true,
+    "powershellAstPassed": 3,
+    "ruffPassed": true,
+    "diffCheckPassed": true,
+    "broadHistoricalReceiptSuite": {
+      "passed": 90,
+      "failed": 5,
+      "classification": "non-product stale HEAD and protected-evidence assumptions recorded in sync receipt"
+    }
+  },
+  "resourceObservation": {
+    "capturedAt": "2026-08-06T13:59:13.4272482Z",
+    "memoryTotalBytes": 16907100160,
+    "memoryFreeBytes": 6770401280,
+    "cFreeBytes": 98426875904,
+    "zFreeBytes": 23570554880,
+    "heavyProcessCount": 0
+  },
+  "resourceRequest": {
+    "cargoBuildJobs": 2,
+    "expectedCpuImpact": "high-transient",
+    "expectedMemoryUpperBoundBytes": 8589934592,
+    "cargoTargetDiskUpperBoundBytes": 8589934592,
+    "workspaceTemporaryDiskUpperBoundBytes": 1073741824,
+    "preExecutionResourceRecheckRequired": true,
+    "abortBeforeTauriIfAnyGateFails": true,
+    "networkAllowed": false
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "threeLayerHardwareDecision": "deny",
+    "frontendIsAuthority": false,
+    "installationAllowed": false,
+    "runtimeMigrationAllowed": false,
+    "deviceOrHardwareAllowed": false,
+    "px4GazeboSitlHitlAllowed": false,
+    "providerOrModelKeyAllowed": false,
+    "deploymentAllowed": false
+  },
+  "failurePolicy": {
+    "preTauriGateFailureConsumesBuild": false,
+    "afterTauriInvocationRetryAllowed": false,
+    "generatedBytesMustBeFrozenOnFailure": true,
+    "postHocSigningAfterFailureAllowed": false,
+    "sourceOrApplicationChangeInvalidatesApproval": true
+  },
+  "postBuildRequiredOutputs": [
+    "DroneDream-Field-1.0.0.exe",
+    "DroneDream-Field-1.0.0.exe.sig",
+    "DroneDream-Field-1.0.0.exe.sha256",
+    "latest-field.json",
+    "build receipt and handoff manifest"
+  ],
+  "remainingGates": [
+    "explicit fresh YELLOW approval for this exact product source and application",
+    "successful single Tauri Cargo NSIS attempt with updater signature and frozen receipts",
+    "separate lifecycle validation before Website handoff",
+    "real hardware remains prohibited"
+  ],
+  "nextGate": "total-control exact fresh YELLOW approval; no build has run for product source edc7aa124e058fda3bb143dc66cd7c208a601cef",
+  "applicationSha256": "e756dc9272d2a5981a6dc674d0d2ae62cd217128876ffb70f81dcc1d611aca35"
+}

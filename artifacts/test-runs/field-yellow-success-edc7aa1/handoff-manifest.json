@@ -1,0 +1,100 @@
+{
+    "schemaVersion":  1,
+    "kind":  "dronedream-field-exact-artifact-handoff-manifest",
+    "editionId":  "field",
+    "state":  "frozen-preview-lifecycle-pending-not-authorized-for-website",
+    "productSourceCommit":  "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+    "evidenceBaseHead":  "6219e731ebe70dbb1e550de9156437f30bf1e648",
+    "commonCore":  {
+                       "commit":  "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+                       "hash":  "9836b3c876e50e4add7f2657774eeb563c4eeb57697960843e406ba1563beddd"
+                   },
+    "exactWebsiteFileSet":  [
+                                {
+                                    "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe",
+                                    "bytes":  11535000,
+                                    "sha256":  "b87a020df957aeca7b179779a2400a2dfeb0fc2d43e655aa5bf8969db7c46dbd"
+                                },
+                                {
+                                    "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+                                    "bytes":  428,
+                                    "sha256":  "95e2f7c26d3059aa4f14bf99b4d17483aa212706207192c7ff39e9a8f913ae03"
+                                },
+                                {
+                                    "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sha256",
+                                    "bytes":  94,
+                                    "sha256":  "2280dbf50db2a4b2f944e9667453cb6c521cb4be4bd52c08d7529f8b8ec74ee6"
+                                },
+                                {
+                                    "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\latest-field.json",
+                                    "bytes":  1024,
+                                    "sha256":  "a8627546443cc0e23201dfa3e6978b9d03d463308a0720c42edbc8fb500677d1"
+                                }
+                            ],
+    "filename":  "DroneDream-Field-1.0.0.exe",
+    "version":  "1.0.0",
+    "displayName":  "DroneDream · FIELD",
+    "buildCount":  1,
+    "retryCount":  0,
+    "signatureState":  {
+                           "authenticode":  "not-signed",
+                           "peCertificatePresent":  false,
+                           "updaterSignaturePresent":  true,
+                           "updaterSignatureVerified":  true,
+                           "updaterPublicKeyId":  "BA3FDCAF71CE2FF5"
+                       },
+    "installerIdentity":  {
+                              "internalProductName":  "DroneDream-Field",
+                              "displayName":  "DroneDream · FIELD",
+                              "bundleId":  "io.dronedream.desktop.field",
+                              "uninstallKey":  "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+                              "shortcutName":  "DroneDream · FIELD",
+                              "appUserModelId":  "io.dronedream.desktop.field",
+                              "dataNamespace":  "io.dronedream.desktop.field",
+                              "centeredDotU00B7Verified":  true,
+                              "mojibakeRoadPresent":  false,
+                              "locales":  [
+                                              "English-1033",
+                                              "Simplified-Chinese-2052"
+                                          ]
+                          },
+    "validationBoundary":  {
+                               "buildAndStaticAudit":  "pass",
+                               "freshInstall":  "not-executed",
+                               "overlayUpgrade":  "not-executed",
+                               "launch":  "not-executed",
+                               "shortcuts":  "static-only",
+                               "webView2":  "compiled-structure-only",
+                               "englishChinese":  "compiled-locales-only",
+                               "uninstall":  "not-executed",
+                               "ownedResidueRollback":  "not-executed",
+                               "hardware":  "prohibited"
+                           },
+    "safety":  {
+                   "registryPackCount":  8,
+                   "validatedHardwarePackCount":  0,
+                   "validatedHardwarePackIds":  [
+
+                                                ],
+                   "discoveryIsAuthorization":  false,
+                   "threeLayerHardwareDecision":  "deny",
+                   "hardwareWriteArmFlight":  "deny",
+                   "frontendIsAuthority":  false,
+                   "realDeviceTouched":  false,
+                   "simulationExecuted":  false
+               },
+    "buildReceipt":  {
+                         "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\artifact\\build-receipt.json",
+                         "sha256":  "f399fc6805e959f6acca434016a29f6348b689a43132007e5dcd02f9644e7e31"
+                     },
+    "postbuildAudit":  {
+                           "path":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-edc7aa1-frontend-dist-replacement\\postbuild-audit.json",
+                           "sha256":  "26a87b49fe8c9573f3cc915942ea482d3d199eebf27c1971fae3fd687022f7e7"
+                       },
+    "releaseReady":  false,
+    "websiteReady":  false,
+    "websiteHandoffAllowed":  false,
+    "previewSubstitutionAllowed":  false,
+    "nextGate":  "separate isolated lifecycle validation approval",
+    "generatedAt":  "2026-08-06T15:27:36.1433095Z"
+}
