@@ -49,6 +49,12 @@ COEXISTENCE_SYNC_PATH = (
 LIFECYCLE_CONTRACT_PATH = (
     ROOT / "desktop" / "scripts" / "edition-installer-lifecycle-contract.ps1"
 )
+YELLOW_ATTEMPT_3_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-3-b51fcd4-application.v1.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -82,6 +88,72 @@ def run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
 
 
 class SoftwareSimBranchContractTests(unittest.TestCase):
+    def test_yellow_attempt_3_application_separates_product_source_and_evidence(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_3_APPLICATION_PATH)
+        source = application["sourceSeparation"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "b51fcd41d69b9019dee6cf23c39d4a5f7e6a5b47",
+        )
+        self.assertEqual(
+            git("show", "-s", "--format=%T", source["productSourceCommit"]),
+            source["productSourceTree"],
+        )
+        self.assertFalse(source["applicationEvidenceIsProductSource"])
+        self.assertFalse(
+            application["authorization"]["yellowBuildExecutionAuthorizedByThisApplication"]
+        )
+        self.assertFalse(
+            application["authorization"]["yellowBuildRequestSubmitted"]
+        )
+        self.assertFalse(application["pendingProductGate"]["exactDonorReceived"])
+        self.assertFalse(
+            application["pendingProductGate"]["currentSourceMayBeUsedForExeBuild"]
+        )
+        self.assertFalse(
+            application["pendingProductGate"]["yellowRequestSubmissionAllowed"]
+        )
+        self.assertTrue(
+            all(value == 0 for value in application["executedCounts"].values())
+        )
+
+    def test_yellow_attempt_3_is_single_sim_only_build_request(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_3_APPLICATION_PATH)
+        attempt = application["attemptAccounting"]
+        self.assertEqual(attempt["globalBuildAttemptOrdinal"], 3)
+        self.assertEqual(attempt["sourceBuildAttemptOrdinal"], 1)
+        self.assertEqual(attempt["sourceBuildAttemptMaximum"], 1)
+        self.assertEqual(attempt["maximumBuildInvocations"], 1)
+        self.assertFalse(attempt["automaticRetryAllowed"])
+        self.assertEqual(application["buildIdentity"]["runtimeProfileId"], "sim-only")
+        self.assertFalse(
+            application["buildIdentity"]["hardwareHitlLabFieldPayloadAllowed"]
+        )
+        self.assertEqual(
+            application["buildIdentity"]["fileName"],
+            "DroneDream-Sim-1.0.0.exe",
+        )
+
+    def test_yellow_attempt_3_preserves_frozen_artifact_and_product_key(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_3_APPLICATION_PATH)
+        frozen = application["permanentlyFrozenPriorArtifact"]
+        self.assertEqual(
+            frozen["sha256"],
+            "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+        )
+        for key in (
+            "reuseAllowed",
+            "relabelAllowed",
+            "furtherLifecycleExecutionAllowed",
+            "websiteHandoffAllowed",
+        ):
+            self.assertFalse(frozen[key], key)
+        residue = application["historicalSimProductKeyResidue"]
+        self.assertTrue(residue["observedPresentDuringApplicationPreparation"])
+        self.assertFalse(residue["buildReadsOrMutatesResidue"])
+        self.assertFalse(residue["cleanupAuthorizedByThisApplication"])
+        self.assertFalse(residue["cleanupExecuted"])
+
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
             "$e=[ordered]@{DisplayName='DroneDream · SIM';DisplayVersion='1.0.0';"
