@@ -1,517 +1,127 @@
 <!doctype html>
 <html lang="__DOCUMENT_LANGUAGE__">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
     <title>DroneDream</title>
     <style nonce="__CSP_NONCE__">
       :root {
-        color: #241c2c;
-        background: #ffffff;
-        font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-        font-synthesis: none;
+        color: #171225;
+        background: #fff;
+        font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       }
-      * { box-sizing: border-box; }
+
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         min-height: 100vh;
         margin: 0;
         display: grid;
         place-items: center;
-        padding: 42px 20px;
-        background: #ffffff;
+        background:
+          radial-gradient(circle at 50% 42%, rgba(106, 76, 255, 0.08), transparent 35%),
+          #fff;
       }
+
       main {
-        width: min(100%, 440px);
-        padding: 20px 4px;
-        border: 0;
-        border-radius: 0;
-        background: transparent;
-        box-shadow: none;
+        width: min(600px, calc(100vw - 40px));
+        padding: 48px 0;
+        text-align: center;
       }
+
       .brand {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 32px;
+        width: min(100%, 520px);
+        max-height: 110px;
+        object-fit: contain;
+        margin-bottom: 46px;
       }
-      .brand img { display: block; width: 100%; max-width: 100%; height: auto; }
-      h1 {
-        margin: 0 0 26px;
-        color: #251b2e;
-        text-align: center;
-        font-size: 28px;
-        letter-spacing: -.025em;
-      }
-      button, input { font: inherit; }
-      button { cursor: pointer; }
-      form { display: grid; gap: 15px; }
-      label, .field {
+
+      .result-mark {
+        width: 58px;
+        height: 58px;
+        margin: 0 auto 18px;
         display: grid;
-        gap: 7px;
-        color: #45394d;
-        font-size: 13px;
-        font-weight: 650;
-      }
-      input {
-        width: 100%;
-        min-height: 46px;
-        border: 1px solid #ddd4e5;
-        border-radius: 12px;
-        padding: 0 13px;
-        color: #261d2d;
-        background: #ffffff;
-        outline: none;
-        transition: border-color .16s ease, box-shadow .16s ease;
-      }
-      input:focus {
-        border-color: #8e64ea;
-        box-shadow: 0 0 0 3px rgba(142, 100, 234, .13);
-      }
-      input::placeholder { color: #9d94a5; }
-      .code-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 9px;
-      }
-      .secondary, .link-button, .cancel {
-        border: 0;
-        color: #7242c7;
-        background: transparent;
-      }
-      .secondary {
-        min-height: 46px;
-        padding: 0 13px;
-        border: 1px solid #d8c8ee;
-        border-radius: 12px;
-        white-space: nowrap;
-        font-weight: 700;
-      }
-      .secondary:hover, .secondary:focus-visible { background: #f7f2fd; }
-      .primary {
-        min-height: 48px;
-        border: 0;
-        border-radius: 13px;
-        color: white;
-        background: linear-gradient(105deg, #654cff, #d442ca 58%, #54cbe7);
-        box-shadow: 0 13px 30px rgba(125, 56, 200, .28);
+        place-items: center;
+        border-radius: 50%;
+        color: #fff;
+        font-size: 30px;
         font-weight: 800;
+        background: linear-gradient(135deg, #ff5574, #6a4cff 52%, #e657d1);
+        box-shadow: 0 14px 34px rgba(106, 76, 255, 0.22);
       }
-      .primary:hover:not(:disabled) { filter: brightness(1.08); }
-      button:disabled { cursor: wait; opacity: .55; }
-      .form-links {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 12px;
-        margin-top: -2px;
+
+      .result-mark[data-success="false"] {
+        background: #c33c60;
       }
-      .mode-switch {
-        justify-self: center;
-        margin-top: -3px;
-        color: #7242c7;
-        font-size: 13px;
-        font-weight: 650;
+
+      h1 {
+        margin: 0;
+        font-size: clamp(26px, 5vw, 36px);
+        line-height: 1.15;
+        letter-spacing: -0.025em;
       }
-      .link-button, .cancel {
-        padding: 4px 0;
-        text-decoration: none;
-        text-underline-offset: 3px;
+
+      p {
+        margin: 14px auto 0;
+        max-width: 440px;
+        color: #665f72;
+        font-size: 16px;
+        line-height: 1.6;
       }
-      .link-button:hover, .link-button:focus-visible,
-      .cancel:hover, .cancel:focus-visible {
-        text-decoration: underline;
-      }
-      .status {
-        min-height: 20px;
-        margin: 14px 0 0;
-        color: #756b7d;
-        font-size: 13px;
-        line-height: 1.45;
-        text-align: center;
-      }
-      .status[data-tone="error"] { color: #b3264c; }
-      .status[data-tone="success"] { color: #167657; }
-      .cancel {
-        display: block;
-        margin: 2px auto 0;
-        color: #827789;
-        font-size: 12px;
-      }
-      .hidden { display: none !important; }
-      :focus-visible { outline: 2px solid #8e64ea; outline-offset: 3px; }
-      @media (max-width: 520px) {
-        body {
-          padding: 26px 20px;
-          place-items: start center;
-        }
+
+      @media (max-width: 480px) {
         main {
-          width: 100%;
-          padding: 8px 0 24px;
+          width: min(100% - 28px, 600px);
+          padding: 32px 0;
         }
-        .brand { margin-bottom: 26px; }
-        h1 { margin-bottom: 22px; font-size: 25px; }
-        .code-row { grid-template-columns: 1fr; }
-        .secondary { width: 100%; }
+
+        .brand {
+          margin-bottom: 36px;
+        }
       }
     </style>
   </head>
   <body>
-    <main aria-labelledby="auth-title">
-      <div class="brand">
-        <img src="__BRAND_LOCKUP_DATA_URL__" alt="DroneDream">
-      </div>
-      <h1 id="auth-title"></h1>
-      <form id="auth-form" novalidate>
-        <label>
-          <span id="label-email"></span>
-          <input id="email" type="email" autocomplete="email" maxlength="254" required>
-        </label>
-        <label>
-          <span id="label-password"></span>
-          <input id="password" type="password" autocomplete="current-password" minlength="8" maxlength="128" required>
-        </label>
-        <label id="confirm-wrap" class="hidden">
-          <span id="label-confirm"></span>
-          <input id="confirm-password" type="password" autocomplete="new-password" minlength="8" maxlength="128">
-        </label>
-        <div id="code-wrap" class="field hidden">
-          <label id="label-code" for="code"></label>
-          <span class="code-row">
-            <input id="code" type="text" inputmode="numeric" autocomplete="one-time-code" minlength="6" maxlength="12">
-            <button class="secondary" id="send-code" type="button"></button>
-          </span>
-        </div>
-        <div class="form-links">
-          <button class="link-button" id="forgot-password" type="button"></button>
-        </div>
-        <button class="primary" id="submit" type="submit"></button>
-        <button class="link-button mode-switch" id="switch-mode" type="button"></button>
-      </form>
-      <p class="status" id="status" role="status" aria-live="polite"></p>
-      <button class="cancel" id="cancel" type="button"></button>
+    <main aria-labelledby="result-title">
+      <img class="brand" src="__BRAND_LOCKUP_DATA_URL__" alt="" />
+      <div id="result-mark" class="result-mark" aria-hidden="true"></div>
+      <h1 id="result-title"></h1>
+      <p id="result-message"></p>
     </main>
     <script nonce="__CSP_NONCE__">
-      "use strict";
       const locale = __LOCALE_JSON__;
-      const state = __STATE_JSON__;
-      const supabaseUrl = __SUPABASE_URL_JSON__;
-      const publishableKey = __PUBLISHABLE_KEY_JSON__;
-      const completePath = __COMPLETE_PATH_JSON__;
-      const cancelPath = __CANCEL_PATH_JSON__;
+      const success = __SUCCESS_JSON__;
+      const displayName = __DISPLAY_NAME_JSON__;
       const homeUrl = __HOME_URL_JSON__;
-      const copy = locale === "zh-CN" ? {
-        title: "登录并进入 DroneDream",
-        registerTitle: "创建 DroneDream 账户",
-        resetTitle: "设置新密码",
-        email: "邮箱",
-        emailPlaceholder: "you@example.com",
-        password: "密码",
-        newPassword: "新密码",
-        passwordPlaceholder: "至少 8 个字符",
-        confirm: "确认密码",
-        confirmPlaceholder: "再次输入密码",
-        code: "邮件验证码",
-        codePlaceholder: "输入验证码",
-        sendCode: "发送验证码",
-        resendCode: "重新发送",
-        forgot: "忘记密码？",
-        back: "返回登录",
-        registerSwitch: "还没有账户？注册",
-        signInSwitch: "已有账户？登录",
-        submitSignIn: "登录并进入调优平台",
-        submitRegister: "创建账户",
-        submitReset: "更新密码并进入",
-        cancel: "取消本次登录",
-        working: "正在处理…",
-        codeSent: "验证码已发送。请检查邮箱；同一邮箱通常需要等待约 60 秒才能再次发送。",
-        mismatch: "两次输入的密码不一致。",
-        shortPassword: "密码至少需要 8 个字符。",
-        codeRequired: "请输入邮件验证码。",
-        genericError: "账户请求失败，请稍后重试。",
-        registrationComplete: "账户已创建。请使用邮箱和密码登录。",
-        success: "登录成功，正在返回 DroneDream…",
-        cancelled: "本次登录已取消。"
-      } : {
-        title: "Sign in to DroneDream",
-        registerTitle: "Create a DroneDream account",
-        resetTitle: "Set a new password",
-        email: "Email",
-        emailPlaceholder: "you@example.com",
-        password: "Password",
-        newPassword: "New password",
-        passwordPlaceholder: "At least 8 characters",
-        confirm: "Confirm password",
-        confirmPlaceholder: "Enter the password again",
-        code: "Email verification code",
-        codePlaceholder: "Enter the code",
-        sendCode: "Send code",
-        resendCode: "Send again",
-        forgot: "Forgot password?",
-        back: "Back to sign in",
-        registerSwitch: "No account? Register",
-        signInSwitch: "Already registered? Sign in",
-        submitSignIn: "Sign in and enter tuning workspace",
-        submitRegister: "Create account",
-        submitReset: "Update password and continue",
-        cancel: "Cancel this sign-in",
-        working: "Working…",
-        codeSent: "Verification code sent. Check your email; the same address normally has a roughly 60-second resend interval.",
-        mismatch: "The passwords do not match.",
-        shortPassword: "Password must contain at least 8 characters.",
-        codeRequired: "Enter the email verification code.",
-        genericError: "The account request failed. Please try again.",
-        registrationComplete: "Account created. Sign in with your email and password.",
-        success: "Signed in. Returning to DroneDream…",
-        cancelled: "This sign-in was cancelled."
-      };
-
-      const elements = {
-        title: document.querySelector("#auth-title"),
-        form: document.querySelector("#auth-form"),
-        email: document.querySelector("#email"),
-        password: document.querySelector("#password"),
-        confirm: document.querySelector("#confirm-password"),
-        confirmWrap: document.querySelector("#confirm-wrap"),
-        code: document.querySelector("#code"),
-        codeWrap: document.querySelector("#code-wrap"),
-        sendCode: document.querySelector("#send-code"),
-        forgot: document.querySelector("#forgot-password"),
-        switchMode: document.querySelector("#switch-mode"),
-        submit: document.querySelector("#submit"),
-        status: document.querySelector("#status"),
-        cancel: document.querySelector("#cancel")
-      };
-      let mode = "sign-in";
-      let codeSent = false;
-      let busy = false;
-      let completed = false;
-
-      document.querySelector("#label-email").textContent = copy.email;
-      document.querySelector("#label-confirm").textContent = copy.confirm;
-      document.querySelector("#label-code").textContent = copy.code;
-      elements.email.placeholder = copy.emailPlaceholder;
-      elements.password.placeholder = copy.passwordPlaceholder;
-      elements.confirm.placeholder = copy.confirmPlaceholder;
-      elements.code.placeholder = copy.codePlaceholder;
-      elements.forgot.textContent = copy.forgot;
-      elements.cancel.textContent = copy.cancel;
-
-      function setStatus(message, tone = "") {
-        elements.status.textContent = message;
-        elements.status.dataset.tone = tone;
-      }
-
-      function setBusy(next) {
-        if (completed && !next) return;
-        busy = next;
-        for (const control of elements.form.querySelectorAll("input, button")) {
-          control.disabled = next;
-        }
-        elements.forgot.disabled = next;
-        elements.cancel.disabled = next;
-      }
-
-      function renderMode(nextMode) {
-        mode = nextMode;
-        codeSent = false;
-        setStatus("");
-        elements.code.value = "";
-        elements.password.value = "";
-        elements.confirm.value = "";
-        const needsCode = mode !== "sign-in";
-        const reset = mode === "reset";
-        elements.title.textContent = reset
-          ? copy.resetTitle
-          : mode === "register"
-            ? copy.registerTitle
-            : copy.title;
-        elements.confirmWrap.classList.toggle("hidden", !needsCode);
-        elements.codeWrap.classList.toggle("hidden", !needsCode);
-        elements.forgot.classList.toggle("hidden", mode !== "sign-in");
-        elements.password.autocomplete = needsCode ? "new-password" : "current-password";
-        document.querySelector("#label-password").textContent =
-          needsCode ? copy.newPassword : copy.password;
-        elements.sendCode.textContent = copy.sendCode;
-        elements.submit.textContent = mode === "register"
-          ? copy.submitRegister
-          : reset
-            ? copy.submitReset
-            : copy.submitSignIn;
-        elements.switchMode.textContent = reset
-          ? copy.back
-          : mode === "register"
-            ? copy.signInSwitch
-            : copy.registerSwitch;
-        elements.confirm.required = needsCode;
-        elements.code.required = needsCode;
-        elements.email.focus();
-      }
-
-      function validateNewPassword() {
-        if (elements.password.value.length < 8) {
-          setStatus(copy.shortPassword, "error");
-          elements.password.focus();
-          return false;
-        }
-        if (elements.password.value !== elements.confirm.value) {
-          setStatus(copy.mismatch, "error");
-          elements.confirm.focus();
-          return false;
-        }
-        return true;
-      }
-
-      async function authRequest(path, body, accessToken = publishableKey) {
-        const response = await fetch(`${supabaseUrl}${path}`, {
-          method: path === "/auth/v1/user" ? "PUT" : "POST",
-          headers: {
-            "apikey": publishableKey,
-            "authorization": `Bearer ${accessToken}`,
-            "content-type": "application/json"
-          },
-          cache: "no-store",
-          credentials: "omit",
-          redirect: "error",
-          referrerPolicy: "no-referrer",
-          body: JSON.stringify(body)
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const message = payload.msg || payload.message ||
-            payload.error_description || payload.error || copy.genericError;
-          throw new Error(String(message).slice(0, 320));
-        }
-        return payload;
-      }
-
-      async function sendCode() {
-        if (!elements.email.reportValidity() || !validateNewPassword()) return;
-        setBusy(true);
-        setStatus(copy.working);
-        let sent = false;
-        try {
-          await authRequest("/auth/v1/otp", {
-            email: elements.email.value.trim(),
-            create_user: mode === "register"
-          });
-          codeSent = true;
-          sent = true;
-          elements.sendCode.textContent = copy.resendCode;
-          setStatus(copy.codeSent, "success");
-        } catch (error) {
-          setStatus(error instanceof Error ? error.message : copy.genericError, "error");
-        } finally {
-          setBusy(false);
-          if (sent) elements.code.focus();
-        }
-      }
-
-      async function verifyCodeAndSetPassword() {
-        if (!codeSent || !elements.code.value.trim()) {
-          setStatus(copy.codeRequired, "error");
-          elements.code.focus();
-          return null;
-        }
-        const session = await authRequest("/auth/v1/verify", {
-          email: elements.email.value.trim(),
-          token: elements.code.value.trim(),
-          type: "email"
-        });
-        if (!session.access_token || !session.refresh_token) {
-          throw new Error(copy.genericError);
-        }
-        await authRequest(
-          "/auth/v1/user",
-          { password: elements.password.value },
-          session.access_token
-        );
-        return session;
-      }
-
-      async function complete(session) {
-        const response = await fetch(completePath, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          cache: "no-store",
-          credentials: "same-origin",
-          body: JSON.stringify({
-            state,
-            accessToken: session.access_token,
-            refreshToken: session.refresh_token
-          })
-        });
-        session.access_token = "";
-        session.refresh_token = "";
-        if (!response.ok) throw new Error(copy.genericError);
-        elements.password.value = "";
-        elements.confirm.value = "";
-        elements.code.value = "";
-        setStatus(copy.success, "success");
-        completed = true;
-        setTimeout(() => window.location.replace(homeUrl), 900);
-      }
-
-      function returnToSignInAfterRegistration(session) {
-        const registeredEmail = elements.email.value.trim();
-        // Verification returns a short-lived session so the password can be
-        // established. Registration must not forward that session to the
-        // desktop: the product contract requires an explicit password sign-in.
-        session.access_token = "";
-        session.refresh_token = "";
-        renderMode("sign-in");
-        elements.email.value = registeredEmail;
-        setStatus(copy.registrationComplete, "success");
-        elements.password.focus();
-      }
-
-      elements.form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        if (busy || !elements.form.reportValidity()) return;
-        if (mode !== "sign-in" && !validateNewPassword()) return;
-        setBusy(true);
-        setStatus(copy.working);
-        try {
-          if (mode === "register") {
-            const registrationSession = await verifyCodeAndSetPassword();
-            if (registrationSession) {
-              returnToSignInAfterRegistration(registrationSession);
-            }
-            return;
+      const copy = locale === "zh-CN"
+        ? {
+            successTitle: "登录成功",
+            successMessage: `${displayName} 已获得本次独立授权，正在返回 DroneDream 首页。`,
+            failureTitle: "登录未完成",
+            failureMessage: `请返回 ${displayName}，重新点击“登录并进入调优平台”。`,
           }
-          const session = mode === "sign-in"
-            ? await authRequest("/auth/v1/token?grant_type=password", {
-                email: elements.email.value.trim(),
-                password: elements.password.value,
-                gotrue_meta_security: {}
-              })
-            : await verifyCodeAndSetPassword();
-          if (session) await complete(session);
-        } catch (error) {
-          setStatus(error instanceof Error ? error.message : copy.genericError, "error");
-        } finally {
-          setBusy(false);
-        }
-      });
-
-      elements.sendCode.addEventListener("click", () => void sendCode());
-      elements.forgot.addEventListener("click", () => renderMode("reset"));
-      elements.switchMode.addEventListener("click", () =>
-        renderMode(mode === "sign-in" ? "register" : "sign-in")
-      );
-      elements.cancel.addEventListener("click", async () => {
-        setBusy(true);
-        setStatus(copy.cancelled);
-        await fetch(cancelPath, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          cache: "no-store",
-          credentials: "same-origin",
-          body: JSON.stringify({ state })
-        }).catch(() => undefined);
-        window.location.replace(homeUrl);
-      });
-      renderMode("sign-in");
+        : {
+            successTitle: "Sign-in complete",
+            successMessage: `${displayName} received this independent authorization. Returning to the DroneDream homepage.`,
+            failureTitle: "Sign-in not completed",
+            failureMessage: `Return to ${displayName} and select “Sign in and enter tuning workspace” again.`,
+          };
+      const mark = document.querySelector("#result-mark");
+      mark.dataset.success = String(success);
+      mark.textContent = success ? "✓" : "!";
+      document.querySelector("#result-title").textContent = success
+        ? copy.successTitle
+        : copy.failureTitle;
+      document.querySelector("#result-message").textContent = success
+        ? copy.successMessage
+        : copy.failureMessage;
+      document.title = `${success ? copy.successTitle : copy.failureTitle} · ${displayName}`;
+      if (success) {
+        window.setTimeout(() => window.location.replace(homeUrl), 1200);
+      }
     </script>
   </body>
 </html>

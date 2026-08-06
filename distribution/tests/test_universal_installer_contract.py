@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import subprocess
 from pathlib import Path
 from types import ModuleType
 
@@ -11,6 +13,7 @@ OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
 HANDOFF = ROOT / "distribution/universal/release/website-exact-exe-handoff.v1.json"
 ENGINE_PACK_TOOL = ROOT / "engine-pack/tools/engine_pack.py"
+BROWSER_AUTH_VERIFIER = ROOT / "desktop/scripts/verify-browser-auth-config.mjs"
 
 
 def _json(path: Path) -> dict[str, object]:
@@ -26,6 +29,30 @@ def _engine_pack_module() -> ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_release_ci_placeholder_cannot_bypass_oauth_client_registration() -> None:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "GITHUB_ACTIONS": "true",
+            "VITE_SUPABASE_URL": "https://ci.invalid",
+            "VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_ci_contract",
+            "DRONEDREAM_RELEASE_SOURCE_COMMIT": "fixture-source",
+            "DRONEDREAM_DESKTOP_EDITION_ID": "universal",
+        }
+    )
+    environment.pop("DRONEDREAM_OAUTH_CLIENT_ID", None)
+    result = subprocess.run(
+        ["node", str(BROWSER_AUTH_VERIFIER)],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "registered public DRONEDREAM_OAUTH_CLIENT_ID" in result.stderr
 
 
 def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() -> None:
@@ -86,7 +113,9 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'DroneDream-Universal-1.0.0.exe',
         'universal-cargo-target',
         '$env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"',
+        '$env:DRONEDREAM_DESKTOP_EDITION_ID = "universal"',
         '$env:VITE_DRONEDREAM_EDITION = "universal"',
+        'Universal browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID.',
         'Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH.',
         'buildCount = 1',
         '$buildReceiptPath = "${artifactPath}.receipt.json"',

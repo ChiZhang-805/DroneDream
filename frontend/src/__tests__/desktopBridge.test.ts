@@ -62,6 +62,19 @@ const runtimeReport = {
   diagnostics: [],
 };
 
+const browserAuthSession = {
+  protocolVersion: "desktop-browser-auth-pkce-v1",
+  editionId: "universal",
+  authClientId: "dronedream-desktop-universal",
+  accessToken: "header.payload.signature",
+  refreshToken: "refresh-token-value",
+  attemptIdHash: "a".repeat(64),
+  stateHash: "b".repeat(64),
+  subjectHash: "c".repeat(64),
+  issuedAt: "2026-08-05T08:00:00Z",
+  completedAt: "2026-08-05T08:00:01Z",
+};
+
 const installPlan = {
   runtimeName: "DroneDreamRuntime",
   targetRoot: "E:\\DroneDream",
@@ -210,10 +223,7 @@ describe("desktop bridge", () => {
   });
 
   it("validates the browser-auth command without exposing returned tokens", async () => {
-    const session = {
-      accessToken: "header.payload.signature",
-      refreshToken: "refresh-token-value",
-    };
+    const session = browserAuthSession;
     const invoke = vi.fn(async (command: string) => {
       if (command === "begin_browser_auth") return session;
       if (command === "cancel_browser_auth") return true;
@@ -223,15 +233,11 @@ describe("desktop bridge", () => {
 
     await expect(beginBrowserAuth({
       locale: "zh-CN",
-      supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
-      publishableKey: "public-test-key-for-browser-auth",
     })).resolves.toEqual(session);
     await expect(cancelBrowserAuth()).resolves.toBe(true);
     expect(invoke).toHaveBeenNthCalledWith(1, "begin_browser_auth", {
       request: {
         locale: "zh-CN",
-        supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
-        publishableKey: "public-test-key-for-browser-auth",
       },
     });
     expect(invoke).toHaveBeenNthCalledWith(2, "cancel_browser_auth", undefined);
@@ -360,6 +366,7 @@ describe("desktop bridge", () => {
 
   it("rejects malformed browser-auth tokens at the native boundary", async () => {
     const invoke = vi.fn().mockResolvedValue({
+      ...browserAuthSession,
       accessToken: "valid-token",
       refreshToken: "secret refresh token",
     });
@@ -367,8 +374,6 @@ describe("desktop bridge", () => {
 
     const error = await beginBrowserAuth({
       locale: "en",
-      supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
-      publishableKey: "public-test-key-for-browser-auth",
     }).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(DesktopCommandContractError);
     expect(String(error)).not.toContain("secret refresh token");

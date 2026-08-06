@@ -580,7 +580,6 @@ export function DesktopSetup() {
     try {
       const session = await beginBrowserAuth({
         locale,
-        ...configuration,
       });
       if (!componentMounted.current) return;
       setBrowserAuthStatus("adopting");

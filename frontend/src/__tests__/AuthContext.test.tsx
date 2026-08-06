@@ -294,12 +294,14 @@ describe("AuthContext account profile", () => {
     await screen.findByLabelText("username");
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     await waitFor(() => expect(authMock.signOut).toHaveBeenCalledTimes(1));
+    expect(authMock.signOut).toHaveBeenLastCalledWith({ scope: "local" });
     expect(window.localStorage.getItem(draftKey)).toBe("local-draft");
     expect(window.sessionStorage.getItem(draftKey)).toBe("session-draft");
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     await waitFor(() => {
       expect(authMock.signOut).toHaveBeenCalledTimes(2);
+      expect(authMock.signOut).toHaveBeenLastCalledWith({ scope: "local" });
       expect(window.localStorage.getItem(draftKey)).toBeNull();
       expect(window.sessionStorage.getItem(draftKey)).toBeNull();
     });

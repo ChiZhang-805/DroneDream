@@ -103,6 +103,11 @@ if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PATH -or
     -not (Test-Path -LiteralPath $env:TAURI_SIGNING_PRIVATE_KEY_PATH -PathType Leaf)) {
     throw "Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH."
 }
+if (-not $env:DRONEDREAM_OAUTH_CLIENT_ID -or
+    $env:DRONEDREAM_OAUTH_CLIENT_ID -match '\s' -or
+    $env:DRONEDREAM_OAUTH_CLIENT_ID -like 'unregistered-*') {
+    throw "Universal browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID."
+}
 if (Test-Path -LiteralPath $outputRootFull) {
     throw "Refusing to replace an existing Universal handoff directory: $outputRootFull"
 }
@@ -110,6 +115,7 @@ if (Test-Path -LiteralPath $outputRootFull) {
 $env:CARGO_TARGET_DIR = $cargoTargetFull
 $env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $sourceCommit
 $env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"
+$env:DRONEDREAM_DESKTOP_EDITION_ID = "universal"
 $env:VITE_DRONEDREAM_EDITION = "universal"
 
 $sharedArguments = @(
