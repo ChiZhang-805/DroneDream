@@ -59,35 +59,35 @@
   ${LABEL_PREFIX}_done:
 !macroend
 
-!macro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT
+!macro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT LABEL_PREFIX
   ; Update-mode shortcuts are migrated/refreshed by NSIS_HOOK_POSTINSTALL after
   ; the new executable and canonical icon have been installed.
   ${If} $WixMode = 0
     ${If} $UpdateMode = 1
     ${OrIf} $NoShortcutMode = 1
-      Goto dronedream_startmenu_done
+      Goto ${LABEL_PREFIX}_done
     ${EndIf}
   ${EndIf}
 
   !if "${STARTMENUFOLDER}" != ""
     CreateDirectory "$SMPROGRAMS\$AppStartMenuFolder"
-    !insertmacro DRONEDREAM_CREATE_DISPLAY_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk" dronedream_startmenu_folder
+    !insertmacro DRONEDREAM_CREATE_DISPLAY_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk" ${LABEL_PREFIX}_folder
   !else
-    !insertmacro DRONEDREAM_CREATE_DISPLAY_SHORTCUT "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk" dronedream_startmenu_root
+    !insertmacro DRONEDREAM_CREATE_DISPLAY_SHORTCUT "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk" ${LABEL_PREFIX}_root
   !endif
-  dronedream_startmenu_done:
+  ${LABEL_PREFIX}_done:
 !macroend
 
-!macro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT
+!macro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT LABEL_PREFIX
   ${If} $WixMode = 0
     ${If} $UpdateMode = 1
     ${OrIf} $NoShortcutMode = 1
-      Goto dronedream_desktop_done
+      Goto ${LABEL_PREFIX}_done
     ${EndIf}
   ${EndIf}
 
-  !insertmacro DRONEDREAM_CREATE_DISPLAY_SHORTCUT "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk" dronedream_desktop
-  dronedream_desktop_done:
+  !insertmacro DRONEDREAM_CREATE_DISPLAY_SHORTCUT "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk" ${LABEL_PREFIX}_shortcut
+  ${LABEL_PREFIX}_done:
 !macroend
 
 ; Remove an early-candidate internal-name shortcut only when its target belongs

@@ -961,7 +961,7 @@ FunctionEnd
 
 Function CreateOrUpdateStartMenuShortcut
   !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT
-    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT
+    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT dronedream_startmenu_entry
     Return
   !endif
 
@@ -1008,7 +1008,7 @@ FunctionEnd
 
 Function CreateOrUpdateDesktopShortcut
   !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT
-    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT
+    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT dronedream_desktop_entry
     Return
   !endif
 
