@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-red-segment-a-lifecycle-evidence",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "attemptId": "debd064-segment-a2-red1-20260806T150100Z",
+  "classification": "RED",
+  "result": "segment-a-passed",
+  "productSource": {
+    "commit": "debd0647c5883ffe5c9c52037d35a6b567d9fd62",
+    "tree": "fa28c390a33835f30d1d7bf88e2b36e68df7f340",
+    "mayBeRelabeled": false
+  },
+  "executionEvidenceSource": {
+    "commit": "a5c443b0c1320eabddf88446fab098be16670b71",
+    "applicationPath": "distribution/editions/lab/lifecycle/red-debd064-app-only-application.v1.json",
+    "applicationBytes": 11676,
+    "applicationSha256": "1e996f77a9d8e1f96cf6173879caf68b9e4111b0852726ab67e32bb9eb9bcebe",
+    "isProductSource": false
+  },
+  "a1Evidence": {
+    "receiptPath": "distribution/build-receipts/lab-debd064-red-segment-a1-failure.json",
+    "receiptSha256": "a2617487a629a8850abc979a6ca75e99fc95f1558b8b221fa55bda82b7ec6cd7",
+    "result": "failed-no-retry",
+    "retryWasAutomatic": false
+  },
+  "artifact": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\debd064-yellow-attempt6\\artifact\\DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12080017,
+    "sha256": "b5969f2f287cf729450618e6d3a8232f426b1ac4cbe5c3662904d31bab215a48",
+    "authenticodeStatus": "NotSigned",
+    "rebuilt": false
+  },
+  "resourceGate": {
+    "firstObservation": {
+      "memoryUsedPercent": 97.1,
+      "memoryFreeGiB": 0.45,
+      "cpuPercent": 54,
+      "heavyProcessCount": 0,
+      "attemptConsumed": false,
+      "decision": "wait"
+    },
+    "executionObservation": {
+      "memoryUsedPercent": 59.6,
+      "memoryFreeGiB": 6.37,
+      "cpuPercent": 27,
+      "heavyProcessCount": 0,
+      "decision": "pass"
+    },
+    "userProcessesTerminated": false
+  },
+  "exactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "accountReads": 0,
+    "tokenReadsOrExchanges": 0,
+    "artifactBuilds": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0
+  },
+  "stageResults": {
+    "freshInstall": {
+      "exitCode": 0,
+      "identityAccepted": true,
+      "shortcutsAccepted": true,
+      "protectedStateParity": true
+    },
+    "freshLiveWebView2": {
+      "passed": true,
+      "pageUrl": "http://tauri.localhost/#/desktop/setup",
+      "initialLocale": "en",
+      "finalLocale": "zh-CN",
+      "brandNaturalWidth": 2386,
+      "brandNaturalHeight": 218,
+      "forbiddenAuthRequestCount": 0,
+      "authStorageKeyCount": 0,
+      "protectedStateParity": true
+    },
+    "overlayInstall": {
+      "arguments": [
+        "/S",
+        "/UPDATE"
+      ],
+      "exitCode": 0,
+      "identityAccepted": true,
+      "shortcutsAccepted": true,
+      "protectedStateParity": true
+    },
+    "overlayLiveWebView2": {
+      "passed": true,
+      "pageUrl": "http://tauri.localhost/#/desktop/setup",
+      "initialLocale": "zh-CN",
+      "finalLocale": "en",
+      "brandNaturalWidth": 2386,
+      "brandNaturalHeight": 218,
+      "forbiddenAuthRequestCount": 0,
+      "authStorageKeyCount": 0,
+      "protectedStateParity": true
+    },
+    "uninstall": {
+      "exitCode": 0,
+      "installRootRemoved": true,
+      "uninstallRegistrationRemoved": true,
+      "desktopShortcutRemoved": true,
+      "startMenuShortcutRemoved": true,
+      "appDataRemoved": true
+    },
+    "ownedPreferenceCleanup": {
+      "registryKey": "HKCU:\\Software\\DroneDream\\DroneDream-Lab",
+      "exactValueNamesAccepted": true,
+      "exactValuesAccepted": true,
+      "cleanupCount": 1,
+      "keyAbsentAfterCleanup": true,
+      "sharedParentPreserved": true
+    }
+  },
+  "protectedSimProductKey": {
+    "registryKey": "HKCU\\Software\\DroneDream\\DroneDream-Sim",
+    "beforeExportBytes": 572,
+    "beforeExportSha256": "ef59eb8105ccef5db3c0ba45a933ee8bbf582255d498104b2928b9f5ef8eab8d",
+    "afterExportBytes": 572,
+    "afterExportSha256": "ef59eb8105ccef5db3c0ba45a933ee8bbf582255d498104b2928b9f5ef8eab8d",
+    "byteExact": true,
+    "touched": false
+  },
+  "finalState": {
+    "installRootAbsent": true,
+    "roamingAppDataAbsent": true,
+    "localAppDataAbsent": true,
+    "uninstallKeyAbsent": true,
+    "productKeyAbsent": true,
+    "desktopShortcutAbsent": true,
+    "startMenuShortcutAbsent": true,
+    "droneDreamProcessCount": 0,
+    "oauthPort49212ListenerCount": 0,
+    "protectedOtherEditionsRuntimeAndWebView2Parity": true
+  },
+  "externalEvidence": {
+    "root": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Lab-RED\\debd064-segment-a2-red1-20260806T150100Z",
+    "receipt": {
+      "fileName": "lab-red-segment-a-lifecycle-receipt.json",
+      "bytes": 23777,
+      "sha256": "b9ad7a62cf22282184b987f23bcfa07c856f937c7dbb426601f5e61220e1f96a"
+    },
+    "freshInspection": {
+      "fileName": "fresh-live-webview2.json",
+      "bytes": 962,
+      "sha256": "158af52f24434d62587bac51e9e751c54ee47fd055feeadcdb7c87082c51c2d5"
+    },
+    "freshScreenshot": {
+      "fileName": "fresh-lab-webview2.png",
+      "bytes": 676247,
+      "sha256": "3cab2a43ecfa1299a9475f00737d75839e9294c57c8c11bc861197a2e2bca2d9"
+    },
+    "overlayInspection": {
+      "fileName": "overlay-live-webview2.json",
+      "bytes": 966,
+      "sha256": "5f339ac77ca09ec520cc2f77d9c2239393f9e6e0d7af301c3ecd57d4cbae2a9c"
+    },
+    "overlayScreenshot": {
+      "fileName": "overlay-lab-webview2.png",
+      "bytes": 640476,
+      "sha256": "13e0e6736638aca88ad01340bbf3684d4e965f45b8bacaee46af6157d233c8c1"
+    },
+    "simProductKeyProtectionRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Lab-RED\\debd064-segment-a2-protected-preflight-20260806T150000Z"
+  },
+  "oauthSegmentB": {
+    "state": "fail-closed-not-executed",
+    "blocksSegmentA": false,
+    "providerCalled": false,
+    "browserOpened": false
+  },
+  "acceptance": {
+    "segmentAReady": true,
+    "retryPerformed": false,
+    "artifactInvalidated": false
+  },
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}

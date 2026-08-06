@@ -29,6 +29,12 @@ FAILURE_RECEIPT_PATH = (
     / "build-receipts"
     / "lab-debd064-red-segment-a1-failure.json"
 )
+A2_SUCCESS_RECEIPT_PATH = (
+    ROOT
+    / "distribution"
+    / "build-receipts"
+    / "lab-debd064-red-segment-a2-success.json"
+)
 
 
 def _load(path: Path) -> dict:
@@ -387,3 +393,59 @@ def test_a2_owned_preference_value_validator_denies_drift() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "owned-preference-fixtures-passed" in result.stdout
+
+
+def test_a2_success_receipt_freezes_exact_counts_and_protected_sim_key() -> None:
+    receipt = _load(A2_SUCCESS_RECEIPT_PATH)
+
+    assert receipt["result"] == "segment-a-passed"
+    assert receipt["productSource"]["commit"] == (
+        "debd0647c5883ffe5c9c52037d35a6b567d9fd62"
+    )
+    assert receipt["executionEvidenceSource"]["commit"] == (
+        "a5c443b0c1320eabddf88446fab098be16670b71"
+    )
+    assert receipt["executionEvidenceSource"]["applicationSha256"] == (
+        "1e996f77a9d8e1f96cf6173879caf68b9e4111b0852726ab67e32bb9eb9bcebe"
+    )
+    assert receipt["artifact"]["sha256"] == (
+        "b5969f2f287cf729450618e6d3a8232f426b1ac4cbe5c3662904d31bab215a48"
+    )
+    assert receipt["exactCounts"] == {
+        "freshInstallerInvocations": 1,
+        "overlayInstallerInvocations": 1,
+        "applicationLaunches": 2,
+        "uninstallerInvocations": 1,
+        "ownedPreferenceKeyCleanupInvocations": 1,
+        "liveWebView2Inspections": 2,
+        "languageTransitions": 2,
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "accountReads": 0,
+        "tokenReadsOrExchanges": 0,
+        "artifactBuilds": 0,
+        "runtimeStarts": 0,
+        "px4Starts": 0,
+        "gazeboStarts": 0,
+        "hardwareActions": 0,
+    }
+    assert receipt["protectedSimProductKey"]["byteExact"] is True
+    assert receipt["protectedSimProductKey"]["touched"] is False
+    assert receipt["protectedSimProductKey"]["beforeExportSha256"] == (
+        receipt["protectedSimProductKey"]["afterExportSha256"]
+    )
+    assert all(
+        value is True
+        for name, value in receipt["finalState"].items()
+        if name.endswith("Absent") or name.endswith("Parity")
+    )
+    assert receipt["finalState"]["droneDreamProcessCount"] == 0
+    assert receipt["finalState"]["oauthPort49212ListenerCount"] == 0
+    assert receipt["oauthSegmentB"]["state"] == "fail-closed-not-executed"
+    assert receipt["acceptance"] == {
+        "segmentAReady": True,
+        "retryPerformed": False,
+        "artifactInvalidated": False,
+    }
+    assert receipt["releaseReady"] is False
+    assert receipt["websiteHandoffReady"] is False
