@@ -123,6 +123,18 @@ YELLOW_ATTEMPT_7_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-7-e181d02-cache-drift-preflight-failed.v1.json"
 )
+YELLOW_ATTEMPT_8_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-8-f4a0562-application.v1.json"
+)
+YELLOW_ATTEMPT_8_PLAN_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-8-f4a0562-plan-ready.v1.json"
+)
 DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     DISTRIBUTION
     / "sim"
@@ -138,7 +150,7 @@ DETACHED_NODE_DEPENDENCY_SYNC_PATH = (
 STABLE_OFFLINE_CACHE_CONTRACT_PATH = (
     DISTRIBUTION / "sim" / "readiness" / "stable-offline-cache-contract.v1.json"
 )
-YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_7_APPLICATION_PATH
+YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_8_APPLICATION_PATH
 LOCKFILE_OFFLINE_CACHE_TOOL = (
     DISTRIBUTION / "sim" / "desktop" / "lockfile-offline-cache.mjs"
 )
@@ -1344,6 +1356,147 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertTrue(snapshot["npmLogsMustBeRedirectedOutsideSnapshot"])
         self.assertTrue(all(value == 0 for value in contract["execution"].values()))
         self.assertFalse(contract["nextGate"]["ordinalSevenApplicationReusable"])
+
+    def test_yellow_attempt_8_binds_new_product_and_stable_cache_tool(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_8_APPLICATION_PATH)
+        source = application["sourceSeparation"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "f4a0562b0883fadeb662881a6ac593073ed2f99f",
+        )
+        self.assertEqual(
+            git("show", "-s", "--format=%T", source["productSourceCommit"]),
+            source["productSourceTree"],
+        )
+        stable = application["stableCacheContract"]
+        for item in (stable["tool"], stable["contract"]):
+            path = ROOT / item["path"]
+            self.assertEqual(path.stat().st_size, item["bytes"], item["path"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                item["sha256"],
+                item["path"],
+            )
+            self.assertEqual(
+                git("rev-parse", f"{source['productSourceCommit']}:{item['path']}"),
+                item["gitBlob"],
+                item["path"],
+            )
+        self.assertEqual(stable["compatibleLockRows"], 330)
+        self.assertEqual(stable["contentObjectCount"], 323)
+        self.assertEqual(stable["indexKeyCount"], 323)
+        self.assertFalse(stable["globalWholeCacheFingerprintRequired"])
+        self.assertIn("_logs", stable["ignoredMutableSurfaces"])
+
+    def test_yellow_attempt_8_plan_is_hash_bound_and_non_mutating(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_8_APPLICATION_PATH)
+        plan = load_json(YELLOW_ATTEMPT_8_PLAN_PATH)
+        entry = ROOT / application["executionPlan"]["entryScript"]["path"]
+        self.assertEqual(
+            YELLOW_ATTEMPT_8_APPLICATION_PATH.stat().st_size,
+            plan["application"]["bytes"],
+        )
+        self.assertEqual(
+            hashlib.sha256(YELLOW_ATTEMPT_8_APPLICATION_PATH.read_bytes()).hexdigest(),
+            plan["application"]["sha256"],
+        )
+        self.assertEqual(entry.stat().st_size, plan["entryScript"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(entry.read_bytes()).hexdigest(),
+            plan["entryScript"]["sha256"],
+        )
+        attributes = git(
+            "check-attr",
+            "eol",
+            "--",
+            application["executionPlan"]["entryScript"]["path"],
+        )
+        self.assertTrue(attributes.endswith(": eol: lf"), attributes)
+        roots = application["ownedBuildSurface"]
+        before = {
+            "source": Path(roots["sourceRoot"]).exists(),
+            "run": Path(roots["runRoot"]).exists(),
+            "cargo": Path(roots["cargoTargetDir"]).exists(),
+            "snapshot": Path(application["attemptOwnedCacheSnapshot"]["snapshotRoot"]).exists(),
+            "dependency": Path(application["dependencyBundle"]["dependencyRoot"]).exists(),
+        }
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(entry),
+                "-Mode",
+                "Plan",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["state"], "green-plan-only-no-mutation")
+        after = {
+            "source": Path(roots["sourceRoot"]).exists(),
+            "run": Path(roots["runRoot"]).exists(),
+            "cargo": Path(roots["cargoTargetDir"]).exists(),
+            "snapshot": Path(application["attemptOwnedCacheSnapshot"]["snapshotRoot"]).exists(),
+            "dependency": Path(application["dependencyBundle"]["dependencyRoot"]).exists(),
+        }
+        self.assertEqual(before, after)
+        self.assertTrue(all(not value for value in after.values()))
+
+    def test_yellow_attempt_8_freezes_snapshot_before_build_and_fails_closed(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_8_APPLICATION_PATH)
+        snapshot = application["attemptOwnedCacheSnapshot"]
+        self.assertEqual(snapshot["copyMaximumFiles"], 646)
+        self.assertFalse(snapshot["copyEntireGlobalCacheAllowed"])
+        self.assertTrue(snapshot["snapshotWholeTreeFingerprintKnownAfterPrepare"])
+        self.assertTrue(snapshot["snapshotWholeTreeFingerprintMustMatchBeforeAndAfterNpmCi"])
+        self.assertTrue(snapshot["snapshotWholeTreeFingerprintMustMatchBeforeAndAfterBuild"])
+        self.assertFalse(snapshot["npmLogsInsideSnapshotAllowed"])
+        maximums = application["executionPlan"]["maximums"]
+        self.assertEqual(maximums["preflight"], 1)
+        self.assertEqual(maximums["snapshotPreparation"], 1)
+        self.assertEqual(maximums["selectedCacheFileCopies"], 646)
+        self.assertEqual(maximums["npmCi"], 2)
+        self.assertEqual(maximums["junctionCreation"], 2)
+        for key in ("buildScript", "frontend", "tauri", "cargo", "nsis", "artifact"):
+            self.assertEqual(maximums[key], 1, key)
+        self.assertEqual(maximums["retry"], 0)
+        self.assertTrue(all(value == 0 for value in application["executedCounts"].values()))
+        authorization = application["authorization"]
+        self.assertFalse(authorization["preflightAuthorizedByThisApplication"])
+        self.assertFalse(authorization["prepareAuthorizedByThisApplication"])
+        self.assertFalse(authorization["executeAuthorizedByThisApplication"])
+
+        entry = (
+            ROOT / application["executionPlan"]["entryScript"]["path"]
+        ).read_text(encoding="utf-8")
+        self.assertIn("-CacheMode create-snapshot", entry)
+        self.assertIn("$env:npm_config_logs_dir = $NpmLogsRoot", entry)
+        self.assertIn("-CacheMode verify-snapshot", entry)
+        self.assertEqual(entry.count("New-Item -ItemType Junction"), 2)
+        self.assertNotIn("Get-FileTreeFingerprint", entry)
+        self.assertNotIn("Remove-Item -LiteralPath $SnapshotRoot -Recurse", entry)
+        self.assertNotIn("npm install", entry)
+
+    def test_yellow_attempt_8_permanently_rejects_ordinal_7_reuse(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_8_APPLICATION_PATH)
+        self.assertTrue(application["attemptAccounting"]["ordinalSevenPermanentlyConsumed"])
+        protected = application["protectedHistory"]
+        self.assertEqual(
+            protected["ordinalSevenFailureReceiptSha256"],
+            "1c8a47be33a394e3282d33c2871a8284969d60ea977d1fe18a24f0cccfb2cd90",
+        )
+        self.assertTrue(protected["dds5Dds6AndAllPriorRootsReadOnly"])
+        self.assertFalse(protected["reuseRelabelOrWebsiteHandoffAllowed"])
+        plan = load_json(YELLOW_ATTEMPT_8_PLAN_PATH)
+        self.assertTrue(plan["protectedHistory"]["ordinalSevenPermanentlyConsumed"])
+        self.assertFalse(plan["authorization"]["preflightAuthorizedByThisReceipt"])
+        self.assertFalse(plan["authorization"]["prepareAuthorizedByThisReceipt"])
+        self.assertFalse(plan["authorization"]["executeAuthorizedByThisReceipt"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
