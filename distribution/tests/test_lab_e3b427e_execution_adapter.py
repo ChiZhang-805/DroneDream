@@ -11,6 +11,11 @@ PLAN = LIFECYCLE / "red-e3b427e-app-only-plan.v1.json"
 TARGET = LIFECYCLE / "red-e3b427e-app-only-target-receipt.v1.json"
 ADAPTER = LIFECYCLE / "run-lab-e3b427e-app-only-lifecycle.ps1"
 INSPECTOR = LIFECYCLE / "inspect-lab-e3b427e-live-webview2.mjs"
+FAILURE_RECEIPT = (
+    ROOT
+    / "distribution/build-receipts/"
+    "lab-e3b427e-red-segment-a1-failure.json"
+)
 
 
 def _load(path: Path) -> dict:
@@ -234,3 +239,48 @@ def test_adapter_and_inspector_parse_without_execution() -> None:
         encoding="utf-8",
     )
     assert node_result.returncode == 0, node_result.stderr
+
+
+def test_first_red_attempt_is_frozen_failed_without_retry_and_rolled_back() -> None:
+    receipt = _load(FAILURE_RECEIPT)
+
+    assert receipt["result"] == "segment-a-failed-no-retry"
+    assert receipt["sourceSeparation"]["artifactProductSourceCommit"] == (
+        "e3b427e9d1d6209495d629c399a1962913f2d00c"
+    )
+    assert receipt["sourceSeparation"]["executionEvidenceCommit"] == (
+        "ebb9f5861eb84c2c590f4ea4eab7a1a17f56fcad"
+    )
+    assert receipt["sourceSeparation"]["artifactInvalidatedByThisFailure"] is False
+    assert receipt["failure"]["classification"] == (
+        "execution-adapter-selector-mismatch"
+    )
+    assert receipt["failure"]["productSourceFacts"] == {
+        "launcherShellSelector": ".app-shell.app-shell-launcher",
+        "launcherShellHasDataBrandEditionAttribute": False,
+        "editionAttributeOwner": "document.documentElement",
+        "editionAttributeWriter": (
+            "applyUniversalMode through EditionThemeProvider"
+        ),
+    }
+    assert receipt["failure"]["productRuntimeFailureProven"] is False
+    assert receipt["actualCounts"]["freshInstallerInvocations"] == 1
+    assert receipt["actualCounts"]["overlayInstallerInvocations"] == 0
+    assert receipt["actualCounts"]["applicationLaunches"] == 1
+    assert receipt["actualCounts"]["uninstallerInvocations"] == 1
+    assert receipt["actualCounts"]["browserLaunches"] == 0
+    assert receipt["actualCounts"]["runtimeStartsOrMigrations"] == 0
+    assert receipt["actualCounts"]["hardwareActions"] == 0
+    assert receipt["rollback"]["protectedStateByteEquivalent"] is True
+    assert receipt["rollback"]["labInstallRootAbsent"] is True
+    assert receipt["rollback"]["labProductKeyAbsent"] is True
+    assert receipt["rollback"]["droneDreamProcessCount"] == 0
+    assert receipt["rollback"]["oauthPort49212ListenerCount"] == 0
+    assert receipt["retry"] == {
+        "performed": False,
+        "authorized": False,
+        "sameCommandMayBeRunAgain": False,
+        "requiresPatchedAdapterNewApplicationAndNewExactRedSignal": True,
+    }
+    assert receipt["releaseReady"] is False
+    assert receipt["websiteHandoffReady"] is False
