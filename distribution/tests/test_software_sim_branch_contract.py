@@ -141,6 +141,18 @@ YELLOW_ATTEMPT_8_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-8-f4a0562-public-config-preflight-failed.v1.json"
 )
+YELLOW_ATTEMPT_9_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-9-77f4718-application.v1.json"
+)
+YELLOW_ATTEMPT_9_PLAN_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-9-77f4718-plan-ready.v1.json"
+)
 DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     DISTRIBUTION
     / "sim"
@@ -156,7 +168,7 @@ DETACHED_NODE_DEPENDENCY_SYNC_PATH = (
 STABLE_OFFLINE_CACHE_CONTRACT_PATH = (
     DISTRIBUTION / "sim" / "readiness" / "stable-offline-cache-contract.v1.json"
 )
-YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_8_APPLICATION_PATH
+YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_9_APPLICATION_PATH
 LOCKFILE_OFFLINE_CACHE_TOOL = (
     DISTRIBUTION / "sim" / "desktop" / "lockfile-offline-cache.mjs"
 )
@@ -1602,6 +1614,163 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(plan["valuesRead"])
         self.assertFalse(plan["valuesPrinted"])
         self.assertFalse(plan["valuesPersisted"])
+
+    def test_yellow_attempt_9_binds_launcher_product_source_and_stable_cache(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_9_APPLICATION_PATH)
+        source = application["sourceSeparation"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "77f471845d2eda0c4a1e3dc1e4eee239905ba248",
+        )
+        self.assertEqual(
+            git("show", "-s", "--format=%T", source["productSourceCommit"]),
+            source["productSourceTree"],
+        )
+        launcher = application["publicConfigurationLauncher"]
+        launcher_path = ROOT / launcher["path"]
+        self.assertEqual(launcher_path.stat().st_size, launcher["bytes"])
+        self.assertEqual(
+            hashlib.sha256(launcher_path.read_bytes()).hexdigest(),
+            launcher["sha256"],
+        )
+        self.assertEqual(
+            git("rev-parse", f"{source['productSourceCommit']}:{launcher['path']}"),
+            launcher["productSourceGitBlob"],
+        )
+        self.assertEqual(launcher["futureProviderInvocationMaximum"], 2)
+        self.assertTrue(launcher["responseNameMustExactlyMatchRequest"])
+        self.assertTrue(launcher["valuesEnterOnlyControlledChildEnvironment"])
+        self.assertFalse(launcher["valuesOnCommandLineAllowed"])
+        self.assertFalse(launcher["valuesInStdoutStderrReceiptOrPlanAllowed"])
+        self.assertTrue(launcher["finallyClearsChildEnvironmentAndMemoryReferences"])
+        stable = application["stableCacheContract"]
+        self.assertEqual(stable["contentObjectCount"], 323)
+        self.assertEqual(stable["indexKeyCount"], 323)
+        self.assertEqual(stable["contentBytes"], 55560694)
+        self.assertEqual(
+            stable["semanticFingerprint"],
+            "fa7523cb1a93b4b3626a3b9132139fea8ed7e2c165097a03545b2e58eaf68a91",
+        )
+
+    def test_yellow_attempt_9_application_and_plan_are_exact_hash_bound(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_9_APPLICATION_PATH)
+        plan = load_json(YELLOW_ATTEMPT_9_PLAN_PATH)
+        self.assertEqual(
+            YELLOW_ATTEMPT_9_APPLICATION_PATH.stat().st_size,
+            plan["application"]["bytes"],
+        )
+        self.assertEqual(
+            hashlib.sha256(YELLOW_ATTEMPT_9_APPLICATION_PATH.read_bytes()).hexdigest(),
+            plan["application"]["sha256"],
+        )
+        entry = ROOT / application["executionPlan"]["entryScript"]["path"]
+        self.assertEqual(entry.stat().st_size, plan["entryScript"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(entry.read_bytes()).hexdigest(),
+            plan["entryScript"]["sha256"],
+        )
+        self.assertEqual(
+            hashlib.sha256(entry.read_bytes()).hexdigest(),
+            application["executionPlan"]["entryScript"]["sha256"],
+        )
+        command = plan["exactFutureCommand"]["executeAuthorizedSequence"]
+        self.assertEqual(
+            command,
+            application["executionPlan"]["exactCommands"]["futureAuthorizedSequence"],
+        )
+        self.assertIn("-Mode ExecuteSequence", command)
+        self.assertIn("-EntryScriptSha256 30b8132107899400", command)
+        self.assertNotIn("https://", command)
+        self.assertNotIn("sb_", command)
+        self.assertFalse(plan["exactFutureCommand"]["executionAuthorizedByThisReceipt"])
+
+    def test_yellow_attempt_9_plans_are_provider_free_and_roots_absent(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_9_APPLICATION_PATH)
+        entry = ROOT / application["executionPlan"]["entryScript"]["path"]
+        plan_commands = (
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(entry),
+                "-Mode",
+                "Plan",
+            ],
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(PUBLIC_BUILD_CONFIG_LAUNCHER),
+                "-Mode",
+                "Plan",
+            ],
+        )
+        for command in plan_commands:
+            result = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+        roots = application["ownedBuildSurface"]
+        snapshot = application["attemptOwnedCacheSnapshot"]["snapshotRoot"]
+        dependency = application["dependencyBundle"]["dependencyRoot"]
+        for path in (
+            roots["sourceRoot"],
+            roots["runRoot"],
+            roots["cargoTargetDir"],
+            snapshot,
+            dependency,
+        ):
+            self.assertFalse(Path(path).exists(), path)
+        plan = load_json(YELLOW_ATTEMPT_9_PLAN_PATH)
+        self.assertEqual(plan["planVerification"]["newRootCount"], 0)
+        self.assertEqual(plan["planVerification"]["providerInvocations"], 0)
+        self.assertFalse(plan["planVerification"]["valuesRead"])
+        self.assertTrue(all(value == 0 for value in plan["executedCounts"].values()))
+
+    def test_yellow_attempt_9_counts_and_history_are_fail_closed(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_9_APPLICATION_PATH)
+        maximums = application["executionPlan"]["maximums"]
+        expected = {
+            "publicConfigLauncher": 1,
+            "publicRepositoryVariableFetch": 2,
+            "controlledChild": 3,
+            "preflight": 1,
+            "snapshotPreparation": 1,
+            "selectedCacheFileCopies": 646,
+            "npmCi": 2,
+            "junctionCreation": 2,
+            "buildScript": 1,
+            "frontend": 1,
+            "tauri": 1,
+            "cargo": 1,
+            "nsis": 1,
+            "artifact": 1,
+            "retry": 0,
+        }
+        self.assertEqual(maximums, expected)
+        accounting = application["attemptAccounting"]
+        self.assertEqual(accounting["globalCommandApplicationOrdinal"], 9)
+        self.assertTrue(accounting["ordinalSevenPermanentlyConsumed"])
+        self.assertTrue(accounting["ordinalEightPermanentlyConsumed"])
+        protected = application["protectedHistory"]
+        self.assertEqual(
+            protected["ordinalEightFailureReceiptSha256"],
+            "fa9ae08e491d2ef4c3a3c98ef36a4c34b1a76c374c950d2e93c8003ce2f29b01",
+        )
+        self.assertTrue(protected["dds5Dds6Dds7Dds8AndAllPriorRootsReadOnly"])
+        self.assertFalse(protected["reuseRelabelOrWebsiteHandoffAllowed"])
+        self.assertTrue(all(value == 0 for value in application["executedCounts"].values()))
+        authorization = application["authorization"]
+        self.assertFalse(authorization["preflightAuthorizedByThisApplication"])
+        self.assertFalse(authorization["prepareAuthorizedByThisApplication"])
+        self.assertFalse(authorization["executeAuthorizedByThisApplication"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
