@@ -31,6 +31,9 @@ const MINIMUM_MEMORY_BYTES: u64 = 15 * 1024 * 1024 * 1024;
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(12);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_BACKEND_RESPONSE_BYTES: usize = 256 * 1024;
+pub(crate) const RUNTIME_REGISTRY_PROBE_BUDGET: Duration = COMMAND_TIMEOUT;
+pub(crate) const RUNTIME_STATUS_PROBE_BUDGET: Duration = Duration::from_secs(64);
+const RUNTIME_INTERNAL_HEALTH_TIMEOUT: Duration = Duration::from_secs(6);
 
 pub(crate) fn runtime_wsl_exec_args(program: &str, args: &[&str]) -> Vec<String> {
     let mut argv = vec![
@@ -889,11 +892,12 @@ pub(crate) fn runtime_is_registered() -> Result<bool, String> {
 }
 
 #[cfg(target_os = "windows")]
-pub(crate) fn probe_runtime_release_health(
+pub(crate) fn probe_runtime_release_health_until(
     expected_build_id: &str,
     expected_version: &str,
+    deadline: Instant,
 ) -> RuntimeReleaseHealth {
-    let manifest = match read_runtime_manifest() {
+    let manifest = match read_runtime_manifest_until(deadline) {
         Ok(Some(manifest)) => manifest,
         Ok(None) => {
             return RuntimeReleaseHealth::NotReady(
@@ -913,16 +917,21 @@ pub(crate) fn probe_runtime_release_health(
             "Runtime manifest has no backend component.".to_string(),
         );
     };
-    let internal = verify_backend_ready_inside_wsl(expected_backend, expected_build_id);
+    let internal =
+        verify_backend_ready_inside_wsl_until(expected_backend, expected_build_id, deadline);
     classify_runtime_release_health(
         internal,
-        || verify_backend_ready(expected_backend, expected_build_id),
-        || verify_backend_ready_inside_wsl(expected_backend, expected_build_id),
+        || verify_backend_ready_until(expected_backend, expected_build_id, deadline),
+        || verify_backend_ready_inside_wsl_until(expected_backend, expected_build_id, deadline),
     )
 }
 
 #[cfg(not(target_os = "windows"))]
-pub(crate) fn probe_runtime_release_health(_: &str, _: &str) -> RuntimeReleaseHealth {
+pub(crate) fn probe_runtime_release_health_until(
+    _: &str,
+    _: &str,
+    _: Instant,
+) -> RuntimeReleaseHealth {
     RuntimeReleaseHealth::Unknown("The runtime installer supports Windows only.".to_string())
 }
 
@@ -1064,6 +1073,14 @@ pub(crate) fn write_runtime_root_receipt(_: &str, _: &str, _: &str) -> Result<()
 
 #[cfg(target_os = "windows")]
 fn read_runtime_manifest() -> Result<Option<RuntimeManifest>, String> {
+    let deadline = Instant::now()
+        .checked_add(COMMAND_TIMEOUT.saturating_mul(2))
+        .ok_or_else(|| "Runtime manifest probe deadline overflowed.".to_string())?;
+    read_runtime_manifest_until(deadline)
+}
+
+#[cfg(target_os = "windows")]
+fn read_runtime_manifest_until(deadline: Instant) -> Result<Option<RuntimeManifest>, String> {
     let mut existence_probe = windows_command("wsl.exe");
     existence_probe.args(runtime_wsl_exec_args(
         "/usr/bin/test",
@@ -1071,7 +1088,11 @@ fn read_runtime_manifest() -> Result<Option<RuntimeManifest>, String> {
     ));
     let existence = command_output(
         existence_probe,
-        COMMAND_TIMEOUT,
+        remaining_probe_timeout(
+            deadline,
+            COMMAND_TIMEOUT,
+            "runtime manifest existence probe",
+        )?,
         "runtime manifest existence probe",
     )?;
     if existence.status.code() == Some(1) {
@@ -1093,7 +1114,11 @@ fn read_runtime_manifest() -> Result<Option<RuntimeManifest>, String> {
 
     let mut command = windows_command("wsl.exe");
     command.args(runtime_wsl_exec_args("/usr/bin/cat", &[RUNTIME_MANIFEST]));
-    let output = command_output(command, COMMAND_TIMEOUT, "runtime manifest read")?;
+    let output = command_output(
+        command,
+        remaining_probe_timeout(deadline, COMMAND_TIMEOUT, "runtime manifest read")?,
+        "runtime manifest read",
+    )?;
     if !output.status.success() {
         let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(if detail.is_empty() {
@@ -1165,26 +1190,43 @@ fn is_uuid_like(value: &str) -> bool {
 }
 
 fn verify_backend_ready(expected_version: &str, expected_runtime_id: &str) -> Result<(), String> {
+    let deadline = Instant::now()
+        .checked_add(HEALTH_TIMEOUT)
+        .ok_or_else(|| "Backend readiness deadline overflowed.".to_string())?;
+    verify_backend_ready_until(expected_version, expected_runtime_id, deadline)
+}
+
+fn verify_backend_ready_until(
+    expected_version: &str,
+    expected_runtime_id: &str,
+    deadline: Instant,
+) -> Result<(), String> {
     let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), BACKEND_PORT);
     verify_backend_ready_at(
         address,
         expected_version,
         expected_runtime_id,
-        HEALTH_TIMEOUT,
+        remaining_probe_timeout(deadline, HEALTH_TIMEOUT, "host backend readiness probe")?,
     )
 }
 
 #[cfg(target_os = "windows")]
-fn verify_backend_ready_inside_wsl(
+fn verify_backend_ready_inside_wsl_until(
     expected_version: &str,
     expected_runtime_id: &str,
+    deadline: Instant,
 ) -> Result<(), InternalBackendHealthError> {
     let mut command = windows_command("wsl.exe");
     let endpoint = format!("http://127.0.0.1:{BACKEND_PORT}/health/ready");
     command.args(runtime_internal_readiness_args(endpoint.as_str()));
     let output = command_output(
         command,
-        Duration::from_secs(6),
+        remaining_probe_timeout(
+            deadline,
+            RUNTIME_INTERNAL_HEALTH_TIMEOUT,
+            "runtime-internal readiness probe",
+        )
+        .map_err(InternalBackendHealthError::Unknown)?,
         "runtime-internal readiness probe",
     )
     .map_err(InternalBackendHealthError::Unknown)?;
@@ -1205,6 +1247,23 @@ fn verify_backend_ready_inside_wsl(
             ))
         },
     )
+}
+
+fn remaining_probe_timeout(
+    deadline: Instant,
+    cap: Duration,
+    label: &str,
+) -> Result<Duration, String> {
+    bounded_probe_timeout(deadline.saturating_duration_since(Instant::now()), cap)
+        .ok_or_else(|| format!("{label} did not start because the shared deadline was exhausted."))
+}
+
+fn bounded_probe_timeout(remaining: Duration, cap: Duration) -> Option<Duration> {
+    if remaining.is_zero() || cap.is_zero() {
+        None
+    } else {
+        Some(remaining.min(cap))
+    }
 }
 
 fn format_internal_readiness_failure(status: &str, stderr: &[u8]) -> String {
@@ -2376,6 +2435,26 @@ mod tests {
                 .map(String::as_str)
                 .collect::<Vec<_>>(),
             vec!["http://127.0.0.1:8000/health/ready", "--"]
+        );
+    }
+
+    #[test]
+    fn shared_health_deadline_caps_every_child_probe() {
+        assert_eq!(
+            bounded_probe_timeout(Duration::from_secs(30), Duration::from_secs(12)),
+            Some(Duration::from_secs(12))
+        );
+        assert_eq!(
+            bounded_probe_timeout(Duration::from_millis(750), Duration::from_secs(12)),
+            Some(Duration::from_millis(750))
+        );
+        assert_eq!(
+            bounded_probe_timeout(Duration::ZERO, Duration::from_secs(12)),
+            None
+        );
+        assert_eq!(
+            bounded_probe_timeout(Duration::from_secs(1), Duration::ZERO),
+            None
         );
     }
 

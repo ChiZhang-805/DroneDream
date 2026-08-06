@@ -94,6 +94,7 @@ def test_attempts_are_durable_before_side_effects_and_runtime_failure_is_bounded
         "runtime_service_unhealthy",
         "runtime_host_connectivity",
         "runtime_health_unknown",
+        "runtime_maintenance_deadline_exceeded",
         "runtime_operation_busy",
         "runtime_update_quiesce_active",
         "runtime_start_pending_timeout",

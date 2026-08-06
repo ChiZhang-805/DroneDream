@@ -131,6 +131,7 @@ try {
           "runtime_service_unhealthy",
           "runtime_host_connectivity",
           "runtime_health_unknown",
+          "runtime_maintenance_deadline_exceeded",
         ]) {
           if (normalized.includes(code)) return code;
         }

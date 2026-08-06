@@ -104,7 +104,7 @@ function Import-ObserverCheckpoint([string]$Path, $Counts, $Receipt) {
     }
     $allowedStages = @("initialized", "connected", "runtime-start-attempted", "runtime-ready", "runtime-already-ready", "runtime-start-failed", "runtime-diagnosis-completed", "oauth-attempted", "local-logout-attempted", "completed")
     if ($observation.stage -notin $allowedStages) { throw "Installed-app OAuth observer checkpoint has an unknown stage." }
-    $allowedRuntimeFailures = @($null, "runtime_service_unhealthy", "runtime_host_connectivity", "runtime_health_unknown", "runtime_operation_busy", "runtime_update_quiesce_active", "runtime_not_installed", "runtime_error_unclassified", "runtime_start_pending_timeout")
+    $allowedRuntimeFailures = @($null, "runtime_service_unhealthy", "runtime_host_connectivity", "runtime_health_unknown", "runtime_maintenance_deadline_exceeded", "runtime_operation_busy", "runtime_update_quiesce_active", "runtime_not_installed", "runtime_error_unclassified", "runtime_start_pending_timeout")
     if ($observation.runtimeFailureCode -notin $allowedRuntimeFailures) {
         throw "Installed-app OAuth observer checkpoint has an unknown Runtime failure code."
     }

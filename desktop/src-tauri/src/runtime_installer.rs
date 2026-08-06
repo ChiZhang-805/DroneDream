@@ -57,6 +57,14 @@ const MAX_JCS_SAFE_INTEGER: u64 = (1_u64 << 53) - 1;
 const IMPORT_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(60);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(3 * 60);
+// The installed-app observer owns a 300 second action window. Native startup
+// uses at most 270 seconds and reserves the final 30 seconds for IPC delivery,
+// durable evidence, app shutdown, and the verifier's owned rollback.
+const RUNTIME_MAINTENANCE_OBSERVER_WINDOW_SECS: u64 = 300;
+const RUNTIME_MAINTENANCE_SETTLEMENT_MARGIN_SECS: u64 = 30;
+const RUNTIME_MAINTENANCE_TIMEOUT: Duration = Duration::from_secs(
+    RUNTIME_MAINTENANCE_OBSERVER_WINDOW_SECS - RUNTIME_MAINTENANCE_SETTLEMENT_MARGIN_SECS,
+);
 const RESUME_STATE_FILE: &str = "install-state.json";
 const RESUME_STATE_TEMP_FILE: &str = "install-state.json.tmp";
 const CACHED_MANIFEST_FILE: &str = "signed-release-manifest.json";
@@ -878,7 +886,18 @@ async fn run_runtime_maintenance(
     tauri::async_runtime::spawn_blocking(move || {
         let _operation = operation;
         let executor = ProductionWslExecutor;
+        let maintenance_deadline = Instant::now()
+            .checked_add(RUNTIME_MAINTENANCE_TIMEOUT)
+            .ok_or_else(|| "Runtime maintenance deadline overflowed.".to_string())?;
+        let health_deadline = maintenance_deadline
+            .checked_sub(crate::runtime::RUNTIME_STATUS_PROBE_BUDGET)
+            .ok_or_else(|| "Runtime maintenance probe budget is invalid.".to_string())?;
         let result = (|| {
+            require_runtime_maintenance_budget(
+                maintenance_deadline,
+                crate::runtime::RUNTIME_REGISTRY_PROBE_BUDGET,
+                "runtime registration probe",
+            )?;
             if !executor
                 .is_registered()
                 .map_err(runtime_maintenance_error_for_ipc)?
@@ -888,6 +907,11 @@ async fn run_runtime_maintenance(
                         .to_string(),
                 );
             }
+            require_runtime_maintenance_budget(
+                maintenance_deadline,
+                crate::runtime::RUNTIME_REGISTRY_PROBE_BUDGET,
+                "runtime ownership probe",
+            )?;
             let (build_id, version) = match crate::runtime::validate_installed_runtime_ownership() {
                 Ok(identity) => identity,
                 Err(_) => {
@@ -923,11 +947,16 @@ async fn run_runtime_maintenance(
             keepalive.ensure_running()?;
             let cancel = AtomicBool::new(false);
             executor
-                .start(&cancel)
+                .start_until(&cancel, health_deadline)
                 .map_err(runtime_maintenance_error_for_ipc)?;
             executor
-                .wait_healthy(&build_id, &version, &cancel)
+                .wait_healthy_until(&build_id, &version, &cancel, health_deadline)
                 .map_err(runtime_maintenance_error_for_ipc)?;
+            require_runtime_maintenance_budget(
+                maintenance_deadline,
+                crate::runtime::RUNTIME_STATUS_PROBE_BUDGET,
+                "final runtime status probe",
+            )?;
             let report = crate::runtime::probe_runtime()?;
             if !report.is_ready() {
                 return Err(
@@ -944,6 +973,23 @@ async fn run_runtime_maintenance(
     })
     .await
     .map_err(|error| format!("Runtime maintenance task failed: {error}"))?
+}
+
+fn require_runtime_maintenance_budget(
+    deadline: Instant,
+    required: Duration,
+    stage: &str,
+) -> Result<(), String> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining < required {
+        Err(format!(
+            "runtime_maintenance_deadline_exceeded: {stage} requires at most {} seconds but only {} milliseconds remain.",
+            required.as_secs(),
+            remaining.as_millis()
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -1851,6 +1897,111 @@ impl ProductionWslExecutor {
         }
         Ok(())
     }
+
+    fn start_until(&self, cancel: &AtomicBool, deadline: Instant) -> Result<(), InstallFailure> {
+        let timeout = remaining_runtime_timeout(deadline, COMMAND_TIMEOUT, "Runtime start")?;
+        let args = crate::runtime::runtime_wsl_exec_args("/bin/true", &[]);
+        self.run_exact("DroneDreamRuntime start", &args, Some(cancel), timeout)
+    }
+
+    fn wait_healthy_until(
+        &self,
+        build_id: &str,
+        version: &str,
+        cancel: &AtomicBool,
+        operation_deadline: Instant,
+    ) -> Result<(), InstallFailure> {
+        let local_deadline = Instant::now()
+            .checked_add(HEALTH_TIMEOUT)
+            .map(|deadline| deadline.min(operation_deadline))
+            .unwrap_or(operation_deadline);
+        let mut last_health = crate::runtime::RuntimeReleaseHealth::NotReady(
+            "runtime health check has not completed".to_string(),
+        );
+        loop {
+            check_cancel(cancel)?;
+            if local_deadline
+                .saturating_duration_since(Instant::now())
+                .is_zero()
+            {
+                break;
+            }
+            let observed = crate::runtime::probe_runtime_release_health_until(
+                build_id,
+                version,
+                local_deadline,
+            );
+            if matches!(observed, crate::runtime::RuntimeReleaseHealth::Ready) {
+                return Ok(());
+            }
+            last_health = retain_specific_runtime_health(last_health, observed);
+            let remaining = local_deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+            std::thread::sleep(remaining.min(Duration::from_secs(2)));
+        }
+        Err(runtime_health_failure(last_health))
+    }
+}
+
+fn remaining_runtime_timeout(
+    deadline: Instant,
+    cap: Duration,
+    stage: &str,
+) -> Result<Duration, InstallFailure> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    let timeout = bounded_runtime_timeout(remaining, cap).ok_or_else(|| {
+        fail(
+            "runtime_maintenance_deadline_exceeded",
+            format!("{stage} did not start because the shared deadline was exhausted."),
+            true,
+        )
+    })?;
+    Ok(timeout)
+}
+
+fn bounded_runtime_timeout(remaining: Duration, cap: Duration) -> Option<Duration> {
+    if remaining.is_zero() || cap.is_zero() {
+        None
+    } else {
+        Some(remaining.min(cap))
+    }
+}
+
+fn runtime_health_failure(last_health: crate::runtime::RuntimeReleaseHealth) -> InstallFailure {
+    let (code, detail) = match last_health {
+        crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(error) => {
+            ("runtime_service_unhealthy", error)
+        }
+        crate::runtime::RuntimeReleaseHealth::HostConnectivity(error) => {
+            ("runtime_host_connectivity", error)
+        }
+        crate::runtime::RuntimeReleaseHealth::Unknown(error)
+        | crate::runtime::RuntimeReleaseHealth::NotReady(error) => {
+            ("runtime_health_unknown", error)
+        }
+        crate::runtime::RuntimeReleaseHealth::Ready => unreachable!("ready returned above"),
+    };
+    fail(
+        code,
+        format!("DroneDreamRuntime did not become healthy: {detail}"),
+        true,
+    )
+}
+
+fn retain_specific_runtime_health(
+    previous: crate::runtime::RuntimeReleaseHealth,
+    observed: crate::runtime::RuntimeReleaseHealth,
+) -> crate::runtime::RuntimeReleaseHealth {
+    match (&previous, &observed) {
+        (
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(_)
+            | crate::runtime::RuntimeReleaseHealth::HostConnectivity(_),
+            crate::runtime::RuntimeReleaseHealth::Unknown(error),
+        ) if error.contains("shared deadline was exhausted") => previous,
+        _ => observed,
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -1972,13 +2123,14 @@ impl WslExecutor for ProductionWslExecutor {
     }
 
     fn start(&self, cancel: &AtomicBool) -> Result<(), InstallFailure> {
-        let args = crate::runtime::runtime_wsl_exec_args("/bin/true", &[]);
-        self.run_exact(
-            "DroneDreamRuntime start",
-            &args,
-            Some(cancel),
-            COMMAND_TIMEOUT,
-        )
+        let deadline = Instant::now().checked_add(COMMAND_TIMEOUT).ok_or_else(|| {
+            fail(
+                "wsl_command_failed",
+                "Runtime start deadline overflowed.",
+                true,
+            )
+        })?;
+        self.start_until(cancel, deadline)
     }
 
     fn terminate(&self) -> Result<(), InstallFailure> {
@@ -2005,36 +2157,14 @@ impl WslExecutor for ProductionWslExecutor {
         version: &str,
         cancel: &AtomicBool,
     ) -> Result<(), InstallFailure> {
-        let started = Instant::now();
-        let mut last_health = crate::runtime::RuntimeReleaseHealth::NotReady(
-            "runtime health check has not completed".to_string(),
-        );
-        while started.elapsed() < HEALTH_TIMEOUT {
-            check_cancel(cancel)?;
-            last_health = crate::runtime::probe_runtime_release_health(build_id, version);
-            if matches!(last_health, crate::runtime::RuntimeReleaseHealth::Ready) {
-                return Ok(());
-            }
-            std::thread::sleep(Duration::from_secs(2));
-        }
-        let (code, detail) = match last_health {
-            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(error) => {
-                ("runtime_service_unhealthy", error)
-            }
-            crate::runtime::RuntimeReleaseHealth::HostConnectivity(error) => {
-                ("runtime_host_connectivity", error)
-            }
-            crate::runtime::RuntimeReleaseHealth::Unknown(error)
-            | crate::runtime::RuntimeReleaseHealth::NotReady(error) => {
-                ("runtime_health_unknown", error)
-            }
-            crate::runtime::RuntimeReleaseHealth::Ready => unreachable!("ready returned above"),
-        };
-        Err(fail(
-            code,
-            format!("DroneDreamRuntime did not become healthy: {detail}"),
-            true,
-        ))
+        let deadline = Instant::now().checked_add(HEALTH_TIMEOUT).ok_or_else(|| {
+            fail(
+                "runtime_health_unknown",
+                "Health deadline overflowed.",
+                true,
+            )
+        })?;
+        self.wait_healthy_until(build_id, version, cancel, deadline)
     }
 
     fn collect_diagnostics(
@@ -4269,6 +4399,63 @@ mod tests {
             "runtime_service_unhealthy ignored: backend did not become ready second line"
         );
         assert!(!value.contains(['\r', '\n']));
+    }
+
+    #[test]
+    fn runtime_maintenance_budget_leaves_observer_settlement_margin() {
+        assert_eq!(
+            RUNTIME_MAINTENANCE_TIMEOUT
+                + Duration::from_secs(RUNTIME_MAINTENANCE_SETTLEMENT_MARGIN_SECS),
+            Duration::from_secs(RUNTIME_MAINTENANCE_OBSERVER_WINDOW_SECS)
+        );
+        assert!(crate::runtime::RUNTIME_STATUS_PROBE_BUDGET < RUNTIME_MAINTENANCE_TIMEOUT);
+        assert_eq!(
+            bounded_runtime_timeout(Duration::from_secs(75), COMMAND_TIMEOUT),
+            Some(COMMAND_TIMEOUT)
+        );
+        assert_eq!(
+            bounded_runtime_timeout(Duration::from_millis(250), COMMAND_TIMEOUT),
+            Some(Duration::from_millis(250))
+        );
+        assert_eq!(
+            bounded_runtime_timeout(Duration::ZERO, COMMAND_TIMEOUT),
+            None
+        );
+    }
+
+    #[test]
+    fn runtime_deadline_preserves_observed_failure_classification() {
+        let service = runtime_health_failure(
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy("backend failed".to_string()),
+        );
+        assert_eq!(service.code, "runtime_service_unhealthy");
+
+        let host = runtime_health_failure(crate::runtime::RuntimeReleaseHealth::HostConnectivity(
+            "host path failed".to_string(),
+        ));
+        assert_eq!(host.code, "runtime_host_connectivity");
+
+        let unknown = runtime_health_failure(crate::runtime::RuntimeReleaseHealth::Unknown(
+            "shared deadline exhausted".to_string(),
+        ));
+        assert_eq!(unknown.code, "runtime_health_unknown");
+        assert!(unknown.message.contains("shared deadline exhausted"));
+
+        let retained = retain_specific_runtime_health(
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(
+                "backend refused connections".to_string(),
+            ),
+            crate::runtime::RuntimeReleaseHealth::Unknown(
+                "host backend readiness probe did not start because the shared deadline was exhausted."
+                    .to_string(),
+            ),
+        );
+        assert_eq!(
+            retained,
+            crate::runtime::RuntimeReleaseHealth::ServiceUnhealthy(
+                "backend refused connections".to_string()
+            )
+        );
     }
     use ed25519_dalek::{Signer, SigningKey};
     use std::sync::atomic::AtomicUsize;
