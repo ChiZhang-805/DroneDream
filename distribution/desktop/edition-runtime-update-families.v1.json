@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-desktop-runtime-update-families",
+  "contractVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "sharedRuntimeBase": {
+    "productId": "DroneDreamRuntime",
+    "wslDistributionName": "DroneDreamRuntime",
+    "owner": "runtime-base-manager",
+    "managerNamespace": "io.dronedream.runtime-base-manager",
+    "operationLeaseFileName": "runtime-operation-v1.lock",
+    "downloadCacheDirectoryName": "DroneDream.download-cache",
+    "diagnosticsRootDirectoryName": "diagnostics",
+    "editionUninstallMayRemoveRuntime": false,
+    "editionOperationsMayUseIndependentLocks": false
+  },
+  "updaterPolicy": {
+    "repository": "ChiZhang-805/DroneDream",
+    "metadataOrigin": "https://github.com/ChiZhang-805/DroneDream/releases/download",
+    "channelTagTemplate": "desktop-{editionId}-channel",
+    "metadataFileTemplate": "latest-{editionId}.json",
+    "releaseTagTemplate": "desktop-{editionId}-v{version}-build-{buildNumber}",
+    "sameEditionUrlFamilyRequired": true,
+    "crossEditionMetadataAllowed": false,
+    "crossEditionArtifactAllowed": false,
+    "sourceCommitAndBuildNumberRequired": true,
+    "updaterSignatureRequired": true
+  },
+  "editions": [
+    {
+      "editionId": "universal",
+      "runtimeProfileId": "unified-sim-lab",
+      "localRuntimeStateNamespace": "io.dronedream.desktop.universal/runtime",
+      "diagnosticsRelativePath": "diagnostics/universal",
+      "installerProductName": "DroneDream-Universal",
+      "publicArtifactFileName": "DroneDream-Universal-1.0.0.exe",
+      "tauriBundleInstallerFileName": "DroneDream-Universal_1.0.0_x64-setup.exe",
+      "updaterChannelTag": "desktop-universal-channel",
+      "updaterMetadataFileName": "latest-universal.json",
+      "updaterMetadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-universal-channel/latest-universal.json",
+      "updaterReleaseTagPrefix": "desktop-universal-v1.0.0-build-"
+    },
+    {
+      "editionId": "sim",
+      "runtimeProfileId": "sim-only",
+      "localRuntimeStateNamespace": "io.dronedream.desktop.sim/runtime",
+      "diagnosticsRelativePath": "diagnostics/sim",
+      "installerProductName": "DroneDream-Sim",
+      "publicArtifactFileName": "DroneDream-Sim-1.0.0.exe",
+      "tauriBundleInstallerFileName": "DroneDream-Sim_1.0.0_x64-setup.exe",
+      "updaterChannelTag": "desktop-sim-channel",
+      "updaterMetadataFileName": "latest-sim.json",
+      "updaterMetadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-sim-channel/latest-sim.json",
+      "updaterReleaseTagPrefix": "desktop-sim-v1.0.0-build-"
+    },
+    {
+      "editionId": "lab",
+      "runtimeProfileId": "unified-sim-lab",
+      "localRuntimeStateNamespace": "io.dronedream.desktop.lab/runtime",
+      "diagnosticsRelativePath": "diagnostics/lab",
+      "installerProductName": "DroneDream-Lab",
+      "publicArtifactFileName": "DroneDream-Lab-1.0.0.exe",
+      "tauriBundleInstallerFileName": "DroneDream-Lab_1.0.0_x64-setup.exe",
+      "updaterChannelTag": "desktop-lab-channel",
+      "updaterMetadataFileName": "latest-lab.json",
+      "updaterMetadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json",
+      "updaterReleaseTagPrefix": "desktop-lab-v1.0.0-build-"
+    },
+    {
+      "editionId": "field",
+      "runtimeProfileId": "field-only",
+      "localRuntimeStateNamespace": "io.dronedream.desktop.field/runtime",
+      "diagnosticsRelativePath": "diagnostics/field",
+      "installerProductName": "DroneDream-Field",
+      "publicArtifactFileName": "DroneDream-Field-1.0.0.exe",
+      "tauriBundleInstallerFileName": "DroneDream-Field_1.0.0_x64-setup.exe",
+      "updaterChannelTag": "desktop-field-channel",
+      "updaterMetadataFileName": "latest-field.json",
+      "updaterMetadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-channel/latest-field.json",
+      "updaterReleaseTagPrefix": "desktop-field-v1.0.0-build-"
+    }
+  ]
+}
