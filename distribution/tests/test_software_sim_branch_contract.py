@@ -79,6 +79,12 @@ YELLOW_ATTEMPT_5_PREFLIGHT_PATH = (
     / "desktop"
     / "yellow-build-attempt-5-2bffcb0-preflight-ready.v1.json"
 )
+YELLOW_ATTEMPT_5_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-5-2bffcb0-common-core-prebuild-failed.v1.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -330,6 +336,72 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertTrue(receipt["preflight"]["sourceRootAbsent"])
         self.assertFalse(receipt["authorization"]["yellowBuildExecutionAuthorizedByThisReceipt"])
         self.assertTrue(all(value == 0 for value in receipt["executedCounts"].values()))
+
+    def test_yellow_attempt_5_common_core_failure_consumes_only_build_invocation(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_5_FAILURE_PATH)
+        binding = receipt["authorizationBinding"]
+        execution = receipt["execution"]
+        self.assertEqual(receipt["state"], "failed-frozen-no-retry")
+        self.assertEqual(binding["globalAuthorizedCommandOrdinal"], 5)
+        self.assertEqual(binding["sourceBuildInvocationOrdinal"], 1)
+        self.assertEqual(binding["sourceBuildInvocationMaximum"], 1)
+        self.assertTrue(binding["sourceBuildInvocationConsumed"])
+        self.assertFalse(binding["retryAllowed"])
+        self.assertEqual(execution["buildDriverInvocations"], 1)
+        for key in (
+            "frontendBuilds",
+            "tauriBuilds",
+            "cargoBuilds",
+            "nsisBuilds",
+            "artifactBuilds",
+            "installations",
+            "runtimeStarts",
+            "px4Starts",
+            "gazeboStarts",
+            "hardwareActions",
+            "deployments",
+            "automaticRetries",
+        ):
+            self.assertEqual(execution[key], 0, key)
+        self.assertEqual(receipt["ownedEvidence"]["bundleFileCount"], 0)
+        self.assertTrue(receipt["ownedEvidence"]["runRootPreserved"])
+        self.assertTrue(receipt["ownedEvidence"]["sourceRootPreserved"])
+        self.assertFalse(receipt["ownedEvidence"]["cleanupExecuted"])
+
+    def test_yellow_attempt_5_failure_is_owned_by_common_core_and_fail_closed(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_5_FAILURE_PATH)
+        failure = receipt["failure"]
+        self.assertEqual(
+            failure["commonCorePath"],
+            "desktop/scripts/verify-updater-signing-contract.ps1",
+        )
+        self.assertEqual(
+            failure["commonCoreSha256"],
+            "7a8b480f3fa268fd474c992b1a4d812f3221f4deb76ee06d37692aab3d785117",
+        )
+        self.assertEqual(failure["failingLine"], 149)
+        self.assertFalse(failure["simLocalVerifierPatchAllowed"])
+        self.assertFalse(failure["automaticRetryAttempted"])
+        self.assertFalse(failure["sameAuthorizationMayBeReused"])
+        self.assertTrue(receipt["nextGate"]["requiresUniversalCommonCoreDonor"])
+        self.assertTrue(receipt["nextGate"]["requiresNewProductSource"])
+        self.assertTrue(receipt["nextGate"]["requiresFreshYellowAuthorization"])
+        self.assertFalse(receipt["nextGate"]["buildMayProceedFromThisReceipt"])
+        self.assertFalse(receipt["nonClaims"]["artifactCreated"])
+        self.assertFalse(receipt["nonClaims"]["releaseReady"])
+
+    def test_yellow_attempt_5_failure_preserves_prior_artifact_and_registry(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_5_FAILURE_PATH)
+        protected = receipt["protectedState"]
+        self.assertEqual(
+            protected["frozenArtifactSha256AfterFailure"],
+            "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+        )
+        self.assertFalse(protected["frozenArtifactMutated"])
+        self.assertTrue(protected["historicalSimRegistryPresentAfterFailure"])
+        self.assertFalse(protected["historicalSimRegistryMutated"])
+        self.assertFalse(protected["updaterKeyContentReadOrPrinted"])
+        self.assertFalse(protected["publicSupabaseValuesPrintedOrPersisted"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
