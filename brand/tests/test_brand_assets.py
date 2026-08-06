@@ -17,22 +17,38 @@ EDITION_IDS = ("universal", "sim", "lab", "field")
 APPROVED_HASHES = {
     "sim": {
         "markPath": "brand/source/approved/sim-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/sim-dot-lockup.png",
+        "dotLockupPath": "brand/source/approved/sim-large-label-lockup.png",
         "markSha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
-        "dotLockupSha256": ("8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548"),
+        "dotLockupSha256": ("d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"),
+        "dotLockupDimensions": {"width": 2337, "height": 218},
+        "supersededPath": "brand/source/approved/sim-dot-lockup.png",
+        "supersededSha256": ("8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548"),
     },
     "lab": {
         "markPath": "brand/source/approved/lab-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/lab-dot-lockup.png",
+        "dotLockupPath": "brand/source/approved/lab-large-label-lockup.png",
         "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
-        "dotLockupSha256": ("b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"),
+        "dotLockupSha256": ("5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"),
+        "dotLockupDimensions": {"width": 2386, "height": 218},
+        "supersededPath": "brand/source/approved/lab-dot-lockup.png",
+        "supersededSha256": ("b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"),
     },
     "field": {
         "markPath": "brand/source/approved/field-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/field-dot-lockup.png",
+        "dotLockupPath": "brand/source/approved/field-large-label-lockup.png",
         "markSha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
-        "dotLockupSha256": ("def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192"),
+        "dotLockupSha256": ("588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"),
+        "dotLockupDimensions": {"width": 2581, "height": 218},
+        "supersededPath": "brand/source/approved/field-dot-lockup.png",
+        "supersededSha256": ("def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192"),
     },
+}
+
+CANONICAL_ICO_HASHES = {
+    "universal": "88223fab6c2b0d493aaedab932c04d40def4da58e28f6d670adbfd745a6ca8ba",
+    "sim": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+    "lab": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1",
+    "field": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",
 }
 
 
@@ -50,8 +66,9 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
     contract = load_json(CONTRACT_PATH)
     schema = load_json(SCHEMA_PATH)
 
-    assert contract["separator"] == "·"
-    assert schema["properties"]["separator"]["const"] == "·"
+    assert contract["brandVersion"] == "1.1.0"
+    assert contract["separator"] == "\u00b7"
+    assert schema["properties"]["separator"]["const"] == "\u00b7"
     assert contract["safety"] == {
         "presentationOnly": True,
         "grantsHardwareAuthority": False,
@@ -59,15 +76,49 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
     assert contract["approval"] == {
         "handoffSha256": ("9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"),
         "conceptAssetsAreReleaseAssets": False,
+        "largeLabelLockupsAreCanonicalSources": True,
+        "largeLabelReviewPreviewPath": (
+            "brand/source/approved/edition-brand-large-label-approved-preview.png"
+        ),
+        "largeLabelReviewPreviewSha256": (
+            "8963661c81db8f9115b37114eccf80580b7bbed02d865e4e648c8503f355a01f"
+        ),
+        "largeLabelReviewPreviewDimensions": {"width": 5200, "height": 1680},
+        "largeLabelReviewStudySha256": (
+            "9b3e9a274ef51393ffbf8ba3cf5d41224a0cafc9990deddeafcef1a92122353a"
+        ),
+        "editionLabelHeightRatio": 0.9,
+        "preserveNaturalLabelWidth": True,
     }
+    approved_preview = ROOT / contract["approval"]["largeLabelReviewPreviewPath"]
+    assert sha256(approved_preview) == contract["approval"]["largeLabelReviewPreviewSha256"]
+    with Image.open(approved_preview) as image:
+        assert image.size == (5200, 1680)
+        assert image.mode == "RGB"
     for edition_id, expected_hashes in APPROVED_HASHES.items():
         descriptor = contract["approvedEditionAssets"][edition_id]
         assert descriptor["markPath"] == expected_hashes["markPath"]
         assert descriptor["dotLockupPath"] == expected_hashes["dotLockupPath"]
         assert descriptor["markSha256"] == expected_hashes["markSha256"]
         assert descriptor["dotLockupSha256"] == expected_hashes["dotLockupSha256"]
+        assert descriptor["dotLockupDimensions"] == expected_hashes["dotLockupDimensions"]
+        assert descriptor["dotLockupStyle"] == "large-edition-label-v1"
+        assert descriptor["supersededDotLockup"] == {
+            "path": expected_hashes["supersededPath"],
+            "sha256": expected_hashes["supersededSha256"],
+            "status": "superseded",
+        }
         assert sha256(ROOT / descriptor["markPath"]) == expected_hashes["markSha256"]
         assert sha256(ROOT / descriptor["dotLockupPath"]) == expected_hashes["dotLockupSha256"]
+        assert sha256(ROOT / expected_hashes["supersededPath"]) == expected_hashes[
+            "supersededSha256"
+        ]
+        with Image.open(ROOT / descriptor["dotLockupPath"]) as lockup:
+            assert lockup.size == (
+                expected_hashes["dotLockupDimensions"]["width"],
+                expected_hashes["dotLockupDimensions"]["height"],
+            )
+            assert lockup.mode == "RGBA"
     assert {
         edition_id: {
             "productName": contract["editions"][edition_id]["productName"],
@@ -92,6 +143,8 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
             "gradientStops": ["#FFC247", "#FF754B", "#D746A5"],
         },
     }
+    for edition_id in EDITION_IDS[1:]:
+        assert contract["editions"][edition_id]["productName"].split()[1] == "\u00b7"
 
 
 def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
@@ -105,6 +158,21 @@ def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
     assert manifest["presentationOnly"] is True
     assert manifest["grantsHardwareAuthority"] is False
     assert manifest["conceptAssetsAreReleaseAssets"] is False
+    assert manifest["brandVersion"] == "1.1.0"
+    assert manifest["largeLabelApproval"] == {
+        "canonicalSources": True,
+        "reviewPreviewPath": (
+            "brand/source/approved/edition-brand-large-label-approved-preview.png"
+        ),
+        "reviewPreviewSha256": (
+            "8963661c81db8f9115b37114eccf80580b7bbed02d865e4e648c8503f355a01f"
+        ),
+        "reviewStudySha256": (
+            "9b3e9a274ef51393ffbf8ba3cf5d41224a0cafc9990deddeafcef1a92122353a"
+        ),
+        "editionLabelHeightRatio": 0.9,
+        "preserveNaturalLabelWidth": True,
+    }
     assert manifest["contractSha256"] == sha256(CONTRACT_PATH)
     assert manifest["schemaSha256"] == sha256(SCHEMA_PATH)
     assert manifest["lockedRequirements"]["sha256"] == sha256(ROOT / "brand/requirements.lock.txt")
@@ -116,6 +184,18 @@ def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
         assert (
             manifest["approvedEditionAssets"][edition_id]["dotLockup"]["sha256"]
             == (expected_hashes["dotLockupSha256"])
+        )
+        assert (
+            manifest["approvedEditionAssets"][edition_id]["dotLockup"]["dimensions"]
+            == expected_hashes["dotLockupDimensions"]
+        )
+        assert (
+            manifest["approvedEditionAssets"][edition_id]["supersededDotLockup"]
+            == {
+                "path": expected_hashes["supersededPath"],
+                "sha256": expected_hashes["supersededSha256"],
+                "status": "superseded",
+            }
         )
 
     for asset in manifest["assets"]:
@@ -132,6 +212,8 @@ def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
                 assert (
                     asset["frameSizesPx"] == contract["artifactContract"]["windowsIcoFrameSizesPx"]
                 )
+    for edition_id, expected_hash in CANONICAL_ICO_HASHES.items():
+        assert sha256(ROOT / f"brand/generated/{edition_id}/windows/icon.ico") == expected_hash
 
 
 def test_all_editions_preserve_shared_white_flight_path_and_exact_mirrors() -> None:
