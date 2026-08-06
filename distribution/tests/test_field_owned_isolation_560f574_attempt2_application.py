@@ -62,10 +62,15 @@ def test_attempt2_tools_bind_exact_current_git_blobs() -> None:
         assert blob == binding["gitBlob"]
         assert len(content) == binding["lfNormalizedBytes"]
         assert sha256(content).hexdigest() == binding["lfNormalizedSha256"]
-        working = (ROOT / binding["path"]).read_text(encoding="utf-8-sig")
-        assert sha256(working.replace("\r\n", "\n").encode()).hexdigest() == (
-            binding["lfNormalizedSha256"]
-        )
+
+
+def test_attempt2_remains_historical_after_observer_tool_moves_forward() -> None:
+    application = _load(APPLICATION)
+    assert {binding["sourceCommit"] for binding in application["toolBindings"]} == {
+        "7586d971176e0e6ecae096aa9a545f8749503819"
+    }
+    assert application["execution"]["retryCountMaximum"] == 0
+    assert application["nonClaims"]["attempt2Executed"] is False
 
 
 def test_attempt2_observer_contract_matches_diagnosis() -> None:
