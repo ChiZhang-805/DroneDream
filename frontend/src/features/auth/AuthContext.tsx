@@ -328,7 +328,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [account]);
 
   const signOut = useCallback(async () => {
-    const { error } = await requireClient().auth.signOut();
+    // This action means "sign out of this app". It must not revoke the shared
+    // account sessions belonging to the website or another desktop edition.
+    const { error } = await requireClient().auth.signOut({ scope: "local" });
     if (error) throw error;
     adoptUser(null, null);
   }, [adoptUser]);
