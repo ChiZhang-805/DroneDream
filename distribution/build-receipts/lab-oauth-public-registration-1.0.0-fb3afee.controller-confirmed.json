@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-oauth-public-registration-receipt",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "controller-confirmed-offline-evidence-only",
+  "verifiedAt": "2026-08-06T18:50:45.2856644+08:00",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "fb3afee6b3cc43bcbc0e4fb9118d79fc513051ef",
+    "tree": "4f57b4e5dc62b9683decd7f1f571a44a99ae0868",
+    "unchangedByThisReceipt": true
+  },
+  "priorEvidence": {
+    "commit": "0a22724a7a83edcc89cdbf373f8a792e6358fe44",
+    "receiptPath": "distribution/build-receipts/lab-safety-oauth-readiness-1.0.0-fb3afee.green.json",
+    "receiptSha256": "f1a5f55282138641e4accae4d202810017e25026ea5471c8806dc0a3757c4e97"
+  },
+  "registration": {
+    "evidenceSource": "controller-handoff-confirmed-by-user",
+    "clientIdSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+    "clientIdValueRecorded": false,
+    "clientType": "public",
+    "tokenEndpointAuthMethod": "none",
+    "clientSecretPresent": false,
+    "callback": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "callbackSha256": "89b7f8cded951255ec63f1dbd1676f769242f258559752c57318f97f266038cb",
+    "siteUrlAndAuthorizationPathConfirmedByUser": true,
+    "siteUrlOrAuthorizationPathValueRecorded": false,
+    "providerCalled": false,
+    "providerCredentialRead": false
+  },
+  "blockerTransition": {
+    "resolved": [
+      "registered public Lab OAuth client and callback have no offline-verifiable external registration receipt"
+    ],
+    "sourceContractUpdateDeferredUntilUniversalDonorsArrive": true,
+    "remainingUniversalDonors": [
+      "canonical parameterized edition-safety fixture donor",
+      "public NSIS duplicate-label fix donor"
+    ]
+  },
+  "yellowBuildRequest": {
+    "supersededProductSource": "fb3afee6b3cc43bcbc0e4fb9118d79fc513051ef",
+    "priorRequestState": "prepared-blocked-not-authorized",
+    "currentRequestState": "superseded-do-not-execute",
+    "buildAttemptPerformed": false,
+    "replacementRequestRequiredAfterBothUniversalDonors": true,
+    "replacementMustBindNewExactCleanProductSource": true,
+    "attemptLimitAfterApproval": 1,
+    "serializeWithOtherEditionBuilds": true,
+    "freezeFailureWithoutAutomaticRetry": true,
+    "artifactFileName": "DroneDream-Lab-1.0.0.exe"
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "oauthRegistrationGrantsHardwareAuthority": false
+  },
+  "sideEffects": {
+    "productSourceChanged": false,
+    "exeBuilt": false,
+    "tauriInvoked": false,
+    "nsisInvoked": false,
+    "installerRun": false,
+    "runtimeMigration": false,
+    "providerReadOrWrite": false,
+    "apiKeyRead": false,
+    "hardwareAccess": false,
+    "releaseBranchCreated": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "releaseReady": false
+}
