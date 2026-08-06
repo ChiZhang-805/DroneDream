@@ -124,6 +124,13 @@ if ($applicationContract.authorization.segmentBExecutionDecision -cne
     "deny-before-real-auth-boundary") {
     throw "Segment B must remain fail-closed."
 }
+if ($applicationContract.attempt.segmentAOrdinal -ne 2 -or
+    $applicationContract.attempt.priorAttemptResult -cne "segment-a-failed-no-retry" -or
+    $applicationContract.ownedIsolation.runId -cne "lab-e3b427e-segment-a-red2" -or
+    [IO.Path]::GetFullPath($applicationContract.ownedIsolation.runRoot).TrimEnd("\") -cne
+        $outputPath) {
+    throw "The fresh RED attempt ordinal or owned output root binding does not match."
+}
 
 $counters = [ordered]@{
     freshInstallerInvocations = 0

@@ -5,12 +5,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LIFECYCLE = ROOT / "distribution/editions/lab/lifecycle"
-APPLICATION = LIFECYCLE / "red-e3b427e-app-only-application.v1.json"
-COMMAND = LIFECYCLE / "red-e3b427e-app-only-command.v1.json"
+APPLICATION = LIFECYCLE / "red-e3b427e-app-only-application-v2.v1.json"
+COMMAND = LIFECYCLE / "red-e3b427e-app-only-command-v2.v1.json"
 PLAN = LIFECYCLE / "red-e3b427e-app-only-plan.v1.json"
 TARGET = LIFECYCLE / "red-e3b427e-app-only-target-receipt.v1.json"
 ADAPTER = LIFECYCLE / "run-lab-e3b427e-app-only-lifecycle.ps1"
 INSPECTOR = LIFECYCLE / "inspect-lab-e3b427e-live-webview2.mjs"
+SELECTOR_FIXTURE = LIFECYCLE / "verify-lab-e3b427e-selector-v2.mjs"
+CONSUMED_COMMAND = LIFECYCLE / "red-e3b427e-app-only-command.v1.json"
 FAILURE_RECEIPT = (
     ROOT
     / "distribution/build-receipts/"
@@ -52,7 +54,11 @@ def test_application_binds_exact_product_artifact_plan_target_and_tools() -> Non
     assert application["plan"]["sha256"] == _sha256(PLAN)
     assert application["targetReceipt"]["sha256"] == _sha256(TARGET)
 
-    for key, path in (("adapter", ADAPTER), ("liveInspector", INSPECTOR)):
+    for key, path in (
+        ("adapter", ADAPTER),
+        ("liveInspector", INSPECTOR),
+        ("selectorFixture", SELECTOR_FIXTURE),
+    ):
         tool = application["executionTools"][key]
         assert tool["lfNormalizedBytes"] == len(_lf_bytes(path))
         assert tool["lfNormalizedSha256"] == _lf_sha256(path)
@@ -89,18 +95,21 @@ def test_application_and_command_freeze_exact_counts_without_execution() -> None
         assert counts[forbidden_count] == 0
 
     assert application["authorization"]["executionAuthorized"] is False
+    assert application["attempt"]["segmentAOrdinal"] == 2
+    assert application["attempt"]["priorCommandConsumed"] is True
     assert command["authorization"]["redCommandAuthorizedNow"] is False
     assert command["executedCounts"] == {
+        "selectorFixtureInvocations": 1,
         "planOnlyCommandInvocations": 1,
         "redCommandInvocations": 0,
         "installerInvocations": 0,
         "applicationLaunches": 0,
         "uninstallerInvocations": 0,
     }
-    assert command["planOnlyValidation"]["result"] == (
+    assert command["greenValidation"]["planOnlyResult"] == (
         "green-plan-only-preflight-passed-no-execute"
     )
-    assert command["planOnlyValidation"]["outputRootAbsentBeforeAndAfter"] is True
+    assert command["greenValidation"]["ownedOutputRootAbsentBeforeAndAfter"] is True
 
 
 def test_command_contract_binds_application_and_separates_plan_only_from_red() -> None:
@@ -113,9 +122,18 @@ def test_command_contract_binds_application_and_separates_plan_only_from_red() -
     assert " -Execute" not in command["planOnlyCommand"]
     assert command["redCommand"].endswith(" -Execute")
     assert command["ownedOutputRoot"]["planOnlyCommandMayCreatePath"] is False
-    assert command["ownedOutputRoot"]["redCommandMayCreatePathOnlyAfterExactStartSignal"] is True
-    for tool, path in (("adapter", ADAPTER), ("liveInspector", INSPECTOR)):
+    assert command["ownedOutputRoot"][
+        "redCommandMayCreatePathOnlyAfterNewExactStartSignal"
+    ] is True
+    for tool, path in (
+        ("adapter", ADAPTER),
+        ("liveInspector", INSPECTOR),
+        ("selectorFixture", SELECTOR_FIXTURE),
+    ):
         assert command["tools"][tool]["lfNormalizedSha256"] == _lf_sha256(path)
+    assert command["attempt"]["segmentAOrdinal"] == 2
+    assert command["attempt"]["priorCommandConsumed"] is True
+    assert command["attempt"]["priorCommandSha256"] == _sha256(CONSUMED_COMMAND)
 
 
 def test_adapter_has_a_no_write_plan_only_gate_and_owned_a1_a2_a3_sequence() -> None:
@@ -159,6 +177,8 @@ def test_live_inspector_asserts_settings_lab_theme_3d_and_zero_provider() -> Non
 
     for fragment in (
         "chromium.connectOverCDP(endpoint)",
+        "LAB_APP_SHELL_SELECTOR",
+        'html[data-brand-edition="lab"] .app-shell',
         '[data-presentation-only="true"]',
         '[data-grants-hardware-authority="false"]',
         ".launcher-settings-panels",
@@ -180,6 +200,31 @@ def test_live_inspector_asserts_settings_lab_theme_3d_and_zero_provider() -> Non
     assert "page.goto(" not in source
     assert ".click();" in source  # Settings and language only.
     assert "sign in" not in source.casefold()
+
+
+def test_selector_fixture_accepts_lab_and_rejects_drift_without_browser() -> None:
+    result = subprocess.run(
+        ["node.exe", str(SELECTOR_FIXTURE)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["selector"] == 'html[data-brand-edition="lab"] .app-shell'
+    assert payload["fixtureCount"] == 4
+    assert payload["results"] == [
+        {"id": "lab-root-and-shell", "expected": True, "accepted": True},
+        {"id": "wrong-sim-edition", "expected": False, "accepted": False},
+        {
+            "id": "missing-edition-attribute",
+            "expected": False,
+            "accepted": False,
+        },
+        {"id": "missing-app-shell", "expected": False, "accepted": False},
+    ]
 
 
 def test_zero_pack_deny_and_protected_parity_are_explicit() -> None:

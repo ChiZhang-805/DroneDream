@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-red-app-only-lifecycle-application",
+  "applicationVersion": "1.1.0",
+  "editionId": "lab",
+  "state": "green-frozen-awaiting-new-exact-red-start-signal",
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+    "artifactProductSourceTree": "eec24c0f1d3d537c8f0da5ef1b015bd129c6d39a",
+    "preparationBaseCommit": "6ee21b9457d1bf0d6bcb2444693ef40e610ada8b",
+    "applicationEvidenceCommitPolicy": "commit-containing-v2-application-command-tools-and-tests",
+    "applicationEvidenceIsArtifactSource": false,
+    "productRuntimeSemanticsChanged": false
+  },
+  "attempt": {
+    "segmentAOrdinal": 2,
+    "sourceArtifactOrdinal": 2,
+    "maximumExecutionInvocations": 1,
+    "automaticRetryMaximum": 0,
+    "priorAttemptResult": "segment-a-failed-no-retry",
+    "priorCommandConsumed": true
+  },
+  "priorAttempt": {
+    "executionEvidenceCommit": "ebb9f5861eb84c2c590f4ea4eab7a1a17f56fcad",
+    "trackedFailureReceiptPath": "distribution/build-receipts/lab-e3b427e-red-segment-a1-failure.json",
+    "trackedFailureReceiptSha256": "7f8600f1efc45d4a522ec75506aad7931942e98d40953a6835b78e05506b3469",
+    "externalReceiptSha256": "1a676467b529ac59a6e6b9505fe0836181c4eedd06a91c226322f7bf7353b650",
+    "failureClassification": "execution-adapter-selector-mismatch",
+    "rollbackRestoredFreshOwnedState": true,
+    "sameCommandMayBeRunAgain": false
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12081900,
+    "sha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4",
+    "version": "1.0.0",
+    "authenticodeStatus": "NotSigned",
+    "updaterSignatureSha256": "722be7a85928c7b601917418fab7899170bd5bd855b88d4db7b17f0093c109c9",
+    "mayBeRebuiltRelabeledOverwrittenOrDeletedByThisApplication": false
+  },
+  "plan": {
+    "path": "distribution/editions/lab/lifecycle/red-e3b427e-app-only-plan.v1.json",
+    "bytes": 12339,
+    "sha256": "e9b1f1a12d5ebb5fe311d9a88c34fc093da09bd72bd73c3c1aee167a9f1233c5"
+  },
+  "targetReceipt": {
+    "path": "distribution/editions/lab/lifecycle/red-e3b427e-app-only-target-receipt.v1.json",
+    "bytes": 3169,
+    "sha256": "c16327e43f45c5b9e0b0dd89ebc224ccdfe0241bad23d36f9623527060f8339c",
+    "state": "target-only-no-execution-evidence"
+  },
+  "executionTools": {
+    "adapter": {
+      "path": "distribution/editions/lab/lifecycle/run-lab-e3b427e-app-only-lifecycle.ps1",
+      "lfNormalizedBytes": 31526,
+      "lfNormalizedSha256": "f491807220f2ba84247a05befbef0ae6c09a2811937400fae0ed49d0c51edfa5"
+    },
+    "liveInspector": {
+      "path": "distribution/editions/lab/lifecycle/inspect-lab-e3b427e-live-webview2.mjs",
+      "lfNormalizedBytes": 11260,
+      "lfNormalizedSha256": "ec396c85a899236bed87159add15a56124818ee149b3857fd76f96e6b209f189"
+    },
+    "selectorFixture": {
+      "path": "distribution/editions/lab/lifecycle/verify-lab-e3b427e-selector-v2.mjs",
+      "lfNormalizedBytes": 1766,
+      "lfNormalizedSha256": "a35fa0294a59c9f304ef195a09646ba08ed1ea5b3ff23ca5375dd069af330e32",
+      "browserLaunches": 0
+    },
+    "historicalFailedToolHashesMayBeRelabeled": false
+  },
+  "selectorContract": {
+    "selector": "html[data-brand-edition=lab] .app-shell",
+    "editionAttributeOwner": "document.documentElement",
+    "shellClassRequired": "app-shell",
+    "positiveFixture": "lab-root-and-shell",
+    "negativeFixtures": [
+      "wrong-sim-edition",
+      "missing-edition-attribute",
+      "missing-app-shell"
+    ],
+    "negativeDecision": "fail-closed"
+  },
+  "ownedIsolation": {
+    "providerClass": "current-user-owned-app-namespace",
+    "ownedBase": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED",
+    "runId": "lab-e3b427e-segment-a-red2",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-segment-a-red2",
+    "runRootMustBeAbsentBeforeExecution": true,
+    "runRootReuseAllowed": false,
+    "priorRunRootMutationAllowed": false,
+    "mutationAllowedOnlyForExactLabIdentity": true
+  },
+  "protectedState": {
+    "baselineSource": "read-only-A0-snapshot-immediately-before-any-mutation",
+    "snapshotCount": 5,
+    "parityCheckCount": 4,
+    "protectedScopes": [
+      "base DroneDream install tree, uninstall and product keys, and shortcuts",
+      "DroneDream Universal install tree, uninstall and product keys, and shortcuts",
+      "DroneDream SIM install tree, uninstall and product keys, and shortcuts",
+      "DroneDream FIELD install tree, uninstall and product keys, and shortcuts",
+      "C:/DroneDream and Z:/DroneDream Runtime root records",
+      "existing system WebView2 registry location and version"
+    ],
+    "otherEditionOrRuntimeMutationAllowed": false,
+    "webView2InstallRepairOrUpdateAllowed": false,
+    "driftDecision": "fail-closed-stop-without-retry"
+  },
+  "segments": {
+    "a": {
+      "ids": ["A1", "A2", "A3"],
+      "orderedStages": [
+        "A1-fresh-install-identity-protected-parity-live-ui-close",
+        "A2-overlay-install-identity-protected-parity-live-ui-close-protected-parity",
+        "A3-uninstall-owned-preference-cleanup-owned-data-cleanup-identity-protected-parity"
+      ],
+      "exactCounts": {
+        "freshInstallerInvocations": 1,
+        "overlayInstallerInvocations": 1,
+        "applicationLaunches": 2,
+        "applicationCloses": 2,
+        "uninstallerInvocations": 1,
+        "ownedPreferenceKeyCleanupInvocations": 1,
+        "shortcutIdentityChecks": 3,
+        "liveWebView2Inspections": 2,
+        "languageTransitions": 2,
+        "languageSurfaceAssertions": 4,
+        "settingsSingleScreenChecks": 2,
+        "labThemeChecks": 2,
+        "authorityFalseChecks": 2,
+        "protectedStateSnapshots": 5,
+        "protectedStateParityChecks": 4,
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "providerTokenExchanges": 0,
+        "accountReads": 0,
+        "artifactBuilds": 0,
+        "runtimeStartsOrMigrations": 0,
+        "px4Starts": 0,
+        "gazeboStarts": 0,
+        "hardwareActions": 0,
+        "uploadsOrDeployments": 0
+      }
+    },
+    "b": {
+      "state": "fail-closed-not-authorized-not-executed",
+      "blocksSegmentA": false,
+      "browserLaunches": 0,
+      "oauthBoundaryChecks": 0,
+      "providerTokenExchanges": 0,
+      "accountReads": 0
+    }
+  },
+  "liveAssertions": {
+    "documentElementEdition": "lab",
+    "appShellRequired": true,
+    "languages": ["en", "zh-CN"],
+    "settingsDialogAndPanelNoVerticalOverflow": true,
+    "themePalette": ["#A7E84A", "#20C77A", "#087E69"],
+    "threeDCanvasMustBeNonblankAndResponsive": true,
+    "themeSettingsAndThreeDGrantHardwareAuthority": false,
+    "themeAndSettingsPresentationOnly": true,
+    "webView2Provider": "existing-system-runtime-read-only"
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "frontendSettingsThemeOrWorkspaceCountsAsAuthority": false,
+    "browserOauthProviderRuntimePx4GazeboHardwareAllowed": false
+  },
+  "rollback": {
+    "uninstallerMaximumInvocations": 1,
+    "ownedPreferenceCleanupMaximumInvocations": 1,
+    "ownedPreferenceKey": "HKCU/Software/DroneDream/DroneDream-Lab",
+    "missingOrExtraValueDecision": "deny",
+    "sharedParentDeletionAllowed": false,
+    "stopAfterFirstFailureWithoutRetry": true
+  },
+  "authorization": {
+    "applicationPreparationAuthorized": true,
+    "executionAuthorized": false,
+    "segmentAExecutionDecision": "prepared-awaiting-new-exact-red-authorization",
+    "segmentBExecutionDecision": "deny-before-real-auth-boundary",
+    "newExactRedStartSignalRequired": true,
+    "installerApplicationOrUninstallerExecutionAllowedNow": false,
+    "browserOauthProviderRuntimePx4GazeboHardwareAllowed": false
+  },
+  "executedCounts": {
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "applicationCloses": 0,
+    "uninstallerInvocations": 0,
+    "browserLaunches": 0,
+    "providerCalls": 0,
+    "runtimeStarts": 0,
+    "hardwareActions": 0
+  },
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}

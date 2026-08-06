@@ -21,6 +21,7 @@ if (!/^(fresh|overlay)$/.test(phase)) {
 }
 
 const LAB_GRADIENT = ["#A7E84A", "#20C77A", "#087E69"];
+const LAB_APP_SHELL_SELECTOR = 'html[data-brand-edition="lab"] .app-shell';
 const authPattern = /(?:\/auth\/v1\/|oauth|authorize|token|session)/i;
 const observedRequests = [];
 const forbiddenAuthRequests = [];
@@ -86,7 +87,7 @@ try {
   );
   for (const url of priorResourceUrls) recordRequest(url);
 
-  await page.waitForSelector('.app-shell[data-brand-edition="lab"]', {
+  await page.waitForSelector(LAB_APP_SHELL_SELECTOR, {
     state: "visible",
     timeout: 30_000,
   });
