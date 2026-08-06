@@ -135,6 +135,12 @@ YELLOW_ATTEMPT_8_PLAN_PATH = (
     / "desktop"
     / "yellow-build-attempt-8-f4a0562-plan-ready.v1.json"
 )
+YELLOW_ATTEMPT_8_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-8-f4a0562-public-config-preflight-failed.v1.json"
+)
 DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     DISTRIBUTION
     / "sim"
@@ -1497,6 +1503,54 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(plan["authorization"]["preflightAuthorizedByThisReceipt"])
         self.assertFalse(plan["authorization"]["prepareAuthorizedByThisReceipt"])
         self.assertFalse(plan["authorization"]["executeAuthorizedByThisReceipt"])
+
+    def test_yellow_attempt_8_public_config_failure_stops_before_owned_mutation(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_8_FAILURE_PATH)
+        self.assertEqual(receipt["state"], "failed-frozen-no-retry")
+        binding = receipt["authorizationBinding"]
+        self.assertEqual(binding["globalCommandApplicationOrdinal"], 8)
+        self.assertFalse(binding["sameAuthorizationReusable"])
+        self.assertFalse(binding["retryAllowed"])
+        for path_key, bytes_key, sha_key in (
+            ("applicationPath", "applicationBytes", "applicationSha256"),
+            ("entryScriptPath", "entryScriptBytes", "entryScriptSha256"),
+            ("planReceiptPath", "planReceiptBytes", "planReceiptSha256"),
+        ):
+            path = ROOT / binding[path_key]
+            self.assertEqual(path.stat().st_size, binding[bytes_key], path_key)
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                binding[sha_key],
+                path_key,
+            )
+        public = receipt["publicConfigurationObservation"]
+        self.assertFalse(public["viteSupabaseUrlPresentInLaunchingProcess"])
+        self.assertFalse(public["viteSupabasePublishableKeyPresentInLaunchingProcess"])
+        self.assertFalse(public["valuesRead"])
+        self.assertFalse(public["valuesPrinted"])
+        self.assertFalse(public["valuesPersisted"])
+        stable = receipt["stableCacheObservation"]
+        self.assertTrue(stable["stableCacheVerificationCompletedBeforeFailure"])
+        self.assertFalse(stable["cacheDriftObserved"])
+        counts = receipt["executionCounts"]
+        self.assertEqual(counts["preflightInvocations"], 1)
+        for key, value in counts.items():
+            if key != "preflightInvocations":
+                self.assertEqual(value, 0, key)
+        roots = receipt["ownedRootsAfterFailure"]
+        self.assertEqual(roots["newOwnedRootCount"], 0)
+        self.assertFalse(roots["sourceRootExists"])
+        self.assertFalse(roots["runRootExists"])
+        self.assertFalse(roots["cargoTargetDirExists"])
+        self.assertFalse(roots["snapshotRootExists"])
+        self.assertFalse(roots["dependencyRootExists"])
+        self.assertFalse(roots["cleanupExecuted"])
+        self.assertFalse(receipt["protectedHistory"]["frozenArtifactMutated"])
+        gate = receipt["nextGate"]
+        self.assertFalse(gate["prepareMayProceedFromThisReceipt"])
+        self.assertFalse(gate["executeMayProceedFromThisReceipt"])
+        self.assertTrue(gate["newExactApplicationRequired"])
+        self.assertTrue(gate["newExactYellowAuthorizationRequired"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
