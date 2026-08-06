@@ -109,6 +109,12 @@ DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     / "readiness"
     / "detached-node-dependency-common-core-gap.v1.json"
 )
+DETACHED_NODE_DEPENDENCY_SYNC_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "readiness"
+    / "detached-node-dependency-common-core-sync.v1.json"
+)
 YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_6_APPLICATION_PATH
 
 
@@ -774,6 +780,34 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertTrue(gate["freshYellowAuthorizationRequired"])
         self.assertTrue(gate["currentProductSourceMayNotBeRebuiltFromThisRequest"])
 
+    def test_detached_node_dependency_common_core_sync_is_exact_and_green_only(self) -> None:
+        receipt = load_json(DETACHED_NODE_DEPENDENCY_SYNC_PATH)
+        self.assertEqual(
+            receipt["donor"]["productCommit"],
+            "b02d593c6c2fc6481bf5b8078b9cf143eb7965d3",
+        )
+        self.assertEqual(receipt["donor"]["pathCount"], 5)
+        self.assertTrue(receipt["donor"]["wholeCommitPathLimited"])
+        self.assertFalse(receipt["donor"]["unrelatedHistoryAdopted"])
+        self.assertEqual(len(receipt["synchronizedPaths"]), 5)
+        for item in receipt["synchronizedPaths"]:
+            path = ROOT / item["path"]
+            self.assertEqual(path.stat().st_size, item["bytes"], item["path"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                item["sha256"],
+                item["path"],
+            )
+            self.assertEqual(
+                git("rev-parse", f"HEAD:{item['path']}"),
+                item["gitBlob"],
+                item["path"],
+            )
+        self.assertTrue(all(value == 0 for value in receipt["execution"].values()))
+        self.assertFalse(receipt["nextGate"]["createDependencyBundleAllowed"])
+        self.assertFalse(receipt["nextGate"]["createJunctionsAllowed"])
+        self.assertFalse(receipt["nextGate"]["buildAllowed"])
+
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
             "$e=[ordered]@{DisplayName='DroneDream · SIM';DisplayVersion='1.0.0';"
@@ -981,6 +1015,10 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             row["path"] for row in coexistence["synchronizedRuntimePaths"]
         }
         supplemental_paths.update(exact_synchronized_paths(ROOT))
+        dependency_sync = load_json(DETACHED_NODE_DEPENDENCY_SYNC_PATH)
+        supplemental_paths.update(
+            row["path"] for row in dependency_sync["synchronizedPaths"]
+        )
         supplemental_paths.add("frontend/src/pages/DesktopSetup.tsx")
         self.assertTrue(changed_paths)
         self.assertTrue(

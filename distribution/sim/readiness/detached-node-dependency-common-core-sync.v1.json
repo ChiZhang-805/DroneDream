@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-detached-node-dependency-common-core-sync",
+  "state": "green-synchronized-awaiting-exact-application",
+  "editionId": "sim",
+  "donor": {
+    "branch": "codex/software",
+    "productCommit": "b02d593c6c2fc6481bf5b8078b9cf143eb7965d3",
+    "title": "Harden detached desktop dependency builds",
+    "parentCommit": "088923b56b90494cb2895d87c375b4f5214d14bd",
+    "pathCount": 5,
+    "wholeCommitPathLimited": true,
+    "unrelatedHistoryAdopted": false
+  },
+  "editionAdoption": {
+    "cherryPickCommit": "3e7ad788ae3a22d6379542c83e62d6607f359258",
+    "productSourcePolicy": "commit-containing-this-sync-receipt-and-scope-test",
+    "receiptIsProductSource": false,
+    "simEditionSemanticsChanged": false,
+    "simOnlyHardwareBoundaryChanged": false
+  },
+  "synchronizedPaths": [
+    {
+      "path": "desktop/scripts/build-windows-llvm.ps1",
+      "gitBlob": "24e37bc904c2dc8d8305a958a028d4a79aae061f",
+      "bytes": 19200,
+      "sha256": "8713f2ca8b601057d3cb5eb97062559b4741a5a8ee7d7b459a83dab91cafc942"
+    },
+    {
+      "path": "desktop/scripts/release-build-driver.psm1",
+      "gitBlob": "bb7ce0d96440d1d0bb8b2820ff8d9208ae40e970",
+      "bytes": 15818,
+      "sha256": "621c22acccc45e0e46d9348e7a25812b8c7e524c6137d7046f116b2e28b741c1"
+    },
+    {
+      "path": "desktop/scripts/verify-detached-node-dependencies.ps1",
+      "gitBlob": "c52e3ddf2c7aabe6dd0d7b0c858f4be239642e03",
+      "bytes": 19697,
+      "sha256": "679635943c8cb2cdf5be9181339b85a59875204df13d0e5c736b963cb4b3a5a3"
+    },
+    {
+      "path": "distribution/schemas/desktop-node-dependency-bundle.schema.json",
+      "gitBlob": "237a80bb93e5481119b70634e8ca84a38e2850cb",
+      "bytes": 8416,
+      "sha256": "015caf5f5bc4174759e570bfc4ab20b8461db2d98468fca0c7f7f269704c6d1e"
+    },
+    {
+      "path": "distribution/tests/test_shared_windows_build_contract.py",
+      "gitBlob": "c95c241c944a0c3cf00525fa2e80e671fde86bdc",
+      "bytes": 26915,
+      "sha256": "19df5a89d149f5227e1743b14ba83340a54356abc3dc9b3088e6ccb7dd11b68a"
+    }
+  ],
+  "priorGap": {
+    "requestPath": "distribution/sim/readiness/detached-node-dependency-common-core-gap.v1.json",
+    "requestSha256": "860ce2ed7724677e8efce2f7044c6b8929363d5d061d3425c5800efc0d574189",
+    "ordinalSixFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-6-a99f5e8-tauri-cli-missing-failed.v1.json",
+    "ordinalSixFailureReceiptSha256": "6d223eb0d2d7996b3afba4b0621d95ef9998a499c098ffbe40b1210dcd2a7224",
+    "ordinalSixRetryAllowed": false
+  },
+  "execution": {
+    "npmCiInvocations": 0,
+    "npmNetworkInvocations": 0,
+    "dependencyDirectoriesCopied": 0,
+    "junctionsCreated": 0,
+    "builds": 0,
+    "ordinalSixRetries": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0
+  },
+  "nextGate": {
+    "freezeExactEditionProductSource": true,
+    "preparePlanOnlyDependencyBundleApplication": true,
+    "createDependencyBundleAllowed": false,
+    "createJunctionsAllowed": false,
+    "buildAllowed": false,
+    "freshYellowAuthorizationRequired": true
+  }
+}
