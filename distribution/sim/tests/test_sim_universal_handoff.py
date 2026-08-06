@@ -70,6 +70,25 @@ class SimUniversalHandoffTests(unittest.TestCase):
         with self.assertRaisesRegex(SimUniversalHandoffError, "release build driver blob"):
             validate_handoff(receipt, ROOT)
 
+    def test_frontend_dist_resolution_path_drift_is_rejected(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["frontendDistResolution"]["paths"][0]["blob"] = (
+            "0" * 40
+        )
+        with self.assertRaisesRegex(
+            SimUniversalHandoffError,
+            "frontendDist resolution blob",
+        ):
+            validate_handoff(receipt, ROOT)
+
+    def test_frontend_dist_overlay_location_overclaim_is_rejected(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["frontendDistResolution"][
+            "overlayLocationChangesResolution"
+        ] = True
+        with self.assertRaisesRegex(SimUniversalHandoffError, "overlay location"):
+            validate_handoff(receipt, ROOT)
+
     def test_auth_verifier_migration_order_drift_is_rejected(self) -> None:
         receipt = load_receipt()
         receipt["corrections"]["authVerifierAtomicSync"]["paths"].reverse()

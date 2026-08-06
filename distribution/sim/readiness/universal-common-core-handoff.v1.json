@@ -28,6 +28,7 @@
     "nsisIdentityFixCommit": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
     "lifecycleRegistrationVerifierCommit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
     "releaseBuildDriverCommit": "f2858e3d2e39f493baab28368b77230e45dd199f",
+    "frontendDistResolutionCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
     "wholeLineageMerged": false,
     "evidenceCommitUsedAsProductSource": false
   },
@@ -146,11 +147,6 @@
           "objectSha256": "4ac9b141b08aae39275d8538d06e11c711b0ce71c3f74ab7baccf11839d2f6dc"
         },
         {
-          "path": "desktop/scripts/release-build-driver.psm1",
-          "blob": "7a8bc527c1bd0be82dbf2ef1624947300543140a",
-          "objectSha256": "9a403da6c8e6ce226dfec1544af418117235a65286a0ceecaf1e197c6887ea4b"
-        },
-        {
           "path": "desktop/scripts/verify-release-source-policy.mjs",
           "blob": "7a0407872f7f24505b376ebfdd1e9f1646acf5ff",
           "objectSha256": "97f643d67348ea11e80506e898302210dece51de1aee9cbf66ee55f839cf0d29"
@@ -159,11 +155,6 @@
           "path": "desktop/scripts/verify-updater-signing-contract.ps1",
           "blob": "b95edd472f9b328a92a279547aafca454aa201e1",
           "objectSha256": "7a8b480f3fa268fd474c992b1a4d812f3221f4deb76ee06d37692aab3d785117"
-        },
-        {
-          "path": "distribution/tests/test_shared_windows_build_contract.py",
-          "blob": "07d4e7b47f8c995790686d0d1906ed8c6eb164ff",
-          "objectSha256": "e936ff7b24edb6be34a707bb7cd8a8c03a23e883fc7af6ff94ba68c05e965807"
         }
       ],
       "nativeStderrVisible": true,
@@ -172,6 +163,27 @@
         "frontend/dist",
         "frontend/sim-dist"
       ],
+      "buildAuthorized": false
+    },
+    "frontendDistResolution": {
+      "sourceCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+      "parentCommit": "f2858e3d2e39f493baab28368b77230e45dd199f",
+      "paths": [
+        {
+          "path": "desktop/scripts/release-build-driver.psm1",
+          "blob": "81b41137febb7a4ef8bdf86b97360b88f0904873",
+          "objectSha256": "c176773d35a789d54570620bc109364aa8ecf5004b41e6a5abdc149da839df57"
+        },
+        {
+          "path": "distribution/tests/test_shared_windows_build_contract.py",
+          "blob": "8f19fe61ae00c8d2358527fee87237da0a227bd7",
+          "objectSha256": "db6ca9f8459980c50bec870f91b72417c44e2aa85031f51c37a6a349a97cc957"
+        }
+      ],
+      "canonicalConfigPath": "desktop/src-tauri/tauri.conf.json",
+      "overlayLocationChangesResolution": false,
+      "absolutePathsRestrictedToEditionOutputs": true,
+      "unknownEditionFailsClosed": true,
       "buildAuthorized": false
     }
   },

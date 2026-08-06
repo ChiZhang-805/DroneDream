@@ -16,6 +16,7 @@ AUTH_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 RUNTIME_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 NSIS_IDENTITY_FIX_COMMIT = "a11fe7d09fceafaecf102a0cbfba49abb066a557"
 RELEASE_BUILD_DRIVER_COMMIT = "f2858e3d2e39f493baab28368b77230e45dd199f"
+FRONTEND_DIST_RESOLUTION_COMMIT = "d80f5f99309668d9d1cd50be51371efaa3c5491d"
 BRAND_PRODUCT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
 
 EXACT_GROUPS = {
@@ -92,9 +93,11 @@ EXACT_GROUPS = {
     ),
     RELEASE_BUILD_DRIVER_COMMIT: (
         "desktop/scripts/build-windows-llvm.ps1",
-        "desktop/scripts/release-build-driver.psm1",
         "desktop/scripts/verify-release-source-policy.mjs",
         "desktop/scripts/verify-updater-signing-contract.ps1",
+    ),
+    FRONTEND_DIST_RESOLUTION_COMMIT: (
+        "desktop/scripts/release-build-driver.psm1",
         "distribution/tests/test_shared_windows_build_contract.py",
     ),
 }
@@ -178,6 +181,10 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     source = document.get("source", {})
     _require(source.get("observedHead") == OBSERVED_HEAD, "observed head drifted")
     _require(source.get("observedTree") == OBSERVED_TREE, "observed tree drifted")
+    _require(
+        source.get("frontendDistResolutionCommit") == FRONTEND_DIST_RESOLUTION_COMMIT,
+        "frontendDist resolution source drifted",
+    )
     _require(source.get("observedHeadIsEvidenceOnly") is False, "product head relabelled")
     _require(
         source.get("observedHeadUsedAsWholeProductSource") is False,
@@ -417,10 +424,6 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
             "f4287f19e96d734dd257ac1421b13677e53e208e",
             "4ac9b141b08aae39275d8538d06e11c711b0ce71c3f74ab7baccf11839d2f6dc",
         ),
-        "desktop/scripts/release-build-driver.psm1": (
-            "7a8bc527c1bd0be82dbf2ef1624947300543140a",
-            "9a403da6c8e6ce226dfec1544af418117235a65286a0ceecaf1e197c6887ea4b",
-        ),
         "desktop/scripts/verify-release-source-policy.mjs": (
             "7a0407872f7f24505b376ebfdd1e9f1646acf5ff",
             "97f643d67348ea11e80506e898302210dece51de1aee9cbf66ee55f839cf0d29",
@@ -428,10 +431,6 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "desktop/scripts/verify-updater-signing-contract.ps1": (
             "b95edd472f9b328a92a279547aafca454aa201e1",
             "7a8b480f3fa268fd474c992b1a4d812f3221f4deb76ee06d37692aab3d785117",
-        ),
-        "distribution/tests/test_shared_windows_build_contract.py": (
-            "07d4e7b47f8c995790686d0d1906ed8c6eb164ff",
-            "e936ff7b24edb6be34a707bb7cd8a8c03a23e883fc7af6ff94ba68c05e965807",
         ),
     }
     build_driver_rows = build_driver.get("paths", [])
@@ -459,6 +458,78 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
             == object_sha256,
             f"historical release build driver bytes drifted: {path}",
         )
+
+    frontend_dist = corrections.get("frontendDistResolution", {})
+    _require(
+        frontend_dist.get("sourceCommit") == FRONTEND_DIST_RESOLUTION_COMMIT,
+        "frontendDist resolution source drifted",
+    )
+    _require(
+        frontend_dist.get("parentCommit") == RELEASE_BUILD_DRIVER_COMMIT,
+        "frontendDist resolution parent drifted",
+    )
+    expected_frontend_dist_rows = {
+        "desktop/scripts/release-build-driver.psm1": (
+            "81b41137febb7a4ef8bdf86b97360b88f0904873",
+            "c176773d35a789d54570620bc109364aa8ecf5004b41e6a5abdc149da839df57",
+        ),
+        "distribution/tests/test_shared_windows_build_contract.py": (
+            "8f19fe61ae00c8d2358527fee87237da0a227bd7",
+            "db6ca9f8459980c50bec870f91b72417c44e2aa85031f51c37a6a349a97cc957",
+        ),
+    }
+    frontend_dist_rows = frontend_dist.get("paths", [])
+    _require(
+        [row.get("path") for row in frontend_dist_rows]
+        == list(expected_frontend_dist_rows),
+        "frontendDist resolution path inventory drifted",
+    )
+    for row in frontend_dist_rows:
+        path = row["path"]
+        blob, object_sha256 = expected_frontend_dist_rows[path]
+        _require(row.get("blob") == blob, f"frontendDist resolution blob drifted: {path}")
+        _require(
+            row.get("objectSha256") == object_sha256,
+            f"frontendDist resolution object SHA drifted: {path}",
+        )
+        _require(
+            _git(root, "rev-parse", f"{FRONTEND_DIST_RESOLUTION_COMMIT}:{path}")
+            == blob,
+            f"historical frontendDist resolution blob drifted: {path}",
+        )
+        _require(
+            hashlib.sha256(
+                _git_bytes(
+                    root,
+                    "cat-file",
+                    "blob",
+                    f"{FRONTEND_DIST_RESOLUTION_COMMIT}:{path}",
+                )
+            ).hexdigest()
+            == object_sha256,
+            f"historical frontendDist resolution bytes drifted: {path}",
+        )
+    _require(
+        frontend_dist.get("canonicalConfigPath")
+        == "desktop/src-tauri/tauri.conf.json",
+        "frontendDist canonical config path drifted",
+    )
+    _require(
+        frontend_dist.get("overlayLocationChangesResolution") is False,
+        "frontendDist overlay location overclaim",
+    )
+    _require(
+        frontend_dist.get("absolutePathsRestrictedToEditionOutputs") is True,
+        "frontendDist absolute path restriction drifted",
+    )
+    _require(
+        frontend_dist.get("unknownEditionFailsClosed") is True,
+        "frontendDist unknown edition gate drifted",
+    )
+    _require(
+        frontend_dist.get("buildAuthorized") is False,
+        "frontendDist donor authorized a build",
+    )
 
     _require(document.get("upstreamBlockers") == [], "resolved blocker was retained")
 
