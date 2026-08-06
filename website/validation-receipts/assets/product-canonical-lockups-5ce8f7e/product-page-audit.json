@@ -1,0 +1,1339 @@
+{
+  "summary": {
+    "generatedAt": "2026-08-06T04:15:24.254Z",
+    "baseUrl": "http://127.0.0.1:4199/",
+    "browsersRequested": [
+      "edge",
+      "chrome",
+      "lenovo",
+      "firefox"
+    ],
+    "unavailable": [],
+    "checks": 20,
+    "passed": 20,
+    "failed": 0,
+    "profiles": [
+      "desktop-1440",
+      "wide-2048",
+      "tablet-760",
+      "mobile-390"
+    ],
+    "locales": [
+      "en",
+      "zh-CN"
+    ]
+  },
+  "failures": [],
+  "results": [
+    {
+      "browser": "edge",
+      "browserVersion": "151.0.4129.59",
+      "locale": "en",
+      "profile": "desktop-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\edge-desktop-1440-en.png",
+      "screenshotSha256": "a2a2b3a5bfeb6ba511f831610083674f0bb26416cdbc3136fbfa17d54f9ab3ed",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 1440,
+        "viewportHeight": 1000,
+        "viewportWidth": 1440,
+        "nav": [
+          {
+            "text": "Product",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "Price",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "Manual",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "Community",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          770,
+          770,
+          770
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 382,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 382,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 382,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "browserVersion": "151.0.4129.59",
+      "locale": "zh-CN",
+      "profile": "desktop-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\edge-desktop-1440-zh-CN.png",
+      "screenshotSha256": "33b96afd7a2b643d346dffbd97306cecc493c168608c042d0ae870c34336d80d",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 1440,
+        "viewportHeight": 1000,
+        "viewportWidth": 1440,
+        "nav": [
+          {
+            "text": "产品",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "价格",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "说明书",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "社区",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          770,
+          770,
+          770
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 382,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 382,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 382,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "browserVersion": "151.0.4129.59",
+      "locale": "en",
+      "profile": "wide-2048",
+      "viewport": {
+        "width": 2048,
+        "height": 1280
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\edge-wide-2048-en.png",
+      "screenshotSha256": "29468b2b0bfaa39c8a3f6755306c5f36c6a8f1ab4b4006771f4df54b3a247c67",
+      "state": {
+        "documentHeight": 1280,
+        "documentWidth": 2048,
+        "viewportHeight": 1280,
+        "viewportWidth": 2048,
+        "nav": [
+          {
+            "text": "Product",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "Price",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "Manual",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "Community",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          960,
+          960,
+          960
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 403,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 403,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 403,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "browserVersion": "151.0.4129.59",
+      "locale": "zh-CN",
+      "profile": "wide-2048",
+      "viewport": {
+        "width": 2048,
+        "height": 1280
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\edge-wide-2048-zh-CN.png",
+      "screenshotSha256": "2c2f92d76096a94a00077a8fbfc14b44cfe6cb86796f8a23484520b0815377a5",
+      "state": {
+        "documentHeight": 1280,
+        "documentWidth": 2048,
+        "viewportHeight": 1280,
+        "viewportWidth": 2048,
+        "nav": [
+          {
+            "text": "产品",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "价格",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "说明书",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "社区",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          960,
+          960,
+          960
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 403,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 403,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 403,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "browserVersion": "151.0.4129.59",
+      "locale": "en",
+      "profile": "tablet-760",
+      "viewport": {
+        "width": 760,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\edge-tablet-760-en.png",
+      "screenshotSha256": "c92046b94c8e4da1b961a890aca1b6af1b10a5ae0f78c5a4cd2029e5f31834ce",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 760,
+        "viewportHeight": 1000,
+        "viewportWidth": 760,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          277,
+          277,
+          277
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 54,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 54,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 54,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "browserVersion": "151.0.4129.59",
+      "locale": "zh-CN",
+      "profile": "tablet-760",
+      "viewport": {
+        "width": 760,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\edge-tablet-760-zh-CN.png",
+      "screenshotSha256": "83b010f2d2ae1f53c7389cf98571164da8864fe90b25f1807e83a4f4478f4e21",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 760,
+        "viewportHeight": 1000,
+        "viewportWidth": 760,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          277,
+          277,
+          277
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 54,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 54,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 54,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "browserVersion": "151.0.4129.59",
+      "locale": "en",
+      "profile": "mobile-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\edge-mobile-390-en.png",
+      "screenshotSha256": "64c0aaf82a215a5335e95fcecb81075d051fc446bd3a9ffc370e508ceca91910",
+      "state": {
+        "documentHeight": 844,
+        "documentWidth": 390,
+        "viewportHeight": 844,
+        "viewportWidth": 390,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          233,
+          233,
+          233
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "edge",
+      "browserVersion": "151.0.4129.59",
+      "locale": "zh-CN",
+      "profile": "mobile-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\edge-mobile-390-zh-CN.png",
+      "screenshotSha256": "ffec255da6dc7561b9ccb1e0c3a291169d1c61870cb68c5b3d71ce2b24759941",
+      "state": {
+        "documentHeight": 844,
+        "documentWidth": 390,
+        "viewportHeight": 844,
+        "viewportWidth": 390,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          233,
+          233,
+          233
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "chrome",
+      "browserVersion": "129.0.6668.59",
+      "locale": "en",
+      "profile": "desktop-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\chrome-desktop-1440-en.png",
+      "screenshotSha256": "d49de41c9db44e59a4d75ff97de26177cc689cc6abb6187d49566e000d3b779a",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 1440,
+        "viewportHeight": 1000,
+        "viewportWidth": 1440,
+        "nav": [
+          {
+            "text": "Product",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "Price",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "Manual",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "Community",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          770,
+          770,
+          770
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 383,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 383,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 383,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "chrome",
+      "browserVersion": "129.0.6668.59",
+      "locale": "zh-CN",
+      "profile": "desktop-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\chrome-desktop-1440-zh-CN.png",
+      "screenshotSha256": "b9af2ce424ff2c5b4214aea5e4bdaacc32d0a7f306c5a173f315641daa49fb2b",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 1440,
+        "viewportHeight": 1000,
+        "viewportWidth": 1440,
+        "nav": [
+          {
+            "text": "产品",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "价格",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "说明书",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "社区",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          770,
+          770,
+          770
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 383,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 383,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 383,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "chrome",
+      "browserVersion": "129.0.6668.59",
+      "locale": "en",
+      "profile": "mobile-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\chrome-mobile-390-en.png",
+      "screenshotSha256": "881638da155b51bc0319d06f1684eafae416c3f691ae7014d40fe68974db977f",
+      "state": {
+        "documentHeight": 844,
+        "documentWidth": 390,
+        "viewportHeight": 844,
+        "viewportWidth": 390,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          233,
+          233,
+          233
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "chrome",
+      "browserVersion": "129.0.6668.59",
+      "locale": "zh-CN",
+      "profile": "mobile-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\chrome-mobile-390-zh-CN.png",
+      "screenshotSha256": "4191e644c02435fdde7fb2904c06ff4fa88abe4775228918c6589f912c189e4e",
+      "state": {
+        "documentHeight": 844,
+        "documentWidth": 390,
+        "viewportHeight": 844,
+        "viewportWidth": 390,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          233,
+          233,
+          233
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "lenovo",
+      "browserVersion": "9.0.8.7271",
+      "locale": "en",
+      "profile": "desktop-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\lenovo-desktop-1440-en.png",
+      "screenshotSha256": "15761b44490e233734f29a512640c264d8fd59ed1182183523757151ef4954a1",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 1440,
+        "viewportHeight": 1000,
+        "viewportWidth": 1440,
+        "nav": [
+          {
+            "text": "Product",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "Price",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "Manual",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "Community",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          770,
+          770,
+          770
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 382,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 382,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 382,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "lenovo",
+      "browserVersion": "9.0.8.7271",
+      "locale": "zh-CN",
+      "profile": "desktop-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\lenovo-desktop-1440-zh-CN.png",
+      "screenshotSha256": "3882a38eaecc488594b7d8b885b9ca2d6c5cca3f431d4558901be20fe62c1b6b",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 1440,
+        "viewportHeight": 1000,
+        "viewportWidth": 1440,
+        "nav": [
+          {
+            "text": "产品",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "价格",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "说明书",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "社区",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          770,
+          770,
+          770
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 382,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 382,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 382,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "lenovo",
+      "browserVersion": "9.0.8.7271",
+      "locale": "en",
+      "profile": "mobile-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\lenovo-mobile-390-en.png",
+      "screenshotSha256": "d0a03b2c8d41807417e8118afbb7d0f60ed8b12434b84d7dbe82d3960a251f4a",
+      "state": {
+        "documentHeight": 844,
+        "documentWidth": 390,
+        "viewportHeight": 844,
+        "viewportWidth": 390,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          233,
+          233,
+          233
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "lenovo",
+      "browserVersion": "9.0.8.7271",
+      "locale": "zh-CN",
+      "profile": "mobile-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\lenovo-mobile-390-zh-CN.png",
+      "screenshotSha256": "b1989005192f48350bc6ee8e94b2aef56c76144372014e8d443621b02e5596c9",
+      "state": {
+        "documentHeight": 844,
+        "documentWidth": 390,
+        "viewportHeight": 844,
+        "viewportWidth": 390,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          233,
+          233,
+          233
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "firefox",
+      "browserVersion": "151.0",
+      "locale": "en",
+      "profile": "desktop-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\firefox-desktop-1440-en.png",
+      "screenshotSha256": "4c7d4f9e27879b0b11669a3ca6ead400669151e269bcb47a575baa2b8b16359a",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 1440,
+        "viewportHeight": 1000,
+        "viewportWidth": 1440,
+        "nav": [
+          {
+            "text": "Product",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "Price",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "Manual",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "Community",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          770,
+          770,
+          770
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 382,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 382,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 382,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "firefox",
+      "browserVersion": "151.0",
+      "locale": "zh-CN",
+      "profile": "desktop-1440",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\firefox-desktop-1440-zh-CN.png",
+      "screenshotSha256": "7334382201cc2ed6045ab6411df2a8b2220930f41e6b3f6198043df3cfda3392",
+      "state": {
+        "documentHeight": 1000,
+        "documentWidth": 1440,
+        "viewportHeight": 1000,
+        "viewportWidth": 1440,
+        "nav": [
+          {
+            "text": "产品",
+            "href": "/product/",
+            "active": true
+          },
+          {
+            "text": "价格",
+            "href": "/pricing/",
+            "active": false
+          },
+          {
+            "text": "说明书",
+            "href": "/manual/",
+            "active": false
+          },
+          {
+            "text": "社区",
+            "href": "/community/",
+            "active": false
+          }
+        ],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          770,
+          770,
+          770
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/sim-lockup-primary-DWZistgO.png",
+            "width": 382,
+            "naturalWidth": 2337,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/lab-lockup-primary-CHXVL8LA.png",
+            "width": 382,
+            "naturalWidth": 2386,
+            "naturalHeight": 218
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/field-lockup-primary-DXnZA5hl.png",
+            "width": 382,
+            "naturalWidth": 2581,
+            "naturalHeight": 218
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "firefox",
+      "browserVersion": "151.0",
+      "locale": "en",
+      "profile": "mobile-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\firefox-mobile-390-en.png",
+      "screenshotSha256": "bef0b1cf48e42cfd32d8adaf18d492580b95cbb03485b837d0cfadbc47477760",
+      "state": {
+        "documentHeight": 844,
+        "documentWidth": 390,
+        "viewportHeight": 844,
+        "viewportWidth": 390,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          233,
+          233,
+          233
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    },
+    {
+      "browser": "firefox",
+      "browserVersion": "151.0",
+      "locale": "zh-CN",
+      "profile": "mobile-390",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "screenshot": "C:\\Users\\zju20\\AppData\\Local\\Temp\\dronedream-brand-a3af67f\\product-page-screenshots\\firefox-mobile-390-zh-CN.png",
+      "screenshotSha256": "f5c76954d97347fd258a6079a214e6e14d83b1635d451604f0c6f4d1ea1395c4",
+      "state": {
+        "documentHeight": 844,
+        "documentWidth": 390,
+        "viewportHeight": 844,
+        "viewportWidth": 390,
+        "nav": [],
+        "headings": [
+          "DroneDream · SIM",
+          "DroneDream · LAB",
+          "DroneDream · FIELD"
+        ],
+        "productCardHeights": [
+          233,
+          233,
+          233
+        ],
+        "iconHandoff": [
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-sim-mark-D2Hbxh-a.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-lab-mark-CsF73BCo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          },
+          {
+            "source": "http://127.0.0.1:4199/assets/dronedream-field-mark-CuLsEEvo.png",
+            "width": 44,
+            "naturalWidth": 1024,
+            "naturalHeight": 1024
+          }
+        ],
+        "uniqueThemeCount": 3,
+        "universalDisabledPresent": true,
+        "currentPreviewPresent": false,
+        "dialogs": 0,
+        "violations": []
+      },
+      "errors": []
+    }
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "schemaVersion": "dronedream.product-canonical-lockups-validation.v1",
+  "generatedAt": "2026-08-06T04:15:24.254Z",
+  "scope": {
+    "branch": "codex/website",
+    "productSource": "5ce8f7e69cfcae75e896f3f851b81cd66edfa510",
+    "productTree": "f9671fbebbc165a520f524503428660a024c4bdc",
+    "brandAssetCommit": "a77826cbde5da7d9fe66a7d41f5a1bc077fc4cce",
+    "auditToolSource": "a3af67fd499c9be48221d17d0ba0582265cafef2",
+    "auditToolTree": "abc3a2d337580c8b41ab60f6b511a993ffc59347",
+    "deploymentPerformed": false,
+    "githubPagesDeploymentPerformed": false,
+    "aliyunDeploymentPerformed": false,
+    "githubReleaseAssetMutationPerformed": false,
+    "supabaseDeploymentPerformed": false,
+    "databaseMigrationPerformed": false,
+    "secretsMutationPerformed": false,
+    "dnsOrTlsMutationPerformed": false,
+    "technicalReportModified": false,
+    "apiKeyRead": false
+  },
+  "canonicalDonor": {
+    "productSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "evidenceHead": "7482647f1c2fcb92f58aaef009efc99764792297",
+    "evidencePolicy": "receipt-only-not-product-source",
+    "handoff": "universal-canonical-brand-donor-v1.1.0",
+    "copyPolicy": "byte-for-byte",
+    "receiptPath": "brand/receipts/canonical-large-label-donor-v1.json",
+    "receiptSha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+    "contractSha256": "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33",
+    "manifestSha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471",
+    "assetVerifier": {
+      "command": "node website/scripts/verify-edition-brand-assets.mjs",
+      "assetsChecked": 9,
+      "status": "passed"
+    },
+    "lockups": {
+      "sim": {
+        "dimensions": "2337x218",
+        "bytes": 122340,
+        "sha256": "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"
+      },
+      "lab": {
+        "dimensions": "2386x218",
+        "bytes": 128948,
+        "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
+      },
+      "field": {
+        "dimensions": "2581x218",
+        "bytes": 116568,
+        "sha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+      }
+    },
+    "editionSeparator": "U+00B7"
+  },
+  "greenValidation": {
+    "focusedTests": {
+      "files": 4,
+      "tests": 61,
+      "passed": 61,
+      "failed": 0
+    },
+    "typecheck": "passed",
+    "scopedLint": "passed",
+    "assetVerifier": "passed-9-of-9",
+    "auditToolSyntax": "passed",
+    "gitDiffCheck": "passed"
+  },
+  "yellowHistory": {
+    "configGateFailure": {
+      "status": "failed-before-bundle",
+      "reason": "VITE_SUPABASE_URL was absent",
+      "retryPolicy": "preserved-as-yellow-1"
+    },
+    "intermediateMarkOnlyMatrix": {
+      "source": "a77826cbde5da7d9fe66a7d41f5a1bc077fc4cce",
+      "result": "20-of-20",
+      "acceptance": "rejected-as-final-because-product-still-rendered-marks"
+    },
+    "productSourceBuild": {
+      "source": "5ce8f7e69cfcae75e896f3f851b81cd66edfa510",
+      "status": "passed",
+      "modulesTransformed": 2180,
+      "configuration": "local-invalid-public-fixture-only",
+      "knownNonBlockingWarning": "existing main chunk exceeds the configured size warning"
+    },
+    "productSourceAuditFailure": {
+      "source": "5ce8f7e69cfcae75e896f3f851b81cd66edfa510",
+      "artifact": "website/validation-receipts/assets/product-canonical-lockups-5ce8f7e/intermediate-product-page-audit-failed.json",
+      "artifactSha256": "c5998837e94d27225e81f0acfc34799ad61dcee9d15517fd2c1054b2f7da2485",
+      "passed": 10,
+      "failed": 10,
+      "failure": "auditor-treated-intentional-accessible-heading-clipping-as-content-overflow",
+      "retryPolicy": "stopped-without-retry"
+    },
+    "finalAudit": {
+      "productSource": "5ce8f7e69cfcae75e896f3f851b81cd66edfa510",
+      "auditToolSource": "a3af67fd499c9be48221d17d0ba0582265cafef2",
+      "buildReused": "the-only-successful-build-from-product-source",
+      "artifact": "website/validation-receipts/assets/product-canonical-lockups-5ce8f7e/product-page-audit.json",
+      "artifactSha256": "e9f17d9bf53dce90782098d1b82d3322fda60047cac1bc900d5f82f1cd40507b",
+      "checks": 20,
+      "passed": 20,
+      "failed": 0,
+      "unavailableBrowsers": [],
+      "browsers": {
+        "edge": "151.0.4129.59",
+        "chrome": "129.0.6668.59",
+        "lenovo": "9.0.8.7271",
+        "firefox": "151.0"
+      },
+      "profiles": [
+        "1440x1000",
+        "2048x1280",
+        "760x1000",
+        "390x844"
+      ],
+      "locales": [
+        "en",
+        "zh-CN"
+      ],
+      "assertions": {
+        "desktopCanonicalLockups": "passed",
+        "tabletAndMobileCanonicalMarks": "passed",
+        "exactNaturalDimensions": "passed",
+        "correctEditionAssetSelection": "passed",
+        "noStretchOrCrop": "passed",
+        "singleViewportProductLayout": "passed",
+        "productAndPriceNavigation": "passed",
+        "horizontalOverflow": 0,
+        "dialogs": 0,
+        "keyboardAndAria": "passed",
+        "universalDownload": "disabled-no-exact-handoff",
+        "editionDownloads": "disabled-no-release-ready-handoff"
+      },
+      "representativeScreenshots": {
+        "edgeEnglishDesktop": {
+          "path": "website/validation-receipts/assets/product-canonical-lockups-5ce8f7e/product-page-screenshots/edge-desktop-1440-en.png",
+          "sha256": "a2a2b3a5bfeb6ba511f831610083674f0bb26416cdbc3136fbfa17d54f9ab3ed"
+        },
+        "firefoxChineseDesktop": {
+          "path": "website/validation-receipts/assets/product-canonical-lockups-5ce8f7e/product-page-screenshots/firefox-desktop-1440-zh-CN.png",
+          "sha256": "7334382201cc2ed6045ab6411df2a8b2220930f41e6b3f6198043df3cfda3392"
+        },
+        "edgeEnglishTablet": {
+          "path": "website/validation-receipts/assets/product-canonical-lockups-5ce8f7e/product-page-screenshots/edge-tablet-760-en.png",
+          "sha256": "c92046b94c8e4da1b961a890aca1b6af1b10a5ae0f78c5a4cd2029e5f31834ce"
+        },
+        "lenovoChineseMobile": {
+          "path": "website/validation-receipts/assets/product-canonical-lockups-5ce8f7e/product-page-screenshots/lenovo-mobile-390-zh-CN.png",
+          "sha256": "b1989005192f48350bc6ee8e94b2aef56c76144372014e8d443621b02e5596c9"
+        }
+      }
+    }
+  },
+  "releaseState": {
+    "universal": "awaiting-exact-handoff",
+    "sim": "awaiting-exact-handoff",
+    "lab": "awaiting-exact-handoff",
+    "field": "awaiting-exact-handoff",
+    "downloadReady": false
+  },
+  "processCleanup": {
+    "listenerPort4199": "released",
+    "auditBrowserProcesses": "closed",
+    "unrelatedExistingProcessesModified": false
+  },
+  "repositoryGovernance": {
+    "forcePushPerformed": false,
+    "mainMergePerformed": false,
+    "manualAndPdfDraftsExcluded": true,
+    "workDirectoryExcluded": true,
+    "runtimeDependencyOnWorkDirectory": false
+  }
+}
