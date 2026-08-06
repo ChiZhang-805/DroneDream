@@ -40,6 +40,18 @@ const browserAuthMocks = vi.hoisted(() => ({
   } as { supabaseUrl: string; publishableKey: string } | null,
   adoptSession: vi.fn(async () => undefined),
 }));
+const validBrowserSession = {
+  protocolVersion: "desktop-browser-auth-pkce-v1",
+  editionId: "universal",
+  authClientId: "dronedream-desktop-universal",
+  accessToken: "header.payload.signature",
+  refreshToken: "refresh-token-value",
+  attemptIdHash: "a".repeat(64),
+  stateHash: "b".repeat(64),
+  subjectHash: "c".repeat(64),
+  issuedAt: "2026-08-05T08:00:00Z",
+  completedAt: "2026-08-05T08:00:01Z",
+};
 const runtimeSessionContractMocks = vi.hoisted(() => ({
   verify: vi.fn(async <T,>(report: T) => report),
 }));
@@ -714,10 +726,7 @@ describe("DesktopSetup", () => {
       loading: false,
       account: null,
     };
-    const browserSession = {
-      accessToken: "header.payload.signature",
-      refreshToken: "refresh-token-value",
-    };
+    const browserSession = validBrowserSession;
     const invoke = vi.fn(async (
       command: string,
       args?: Record<string, unknown>,
@@ -742,8 +751,6 @@ describe("DesktopSetup", () => {
     expect(invoke).toHaveBeenCalledWith("begin_browser_auth", {
       request: {
         locale: "en",
-        supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
-        publishableKey: "public-test-key-for-browser-auth",
       },
     });
   });
@@ -754,10 +761,7 @@ describe("DesktopSetup", () => {
       loading: false,
       account: null,
     };
-    const browserSession = {
-      accessToken: "header.payload.signature",
-      refreshToken: "refresh-token-value",
-    };
+    const browserSession = validBrowserSession;
     browserAuthMocks.adoptSession.mockImplementationOnce(async () => {
       optionalAuthState.current = {
         configured: true,
@@ -832,10 +836,7 @@ describe("DesktopSetup", () => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return runtime;
           if (command === "begin_browser_auth") {
-            return {
-              accessToken: "header.payload.signature",
-              refreshToken: "refresh-token-value",
-            };
+            return validBrowserSession;
           }
           throw new Error(`Unexpected command: ${command}`);
         }),

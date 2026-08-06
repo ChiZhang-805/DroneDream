@@ -69,6 +69,46 @@ fn emit_git_provenance_reruns(repository_root: &std::path::Path) {
     println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_SOURCE_COMMIT");
     println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_BUILD_NUMBER");
     println!("cargo:rerun-if-env-changed=DRONEDREAM_EDITION_PROFILE");
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_DESKTOP_EDITION_ID");
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_OAUTH_CLIENT_ID");
+}
+
+fn configure_desktop_auth_identity() {
+    let release_build = std::env::var_os("DRONEDREAM_RELEASE_SOURCE_COMMIT").is_some();
+    let edition_id = std::env::var("DRONEDREAM_DESKTOP_EDITION_ID").unwrap_or_else(|_| {
+        assert!(
+            !release_build,
+            "release builds require DRONEDREAM_DESKTOP_EDITION_ID"
+        );
+        "universal".to_owned()
+    });
+    assert!(
+        matches!(edition_id.as_str(), "universal" | "sim" | "lab" | "field"),
+        "DRONEDREAM_DESKTOP_EDITION_ID is not a supported desktop edition"
+    );
+
+    let oauth_client_id = std::env::var("DRONEDREAM_OAUTH_CLIENT_ID").unwrap_or_else(|_| {
+        assert!(
+            !release_build,
+            "release builds require the registered public DRONEDREAM_OAUTH_CLIENT_ID"
+        );
+        "unregistered-development-client".to_owned()
+    });
+    assert!(
+        oauth_client_id.len() >= 8
+            && oauth_client_id.len() <= 512
+            && oauth_client_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')),
+        "DRONEDREAM_OAUTH_CLIENT_ID is malformed"
+    );
+    assert!(
+        !release_build || !oauth_client_id.starts_with("unregistered-"),
+        "release builds cannot use an unregistered OAuth client"
+    );
+
+    println!("cargo:rustc-env=DRONEDREAM_DESKTOP_EDITION_ID={edition_id}");
+    println!("cargo:rustc-env=DRONEDREAM_OAUTH_CLIENT_ID={oauth_client_id}");
 }
 
 fn prepare_generated_directory(path: &std::path::Path) {
@@ -200,6 +240,7 @@ fn main() {
     let manifest_dir = PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("Cargo must set CARGO_MANIFEST_DIR"),
     );
+    configure_desktop_auth_identity();
     build_engine_pack(&manifest_dir);
     let frontend_environment = manifest_dir.join("../../frontend/.env.production");
     println!("cargo:rerun-if-changed={}", frontend_environment.display());
