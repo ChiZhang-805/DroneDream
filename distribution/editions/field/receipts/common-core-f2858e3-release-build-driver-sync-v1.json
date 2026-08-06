@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-release-build-driver-sync-receipt",
+  "editionId": "field",
+  "productSource": {
+    "branch": "codex/software-field",
+    "commit": "323fd05313527c0edec481d7e09acb5ac4735d22",
+    "tree": "55d6be926353cb375bbed1b0a9d8a4fa3c71e11c",
+    "cleanAndPushedAtReceiptInput": true
+  },
+  "commonCore": {
+    "branch": "codex/software",
+    "lineageBaseCommit": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+    "incrementalDonorCommit": "f2858e3d2e39f493baab28368b77230e45dd199f",
+    "incrementalDonorParent": "350253f8c17def231d81d39860846d1eb4ab1a94",
+    "incrementalDonorTree": "bedb3fe091fe1910575bdda9343f4c1be8558a05"
+  },
+  "provenance": {
+    "sourceSubject": "fix(desktop): harden shared release build driver",
+    "syncMethod": "three-way-reviewed-whole-isolated-common-core-commit",
+    "wholeIsolatedCommitConsumed": true,
+    "unrelatedUniversalHistoryConsumed": false,
+    "fieldSpecificProductOrSafetyChanged": false,
+    "historicalFailureEvidenceChanged": false
+  },
+  "paths": [
+    {
+      "path": "desktop/scripts/build-windows-llvm.ps1",
+      "gitBlob": "f4287f19e96d734dd257ac1421b13677e53e208e",
+      "canonicalBlobSha256": "4ac9b141b08aae39275d8538d06e11c711b0ce71c3f74ab7baccf11839d2f6dc",
+      "workingTreeSha256": "4ac9b141b08aae39275d8538d06e11c711b0ce71c3f74ab7baccf11839d2f6dc",
+      "exactDonorBlob": true
+    },
+    {
+      "path": "desktop/scripts/release-build-driver.psm1",
+      "gitBlob": "7a8bc527c1bd0be82dbf2ef1624947300543140a",
+      "canonicalBlobSha256": "9a403da6c8e6ce226dfec1544af418117235a65286a0ceecaf1e197c6887ea4b",
+      "workingTreeSha256": "81609935ca7f34a3fa800dffc1baa2175f8aa0104259c3351d674108a73a9e3f",
+      "workingTreeDifference": "windows-checkout-line-endings-only",
+      "exactDonorBlob": true
+    },
+    {
+      "path": "desktop/scripts/verify-release-source-policy.mjs",
+      "gitBlob": "7a0407872f7f24505b376ebfdd1e9f1646acf5ff",
+      "canonicalBlobSha256": "97f643d67348ea11e80506e898302210dece51de1aee9cbf66ee55f839cf0d29",
+      "workingTreeSha256": "97f643d67348ea11e80506e898302210dece51de1aee9cbf66ee55f839cf0d29",
+      "exactDonorBlob": true
+    },
+    {
+      "path": "desktop/scripts/verify-updater-signing-contract.ps1",
+      "gitBlob": "b95edd472f9b328a92a279547aafca454aa201e1",
+      "canonicalBlobSha256": "7a8b480f3fa268fd474c992b1a4d812f3221f4deb76ee06d37692aab3d785117",
+      "workingTreeSha256": "7a8b480f3fa268fd474c992b1a4d812f3221f4deb76ee06d37692aab3d785117",
+      "exactDonorBlob": true
+    },
+    {
+      "path": "distribution/tests/test_shared_windows_build_contract.py",
+      "gitBlob": "07d4e7b47f8c995790686d0d1906ed8c6eb164ff",
+      "canonicalBlobSha256": "e936ff7b24edb6be34a707bb7cd8a8c03a23e883fc7af6ff94ba68c05e965807",
+      "workingTreeSha256": "e936ff7b24edb6be34a707bb7cd8a8c03a23e883fc7af6ff94ba68c05e965807",
+      "exactDonorBlob": true
+    }
+  ],
+  "driverContract": {
+    "nativeInformationalStderrExitZero": "allow-visible-output",
+    "nativeNonzeroExit": "deny",
+    "fieldGeneratedFrontendAllowedPaths": [
+      "frontend/field-dist"
+    ],
+    "trackedModification": "deny",
+    "directoryEscape": "deny",
+    "otherUntrackedPath": "deny",
+    "unknownFrontendPath": "deny",
+    "unknownEdition": "deny"
+  },
+  "tests": [
+    {
+      "suite": "shared-windows-build-contract",
+      "passed": 7,
+      "coversNativeExitAndPathNegatives": true
+    },
+    {
+      "suite": "field-and-shared-safety-contracts",
+      "passed": 71
+    },
+    {
+      "suite": "updater-signing-fixture",
+      "passed": true,
+      "emptyPassword": "pass",
+      "nonemptyPasswordEnvOnly": "pass",
+      "signerFailure": "pass-fail-closed",
+      "missingOutput": "pass-fail-closed"
+    },
+    {
+      "suite": "real-makensis-edition-identity-fixture",
+      "compiledEditions": 4,
+      "unknownProductsRejected": 1,
+      "temporaryOutputsRetained": false
+    },
+    {
+      "suite": "nsis-vendored-template-static",
+      "passed": 1
+    },
+    {
+      "suite": "release-source-policy",
+      "passed": 1,
+      "trackedFiles": 1952,
+      "npmPackages": 390,
+      "rustPackages": 532
+    },
+    {
+      "suite": "powershell-ast",
+      "passed": 3
+    },
+    {
+      "suite": "ruff-scoped",
+      "passed": 1
+    },
+    {
+      "suite": "git-diff-check",
+      "passed": 1
+    }
+  ],
+  "readiness": {
+    "fileSha256": "bb1321b5843e4c806dee1c019564b4a54e881fd19200076765311c872fe6c6d1",
+    "canonicalReceiptSha256": "75e315e1c893602f1fa1033d5aa3461eab81fc59a8357b5d5ff60546bc656919",
+    "decision": "ready-to-request-yellow",
+    "blockers": []
+  },
+  "historicalAttempts": [
+    {
+      "productSource": "26dd3c141f86bc9cc538336bc3cb6a8155cc88e7",
+      "installerProduced": false,
+      "retryAllowed": false
+    },
+    {
+      "productSource": "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+      "frozenArtifactSha256": "90d867aedf728a70e55d6df349da1ce96b80e6f37b4689224eebdc4fd8cfa2c3",
+      "updaterSignatureIssued": false,
+      "installOrHandoffAllowed": false,
+      "retryAllowed": false
+    }
+  ],
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "threeLayerHardwareDecision": "deny",
+    "buildPerformedForProductSource": false,
+    "installPerformed": false,
+    "runtimeMigrationPerformed": false,
+    "deviceTouched": false,
+    "simulationAllowed": false,
+    "providerOrApiKeyUsed": false,
+    "releaseBranchCreated": false,
+    "deploymentPerformed": false
+  },
+  "releaseState": {
+    "freshReplacementYellowAuthorized": false,
+    "artifactProducedForProductSource": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "nextGate": "submit a fresh exact replacement YELLOW application for product source 323fd05313527c0edec481d7e09acb5ac4735d22"
+  }
+}
