@@ -58,7 +58,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
     receiver = website_handoff.get("receiver")
     edition = website_handoff.get("edition")
     if (
-        website_handoff.get("state") != "awaiting-exact-handoff"
+        website_handoff.get("state") not in {"awaiting-exact-handoff", "exact-artifact"}
         or website_handoff.get("releaseReady") is not False
         or not isinstance(receiver, dict)
         or receiver.get("websiteSourceCommit")
@@ -73,6 +73,14 @@ def verify_lab_preview_contract() -> dict[str, object]:
         or edition.get("fileName") != "DroneDream-Lab-1.0.0.exe"
     ):
         raise LabPreviewContractError("Website exact EXE receiving contract drifted")
+    if website_handoff.get("state") == "exact-artifact":
+        validation = website_handoff.get("validation")
+        if (
+            website_handoff.get("releaseConclusion") != "exact-artifact-not-release-ready"
+            or not isinstance(validation, dict)
+            or validation.get("overlayInstall") != "failed"
+        ):
+            raise LabPreviewContractError("Website exact artifact must preserve its failed overlay gate")
 
     common_core = profile.get("commonCore")
     if not isinstance(common_core, dict):

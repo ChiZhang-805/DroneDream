@@ -181,16 +181,17 @@ class LabWebsiteHandoffTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
-    def test_awaiting_contract_is_machine_readable_but_not_release_ready(self) -> None:
-        awaiting = handoff._load_json(handoff.CONTRACT_PATH)
+    def test_exact_artifact_contract_is_machine_readable_but_not_release_ready(self) -> None:
+        exact = handoff._load_json(handoff.CONTRACT_PATH)
         validated = handoff.validate_handoff(
-            awaiting, verify_files=False, require_release_ready=False
+            exact, verify_files=False, require_release_ready=False
         )
-        self.assertEqual(validated["state"], "awaiting-exact-handoff")
+        self.assertEqual(validated["state"], "exact-artifact")
         self.assertFalse(validated["releaseReady"])
+        self.assertEqual(validated["validation"]["overlayInstall"], "failed")
         self.assertEqual(validated["edition"]["fileName"], handoff.FILE_NAME)
         with self.assertRaisesRegex(handoff.LabWebsiteHandoffError, "not release-ready"):
-            handoff.validate_handoff(awaiting, verify_files=False)
+            handoff.validate_handoff(exact, verify_files=False)
 
     def test_release_ready_fixture_binds_exact_files_and_url_family(self) -> None:
         validated = handoff.validate_handoff(self.ready)

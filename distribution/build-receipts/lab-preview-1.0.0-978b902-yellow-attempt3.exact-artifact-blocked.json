@@ -1,0 +1,184 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-preview-1.0.0-978b902-yellow-attempt3",
+  "attemptOrdinalOverall": 3,
+  "attemptOrdinalForSource": 1,
+  "auditMode": "yellow-build-and-owned-install-acceptance",
+  "editionId": "lab",
+  "productDisplayVersion": "1.0.0",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
+    "shortCommit": "978b902",
+    "upstream": "origin/codex/software-lab",
+    "upstreamExactBeforeAttempt": true,
+    "treeStateBeforeAttempt": "clean",
+    "treeStateAfterAttempt": "clean"
+  },
+  "evidenceTooling": {
+    "receiptPortabilityCommit": "41ff06db23f5f2d28727e534b9ef8a11265b44a6",
+    "handoffCycleFixCommit": "7ca69b7d169458512e692a23998fdb3ce685fca5"
+  },
+  "commonCore": {
+    "authorityName": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "productCommonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "excludedSimPreviewEvidenceCommit": "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"
+  },
+  "resourceGate": {
+    "memoryPercentBefore": 63.9,
+    "freeMemoryGiBBefore": 5.68,
+    "cpuPercentBefore": 17.5,
+    "heavyBuildProcessesBefore": [],
+    "observedMemoryPercentDuring": 72.5,
+    "observedFreeMemoryGiBDuring": 4.32,
+    "cargoBuildJobs": 2,
+    "cargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target"
+  },
+  "publicSupabaseClientConfig": {
+    "source": "GitHub repository Actions variables",
+    "repository": "ChiZhang-805/DroneDream",
+    "variableNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "singleProcessInjection": true,
+    "valuesPrinted": false,
+    "valuesPersisted": false,
+    "valuesHashed": false,
+    "modelApiKeyRead": false,
+    "accountPasswordRead": false,
+    "tauriSigningPrivateKeyRead": false
+  },
+  "attempt": {
+    "startedAtUtc": "2026-08-06T02:02:35.2945970Z",
+    "finishedAtUtc": "2026-08-06T02:04:11.0902170Z",
+    "status": "artifact-generated-harvested-after-launcher-stream-failure",
+    "wrapperExitCode": 1,
+    "wrapperFailure": "Windows PowerShell 5.1 promoted Tauri stderr Info to a terminating error after the child build completed.",
+    "cargoCompilationCompleted": true,
+    "tauriCompleted": true,
+    "nsisCompleted": true,
+    "secondBuildForSourceExecuted": false,
+    "artifactHarvestedWithoutRebuild": true
+  },
+  "buildEvidence": {
+    "runRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-978b902-attempt3",
+    "log": {
+      "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-978b902-attempt3\\lab-build-attempt3.log",
+      "bytes": 1004,
+      "sha256": "eae0d92ad6e04507514ca36b152b70776487839d8ab73a1ed6ac33efd2dc0775"
+    },
+    "wrapperResult": {
+      "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-978b902-attempt3\\attempt-result.json",
+      "bytes": 591,
+      "sha256": "33c96bf040f48718e849d3dc45e30cf11a144814215b37394cbcc6e3ed2c08b1"
+    },
+    "preserved": true
+  },
+  "artifact": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe",
+    "bytes": 11815002,
+    "sha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0",
+    "peMachine": "0x014c",
+    "peOptionalMagic": "0x010b",
+    "peCertificateTableOffset": 0,
+    "peCertificateTableSize": 0,
+    "authenticodeStatus": "NotSigned",
+    "signerCertificatePresent": false,
+    "tauriUpdaterSignature": "not-issued",
+    "sigFileExists": false,
+    "successfulArtifactCount": 1,
+    "uniqueExe": true
+  },
+  "companions": {
+    "checksum": {
+      "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe.sha256",
+      "bytes": 91,
+      "sha256": "dcc1cde9b968e64812754c25bbb393cc8d78fc81ff18dc3a3150b189ec94ab5f"
+    },
+    "receipt": {
+      "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe.receipt.json",
+      "bytes": 8642,
+      "sha256": "d65effc95be7a9441becf0a657f24acf16e871428047d18762ee10ca9f68dc09"
+    },
+    "manifest": {
+      "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe.manifest.json",
+      "bytes": 9175,
+      "sha256": "17fdcff005377a457d3bd4e1a444555148d9f9cda03cef95ce23779bbe8a0464"
+    }
+  },
+  "staticAcceptance": {
+    "filename": "passed",
+    "profile": "passed",
+    "payload": "passed",
+    "brand": "passed",
+    "version": "passed",
+    "sha256": "passed",
+    "pe": "passed",
+    "license": "passed",
+    "notice": "passed",
+    "loopback": "passed",
+    "sourceCommitEmbedded": true,
+    "fieldOnlyModulesAbsent": true,
+    "universalBootstrapperAbsent": true,
+    "labMarkSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+    "labDotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+  },
+  "installAcceptance": {
+    "ownedInstallTarget": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-runs\\lab-978b902-attempt3\\install-root",
+    "freshInstall": "passed",
+    "overlayInstall": "failed-exit-2",
+    "uninstall": "passed",
+    "shortcuts": "passed",
+    "webView2": "passed-existing-runtime-151.0.4129.59",
+    "localization": {
+      "en": "passed-installer-init-1033",
+      "zhCN": "passed-installer-init-2052",
+      "exactInstalledUi": "not-run"
+    },
+    "nativeQuiesceSequence": "passed-recover-begin-status-end",
+    "rollback": "blocked-no-previous-verified-promotion",
+    "existingRuntimeChanged": false,
+    "prestateRestored": true,
+    "finalInstallExists": false,
+    "finalShortcutsExist": false,
+    "finalProductRegistryExists": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecisionAtZeroValidatedPacks": "deny",
+    "requiredDecisionLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "hardwareConnected": false,
+    "px4GazeboStarted": false,
+    "runtimeMigrated": false,
+    "releaseBranchCreated": false,
+    "uploadedOrDeployed": false
+  },
+  "websiteHandoff": {
+    "state": "exact-artifact",
+    "releaseReady": false,
+    "contractPath": "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json",
+    "contractSha256": "3394f40506832db6aaba56f6489f046536216ea002d2951d22dd27e1bc887e47",
+    "receiverSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "receiverEvidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92"
+  },
+  "releaseReady": false,
+  "remainingGates": [
+    "Fix the shared NSIS existing-install /UPDATE quiesce failure in Universal/Core, then obtain fresh YELLOW approval for any rebuilt Lab bytes.",
+    "Complete rendered EN/ZH acceptance from the exact installed application.",
+    "Create and validate a previous verified promotion before claiming rollback acceptance.",
+    "Issue required Authenticode and updater signatures for public release, or explicitly approve an unsigned distribution policy.",
+    "Complete publication URL-family and four-Edition SHA, URL, and tag uniqueness evidence before Website handoff and deployment.",
+    "Keep hardware parameter write, arm, HITL, and flight denied while validatedVehiclePackCount is zero."
+  ]
+}

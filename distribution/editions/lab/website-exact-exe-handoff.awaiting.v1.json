@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "dronedream-lab-website-exact-exe-handoff",
   "handoffVersion": "1.0.0",
-  "state": "awaiting-exact-handoff",
+  "state": "exact-artifact",
   "receiver": {
     "websiteSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
     "websiteEvidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
@@ -18,45 +18,54 @@
   },
   "productSource": {
     "branch": "codex/software-lab",
-    "commit": null,
-    "clean": null,
+    "commit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
+    "clean": true,
     "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9"
   },
   "artifact": {
-    "absolutePath": null,
+    "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe",
     "fileName": "DroneDream-Lab-1.0.0.exe",
     "version": "1.0.0",
-    "bytes": null,
-    "sha256": null,
+    "bytes": 11815002,
+    "sha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
     "authenticode": {
-      "signatureState": "awaiting",
+      "signatureState": "NotSigned",
       "subject": null,
       "timestamp": null
     },
     "updaterSignature": {
-      "state": "awaiting",
+      "state": "not-issued",
       "absolutePath": null,
       "bytes": null,
       "sha256": null
     }
   },
-  "receipt": {"absolutePath": null, "sha256": null},
-  "manifest": {"absolutePath": null, "sha256": null},
+  "receipt": {
+    "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe.receipt.json",
+    "sha256": "d65effc95be7a9441becf0a657f24acf16e871428047d18762ee10ca9f68dc09"
+  },
+  "manifest": {
+    "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe.manifest.json",
+    "sha256": "17fdcff005377a457d3bd4e1a444555148d9f9cda03cef95ce23779bbe8a0464"
+  },
   "build": {
-    "attemptCount": null,
-    "successfulArtifactCount": null,
-    "uniqueExe": null
+    "attemptCount": 3,
+    "successfulArtifactCount": 1,
+    "uniqueExe": true
   },
   "validation": {
-    "freshInstall": "not-run",
-    "overlayInstall": "not-run",
-    "uninstall": "not-run",
-    "shortcuts": "not-run",
-    "webView2": "not-run",
-    "localization": {"en": "not-run", "zhCN": "not-run"},
+    "freshInstall": "passed",
+    "overlayInstall": "failed",
+    "uninstall": "passed",
+    "shortcuts": "passed",
+    "webView2": "passed",
+    "localization": {"en": "passed", "zhCN": "passed"},
     "boundaryNotes": [
-      "No Lab EXE exists; install and runtime-affecting validation require separate approval.",
+      "Fresh install and uninstall used an owned /D target; the default Lab path and existing E:\\DroneDream Runtime were not modified.",
+      "Installer diagnostics observed zh-CN language 2052 and English language 1033; the exact installed application UI was not launched.",
+      "Same-version /UPDATE overlay failed closed with exit code 2 while preserving installed bytes, shortcuts, marker, and Runtime.",
+      "No previous verified Lab promotion exists, so rollback remains blocked.",
       "Zero Vehicle Packs are validated; hardware write, arm, flight, and HITL remain denied."
     ]
   },
@@ -80,11 +89,12 @@
     "distinctReleaseTag": false
   },
   "releaseReady": false,
-  "releaseConclusion": "awaiting-exact-handoff",
+  "releaseConclusion": "exact-artifact-not-release-ready",
   "blockers": [
-    "DroneDream-Lab-1.0.0.exe does not exist.",
-    "The required MSVC Rust host linker link.exe is unavailable.",
-    "Fresh install, overlay install, uninstall, shortcut, WebView2, and EN/ZH acceptance are not complete.",
+    "Same-version /UPDATE overlay exits with code 2 after entering the existing-install quiesce path.",
+    "No previous verified Lab promotion exists for rollback acceptance.",
+    "The exact installed application UI has not completed rendered EN/ZH acceptance.",
+    "The Lab artifact is an unsigned internal preview with no updater signature.",
     "Publication URL-family and cross-Edition uniqueness evidence do not exist."
   ]
 }

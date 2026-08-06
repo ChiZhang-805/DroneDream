@@ -332,7 +332,7 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertFalse(result["brand"]["grantsHardwareAuthority"])
         self.assertEqual(
             result["websiteExactExeHandoff"]["state"],
-            "awaiting-exact-handoff",
+            "exact-artifact",
         )
         self.assertFalse(result["websiteExactExeHandoff"]["releaseReady"])
         self.assertEqual(result["toolchain"]["selectedToolchain"], "gnullvm")

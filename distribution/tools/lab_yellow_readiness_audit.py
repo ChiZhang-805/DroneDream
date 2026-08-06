@@ -627,7 +627,7 @@ def evaluate_readiness(
         "Lab preview remains unsigned internal-test material until YELLOW build evidence exists.",
         "There are zero validated Vehicle Packs; hardware write, arm, HITL, and flight stay denied.",
         "No codex/release-lab branch or production promotion is authorized by this audit.",
-        "Website remains awaiting-exact-handoff until artifact, validation, publication, and cross-Edition evidence are complete.",
+        "Website exact artifact remains not release-ready until validation, publication, and cross-Edition evidence are complete.",
     ]
 
     return {
