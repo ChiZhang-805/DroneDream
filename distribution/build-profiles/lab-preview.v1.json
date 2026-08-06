@@ -20,7 +20,8 @@
     "desktopEditionBrowserAuth": "distribution/desktop/edition-browser-auth.v1.json",
     "desktopRuntimeUpdateFamilies": "distribution/desktop/edition-runtime-update-families.v1.json",
     "coexistenceAndAuth": "distribution/editions/lab/coexistence-and-auth.v1.json",
-    "universalDonorRequests": "distribution/editions/lab/universal-donor-requests.v1.json"
+    "universalDonorRequests": "distribution/editions/lab/universal-donor-requests.v1.json",
+    "safetyOauthSourceReadiness": "distribution/editions/lab/safety-oauth-source-readiness.v1.json"
   },
   "commonCore": {
     "authorityName": "Universal/Core",
@@ -64,12 +65,14 @@
     "distribution/tests/test_lab_brand_assets.py",
     "distribution/tests/test_lab_coexistence_contract.py",
     "distribution/tests/test_lab_preview_contract.py",
+    "distribution/tests/test_lab_safety_oauth_readiness.py",
     "distribution/tests/test_lab_website_handoff.py",
     "distribution/tools/lab_yellow_readiness_audit.py",
     "distribution/tools/lab_preinstall_acceptance.py",
     "distribution/tools/verify_lab_coexistence_contract.py",
     "distribution/tools/verify_lab_preview_artifact.py",
     "distribution/tools/verify_lab_preview_contract.py",
+    "distribution/tools/verify_lab_safety_oauth_readiness.py",
     "distribution/tools/verify_lab_website_handoff.py",
     "frontend/package.json",
     "frontend/scripts/verify-lab-ui.mjs",
@@ -134,6 +137,7 @@
     "websiteHandoffVerifier": "distribution/tools/verify_lab_website_handoff.py",
     "preinstallAcceptanceTool": "distribution/tools/lab_preinstall_acceptance.py",
     "yellowReadinessAuditTool": "distribution/tools/lab_yellow_readiness_audit.py",
+    "safetyOauthReadinessVerifier": "distribution/tools/verify_lab_safety_oauth_readiness.py",
     "selectedVehiclePack": "distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
     "selectedControllerModel": "Pixhawk 6C",
     "firmwareFamily": "px4",
@@ -319,6 +323,8 @@
     "No real EXE has been built by this profile.",
     "All Vehicle Packs remain planned or contract-only; zero are validated.",
     "Hardware writes, unlocking, arming, HITL, and flight remain denied by native, backend, and runtime safety gates.",
+    "The canonical parameterized edition-safety fixture donor is not delivered; three test-only allow-precondition tests remain fail-closed on the Lab manifest hash.",
+    "The registered public Lab OAuth client and callback require an externally verifiable approved input receipt before another YELLOW build.",
     "The preview is unsigned and must not be represented as Authenticode-signed.",
     "Website remains awaiting-exact-handoff until one clean-source EXE, receipt, manifest, validation boundary, and URL-family inventory are verified.",
     "No release branch may be created from this profile."

@@ -58,6 +58,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         != "distribution/editions/lab/coexistence-and-auth.v1.json"
         or authority.get("universalDonorRequests")
         != "distribution/editions/lab/universal-donor-requests.v1.json"
+        or authority.get("safetyOauthSourceReadiness")
+        != "distribution/editions/lab/safety-oauth-source-readiness.v1.json"
     ):
         raise LabPreviewContractError("Lab preview source or Website handoff authority is missing")
 
@@ -139,12 +141,14 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "distribution/tests/test_lab_brand_assets.py",
         "distribution/tests/test_lab_coexistence_contract.py",
         "distribution/tests/test_lab_preview_contract.py",
+        "distribution/tests/test_lab_safety_oauth_readiness.py",
         "distribution/tests/test_lab_website_handoff.py",
         "distribution/tools/lab_yellow_readiness_audit.py",
         "distribution/tools/lab_preinstall_acceptance.py",
         "distribution/tools/verify_lab_coexistence_contract.py",
         "distribution/tools/verify_lab_preview_artifact.py",
         "distribution/tools/verify_lab_preview_contract.py",
+        "distribution/tools/verify_lab_safety_oauth_readiness.py",
         "distribution/tools/verify_lab_website_handoff.py",
         "frontend/package.json",
         "frontend/scripts/verify-lab-ui.mjs",
@@ -384,6 +388,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "../../distribution/editions/lab/brand-source-manifest.v1.json",
         "../../distribution/editions/lab/coexistence-and-auth.v1.json",
         "../../distribution/editions/lab/universal-donor-requests.v1.json",
+        "../../distribution/editions/lab/safety-oauth-source-readiness.v1.json",
         "../../distribution/desktop/edition-coexistence.v1.json",
         "../../distribution/schemas/desktop-edition-coexistence.schema.json",
         "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png",

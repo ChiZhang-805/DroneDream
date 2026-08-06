@@ -143,6 +143,31 @@ class LabCoexistenceContractTests(unittest.TestCase):
         with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "runtime-mode bytes"):
             coexistence.validate_contract(*inputs)
 
+    def test_rejects_safety_fixture_delivery_or_failure_count_overstatement(self) -> None:
+        inputs = list(load_inputs())
+        donor = copy.deepcopy(inputs[1])
+        safety_request = next(
+            item
+            for item in donor["requests"]
+            if item["requestId"] == "universal-edition-safety-fixture-binding-v1"
+        )
+        safety_request["state"] = "delivered-exact-donor-forward-synced"
+        inputs[1] = donor
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "fixture blocker"):
+            coexistence.validate_contract(*inputs)
+
+        inputs = list(load_inputs())
+        donor = copy.deepcopy(inputs[1])
+        safety_request = next(
+            item
+            for item in donor["requests"]
+            if item["requestId"] == "universal-edition-safety-fixture-binding-v1"
+        )
+        safety_request["evidence"]["failedTestsRequireTestOnlyAllowPrecondition"] = 2
+        inputs[1] = donor
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "fixture blocker"):
+            coexistence.validate_contract(*inputs)
+
     def test_rejects_silent_cross_edition_auth_or_frontend_identity(self) -> None:
         inputs = list(load_inputs())
         contract = copy.deepcopy(inputs[0])

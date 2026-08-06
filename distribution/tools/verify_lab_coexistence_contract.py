@@ -533,6 +533,22 @@ def validate_contract(
                 or canonical.get("labBytesExact") is not True
             ):
                 raise LabCoexistenceContractError("auth donor provenance drifted")
+        if item.get("requestId") == "universal-edition-safety-fixture-binding-v1":
+            evidence = _mapping(item.get("evidence"), "edition-safety fixture evidence")
+            if (
+                item.get("state") != "requested-not-delivered"
+                or evidence.get("verifiedAtUniversalSource")
+                != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+                or evidence.get("sharedFixtureBlob") != "06731ea2b9ab214e947345473ff0ffcdb95fffa5"
+                or evidence.get("sharedFixtureSha256")
+                != "9eb9117441f930c8f8240306bc52b3b5001f3e85cc4cf33ebaa790aff547171f"
+                or evidence.get("backendRuntimeSafetyTestResult") != "23-passed-3-failed"
+                or evidence.get("failedTestsRequireTestOnlyAllowPrecondition") != 3
+                or evidence.get("nonAllowAndNegativeSubset") != "23-passed-3-deselected"
+                or evidence.get("productionDecision") != "deny"
+                or evidence.get("zeroValidatedPackBoundaryPreserved") is not True
+            ):
+                raise LabCoexistenceContractError("edition-safety fixture blocker drifted")
     recovery = _mapping(donor.get("labRecovery"), "labRecovery")
     if (
         recovery.get("rebuildAuthorizedByThisRequest") is not False

@@ -21,6 +21,7 @@ from typing import Any
 import lab_preinstall_acceptance as preinstall
 import verify_lab_preview_artifact as artifact_verifier
 import verify_lab_preview_contract as profile_verifier
+import verify_lab_safety_oauth_readiness as safety_oauth_verifier
 import verify_lab_website_handoff as website_handoff_verifier
 
 
@@ -616,6 +617,7 @@ def evaluate_readiness(
     brand = _brand_state()
     toolchain = toolchain_state if toolchain_state is not None else _toolchain_state(profile)
     safety = _safety_state(profile)
+    safety_oauth = safety_oauth_verifier.verify_lab_safety_oauth_readiness()
     profile_result = profile_verifier.verify_lab_preview_contract()
     website_handoff = website_handoff_verifier.validate_handoff(
         _load_json(WEBSITE_HANDOFF_PATH),
@@ -640,6 +642,7 @@ def evaluate_readiness(
         request_blockers.append("validated Vehicle Pack count drifted from zero")
     if safety["zeroValidatedPackDecision"] != "deny":
         request_blockers.append("zero-validated-pack hardware decision is not deny")
+    request_blockers.extend(str(blocker) for blocker in safety_oauth["blockers"])
     if not brand["readyForYellowBuild"]:
         request_blockers.append("Lab brand source, application, or installer binding drifted")
     if toolchain.get("selectedToolchain") != "gnullvm":
@@ -692,6 +695,7 @@ def evaluate_readiness(
         "licenseNotice": _file_ref(NOTICE_PATH),
         "vehiclePacks": vehicle_packs,
         "safety": safety,
+        "safetyAndOAuthSourceReadiness": safety_oauth,
         "sideEffects": {
             "tauri": False,
             "nsis": False,

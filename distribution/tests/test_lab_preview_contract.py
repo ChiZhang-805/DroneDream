@@ -311,13 +311,23 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertIn("Only a fake test fixture receipt was supplied.", result["blockers"])
         self.assertTrue(all(value is False for value in result["sideEffects"].values()))
 
-    def test_lab_yellow_readiness_audit_is_read_only_and_requestable(self) -> None:
+    def test_lab_yellow_readiness_audit_is_read_only_and_source_blocked(self) -> None:
         result = lab_readiness.evaluate_readiness(
             require_clean=False,
             toolchain_state=fake_gnullvm_toolchain(),
         )
         self.assertEqual(result["kind"], "dronedream-lab-yellow-readiness-audit")
-        self.assertTrue(result["yellowBuildRequest"]["requestable"])
+        self.assertFalse(result["yellowBuildRequest"]["requestable"])
+        self.assertEqual(
+            result["yellowBuildRequest"]["requestBlockers"],
+            result["safetyAndOAuthSourceReadiness"]["blockers"],
+        )
+        self.assertFalse(result["safetyAndOAuthSourceReadiness"]["sourceReady"])
+        self.assertFalse(
+            result["safetyAndOAuthSourceReadiness"]["oauth"][
+                "providerExecutionEvidenceCollected"
+            ]
+        )
         self.assertEqual(
             result["commonCore"]["productSourceCommit"],
             lab_artifact.COMMON_CORE_PRODUCT_SOURCE_COMMIT,

@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-safety-oauth-source-readiness",
+  "contractVersion": "1.0.0",
+  "editionId": "lab",
+  "auditMode": "green-offline-only",
+  "universalAuthority": {
+    "branch": "codex/software",
+    "verificationSourceCommit": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "verificationSourceTree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d",
+    "wholeCommitConsumptionAuthorized": false
+  },
+  "editionSafetyFixture": {
+    "sourceCommit": "b6b3659e112d9bf43b0b01c54dfc32755a12f90c",
+    "path": "distribution/tests/fixtures/edition-safety-cases.v1.json",
+    "blob": "06731ea2b9ab214e947345473ff0ffcdb95fffa5",
+    "sha256": "9eb9117441f930c8f8240306bc52b3b5001f3e85cc4cf33ebaa790aff547171f",
+    "fixtureEditionId": "lab",
+    "fixtureEditionManifestSha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356",
+    "activeLabManifest": {
+      "path": "distribution/editions/lab.v1.json",
+      "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+    },
+    "activeManifestMatchesFixture": false,
+    "parameterizedCanonicalDonorState": "requested-not-delivered",
+    "inMemoryRewriteCountsAsCanonicalEvidence": false,
+    "requiredParameterization": [
+      "editionId",
+      "editionManifestSha256"
+    ],
+    "dependentFieldsThatMustBeRefreshed": [
+      "evidenceReceipts[*].contextHash"
+    ],
+    "mismatchedManifestMustDeny": true,
+    "productionPolicyMayBeRelaxed": false
+  },
+  "oauthSourceContract": {
+    "path": "distribution/desktop/edition-browser-auth.v1.json",
+    "blob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+    "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+    "editionId": "lab",
+    "authClientId": "dronedream-desktop-lab",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
+    "flow": "hosted-authorization-code-pkce",
+    "pkceMethod": "S256",
+    "explicitUserGestureRequired": true,
+    "crossEditionSessionAdoptionAllowed": false,
+    "providerExecutionEvidenceCollected": false
+  },
+  "nextYellowBuildInputs": {
+    "exactCleanProductSourceRequired": true,
+    "evidenceCommitMayBeProductSource": false,
+    "publicInputs": [
+      {
+        "name": "VITE_SUPABASE_URL",
+        "classification": "public-client-config",
+        "approvedValueSourceRequired": true,
+        "valueRecordedByThisContract": false
+      },
+      {
+        "name": "VITE_SUPABASE_PUBLISHABLE_KEY",
+        "classification": "public-client-config",
+        "approvedValueSourceRequired": true,
+        "serviceRoleForbidden": true,
+        "valueRecordedByThisContract": false
+      },
+      {
+        "name": "DRONEDREAM_OAUTH_CLIENT_ID",
+        "classification": "public-oauth-client-id",
+        "approvedValueSourceRequired": true,
+        "registeredLabCallbackRequired": true,
+        "valueRecordedByThisContract": false
+      }
+    ],
+    "fixedInputs": {
+      "DRONEDREAM_DESKTOP_EDITION_ID": "lab",
+      "DRONEDREAM_EDITION_PROFILE": "unified-sim-lab",
+      "VITE_DRONEDREAM_EDITION": "lab",
+      "CARGO_BUILD_JOBS": "2",
+      "cargoTargetDir": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target",
+      "sharedScriptJobsMaximum": 4,
+      "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+      "artifactFileName": "DroneDream-Lab-1.0.0.exe"
+    },
+    "forbiddenInputs": [
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "OPENAI_API_KEY",
+      "account-password",
+      "TAURI_SIGNING_PRIVATE_KEY_PATH",
+      "TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+    ],
+    "actualEnvironmentReadByGreenAudit": false,
+    "providerCalledByGreenAudit": false
+  },
+  "signatureGates": {
+    "unsignedInternalPreview": {
+      "authenticodeState": "NotSigned",
+      "updaterSignatureState": "not-issued",
+      "allowedOnlyWithExactYellowAuthorization": true,
+      "releaseReady": false
+    },
+    "release": {
+      "authenticodeRequired": true,
+      "updaterSignatureRequired": true,
+      "privateKeyMayBeReadByGreenAudit": false,
+      "signatureUrlFamilyMustMatchLabArtifact": true
+    }
+  },
+  "installLifecycleGates": [
+    "fresh-install-owned-root",
+    "same-version-overlay-update",
+    "upgrade-source-and-build-number",
+    "uninstall-preserves-runtime-and-other-editions",
+    "desktop-and-start-menu-shortcuts",
+    "webview2-health",
+    "en-zh",
+    "rollback-recorded-previous-version",
+    "owned-residue-only",
+    "website-exact-four-file-handoff"
+  ],
+  "sourceReadiness": {
+    "editionSafetyFixtureReady": false,
+    "oauthOfflineContractReady": true,
+    "installerSourceReady": true,
+    "yellowBuildSourceReady": false,
+    "blockers": [
+      "canonical parameterized edition-safety fixture donor is not delivered",
+      "registered public Lab OAuth client and callback have no offline-verifiable external registration receipt",
+      "a new exact clean Lab product source and single-attempt YELLOW authorization are not frozen"
+    ]
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "frontendOrWorkspaceCountsAsAuthority": false
+  },
+  "releaseReady": false
+}

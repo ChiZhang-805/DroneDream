@@ -35,6 +35,7 @@
       "../../distribution/editions/lab/brand-source-manifest.v1.json": "distribution/editions/lab/brand-source-manifest.v1.json",
       "../../distribution/editions/lab/coexistence-and-auth.v1.json": "distribution/editions/lab/coexistence-and-auth.v1.json",
       "../../distribution/editions/lab/universal-donor-requests.v1.json": "distribution/editions/lab/universal-donor-requests.v1.json",
+      "../../distribution/editions/lab/safety-oauth-source-readiness.v1.json": "distribution/editions/lab/safety-oauth-source-readiness.v1.json",
       "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",
       "../../distribution/schemas/desktop-edition-coexistence.schema.json": "distribution/schemas/desktop-edition-coexistence.schema.json",
       "../../distribution/desktop/edition-browser-auth.v1.json": "distribution/desktop/edition-browser-auth.v1.json",
