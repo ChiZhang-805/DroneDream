@@ -13,6 +13,9 @@ TOOL_PATH = ROOT / "distribution/tools/desktop_edition_coexistence.py"
 CONTRACT_PATH = ROOT / "distribution/desktop/edition-coexistence.v1.json"
 SCHEMA_PATH = ROOT / "distribution/schemas/desktop-edition-coexistence.schema.json"
 UNIVERSAL_OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
+NSIS_IDENTITY = ROOT / "desktop/src-tauri/nsis/edition-identity.nsh"
+NSIS_TEMPLATE = ROOT / "desktop/src-tauri/nsis/installer.nsi"
+NSIS_HOOK = ROOT / "desktop/src-tauri/nsis/webview2-health.nsh"
 
 SPEC = importlib.util.spec_from_file_location("desktop_edition_coexistence", TOOL_PATH)
 assert SPEC and SPEC.loader
@@ -158,3 +161,45 @@ def test_state_machine_requires_all_four_upgrade_uninstall_and_legacy_states() -
     invalid["stateMachineVerification"]["requiredStates"].pop()
     with pytest.raises(contract_tool.DesktopEditionCoexistenceError, match="state-machine"):
         contract_tool.validate_contract(invalid, root=ROOT)
+
+
+def test_nsis_maps_internal_product_identities_to_canonical_display_names() -> None:
+    document = contract_tool.load_contract(ROOT)
+    identity = NSIS_IDENTITY.read_text(encoding="utf-8")
+    for edition in document["editions"]:
+        assert f'!if "${{PRODUCTNAME}}" == "{edition["installerProductName"]}"' in identity or (
+            edition["editionId"] != "universal"
+            and f'!else if "${{PRODUCTNAME}}" == "{edition["installerProductName"]}"' in identity
+        )
+        assert f'!define DRONEDREAM_DISPLAYNAME "{edition["displayName"]}"' in identity
+    assert '!error "Unknown DroneDream installer PRODUCTNAME:' in identity
+
+
+def test_nsis_keeps_internal_ownership_but_uses_display_shortcuts() -> None:
+    template = NSIS_TEMPLATE.read_text(encoding="utf-8")
+    identity = NSIS_IDENTITY.read_text(encoding="utf-8")
+    hook = NSIS_HOOK.read_text(encoding="utf-8")
+
+    # Internal identity continues to own directories, registry and app data.
+    uninstall_key = (
+        '!define UNINSTKEY "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
+        '\\${PRODUCTNAME}"'
+    )
+    assert uninstall_key in template
+    assert 'StrCpy $INSTDIR "$LOCALAPPDATA\\${PRODUCTNAME}"' in template
+    assert 'RmDir /r "$LOCALAPPDATA\\${BUNDLEID}"' in template
+    assert 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"' in template
+
+    # Shortcut conflicts are retained, reported and never blindly overwritten.
+    assert 'IfFileExists "${SHORTCUT_PATH}" 0 ${LABEL_PREFIX}_create' in identity
+    assert 'DetailPrint "$(DD_ShortcutConflict)"' in identity
+    assert 'SetErrors' in identity
+    assert 'DRONEDREAM_REMOVE_INTERNAL_SHORTCUT' in template
+    assert 'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe"' in identity
+
+    # A prior internal-name shortcut may move only after target ownership proof.
+    ownership_check = hook.index(
+        'IsShortcutTarget "${INTERNAL_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe"'
+    )
+    rename = hook.index('Rename "${INTERNAL_PATH}" "${DISPLAY_PATH}"')
+    assert ownership_check < rename
