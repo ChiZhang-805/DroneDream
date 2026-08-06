@@ -88,6 +88,32 @@ def run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
 
 
 class SoftwareSimBranchContractTests(unittest.TestCase):
+    def test_yellow_attempt_3_freezes_exact_commands_without_execution(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_3_APPLICATION_PATH)
+        plan = application["executionPlan"]
+        script = ROOT / plan["entryScript"]["path"]
+        self.assertEqual(script.stat().st_size, plan["entryScript"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(script.read_bytes()).hexdigest(),
+            plan["entryScript"]["sha256"],
+        )
+        self.assertEqual(plan["entryScript"]["defaultMode"], "Plan")
+        self.assertTrue(plan["entryScript"]["executeRequiresExplicitMode"])
+        self.assertTrue(plan["exactCommands"]["preflight"].endswith("-Mode Preflight"))
+        self.assertTrue(plan["exactCommands"]["build"].endswith("-Mode Execute"))
+        self.assertIn("worktree add --detach", plan["sourceCheckout"]["exactCommand"])
+        self.assertTrue(plan["sourceCheckout"]["postCheckoutStatusMustBeClean"])
+        self.assertEqual(plan["singleBuildInvocation"]["frontendMaximum"], 1)
+        self.assertEqual(plan["singleBuildInvocation"]["tauriMaximum"], 1)
+        self.assertEqual(plan["singleBuildInvocation"]["cargoMaximum"], 1)
+        self.assertEqual(plan["singleBuildInvocation"]["nsisMaximum"], 1)
+        self.assertEqual(plan["singleBuildInvocation"]["retryMaximum"], 0)
+        self.assertFalse(plan["preflightExecutedDuringThisGreenAtom"])
+        self.assertFalse(plan["buildExecutedDuringThisGreenAtom"])
+        self.assertFalse(
+            application["authorization"]["yellowBuildExecutionAuthorizedByThisApplication"]
+        )
+
     def test_yellow_attempt_3_application_separates_product_source_and_evidence(self) -> None:
         application = load_json(YELLOW_ATTEMPT_3_APPLICATION_PATH)
         source = application["sourceSeparation"]
