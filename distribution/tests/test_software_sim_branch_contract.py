@@ -53,7 +53,7 @@ YELLOW_APPLICATION_PATH = (
     DISTRIBUTION
     / "sim"
     / "desktop"
-    / "yellow-build-attempt-4-2bffcb0-application.v1.json"
+    / "yellow-build-attempt-5-2bffcb0-application.v1.json"
 )
 YELLOW_ATTEMPT_3_FAILURE_PATH = (
     DISTRIBUTION
@@ -66,6 +66,12 @@ YELLOW_ATTEMPT_4_PREFLIGHT_PATH = (
     / "sim"
     / "desktop"
     / "yellow-build-attempt-4-2bffcb0-preflight-ready.v1.json"
+)
+YELLOW_ATTEMPT_4_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-4-2bffcb0-checkout-failed.v1.json"
 )
 
 
@@ -100,7 +106,7 @@ def run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
 
 
 class SoftwareSimBranchContractTests(unittest.TestCase):
-    def test_yellow_attempt_4_freezes_exact_commands_without_execution(self) -> None:
+    def test_yellow_attempt_5_freezes_exact_commands_without_execution(self) -> None:
         application = load_json(YELLOW_APPLICATION_PATH)
         plan = application["executionPlan"]
         script = ROOT / plan["entryScript"]["path"]
@@ -122,6 +128,11 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertTrue(plan["exactCommands"]["preflight"].endswith("-Mode Preflight"))
         self.assertTrue(plan["exactCommands"]["build"].endswith("-Mode Execute"))
         self.assertIn("worktree add --detach", plan["sourceCheckout"]["exactCommand"])
+        self.assertIn("-c core.longpaths=true", plan["sourceCheckout"]["exactCommand"])
+        self.assertEqual(
+            application["ownedBuildSurface"]["sourceRoot"],
+            "C:/Users/zju20/dds5",
+        )
         self.assertTrue(plan["sourceCheckout"]["postCheckoutStatusMustBeClean"])
         self.assertEqual(plan["singleBuildInvocation"]["frontendMaximum"], 1)
         self.assertEqual(plan["singleBuildInvocation"]["tauriMaximum"], 1)
@@ -134,7 +145,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             application["authorization"]["yellowBuildExecutionAuthorizedByThisApplication"]
         )
 
-    def test_yellow_attempt_4_application_separates_product_source_and_evidence(self) -> None:
+    def test_yellow_attempt_5_application_separates_product_source_and_evidence(self) -> None:
         application = load_json(YELLOW_APPLICATION_PATH)
         source = application["sourceSeparation"]
         self.assertEqual(
@@ -168,11 +179,11 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             all(value == 0 for value in application["executedCounts"].values())
         )
 
-    def test_yellow_attempt_4_is_single_sim_only_build_request(self) -> None:
+    def test_yellow_attempt_5_is_single_sim_only_build_request(self) -> None:
         application = load_json(YELLOW_APPLICATION_PATH)
         attempt = application["attemptAccounting"]
-        self.assertEqual(attempt["globalAuthorizedCommandOrdinal"], 4)
-        self.assertEqual(attempt["sourceApplicationPreflightOrdinal"], 2)
+        self.assertEqual(attempt["globalAuthorizedCommandOrdinal"], 5)
+        self.assertEqual(attempt["sourceApplicationPreflightOrdinal"], 3)
         self.assertEqual(attempt["priorSourceBuildInvocationCount"], 0)
         self.assertEqual(attempt["sourceBuildInvocationOrdinal"], 1)
         self.assertEqual(attempt["sourceBuildInvocationMaximum"], 1)
@@ -189,7 +200,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             "DroneDream-Sim-1.0.0.exe",
         )
 
-    def test_yellow_attempt_4_preserves_frozen_artifact_and_product_key(self) -> None:
+    def test_yellow_attempt_5_preserves_frozen_artifact_and_product_key(self) -> None:
         application = load_json(YELLOW_APPLICATION_PATH)
         frozen = application["permanentlyFrozenPriorArtifact"]
         self.assertEqual(
@@ -265,6 +276,27 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(receipt["preflight"]["publicSupabaseValuesRecorded"])
         self.assertFalse(receipt["authorization"]["yellowBuildExecutionAuthorizedByThisReceipt"])
         self.assertTrue(all(value == 0 for value in receipt["executedCounts"].values()))
+
+    def test_yellow_attempt_4_checkout_failure_is_frozen_before_build(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_4_FAILURE_PATH)
+        binding = receipt["authorizationBinding"]
+        self.assertEqual(binding["globalAuthorizedCommandOrdinal"], 4)
+        self.assertEqual(binding["sourceApplicationPreflightOrdinal"], 2)
+        self.assertFalse(binding["sourceBuildInvocationConsumed"])
+        self.assertEqual(binding["sourceBuildInvocationCount"], 0)
+        self.assertEqual(receipt["failure"]["failedAbsolutePathChars"], 264)
+        self.assertFalse(receipt["failure"]["sameAuthorizationMayBeReused"])
+        self.assertTrue(receipt["ownedEvidence"]["runRootPreserved"])
+        self.assertFalse(receipt["ownedEvidence"]["cleanupExecuted"])
+        for key in (
+            "buildDriverInvocations",
+            "frontendBuilds",
+            "tauriBuilds",
+            "cargoBuilds",
+            "nsisBuilds",
+            "artifactBuilds",
+        ):
+            self.assertEqual(receipt["execution"][key], 0, key)
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
