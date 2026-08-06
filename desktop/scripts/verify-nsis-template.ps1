@@ -96,7 +96,7 @@ foreach ($substitution in $substitutions) {
 }
 
 $startMenuIdentityAnchor = "  !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT`n" +
-    "    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT`n" +
+    "    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT dronedream_startmenu_entry`n" +
     "    Return`n" +
     "  !endif`n`n"
 if (([regex]::Matches($upstream, [regex]::Escape($startMenuIdentityAnchor))).Count -ne 1) {
@@ -104,7 +104,7 @@ if (([regex]::Matches($upstream, [regex]::Escape($startMenuIdentityAnchor))).Cou
 }
 $upstream = $upstream.Replace($startMenuIdentityAnchor, "")
 $desktopIdentityAnchor = "  !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT`n" +
-    "    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT`n" +
+    "    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT dronedream_desktop_entry`n" +
     "    Return`n" +
     "  !endif`n`n"
 if (([regex]::Matches($upstream, [regex]::Escape($desktopIdentityAnchor))).Count -ne 1) {
@@ -273,13 +273,19 @@ foreach ($required in @(
     'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"',
     'DetailPrint "$(DD_ShortcutConflict)"',
     'SetErrors',
-    '!macro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT',
-    '!macro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT',
+    '!macro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT LABEL_PREFIX',
+    '!macro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT LABEL_PREFIX',
+    'Goto ${LABEL_PREFIX}_done',
+    '${LABEL_PREFIX}_shortcut',
     '!macro DRONEDREAM_REMOVE_INTERNAL_SHORTCUT SHORTCUT_PATH'
 )) {
     if (-not $editionIdentity.Contains($required)) {
         throw "Edition identity contract is missing: $required"
     }
+}
+if ($editionIdentity.Contains('dronedream_desktop_done:') -or
+    $editionIdentity.Contains('dronedream_startmenu_done:')) {
+    throw "Edition shortcut macros must not emit fixed labels across nested or repeated expansions"
 }
 
 if ($runtimeMode -match '[\p{IsCJKUnifiedIdeographs}]') {
