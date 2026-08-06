@@ -135,6 +135,72 @@ function Get-WindowRecord {
     }
 }
 
+function Protect-DiagnosticText {
+    param(
+        [AllowNull()][AllowEmptyString()][string]$Text,
+        [Parameter(Mandatory = $true)][string]$ExpectedInstallRoot
+    )
+    if ([string]::IsNullOrEmpty($Text)) { return $Text }
+    if ($Text -match '(?i)(password|passwd|secret|token|bearer|authorization|api[ _-]?key)') {
+        return "[redacted-sensitive]"
+    }
+    if ($Text -match '(?i)https?://') { return "[redacted-uri]" }
+    if ($Text -match '(?i)([A-Z]:\\|^\\\\)') {
+        if ($Text.IndexOf($ExpectedInstallRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            return $Text.Replace($ExpectedInstallRoot, "%LOCALAPPDATA%\DroneDream-Field")
+        }
+        return "[redacted-path]"
+    }
+    if ($Text.Length -gt 256) { return $Text.Substring(0, 256) + "[truncated]" }
+    return $Text
+}
+
+function Get-DiagnosticWindowRecord {
+    param(
+        [Parameter(Mandatory = $true)][Collections.IDictionary]$WindowRecord,
+        [Parameter(Mandatory = $true)][string]$ExpectedInstallRoot
+    )
+    $controls = @($WindowRecord.controls | ForEach-Object {
+        [ordered]@{
+            controlType = [string]$_.controlType
+            automationId = [string]$_.automationId
+            name = Protect-DiagnosticText -Text ([string]$_.name) -ExpectedInstallRoot $ExpectedInstallRoot
+            value = Protect-DiagnosticText -Text ([string]$_.value) -ExpectedInstallRoot $ExpectedInstallRoot
+        }
+    })
+    return [ordered]@{
+        title = Protect-DiagnosticText -Text ([string]$WindowRecord.title) -ExpectedInstallRoot $ExpectedInstallRoot
+        automationId = [string]$WindowRecord.automationId
+        className = [string]$WindowRecord.className
+        processId = [int]$WindowRecord.processId
+        visibleText = @($WindowRecord.visibleText | ForEach-Object {
+            Protect-DiagnosticText -Text ([string]$_) -ExpectedInstallRoot $ExpectedInstallRoot
+        } | Sort-Object -Unique)
+        controls = $controls
+    }
+}
+
+function Add-PreclassificationSnapshot {
+    param(
+        [Parameter(Mandatory = $true)][Collections.IDictionary]$WindowRecord,
+        [Parameter(Mandatory = $true)][int]$ExpectedProcessId,
+        [Parameter(Mandatory = $true)][string]$ExpectedInstallRoot,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[object]]$Snapshots
+    )
+    if ([int]$WindowRecord.processId -ne $ExpectedProcessId) {
+        throw "Diagnostic snapshot refuses a foreign installer PID."
+    }
+    if ([string]$WindowRecord.className -cne "#32770") {
+        throw "Diagnostic snapshot refuses a non-NSIS top-level window."
+    }
+    $snapshot = [ordered]@{
+        stage = "pending-classification"
+        window = Get-DiagnosticWindowRecord -WindowRecord $WindowRecord -ExpectedInstallRoot $ExpectedInstallRoot
+    }
+    $Snapshots.Add($snapshot)
+    return $snapshot
+}
+
 function Select-SingleOwnedWindowRecord {
     param(
         [Parameter(Mandatory = $true)][AllowEmptyCollection()]
@@ -282,8 +348,9 @@ try {
     $processId = $process.Id
     $languageWindow = Wait-SingleOwnedWindow -Process $process -DifferentFromTitle ""
     $languageRecord = Get-WindowRecord -Window $languageWindow
+    $languageSnapshot = Add-PreclassificationSnapshot -WindowRecord $languageRecord -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
     $languageStage = Resolve-InstallerWindowStage -WindowRecord $languageRecord -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
-    $snapshots.Add([ordered]@{ stage = $languageStage; window = $languageRecord })
+    $languageSnapshot["stage"] = $languageStage
     if ($languageStage -ne "language-selector") {
         throw "The first owned window was not the exact generic NSIS language selector."
     }
@@ -291,8 +358,9 @@ try {
 
     $mainWindow = Wait-SingleOwnedWindow -Process $process -DifferentFromTitle "Installer Language"
     $welcomeRecord = Get-WindowRecord -Window $mainWindow
+    $welcomeSnapshot = Add-PreclassificationSnapshot -WindowRecord $welcomeRecord -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
     $welcomeStage = Resolve-InstallerWindowStage -WindowRecord $welcomeRecord -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
-    $snapshots.Add([ordered]@{ stage = $welcomeStage; window = $welcomeRecord })
+    $welcomeSnapshot["stage"] = $welcomeStage
     if ($welcomeStage -ne "branded") { throw "Expected the branded Field welcome stage." }
 
     foreach ($step in 1..2) {
@@ -306,8 +374,9 @@ try {
             $currentText = @($record.visibleText) -join "`n"
         } while ($currentText -ceq $priorText -and [DateTime]::UtcNow -lt $deadline)
         if ($currentText -ceq $priorText) { throw "The exact Next-$step transition did not advance." }
+        $stepSnapshot = Add-PreclassificationSnapshot -WindowRecord $record -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
         $stage = Resolve-InstallerWindowStage -WindowRecord $record -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
-        $snapshots.Add([ordered]@{ stage = $stage; window = $record })
+        $stepSnapshot["stage"] = $stage
     }
     if ($stage -ne "directory") { throw "The bounded observer did not reach the exact Field directory stage." }
 

@@ -53,7 +53,11 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
           '{observer}', [ref]$tokens, [ref]$errors
         )
         if ($errors.Count -ne 0) {{ throw 'observer AST failed' }}
-        foreach ($name in @('Resolve-InstallerWindowStage', 'Select-SingleOwnedWindowRecord', 'Wait-SingleOwnedWindow')) {{
+        foreach ($name in @(
+          'Resolve-InstallerWindowStage', 'Protect-DiagnosticText',
+          'Get-DiagnosticWindowRecord', 'Add-PreclassificationSnapshot',
+          'Select-SingleOwnedWindowRecord', 'Wait-SingleOwnedWindow'
+        )) {{
           $function = $ast.Find({{
             param($node)
             $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
@@ -110,6 +114,31 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
         }}
         if ((Resolve-InstallerWindowStage -WindowRecord $directory -ExpectedProcessId $pidValue -ExpectedDisplayName $display -ExpectedInstallRoot $root) -cne 'directory') {{
           throw 'directory fixture failed'
+        }}
+        $diagnosticSnapshots = [Collections.Generic.List[object]]::new()
+        $identityFailure = [ordered]@{{
+          processId=$pidValue; className='#32770'; title='Unexpected Setup'
+          automationId=''; visibleText=@('Welcome', 'token=do-not-record'); controls=@(
+            [ordered]@{{controlType='ControlType.Text';automationId='10';name='password';value='secret-value'}},
+            [ordered]@{{controlType='ControlType.Edit';automationId='11';name='';value='C:\\Sensitive\\outside'}}
+          )
+        }}
+        $pending = Add-PreclassificationSnapshot -WindowRecord $identityFailure -ExpectedProcessId $pidValue -ExpectedInstallRoot $root -Snapshots $diagnosticSnapshots
+        try {{
+          Resolve-InstallerWindowStage -WindowRecord $identityFailure -ExpectedProcessId $pidValue -ExpectedDisplayName $display -ExpectedInstallRoot $root | Out-Null
+          throw 'identity failure fixture unexpectedly accepted'
+        }} catch {{
+          if ($_.Exception.Message -eq 'identity failure fixture unexpectedly accepted') {{ throw }}
+        }}
+        if ($diagnosticSnapshots.Count -ne 1 -or $pending.stage -cne 'pending-classification') {{
+          throw 'identity failure did not preserve its preclassification snapshot'
+        }}
+        $diagnosticJson = $diagnosticSnapshots | ConvertTo-Json -Depth 10 -Compress
+        if ($diagnosticJson -match 'do-not-record|secret-value|C:\\\\Sensitive') {{
+          throw 'diagnostic snapshot leaked sensitive fixture text'
+        }}
+        if ($diagnosticJson -notmatch '\\[redacted-sensitive\\]' -or $diagnosticJson -notmatch '\\[redacted-path\\]') {{
+          throw 'diagnostic snapshot did not record explicit redaction markers'
         }}
         Select-SingleOwnedWindowRecord -WindowRecords @([ordered]@{{processId=$pidValue;title='owned'}}) -ExpectedProcessId $pidValue | Out-Null
         try {{
