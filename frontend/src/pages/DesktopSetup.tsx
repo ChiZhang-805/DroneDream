@@ -17,6 +17,8 @@ import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
 import {
   autoStartInstallerRuntime,
   beginBrowserAuth,
+  clearBrowserAuthVault,
+  restoreBrowserAuthVault,
   cancelBrowserAuth,
   cancelRuntimeInstall,
   discardInstallerRuntimeIntent,
@@ -577,10 +579,10 @@ export function DesktopSetup() {
     setDesktopStartupGateState("idle");
     setBrowserAuthStatus("waiting");
     browserAuthActive.current = true;
+    let sessionIssued = false;
     try {
-      const session = await beginBrowserAuth({
-        locale,
-      });
+      const session = await restoreBrowserAuthVault() ?? await beginBrowserAuth({ locale });
+      sessionIssued = true;
       if (!componentMounted.current) return;
       setBrowserAuthStatus("adopting");
       await adoptBrowserAuthSession(session);
@@ -589,6 +591,12 @@ export function DesktopSetup() {
         setBrowserAuthStatus("idle");
       }
     } catch (error) {
+      if (sessionIssued) {
+        // Native persists only this edition's refresh grant before returning
+        // the session. If the WebView refuses that session, do not leave a
+        // credential that would be retried on the next explicit sign-in.
+        await clearBrowserAuthVault().catch(() => false);
+      }
       if (!componentMounted.current) return;
       setBrowserAuthStatus("idle");
       const message = error instanceof Error ? error.message : String(error);

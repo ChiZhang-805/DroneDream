@@ -306,4 +306,52 @@ describe("AuthContext account profile", () => {
       expect(window.sessionStorage.getItem(draftKey)).toBeNull();
     });
   });
+
+  it("clears only the desktop edition vault before local sign-out", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "clear_browser_auth_vault") return true;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("clear_browser_auth_vault", undefined);
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+    });
+    expect(invoke.mock.invocationCallOrder[0])
+      .toBeLessThan(authMock.signOut.mock.invocationCallOrder[0]);
+  });
+
+  it("still closes the local WebView session when edition vault cleanup fails", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "clear_browser_auth_vault") {
+        throw new Error("credential manager unavailable");
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(screen.getByLabelText("username")).toHaveTextContent("");
+    });
+  });
 });

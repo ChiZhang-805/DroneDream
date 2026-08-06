@@ -640,6 +640,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return runtime;
+          if (command === "restore_browser_auth_vault") return null;
           if (command === "begin_browser_auth") return new Promise(() => undefined);
           throw new Error(`Unexpected command: ${command}`);
         }),
@@ -733,6 +734,7 @@ describe("DesktopSetup", () => {
     ) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
+      if (command === "restore_browser_auth_vault") return null;
       if (command === "begin_browser_auth") return browserSession;
       throw new Error(`Unexpected command: ${command} ${JSON.stringify(args)}`);
     });
@@ -753,6 +755,69 @@ describe("DesktopSetup", () => {
         locale: "en",
       },
     });
+  });
+
+  it("restores only this edition vault before opening a new browser transaction", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "restore_browser_auth_vault") return validBrowserSession;
+      if (command === "begin_browser_auth") {
+        throw new Error("A restored session must not start another browser transaction.");
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    }));
+
+    await waitFor(() => {
+      expect(browserAuthMocks.adoptSession).toHaveBeenCalledWith(validBrowserSession);
+    });
+    expect(invoke).toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+  });
+
+  it("clears the edition vault when the WebView refuses a returned session", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    browserAuthMocks.adoptSession.mockRejectedValueOnce(
+      new Error("session binding mismatch"),
+    );
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "restore_browser_auth_vault") return validBrowserSession;
+      if (command === "clear_browser_auth_vault") return true;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+    await userEvent.click(await screen.findByRole("button", {
+      name: "Sign in and enter tuning workspace",
+    }));
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("clear_browser_auth_vault", undefined);
+    });
+    expect(screen.getByText(
+      "The browser sign-in did not complete. Start it again when you are ready.",
+    ))
+      .toBeInTheDocument();
+    expect(screen.queryByText("Workspace ready"))
+      .not.toBeInTheDocument();
   });
 
   it("enters only after the browser flow and local backend accept the same account", async () => {
@@ -782,6 +847,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return runtime;
+          if (command === "restore_browser_auth_vault") return null;
           if (command === "begin_browser_auth") return browserSession;
           throw new Error(`Unexpected command: ${command}`);
         }),
@@ -835,6 +901,7 @@ describe("DesktopSetup", () => {
         invoke: vi.fn(async (command: string) => {
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") return runtime;
+          if (command === "restore_browser_auth_vault") return null;
           if (command === "begin_browser_auth") {
             return validBrowserSession;
           }

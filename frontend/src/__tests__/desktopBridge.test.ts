@@ -4,6 +4,7 @@ import {
   autoStartInstallerRuntime,
   beginBrowserAuth,
   cancelBrowserAuth,
+  clearBrowserAuthVault,
   cancelRuntimeInstall,
   desktopApiRequest,
   desktopDownloadArtifact,
@@ -19,6 +20,7 @@ import {
   probeRuntimeStatus,
   probeSystemPrerequisites,
   repairRuntime,
+  restoreBrowserAuthVault,
   installEmbeddedEnginePack,
   startRuntime,
   startRuntimeInstall,
@@ -227,6 +229,8 @@ describe("desktop bridge", () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "begin_browser_auth") return session;
       if (command === "cancel_browser_auth") return true;
+      if (command === "clear_browser_auth_vault") return true;
+      if (command === "restore_browser_auth_vault") return session;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
@@ -235,12 +239,16 @@ describe("desktop bridge", () => {
       locale: "zh-CN",
     })).resolves.toEqual(session);
     await expect(cancelBrowserAuth()).resolves.toBe(true);
+    await expect(clearBrowserAuthVault()).resolves.toBe(true);
+    await expect(restoreBrowserAuthVault()).resolves.toEqual(session);
     expect(invoke).toHaveBeenNthCalledWith(1, "begin_browser_auth", {
       request: {
         locale: "zh-CN",
       },
     });
     expect(invoke).toHaveBeenNthCalledWith(2, "cancel_browser_auth", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(3, "clear_browser_auth_vault", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(4, "restore_browser_auth_vault", undefined);
   });
 
   it("routes a source-bound distribution preview and preserves every native deny", async () => {

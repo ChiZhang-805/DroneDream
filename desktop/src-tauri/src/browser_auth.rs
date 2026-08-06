@@ -5,7 +5,7 @@ use base64::{
     Engine as _,
 };
 use chrono::Utc;
-use reqwest::{blocking::Client, redirect::Policy, Url};
+use reqwest::{blocking::Client, redirect::Policy, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -22,6 +22,8 @@ use std::{
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
+
+use crate::browser_auth_vault;
 
 const AUTH_RESULT_TEMPLATE: &str = include_str!("../browser-auth.html");
 const UNIVERSAL_BRAND_LOCKUP: &[u8] =
@@ -189,10 +191,24 @@ pub struct BrowserAuthSession {
 #[serde(rename_all = "camelCase")]
 struct OAuthTokenResponse {
     access_token: String,
-    refresh_token: String,
-    id_token: String,
+    #[serde(default)]
+    refresh_token: Option<String>,
+    #[serde(default)]
+    id_token: Option<String>,
     token_type: String,
     expires_in: u64,
+}
+
+enum TokenHttpOutcome {
+    Accepted(OAuthTokenResponse),
+    Rejected,
+}
+
+fn token_status_is_credential_rejection(status: StatusCode) -> bool {
+    matches!(
+        status,
+        StatusCode::BAD_REQUEST | StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
+    )
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -239,6 +255,19 @@ pub fn cancel_browser_auth(
     coordinator: tauri::State<'_, BrowserAuthCoordinator>,
 ) -> Result<bool, String> {
     coordinator.cancel()
+}
+
+#[tauri::command]
+pub fn clear_browser_auth_vault() -> Result<bool, String> {
+    let identity = compiled_desktop_auth_identity()?;
+    browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace)
+}
+
+#[tauri::command]
+pub async fn restore_browser_auth_vault() -> Result<Option<BrowserAuthSession>, String> {
+    tauri::async_runtime::spawn_blocking(restore_browser_auth_vault_sync)
+        .await
+        .map_err(|error| format!("Desktop session restoration task failed: {error}"))?
 }
 
 fn validate_request(request: &BrowserAuthRequest) -> Result<(), String> {
@@ -395,6 +424,24 @@ fn run_browser_auth(
                             }
                         };
                     let completed_at = Utc::now();
+                    let subject_hash = sha256_hex(subject.as_bytes());
+                    let refresh_token = token_response
+                        .refresh_token
+                        .as_deref()
+                        .ok_or_else(|| {
+                            "Browser sign-in did not return a refresh token.".to_owned()
+                        })?
+                        .to_owned();
+                    if let Err(error) = browser_auth_vault::store_refresh_token(
+                        identity.credential_vault_namespace,
+                        &subject_hash,
+                        &refresh_token,
+                    ) {
+                        let page =
+                            render_auth_result_page(&request.locale, identity, false, &attempt_id)?;
+                        let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
+                        return Err(error);
+                    }
                     let page =
                         render_auth_result_page(&request.locale, identity, true, &attempt_id)?;
                     let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
@@ -403,10 +450,10 @@ fn run_browser_auth(
                         edition_id: identity.edition_id,
                         auth_client_id: identity.auth_client_id,
                         access_token: token_response.access_token,
-                        refresh_token: token_response.refresh_token,
+                        refresh_token,
                         attempt_id_hash: sha256_hex(attempt_id.as_bytes()),
                         state_hash: sha256_hex(state.as_bytes()),
-                        subject_hash: sha256_hex(subject.as_bytes()),
+                        subject_hash,
                         issued_at: issued_at.to_rfc3339(),
                         completed_at: completed_at.to_rfc3339(),
                     });
@@ -520,6 +567,21 @@ fn exchange_authorization_code(
     code: &str,
     code_verifier: &str,
 ) -> Result<OAuthTokenResponse, String> {
+    match send_token_request(&[
+        ("grant_type", "authorization_code"),
+        ("code", code),
+        ("client_id", oauth_client_id),
+        ("redirect_uri", redirect_uri),
+        ("code_verifier", code_verifier),
+    ])? {
+        TokenHttpOutcome::Accepted(response) => Ok(response),
+        TokenHttpOutcome::Rejected => {
+            Err("The browser sign-in authorization code was rejected.".to_owned())
+        }
+    }
+}
+
+fn send_token_request(fields: &[(&str, &str)]) -> Result<TokenHttpOutcome, String> {
     let client = Client::builder()
         .connect_timeout(TOKEN_REQUEST_TIMEOUT)
         .timeout(TOKEN_REQUEST_TIMEOUT)
@@ -529,19 +591,17 @@ fn exchange_authorization_code(
         .map_err(|_| "The browser sign-in token client could not be created.".to_owned())?;
     let mut response = client
         .post(OAUTH_TOKEN_URL)
-        .form(&[
-            ("grant_type", "authorization_code"),
-            ("code", code),
-            ("client_id", oauth_client_id),
-            ("redirect_uri", redirect_uri),
-            ("code_verifier", code_verifier),
-        ])
+        .form(fields)
         .send()
         .map_err(|_| {
             "The browser sign-in code exchange could not reach the account service.".to_owned()
         })?;
     if !response.status().is_success() {
-        return Err("The browser sign-in authorization code was rejected.".to_owned());
+        return if token_status_is_credential_rejection(response.status()) {
+            Ok(TokenHttpOutcome::Rejected)
+        } else {
+            Err("The browser sign-in account service is temporarily unavailable.".to_owned())
+        };
     }
     if response
         .content_length()
@@ -558,8 +618,9 @@ fn exchange_authorization_code(
     if body.len() > MAX_TOKEN_RESPONSE_BYTES {
         return Err("The browser sign-in token response is too large.".to_owned());
     }
-    serde_json::from_slice(&body)
-        .map_err(|_| "The browser sign-in token response is invalid.".to_owned())
+    let parsed = serde_json::from_slice(&body)
+        .map_err(|_| "The browser sign-in token response is invalid.".to_owned())?;
+    Ok(TokenHttpOutcome::Accepted(parsed))
 }
 
 fn jwt_payload(token: &str) -> Result<serde_json::Value, String> {
@@ -587,31 +648,25 @@ fn validate_token_response(
     oauth_client_id: &str,
     nonce: &str,
 ) -> Result<String, String> {
-    validate_token("access token", &response.access_token)?;
-    validate_token("refresh token", &response.refresh_token)?;
-    if !response.token_type.eq_ignore_ascii_case("bearer")
-        || response.expires_in == 0
-        || response.expires_in > 86_400
-    {
-        return Err("Browser sign-in returned invalid token metadata.".to_owned());
-    }
-    let access_claims = jwt_payload(&response.access_token)?;
-    let identity_claims = jwt_payload(&response.id_token)?;
-    let access_subject = access_claims.get("sub").and_then(serde_json::Value::as_str);
+    let access_subject = validate_access_token_response(response, oauth_client_id)?;
+    let refresh_token = response
+        .refresh_token
+        .as_deref()
+        .ok_or_else(|| "Browser sign-in did not return a refresh token.".to_owned())?;
+    validate_token("refresh token", refresh_token)?;
+    let id_token = response
+        .id_token
+        .as_deref()
+        .ok_or_else(|| "Browser sign-in did not return an identity token.".to_owned())?;
+    let identity_claims = jwt_payload(id_token)?;
     let identity_subject = identity_claims
         .get("sub")
         .and_then(serde_json::Value::as_str);
-    if access_subject.is_none()
-        || access_subject != identity_subject
-        || access_claims.get("iss").and_then(serde_json::Value::as_str) != Some(EXPECTED_ISSUER)
+    if Some(access_subject.as_str()) != identity_subject
         || identity_claims
             .get("iss")
             .and_then(serde_json::Value::as_str)
             != Some(EXPECTED_ISSUER)
-        || access_claims
-            .get("client_id")
-            .and_then(serde_json::Value::as_str)
-            != Some(oauth_client_id)
         || !identity_claims
             .get("aud")
             .is_some_and(|audience| audience_matches(audience, oauth_client_id))
@@ -624,17 +679,102 @@ fn validate_token_response(
             "Browser sign-in identity binding did not match this desktop edition.".to_owned(),
         );
     }
-    let now = Utc::now().timestamp();
-    for claims in [&access_claims, &identity_claims] {
-        let expires_at = claims
-            .get("exp")
-            .and_then(serde_json::Value::as_i64)
-            .ok_or_else(|| "Browser sign-in token expiry is missing.".to_owned())?;
-        if expires_at <= now {
-            return Err("Browser sign-in returned an expired token.".to_owned());
-        }
+    validate_claim_expiry(&identity_claims)?;
+    Ok(access_subject)
+}
+
+fn validate_access_token_response(
+    response: &OAuthTokenResponse,
+    oauth_client_id: &str,
+) -> Result<String, String> {
+    validate_token("access token", &response.access_token)?;
+    if !response.token_type.eq_ignore_ascii_case("bearer")
+        || response.expires_in == 0
+        || response.expires_in > 86_400
+    {
+        return Err("Browser sign-in returned invalid token metadata.".to_owned());
     }
-    Ok(access_subject.unwrap_or_default().to_owned())
+    let access_claims = jwt_payload(&response.access_token)?;
+    let access_subject = access_claims
+        .get("sub")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "Browser sign-in account subject is missing.".to_owned())?;
+    if access_claims.get("iss").and_then(serde_json::Value::as_str) != Some(EXPECTED_ISSUER)
+        || access_claims
+            .get("client_id")
+            .and_then(serde_json::Value::as_str)
+            != Some(oauth_client_id)
+    {
+        return Err(
+            "Browser sign-in identity binding did not match this desktop edition.".to_owned(),
+        );
+    }
+    validate_claim_expiry(&access_claims)?;
+    Ok(access_subject.to_owned())
+}
+
+fn validate_claim_expiry(claims: &serde_json::Value) -> Result<(), String> {
+    let expires_at = claims
+        .get("exp")
+        .and_then(serde_json::Value::as_i64)
+        .ok_or_else(|| "Browser sign-in token expiry is missing.".to_owned())?;
+    if expires_at <= Utc::now().timestamp() {
+        return Err("Browser sign-in returned an expired token.".to_owned());
+    }
+    Ok(())
+}
+
+fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, String> {
+    let identity = compiled_desktop_auth_identity()?;
+    let oauth_client_id = compiled_oauth_client_id()?;
+    let Some(stored) = browser_auth_vault::load_refresh_token(identity.credential_vault_namespace)?
+    else {
+        return Ok(None);
+    };
+    let token_response = match send_token_request(&[
+        ("grant_type", "refresh_token"),
+        ("refresh_token", &stored.refresh_token),
+        ("client_id", oauth_client_id),
+    ])? {
+        TokenHttpOutcome::Accepted(response) => response,
+        TokenHttpOutcome::Rejected => {
+            browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace)?;
+            return Ok(None);
+        }
+    };
+    let subject =
+        validate_access_token_response(&token_response, oauth_client_id).inspect_err(|_error| {
+            let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+        })?;
+    let subject_hash = sha256_hex(subject.as_bytes());
+    if subject_hash != stored.subject_hash {
+        let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+        return Err("The stored desktop session belongs to a different account.".to_owned());
+    }
+    let refresh_token = token_response
+        .refresh_token
+        .as_deref()
+        .unwrap_or(&stored.refresh_token)
+        .to_owned();
+    browser_auth_vault::store_refresh_token(
+        identity.credential_vault_namespace,
+        &subject_hash,
+        &refresh_token,
+    )?;
+    let now = Utc::now();
+    let attempt_id = random_hex_32();
+    Ok(Some(BrowserAuthSession {
+        protocol_version: AUTH_PROTOCOL_VERSION,
+        edition_id: identity.edition_id,
+        auth_client_id: identity.auth_client_id,
+        access_token: token_response.access_token,
+        refresh_token,
+        attempt_id_hash: sha256_hex(attempt_id.as_bytes()),
+        state_hash: sha256_hex(format!("restore:{attempt_id}").as_bytes()),
+        subject_hash,
+        issued_at: now.to_rfc3339(),
+        completed_at: now.to_rfc3339(),
+    }))
 }
 
 fn render_auth_result_page(
@@ -859,14 +999,14 @@ mod tests {
                 "client_id": client_id,
                 "exp": expiration,
             })),
-            refresh_token: "bounded-refresh-token".to_owned(),
-            id_token: fake_jwt(serde_json::json!({
+            refresh_token: Some("bounded-refresh-token".to_owned()),
+            id_token: Some(fake_jwt(serde_json::json!({
                 "sub": "account-subject-1",
                 "iss": EXPECTED_ISSUER,
                 "aud": client_id,
                 "nonce": nonce,
                 "exp": expiration,
-            })),
+            }))),
             token_type: "Bearer".to_owned(),
             expires_in: 600,
         }
@@ -1034,14 +1174,47 @@ mod tests {
         assert!(validate_token_response(&response, client_id, "different-nonce").is_err());
 
         let mut expired = token_response(client_id, nonce);
-        expired.id_token = fake_jwt(serde_json::json!({
+        expired.id_token = Some(fake_jwt(serde_json::json!({
             "sub": "account-subject-1",
             "iss": EXPECTED_ISSUER,
             "aud": client_id,
             "nonce": nonce,
             "exp": Utc::now().timestamp() - 1,
-        }));
+        })));
         assert!(validate_token_response(&expired, client_id, nonce).is_err());
+    }
+
+    #[test]
+    fn refresh_response_accepts_rotated_or_unchanged_refresh_without_an_id_token() {
+        let client_id = "registered-universal-client";
+        let mut response = token_response(client_id, "unused-for-refresh");
+        response.refresh_token = None;
+        response.id_token = None;
+
+        assert_eq!(
+            validate_access_token_response(&response, client_id).unwrap(),
+            "account-subject-1"
+        );
+        assert!(validate_token_response(&response, client_id, "unused-for-refresh").is_err());
+    }
+
+    #[test]
+    fn only_permanent_token_rejections_may_invalidate_a_stored_session() {
+        for status in [
+            StatusCode::BAD_REQUEST,
+            StatusCode::UNAUTHORIZED,
+            StatusCode::FORBIDDEN,
+        ] {
+            assert!(token_status_is_credential_rejection(status));
+        }
+        for status in [
+            StatusCode::NOT_FOUND,
+            StatusCode::TOO_MANY_REQUESTS,
+            StatusCode::INTERNAL_SERVER_ERROR,
+            StatusCode::SERVICE_UNAVAILABLE,
+        ] {
+            assert!(!token_status_is_credential_rejection(status));
+        }
     }
 
     #[test]

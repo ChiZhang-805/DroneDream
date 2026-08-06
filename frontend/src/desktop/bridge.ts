@@ -461,6 +461,18 @@ export function cancelBrowserAuth(): Promise<boolean> {
     expectBoolean(value, "response"));
 }
 
+export function clearBrowserAuthVault(): Promise<boolean> {
+  return invokeDesktop("clear_browser_auth_vault", (value) =>
+    expectBoolean(value, "response"),
+  );
+}
+
+export function restoreBrowserAuthVault(): Promise<BrowserAuthSession | null> {
+  return invokeDesktop("restore_browser_auth_vault", (value) =>
+    value === null ? null : parseBrowserAuthSession(value),
+  );
+}
+
 export function validateDistributionPlan(
   request: DistributionPlanRequest,
 ): Promise<DistributionPlanValidation> {
