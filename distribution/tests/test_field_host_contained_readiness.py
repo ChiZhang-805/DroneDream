@@ -36,7 +36,7 @@ CURRENT_EVIDENCE = (
     ROOT
     / "artifacts"
     / "test-runs"
-    / "field-host-contained-readiness-07c9262-array"
+    / "field-host-contained-readiness-6afa14a-wait"
 )
 FIRST_PREFLIGHT_FAILURE_EVIDENCE = (
     ROOT
@@ -49,6 +49,12 @@ SECOND_PREFLIGHT_FAILURE_EVIDENCE = (
     / "artifacts"
     / "test-runs"
     / "field-host-contained-preflight-failure-90a2a3c"
+)
+EXECUTION_FAILURE_EVIDENCE = (
+    ROOT
+    / "artifacts"
+    / "test-runs"
+    / "field-host-contained-execution-failure-452eed9"
 )
 
 SPEC = importlib.util.spec_from_file_location("field_host_contained_readiness_tests", TOOL_PATH)
@@ -300,6 +306,22 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         )
         self.assertEqual(set(failure["executionCounts"].values()), {0})
         self.assertFalse(any(failure["postFailureState"].values()))
+
+    def test_resource_abort_preserves_complete_owned_rollback(self) -> None:
+        failure = host_readiness.load_json(
+            EXECUTION_FAILURE_EVIDENCE / "execution-failure-receipt.json"
+        )
+        self.assertEqual(failure["result"], "fail-resource-abort-with-complete-rollback")
+        self.assertTrue(failure["attempt"]["forcedExecutorTermination"])
+        self.assertFalse(failure["attempt"]["productFailure"])
+        self.assertEqual(failure["executionCounts"]["installerExe"], 1)
+        self.assertEqual(failure["executionCounts"]["uninstaller"], 1)
+        self.assertEqual(failure["executionCounts"]["applicationLaunch"], 0)
+        self.assertTrue(failure["rollback"]["protectedStateMatched"])
+        self.assertEqual(failure["rollback"]["protectedChecksPassed"], 16)
+        self.assertEqual(failure["rollback"]["protectedChecksTotal"], 16)
+        self.assertTrue(failure["rollback"]["ownedRootAbsent"])
+        self.assertFalse(failure["releaseState"]["releaseReady"])
 
     def test_snapshot_tool_is_read_only_outside_its_explicit_output(self) -> None:
         source = SNAPSHOT_TOOL_PATH.read_text(encoding="utf-8")

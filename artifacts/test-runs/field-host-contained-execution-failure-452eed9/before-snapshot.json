@@ -1,0 +1,236 @@
+{
+    "schemaVersion":  1,
+    "kind":  "dronedream-field-host-contained-host-snapshot",
+    "capturedAtUtc":  "2026-08-06T03:24:59.2663646Z",
+    "host":  {
+                 "computerName":  "ZHANGCHI805",
+                 "userName":  "zju20",
+                 "os":  "Microsoft Windows 11 家庭版 中文版",
+                 "build":  "10.0.26200.0"
+             },
+    "paths":  {
+                  "universalInstall":  {
+                                           "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream",
+                                           "digest":  {
+                                                          "exists":  true,
+                                                          "fileCount":  26281,
+                                                          "bytes":  13192038895,
+                                                          "sha256":  "accefbbef8f8e416bd23e3e410bba2e5e571bea708976f5f6ab2ec246d39423c"
+                                                      }
+                                       },
+                  "simDefaultInstall":  {
+                                            "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream · SIM",
+                                            "digest":  {
+                                                           "exists":  false,
+                                                           "fileCount":  0,
+                                                           "bytes":  0,
+                                                           "sha256":  null
+                                                       }
+                                        },
+                  "labDefaultInstall":  {
+                                            "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream · LAB",
+                                            "digest":  {
+                                                           "exists":  false,
+                                                           "fileCount":  0,
+                                                           "bytes":  0,
+                                                           "sha256":  null
+                                                       }
+                                        },
+                  "fieldDefaultInstall":  {
+                                              "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream · FIELD",
+                                              "digest":  {
+                                                             "exists":  false,
+                                                             "fileCount":  0,
+                                                             "bytes":  0,
+                                                             "sha256":  null
+                                                         }
+                                          },
+                  "ownedRoot":  {
+                                    "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3",
+                                    "digest":  {
+                                                   "exists":  false,
+                                                   "fileCount":  0,
+                                                   "bytes":  0,
+                                                   "sha256":  null
+                                               }
+                                },
+                  "sharedHandoff":  {
+                                        "path":  "C:\\Users\\zju20\\AppData\\Local\\io.dronedream.desktop",
+                                        "digest":  {
+                                                       "exists":  true,
+                                                       "fileCount":  462,
+                                                       "bytes":  93259160,
+                                                       "sha256":  "8753d50f1740ffaae80c08080324c7ecb5c137a811f740656e30c6b98dc8b8e9"
+                                                   },
+                                        "controls":  {
+                                                         "receipt":  {
+                                                                         "exists":  false,
+                                                                         "bytes":  null,
+                                                                         "sha256":  null
+                                                                     },
+                                                         "terminal":  {
+                                                                          "exists":  false,
+                                                                          "bytes":  null,
+                                                                          "sha256":  null
+                                                                      },
+                                                         "quiesce":  {
+                                                                         "exists":  false,
+                                                                         "bytes":  null,
+                                                                         "sha256":  null
+                                                                     },
+                                                         "legacyLock":  {
+                                                                            "exists":  true,
+                                                                            "bytes":  0,
+                                                                            "sha256":  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                                                                        }
+                                                     }
+                                    },
+                  "fieldBundleRoaming":  {
+                                             "path":  "C:\\Users\\zju20\\AppData\\Roaming\\io.dronedream.desktop.field",
+                                             "digest":  {
+                                                            "exists":  false,
+                                                            "fileCount":  0,
+                                                            "bytes":  0,
+                                                            "sha256":  null
+                                                        }
+                                         },
+                  "fieldBundleLocal":  {
+                                           "path":  "C:\\Users\\zju20\\AppData\\Local\\io.dronedream.desktop.field",
+                                           "digest":  {
+                                                          "exists":  false,
+                                                          "fileCount":  0,
+                                                          "bytes":  0,
+                                                          "sha256":  null
+                                                      }
+                                       }
+              },
+    "registry":  {
+                     "universalUninstall":  {
+                                                "exists":  true,
+                                                "values":  {
+                                                               "DisplayIcon":  "\"C:\\Users\\zju20\\AppData\\Local\\DroneDream\\drone-dream-desktop.exe\"",
+                                                               "DisplayName":  "DroneDream",
+                                                               "DisplayVersion":  "1.0.0",
+                                                               "EstimatedSize":  23982,
+                                                               "InstallLocation":  "\"C:\\Users\\zju20\\AppData\\Local\\DroneDream\"",
+                                                               "MainBinaryName":  "drone-dream-desktop.exe",
+                                                               "NoModify":  1,
+                                                               "NoRepair":  1,
+                                                               "Publisher":  "DroneDream",
+                                                               "UninstallString":  "\"C:\\Users\\zju20\\AppData\\Local\\DroneDream\\uninstall.exe\""
+                                                           }
+                                            },
+                     "simUninstall":  {
+                                          "exists":  false,
+                                          "values":  {
+
+                                                     }
+                                      },
+                     "labUninstall":  {
+                                          "exists":  false,
+                                          "values":  {
+
+                                                     }
+                                      },
+                     "fieldUninstall":  {
+                                            "exists":  false,
+                                            "values":  {
+
+                                                       }
+                                        },
+                     "fieldProduct":  {
+                                          "exists":  false,
+                                          "values":  {
+
+                                                     }
+                                      },
+                     "fieldAutorun":  {
+                                          "exists":  true,
+                                          "values":  {
+                                                         "Lark":  "\"E:\\Lark\\Lark.exe\"",
+                                                         "Microsoft.Lists":  "C:\\Program Files\\Microsoft OneDrive\\26.134.0713.0003\\OneDrive.Sync.Service.exe",
+                                                         "OneDrive":  "\"C:\\Program Files\\Microsoft OneDrive\\OneDrive.exe\" /background"
+                                                     }
+                                      }
+                 },
+    "shortcuts":  {
+                      "universalStartMenu":  {
+                                                 "exists":  true,
+                                                 "target":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\drone-dream-desktop.exe",
+                                                 "sha256":  "a1e20555e3544d0a2d55763d4d72cb9834ef3fbd45e70bc0871b2e53ecf90ba4"
+                                             },
+                      "universalDesktop":  {
+                                               "exists":  true,
+                                               "target":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\drone-dream-desktop.exe",
+                                               "sha256":  "32742000f94f875f400485bbc6b1598dabc29db0fe0a8fc2c215fd2238faca8c"
+                                           },
+                      "simStartMenu":  {
+                                           "exists":  false,
+                                           "target":  null,
+                                           "sha256":  null
+                                       },
+                      "simDesktop":  {
+                                         "exists":  false,
+                                         "target":  null,
+                                         "sha256":  null
+                                     },
+                      "labStartMenu":  {
+                                           "exists":  false,
+                                           "target":  null,
+                                           "sha256":  null
+                                       },
+                      "labDesktop":  {
+                                         "exists":  false,
+                                         "target":  null,
+                                         "sha256":  null
+                                     },
+                      "fieldStartMenu":  {
+                                             "exists":  false,
+                                             "target":  null,
+                                             "sha256":  null
+                                         },
+                      "fieldDesktop":  {
+                                           "exists":  false,
+                                           "target":  null,
+                                           "sha256":  null
+                                       }
+                  },
+    "runtime":  {
+                    "root":  "E:\\DroneDream",
+                    "exists":  true,
+                    "topLevel":  [
+                                     {
+                                         "name":  ".dronedream-runtime-root.json",
+                                         "kind":  "file",
+                                         "length":  200,
+                                         "lastWriteTimeUtc":  "2026-08-02T05:35:27.8568453Z"
+                                     },
+                                     {
+                                         "name":  "ext4.vhdx",
+                                         "kind":  "file",
+                                         "length":  22618832896,
+                                         "lastWriteTimeUtc":  "2026-08-04T23:53:56.6016656Z"
+                                     }
+                                 ]
+                },
+    "webView2":  {
+                     "healthy":  true,
+                     "registryKey":  "HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\EdgeUpdate\\Clients\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+                     "version":  "151.0.4129.59",
+                     "binary":  "C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\151.0.4129.59\\msedgewebview2.exe",
+                     "binarySha256":  "e50db9cc5fba98e20e99ef46d4c259ae87df5bad69472822a789aa88a3d714c6"
+                 },
+    "universalRuntimeStatus":  {
+                                   "operation":  {
+                                                     "available":  true,
+                                                     "exitCode":  0
+                                                 },
+                                   "handoff":  {
+                                                   "available":  true,
+                                                   "exitCode":  0
+                                               }
+                               },
+    "processes":  [
+
+                  ]
+}
