@@ -67,6 +67,19 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert payload["profileIdIsCompatibilityIdentity"] is True  # type: ignore[index]
     assert payload["uiModeNeverGrantsCapability"] is True  # type: ignore[index]
     assert profile["workspaceModes"] == ["universal", "sim", "lab", "field"]
+    desktop_contracts = profile["desktopContracts"]
+    assert desktop_contracts == {  # type: ignore[comparison-overlap]
+        "coexistence": "distribution/desktop/edition-coexistence.v1.json",
+        "browserAuth": "distribution/desktop/edition-browser-auth.v1.json",
+        "runtimeAndUpdaterFamilies": (
+            "distribution/desktop/edition-runtime-update-families.v1.json"
+        ),
+        "editionId": "universal",
+        "authClientId": "dronedream-desktop-universal",
+        "bundleIdentifier": "io.dronedream.desktop.universal",
+        "credentialVaultNamespace": "DroneDream/Auth/universal/v1",
+        "updaterMetadataFileName": "latest-universal.json",
+    }
     assert profile["brand"]["presentationOnly"] is True  # type: ignore[index]
     assert profile["brand"]["grantsHardwareAuthority"] is False  # type: ignore[index]
     authority = profile["capabilityAuthority"]
@@ -80,6 +93,16 @@ def test_universal_overlay_uses_mother_brand_and_canonical_windows_icon() -> Non
     assert overlay["productName"] == "DroneDream-Universal"
     assert overlay["app"]["windows"][0]["title"] == "DroneDream"  # type: ignore[index]
     assert "../../brand/generated/universal/windows/icon.ico" in overlay["bundle"]["icon"]  # type: ignore[index]
+    resources = overlay["bundle"]["resources"]  # type: ignore[index]
+    assert resources["../../distribution/desktop/edition-coexistence.v1.json"] == (  # type: ignore[index]
+        "distribution/desktop/edition-coexistence.v1.json"
+    )
+    assert resources["../../distribution/desktop/edition-browser-auth.v1.json"] == (  # type: ignore[index]
+        "distribution/desktop/edition-browser-auth.v1.json"
+    )
+    assert resources[
+        "../../distribution/desktop/edition-runtime-update-families.v1.json"
+    ] == "distribution/desktop/edition-runtime-update-families.v1.json"  # type: ignore[index]
 
 
 def test_universal_engine_payload_contains_all_editions_without_build_plans() -> None:
@@ -93,6 +116,9 @@ def test_universal_engine_payload_contains_all_editions_without_build_plans() ->
         "distribution/editions/sim.v1.json",
         "distribution/editions/lab.v1.json",
         "distribution/editions/field.v1.json",
+        "distribution/desktop/edition-coexistence.v1.json",
+        "distribution/desktop/edition-browser-auth.v1.json",
+        "distribution/desktop/edition-runtime-update-families.v1.json",
         "distribution/safety/edition-execution-gate.v1.json",
         "distribution/vehicle-packs/registry.v1.json",
     } <= paths
@@ -117,7 +143,11 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         '$env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"',
         '$env:DRONEDREAM_DESKTOP_EDITION_ID = "universal"',
         '$env:VITE_DRONEDREAM_EDITION = "universal"',
+        '$browserAuth.identityBinding.contractSha256 -cne $coexistenceSha256',
+        '$browserAuthIdentity.authClientId -cne $coexistenceIdentity.authClientId',
         'Universal browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID.',
+        'providerOAuthClientIdSha256 = $providerOAuthClientIdSha256',
+        'browserAuthStatus = "pending-exact-headed-roundtrip-validation"',
         'Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH.',
         'buildCount = 1',
         '$buildReceiptPath = "${artifactPath}.receipt.json"',
@@ -136,6 +166,7 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         assert fragment in script
     assert "-AllowUnsignedUpdater" not in script
     assert "$sharedArguments" not in script
+    assert '$env:DRONEDREAM_OAUTH_CLIENT_ID =' not in script
 
 
 def test_website_contract_publishes_exact_four_files_without_rename() -> None:
@@ -149,6 +180,9 @@ def test_website_contract_publishes_exact_four_files_without_rename() -> None:
         "DroneDream-Universal-1.0.0.exe.receipt.json",
     ]
     assert handoff["consistency"]["updaterSignatureRequired"] is True  # type: ignore[index]
+    assert handoff["consistency"]["installerLifecycleAndBrowserAuthReceiptsRequired"] is True  # type: ignore[index]
+    assert handoff["consistency"]["crossEditionDesktopSessionReuseAllowed"] is False  # type: ignore[index]
+    assert "browserAuthBoundary" in handoff["requiredHandoffFields"]
 
 
 def test_existing_candidate_finalizer_preserves_product_source_and_never_rebuilds() -> None:
@@ -180,6 +214,10 @@ def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None
         'io.dronedream.desktop.universal',
         'install-app-only',
         'hardwareActionDecision -cne "deny"',
+        'distribution\\desktop\\edition-coexistence.v1.json',
+        'distribution\\desktop\\edition-browser-auth.v1.json',
+        'distribution\\desktop\\edition-runtime-update-families.v1.json',
+        'browserAuthIdentity[0].authClientId -cne "dronedream-desktop-universal"',
         'dronedream-vehicle-pack-registry',
         '$registry.packs',
         '$_.currentValidationTier',
@@ -190,6 +228,8 @@ def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None
         'Universal lifecycle preflight found pre-existing product state',
         'Protected existing DroneDream, Runtime, shortcut, registry, or WebView2 state changed',
         'releaseReady = $false',
+        'installerLifecycleReady = $true',
+        'browserAuth = "not-run-separate-headed-gate"',
         'if ($Execute)',
     ):
         assert fragment in lifecycle
@@ -197,3 +237,4 @@ def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None
     assert "tauri build" not in lifecycle
     assert "npm.cmd" not in lifecycle
     assert "engine_pack.py" not in lifecycle
+    assert "releaseReady = $true" not in lifecycle

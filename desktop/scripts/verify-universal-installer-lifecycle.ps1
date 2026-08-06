@@ -217,6 +217,9 @@ function Assert-UniversalInstalled {
         (Join-Path $installDirectory "distribution\editions\sim.v1.json"),
         (Join-Path $installDirectory "distribution\editions\lab.v1.json"),
         (Join-Path $installDirectory "distribution\editions\field.v1.json"),
+        (Join-Path $installDirectory "distribution\desktop\edition-coexistence.v1.json"),
+        (Join-Path $installDirectory "distribution\desktop\edition-browser-auth.v1.json"),
+        (Join-Path $installDirectory "distribution\desktop\edition-runtime-update-families.v1.json"),
         (Join-Path $installDirectory "distribution\safety\edition-execution-gate.v1.json"),
         (Join-Path $installDirectory "distribution\vehicle-packs\registry.v1.json"),
         (Join-Path $installDirectory "brand\brand-editions.v1.json"),
@@ -262,6 +265,28 @@ function Assert-UniversalInstalled {
     if ($profile.capabilityAuthority.frontendCanAuthorize -ne $false -or
         $profile.capabilityAuthority.hardwareActionDecision -cne "deny") {
         throw "$Stage does not preserve Universal capability denial."
+    }
+    $coexistencePath = Join-Path $installDirectory "distribution\desktop\edition-coexistence.v1.json"
+    $browserAuthPath = Join-Path $installDirectory "distribution\desktop\edition-browser-auth.v1.json"
+    $runtimeFamiliesPath = Join-Path $installDirectory "distribution\desktop\edition-runtime-update-families.v1.json"
+    $coexistence = Get-Content -LiteralPath $coexistencePath -Raw | ConvertFrom-Json
+    $browserAuth = Get-Content -LiteralPath $browserAuthPath -Raw | ConvertFrom-Json
+    $runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw | ConvertFrom-Json
+    $installedCoexistenceSha256 = (
+        Get-FileHash -LiteralPath $coexistencePath -Algorithm SHA256
+    ).Hash.ToLowerInvariant()
+    $coexistenceIdentity = @($coexistence.editions | Where-Object { $_.editionId -ceq "universal" })
+    $browserAuthIdentity = @($browserAuth.editions | Where-Object { $_.editionId -ceq "universal" })
+    $runtimeFamilyIdentity = @($runtimeFamilies.editions | Where-Object { $_.editionId -ceq "universal" })
+    if ($coexistenceIdentity.Count -ne 1 -or
+        $browserAuthIdentity.Count -ne 1 -or
+        $runtimeFamilyIdentity.Count -ne 1 -or
+        $browserAuth.identityBinding.contractSha256 -cne $installedCoexistenceSha256 -or
+        $browserAuthIdentity[0].authClientId -cne "dronedream-desktop-universal" -or
+        $browserAuthIdentity[0].credentialVaultNamespace -cne "DroneDream/Auth/universal/v1" -or
+        $runtimeFamilyIdentity[0].runtimeProfileId -cne "unified-sim-lab" -or
+        $runtimeFamilyIdentity[0].updaterMetadataFileName -cne "latest-universal.json") {
+        throw "$Stage installed inconsistent Universal coexistence, browser-auth, or Runtime/update contracts."
     }
 
     $expectedTarget = [IO.Path]::GetFullPath($application)
@@ -399,8 +424,10 @@ $receipt = [ordered]@{
         shortcut = "not-run"
         webView2 = "preflight-usable"
         locales = "not-run"
+        browserAuth = "not-run-separate-headed-gate"
     }
     events = $lifecycleEvents
+    installerLifecycleReady = $false
     releaseReady = $false
 }
 
@@ -434,7 +461,7 @@ try {
         Assert-ProtectedStateUnchanged -Before $protectedBefore -Stage "final-uninstall"
         $receipt.lifecycle.uninstall = "pass-both-cycles"
         $receipt.isolation.testCreatedProductRegistrationRemoved = $registrationRemoved
-        $receipt.releaseReady = $true
+        $receipt.installerLifecycleReady = $true
     }
     else {
         $receipt.lifecycle.freshInstall = "plan-only"
@@ -484,7 +511,7 @@ finally {
 }
 
 if ($Execute) {
-    Write-Host "Universal isolated lifecycle verified without replacing the existing DroneDream application or Runtime."
+    Write-Host "Universal isolated lifecycle verified; separate exact browser-auth validation still gates release readiness."
 }
 else {
     Write-Host "Universal lifecycle plan verified; no application, Runtime, shortcut, or registry state was changed."

@@ -57,6 +57,11 @@ RUNTIME_DISTRIBUTION_BASE_PATHS = (
     "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
     "distribution/vehicle-packs/registry.v1.json",
 )
+UNIFIED_DESKTOP_CONTRACT_PATHS = (
+    "distribution/desktop/edition-browser-auth.v1.json",
+    "distribution/desktop/edition-coexistence.v1.json",
+    "distribution/desktop/edition-runtime-update-families.v1.json",
+)
 SOURCE_BASE_PATHS = (
     "backend/app",
     "backend/alembic",
@@ -335,7 +340,7 @@ def source_paths_for_profile(repository_root: Path, edition_profile: str) -> tup
     source_paths = (*SOURCE_BASE_PATHS, *runtime_distribution_paths(repository_root))
     if edition_profile == FIELD_EDITION_PROFILE:
         return tuple(path for path in source_paths if path not in FIELD_EXCLUDED_SOURCE_PATHS)
-    return source_paths
+    return (*source_paths, *UNIFIED_DESKTOP_CONTRACT_PATHS)
 
 
 def is_excluded_for_profile(path: str, edition_profile: str) -> bool:

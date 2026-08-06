@@ -19,6 +19,17 @@ function Get-FileSha256Lower([string]$Path) {
     return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
 }
 
+function Get-StringSha256Lower([string]$Value) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try {
+        return ([BitConverter]::ToString(
+            $algorithm.ComputeHash([Text.Encoding]::UTF8.GetBytes($Value))
+        )).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $algorithm.Dispose()
+    }
+}
+
 function New-RepoFileRef([string]$RelativePath) {
     $path = Join-Path $repoRoot $RelativePath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -46,17 +57,55 @@ if ($sourceStatus) {
 
 $profilePath = Join-Path $repoRoot "distribution\build-profiles\universal-1.0.0.v1.json"
 $overlayPath = Join-Path $repoRoot "desktop\src-tauri\tauri.universal.conf.json"
+$coexistencePath = Join-Path $repoRoot "distribution\desktop\edition-coexistence.v1.json"
+$browserAuthPath = Join-Path $repoRoot "distribution\desktop\edition-browser-auth.v1.json"
+$runtimeFamiliesPath = Join-Path $repoRoot "distribution\desktop\edition-runtime-update-families.v1.json"
 $profile = Get-Content -LiteralPath $profilePath -Raw -Encoding UTF8 | ConvertFrom-Json
 $overlay = Get-Content -LiteralPath $overlayPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$coexistence = Get-Content -LiteralPath $coexistencePath -Raw -Encoding UTF8 | ConvertFrom-Json
+$browserAuth = Get-Content -LiteralPath $browserAuthPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $overlay.productName -cne "DroneDream-Universal" -or
     $profile.enginePackProfile -cne "unified-sim-lab" -or
+    $profile.desktopContracts.coexistence -cne "distribution/desktop/edition-coexistence.v1.json" -or
+    $profile.desktopContracts.browserAuth -cne "distribution/desktop/edition-browser-auth.v1.json" -or
+    $profile.desktopContracts.runtimeAndUpdaterFamilies -cne "distribution/desktop/edition-runtime-update-families.v1.json" -or
+    $profile.releaseGates.installerLifecycleReceiptRequired -ne $true -or
+    $profile.releaseGates.exactEditionBrowserAuthReceiptRequired -ne $true -or
+    $profile.releaseGates.crossEditionSessionReuseAllowed -ne $false -or
+    $profile.releaseGates.releaseReadyBeforeBothReceipts -ne $false -or
     $profile.brand.presentationOnly -ne $true -or
     $profile.brand.grantsHardwareAuthority -ne $false -or
     $profile.capabilityAuthority.frontendCanAuthorize -ne $false -or
     $profile.capabilityAuthority.hardwareActionDecision -cne "deny") {
     throw "Universal build identity or safety policy drifted."
 }
+$coexistenceMatches = @($coexistence.editions | Where-Object { $_.editionId -ceq "universal" })
+$browserAuthMatches = @($browserAuth.editions | Where-Object { $_.editionId -ceq "universal" })
+$runtimeFamilyMatches = @($runtimeFamilies.editions | Where-Object { $_.editionId -ceq "universal" })
+if ($coexistence.kind -cne "dronedream-desktop-edition-coexistence" -or
+    $browserAuth.kind -cne "dronedream-desktop-edition-browser-auth" -or
+    $runtimeFamilies.kind -cne "dronedream-desktop-runtime-update-families" -or
+    $coexistenceMatches.Count -ne 1 -or
+    $browserAuthMatches.Count -ne 1 -or
+    $runtimeFamilyMatches.Count -ne 1) {
+    throw "Universal desktop identity registries are invalid or ambiguous."
+}
+$coexistenceIdentity = $coexistenceMatches[0]
+$browserAuthIdentity = $browserAuthMatches[0]
+$runtimeFamilyIdentity = $runtimeFamilyMatches[0]
+$coexistenceSha256 = Get-FileSha256Lower $coexistencePath
+if ($browserAuth.identityBinding.contractSha256 -cne $coexistenceSha256 -or
+    $browserAuthIdentity.authClientId -cne $coexistenceIdentity.authClientId -or
+    $browserAuthIdentity.authClientId -cne $profile.desktopContracts.authClientId -or
+    $browserAuthIdentity.bundleIdentifier -cne $profile.desktopContracts.bundleIdentifier -or
+    $browserAuthIdentity.credentialVaultNamespace -cne $profile.desktopContracts.credentialVaultNamespace -or
+    $runtimeFamilyIdentity.runtimeProfileId -cne $profile.enginePackProfile -or
+    $runtimeFamilyIdentity.updaterMetadataFileName -cne $profile.desktopContracts.updaterMetadataFileName) {
+    throw "Universal coexistence, browser-auth, Runtime, or updater identity drifted."
+}
+$expectedAppAuthClientId = [string]$browserAuthIdentity.authClientId
 
 if (-not $CargoTargetDir) {
     $CargoTargetDir = Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache\universal-cargo-target"
@@ -90,12 +139,24 @@ if (-not $Build) {
         profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
         overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
         websiteHandoff = New-RepoFileRef "distribution\universal\release\website-exact-exe-handoff.v1.json"
+        desktopContracts = [ordered]@{
+            coexistence = New-RepoFileRef "distribution\desktop\edition-coexistence.v1.json"
+            browserAuth = New-RepoFileRef "distribution\desktop\edition-browser-auth.v1.json"
+            runtimeAndUpdaterFamilies = New-RepoFileRef "distribution\desktop\edition-runtime-update-families.v1.json"
+        }
+        appAuthClientId = $expectedAppAuthClientId
+        providerOAuthClientId = "external-registered-public-config-required"
         enginePackProfile = "unified-sim-lab"
         enginePackPayloadContract = "dronedream-universal-engine-payload/v1"
         workspaceModes = @("universal", "sim", "lab", "field")
         presentationSwitchGrantsAuthority = $false
         validatedVehiclePackCount = 0
         hardwareActionDecision = "deny"
+        releaseGates = [ordered]@{
+            installerLifecycleReceiptRequired = $true
+            exactEditionBrowserAuthReceiptRequired = $true
+            releaseReadyBeforeBothReceipts = $false
+        }
         buildInvoked = $false
     } | ConvertTo-Json -Depth 6
     exit 0
@@ -110,6 +171,7 @@ if (-not $env:DRONEDREAM_OAUTH_CLIENT_ID -or
     $env:DRONEDREAM_OAUTH_CLIENT_ID -like 'unregistered-*') {
     throw "Universal browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID."
 }
+$providerOAuthClientIdSha256 = Get-StringSha256Lower $env:DRONEDREAM_OAUTH_CLIENT_ID
 if (Test-Path -LiteralPath $outputRootFull) {
     throw "Refusing to replace an existing Universal handoff directory: $outputRootFull"
 }
@@ -200,6 +262,9 @@ $requiredEnginePayloadPaths = @(
     "distribution/editions/field.v1.json",
     "distribution/editions/lab.v1.json",
     "distribution/editions/sim.v1.json",
+    "distribution/desktop/edition-coexistence.v1.json",
+    "distribution/desktop/edition-browser-auth.v1.json",
+    "distribution/desktop/edition-runtime-update-families.v1.json",
     "distribution/safety/edition-execution-gate.v1.json",
     "distribution/vehicle-packs/registry.v1.json"
 )
@@ -262,6 +327,15 @@ $buildReceipt = [ordered]@{
     profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
     overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
     brand = New-RepoFileRef "brand\brand-editions.v1.json"
+    desktopContracts = [ordered]@{
+        coexistence = New-RepoFileRef "distribution\desktop\edition-coexistence.v1.json"
+        browserAuth = New-RepoFileRef "distribution\desktop\edition-browser-auth.v1.json"
+        runtimeAndUpdaterFamilies = New-RepoFileRef "distribution\desktop\edition-runtime-update-families.v1.json"
+        appAuthClientId = $expectedAppAuthClientId
+        providerOAuthClientIdSha256 = $providerOAuthClientIdSha256
+        browserAuthStatus = "pending-exact-headed-roundtrip-validation"
+        crossEditionSessionReuseAllowed = $false
+    }
     enginePack = [ordered]@{
         profileCompatibilityId = [string]$engineManifestMatch.Document.editionProfile.profileId
         payloadContractId = "dronedream-universal-engine-payload/v1"
@@ -290,6 +364,12 @@ $buildReceipt = [ordered]@{
         shortcut = "pending-isolated-red-validation"
         webView2 = "pending-isolated-red-validation"
         locales = "pending-en-zh-red-validation"
+        browserAuth = "pending-exact-headed-roundtrip-validation"
+    }
+    releaseGates = [ordered]@{
+        installerLifecycleReceiptRequired = $true
+        exactEditionBrowserAuthReceiptRequired = $true
+        releaseReadyBeforeBothReceipts = $false
     }
     releaseReady = $false
 }

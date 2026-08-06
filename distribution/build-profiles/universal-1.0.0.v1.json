@@ -29,6 +29,16 @@
     "grantsHardwareAuthority": false
   },
   "workspaceModes": ["universal", "sim", "lab", "field"],
+  "desktopContracts": {
+    "coexistence": "distribution/desktop/edition-coexistence.v1.json",
+    "browserAuth": "distribution/desktop/edition-browser-auth.v1.json",
+    "runtimeAndUpdaterFamilies": "distribution/desktop/edition-runtime-update-families.v1.json",
+    "editionId": "universal",
+    "authClientId": "dronedream-desktop-universal",
+    "bundleIdentifier": "io.dronedream.desktop.universal",
+    "credentialVaultNamespace": "DroneDream/Auth/universal/v1",
+    "updaterMetadataFileName": "latest-universal.json"
+  },
   "capabilityAuthority": {
     "frontendCanAuthorize": false,
     "requiredDecisionLayers": ["native", "backend", "runtime"],
@@ -64,5 +74,12 @@
     "shortcut": "must use the canonical Universal icon",
     "webView2": "embedded bootstrapper and post-install health check required",
     "locales": ["en", "zh-CN"]
+  },
+  "releaseGates": {
+    "installerLifecycleReceiptRequired": true,
+    "exactEditionBrowserAuthReceiptRequired": true,
+    "browserAuthMayUseExistingBrowserCookie": true,
+    "crossEditionSessionReuseAllowed": false,
+    "releaseReadyBeforeBothReceipts": false
   }
 }

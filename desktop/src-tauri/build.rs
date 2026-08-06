@@ -155,7 +155,6 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
         !release_build || !oauth_client_id.starts_with("unregistered-"),
         "release builds cannot use an unregistered OAuth client"
     );
-
     println!("cargo:rustc-env=DRONEDREAM_DESKTOP_EDITION_ID={edition_id}");
     println!("cargo:rustc-env=DRONEDREAM_EDITION_PROFILE={edition_profile}");
     println!("cargo:rustc-env=DRONEDREAM_OAUTH_CLIENT_ID={oauth_client_id}");

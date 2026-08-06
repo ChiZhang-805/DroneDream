@@ -45,6 +45,9 @@
     "shortcutBoundary",
     "webView2Boundary",
     "localeBoundary",
+    "editionCoexistenceBoundary",
+    "browserAuthBoundary",
+    "runtimeUpdateFamilyBoundary",
     "releaseReady"
   ],
   "consistency": {
@@ -53,6 +56,8 @@
     "uniqueShaUrlTagRequired": true,
     "sourceAndEvidenceMustRemainSeparate": true,
     "updaterSignatureRequired": true,
-    "authenticodeMayBeNotSignedForInternalTest": true
+    "authenticodeMayBeNotSignedForInternalTest": true,
+    "installerLifecycleAndBrowserAuthReceiptsRequired": true,
+    "crossEditionDesktopSessionReuseAllowed": false
   }
 }
