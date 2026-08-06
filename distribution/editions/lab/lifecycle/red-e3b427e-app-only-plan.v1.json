@@ -1,0 +1,323 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-red-app-only-lifecycle-plan",
+  "planVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "green-plan-frozen-no-execute",
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+    "artifactProductSourceTree": "eec24c0f1d3d537c8f0da5ef1b015bd129c6d39a",
+    "buildCheckoutCommit": "8885212d2702ae933c5e62fbb5a3c22d1bda8a2b",
+    "buildCheckoutTree": "297341f5af3d0bc478ea3e8a581a713163b7c7f6",
+    "preparationBaseCommit": "51ad0961ef7ce7ecabb45000d578947dd54fb598",
+    "planEvidenceCommitPolicy": "commit-containing-this-plan-verifier-target-and-tests",
+    "planEvidenceIsArtifactSource": false,
+    "productRuntimeSemanticsChanged": false
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12081900,
+    "sha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4",
+    "version": "1.0.0",
+    "productName": "DroneDream · LAB",
+    "authenticodeStatus": "NotSigned",
+    "updaterSignatureSha256": "722be7a85928c7b601917418fab7899170bd5bd855b88d4db7b17f0093c109c9",
+    "mayBeRebuiltRelabeledOverwrittenOrDeletedByThisPlan": false
+  },
+  "buildReceipt": {
+    "path": "distribution/build-receipts/lab-preview-1.0.0-e3b427e-yellow-attempt7.exact-artifact.json",
+    "bytes": 8463,
+    "sha256": "63d3577c614d7e839e22ed8a57e6ffdec9eb36cdbdfae82581454c2e7853b4cd"
+  },
+  "verificationTool": {
+    "path": "distribution/editions/lab/lifecycle/verify-lab-e3b427e-lifecycle-plan.ps1",
+    "bytes": 9029,
+    "sha256": "882a8961e4808ab4f1a15bd74a4e470d79b9dfcd4789c4ffc93551306d5f01f1",
+    "executeParameterPresent": false,
+    "mutationCapabilityPresent": false,
+    "purpose": "read-only exact artifact, plan, target, provider, fresh-state, and protected-state verification"
+  },
+  "targetReceipt": {
+    "path": "distribution/editions/lab/lifecycle/red-e3b427e-app-only-target-receipt.v1.json",
+    "bytes": 3169,
+    "sha256": "c16327e43f45c5b9e0b0dd89ebc224ccdfe0241bad23d36f9623527060f8339c",
+    "state": "target-only-no-execution-evidence"
+  },
+  "identity": {
+    "internalProductName": "DroneDream-Lab",
+    "displayName": "DroneDream · LAB",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "appUserModelId": "io.dronedream.desktop.lab",
+    "installMode": "currentUser",
+    "installRoot": "C:/Users/zju20/AppData/Local/DroneDream-Lab",
+    "uninstallRegistryKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Lab",
+    "productRegistryKey": "HKCU/Software/DroneDream/DroneDream-Lab",
+    "mainBinaryName": "drone-dream-desktop.exe",
+    "desktopShortcut": "C:/Users/zju20/Desktop/DroneDream · LAB.lnk",
+    "startMenuShortcut": "C:/Users/zju20/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/DroneDream · LAB.lnk",
+    "roamingAppData": "C:/Users/zju20/AppData/Roaming/io.dronedream.desktop.lab",
+    "localAppData": "C:/Users/zju20/AppData/Local/io.dronedream.desktop.lab"
+  },
+  "ownedIsolation": {
+    "providerClass": "current-user-owned-app-namespace",
+    "providerState": "read-only-preconditions-observed-no-mutation",
+    "ownedBase": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED",
+    "runId": "lab-e3b427e-segment-a-red1",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-e3b427e-segment-a-red1",
+    "runRootObservedAbsent": true,
+    "systemVirtualizationInstallAllowed": false,
+    "userExistingInstallOverwriteAllowed": false,
+    "runtimeOwnershipClaimed": false,
+    "mutationPaths": [
+      "C:/Users/zju20/AppData/Local/DroneDream-Lab",
+      "C:/Users/zju20/AppData/Roaming/io.dronedream.desktop.lab",
+      "C:/Users/zju20/AppData/Local/io.dronedream.desktop.lab",
+      "C:/Users/zju20/Desktop/DroneDream · LAB.lnk",
+      "C:/Users/zju20/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/DroneDream · LAB.lnk"
+    ],
+    "mutationRegistryKeys": [
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Lab",
+      "HKCU/Software/DroneDream/DroneDream-Lab"
+    ]
+  },
+  "providers": {
+    "webView2": {
+      "provider": "existing-system-webview2-runtime-read-only",
+      "observedVersion": "151.0.4129.59",
+      "installRepairOrUpdateAllowed": false,
+      "networkBootstrapAllowed": false,
+      "versionParityRequired": true
+    },
+    "browserAndOAuth": {
+      "segment": "B",
+      "state": "blocked-not-authorized-not-required-for-segment-a",
+      "browserLaunchAllowed": false,
+      "providerCallAllowed": false,
+      "accountReadAllowed": false,
+      "tokenReadOrExchangeAllowed": false,
+      "clientIdSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+      "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+      "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
+      "disposableProviderBoundaryProven": false
+    }
+  },
+  "protectedState": {
+    "observedAtUtc": "2026-08-06T18:43:37.3524973Z",
+    "observedStateSha256": "10026dda1fe2a1fd4080c2fdbb0132413f18a5dabf7f792d71e64f0eba5d106b",
+    "mustRevalidateImmediatelyBeforeAnyRedMutation": true,
+    "driftDecision": "fail-closed-replan-and-reapprove",
+    "labOwnedNamespaceFresh": true,
+    "droneDreamProcessCount": 0,
+    "oauthPort49212ListenerCount": 0,
+    "baseApp": {
+      "installRootExists": true,
+      "uninstallKeyValueCount": 10,
+      "uninstallKeySha256": "27e2fa89d89c9476a4826c61bee673b84282b27e61a0be1d1a5e117580b824fa",
+      "productKeyValueCount": 5,
+      "productKeySha256": "b64bc332e095c34c6239d7b9bf9194180c11ccc1df60fd496ee2fe760be25c66",
+      "desktopShortcutExists": true,
+      "startMenuShortcutExists": true
+    },
+    "runtime": {
+      "cRootExists": false,
+      "zRootExists": true,
+      "mutationAllowed": false
+    },
+    "otherEditions": {
+      "universalInstallAndKeysAbsent": true,
+      "simInstallAndUninstallKeyAbsent": true,
+      "simProductKeyExists": true,
+      "simProductKeyValueCount": 4,
+      "simProductKeySha256": "c80981cb92b2e26f03bc581a3440b0710167edc380dfa5c5a1e5a410c696cec6",
+      "fieldInstallAndKeysAbsent": true,
+      "parityRequiredAfterEveryMutationSegment": true,
+      "deletionAllowed": false
+    }
+  },
+  "segments": [
+    {
+      "id": "A0",
+      "name": "read-only-preflight-and-protected-baseline",
+      "mutationAllowed": false,
+      "sequence": [
+        "verify-plan-tool-target-and-exact-artifact",
+        "verify-owned-run-root-absent",
+        "verify-lab-owned-namespace-fresh",
+        "verify-no-app-process-or-oauth-listener",
+        "verify-existing-webview2-without-repair",
+        "snapshot-base-app-runtime-other-editions-and-shortcuts"
+      ]
+    },
+    {
+      "id": "A1",
+      "name": "fresh-install-and-first-live-ui",
+      "mutationAllowedOnlyAfterExactRedSignal": true,
+      "sequence": [
+        "fresh-silent-current-user-install-once",
+        "verify-lab-registration-and-canonical-shortcuts",
+        "verify-protected-state-parity",
+        "launch-owned-lab-app-once-with-local-webview2-inspection",
+        "verify-en-and-zh",
+        "verify-settings-single-screen",
+        "verify-canonical-lab-green-theme",
+        "verify-settings-theme-workspace-authority-false-and-zero-pack-deny",
+        "close-owned-lab-app-once"
+      ]
+    },
+    {
+      "id": "A2",
+      "name": "same-version-overlay-and-second-live-ui",
+      "mutationAllowedOnlyAfterExactRedSignal": true,
+      "sequence": [
+        "same-version-silent-overlay-install-once",
+        "verify-registration-shortcuts-owned-files-and-protected-state-parity",
+        "launch-owned-lab-app-once-with-local-webview2-inspection",
+        "verify-en-zh-settings-theme-persistence",
+        "verify-authority-false-and-zero-auth-network",
+        "close-owned-lab-app-once"
+      ]
+    },
+    {
+      "id": "A3",
+      "name": "uninstall-owned-cleanup-and-rollback",
+      "mutationAllowedOnlyAfterExactRedSignal": true,
+      "sequence": [
+        "run-exact-installed-uninstaller-once",
+        "verify-lab-registration-shortcuts-and-app-data-removed",
+        "verify-exact-owned-preference-values",
+        "remove-exact-owned-preference-key-once",
+        "verify-owned-residue-absent",
+        "verify-base-app-runtime-other-editions-webview2-byte-exact-parity",
+        "freeze-target-receipt"
+      ]
+    },
+    {
+      "id": "B",
+      "name": "independent-browser-oauth-boundary",
+      "state": "blocked-separate-authorization-required",
+      "blocksSegmentA": false,
+      "executionCounts": {
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "providerCalls": 0,
+        "accountReads": 0,
+        "tokenReadsOrExchanges": 0
+      }
+    }
+  ],
+  "exactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "applicationCloses": 2,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "shortcutIdentityChecks": 3,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "languageSurfaceAssertions": 4,
+    "settingsSingleScreenChecks": 2,
+    "labThemeChecks": 2,
+    "authorityFalseChecks": 2,
+    "protectedStateSnapshots": 5,
+    "protectedStateParityChecks": 4,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "accountReads": 0,
+    "artifactBuilds": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "uiAcceptance": {
+    "languages": [
+      "en",
+      "zh-CN"
+    ],
+    "settingsSingleScreenNoVerticalScroll": true,
+    "fixedThemeEdition": "lab",
+    "themePalette": [
+      "#A7E84A",
+      "#20C77A",
+      "#087E69"
+    ],
+    "settingsOrThemeGrantsHardwareAuthority": false,
+    "workspaceSwitchCountsAsAuthority": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "frontendSettingsThemeOrWorkspaceCountsAsAuthority": false
+  },
+  "rollback": {
+    "uninstallerPath": "C:/Users/zju20/AppData/Local/DroneDream-Lab/uninstall.exe",
+    "maximumUninstallerInvocations": 1,
+    "ownedPreferenceCleanup": {
+      "maximumInvocations": 1,
+      "registryKey": "HKCU/Software/DroneDream/DroneDream-Lab",
+      "exactValueNames": [
+        "(default)",
+        "DroneDreamRuntimeDrive",
+        "DroneDreamRuntimeInstallMode",
+        "DroneDreamRuntimeOperationProtocol"
+      ],
+      "exactValues": {
+        "(default)": "C:/Users/zju20/AppData/Local/DroneDream-Lab",
+        "DroneDreamRuntimeDrive": "",
+        "DroneDreamRuntimeInstallMode": "install-app-only",
+        "DroneDreamRuntimeOperationProtocol": "2"
+      },
+      "extraOrMissingValueDecision": "deny",
+      "sharedParentDeletionAllowed": false
+    },
+    "stopAfterFirstFailureWithoutRetry": true,
+    "historicalArtifactOrEvidenceDeletionAllowed": false
+  },
+  "redReadiness": {
+    "planVerifierAndTargetFrozen": true,
+    "exactRedRequestable": false,
+    "blockers": [
+      "A new execution adapter bound to this exact plan and Settings/LAB-theme assertions is not frozen; the historical debd064 runner must not be reused or relabeled.",
+      "A new exact RED start signal has not been issued."
+    ]
+  },
+  "authorization": {
+    "planPreparationAuthorized": true,
+    "executionAuthorized": false,
+    "installerExecutionAllowed": false,
+    "applicationLaunchAllowed": false,
+    "runtimeStartOrMigrationAllowed": false,
+    "browserOrOauthAllowed": false,
+    "providerCallAllowed": false,
+    "hardwareAccessAllowed": false,
+    "newExactRedStartSignalRequired": true
+  },
+  "executedCounts": {
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "browserLaunches": 0,
+    "providerCalls": 0,
+    "runtimeStarts": 0,
+    "px4OrGazeboStarts": 0,
+    "hardwareActions": 0
+  },
+  "nonClaims": {
+    "redStartSignalReceived": false,
+    "installerExecuted": false,
+    "applicationLaunched": false,
+    "runtimeStarted": false,
+    "providerCalled": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-red-lifecycle-target-receipt-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "target-only-no-execution-evidence",
+  "artifact": {
+    "productSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12081900,
+    "sha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4",
+    "authenticodeStatus": "NotSigned"
+  },
+  "requiredOutcome": {
+    "result": "segment-a-app-only-passed",
+    "freshInstall": "passed",
+    "overlayInstall": "passed",
+    "uninstallAndOwnedRollback": "passed",
+    "shortcutIdentity": "passed",
+    "webView2ExistingRuntimeOnly": "passed",
+    "languages": [
+      "en",
+      "zh-CN"
+    ],
+    "settingsSingleScreen": "passed",
+    "fixedThemeEdition": "lab",
+    "themePalette": [
+      "#A7E84A",
+      "#20C77A",
+      "#087E69"
+    ],
+    "settingsOrThemeGrantsHardwareAuthority": false,
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny"
+  },
+  "requiredExactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "applicationCloses": 2,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "shortcutIdentityChecks": 3,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "languageSurfaceAssertions": 4,
+    "settingsSingleScreenChecks": 2,
+    "labThemeChecks": 2,
+    "authorityFalseChecks": 2,
+    "protectedStateSnapshots": 5,
+    "protectedStateParityChecks": 4,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "accountReads": 0,
+    "artifactBuilds": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "requiredProtectedEvidence": {
+    "baseAppByteExactParity": true,
+    "runtimeRootParity": true,
+    "otherEditionRootRegistryAndShortcutParity": true,
+    "existingSimProductKeyByteExactParity": true,
+    "webView2VersionParity": true,
+    "sharedParentRegistryDeletionAllowed": false
+  },
+  "requiredFinalState": {
+    "labInstallRootAbsent": true,
+    "labUninstallKeyAbsent": true,
+    "labOwnedAppDataAbsent": true,
+    "labShortcutsAbsent": true,
+    "labOwnedPreferenceKeyAbsentAfterExactCleanup": true,
+    "droneDreamProcessCount": 0,
+    "oauthPort49212ListenerCount": 0,
+    "protectedStateMatchesBaseline": true
+  },
+  "failurePolicy": {
+    "stopAtFirstFailure": true,
+    "automaticRetryAllowed": false,
+    "preservePartialEvidence": true,
+    "rollbackOnlyThroughExactOwnedLabSurface": true,
+    "historicalArtifactDeletionAllowed": false
+  },
+  "authorization": {
+    "thisContractAuthorizesExecution": false,
+    "newExactRedStartSignalRequired": true,
+    "oauthSegmentAuthorized": false
+  },
+  "executedCounts": {
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "browserLaunches": 0,
+    "providerCalls": 0,
+    "runtimeStarts": 0,
+    "hardwareActions": 0
+  },
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}
