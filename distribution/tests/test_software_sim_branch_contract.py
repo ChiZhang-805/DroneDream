@@ -61,6 +61,12 @@ YELLOW_ATTEMPT_3_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-3-2bffcb0-preflight-failed.v1.json"
 )
+YELLOW_ATTEMPT_4_PREFLIGHT_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-4-2bffcb0-preflight-ready.v1.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -219,6 +225,27 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(receipt["protectedState"]["runRootExistsAfterFailure"])
         self.assertFalse(receipt["protectedState"]["sourceRootExistsAfterFailure"])
         self.assertFalse(receipt["protectedState"]["cleanupExecuted"])
+
+    def test_yellow_attempt_4_preflight_is_ready_without_execution(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_4_PREFLIGHT_PATH)
+        application = ROOT / receipt["application"]["path"]
+        entry_script = ROOT / receipt["entryScript"]["path"]
+        self.assertEqual(application.stat().st_size, receipt["application"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(application.read_bytes()).hexdigest(),
+            receipt["application"]["sha256"],
+        )
+        self.assertEqual(entry_script.stat().st_size, receipt["entryScript"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(entry_script.read_bytes()).hexdigest(),
+            receipt["entryScript"]["sha256"],
+        )
+        self.assertEqual(receipt["preflight"]["status"], "pass")
+        self.assertTrue(receipt["preflight"]["runRootAbsent"])
+        self.assertTrue(receipt["preflight"]["sourceRootAbsent"])
+        self.assertFalse(receipt["preflight"]["publicSupabaseValuesRecorded"])
+        self.assertFalse(receipt["authorization"]["yellowBuildExecutionAuthorizedByThisReceipt"])
+        self.assertTrue(all(value == 0 for value in receipt["executedCounts"].values()))
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(

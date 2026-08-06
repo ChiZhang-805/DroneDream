@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-preflight-readiness",
+  "editionId": "sim",
+  "state": "green-preflight-passed-awaiting-exact-yellow-authorization",
+  "sourceSeparation": {
+    "productSourceCommit": "2bffcb0d26d080107144441f1c356f45dc4320ec",
+    "productSourceTree": "3ed74a2299fe3b9e6ad83763b05fcf17952b0cfc",
+    "preflightEvidenceHead": "797c7aff0819763a02d1e21817134be094d06644",
+    "evidenceIsProductSource": false
+  },
+  "application": {
+    "path": "distribution/sim/desktop/yellow-build-attempt-4-2bffcb0-application.v1.json",
+    "bytes": 11195,
+    "sha256": "13990cc74cf03440548930096d8e7621ea343dbe442afbdcb4989bc1435225fb",
+    "globalBuildAttemptOrdinal": 4,
+    "sourceAttemptOrdinal": 2,
+    "maximumBuildInvocations": 1,
+    "retryMaximum": 0
+  },
+  "entryScript": {
+    "path": "distribution/sim/desktop/invoke-yellow-build-attempt-4-2bffcb0.ps1",
+    "bytes": 14875,
+    "sha256": "48b1a069453ef6be5947ac7658faca8f2586d4cd3e2b49d44430c2a9b746080b",
+    "preflightCommand": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-4-2bffcb0.ps1 -Mode Preflight",
+    "executeCommand": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-4-2bffcb0.ps1 -Mode Execute"
+  },
+  "priorAttempt": {
+    "failureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-3-2bffcb0-preflight-failed.v1.json",
+    "failureReceiptSha256": "889beba7ff7320277a134c68037ebe0c62d54988625717b041986888b3dd0ef2",
+    "sameAuthorizationReusable": false,
+    "buildDriverInvocations": 0
+  },
+  "preflight": {
+    "status": "pass",
+    "runRootAbsent": true,
+    "sourceRootAbsent": true,
+    "detachedCheckoutCreated": false,
+    "evidenceWorktreeClean": true,
+    "productSourceAndTreeExact": true,
+    "publicSupabaseVariablesPresent": true,
+    "publicSupabaseValuesRecorded": false,
+    "publicSupabaseSourcePath": "Z:/DroneDream/frontend/.env.local",
+    "publicSupabaseSourceSha256": "23921568af0555b4b31775c0cad02d404aac349bc097feb9fdcb07f90424735f",
+    "publicSupabaseVariableNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "serviceRoleAccepted": false,
+    "updaterKeyPathPresent": true,
+    "updaterKeyReadOrPrinted": false,
+    "frozenArtifactSha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "frozenArtifactReadOnly": true,
+    "simRegistryPresent": true,
+    "simRegistryReadOnly": true,
+    "cleanupExecuted": false
+  },
+  "resources": {
+    "memoryUsedPercent": 58.0,
+    "memoryFreeBytes": 7099490304,
+    "cpuUsedPercent": 29.0,
+    "cFreeBytes": 97605513216,
+    "zFreeBytes": 23542820864,
+    "heavyProcessCount": 0
+  },
+  "executedCounts": {
+    "runRootsCreated": 0,
+    "sourceRootsCreated": 0,
+    "buildDriverInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0
+  },
+  "authorization": {
+    "yellowBuildExecutionAuthorizedByThisReceipt": false,
+    "newExactStartSignalRequired": true
+  }
+}
