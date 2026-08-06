@@ -1,0 +1,304 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-host-contained-install-plan",
+  "editionId": "field",
+  "state": "yellow-host-contained-requestable",
+  "source": {
+    "productSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "evidenceHead": "8a767e015f588468b55b11f108b201e8b15a2d45",
+    "contractSha256": "2438660f1aa02f6b661dd018d675bdbef94a261ad0126579599a0c8bbfcda09e",
+    "toolSha256": "2af3b35bccecda784499c296e8c32c269f160d2df5766d8ba60c99029dd9edd9",
+    "schemaSha256": "b12a04b8314eeb40d0abbd77cdbc17f3e9fc6170694e7926a651e00f7edd7bb4",
+    "hostSnapshotSha256": "952b8d68dcdb2293a1ef623a1a738e6eb72dced2c20529d076e280b0d9b087d0"
+  },
+  "previousVmEvidence": {
+    "preserved": true,
+    "planFileSha256": "8fca6e3a5d66749ce9aeabca45edae4424e2548c28d2ca02edf4eb8e82244bb4",
+    "readinessReceiptFileSha256": "5690269c86128300b42bd9537d73261f73172b6218e6002a4fb7d36170134643",
+    "decision": "deny-before-yellow"
+  },
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "bytes": 11267482,
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "authenticodeStatus": "NotSigned",
+    "productSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "absolutePath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\artifact\\DroneDream-Field-1.0.0.exe"
+  },
+  "environment": {
+    "isolationClass": "host-contained-owned-paths",
+    "claimsVmLevelIsolation": false,
+    "processEnvironment": {
+      "LOCALAPPDATA": "ownedPaths.redirectedLocalAppData",
+      "APPDATA": "ownedPaths.redirectedRoamingAppData",
+      "TEMP": "ownedPaths.redirectedTemp",
+      "TMP": "ownedPaths.redirectedTemp",
+      "HTTP_PROXY": "http://127.0.0.1:9",
+      "HTTPS_PROXY": "http://127.0.0.1:9",
+      "NO_PROXY": "127.0.0.1,localhost"
+    },
+    "ownedPaths": {
+      "hostRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3",
+      "installRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\install",
+      "redirectedLocalAppData": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\env\\LocalAppData",
+      "redirectedRoamingAppData": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\env\\RoamingAppData",
+      "redirectedTemp": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\temp",
+      "evidenceRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\evidence"
+    },
+    "protectedState": [
+      "%LOCALAPPDATA%\\DroneDream",
+      "%LOCALAPPDATA%\\DroneDream · LAB",
+      "%LOCALAPPDATA%\\DroneDream · FIELD",
+      "E:\\DroneDream",
+      "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream",
+      "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · LAB",
+      "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream.lnk",
+      "%USERPROFILE%\\Desktop\\DroneDream.lnk",
+      "Microsoft Edge WebView2 shared runtime"
+    ]
+  },
+  "sourceAudit": {
+    "passed": true,
+    "checks": [
+      {
+        "checkId": "field-product-name",
+        "passed": true,
+        "evidence": "tauri.field.conf.json:productName"
+      },
+      {
+        "checkId": "field-bundle-id",
+        "passed": true,
+        "evidence": "tauri.field.conf.json:identifier"
+      },
+      {
+        "checkId": "current-user-install",
+        "passed": true,
+        "evidence": "tauri.conf.json:bundle.windows.nsis.installMode"
+      },
+      {
+        "checkId": "no-deep-link-plugin",
+        "passed": true,
+        "evidence": "merged Tauri plugins"
+      },
+      {
+        "checkId": "no-file-associations",
+        "passed": true,
+        "evidence": "merged Tauri bundle"
+      },
+      {
+        "checkId": "nsis-product-scoped-writes",
+        "passed": true,
+        "evidence": "installer.nsi product-scoped markers"
+      },
+      {
+        "checkId": "no-service-task-autorun-create",
+        "passed": true,
+        "evidence": "installer.nsi forbidden create markers"
+      },
+      {
+        "checkId": "shared-handoff-identified",
+        "passed": true,
+        "evidence": "installer_handoff.rs:RECEIPT_DIRECTORY"
+      },
+      {
+        "checkId": "field-ui-no-native-invoke",
+        "passed": true,
+        "evidence": "FieldApp.tsx"
+      },
+      {
+        "checkId": "field-ui-no-device-api",
+        "passed": true,
+        "evidence": "Field frontend sources"
+      },
+      {
+        "checkId": "field-controls-disabled",
+        "passed": true,
+        "evidence": "FieldApp.tsx controls"
+      }
+    ],
+    "sourceFiles": {
+      "desktop/src-tauri/tauri.field.conf.json": "782cb601e2c3e31b5474815a6446dd7fa38ed0673bd078802cf8dc4b188d2400",
+      "desktop/src-tauri/tauri.conf.json": "cbcd45f68670e61c9e221ee292baeb4cefd26c492fb8511a20e9d41c34145cd5",
+      "desktop/src-tauri/nsis/installer.nsi": "29ea70929025661177107c1c0e072e2ac7d9ecc46e188a1ddf4c5de11642e45e",
+      "desktop/src-tauri/src/installer_handoff.rs": "9ab5b682083298db5b90e483fa01a9dd99d9a0b347a4e56462e069c06b75db0a",
+      "frontend/src/field/FieldApp.tsx": "0b233a7bede296b7f4960f9ab4ea8909591d57c8e48d43eeee14f462aac164b5",
+      "frontend/src/field/safety.ts": "432f9b32f03e2100f89b780924788660b2e97e21415d8c8f78e2d1409e813ce6"
+    }
+  },
+  "writeSurfaces": [
+    {
+      "surfaceId": "application-files",
+      "target": "ownedPaths.installRoot",
+      "operation": "create-replace-delete",
+      "collisionBoundary": "exact-owned-path",
+      "rollback": "uninstaller-then-owned-residue-delete"
+    },
+    {
+      "surfaceId": "uninstall-registry",
+      "target": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · FIELD",
+      "operation": "create-replace-delete",
+      "collisionBoundary": "field-product-name",
+      "rollback": "exact-key-delete-after-value-proof"
+    },
+    {
+      "surfaceId": "manufacturer-registry",
+      "target": "HKCU\\Software\\DroneDream\\DroneDream · FIELD",
+      "operation": "create-replace-delete",
+      "collisionBoundary": "field-product-name",
+      "rollback": "exact-key-delete-after-value-proof"
+    },
+    {
+      "surfaceId": "start-menu-shortcut",
+      "target": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk",
+      "operation": "create-refresh-delete",
+      "collisionBoundary": "field-product-name",
+      "rollback": "uninstaller-and-exact-target-check"
+    },
+    {
+      "surfaceId": "desktop-shortcut",
+      "target": "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk",
+      "operation": "create-refresh-delete",
+      "collisionBoundary": "field-product-name",
+      "rollback": "uninstaller-and-exact-target-check"
+    },
+    {
+      "surfaceId": "autostart-cleanup",
+      "target": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run::DroneDream · FIELD",
+      "operation": "delete-if-present-on-uninstall",
+      "collisionBoundary": "field-product-name",
+      "rollback": "precondition-value-absent"
+    },
+    {
+      "surfaceId": "bundle-app-data",
+      "target": "%APPDATA%|%LOCALAPPDATA%\\io.dronedream.desktop.field",
+      "operation": "application-owned-create-delete",
+      "collisionBoundary": "field-bundle-id",
+      "rollback": "redirect-process-environment-and-exact-residue-delete"
+    },
+    {
+      "surfaceId": "native-handoff",
+      "target": "%LOCALAPPDATA%\\io.dronedream.desktop",
+      "operation": "clear-quiesce-receipt",
+      "collisionBoundary": "shared-common-core-path",
+      "rollback": "redirect-process-LOCALAPPDATA-to-owned-path"
+    },
+    {
+      "surfaceId": "temporary-files",
+      "target": "%TEMP%|%TMP%",
+      "operation": "installer-and-webview-temporary-files",
+      "collisionBoundary": "redirected-process-environment",
+      "rollback": "owned-temp-delete"
+    },
+    {
+      "surfaceId": "webview2-runtime",
+      "target": "Microsoft Edge WebView2 shared runtime",
+      "operation": "read-health-or-repair",
+      "collisionBoundary": "shared-system-component",
+      "rollback": "repair-forbidden-by-healthy-precondition-and-before-after-snapshot"
+    }
+  ],
+  "absentWriteSurfaces": {
+    "fileAssociations": true,
+    "deepLinkProtocols": true,
+    "services": true,
+    "drivers": true,
+    "scheduledTasks": true,
+    "autorunCreation": true,
+    "machineWideInstall": true
+  },
+  "invocationBudget": {
+    "installerExe": 2,
+    "uninstaller": 1,
+    "applicationLaunch": 2,
+    "rebuild": 0,
+    "networkRequest": 0,
+    "deviceEnumeration": 0,
+    "hardwareAction": 0,
+    "simulation": 0
+  },
+  "phases": [
+    {
+      "phaseId": "host-baseline",
+      "state": "planned-not-executed"
+    },
+    {
+      "phaseId": "fresh-install-en",
+      "state": "planned-not-executed"
+    },
+    {
+      "phaseId": "fresh-launch-en",
+      "state": "planned-not-executed"
+    },
+    {
+      "phaseId": "same-version-overlay-zh-CN",
+      "state": "planned-not-executed"
+    },
+    {
+      "phaseId": "shortcut-launch-zh-CN",
+      "state": "planned-not-executed"
+    },
+    {
+      "phaseId": "uninstall",
+      "state": "planned-not-executed"
+    },
+    {
+      "phaseId": "owned-residue-audit",
+      "state": "planned-not-executed"
+    },
+    {
+      "phaseId": "protected-state-rollback-audit",
+      "state": "planned-not-executed"
+    }
+  ],
+  "preconditions": {
+    "fieldDefaultInstallAbsent": true,
+    "fieldRegistryAbsent": true,
+    "fieldShortcutsAbsent": true,
+    "ownedRootAbsent": true,
+    "fieldProcessesAbsent": true,
+    "sharedRuntimeOperationIdle": true,
+    "webView2Healthy": true,
+    "webView2RepairAllowed": false,
+    "externalNetworkAllowed": false,
+    "hardwareAndDeviceAccessAllowed": false,
+    "currentInstallAndRuntimeMutationAllowed": false
+  },
+  "rollback": {
+    "captureBeforeEveryWriteSurface": true,
+    "stopOnUnexpectedWrite": true,
+    "restorePreexistingExactValuesOnly": true,
+    "deleteOnlyOwnedOrProvenNewPaths": true,
+    "protectedStateMustMatchBaseline": true,
+    "evidenceDeletionAllowed": false
+  },
+  "safetyBoundary": {
+    "validatedHardwarePackCount": 0,
+    "frontendIsAuthority": false,
+    "deviceEnumerationAllowed": false,
+    "hardwareActionAllowed": false,
+    "simulationAllowed": false,
+    "externalNetworkAllowed": false
+  },
+  "authorization": {
+    "currentClass": "GREEN",
+    "requestedExecutionClass": "YELLOW",
+    "fullDeliveryAuthorizationSourceThreadId": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9",
+    "planOnly": true,
+    "executionPerformed": false,
+    "rebuildAllowed": false,
+    "releaseBranchAllowed": false,
+    "uploadAllowed": false
+  },
+  "websiteGate": {
+    "websiteReadyBeforeExecution": false,
+    "exactFourFileHandoffRequired": true,
+    "previewSubstitutionAllowed": false,
+    "crossEditionAttachmentAllowed": false,
+    "websiteReady": false,
+    "blockers": [
+      "field.website.dynamic-host-acceptance-not-executed"
+    ]
+  },
+  "blockers": [],
+  "planSha256": "e7348831bccd68d4781201417d3021075284adac8e70cc58ee546d1f0746b5d3"
+}

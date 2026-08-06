@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/field-host-contained-install-evidence.v1.json",
+  "title": "DroneDream Field host-contained install validation evidence",
+  "oneOf": [
+    {"$ref": "#/$defs/plan"},
+    {"$ref": "#/$defs/readinessReceipt"},
+    {"$ref": "#/$defs/executionReceipt"}
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["productSourceCommit", "evidenceHead", "contractSha256", "toolSha256", "schemaSha256", "hostSnapshotSha256"],
+      "properties": {
+        "productSourceCommit": {"$ref": "#/$defs/commit"},
+        "evidenceHead": {"$ref": "#/$defs/commit"},
+        "contractSha256": {"$ref": "#/$defs/sha256"},
+        "toolSha256": {"$ref": "#/$defs/sha256"},
+        "schemaSha256": {"$ref": "#/$defs/sha256"},
+        "hostSnapshotSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "bytes", "sha256", "authenticodeStatus", "productSourceCommit", "absolutePath"],
+      "properties": {
+        "filename": {"const": "DroneDream-Field-1.0.0.exe"},
+        "bytes": {"const": 11267482},
+        "sha256": {"const": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317"},
+        "authenticodeStatus": {"const": "NotSigned"},
+        "productSourceCommit": {"const": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3"},
+        "absolutePath": {"type": "string", "minLength": 1}
+      }
+    },
+    "previousVmEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserved", "planFileSha256", "readinessReceiptFileSha256", "decision"],
+      "properties": {
+        "preserved": {"const": true},
+        "planFileSha256": {"const": "8fca6e3a5d66749ce9aeabca45edae4424e2548c28d2ca02edf4eb8e82244bb4"},
+        "readinessReceiptFileSha256": {"const": "5690269c86128300b42bd9537d73261f73172b6218e6002a4fb7d36170134643"},
+        "decision": {"const": "deny-before-yellow"}
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isolationClass", "claimsVmLevelIsolation", "processEnvironment", "ownedPaths", "protectedState"],
+      "properties": {
+        "isolationClass": {"const": "host-contained-owned-paths"},
+        "claimsVmLevelIsolation": {"const": false},
+        "processEnvironment": {"$ref": "#/$defs/processEnvironment"},
+        "ownedPaths": {"$ref": "#/$defs/ownedPaths"},
+        "protectedState": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "processEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["LOCALAPPDATA", "APPDATA", "TEMP", "TMP", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"],
+      "properties": {
+        "LOCALAPPDATA": {"const": "ownedPaths.redirectedLocalAppData"},
+        "APPDATA": {"const": "ownedPaths.redirectedRoamingAppData"},
+        "TEMP": {"const": "ownedPaths.redirectedTemp"},
+        "TMP": {"const": "ownedPaths.redirectedTemp"},
+        "HTTP_PROXY": {"const": "http://127.0.0.1:9"},
+        "HTTPS_PROXY": {"const": "http://127.0.0.1:9"},
+        "NO_PROXY": {"const": "127.0.0.1,localhost"}
+      }
+    },
+    "ownedPaths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostRoot", "installRoot", "redirectedLocalAppData", "redirectedRoamingAppData", "redirectedTemp", "evidenceRoot"],
+      "properties": {
+        "hostRoot": {"type": "string", "minLength": 1},
+        "installRoot": {"type": "string", "minLength": 1},
+        "redirectedLocalAppData": {"type": "string", "minLength": 1},
+        "redirectedRoamingAppData": {"type": "string", "minLength": 1},
+        "redirectedTemp": {"type": "string", "minLength": 1},
+        "evidenceRoot": {"type": "string", "minLength": 1}
+      }
+    },
+    "absentWriteSurfaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fileAssociations", "deepLinkProtocols", "services", "drivers", "scheduledTasks", "autorunCreation", "machineWideInstall"],
+      "properties": {
+        "fileAssociations": {"const": true},
+        "deepLinkProtocols": {"const": true},
+        "services": {"const": true},
+        "drivers": {"const": true},
+        "scheduledTasks": {"const": true},
+        "autorunCreation": {"const": true},
+        "machineWideInstall": {"const": true}
+      }
+    },
+    "preconditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fieldDefaultInstallAbsent", "fieldRegistryAbsent", "fieldShortcutsAbsent", "ownedRootAbsent", "fieldProcessesAbsent", "sharedRuntimeOperationIdle", "webView2Healthy", "webView2RepairAllowed", "externalNetworkAllowed", "hardwareAndDeviceAccessAllowed", "currentInstallAndRuntimeMutationAllowed"],
+      "properties": {
+        "fieldDefaultInstallAbsent": {"const": true},
+        "fieldRegistryAbsent": {"const": true},
+        "fieldShortcutsAbsent": {"const": true},
+        "ownedRootAbsent": {"const": true},
+        "fieldProcessesAbsent": {"const": true},
+        "sharedRuntimeOperationIdle": {"const": true},
+        "webView2Healthy": {"const": true},
+        "webView2RepairAllowed": {"const": false},
+        "externalNetworkAllowed": {"const": false},
+        "hardwareAndDeviceAccessAllowed": {"const": false},
+        "currentInstallAndRuntimeMutationAllowed": {"const": false}
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["captureBeforeEveryWriteSurface", "stopOnUnexpectedWrite", "restorePreexistingExactValuesOnly", "deleteOnlyOwnedOrProvenNewPaths", "protectedStateMustMatchBaseline", "evidenceDeletionAllowed"],
+      "properties": {
+        "captureBeforeEveryWriteSurface": {"const": true},
+        "stopOnUnexpectedWrite": {"const": true},
+        "restorePreexistingExactValuesOnly": {"const": true},
+        "deleteOnlyOwnedOrProvenNewPaths": {"const": true},
+        "protectedStateMustMatchBaseline": {"const": true},
+        "evidenceDeletionAllowed": {"const": false}
+      }
+    },
+    "sourceCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkId", "passed", "evidence"],
+      "properties": {
+        "checkId": {"type": "string", "minLength": 1},
+        "passed": {"type": "boolean"},
+        "evidence": {"type": "string", "minLength": 1}
+      }
+    },
+    "sourceAudit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "checks", "sourceFiles"],
+      "properties": {
+        "passed": {"type": "boolean"},
+        "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/sourceCheck"}},
+        "sourceFiles": {"type": "object", "additionalProperties": {"$ref": "#/$defs/sha256"}}
+      }
+    },
+    "writeSurface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surfaceId", "target", "operation", "collisionBoundary", "rollback"],
+      "properties": {
+        "surfaceId": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "operation": {"type": "string", "minLength": 1},
+        "collisionBoundary": {"type": "string", "minLength": 1},
+        "rollback": {"type": "string", "minLength": 1}
+      }
+    },
+    "invocationCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["installerExe", "uninstaller", "applicationLaunch", "rebuild", "networkRequest", "deviceEnumeration", "hardwareAction", "simulation"],
+      "properties": {
+        "installerExe": {"type": "integer", "minimum": 0, "maximum": 2},
+        "uninstaller": {"type": "integer", "minimum": 0, "maximum": 1},
+        "applicationLaunch": {"type": "integer", "minimum": 0, "maximum": 2},
+        "rebuild": {"const": 0},
+        "networkRequest": {"const": 0},
+        "deviceEnumeration": {"const": 0},
+        "hardwareAction": {"const": 0},
+        "simulation": {"const": 0}
+      }
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phaseId", "state"],
+      "properties": {
+        "phaseId": {"type": "string", "minLength": 1},
+        "state": {"enum": ["planned-not-executed", "pass", "fail", "not-run"]}
+      }
+    },
+    "safetyBoundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["validatedHardwarePackCount", "frontendIsAuthority", "deviceEnumerationAllowed", "hardwareActionAllowed", "simulationAllowed", "externalNetworkAllowed"],
+      "properties": {
+        "validatedHardwarePackCount": {"const": 0},
+        "frontendIsAuthority": {"const": false},
+        "deviceEnumerationAllowed": {"const": false},
+        "hardwareActionAllowed": {"const": false},
+        "simulationAllowed": {"const": false},
+        "externalNetworkAllowed": {"const": false}
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currentClass", "requestedExecutionClass", "fullDeliveryAuthorizationSourceThreadId", "planOnly", "executionPerformed", "rebuildAllowed", "releaseBranchAllowed", "uploadAllowed"],
+      "properties": {
+        "currentClass": {"const": "GREEN"},
+        "requestedExecutionClass": {"const": "YELLOW"},
+        "fullDeliveryAuthorizationSourceThreadId": {"const": "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9"},
+        "planOnly": {"const": true},
+        "executionPerformed": {"const": false},
+        "rebuildAllowed": {"const": false},
+        "releaseBranchAllowed": {"const": false},
+        "uploadAllowed": {"const": false}
+      }
+    },
+    "websiteGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["websiteReadyBeforeExecution", "exactFourFileHandoffRequired", "previewSubstitutionAllowed", "crossEditionAttachmentAllowed", "websiteReady", "blockers"],
+      "properties": {
+        "websiteReadyBeforeExecution": {"const": false},
+        "exactFourFileHandoffRequired": {"const": true},
+        "previewSubstitutionAllowed": {"const": false},
+        "crossEditionAttachmentAllowed": {"const": false},
+        "websiteReady": {"type": "boolean"},
+        "blockers": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "editionId", "state", "source", "previousVmEvidence", "artifact", "environment", "sourceAudit", "writeSurfaces", "absentWriteSurfaces", "invocationBudget", "phases", "preconditions", "rollback", "safetyBoundary", "authorization", "websiteGate", "blockers", "planSha256"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-host-contained-install-plan"},
+        "editionId": {"const": "field"},
+        "state": {"enum": ["yellow-host-contained-requestable", "blocked"]},
+        "source": {"$ref": "#/$defs/source"},
+        "previousVmEvidence": {"$ref": "#/$defs/previousVmEvidence"},
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "sourceAudit": {"$ref": "#/$defs/sourceAudit"},
+        "writeSurfaces": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/writeSurface"}},
+        "absentWriteSurfaces": {"$ref": "#/$defs/absentWriteSurfaces"},
+        "invocationBudget": {"$ref": "#/$defs/invocationCounts"},
+        "phases": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/phase"}},
+        "preconditions": {"$ref": "#/$defs/preconditions"},
+        "rollback": {"$ref": "#/$defs/rollback"},
+        "safetyBoundary": {"$ref": "#/$defs/safetyBoundary"},
+        "authorization": {"$ref": "#/$defs/authorization"},
+        "websiteGate": {"$ref": "#/$defs/websiteGate"},
+        "blockers": {"type": "array", "items": {"type": "string"}},
+        "planSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "readinessReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "editionId", "decision", "planSha256", "source", "artifact", "environment", "executionCounts", "executionPerformed", "websiteReady", "blockers", "receiptSha256"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-host-contained-green-readiness-receipt"},
+        "editionId": {"const": "field"},
+        "decision": {"enum": ["request-yellow-host-contained", "deny"]},
+        "planSha256": {"$ref": "#/$defs/sha256"},
+        "source": {"$ref": "#/$defs/source"},
+        "artifact": {"$ref": "#/$defs/artifact"},
+        "environment": {"$ref": "#/$defs/environment"},
+        "executionCounts": {"$ref": "#/$defs/invocationCounts"},
+        "executionPerformed": {"const": false},
+        "websiteReady": {"const": false},
+        "blockers": {"type": "array", "items": {"type": "string"}},
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "executionReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "editionId", "planSha256", "artifactSha256", "result", "invocationCounts", "phases", "beforeSnapshotSha256", "afterSnapshotSha256", "protectedStateMatched", "unexpectedWrites", "websiteReady", "receiptSha256"],
+      "properties": {
+        "schemaVersion": {"const": 1},
+        "kind": {"const": "dronedream-field-host-contained-execution-receipt"},
+        "editionId": {"const": "field"},
+        "planSha256": {"$ref": "#/$defs/sha256"},
+        "artifactSha256": {"const": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317"},
+        "result": {"enum": ["pass", "fail"]},
+        "invocationCounts": {"$ref": "#/$defs/invocationCounts"},
+        "phases": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/phase"}},
+        "beforeSnapshotSha256": {"$ref": "#/$defs/sha256"},
+        "afterSnapshotSha256": {"$ref": "#/$defs/sha256"},
+        "protectedStateMatched": {"type": "boolean"},
+        "unexpectedWrites": {"type": "array", "items": {"type": "string"}},
+        "websiteReady": {"type": "boolean"},
+        "receiptSha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

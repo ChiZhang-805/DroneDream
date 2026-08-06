@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-host-contained-install-validation-contract",
+  "editionId": "field",
+  "version": "1.0.0",
+  "isolationClass": "host-contained-owned-paths",
+  "disposableWindowsGuestRequired": false,
+  "claimsVmLevelIsolation": false,
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "bytes": 11267482,
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "authenticodeStatus": "NotSigned",
+    "productSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3"
+  },
+  "productIdentities": [
+    {
+      "editionId": "universal",
+      "productName": "DroneDream",
+      "bundleId": "io.dronedream.desktop",
+      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream",
+      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream",
+      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream",
+      "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream.lnk",
+      "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream.lnk"
+    },
+    {
+      "editionId": "lab",
+      "productName": "DroneDream · LAB",
+      "bundleId": "io.dronedream.desktop.lab",
+      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream · LAB",
+      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · LAB",
+      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream · LAB",
+      "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · LAB.lnk",
+      "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · LAB.lnk"
+    },
+    {
+      "editionId": "field",
+      "productName": "DroneDream · FIELD",
+      "bundleId": "io.dronedream.desktop.field",
+      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream · FIELD",
+      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · FIELD",
+      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream · FIELD",
+      "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk",
+      "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk"
+    }
+  ],
+  "ownedPaths": {
+    "hostRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3",
+    "installRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\install",
+    "redirectedLocalAppData": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\env\\LocalAppData",
+    "redirectedRoamingAppData": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\env\\RoamingAppData",
+    "redirectedTemp": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\temp",
+    "evidenceRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\evidence"
+  },
+  "writeSurfaces": [
+    {
+      "surfaceId": "application-files",
+      "target": "ownedPaths.installRoot",
+      "operation": "create-replace-delete",
+      "collisionBoundary": "exact-owned-path",
+      "rollback": "uninstaller-then-owned-residue-delete"
+    },
+    {
+      "surfaceId": "uninstall-registry",
+      "target": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · FIELD",
+      "operation": "create-replace-delete",
+      "collisionBoundary": "field-product-name",
+      "rollback": "exact-key-delete-after-value-proof"
+    },
+    {
+      "surfaceId": "manufacturer-registry",
+      "target": "HKCU\\Software\\DroneDream\\DroneDream · FIELD",
+      "operation": "create-replace-delete",
+      "collisionBoundary": "field-product-name",
+      "rollback": "exact-key-delete-after-value-proof"
+    },
+    {
+      "surfaceId": "start-menu-shortcut",
+      "target": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk",
+      "operation": "create-refresh-delete",
+      "collisionBoundary": "field-product-name",
+      "rollback": "uninstaller-and-exact-target-check"
+    },
+    {
+      "surfaceId": "desktop-shortcut",
+      "target": "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk",
+      "operation": "create-refresh-delete",
+      "collisionBoundary": "field-product-name",
+      "rollback": "uninstaller-and-exact-target-check"
+    },
+    {
+      "surfaceId": "autostart-cleanup",
+      "target": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run::DroneDream · FIELD",
+      "operation": "delete-if-present-on-uninstall",
+      "collisionBoundary": "field-product-name",
+      "rollback": "precondition-value-absent"
+    },
+    {
+      "surfaceId": "bundle-app-data",
+      "target": "%APPDATA%|%LOCALAPPDATA%\\io.dronedream.desktop.field",
+      "operation": "application-owned-create-delete",
+      "collisionBoundary": "field-bundle-id",
+      "rollback": "redirect-process-environment-and-exact-residue-delete"
+    },
+    {
+      "surfaceId": "native-handoff",
+      "target": "%LOCALAPPDATA%\\io.dronedream.desktop",
+      "operation": "clear-quiesce-receipt",
+      "collisionBoundary": "shared-common-core-path",
+      "rollback": "redirect-process-LOCALAPPDATA-to-owned-path"
+    },
+    {
+      "surfaceId": "temporary-files",
+      "target": "%TEMP%|%TMP%",
+      "operation": "installer-and-webview-temporary-files",
+      "collisionBoundary": "redirected-process-environment",
+      "rollback": "owned-temp-delete"
+    },
+    {
+      "surfaceId": "webview2-runtime",
+      "target": "Microsoft Edge WebView2 shared runtime",
+      "operation": "read-health-or-repair",
+      "collisionBoundary": "shared-system-component",
+      "rollback": "repair-forbidden-by-healthy-precondition-and-before-after-snapshot"
+    }
+  ],
+  "absentWriteSurfaces": {
+    "fileAssociations": true,
+    "deepLinkProtocols": true,
+    "services": true,
+    "drivers": true,
+    "scheduledTasks": true,
+    "autorunCreation": true,
+    "machineWideInstall": true
+  },
+  "protectedState": [
+    "%LOCALAPPDATA%\\DroneDream",
+    "%LOCALAPPDATA%\\DroneDream · LAB",
+    "%LOCALAPPDATA%\\DroneDream · FIELD",
+    "E:\\DroneDream",
+    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream",
+    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · LAB",
+    "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream.lnk",
+    "%USERPROFILE%\\Desktop\\DroneDream.lnk",
+    "Microsoft Edge WebView2 shared runtime"
+  ],
+  "processEnvironment": {
+    "LOCALAPPDATA": "ownedPaths.redirectedLocalAppData",
+    "APPDATA": "ownedPaths.redirectedRoamingAppData",
+    "TEMP": "ownedPaths.redirectedTemp",
+    "TMP": "ownedPaths.redirectedTemp",
+    "HTTP_PROXY": "http://127.0.0.1:9",
+    "HTTPS_PROXY": "http://127.0.0.1:9",
+    "NO_PROXY": "127.0.0.1,localhost"
+  },
+  "invocationBudget": {
+    "installerExe": 2,
+    "uninstaller": 1,
+    "applicationLaunch": 2,
+    "rebuild": 0,
+    "networkRequest": 0,
+    "deviceEnumeration": 0,
+    "hardwareAction": 0,
+    "simulation": 0
+  },
+  "phases": [
+    "host-baseline",
+    "fresh-install-en",
+    "fresh-launch-en",
+    "same-version-overlay-zh-CN",
+    "shortcut-launch-zh-CN",
+    "uninstall",
+    "owned-residue-audit",
+    "protected-state-rollback-audit"
+  ],
+  "preconditions": {
+    "fieldDefaultInstallAbsent": true,
+    "fieldRegistryAbsent": true,
+    "fieldShortcutsAbsent": true,
+    "ownedRootAbsent": true,
+    "fieldProcessesAbsent": true,
+    "sharedRuntimeOperationIdle": true,
+    "webView2Healthy": true,
+    "webView2RepairAllowed": false,
+    "externalNetworkAllowed": false,
+    "hardwareAndDeviceAccessAllowed": false,
+    "currentInstallAndRuntimeMutationAllowed": false
+  },
+  "rollback": {
+    "captureBeforeEveryWriteSurface": true,
+    "stopOnUnexpectedWrite": true,
+    "restorePreexistingExactValuesOnly": true,
+    "deleteOnlyOwnedOrProvenNewPaths": true,
+    "protectedStateMustMatchBaseline": true,
+    "evidenceDeletionAllowed": false
+  },
+  "websiteGate": {
+    "websiteReadyBeforeExecution": false,
+    "exactFourFileHandoffRequired": true,
+    "previewSubstitutionAllowed": false,
+    "crossEditionAttachmentAllowed": false
+  }
+}
