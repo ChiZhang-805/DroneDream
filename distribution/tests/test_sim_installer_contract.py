@@ -193,6 +193,16 @@ class SimInstallerContractTests(unittest.TestCase):
         with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "artifact identity"):
             sim_contract.validate_build_profile(invalid, repo_root=ROOT)
 
+        invalid = deepcopy(load_json(PROFILE_PATH))
+        invalid["manifests"]["enginePackProfile"]["profileId"] = "unified-sim-lab"
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "profile binding"):
+            sim_contract.validate_build_profile(invalid, repo_root=ROOT)
+
+        invalid = deepcopy(load_json(PROFILE_PATH))
+        invalid["manifests"]["vehiclePackRegistry"]["sha256"] = "0" * 64
+        with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "SHA-256 drifted"):
+            sim_contract.validate_build_profile(invalid, repo_root=ROOT)
+
     def test_valid_receipt_binds_exact_artifact_bytes_and_source(self) -> None:
         artifact = b"MZ DroneDream Sim fixture\n"
         validated = self.validate(self.receipt(artifact), artifact)

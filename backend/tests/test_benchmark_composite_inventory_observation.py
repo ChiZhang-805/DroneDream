@@ -17,6 +17,7 @@ from app.benchmarking.composite_inventory_observation import (
     DesktopComponentAttestationV1,
     EnginePackManifestAttestationV1,
     RuntimeManifestAttestationV1,
+    _validate_engine_edition_profile,
     compile_composite_execution_observation,
 )
 from app.benchmarking.contracts import CompositeExecutionInventoryV1, canonical_sha256
@@ -507,6 +508,88 @@ def test_engine_pack_payload_and_attestation_tamper_fail_closed() -> None:
     values["engine_pack_attestation"] = attestation.model_copy(update={"archive_sha256": "8" * 64})
     with pytest.raises(CompositeObservationCompilationError, match="trusted attestation"):
         _compile(values)
+
+
+@pytest.mark.parametrize(
+    ("profile", "message"),
+    (
+        (
+            {
+                "profileId": "unified-sim-lab",
+                "includesLargeSimulator": False,
+                "excludedSourcePaths": [],
+            },
+            "internally inconsistent",
+        ),
+        (
+            {
+                "profileId": "unknown-profile",
+                "includesLargeSimulator": True,
+                "excludedSourcePaths": [],
+            },
+            "unsupported",
+        ),
+        (
+            {
+                "profileId": "field-lightweight",
+                "includesLargeSimulator": False,
+                "excludedSourcePaths": ["../backend/app/simulator"],
+            },
+            "excluded paths",
+        ),
+    ),
+)
+def test_engine_pack_edition_profile_drift_fails_closed(
+    profile: dict[str, object],
+    message: str,
+) -> None:
+    values = _fixture()
+    manifest = json.loads(values["engine_pack_manifest_bytes"])
+    manifest["editionProfile"] = profile
+    raw = engine_pack.canonical_json(manifest)
+    values["engine_pack_manifest_bytes"] = raw
+    attestation = values["engine_pack_attestation"]
+    assert isinstance(attestation, EnginePackManifestAttestationV1)
+    values["engine_pack_attestation"] = attestation.model_copy(
+        update={"manifest_sha256": _sha256(raw)}
+    )
+    with pytest.raises(CompositeObservationCompilationError, match=message):
+        _compile(values)
+
+
+def test_engine_pack_edition_profile_is_bound_into_pack_identity() -> None:
+    values = _fixture()
+    manifest = json.loads(values["engine_pack_manifest_bytes"])
+    manifest["editionProfile"] = {
+        "profileId": "field-lightweight",
+        "includesLargeSimulator": False,
+        "excludedSourcePaths": ["backend/app/simulator", "scripts/simulators"],
+    }
+    raw = engine_pack.canonical_json(manifest)
+    values["engine_pack_manifest_bytes"] = raw
+    attestation = values["engine_pack_attestation"]
+    assert isinstance(attestation, EnginePackManifestAttestationV1)
+    values["engine_pack_attestation"] = attestation.model_copy(
+        update={"manifest_sha256": _sha256(raw)}
+    )
+    with pytest.raises(CompositeObservationCompilationError, match="payload identity"):
+        _compile(values)
+
+
+def test_sim_only_engine_profile_is_supported_and_hash_bound() -> None:
+    profile = {
+        "profileId": "sim-only",
+        "profileVersion": "1.0.0",
+        "profileManifestPath": "distribution/engine-pack-profiles/sim-only.v1.json",
+        "profileManifestSha256": "a" * 64,
+        "includesLargeSimulator": True,
+        "excludedSourcePaths": ["backend/app/distribution_safety.py"],
+    }
+    assert _validate_engine_edition_profile(profile) == profile
+    drifted = dict(profile)
+    drifted["profileManifestSha256"] = "not-a-hash"
+    with pytest.raises(CompositeObservationCompilationError, match="internally inconsistent"):
+        _validate_engine_edition_profile(drifted)
 
 
 def test_artifact_sizes_and_release_timestamps_are_bound() -> None:

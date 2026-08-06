@@ -415,7 +415,7 @@ def _load_contract_inputs(
 
     pack_dir = repo_root / "distribution" / "vehicle-packs"
     all_pack_paths = sorted(
-        path for path in pack_dir.glob("*.v1.json") if path.name != "registry.v1.json"
+        path for path in pack_dir.glob("*.v1.json") if not path.name.startswith("registry.")
     )
     registry = contract.load_vehicle_pack_registry(
         registry_path,

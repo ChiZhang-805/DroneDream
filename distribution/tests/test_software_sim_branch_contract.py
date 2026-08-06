@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -26,6 +27,12 @@ ADOPTION_RECEIPT_PATH = (
 )
 CAPABILITY_POLICY_PATH = DISTRIBUTION / "capabilities" / "core-capabilities.v1.json"
 E4_REQUEST_PATH = DISTRIBUTION / "build-planning" / "e4-request.v1.json"
+READINESS_PATH = (
+    DISTRIBUTION / "sim" / "readiness" / "sim-only-common-core-sync.v1.json"
+)
+FAILED_YELLOW2_PATH = (
+    DISTRIBUTION / "sim" / "desktop" / "yellow-2-build-evidence-record.v1.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -80,10 +87,38 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         evidence = contract["syncEvidence"]
         self.assertEqual(evidence["universalSourceCommit"], baseline["commonCoreCommit"])
         self.assertFalse(evidence["receiptHeadIsProductSource"])
+        self.assertFalse(evidence["wholeCommitCherryPicked"])
+        self.assertFalse(evidence["unrelatedParentChainAdopted"])
         self.assertEqual(evidence["validatedVehiclePackCount"], 0)
         self.assertEqual(
             evidence["installerState"],
-            "planned-or-preview-not-promotion-ready",
+            "prior-yellow2-failed-new-source-awaiting-authorization",
+        )
+
+    def test_path_limited_sync_matches_every_authoritative_donor_blob(self) -> None:
+        baseline = self.contract["syncBaseline"]
+        evidence = self.contract["syncEvidence"]
+        source = baseline["commonCoreCommit"]
+        direct_paths = git(
+            "diff-tree", "--no-commit-id", "--name-only", "-r", source
+        ).splitlines()
+        self.assertEqual(direct_paths, self.contract["synchronizedPaths"])
+        self.assertEqual(len(direct_paths), evidence["synchronizedPathCount"])
+        blob_rows: list[dict[str, str]] = []
+        for path in direct_paths:
+            donor_blob = git("rev-parse", f"{source}:{path}")
+            self.assertEqual(git("hash-object", "--", path), donor_blob, path)
+            blob_rows.append({"path": path, "blob": donor_blob})
+        canonical = (
+            json.dumps(blob_rows, sort_keys=True, separators=(",", ":")) + "\n"
+        ).encode()
+        self.assertEqual(
+            hashlib.sha256(canonical).hexdigest(),
+            evidence["synchronizedBlobSetSha256"],
+        )
+        self.assertEqual(
+            git("merge-base", "HEAD", source),
+            baseline["commonAncestorCommit"],
         )
 
     def test_common_core_sync_does_not_relabel_the_adopted_preview(self) -> None:
@@ -99,16 +134,62 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         )
 
     def test_current_branch_diff_is_limited_to_sim_edition_contract_paths(self) -> None:
-        baseline = self.contract["syncBaseline"]["commonCoreCommit"]
+        baseline = self.contract["syncBaseline"]["previousCommonCoreCommit"]
         committed_or_modified = git("diff", "--name-only", baseline).splitlines()
         untracked = git("ls-files", "--others", "--exclude-standard").splitlines()
         changed_paths = sorted({path for path in committed_or_modified + untracked if path})
         prefixes = tuple(self.contract["editionSpecificPathPrefixes"])
+        synchronized_paths = set(self.contract["synchronizedPaths"])
         self.assertTrue(changed_paths)
         self.assertTrue(
-            all(path.startswith(prefixes) for path in changed_paths),
+            all(
+                path in synchronized_paths or path.startswith(prefixes)
+                for path in changed_paths
+            ),
             changed_paths,
         )
+
+    def test_new_readiness_receipt_blocks_failed_exe_reuse_and_execution(self) -> None:
+        readiness = load_json(READINESS_PATH)
+        baseline = self.contract["syncBaseline"]
+        evidence = self.contract["syncEvidence"]
+        self.assertEqual(readiness["kind"], "dronedream-sim-common-core-sync-readiness")
+        self.assertEqual(readiness["state"], "green-ready-awaiting-yellow-authorization")
+        self.assertEqual(readiness["source"]["commonCoreCommit"], baseline["commonCoreCommit"])
+        self.assertEqual(readiness["source"]["commonCoreHash"], baseline["commonCoreHash"])
+        self.assertEqual(
+            readiness["source"]["synchronizedBlobSetSha256"],
+            evidence["synchronizedBlobSetSha256"],
+        )
+        self.assertEqual(
+            readiness["source"]["synchronizedPaths"],
+            self.contract["synchronizedPaths"],
+        )
+        self.assertEqual(
+            readiness["universalEvidence"]["sha256"],
+            evidence["universalReceiptSha256"],
+        )
+        self.assertEqual(
+            distribution.sha256_file(FAILED_YELLOW2_PATH),
+            readiness["priorFailedArtifact"]["evidenceRecordSha256"],
+        )
+        self.assertFalse(readiness["priorFailedArtifact"]["reuseAllowed"])
+        self.assertFalse(readiness["priorFailedArtifact"]["relabelAllowed"])
+        self.assertFalse(readiness["nextYellow"]["executionAuthorized"])
+        self.assertFalse(readiness["nextYellow"]["buildStarted"])
+        self.assertEqual(readiness["nextYellow"]["enginePackProfileId"], "sim-only")
+        self.assertEqual(
+            readiness["nextYellow"]["enginePackProfileEnvironmentVariable"],
+            "DRONEDREAM_ENGINE_PACK_EDITION_PROFILE",
+        )
+        self.assertEqual(
+            readiness["nextYellow"]["enginePackProfileEnvironmentValue"],
+            "sim-only",
+        )
+        self.assertEqual(readiness["nextYellow"]["plannedGlobalBuildAttemptOrdinal"], 2)
+        self.assertEqual(readiness["boundaries"]["validatedVehiclePackCount"], 0)
+        self.assertFalse(readiness["boundaries"]["formalEnginePackBuilt"])
+        self.assertFalse(readiness["boundaries"]["installerBuilt"])
 
     def test_sim_manifest_and_capability_policy_deny_hardware_below_frontend(self) -> None:
         boundary = self.contract["simEditionBoundary"]

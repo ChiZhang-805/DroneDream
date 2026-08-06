@@ -65,6 +65,24 @@ _SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 _PYTHON_VERSION = re.compile(r"^[0-9]+\.[0-9]+$")
 _SAFE_FILENAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$")
 _SAFE_PATH = re.compile(r"^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$")
+_FIELD_ENGINE_PROFILE: Final[dict[str, Any]] = {
+    "profileId": "field-lightweight",
+    "includesLargeSimulator": False,
+    "excludedSourcePaths": ["backend/app/simulator", "scripts/simulators"],
+}
+_UNIFIED_ENGINE_PROFILE: Final[dict[str, Any]] = {
+    "profileId": "unified-sim-lab",
+    "includesLargeSimulator": True,
+    "excludedSourcePaths": [],
+}
+_SIM_ENGINE_PROFILE_KEYS: Final[set[str]] = {
+    "profileId",
+    "profileVersion",
+    "profileManifestPath",
+    "profileManifestSha256",
+    "includesLargeSimulator",
+    "excludedSourcePaths",
+}
 
 
 class CompositeObservationCompilationError(ValueError):
@@ -658,6 +676,7 @@ def _engine_payload_identity(records: list[dict[str, Any]]) -> str:
 
 def _engine_manifest_identity(
     source: dict[str, Any],
+    edition_profile: dict[str, Any],
     compatibility: dict[str, Any],
     records: list[dict[str, Any]],
 ) -> str:
@@ -666,6 +685,7 @@ def _engine_manifest_identity(
             {
                 "engineApiVersion": 1,
                 "source": source,
+                "editionProfile": edition_profile,
                 "runtimeCompatibility": compatibility,
                 "payloadSha256": _engine_payload_identity(records),
                 "files": records,
@@ -673,6 +693,62 @@ def _engine_manifest_identity(
             newline=True,
         )
     )
+
+
+def _validate_engine_edition_profile(value: object) -> dict[str, Any]:
+    profile = _mapping(value, label="Engine Pack edition profile")
+    profile_id = _safe_text(profile.get("profileId"), label="Engine Pack edition profile ID")
+    if profile_id == "sim-only":
+        _require_exact_keys(
+            profile,
+            _SIM_ENGINE_PROFILE_KEYS,
+            label="Engine Pack edition profile",
+        )
+        if (
+            profile["profileVersion"] != "1.0.0"
+            or profile["profileManifestPath"]
+            != "distribution/engine-pack-profiles/sim-only.v1.json"
+            or not isinstance(profile["profileManifestSha256"], str)
+            or _SHA256.fullmatch(profile["profileManifestSha256"]) is None
+            or profile["includesLargeSimulator"] is not True
+            or profile["excludedSourcePaths"] != ["backend/app/distribution_safety.py"]
+        ):
+            raise CompositeObservationCompilationError(
+                "Engine Pack edition profile is unsupported or internally inconsistent"
+            )
+        return profile
+    _require_exact_keys(
+        profile,
+        {"profileId", "includesLargeSimulator", "excludedSourcePaths"},
+        label="Engine Pack edition profile",
+    )
+    if type(profile["includesLargeSimulator"]) is not bool:
+        raise CompositeObservationCompilationError(
+            "Engine Pack edition profile simulator flag is invalid"
+        )
+    excluded = profile["excludedSourcePaths"]
+    if (
+        not isinstance(excluded, list)
+        or any(
+            not isinstance(path, str)
+            or _SAFE_PATH.fullmatch(path) is None
+            or any(segment in {".", ".."} for segment in path.split("/"))
+            for path in excluded
+        )
+        or len(excluded) != len(set(excluded))
+    ):
+        raise CompositeObservationCompilationError(
+            "Engine Pack edition profile excluded paths are invalid"
+        )
+    expected = {
+        "field-lightweight": _FIELD_ENGINE_PROFILE,
+        "unified-sim-lab": _UNIFIED_ENGINE_PROFILE,
+    }.get(profile_id)
+    if expected is None or profile != expected:
+        raise CompositeObservationCompilationError(
+            "Engine Pack edition profile is unsupported or internally inconsistent"
+        )
+    return profile
 
 
 def _validate_engine_manifest(raw: bytes) -> dict[str, Any]:
@@ -685,6 +761,7 @@ def _validate_engine_manifest(raw: bytes) -> dict[str, Any]:
             "packId",
             "engineApiVersion",
             "source",
+            "editionProfile",
             "runtimeCompatibility",
             "files",
         },
@@ -705,6 +782,7 @@ def _validate_engine_manifest(raw: bytes) -> dict[str, Any]:
     _commit(source["gitCommit"], label="Engine Pack source commit")
     if type(source["sourceDateEpoch"]) is not int or source["sourceDateEpoch"] < 0:
         raise CompositeObservationCompilationError("Engine Pack source epoch is invalid")
+    edition_profile = _validate_engine_edition_profile(manifest["editionProfile"])
     compatibility = _mapping(
         manifest["runtimeCompatibility"], label="Engine Pack Runtime compatibility"
     )
@@ -734,7 +812,9 @@ def _validate_engine_manifest(raw: bytes) -> dict[str, Any]:
     _safe_text(compatibility["gazeboVersion"], label="Engine Pack Gazebo version")
     _sha(compatibility["dependencyLockSha256"], label="Engine Pack dependency lock")
     records = _validate_file_records(manifest["files"])
-    expected_pack_id = "sha256:" + _engine_manifest_identity(source, compatibility, records)
+    expected_pack_id = "sha256:" + _engine_manifest_identity(
+        source, edition_profile, compatibility, records
+    )
     if manifest["packId"] != expected_pack_id:
         raise CompositeObservationCompilationError(
             "Engine Pack ID does not match its payload identity"

@@ -147,6 +147,7 @@ APPROVED_INTEGRATION_KEYS = {
 }
 APPROVED_SOURCE_THREAD_ID = "019fa6ec-e8e6-7222-8c4c-1a064d17a0a9"
 APPROVED_SCHEMA_PATH = "distribution/sim/brand/approved-edition-assets.schema.json"
+APPROVED_RECORD_PATH = "distribution/sim/brand/approved-edition-assets.v1.json"
 APPROVED_HANDOFF_PATH = (
     "Z:/DroneDream/work/brand-edition-concepts-v1/BRAND_EDITION_HANDOFF_V2.md"
 )
@@ -261,6 +262,9 @@ RECONCILIATION_GATE_KEYS = {
 }
 RECONCILIATION_DONOR_COMMIT = "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235"
 RECONCILIATION_PARENT_COMMIT = "26d69562c9cea6557f30b3b21b3d6d39ac89e294"
+RECONCILIATION_RECORD_PATH = (
+    "distribution/sim/brand/canonical-reconciliation-candidate.v1.json"
+)
 RECONCILIATION_REF_PATHS = {
     "brandSchema": "brand/brand-editions.schema.json",
     "brandContract": "brand/brand-editions.v1.json",
@@ -598,6 +602,15 @@ def _git_asset_reader(repo_root: Path, commit: str, relative_path: str) -> bytes
     return output
 
 
+def _historical_sibling_reader(
+    repo_root: Path, record_path: str, sibling_path: str
+) -> bytes:
+    commit = _run_git(repo_root, "log", "-1", "--format=%H", "--", record_path)
+    if not isinstance(commit, str) or COMMIT_RE.fullmatch(commit.strip()) is None:
+        raise SimBrandDonorError(f"historical record commit is unavailable: {record_path}")
+    return _git_asset_reader(repo_root, commit.strip(), sibling_path)
+
+
 def _git_common_core_hash(repo_root: Path, commit: str, paths: tuple[str, ...]) -> str:
     output = _run_git(
         repo_root,
@@ -925,10 +938,17 @@ def validate_approved_edition_assets(
     )
     if branch_ref["path"] != "distribution/branch-contracts/software-sim.v1.json":
         raise SimBrandDonorError("approved SIM branch contract path drifted")
-    branch_path = _resolve(repo_root, branch_ref["path"], "approved branch contract path")
-    if sha256_file(branch_path) != _sha(branch_ref["sha256"], "approved branch contract SHA"):
+    branch_bytes = _historical_sibling_reader(
+        repo_root, APPROVED_RECORD_PATH, branch_ref["path"]
+    )
+    if sha256_bytes(branch_bytes) != _sha(
+        branch_ref["sha256"], "approved branch contract SHA"
+    ):
         raise SimBrandDonorError("approved SIM branch contract SHA-256 drifted")
-    branch_contract = load_json(branch_path)
+    try:
+        branch_contract = json.loads(branch_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SimBrandDonorError("approved historical branch contract is invalid") from exc
     baseline = branch_contract.get("syncBaseline")
     if not isinstance(baseline, dict):
         raise SimBrandDonorError("approved SIM branch contract baseline is missing")
@@ -1104,14 +1124,17 @@ def validate_canonical_reconciliation_candidate(
         RECONCILIATION_BASELINE_KEYS,
         "reconciliation recorded baseline",
     )
-    branch_path = _resolve(
-        repo_root, baseline["branchContractPath"], "reconciliation branch contract"
+    branch_bytes = _historical_sibling_reader(
+        repo_root, RECONCILIATION_RECORD_PATH, baseline["branchContractPath"]
     )
-    if sha256_file(branch_path) != _sha(
+    if sha256_bytes(branch_bytes) != _sha(
         baseline["branchContractSha256"], "reconciliation branch contract SHA"
     ):
         raise SimBrandDonorError("reconciliation branch contract SHA-256 drifted")
-    branch_contract = load_json(branch_path)
+    try:
+        branch_contract = json.loads(branch_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise SimBrandDonorError("reconciliation historical branch contract is invalid") from exc
     branch_baseline = branch_contract.get("syncBaseline")
     if not isinstance(branch_baseline, dict) or baseline != {
         "branchContractPath": "distribution/branch-contracts/software-sim.v1.json",

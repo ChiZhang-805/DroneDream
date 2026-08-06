@@ -21,6 +21,16 @@ from types import ModuleType
 from typing import Any
 
 RUNTIME_CONTRACT_REGISTRY_PATH = "distribution/runtime-contract-registry.v1.json"
+SIM_EDITION_PROFILE = "sim-only"
+KNOWN_EDITION_PROFILES = {"field-lightweight", SIM_EDITION_PROFILE, "unified-sim-lab"}
+SIM_PROFILE_MANIFEST_KEYS = {
+    "profileId",
+    "profileVersion",
+    "profileManifestPath",
+    "profileManifestSha256",
+    "includesLargeSimulator",
+    "excludedSourcePaths",
+}
 RUNTIME_DISTRIBUTION_BASE_PATHS = (
     "LICENSE",
     "runtime/THIRD_PARTY_NOTICES.md",
@@ -48,7 +58,60 @@ class RuntimeEditionSafetyError(RuntimeError):
     """Raised when no trustworthy Runtime decision can be produced."""
 
 
-def runtime_distribution_paths(active_engine_root: Path) -> tuple[str, ...]:
+def _load_profile_contract(active_engine_root: Path) -> ModuleType:
+    path = active_engine_root / "distribution/tools/engine_pack_profile_contract.py"
+    name = "dronedream_runtime_engine_pack_profile_contract"
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeEditionSafetyError("Runtime Engine Pack profile contract is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _sim_profile_from_manifest(
+    active_engine_root: Path,
+    engine_manifest: Mapping[str, Any],
+) -> tuple[ModuleType, dict[str, Any]] | None:
+    edition_profile = engine_manifest.get("editionProfile")
+    if not isinstance(edition_profile, dict):
+        return None
+    profile_id = edition_profile.get("profileId")
+    if profile_id not in KNOWN_EDITION_PROFILES:
+        raise RuntimeEditionSafetyError("Engine Pack profile is unsupported")
+    if profile_id != SIM_EDITION_PROFILE:
+        return None
+    if set(edition_profile) != SIM_PROFILE_MANIFEST_KEYS:
+        raise RuntimeEditionSafetyError("Sim-only Engine Pack profile fields are invalid")
+    contract = _load_profile_contract(active_engine_root)
+    try:
+        profile = contract.load_profile(active_engine_root)
+        contract.verify_profile_files(active_engine_root, profile, active_payload=True)
+        binding = contract.profile_manifest_binding(profile, active_engine_root)
+    except contract.EnginePackProfileError as error:
+        raise RuntimeEditionSafetyError("Sim-only Engine Pack profile failed closed") from error
+    if edition_profile != binding:
+        raise RuntimeEditionSafetyError("Sim-only Engine Pack profile binding drifted")
+    return contract, profile
+
+
+def _validate_sim_payload_paths(
+    contract: ModuleType,
+    profile: Mapping[str, Any],
+    paths: list[str],
+) -> None:
+    try:
+        contract.validate_payload_paths(profile, paths)
+    except contract.EnginePackProfileError as error:
+        raise RuntimeEditionSafetyError("Sim-only payload inventory failed closed") from error
+
+
+def runtime_distribution_paths(
+    active_engine_root: Path,
+    *,
+    engine_manifest: Mapping[str, Any] | None = None,
+) -> tuple[str, ...]:
     registry_path = active_engine_root / RUNTIME_CONTRACT_REGISTRY_PATH
     if registry_path.is_symlink() or not registry_path.is_file():
         raise RuntimeEditionSafetyError("Runtime contract registry must be an ordinary file")
@@ -62,10 +125,7 @@ def runtime_distribution_paths(active_engine_root: Path) -> tuple[str, ...]:
         "contractPaths",
     }:
         raise RuntimeEditionSafetyError("Runtime contract registry fields are invalid")
-    if (
-        registry["schemaVersion"] != 1
-        or registry["kind"] != "dronedream-runtime-contract-registry"
-    ):
+    if registry["schemaVersion"] != 1 or registry["kind"] != "dronedream-runtime-contract-registry":
         raise RuntimeEditionSafetyError("Runtime contract registry identity is unsupported")
     paths = registry["contractPaths"]
     if (
@@ -74,9 +134,7 @@ def runtime_distribution_paths(active_engine_root: Path) -> tuple[str, ...]:
         or any(not isinstance(path, str) for path in paths)
         or paths != sorted(set(paths))
     ):
-        raise RuntimeEditionSafetyError(
-            "Runtime contract registry paths must be unique and sorted"
-        )
+        raise RuntimeEditionSafetyError("Runtime contract registry paths must be unique and sorted")
     allowed = re.compile(
         r"^distribution/(?:schemas/[a-z0-9][a-z0-9.-]*\.schema\.json|tools/[a-z][a-z0-9_]*\.py)$"
     )
@@ -93,6 +151,21 @@ def runtime_distribution_paths(active_engine_root: Path) -> tuple[str, ...]:
             or not candidate.resolve().is_relative_to(root)
         ):
             raise RuntimeEditionSafetyError(f"Runtime contract path is unavailable: {relative}")
+    if engine_manifest is not None:
+        sim_profile = _sim_profile_from_manifest(active_engine_root, engine_manifest)
+        if sim_profile is not None:
+            _profile_contract, profile = sim_profile
+            profile_paths = sorted(
+                {
+                    *profile["directPayloadPaths"],
+                    *(mapping["payloadPath"] for mapping in profile["sourceMappings"]),
+                }
+            )
+            if not set(paths) <= set(profile_paths):
+                raise RuntimeEditionSafetyError(
+                    "Sim-only runtime registry exceeds its profile allowlist"
+                )
+            return tuple(profile_paths)
     combined = (*RUNTIME_DISTRIBUTION_BASE_PATHS, *paths)
     if len(combined) != len(set(combined)):
         raise RuntimeEditionSafetyError("Runtime distribution path registry contains duplicates")
@@ -266,7 +339,14 @@ def _active_inventory_reasons(
     if any(path.startswith(forbidden_prefixes) for path in records):
         reasons.append("runtime.engine-pack.planned-artifact-present")
     try:
-        distribution_paths = runtime_distribution_paths(observed.active_engine_root)
+        sim_profile = _sim_profile_from_manifest(observed.active_engine_root, engine_manifest)
+        if sim_profile is not None:
+            profile_contract, profile = sim_profile
+            _validate_sim_payload_paths(profile_contract, profile, sorted(records))
+        distribution_paths = runtime_distribution_paths(
+            observed.active_engine_root,
+            engine_manifest=engine_manifest,
+        )
     except RuntimeEditionSafetyError:
         reasons.append("runtime.engine-pack.contract-registry-invalid")
         return reasons
@@ -316,7 +396,7 @@ def _validate_active_catalog(
         packs_by_path: dict[str, dict[str, Any]] = {}
         pack_hashes: dict[str, str] = {}
         for path in sorted(pack_directory.glob("*.v1.json")):
-            if path.name == "registry.v1.json":
+            if path.name.startswith("registry."):
                 continue
             relative = path.relative_to(active_root).as_posix()
             packs_by_path[relative] = distribution_contract.validate_vehicle_pack_manifest(

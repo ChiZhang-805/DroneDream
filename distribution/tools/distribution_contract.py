@@ -57,9 +57,7 @@ DOTTED_ID_RE = re.compile(r"^[a-z0-9]+(?:[.-][a-z0-9]+)*$")
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 DATE_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
-LICENSE_RE = re.compile(
-    r"^(?:[A-Za-z0-9.+-]+(?: (?:AND|OR) [A-Za-z0-9.+-]+)*|NOASSERTION)$"
-)
+LICENSE_RE = re.compile(r"^(?:[A-Za-z0-9.+-]+(?: (?:AND|OR) [A-Za-z0-9.+-]+)*|NOASSERTION)$")
 IMMUTABLE_RAW_LICENSE_RE = re.compile(
     r"^https://raw\.githubusercontent\.com/[^/]+/[^/]+/[0-9a-f]{40}/"
 )
@@ -111,9 +109,7 @@ TARGET_KINDS = {"installation", "simulation", "hitl", "real-hardware"}
 RISK_LEVELS = {"read-only", "controlled", "safety-critical"}
 DECISIONS = {"allow", "conditioned", "deny"}
 SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
-SAFE_RELATIVE_PATH_RE = re.compile(
-    r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
-)
+SAFE_RELATIVE_PATH_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$")
 ED25519_KEY_ID_RE = re.compile(r"^ed25519:[0-9a-f]{64}$")
 PARAMETER_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,63}$")
 VEHICLE_PACK_KEYS = {
@@ -188,6 +184,31 @@ VEHICLE_PACK_REGISTRY_KEYS = {
     "auditDate",
     "policy",
     "packs",
+}
+VEHICLE_PACK_PROFILE_REGISTRY_KEYS = {
+    "schemaVersion",
+    "kind",
+    "registryId",
+    "registryVersion",
+    "profileId",
+    "sourceRegistry",
+    "policy",
+    "packs",
+}
+VEHICLE_PACK_PROFILE_SOURCE_KEYS = {
+    "path",
+    "sha256",
+    "registryId",
+    "registryVersion",
+    "auditDate",
+}
+VEHICLE_PACK_PROFILE_POLICY_KEYS = {
+    "exactPackCount",
+    "allowedPackIds",
+    "hardwareMetadataAllowed",
+    "validatedRequiresSignedReceipt",
+    "stockDoesNotImplyCompatibility",
+    "parameterBoundsAreProvisionalUntilValidated",
 }
 VEHICLE_PACK_REGISTRY_POLICY_KEYS = {
     "minimumPackCount",
@@ -404,9 +425,7 @@ def _validate_text_list(value: Any, label: str) -> None:
         _require_nonempty_string(item, f"{label}[{index}]")
 
 
-def _validate_unique_text_list(
-    value: Any, label: str, *, allow_empty: bool = False
-) -> set[str]:
+def _validate_unique_text_list(value: Any, label: str, *, allow_empty: bool = False) -> set[str]:
     if not isinstance(value, list) or (not value and not allow_empty):
         qualifier = "a list" if allow_empty else "a non-empty list"
         raise DistributionContractError(f"{label} must be {qualifier}")
@@ -487,9 +506,7 @@ def validate_upstream_source_inventory(document: Any) -> dict[str, Any]:
         raise DistributionContractError("inventory.schemaVersion must be 1")
     if document["kind"] != "dronedream-upstream-source-inventory":
         raise DistributionContractError("inventory.kind is unsupported")
-    if not isinstance(document["auditDate"], str) or not DATE_RE.fullmatch(
-        document["auditDate"]
-    ):
+    if not isinstance(document["auditDate"], str) or not DATE_RE.fullmatch(document["auditDate"]):
         raise DistributionContractError("inventory.auditDate must be YYYY-MM-DD")
     policy = document["policy"]
     if not isinstance(policy, dict):
@@ -536,9 +553,7 @@ def validate_upstream_source_inventory(document: Any) -> dict[str, Any]:
                 f"{label}.auditedUpstreamCommit must be a full lowercase Git SHA"
             )
         license_conclusion = source["licenseConclusion"]
-        if not isinstance(license_conclusion, str) or not LICENSE_RE.fullmatch(
-            license_conclusion
-        ):
+        if not isinstance(license_conclusion, str) or not LICENSE_RE.fullmatch(license_conclusion):
             raise DistributionContractError(f"{label}.licenseConclusion is invalid")
         declared = source.get("declaredLicenses")
         if declared is not None:
@@ -648,10 +663,15 @@ def validate_capability_policy(document: Any) -> dict[str, Any]:
         )
         if not targets <= TARGET_KINDS or not layers <= ENFORCEMENT_LAYERS:
             raise DistributionContractError(f"{label} contains an unsupported target or layer")
-        if capability["risk"] == "safety-critical" and targets & {
-            "hitl",
-            "real-hardware",
-        } and layers != ENFORCEMENT_LAYERS:
+        if (
+            capability["risk"] == "safety-critical"
+            and targets
+            & {
+                "hitl",
+                "real-hardware",
+            }
+            and layers != ENFORCEMENT_LAYERS
+        ):
             raise DistributionContractError(
                 f"{label} safety-critical hardware authority requires backend, runtime, and native"
             )
@@ -673,9 +693,7 @@ def validate_capability_policy(document: Any) -> dict[str, Any]:
                 allow_empty=True,
             )
             if not referenced_conditions <= conditions:
-                raise DistributionContractError(
-                    f"{decision_label} references an unknown condition"
-                )
+                raise DistributionContractError(f"{decision_label} references an unknown condition")
             if decision["decision"] == "deny" and referenced_conditions:
                 raise DistributionContractError(
                     f"{decision_label} deny must not imply bypass conditions"
@@ -686,17 +704,10 @@ def validate_capability_policy(document: Any) -> dict[str, Any]:
                 )
             _require_nonempty_string(decision["reason"], decision_label + ".reason")
         if capability_id.startswith("hardware.") and decisions["sim"]["decision"] != "deny":
-            raise DistributionContractError(
-                f"{capability_id} must be denied by the Sim edition"
-            )
+            raise DistributionContractError(f"{capability_id} must be denied by the Sim edition")
         if capability_id.startswith("simulation.") and decisions["field"]["decision"] != "deny":
-            raise DistributionContractError(
-                f"{capability_id} must be denied by the Field edition"
-            )
-        if (
-            capability_id == "hardware.hitl.execute"
-            and decisions["field"]["decision"] != "deny"
-        ):
+            raise DistributionContractError(f"{capability_id} must be denied by the Field edition")
+        if capability_id == "hardware.hitl.execute" and decisions["field"]["decision"] != "deny":
             raise DistributionContractError(
                 "hardware.hitl.execute must be denied by the Field edition"
             )
@@ -821,9 +832,7 @@ def validate_edition_manifest(
         raise DistributionContractError("qualification receipt compatibility must fail closed")
     if edition_id == "sim" and (
         "hardware-bridge" not in forbidden_modules
-        or not runtime_profile.get(
-            "includesLargeSimulator"
-        )
+        or not runtime_profile.get("includesLargeSimulator")
     ):
         raise DistributionContractError("Sim must include simulation and forbid hardware")
     if edition_id == "field" and (
@@ -859,9 +868,7 @@ def load_capability_policy(path: Path) -> dict[str, Any]:
     return validate_capability_policy(_load_json_document(path, "capability policy"))
 
 
-def load_edition_manifests(
-    paths: list[Path], *, policy_path: Path
-) -> dict[str, dict[str, Any]]:
+def load_edition_manifests(paths: list[Path], *, policy_path: Path) -> dict[str, dict[str, Any]]:
     policy = load_capability_policy(policy_path)
     policy_sha256 = sha256_file(policy_path)
     editions: dict[str, dict[str, Any]] = {}
@@ -965,15 +972,11 @@ def validate_vehicle_pack_manifest(
         controller_keys.add(key)
         if controller["status"] not in VEHICLE_VALIDATION_STATUSES:
             raise DistributionContractError(f"{label}.status is unsupported")
-        controller_regions = _validate_unique_text_list(
-            controller["regions"], f"{label}.regions"
-        )
+        controller_regions = _validate_unique_text_list(controller["regions"], f"{label}.regions")
         if not controller_regions <= regions:
             raise DistributionContractError(f"{label}.regions exceed pack availability")
 
-    upstream_sources = {
-        source["id"]: source for source in upstream_inventory["sources"]
-    }
+    upstream_sources = {source["id"]: source for source in upstream_inventory["sources"]}
     known_source_ids = set(upstream_sources)
     source_bindings = document["sourceBindings"]
     if not isinstance(source_bindings, list) or not source_bindings:
@@ -1011,13 +1014,9 @@ def validate_vehicle_pack_manifest(
         if license_id in license_ids:
             raise DistributionContractError(f"duplicate Vehicle Pack license: {license_id}")
         license_ids.add(license_id)
-        _require_nonempty_string(
-            license_binding["spdxExpression"], f"{label}.spdxExpression"
-        )
+        _require_nonempty_string(license_binding["spdxExpression"], f"{label}.spdxExpression")
         notice_path = license_binding["noticePath"]
-        if not isinstance(notice_path, str) or not SAFE_RELATIVE_PATH_RE.fullmatch(
-            notice_path
-        ):
+        if not isinstance(notice_path, str) or not SAFE_RELATIVE_PATH_RE.fullmatch(notice_path):
             raise DistributionContractError(f"{label}.noticePath is unsafe")
         if license_binding["redistribution"] not in {
             "bundled",
@@ -1141,15 +1140,10 @@ def validate_vehicle_pack_manifest(
             or not SHA256_RE.fullmatch(signature["detachedSignatureSha256"])
         ):
             raise DistributionContractError("verified Vehicle Pack signature is incomplete")
-    elif (
-        signature["keyId"] is not None
-        or signature["detachedSignatureSha256"] is not None
-    ):
+    elif signature["keyId"] is not None or signature["detachedSignatureSha256"] is not None:
         raise DistributionContractError("unissued Vehicle Pack signature must not imply trust")
     if validation_status == "validated" and (
-        signature["state"] != "verified"
-        or artifact_count == 0
-        or validation_artifact_count == 0
+        signature["state"] != "verified" or artifact_count == 0 or validation_artifact_count == 0
     ):
         raise DistributionContractError(
             "validated Vehicle Pack requires signed payload and validation artifacts"
@@ -1161,8 +1155,7 @@ def validate_vehicle_pack_manifest(
             "validated Vehicle Pack requires external cryptographic signature verification"
         )
     if validation_tier == "sim-validated" and (
-        not editions & {"sim", "lab"}
-        or components["sim"]["status"] not in {"included", "external"}
+        not editions & {"sim", "lab"} or components["sim"]["status"] not in {"included", "external"}
     ):
         raise DistributionContractError(
             "sim-validated Vehicle Pack requires a supported simulation edition and component"
@@ -1210,9 +1203,19 @@ def validate_vehicle_pack_registry(
     *,
     vehicle_packs_by_path: dict[str, dict[str, Any]],
     vehicle_pack_manifest_sha256: dict[str, str],
+    source_registry_document: dict[str, Any] | None = None,
+    source_registry_sha256: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise DistributionContractError("Vehicle Pack registry must be an object")
+    if document.get("kind") == "dronedream-vehicle-pack-profile-registry":
+        return validate_vehicle_pack_profile_registry(
+            document,
+            vehicle_packs_by_path=vehicle_packs_by_path,
+            vehicle_pack_manifest_sha256=vehicle_pack_manifest_sha256,
+            source_registry_document=source_registry_document,
+            source_registry_sha256=source_registry_sha256,
+        )
     _require_exact_keys(document, VEHICLE_PACK_REGISTRY_KEYS, "Vehicle Pack registry")
     if document["schemaVersion"] != 1 or document["kind"] != "dronedream-vehicle-pack-registry":
         raise DistributionContractError("Vehicle Pack registry identity is unsupported")
@@ -1364,6 +1367,144 @@ def validate_vehicle_pack_registry(
     return document
 
 
+def validate_vehicle_pack_profile_registry(
+    document: Any,
+    *,
+    vehicle_packs_by_path: dict[str, dict[str, Any]],
+    vehicle_pack_manifest_sha256: dict[str, str],
+    source_registry_document: dict[str, Any] | None = None,
+    source_registry_sha256: str | None = None,
+) -> dict[str, Any]:
+    """Validate the immutable X500-only catalog projection used by Sim payloads."""
+
+    if not isinstance(document, dict):
+        raise DistributionContractError("Vehicle Pack profile registry must be an object")
+    _require_exact_keys(
+        document,
+        VEHICLE_PACK_PROFILE_REGISTRY_KEYS,
+        "Vehicle Pack profile registry",
+    )
+    if (
+        document["schemaVersion"] != 1
+        or document["kind"] != "dronedream-vehicle-pack-profile-registry"
+        or document["registryId"] != "sim-only-x500"
+        or document["registryVersion"] != "1.0.0"
+        or document["profileId"] != "sim-only"
+    ):
+        raise DistributionContractError("Vehicle Pack profile registry identity is unsupported")
+
+    source = document["sourceRegistry"]
+    if not isinstance(source, dict):
+        raise DistributionContractError("Vehicle Pack profile source registry must be an object")
+    _require_exact_keys(source, VEHICLE_PACK_PROFILE_SOURCE_KEYS, "profile source registry")
+    if (
+        source["path"] != "distribution/vehicle-packs/registry.v1.json"
+        or source["registryId"] != "initial-vehicle-packs"
+        or source["registryVersion"] != "1.0.0"
+        or not isinstance(source["sha256"], str)
+        or not SHA256_RE.fullmatch(source["sha256"])
+        or not isinstance(source["auditDate"], str)
+        or not DATE_RE.fullmatch(source["auditDate"])
+    ):
+        raise DistributionContractError("Vehicle Pack profile source identity drifted")
+
+    policy = document["policy"]
+    if not isinstance(policy, dict):
+        raise DistributionContractError("Vehicle Pack profile policy must be an object")
+    _require_exact_keys(policy, VEHICLE_PACK_PROFILE_POLICY_KEYS, "Vehicle Pack profile policy")
+    if policy != {
+        "exactPackCount": 1,
+        "allowedPackIds": ["px4-gazebo-x500-reference"],
+        "hardwareMetadataAllowed": False,
+        "validatedRequiresSignedReceipt": True,
+        "stockDoesNotImplyCompatibility": True,
+        "parameterBoundsAreProvisionalUntilValidated": True,
+    }:
+        raise DistributionContractError("Vehicle Pack profile policy drifted")
+
+    expected_path = "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json"
+    if set(vehicle_packs_by_path) != {expected_path} or set(vehicle_pack_manifest_sha256) != {
+        expected_path
+    }:
+        raise DistributionContractError(
+            "Sim-only Vehicle Pack registry requires exactly the X500 reference manifest"
+        )
+    entries = document["packs"]
+    if not isinstance(entries, list) or len(entries) != 1:
+        raise DistributionContractError("Vehicle Pack profile registry must contain one pack")
+    entry = entries[0]
+    if not isinstance(entry, dict):
+        raise DistributionContractError("Vehicle Pack profile registry entry must be an object")
+    _require_exact_keys(entry, VEHICLE_PACK_REGISTRY_ENTRY_KEYS, "profile registry entry")
+    pack = vehicle_packs_by_path[expected_path]
+    if entry["packId"] != "px4-gazebo-x500-reference" or pack["packId"] != entry["packId"]:
+        raise DistributionContractError("Vehicle Pack profile pack identity drifted")
+    if entry["manifestPath"] != expected_path:
+        raise DistributionContractError("Vehicle Pack profile manifest path drifted")
+    if entry["manifestSha256"] != vehicle_pack_manifest_sha256[
+        expected_path
+    ] or not SHA256_RE.fullmatch(str(entry["manifestSha256"])):
+        raise DistributionContractError("Vehicle Pack profile manifest hash drifted")
+    if (
+        entry["currentValidationStatus"] != pack["validationStatus"]
+        or entry["currentValidationTier"] != pack["validationTier"]
+    ):
+        raise DistributionContractError("Vehicle Pack profile validation claim drifted")
+    if entry["productAvailability"] != "simulation-only":
+        raise DistributionContractError("Vehicle Pack profile must remain simulation-only")
+    if pack["components"]["hardware"]["status"] != "unsupported" or pack["controllers"]:
+        raise DistributionContractError("Vehicle Pack profile contains physical hardware metadata")
+    segments = _validate_unique_text_list(entry["segments"], "profile registry entry.segments")
+    if not segments or not segments <= VEHICLE_PACK_SEGMENTS:
+        raise DistributionContractError("Vehicle Pack profile segments are unsupported")
+    if not isinstance(entry["goldenCandidate"], bool):
+        raise DistributionContractError("Vehicle Pack profile goldenCandidate must be boolean")
+    regions = _validate_unique_text_list(
+        entry["supportRegions"], "profile registry entry.supportRegions"
+    )
+    if regions != set(pack["availabilityRegions"]):
+        raise DistributionContractError("Vehicle Pack profile regions drifted")
+    evidence_items = entry["availabilityEvidence"]
+    if not isinstance(evidence_items, list) or not evidence_items:
+        raise DistributionContractError("Vehicle Pack profile availability evidence is required")
+    for index, evidence in enumerate(evidence_items):
+        label = f"profile registry entry.availabilityEvidence[{index}]"
+        if not isinstance(evidence, dict):
+            raise DistributionContractError(f"{label} must be an object")
+        _require_exact_keys(evidence, VEHICLE_PACK_AVAILABILITY_EVIDENCE_KEYS, label)
+        _validate_https_url(evidence["url"], f"{label}.url")
+        _require_nonempty_string(evidence["scope"], f"{label}.scope")
+        observed_date = evidence["observedDate"]
+        if (
+            not isinstance(observed_date, str)
+            or not DATE_RE.fullmatch(observed_date)
+            or observed_date > source["auditDate"]
+        ):
+            raise DistributionContractError(
+                f"{label}.observedDate must not follow source registry auditDate"
+            )
+
+    if (source_registry_document is None) != (source_registry_sha256 is None):
+        raise DistributionContractError("Vehicle Pack source registry binding is incomplete")
+    if source_registry_document is not None and source_registry_sha256 is not None:
+        if source_registry_sha256 != source["sha256"]:
+            raise DistributionContractError("Vehicle Pack source registry hash drifted")
+        if (
+            source_registry_document.get("kind") != "dronedream-vehicle-pack-registry"
+            or source_registry_document.get("registryId") != source["registryId"]
+            or source_registry_document.get("registryVersion") != source["registryVersion"]
+            or source_registry_document.get("auditDate") != source["auditDate"]
+        ):
+            raise DistributionContractError("Vehicle Pack source registry identity drifted")
+        source_entries = source_registry_document.get("packs")
+        if not isinstance(source_entries, list):
+            raise DistributionContractError("Vehicle Pack source registry entries are invalid")
+        matching = [item for item in source_entries if item.get("packId") == entry["packId"]]
+        if matching != [entry]:
+            raise DistributionContractError("Vehicle Pack profile projection drifted from source")
+    return document
+
+
 def load_vehicle_pack_registry(
     path: Path,
     *,
@@ -1405,17 +1546,13 @@ def load_vehicle_pack_registry(
     )
 
 
-def _validate_composite_component_ref(
-    value: Any, label: str
-) -> dict[str, Any]:
+def _validate_composite_component_ref(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise DistributionContractError(f"{label} must be an object")
     _require_exact_keys(value, COMPOSITE_COMPONENT_REF_KEYS, label)
     for field in ("componentId", "version", "buildId", "validationTier"):
         _require_nonempty_string(value[field], f"{label}.{field}")
-    if not isinstance(value["sourceCommit"], str) or not COMMIT_RE.fullmatch(
-        value["sourceCommit"]
-    ):
+    if not isinstance(value["sourceCommit"], str) or not COMMIT_RE.fullmatch(value["sourceCommit"]):
         raise DistributionContractError(f"{label}.sourceCommit is invalid")
     for field in ("manifestSha256", "artifactSha256"):
         if not isinstance(value[field], str) or not SHA256_RE.fullmatch(value[field]):
@@ -1510,9 +1647,7 @@ def validate_composite_installation_manifest(
         or selected_modules & forbidden_modules
     ):
         raise DistributionContractError("composite selectedModules violate edition policy")
-    capabilities = _validate_unique_text_list(
-        document["capabilities"], "composite capabilities"
-    )
+    capabilities = _validate_unique_text_list(document["capabilities"], "composite capabilities")
     if capabilities != set(edition["capabilities"]["enabledOrConditioned"]):
         raise DistributionContractError("composite capabilities drifted from edition")
 
@@ -1547,13 +1682,12 @@ def validate_composite_installation_manifest(
         }
         if vehicle_ref != expected_vehicle_ref:
             raise DistributionContractError(f"{label} drifted from Vehicle Pack manifest")
-        if edition_id not in pack["supportedEditions"] or document["region"] not in pack[
-            "availabilityRegions"
-        ]:
+        if (
+            edition_id not in pack["supportedEditions"]
+            or document["region"] not in pack["availabilityRegions"]
+        ):
             raise DistributionContractError(f"{label} is incompatible with edition or region")
-        if not isinstance(vehicle_ref["artifactBytes"], int) or vehicle_ref[
-            "artifactBytes"
-        ] < 0:
+        if not isinstance(vehicle_ref["artifactBytes"], int) or vehicle_ref["artifactBytes"] < 0:
             raise DistributionContractError(f"{label}.artifactBytes is invalid")
         if not isinstance(vehicle_ref["artifactSha256"], str) or not SHA256_RE.fullmatch(
             vehicle_ref["artifactSha256"]
@@ -1610,8 +1744,10 @@ def validate_composite_installation_manifest(
         raise DistributionContractError("composite physical capability status is unsupported")
     if edition_id == "sim" and installability["physicalCapabilityStatus"] != "disabled":
         raise DistributionContractError("Sim physical capabilities must be disabled")
-    if edition_id in {"lab", "field"} and edition["validationTier"] == "contract-only" and (
-        installability["physicalCapabilityStatus"] != "contract-only"
+    if (
+        edition_id in {"lab", "field"}
+        and edition["validationTier"] == "contract-only"
+        and (installability["physicalCapabilityStatus"] != "contract-only")
     ):
         raise DistributionContractError("hardware edition cannot overstate physical validation")
     if installability["state"] == "installable":
@@ -1724,9 +1860,10 @@ def validate_release_promotion_manifest(
         "editionManifestSha256": edition_manifest_sha256,
         "compositeManifestSha256": composite_manifest_sha256,
     }
-    if edition_ref != expected_edition_ref or composite["edition"]["editionId"] != edition[
-        "editionId"
-    ]:
+    if (
+        edition_ref != expected_edition_ref
+        or composite["edition"]["editionId"] != edition["editionId"]
+    ):
         raise DistributionContractError("release promotion edition binding drifted")
 
     branch_policy = document["branchPolicy"]
@@ -1752,9 +1889,8 @@ def validate_release_promotion_manifest(
         allow_empty=True,
     )
     for path in declared_paths:
-        if (
-            not SAFE_RELATIVE_PATH_RE.fullmatch(path)
-            or not path.startswith(PROMOTION_METADATA_PREFIXES)
+        if not SAFE_RELATIVE_PATH_RE.fullmatch(path) or not path.startswith(
+            PROMOTION_METADATA_PREFIXES
         ):
             raise DistributionContractError(
                 "release promotion metadata-only path is outside the allowlist"
@@ -1798,9 +1934,7 @@ def validate_release_promotion_manifest(
     _require_exact_keys(artifact, PROMOTION_ARTIFACT_KEYS, "release promotion artifact")
     if artifact["fileName"] != edition["artifactBaseName"]:
         raise DistributionContractError("release promotion artifact filename drifted from edition")
-    if not isinstance(artifact["sha256"], str) or not SHA256_RE.fullmatch(
-        artifact["sha256"]
-    ):
+    if not isinstance(artifact["sha256"], str) or not SHA256_RE.fullmatch(artifact["sha256"]):
         raise DistributionContractError("release promotion artifact SHA-256 is invalid")
     if not isinstance(artifact["bytes"], int) or artifact["bytes"] < 0:
         raise DistributionContractError("release promotion artifact size is invalid")

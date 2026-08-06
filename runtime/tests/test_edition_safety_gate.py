@@ -29,6 +29,10 @@ def load_module(name: str, path: Path) -> ModuleType:
 
 gate = load_module("runtime_edition_safety_gate_tests", RUNTIME_GATE_PATH)
 contract = load_module("runtime_edition_safety_contract_tests", CONTRACT_PATH)
+engine_pack = load_module(
+    "runtime_engine_pack_tool_tests",
+    ROOT / "engine-pack/tools/engine_pack.py",
+)
 FIXTURE = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
 
 
@@ -133,6 +137,69 @@ def allow_override(
         pack_signature_state_override="verified",
         controller_status_override="validated",
     )
+
+
+def sim_active_payload(tmp_path: Path) -> tuple[Path, dict[str, object]]:
+    active_root = tmp_path / "sim-active-engine"
+    files = engine_pack.production_files(
+        ROOT,
+        edition_profile=engine_pack.SIM_EDITION_PROFILE,
+    )
+    for relative, source in files:
+        destination = active_root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    manifest = engine_pack.build_manifest(
+        ROOT,
+        "1" * 40,
+        1_722_000_000,
+        engine_pack.file_records(files),
+        edition_profile_id=engine_pack.SIM_EDITION_PROFILE,
+    )
+    return active_root, manifest
+
+
+def test_runtime_accepts_exact_sim_profile_catalog_and_rejects_extra_hardware(
+    tmp_path: Path,
+) -> None:
+    active_root, manifest = sim_active_payload(tmp_path)
+    paths = gate.runtime_distribution_paths(active_root, engine_manifest=manifest)
+    assert "distribution/editions/sim.v1.json" in paths
+    assert "distribution/editions/lab.v1.json" not in paths
+    assert "distribution/editions/field.v1.json" not in paths
+    assert "distribution/vehicle-packs/registry.v1.json" in paths
+    assert not any("holybro" in path or "amovlab" in path for path in paths)
+
+    edition, pack = gate._validate_active_catalog(
+        contract,
+        active_root,
+        {
+            "editionId": "sim",
+            "vehicle": {"packId": "px4-gazebo-x500-reference"},
+        },
+    )
+    assert edition["editionId"] == "sim"
+    assert pack["packId"] == "px4-gazebo-x500-reference"
+
+    profile_contract, profile = gate._sim_profile_from_manifest(active_root, manifest)
+    with pytest.raises(gate.RuntimeEditionSafetyError, match="inventory failed closed"):
+        gate._validate_sim_payload_paths(
+            profile_contract,
+            profile,
+            sorted(
+                {
+                    *(record["path"] for record in manifest["files"]),
+                    "distribution/editions/lab.v1.json",
+                }
+            ),
+        )
+
+
+def test_runtime_rejects_unknown_engine_pack_profile(tmp_path: Path) -> None:
+    active_root, manifest = sim_active_payload(tmp_path)
+    manifest["editionProfile"]["profileId"] = "unknown-profile"
+    with pytest.raises(gate.RuntimeEditionSafetyError, match="profile is unsupported"):
+        gate.runtime_distribution_paths(active_root, engine_manifest=manifest)
 
 
 def test_runtime_independently_denies_current_unvalidated_catalog(tmp_path: Path) -> None:
@@ -394,8 +461,7 @@ def test_backend_allow_runtime_deny_cannot_become_joint_allow(tmp_path: Path) ->
     reverse_layers = [native, dict(backend_denied.receipt), dict(runtime_allowed.receipt)]
     reverse_quorum = deepcopy(quorum)
     reverse_quorum["layerDecisionHashes"] = {
-        str(receipt["layer"]): receipt["canonicalDecisionHash"]
-        for receipt in reverse_layers
+        str(receipt["layer"]): receipt["canonicalDecisionHash"] for receipt in reverse_layers
     }
     reverse_quorum["reasonCodes"] = list(backend_denied.reason_codes)
     validated_reverse = contract.validate_quorum_receipt(

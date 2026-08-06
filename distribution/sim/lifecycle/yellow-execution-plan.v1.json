@@ -3,14 +3,25 @@
   "kind": "dronedream-sim-yellow-execution-plan",
   "planVersion": "1.0.0",
   "editionId": "sim",
-  "executionClass": "GREEN-static-ready-yellow2-not-authorized",
-  "state": "yellow1-complete-canonical-brand-adopted-yellow2-awaiting-authorization",
+  "executionClass": "GREEN-static-ready-replacement-yellow2-not-authorized",
+  "state": "yellow1-complete-yellow2-attempt1-failed-new-source-ready-awaiting-authorization",
   "authorization": {
     "yellow1Approved": true,
     "yellow2Approved": false,
     "yellow3Approved": false,
     "separateApprovalRequiredForEachStage": true,
     "redRuntimeOrSimulatorApproved": false
+  },
+  "replacementReadiness": {
+    "path": "distribution/sim/readiness/sim-only-common-core-sync.v1.json",
+    "sha256": "0d1c01a9df571b48178730e0922324a4f6932717221158557a019e0d71488743",
+    "commonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
+    "commonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
+    "priorAttemptEvidencePath": "distribution/sim/desktop/yellow-2-build-evidence-record.v1.json",
+    "priorAttemptEvidenceSha256": "a6e00057c489fd2e68a88a34f69e48ba2e95e95b0e80adde108a703f0eb68a5d",
+    "nextAttemptOrdinal": 2,
+    "executionAuthorized": false,
+    "buildStarted": false
   },
   "yellow1VisualBinding": {
     "path": "distribution/sim/frontend/visual-acceptance.v1.json",

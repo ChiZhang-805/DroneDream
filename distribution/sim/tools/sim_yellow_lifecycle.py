@@ -27,6 +27,7 @@ PLAN_KEYS = {
     "executionClass",
     "state",
     "authorization",
+    "replacementReadiness",
     "yellow1VisualBinding",
     "approvedEditionAssetGate",
     "canonicalSyncGate",
@@ -44,6 +45,17 @@ AUTHORIZATION_KEYS = {
     "yellow3Approved",
     "separateApprovalRequiredForEachStage",
     "redRuntimeOrSimulatorApproved",
+}
+REPLACEMENT_READINESS_KEYS = {
+    "path",
+    "sha256",
+    "commonCoreCommit",
+    "commonCoreHash",
+    "priorAttemptEvidencePath",
+    "priorAttemptEvidenceSha256",
+    "nextAttemptOrdinal",
+    "executionAuthorized",
+    "buildStarted",
 }
 VISUAL_BINDING_KEYS = {
     "path",
@@ -416,9 +428,10 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         or plan["kind"] != "dronedream-sim-yellow-execution-plan"
         or plan["planVersion"] != "1.0.0"
         or plan["editionId"] != "sim"
-        or plan["executionClass"] != "GREEN-static-ready-yellow2-not-authorized"
+        or plan["executionClass"]
+        != "GREEN-static-ready-replacement-yellow2-not-authorized"
         or plan["state"]
-        != "yellow1-complete-canonical-brand-adopted-yellow2-awaiting-authorization"
+        != "yellow1-complete-yellow2-attempt1-failed-new-source-ready-awaiting-authorization"
     ):
         raise SimYellowLifecycleError("Sim YELLOW execution plan identity drifted")
 
@@ -431,6 +444,51 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         "redRuntimeOrSimulatorApproved": False,
     }:
         raise SimYellowLifecycleError("YELLOW/RED authorization state drifted")
+
+    replacement = _exact_keys(
+        plan["replacementReadiness"],
+        REPLACEMENT_READINESS_KEYS,
+        "replacementReadiness",
+    )
+    replacement_path = _repo_file(
+        repo_root, replacement["path"], "replacement readiness receipt"
+    )
+    prior_attempt_path = _repo_file(
+        repo_root,
+        replacement["priorAttemptEvidencePath"],
+        "prior YELLOW-2 evidence record",
+    )
+    if (
+        sha256_file(replacement_path)
+        != _sha(replacement["sha256"], "replacement readiness SHA-256")
+        or sha256_file(prior_attempt_path)
+        != _sha(
+            replacement["priorAttemptEvidenceSha256"],
+            "prior YELLOW-2 evidence SHA-256",
+        )
+        or replacement["commonCoreCommit"]
+        != "4024e546fe6eaf298a37375924315a9816f6bf41"
+        or replacement["commonCoreHash"]
+        != "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8"
+        or replacement["nextAttemptOrdinal"] != 2
+        or replacement["executionAuthorized"] is not False
+        or replacement["buildStarted"] is not False
+    ):
+        raise SimYellowLifecycleError("replacement YELLOW-2 readiness drifted")
+    replacement_receipt = load_json(replacement_path)
+    prior_attempt = load_json(prior_attempt_path)
+    if (
+        replacement_receipt.get("state")
+        != "green-ready-awaiting-yellow-authorization"
+        or replacement_receipt.get("nextYellow", {}).get("enginePackProfileId")
+        != "sim-only"
+        or replacement_receipt.get("priorFailedArtifact", {}).get("reuseAllowed")
+        is not False
+        or prior_attempt.get("payloadAudit", {}).get("simPayloadContractPassed")
+        is not False
+        or prior_attempt.get("nonClaims", {}).get("releaseReady") is not False
+    ):
+        raise SimYellowLifecycleError("replacement YELLOW-2 evidence overclaims readiness")
 
     visual = _exact_keys(plan["yellow1VisualBinding"], VISUAL_BINDING_KEYS, "yellow1VisualBinding")
     visual_path = _repo_file(repo_root, visual["path"], "yellow1 visual contract")
@@ -611,8 +669,13 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
     )
     branch_baseline = branch_contract.get("syncBaseline")
     if not isinstance(branch_baseline, dict) or (
-        branch_baseline.get("commonCoreCommit") != sync_gate["recordedCommonCoreCommit"]
-        or branch_baseline.get("commonCoreHash") != sync_gate["recordedCommonCoreHash"]
+        branch_baseline.get("previousCommonCoreCommit")
+        != sync_gate["recordedCommonCoreCommit"]
+        or branch_baseline.get("commonCoreCommit")
+        != "4024e546fe6eaf298a37375924315a9816f6bf41"
+        or branch_baseline.get("commonCoreHash")
+        != "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8"
+        or branch_baseline.get("syncMode") != "path-limited-semantic-product-source"
     ):
         raise SimYellowLifecycleError("canonical sync recorded commonCore binding drifted")
     candidate_ref = sync_source.get("reconciliationCandidate")

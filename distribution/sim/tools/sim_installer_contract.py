@@ -12,6 +12,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -44,8 +45,17 @@ PROFILE_SOURCE_KEYS = {
     "sourceCommitPolicy",
     "sourceTreeRequired",
 }
-PROFILE_MANIFEST_KEYS = {"edition", "capabilityPolicy", "vehiclePacks", "licenseNotice"}
+PROFILE_MANIFEST_KEYS = {
+    "edition",
+    "capabilityPolicy",
+    "enginePackProfile",
+    "runtimeContractRegistry",
+    "vehiclePackRegistry",
+    "vehiclePacks",
+    "licenseNotice",
+}
 FILE_REF_KEYS = {"path", "sha256"}
+PROFILE_ENGINE_PACK_REF_KEYS = {"profileId", "path", "sha256"}
 LICENSE_REF_KEYS = {"path", "sha256", "sizeBytes"}
 PROFILE_PACK_REF_KEYS = {"packId", "path", "sha256", "payloadSha256", "requiredSimulationOnly"}
 PROFILE_PAYLOAD_KEYS = {
@@ -398,6 +408,10 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
 def load_json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -458,6 +472,26 @@ def _commit(value: Any, label: str) -> str:
     if not isinstance(value, str) or not COMMIT_RE.fullmatch(value):
         raise SimInstallerContractError(f"{label} is not a Git commit")
     return value
+
+
+def _historical_sibling_bytes(
+    repo_root: Path, record_path: str, sibling_path: str
+) -> bytes:
+    record_path = _safe_path(record_path, "historical record path")
+    sibling_path = _safe_path(sibling_path, "historical sibling path")
+    commit = subprocess.run(
+        ["git", "-C", str(repo_root), "log", "-1", "--format=%H", "--", record_path],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout.strip()
+    _commit(commit, "historical record commit")
+    return subprocess.run(
+        ["git", "-C", str(repo_root), "show", f"{commit}:{sibling_path}"],
+        check=True,
+        capture_output=True,
+    ).stdout
 
 
 def _validate_file_ref(ref: Any, root: Path, label: str) -> dict[str, Any]:
@@ -524,6 +558,50 @@ def validate_build_profile(document: Any, *, repo_root: Path) -> dict[str, Any]:
     _validate_file_ref(
         manifests["capabilityPolicy"], repo_root, "profile.manifests.capabilityPolicy"
     )
+    engine_ref = _exact_keys(
+        manifests["enginePackProfile"],
+        PROFILE_ENGINE_PACK_REF_KEYS,
+        "profile.manifests.enginePackProfile",
+    )
+    engine_path = _resolve(
+        repo_root, engine_ref["path"], "profile.manifests.enginePackProfile.path"
+    )
+    if (
+        engine_ref["profileId"] != "sim-only"
+        or engine_ref["path"] != "distribution/engine-pack-profiles/sim-only.v1.json"
+        or sha256_file(engine_path)
+        != _sha(engine_ref["sha256"], "profile.manifests.enginePackProfile.sha256")
+    ):
+        raise SimInstallerContractError("Sim Engine Pack profile binding drifted")
+    engine_profile = load_json(engine_path)
+    if (
+        engine_profile.get("profileId") != "sim-only"
+        or engine_profile.get("hardwarePayloadAllowed") is not False
+        or engine_profile.get("allowedEditionIds") != ["sim"]
+        or engine_profile.get("allowedVehiclePackIds")
+        != ["px4-gazebo-x500-reference"]
+    ):
+        raise SimInstallerContractError("Sim Engine Pack profile is not fail-closed")
+    runtime_registry_ref = _validate_file_ref(
+        manifests["runtimeContractRegistry"],
+        repo_root,
+        "profile.manifests.runtimeContractRegistry",
+    )
+    vehicle_registry_ref = _validate_file_ref(
+        manifests["vehiclePackRegistry"],
+        repo_root,
+        "profile.manifests.vehiclePackRegistry",
+    )
+    observed_mappings = {
+        item.get("sourcePath"): item.get("sourceSha256")
+        for item in engine_profile.get("sourceMappings", [])
+        if isinstance(item, dict)
+    }
+    if observed_mappings != {
+        runtime_registry_ref["path"]: runtime_registry_ref["sha256"],
+        vehicle_registry_ref["path"]: vehicle_registry_ref["sha256"],
+    }:
+        raise SimInstallerContractError("Sim Engine Pack registry mapping drifted")
     _validate_license_ref(
         manifests["licenseNotice"], repo_root, "profile.manifests.licenseNotice"
     )
@@ -635,6 +713,7 @@ def validate_adoption_receipt(
     profile_path: Path,
     artifact_path: Path | None = None,
     expected_source_commit: str | None = None,
+    expected_profile_sha256: str | None = None,
 ) -> dict[str, Any]:
     receipt = _exact_keys(document, RECEIPT_KEYS, "Sim adoption receipt")
     if (
@@ -648,9 +727,12 @@ def validate_adoption_receipt(
     profile_ref = _exact_keys(receipt["profile"], RECEIPT_PROFILE_KEYS, "receipt.profile")
     if profile_ref["path"] != "distribution/sim/build-profile.v1.json":
         raise SimInstallerContractError("receipt profile path drifted")
-    if _sha(profile_ref["sha256"], "receipt.profile.sha256") != _expected_profile_sha(
-        profile, profile_path
-    ):
+    expected_profile_sha = (
+        _sha(expected_profile_sha256, "expected historical profile SHA-256")
+        if expected_profile_sha256 is not None
+        else _expected_profile_sha(profile, profile_path)
+    )
+    if _sha(profile_ref["sha256"], "receipt.profile.sha256") != expected_profile_sha:
         raise SimInstallerContractError("receipt profile SHA-256 drifted")
 
     source = _exact_keys(receipt["source"], RECEIPT_SOURCE_KEYS, "receipt.source")
@@ -812,12 +894,33 @@ def validate_install_readiness_audit(
         raise SimInstallerContractError("readiness adoption receipt SHA-256 drifted")
     if sha256_file(sidecar_path) != _sha(adoption["sidecarSha256"], "readiness sidecar sha256"):
         raise SimInstallerContractError("readiness adoption sidecar SHA-256 drifted")
+    receipt_document = load_json(receipt_path)
+    receipt_profile_ref = _exact_keys(
+        receipt_document["profile"], RECEIPT_PROFILE_KEYS, "receipt.profile"
+    )
+    receipt_profile_sha = _sha(
+        receipt_profile_ref["sha256"], "receipt.profile.sha256"
+    )
+    receipt_profile = profile
+    if receipt_profile_sha != sha256_file(profile_path):
+        historical_profile_bytes = _historical_sibling_bytes(
+            repo_root, adoption["receiptPath"], receipt_profile_ref["path"]
+        )
+        if sha256_bytes(historical_profile_bytes) != receipt_profile_sha:
+            raise SimInstallerContractError("historical receipt profile SHA-256 drifted")
+        try:
+            receipt_profile = json.loads(historical_profile_bytes)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise SimInstallerContractError("historical receipt profile is invalid") from exc
+        if not isinstance(receipt_profile, dict):
+            raise SimInstallerContractError("historical receipt profile must be an object")
     receipt = validate_adoption_receipt(
-        load_json(receipt_path),
-        profile=profile,
+        receipt_document,
+        profile=receipt_profile,
         profile_path=profile_path,
         artifact_path=artifact_path,
         expected_source_commit=artifact["productSubjectCommit"],
+        expected_profile_sha256=receipt_profile_sha,
     )
     sidecar = load_json(sidecar_path)
     if sidecar.get("sourceSeparation", {}).get("postAdoptionEvidenceHead") != artifact[
