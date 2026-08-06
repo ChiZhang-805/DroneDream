@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-installer-postbuild-failure-receipt",
+  "recordedAt": "2026-08-06T02:38:52.388Z",
+  "executionSubject": "a1aeaf01ebb7aa3e33883346b0b225db0962adfc",
+  "branch": "codex/software",
+  "resourceClass": "YELLOW",
+  "outcome": "candidate_built_and_signed_metadata_failed_closed",
+  "failureStage": "updater-manifest-product-name-resolution",
+  "failureSummary": "The shared updater-manifest writer assumed the legacy DroneDream installer basename and rejected the already-built DroneDream-Universal candidate. The candidate bytes must be preserved and finalized without rebuilding NSIS.",
+  "buildCount": 1,
+  "candidate": {
+    "fileName": "DroneDream-Universal_1.0.0_x64-setup.exe",
+    "bytes": 11650239,
+    "sha256": "815c9fe5990242e90e3377850b3797c06409005cdb0148f14be6f402cf9154ff",
+    "authenticodeStatus": "NotSigned",
+    "updaterSignatureBytes": 436,
+    "updaterSignatureSha256": "ef6cf3657787d562a053c9c923a1508f04b98011962fc760148eb24c192a0992",
+    "checksumMatches": true
+  },
+  "enginePack": {
+    "profileCompatibilityId": "unified-sim-lab",
+    "payloadContractId": "dronedream-universal-engine-payload/v1",
+    "packId": "sha256:3fd83fa92dd57b05eff86dffe478e10ab03b0917d99f4c60f5b9f0f5d2c8cc0e",
+    "manifestSha256": "18be7a3f64b1a891839f4e84c98a18648ed80cde3d334c094fc82d89248123e1",
+    "fileCount": 234,
+    "sourceCommit": "a1aeaf01ebb7aa3e33883346b0b225db0962adfc"
+  },
+  "handoff": {
+    "finalOutputDirectoryCreated": false,
+    "releaseReady": false,
+    "websiteTransferred": false,
+    "rebuildProhibited": true
+  },
+  "credentialBoundary": {
+    "supabasePublishableConfigurationPrinted": false,
+    "updaterPrivateKeyPrinted": false,
+    "modelApiKeysRead": false,
+    "accountCredentialsRead": false,
+    "temporaryProcessEnvironmentCleared": true
+  },
+  "safetyBoundary": {
+    "installedApplicationChanged": false,
+    "runtimeChanged": false,
+    "px4OrGazeboStarted": false,
+    "websiteOrReleaseChanged": false
+  },
+  "nextAction": "Fix the shared product-name parameter contract and finalize the exact candidate bytes with source-bound verification. Do not run Tauri or NSIS again."
+}
