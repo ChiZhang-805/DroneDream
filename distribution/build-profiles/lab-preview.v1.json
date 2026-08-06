@@ -17,6 +17,8 @@
     "licenseNotice": "runtime/THIRD_PARTY_NOTICES.md",
     "websiteExactExeHandoff": "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json",
     "desktopEditionCoexistence": "distribution/desktop/edition-coexistence.v1.json",
+    "desktopEditionBrowserAuth": "distribution/desktop/edition-browser-auth.v1.json",
+    "desktopRuntimeUpdateFamilies": "distribution/desktop/edition-runtime-update-families.v1.json",
     "coexistenceAndAuth": "distribution/editions/lab/coexistence-and-auth.v1.json",
     "universalDonorRequests": "distribution/editions/lab/universal-donor-requests.v1.json"
   },
@@ -138,6 +140,12 @@
     "qualificationReceiptRequired": true,
     "runtimeProfile": "full-lab",
     "enginePackEditionProfile": "unified-sim-lab",
+    "compiledDesktopEditionId": "lab",
+    "authNamespace": "DroneDream/Auth/lab/v1",
+    "runtimeStateNamespace": "io.dronedream.desktop.lab/runtime",
+    "diagnosticsNamespace": "diagnostics/lab",
+    "updaterChannelTag": "desktop-lab-channel",
+    "updaterMetadataFileName": "latest-lab.json",
     "brand": {
       "displayName": "DroneDream · LAB",
       "canonicalDonorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",

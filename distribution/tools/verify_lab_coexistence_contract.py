@@ -7,7 +7,6 @@ import hashlib
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "distribution/editions/lab/coexistence-and-auth.v1.json"
 DONOR_PATH = ROOT / "distribution/editions/lab/universal-donor-requests.v1.json"
@@ -16,6 +15,12 @@ BUILD_SCRIPT_PATH = ROOT / "desktop/scripts/build-lab-preview.ps1"
 PROFILE_PATH = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 COMMON_CONTRACT_PATH = ROOT / "distribution/desktop/edition-coexistence.v1.json"
 COMMON_SCHEMA_PATH = ROOT / "distribution/schemas/desktop-edition-coexistence.schema.json"
+COMMON_AUTH_PATH = ROOT / "distribution/desktop/edition-browser-auth.v1.json"
+COMMON_AUTH_SCHEMA_PATH = ROOT / "distribution/schemas/desktop-edition-browser-auth.schema.json"
+RUNTIME_UPDATE_PATH = ROOT / "distribution/desktop/edition-runtime-update-families.v1.json"
+RUNTIME_UPDATE_SCHEMA_PATH = (
+    ROOT / "distribution/schemas/desktop-edition-runtime-update-families.schema.json"
+)
 BUILD_RECEIPT_PATH = (
     ROOT
     / "distribution/build-receipts"
@@ -109,7 +114,7 @@ def validate_contract(
         "installerProductName": "DroneDream-Lab",
         "identifier": "io.dronedream.desktop.lab",
         "artifactFileName": "DroneDream-Lab-1.0.0.exe",
-        "updaterManifest": "lab-latest.json",
+        "updaterManifest": "latest-lab.json",
         "enginePackEditionProfile": "unified-sim-lab",
     }
     for key, expected in expected_lab.items():
@@ -125,10 +130,14 @@ def validate_contract(
     derivation = _mapping(contract.get("identityDerivation"), "identityDerivation")
     expected_derivation = {
         "defaultInstallRoot": "%LOCALAPPDATA%\\{installerProductName}",
-        "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{installerProductName}",
+        "uninstallKey": (
+            "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{installerProductName}"
+        ),
         "manufacturerProductKey": "HKCU\\Software\\DroneDream\\{installerProductName}",
         "desktopShortcut": "%USERPROFILE%\\Desktop\\{productName}.lnk",
-        "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{productName}.lnk",
+        "startMenuShortcut": (
+            "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{productName}.lnk"
+        ),
         "appUserModelId": "{identifier}",
         "roamingAppData": "%APPDATA%\\{identifier}",
         "localAppData": "%LOCALAPPDATA%\\{identifier}",
@@ -138,7 +147,9 @@ def validate_contract(
             raise LabCoexistenceContractError(f"identity derivation drifted: {key}")
     deletion_scope = _sequence(derivation.get("uninstallDeletionScope"), "uninstallDeletionScope")
     if not any("exact identifier" in str(item) for item in deletion_scope):
-        raise LabCoexistenceContractError("Lab uninstall app-data deletion is not identifier scoped")
+        raise LabCoexistenceContractError(
+            "Lab uninstall app-data deletion is not identifier scoped"
+        )
 
     common_contract = _mapping(
         contract.get("commonCoexistenceContract"),
@@ -147,14 +158,11 @@ def validate_contract(
     common_manifest = _mapping(common_contract.get("manifest"), "common contract manifest")
     common_schema = _mapping(common_contract.get("schema"), "common contract schema")
     if (
-        common_contract.get("prerequisiteCommit")
-        != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
-        or common_contract.get("productDonorCommit")
-        != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
+        common_contract.get("prerequisiteCommit") != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
+        or common_contract.get("productDonorCommit") != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
         or common_contract.get("unknownProductDecision") != "deny"
         or common_contract.get("lifecycleExecutionEvidenceRequired") is not True
-        or common_manifest.get("path")
-        != "distribution/desktop/edition-coexistence.v1.json"
+        or common_manifest.get("path") != "distribution/desktop/edition-coexistence.v1.json"
         or common_manifest.get("bytes") != COMMON_CONTRACT_PATH.stat().st_size
         or common_manifest.get("sha256") != _sha256(COMMON_CONTRACT_PATH)
         or common_schema.get("path")
@@ -164,10 +172,60 @@ def validate_contract(
     ):
         raise LabCoexistenceContractError("common desktop coexistence donor drifted")
 
+    common_auth = _mapping(contract.get("commonBrowserAuthContract"), "commonBrowserAuthContract")
+    common_auth_manifest = _mapping(common_auth.get("manifest"), "common auth manifest")
+    common_auth_schema = _mapping(common_auth.get("schema"), "common auth schema")
+    if (
+        common_auth.get("contractDonorCommit") != "6355aad351370178a7171b504a5d2f235fb12ceb"
+        or common_auth.get("oauthPkceProductCommit") != "2f1dbc5fef092ae4cf58366e1178684672ae26c2"
+        or common_auth.get("credentialVaultProductCommit")
+        != "bed637c726462e1a38b74eba46915543d007869d"
+        or common_auth.get("nativeAuditProductCommit") != "4c779b7ca316c0953f94f7ef3f4f850881ef2d58"
+        or common_auth.get("portableIdentityBindingFixMustReturnToUniversal") is not True
+        or common_auth_manifest.get("path") != "distribution/desktop/edition-browser-auth.v1.json"
+        or common_auth_manifest.get("bytes") != COMMON_AUTH_PATH.stat().st_size
+        or common_auth_manifest.get("sha256") != _sha256(COMMON_AUTH_PATH)
+        or common_auth_schema.get("path")
+        != "distribution/schemas/desktop-edition-browser-auth.schema.json"
+        or common_auth_schema.get("bytes") != COMMON_AUTH_SCHEMA_PATH.stat().st_size
+        or common_auth_schema.get("sha256") != _sha256(COMMON_AUTH_SCHEMA_PATH)
+        or common_auth.get("providerExecutionEvidenceRequired") is not True
+    ):
+        raise LabCoexistenceContractError("common desktop browser auth donor drifted")
+
+    runtime_update = _mapping(contract.get("runtimeUpdateIsolation"), "runtimeUpdateIsolation")
+    runtime_manifest = _mapping(runtime_update.get("manifest"), "Runtime/update manifest")
+    runtime_schema = _mapping(runtime_update.get("schema"), "Runtime/update schema")
+    if (
+        runtime_update.get("registryProductCommit") != "4ea7fd1dfe3a69d90ada1a37a82dd888cba48430"
+        or runtime_update.get("runtimeDiagnosticsProductCommit")
+        != "8a0828c258782fa77506ee32c7c016e5b18ad292"
+        or runtime_update.get("updaterProductCommit") != "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d"
+        or runtime_update.get("evidenceOnlyCommit") != "528ecf39ef7c4f2a85b88af73a76057f87184e35"
+        or runtime_update.get("evidenceOnlyCommitIsProductSource") is not False
+        or runtime_update.get("labRuntimeProfile") != "unified-sim-lab"
+        or runtime_update.get("labRuntimeStateNamespace") != "io.dronedream.desktop.lab/runtime"
+        or runtime_update.get("labDiagnosticsRelativePath") != "diagnostics/lab"
+        or runtime_update.get("labUpdaterChannelTag") != "desktop-lab-channel"
+        or runtime_update.get("labUpdaterMetadataFileName") != "latest-lab.json"
+        or runtime_manifest.get("path")
+        != "distribution/desktop/edition-runtime-update-families.v1.json"
+        or runtime_manifest.get("bytes") != RUNTIME_UPDATE_PATH.stat().st_size
+        or runtime_manifest.get("sha256") != _sha256(RUNTIME_UPDATE_PATH)
+        or runtime_schema.get("path")
+        != "distribution/schemas/desktop-edition-runtime-update-families.schema.json"
+        or runtime_schema.get("bytes") != RUNTIME_UPDATE_SCHEMA_PATH.stat().st_size
+        or runtime_schema.get("sha256") != _sha256(RUNTIME_UPDATE_SCHEMA_PATH)
+        or runtime_update.get("updaterSignatureRequiredForRelease") is not True
+    ):
+        raise LabCoexistenceContractError("Lab Runtime/update isolation donor drifted")
+
     runtime = _mapping(contract.get("sharedRuntimeCoordination"), "sharedRuntimeCoordination")
     if (
         runtime.get("runtimeProductId") != "DroneDreamRuntime"
-        or runtime.get("coordinatorNamespace") != "%LOCALAPPDATA%\\io.dronedream.desktop"
+        or runtime.get("coordinatorNamespace")
+        != "%LOCALAPPDATA%\\io.dronedream.runtime-base-manager"
+        or runtime.get("operationLeaseFileName") != "runtime-operation-v1.lock"
         or runtime.get("isAccountSessionStorage") is not False
         or runtime.get("isEditionProfileStorage") is not False
         or runtime.get("mayBeDeletedByLabUninstall") is not False
@@ -197,12 +255,9 @@ def validate_contract(
             raise LabCoexistenceContractError(f"canonical Lab brand bytes drifted: {path_key}")
     canonical_donor = _mapping(brand.get("canonicalDonor"), "brandContinuity.canonicalDonor")
     if (
-        canonical_donor.get("productCommit")
-        != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
-        or canonical_donor.get("productParentCommit")
-        != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
-        or canonical_donor.get("evidenceCommit")
-        != "7482647f1c2fcb92f58aaef009efc99764792297"
+        canonical_donor.get("productCommit") != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
+        or canonical_donor.get("productParentCommit") != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
+        or canonical_donor.get("evidenceCommit") != "7482647f1c2fcb92f58aaef009efc99764792297"
         or canonical_donor.get("receiptSha256")
         != "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94"
         or canonical_donor.get("evidenceCommitIsProductSource") is not False
@@ -216,7 +271,10 @@ def validate_contract(
     ):
         raise LabCoexistenceContractError("Lab canonical green tokens drifted")
     surfaces = set(_sequence(brand.get("requiredSurfaces"), "requiredSurfaces"))
-    if not {"executable", "taskbar", "login", "browser-callback", "website-download-metadata"} <= surfaces:
+    if (
+        not {"executable", "taskbar", "login", "browser-callback", "website-download-metadata"}
+        <= surfaces
+    ):
         raise LabCoexistenceContractError("Lab brand surface coverage is incomplete")
 
     authentication = _mapping(contract.get("authentication"), "authentication")
@@ -242,11 +300,9 @@ def validate_contract(
         raise LabCoexistenceContractError("Lab authentication isolation requirements drifted")
     if (
         authentication.get("requiredLabAppIdentity") != "io.dronedream.desktop.lab"
-        or authentication.get("requiredFlow") != "authorization-code-pkce-s256"
-        or authentication.get("requiredCredentialVaultNamespace")
-        != "io.dronedream.desktop.lab/auth"
-        or authentication.get("requiredLocalSessionNamespace")
-        != "io.dronedream.desktop.lab/session"
+        or authentication.get("requiredFlow") != "hosted-authorization-code-pkce-s256"
+        or authentication.get("requiredCredentialVaultNamespace") != "DroneDream/Auth/lab/v1"
+        or authentication.get("requiredLocalSessionNamespace") != "io.dronedream.desktop.lab"
     ):
         raise LabCoexistenceContractError("Lab auth namespace or flow drifted")
     observation = _mapping(
@@ -254,13 +310,14 @@ def validate_contract(
         "authentication.currentCommonCoreObservation",
     )
     if (
-        observation.get("readyAsCanonicalAuthDonor") is not False
-        or observation.get("editionBoundCallback") is not False
-        or observation.get("pkceS256") is not False
-        or observation.get("osCredentialVault") is not False
-        or observation.get("crossEditionSilentAdoptionDenied") != "not-proven"
+        observation.get("readyAsCanonicalAuthDonor") is not True
+        or observation.get("editionBoundCallback") is not True
+        or observation.get("pkceS256") is not True
+        or observation.get("osCredentialVault") is not True
+        or observation.get("crossEditionSilentAdoptionDenied") is not True
+        or observation.get("providerExecutionEvidenceCollected") is not False
     ):
-        raise LabCoexistenceContractError("current auth gaps must remain fail-closed")
+        raise LabCoexistenceContractError("canonical auth donor observation drifted")
 
     safety = _mapping(contract.get("safetyBoundary"), "safetyBoundary")
     if (
@@ -275,7 +332,9 @@ def validate_contract(
     receipt_artifact = _mapping(build_receipt.get("artifact"), "build receipt artifact")
     handoff_artifact = _mapping(handoff.get("artifact"), "handoff artifact")
     for key in ("fileName", "bytes", "sha256"):
-        if frozen.get(key) != receipt_artifact.get(key) or frozen.get(key) != handoff_artifact.get(key):
+        if frozen.get(key) != receipt_artifact.get(key) or frozen.get(key) != handoff_artifact.get(
+            key
+        ):
             raise LabCoexistenceContractError(f"frozen Lab artifact {key} was relabeled")
     if (
         frozen.get("sourceCommit") != "978b902fbe3038a526ab4970f55ea6eb37685c64"
@@ -298,13 +357,19 @@ def validate_contract(
     plugins = _mapping(overlay.get("plugins"), "Lab overlay plugins")
     updater = _mapping(plugins.get("updater"), "Lab updater")
     if updater.get("endpoints") != [
-        "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/lab-latest.json"
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json"
     ]:
         raise LabCoexistenceContractError("Lab updater endpoint is not edition scoped")
-    resources = _mapping(_mapping(overlay.get("bundle"), "Lab bundle").get("resources"), "Lab resources")
+    resources = _mapping(
+        _mapping(overlay.get("bundle"), "Lab bundle").get("resources"), "Lab resources"
+    )
     for source in (
         "../../distribution/desktop/edition-coexistence.v1.json",
         "../../distribution/schemas/desktop-edition-coexistence.schema.json",
+        "../../distribution/desktop/edition-browser-auth.v1.json",
+        "../../distribution/schemas/desktop-edition-browser-auth.schema.json",
+        "../../distribution/desktop/edition-runtime-update-families.v1.json",
+        "../../distribution/schemas/desktop-edition-runtime-update-families.schema.json",
         "../../distribution/editions/lab/coexistence-and-auth.v1.json",
         "../../distribution/editions/lab/universal-donor-requests.v1.json",
     ):
@@ -314,6 +379,11 @@ def validate_contract(
         raise LabCoexistenceContractError("Lab Engine Pack profile is not explicit")
     if '$env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"' not in build_script:
         raise LabCoexistenceContractError("Lab build does not pin its Engine Pack profile")
+    if (
+        '$env:DRONEDREAM_DESKTOP_EDITION_ID = "lab"' not in build_script
+        or "-EditionId lab" not in build_script
+    ):
+        raise LabCoexistenceContractError("Lab build does not pin its compiled Edition identity")
 
     if (
         donor.get("kind") != "dronedream-lab-universal-donor-requests"
@@ -323,14 +393,14 @@ def validate_contract(
     authority = _mapping(donor.get("authority"), "donor authority")
     if (
         authority.get("branch") != "codex/software"
-        or authority.get("observedHead")
-        != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
-        or authority.get("observedProductSource")
-        != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
+        or authority.get("observedHead") != "528ecf39ef7c4f2a85b88af73a76057f87184e35"
+        or authority.get("observedHeadIsProductSource") is not False
+        or authority.get("observedProductSource") != "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d"
         or authority.get("canonicalBrandProductSource")
         != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
         or authority.get("labMayCarrySharedFixLongTerm") is not False
-        or "without hand-copying or blindly cherry-picking" not in str(authority.get("integrationRule"))
+        or "without hand-copying or blindly cherry-picking"
+        not in str(authority.get("integrationRule"))
     ):
         raise LabCoexistenceContractError("shared fixes are not owned by Universal")
     requests = _sequence(donor.get("requests"), "donor requests")
@@ -339,6 +409,8 @@ def validate_contract(
         "universal-nsis-existing-install-quiesce-v1",
         "universal-edition-auth-isolation-v1",
         "universal-large-edition-lockup-brand-v1",
+        "universal-runtime-diagnostics-isolation-v1",
+        "universal-updater-release-family-isolation-v1",
         "universal-edition-safety-fixture-binding-v1",
     }:
         raise LabCoexistenceContractError("required Universal donor requests are incomplete")
@@ -346,6 +418,7 @@ def validate_contract(
         item = _mapping(request, "donor request")
         if item.get("ownership") != "Universal/Core" or item.get("state") not in {
             "delivered-exact-donor-forward-synced",
+            "delivered-exact-donor-forward-synced-with-portable-binding-fix",
             "awaiting-exact-donor",
             "requested-not-delivered",
         }:
@@ -367,10 +440,8 @@ def validate_contract(
                 exact_donor.get("commit") != "b099ed00923e9f2b833f812ad79f1614529038de"
                 or exact_donor.get("parent") != "39d19414e4ac6649288726195f74afaf6dc58123"
                 or exact_donor.get("integration") != "merge-parent-preserved"
-                or coexistence_donor.get("commit")
-                != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
-                or identity_donor.get("commit")
-                != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
+                or coexistence_donor.get("commit") != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
+                or identity_donor.get("commit") != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
                 or identity_donor.get("unknownProductDecision") != "deny"
                 or identity_donor.get("labInstallerProductName") != "DroneDream-Lab"
                 or identity_donor.get("labDisplayName") != "DroneDream · LAB"
@@ -382,19 +453,32 @@ def validate_contract(
             receipt = _mapping(evidence.get("receipt"), "brand donor receipt")
             if (
                 item.get("state") != "delivered-exact-donor-forward-synced"
-                or exact_donor.get("commit")
-                != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
-                or exact_donor.get("parent")
-                != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
+                or exact_donor.get("commit") != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
+                or exact_donor.get("parent") != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
                 or evidence.get("canonicalDotLockupSha256")
                 != "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
                 or evidence.get("canonicalDotLockupDimensions") != [2386, 218]
                 or evidence.get("preserveNaturalEditionLabelWidth") is not True
-                or receipt.get("commit")
-                != "7482647f1c2fcb92f58aaef009efc99764792297"
+                or receipt.get("commit") != "7482647f1c2fcb92f58aaef009efc99764792297"
                 or receipt.get("isProductSource") is not False
             ):
                 raise LabCoexistenceContractError("brand donor provenance drifted")
+        if item.get("requestId") == "universal-edition-auth-isolation-v1":
+            chain = _sequence(item.get("exactDonorChain"), "auth exact donor chain")
+            portable = _mapping(item.get("portableUniversalPatch"), "portable auth patch")
+            if (
+                chain
+                != [
+                    "6355aad351370178a7171b504a5d2f235fb12ceb",
+                    "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
+                    "2f1dbc5fef092ae4cf58366e1178684672ae26c2",
+                    "bed637c726462e1a38b74eba46915543d007869d",
+                    "4c779b7ca316c0953f94f7ef3f4f850881ef2d58",
+                ]
+                or portable.get("mustReturnToUniversal") is not True
+                or portable.get("mayRemainAsLabFork") is not False
+            ):
+                raise LabCoexistenceContractError("auth donor provenance drifted")
     recovery = _mapping(donor.get("labRecovery"), "labRecovery")
     if (
         recovery.get("rebuildAuthorizedByThisRequest") is not False
@@ -406,10 +490,10 @@ def validate_contract(
     blockers = _sequence(contract.get("crossEditionBlockers"), "crossEditionBlockers")
     blocker_text = " ".join(str(item) for item in blockers)
     for required in (
-        "same latest.json",
-        "authentication donor",
         "existing-install/quiesce",
         "large LAB suffix",
+        "provider, signed-updater",
+        "identity-binding hash fix",
         "edition-safety allow-fixture",
         "predates this contract",
     ):

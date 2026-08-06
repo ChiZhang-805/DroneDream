@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "distribution/tools"
@@ -15,9 +16,7 @@ if str(TOOLS) not in sys.path:
 import verify_lab_coexistence_contract as coexistence  # noqa: E402
 
 SYNC_RECEIPT_PATH = (
-    ROOT
-    / "distribution/build-receipts"
-    / "lab-universal-coexistence-sync-1.0.0-74418e1.green.json"
+    ROOT / "distribution/build-receipts" / "lab-universal-coexistence-sync-1.0.0-74418e1.green.json"
 )
 
 
@@ -43,7 +42,7 @@ class LabCoexistenceContractTests(unittest.TestCase):
             result["labIdentity"]["installerProductName"],
             "DroneDream-Lab",
         )
-        self.assertEqual(result["universalDonorRequestCount"], 4)
+        self.assertEqual(result["universalDonorRequestCount"], 6)
         contract = coexistence._load_json(coexistence.CONTRACT_PATH)
         self.assertEqual(
             contract["brandContinuity"]["dotLockupState"],
@@ -53,13 +52,9 @@ class LabCoexistenceContractTests(unittest.TestCase):
             contract["brandContinuity"]["approvedEditionSuffixCapHeightRatio"],
             0.9,
         )
-        self.assertTrue(
-            contract["brandContinuity"]["preserveNaturalEditionLabelWidth"]
-        )
+        self.assertTrue(contract["brandContinuity"]["preserveNaturalEditionLabelWidth"])
         self.assertFalse(
-            contract["brandContinuity"]["canonicalDonor"][
-                "evidenceCommitIsProductSource"
-            ]
+            contract["brandContinuity"]["canonicalDonor"]["evidenceCommitIsProductSource"]
         )
 
     def test_rejects_product_and_app_identity_collision(self) -> None:
@@ -95,6 +90,44 @@ class LabCoexistenceContractTests(unittest.TestCase):
         ]
         inputs[2] = overlay
         with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "updater"):
+            coexistence.validate_contract(*inputs)
+
+    def test_rejects_runtime_profile_or_compiled_edition_drift(self) -> None:
+        inputs = list(load_inputs())
+        contract = copy.deepcopy(inputs[0])
+        contract["runtimeUpdateIsolation"]["labRuntimeProfile"] = "sim-only"
+        inputs[0] = contract
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "Runtime/update"):
+            coexistence.validate_contract(*inputs)
+
+        inputs = list(load_inputs())
+        inputs[4] = inputs[4].replace(
+            '$env:DRONEDREAM_DESKTOP_EDITION_ID = "lab"',
+            '$env:DRONEDREAM_DESKTOP_EDITION_ID = "universal"',
+        )
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "compiled Edition"):
+            coexistence.validate_contract(*inputs)
+
+    def test_rejects_auth_donor_or_portable_backflow_claim_drift(self) -> None:
+        inputs = list(load_inputs())
+        contract = copy.deepcopy(inputs[0])
+        contract["authentication"]["currentCommonCoreObservation"][
+            "crossEditionSilentAdoptionDenied"
+        ] = False
+        inputs[0] = contract
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "auth donor"):
+            coexistence.validate_contract(*inputs)
+
+        inputs = list(load_inputs())
+        donor = copy.deepcopy(inputs[1])
+        auth_request = next(
+            item
+            for item in donor["requests"]
+            if item["requestId"] == "universal-edition-auth-isolation-v1"
+        )
+        auth_request["portableUniversalPatch"]["mustReturnToUniversal"] = False
+        inputs[1] = donor
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "auth donor"):
             coexistence.validate_contract(*inputs)
 
     def test_rejects_silent_cross_edition_auth_or_frontend_identity(self) -> None:
@@ -192,35 +225,31 @@ class LabCoexistenceContractTests(unittest.TestCase):
             "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
         )
         self.assertEqual(
-            receipt["universalDonors"]["coexistenceContractPrerequisite"][
-                "labIntegrationCommit"
-            ],
+            receipt["universalDonors"]["coexistenceContractPrerequisite"]["labIntegrationCommit"],
             "3c108a60fb00292cede529127cbb8890d687af2a",
         )
         self.assertEqual(
-            receipt["universalDonors"]["installerIdentityProduct"][
-                "labIntegrationCommit"
-            ],
+            receipt["universalDonors"]["installerIdentityProduct"]["labIntegrationCommit"],
             "28db5928371aa58eb918e1554a87c0ae4b14444c",
         )
         self.assertTrue(
-            receipt["universalDonors"]["installerIdentityProduct"][
-                "changedPathsExactAtSource"
-            ]
+            receipt["universalDonors"]["installerIdentityProduct"]["changedPathsExactAtSource"]
         )
         self.assertEqual(receipt["labIdentity"]["installerProductName"], "DroneDream-Lab")
         self.assertEqual(receipt["labIdentity"]["displayName"], "DroneDream · LAB")
+        coexistence_source = receipt["source"]["commit"]
         for key in ("manifest", "schema", "validator", "tests"):
             reference = receipt["commonCoexistenceContract"][key]
-            payload = (ROOT / reference["path"]).read_bytes()
+            payload = subprocess.check_output(
+                ["git", "show", f"{coexistence_source}:{reference['path']}"],
+                cwd=ROOT,
+            )
             self.assertEqual(len(payload), reference["bytes"])
-            self.assertEqual(coexistence._sha256(ROOT / reference["path"]), reference["sha256"])
+            self.assertEqual(hashlib.sha256(payload).hexdigest(), reference["sha256"])
         self.assertTrue(
             receipt["verification"]["cleanSourceUiLayout"]["hostLocalGreenEvidenceOnly"]
         )
-        self.assertFalse(
-            receipt["verification"]["cleanSourceUiLayout"]["releaseLifecycleEvidence"]
-        )
+        self.assertFalse(receipt["verification"]["cleanSourceUiLayout"]["releaseLifecycleEvidence"])
         self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
         self.assertFalse(receipt["releaseReady"])
 

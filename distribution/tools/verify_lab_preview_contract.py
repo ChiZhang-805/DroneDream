@@ -402,7 +402,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
     if (
         not isinstance(updater, dict)
         or updater.get("endpoints")
-        != ["https://github.com/ChiZhang-805/DroneDream/releases/latest/download/lab-latest.json"]
+        != [
+            "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json"
+        ]
     ):
         raise LabPreviewContractError("Lab updater endpoint is not edition scoped")
 
@@ -426,7 +428,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'authenticode',
         'tauriUpdaterSignature = "not-issued"',
         'VITE_DRONEDREAM_EDITION = "lab"',
+        'DRONEDREAM_DESKTOP_EDITION_ID = "lab"',
         'DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"',
+        'DRONEDREAM_OAUTH_CLIENT_ID',
         '$coreListing.Replace("`r`n", "`n").Replace("`r", "`n").Trim()',
         'Get-Sha256Text $coreListingCanonical',
         '[IO.File]::WriteAllText($receiptPath, $receiptJson, $utf8NoBom)',
@@ -445,6 +449,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         '-AdditionalConfigPath',
         '-CargoTargetDir $cargoTargetFull',
         '-LlvmRoot $gnullvm.llvmRoot',
+        '-EditionId lab',
         '-AllowUnsignedUpdater',
         '-PreserveBundleHistory',
         'x86_64-pc-windows-gnullvm\\release\\bundle\\nsis',

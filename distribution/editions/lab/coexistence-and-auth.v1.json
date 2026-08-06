@@ -6,9 +6,11 @@
   "auditMode": "green-source-only",
   "auditBase": {
     "labBranch": "codex/software-lab",
-    "labCommit": "a62111eee2b7dc5d64475b9ac207bb599fe13669",
+    "labCommit": "next-clean-lab-source",
     "universalBranch": "codex/software",
-    "universalObservedCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "universalObservedCommit": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+    "universalObservedCommitIsProductSource": false,
+    "latestUniversalProductSourceCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "simObservedCommit": "c8630332cdad1c1a94155d13d1981c83bdec0d1c",
     "fieldObservedCommit": "452eed9c7b018d97beec3cd3d61ee182b6e67330"
@@ -18,8 +20,8 @@
     "productDonorCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
     "manifest": {
       "path": "distribution/desktop/edition-coexistence.v1.json",
-      "bytes": 6064,
-      "sha256": "1af65a86d4f77add7d16d21fe257b7052cb5138de68b6eb3f111f0a32d17bd38"
+      "bytes": 6071,
+      "sha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a"
     },
     "schema": {
       "path": "distribution/schemas/desktop-edition-coexistence.schema.json",
@@ -28,6 +30,51 @@
     },
     "unknownProductDecision": "deny",
     "lifecycleExecutionEvidenceRequired": true
+  },
+  "commonBrowserAuthContract": {
+    "contractDonorCommit": "6355aad351370178a7171b504a5d2f235fb12ceb",
+    "supabaseBindingFixCommit": "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
+    "oauthPkceProductCommit": "2f1dbc5fef092ae4cf58366e1178684672ae26c2",
+    "credentialVaultProductCommit": "bed637c726462e1a38b74eba46915543d007869d",
+    "nativeAuditProductCommit": "4c779b7ca316c0953f94f7ef3f4f850881ef2d58",
+    "portableIdentityBindingFixCommit": "169ae40d7b727aa0f89964dd11e2f217a6ca22db",
+    "portableIdentityBindingFixMustReturnToUniversal": true,
+    "manifest": {
+      "path": "distribution/desktop/edition-browser-auth.v1.json",
+      "bytes": 6061,
+      "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345"
+    },
+    "schema": {
+      "path": "distribution/schemas/desktop-edition-browser-auth.schema.json",
+      "bytes": 9480,
+      "sha256": "1d5a9c2a5ba3a4ebc77d8f35897e145d52f95f310a6a6d1ef0a59a8667fd1af2"
+    },
+    "providerExecutionEvidenceRequired": true
+  },
+  "runtimeUpdateIsolation": {
+    "registryProductCommit": "4ea7fd1dfe3a69d90ada1a37a82dd888cba48430",
+    "runtimeDiagnosticsProductCommit": "8a0828c258782fa77506ee32c7c016e5b18ad292",
+    "updaterProductCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "evidenceOnlyCommit": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+    "evidenceOnlyCommitIsProductSource": false,
+    "evidenceReceiptSha256": "a2a42830b5a235345784e8eb7054c174fea88085b9f1aa4ce8ba5ecb491b3567",
+    "manifest": {
+      "path": "distribution/desktop/edition-runtime-update-families.v1.json",
+      "bytes": 4175,
+      "sha256": "79f421b8ec81a746b7b7ae4df7702d18d3df08e76e89ccbf9e6937e22306ce32"
+    },
+    "schema": {
+      "path": "distribution/schemas/desktop-edition-runtime-update-families.schema.json",
+      "bytes": 4959,
+      "sha256": "55c24d184a27d88a74cb3a41789c247edb2e8988502629e8cd43647575560b8c"
+    },
+    "labRuntimeProfile": "unified-sim-lab",
+    "labRuntimeStateNamespace": "io.dronedream.desktop.lab/runtime",
+    "labDiagnosticsRelativePath": "diagnostics/lab",
+    "labUpdaterChannelTag": "desktop-lab-channel",
+    "labUpdaterMetadataFileName": "latest-lab.json",
+    "labUpdaterMetadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json",
+    "updaterSignatureRequiredForRelease": true
   },
   "frozenArtifact": {
     "sourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
@@ -66,7 +113,7 @@
       "installerProductName": "DroneDream-Universal",
       "identifier": "io.dronedream.desktop.universal",
       "artifactFileName": "DroneDream-Universal-1.0.0.exe",
-      "updaterManifest": "latest.json",
+      "updaterManifest": "latest-universal.json",
       "enginePackEditionProfile": "unified-sim-lab"
     },
     {
@@ -78,7 +125,7 @@
       "installerProductName": "DroneDream-Sim",
       "identifier": "io.dronedream.desktop.sim",
       "artifactFileName": "DroneDream-Sim-1.0.0.exe",
-      "updaterManifest": "latest.json",
+      "updaterManifest": "latest-sim.json",
       "enginePackEditionProfile": "sim-only"
     },
     {
@@ -90,7 +137,7 @@
       "installerProductName": "DroneDream-Lab",
       "identifier": "io.dronedream.desktop.lab",
       "artifactFileName": "DroneDream-Lab-1.0.0.exe",
-      "updaterManifest": "lab-latest.json",
+      "updaterManifest": "latest-lab.json",
       "enginePackEditionProfile": "unified-sim-lab",
       "canonicalWindowsIcon": "brand/generated/lab/windows/icon.ico",
       "canonicalMarkSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
@@ -105,13 +152,15 @@
       "installerProductName": "DroneDream-Field",
       "identifier": "io.dronedream.desktop.field",
       "artifactFileName": "DroneDream-Field-1.0.0.exe",
-      "updaterManifest": "field-latest.json",
-      "enginePackEditionProfile": "field-only"
+      "updaterManifest": "latest-field.json",
+      "enginePackEditionProfile": "field-lightweight"
     }
   ],
   "sharedRuntimeCoordination": {
     "runtimeProductId": "DroneDreamRuntime",
-    "coordinatorNamespace": "%LOCALAPPDATA%\\io.dronedream.desktop",
+    "coordinatorNamespace": "%LOCALAPPDATA%\\io.dronedream.runtime-base-manager",
+    "operationLeaseFileName": "runtime-operation-v1.lock",
+    "legacyCompatibilityLeaseRelativePath": "io.dronedream.desktop/runtime-operation-v1.lock",
     "purpose": "cross-edition runtime mutation lease and installer quiesce only",
     "isAccountSessionStorage": false,
     "isEditionProfileStorage": false,
@@ -161,10 +210,11 @@
   "authentication": {
     "accountSubjectPolicy": "the same website account subject may be used in every Edition",
     "requiredLabAppIdentity": "io.dronedream.desktop.lab",
-    "requiredCallbackNamespace": "io.dronedream.desktop.lab/auth/callback",
-    "requiredCredentialVaultNamespace": "io.dronedream.desktop.lab/auth",
-    "requiredLocalSessionNamespace": "io.dronedream.desktop.lab/session",
-    "requiredFlow": "authorization-code-pkce-s256",
+    "requiredCallbackNamespace": "/desktop-auth/lab/callback",
+    "requiredRedirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "requiredCredentialVaultNamespace": "DroneDream/Auth/lab/v1",
+    "requiredLocalSessionNamespace": "io.dronedream.desktop.lab",
+    "requiredFlow": "hosted-authorization-code-pkce-s256",
     "requirements": {
       "explicitLabLoginGestureEveryLocalSession": true,
       "browserSessionMayAvoidPasswordEntry": true,
@@ -179,21 +229,24 @@
       "frontendMayAssertEditionIdentity": false
     },
     "currentCommonCoreObservation": {
-      "sourceCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
+      "sourceCommit": "4c779b7ca316c0953f94f7ef3f4f850881ef2d58",
       "nativePath": "desktop/src-tauri/src/browser_auth.rs",
-      "nativeGitObjectId": "8bec964e39a9fed851746d2f35285f8c17e7ce62",
+      "nativeGitObjectId": "fcd44440704d0c30e1b07a84dde3bd3b29e8d665",
       "frontendStoragePath": "frontend/src/features/auth/supabaseClient.ts",
-      "frontendStorageGitObjectId": "2a9819b7e6dcfaf73e8faa3c8a95b76171a0d7fd",
+      "frontendStorageGitObjectId": "4dba74946ffa260a6322690ca8a53f809eba6c1f",
+      "nativeCredentialVaultPath": "desktop/src-tauri/src/browser_auth_vault.rs",
+      "nativeCredentialVaultGitObjectId": "75afeecc0a12e6170b01f1b6061266303972b3ac",
       "explicitUserGesture": true,
       "loopbackCallback": true,
       "cryptographicPerAttemptState": true,
       "cryptographicPerAttemptNonce": true,
-      "editionBoundCallback": false,
-      "pkceS256": false,
-      "editionBoundStateAndNonce": false,
-      "osCredentialVault": false,
-      "crossEditionSilentAdoptionDenied": "not-proven",
-      "readyAsCanonicalAuthDonor": false
+      "editionBoundCallback": true,
+      "pkceS256": true,
+      "editionBoundStateAndNonce": true,
+      "osCredentialVault": true,
+      "crossEditionSilentAdoptionDenied": true,
+      "readyAsCanonicalAuthDonor": true,
+      "providerExecutionEvidenceCollected": false
     }
   },
   "safetyBoundary": {
@@ -203,10 +256,10 @@
     "requiredAuthorityLayers": ["native", "backend", "runtime"]
   },
   "crossEditionBlockers": [
-    "Universal and Sim currently resolve the same latest.json updater manifest; Sim needs an edition-owned endpoint before four-Edition update isolation is accepted.",
-    "Universal has not delivered the exact edition-aware authentication donor required by this contract.",
     "The exact Universal existing-install/quiesce donor b099ed0 and installer identity donor 8a8ad6c are forward-synced, but rebuilt Lab bytes and same-version /UPDATE acceptance remain gated.",
     "The exact large LAB suffix brand donor b8e0d0c is forward-synced, but the frozen Lab EXE predates it and future release bytes require a new gated build.",
+    "The exact auth, credential-vault, Runtime diagnostics, and updater donors are forward-synced, but provider, signed-updater, and four-Edition lifecycle execution receipts are not collected.",
+    "The portable browser-auth identity-binding hash fix 169ae40 must return to Universal before Lab may consume a canonical replacement.",
     "Universal edition-safety allow-fixture tests pin the Universal Lab manifest hash and need a canonical parameterized fixture before the branded Lab manifest can pass the test-only allow path.",
     "The frozen Lab EXE predates this contract and remains an exact unsigned non-release artifact."
   ],

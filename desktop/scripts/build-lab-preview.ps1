@@ -150,14 +150,22 @@ if (-not $gnullvm.strictlyPinnedReady -or $gnullvm.requiresMsvcLinkExe) {
 $env:CARGO_TARGET_DIR = $cargoTargetFull
 $env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $sourceCommit
 $env:DRONEDREAM_LAB_PREVIEW = "1"
+$env:DRONEDREAM_DESKTOP_EDITION_ID = "lab"
 $env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"
 $env:VITE_DRONEDREAM_EDITION = "lab"
+
+if (-not $env:DRONEDREAM_OAUTH_CLIENT_ID -or
+    $env:DRONEDREAM_OAUTH_CLIENT_ID -match '\s' -or
+    $env:DRONEDREAM_OAUTH_CLIENT_ID -like 'unregistered-*') {
+    throw "Lab browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID."
+}
 
 & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
     -AdditionalConfigPath $tauriOverlayPath `
     -CargoTargetDir $cargoTargetFull `
     -LlvmRoot $gnullvm.llvmRoot `
     -ExpectedProductName $tauriProductName `
+    -EditionId lab `
     -AllowUnsignedUpdater `
     -PreserveBundleHistory
 if ($LASTEXITCODE -ne 0) {

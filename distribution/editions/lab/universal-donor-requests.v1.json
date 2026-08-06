@@ -5,8 +5,9 @@
   "requestingEdition": "lab",
   "authority": {
     "branch": "codex/software",
-    "observedHead": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
-    "observedProductSource": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "observedHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+    "observedHeadIsProductSource": false,
+    "observedProductSource": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
     "canonicalBrandProductSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "labMayCarrySharedFixLongTerm": false,
@@ -85,14 +86,29 @@
     {
       "requestId": "universal-edition-auth-isolation-v1",
       "ownership": "Universal/Core",
-      "state": "awaiting-exact-donor",
+      "state": "delivered-exact-donor-forward-synced-with-portable-binding-fix",
+      "exactDonorChain": [
+        "6355aad351370178a7171b504a5d2f235fb12ceb",
+        "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
+        "2f1dbc5fef092ae4cf58366e1178684672ae26c2",
+        "bed637c726462e1a38b74eba46915543d007869d",
+        "4c779b7ca316c0953f94f7ef3f4f850881ef2d58"
+      ],
+      "portableUniversalPatch": {
+        "labCommit": "169ae40d7b727aa0f89964dd11e2f217a6ca22db",
+        "path": "distribution/desktop/edition-browser-auth.v1.json",
+        "purpose": "bind browser auth to the coexistence contract changed by the Runtime diagnostics donor",
+        "mustReturnToUniversal": true,
+        "mayRemainAsLabFork": false
+      },
       "evidence": {
-        "observedUniversalHead": "b099ed00923e9f2b833f812ad79f1614529038de",
+        "observedUniversalHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
         "browserAuthPath": "desktop/src-tauri/src/browser_auth.rs",
-        "browserAuthGitObjectId": "8bec964e39a9fed851746d2f35285f8c17e7ce62",
-        "currentCallbackIsEditionBound": false,
-        "currentFlowUsesPkceS256": false,
-        "currentOsCredentialVaultIsEditionScoped": false
+        "browserAuthGitObjectId": "fcd44440704d0c30e1b07a84dde3bd3b29e8d665",
+        "currentCallbackIsEditionBound": true,
+        "currentFlowUsesPkceS256": true,
+        "currentOsCredentialVaultIsEditionScoped": true,
+        "providerExecutionEvidenceCollected": false
       },
       "candidatePaths": [
         "desktop/src-tauri/src/browser_auth.rs",
@@ -100,7 +116,9 @@
         "frontend/src/features/auth/AuthContext.tsx",
         "frontend/src/features/auth/browserAuth.ts",
         "frontend/src/features/auth/supabaseClient.ts",
-        "frontend/src/desktop/bridge.ts"
+        "frontend/src/desktop/bridge.ts",
+        "desktop/src-tauri/src/browser_auth_audit.rs",
+        "desktop/src-tauri/src/browser_auth_vault.rs"
       ],
       "acceptance": [
         "Derive trusted app identity from the native bundle identifier, never from a frontend mode switch.",
@@ -110,6 +128,58 @@
         "Render login and browser callback from the trusted Edition identity using exact canonical Edition assets and tokens; do not redraw, use concept directories, or let branding grant authority.",
         "Reject callback, state, nonce, verifier, vault, or session material issued for another Edition.",
         "Add cross-Edition fake tests for Universal, Sim, Lab, and Field plus replay, mismatch, cancellation, and missing-identity negatives."
+      ]
+    },
+    {
+      "requestId": "universal-runtime-diagnostics-isolation-v1",
+      "ownership": "Universal/Core",
+      "state": "delivered-exact-donor-forward-synced",
+      "exactDonor": {
+        "registryCommit": "4ea7fd1dfe3a69d90ada1a37a82dd888cba48430",
+        "productCommit": "8a0828c258782fa77506ee32c7c016e5b18ad292",
+        "registryPath": "distribution/desktop/edition-runtime-update-families.v1.json",
+        "registrySha256": "79f421b8ec81a746b7b7ae4df7702d18d3df08e76e89ccbf9e6937e22306ce32",
+        "labRuntimeProfile": "unified-sim-lab",
+        "labRuntimeStateNamespace": "io.dronedream.desktop.lab/runtime",
+        "labDiagnosticsRelativePath": "diagnostics/lab"
+      },
+      "candidatePaths": [
+        "desktop/src-tauri/build.rs",
+        "desktop/src-tauri/src/runtime_installer.rs",
+        "desktop/src-tauri/src/runtime.rs",
+        "distribution/desktop/edition-runtime-update-families.v1.json",
+        "distribution/tools/desktop_runtime_update_families.py"
+      ],
+      "acceptance": [
+        "Keep the Runtime base globally coordinated by the runtime-base-manager namespace.",
+        "Keep Lab runtime state and diagnostics in edition-owned lab namespaces.",
+        "Lab uninstall must not remove the globally owned Runtime base or another Edition diagnostics."
+      ]
+    },
+    {
+      "requestId": "universal-updater-release-family-isolation-v1",
+      "ownership": "Universal/Core",
+      "state": "delivered-exact-donor-forward-synced",
+      "exactDonor": {
+        "productCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+        "evidenceOnlyCommit": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+        "evidenceOnlyCommitIsProductSource": false,
+        "evidenceReceiptSha256": "a2a42830b5a235345784e8eb7054c174fea88085b9f1aa4ce8ba5ecb491b3567",
+        "labChannelTag": "desktop-lab-channel",
+        "labMetadataFileName": "latest-lab.json",
+        "labMetadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json"
+      },
+      "candidatePaths": [
+        "desktop/scripts/build-windows-llvm.ps1",
+        "desktop/scripts/verify-updater-build-contract.ps1",
+        "desktop/scripts/write-updater-manifest.ps1",
+        "desktop/src-tauri/src/app_update.rs",
+        "distribution/desktop/edition-runtime-update-families.v1.json"
+      ],
+      "acceptance": [
+        "Compile editionId=lab and reject another Edition updater family.",
+        "Use the exact desktop-lab-channel/latest-lab.json URL family.",
+        "Require updater signatures and source commit plus build number before release."
       ]
     },
     {
@@ -210,7 +280,7 @@
     }
   ],
   "labRecovery": {
-    "nextStep": "keep the exact brand, coexistence, NSIS identity, and quiesce donors frozen, then wait for exact Universal auth, runtime, updater, and edition-safety fixture donors before requesting a new gated Lab build",
+    "nextStep": "return the portable auth identity-binding fix to Universal, obtain the edition-safety fixture donor, and collect separately authorized auth/updater/lifecycle execution evidence before requesting a new gated Lab build",
     "rebuildAuthorizedByThisRequest": false,
     "installAuthorizedByThisRequest": false,
     "frozenArtifactMayBecomeFinalWithoutRebuild": false
