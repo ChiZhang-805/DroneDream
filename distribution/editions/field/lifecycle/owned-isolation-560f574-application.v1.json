@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-owned-isolation-lifecycle-application",
+  "applicationId": "field-owned-isolation-560f574-attempt-1",
+  "editionId": "field",
+  "status": "prepared-awaiting-exact-red-start-signal",
+  "preparedAt": "2026-08-06T20:15:35.0326944Z",
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "560f574a95c8b51bbf34711bfd092d77fd3e166e",
+    "productTree": "0e4535535b7ee339faeaa704069a46bcfe1c350d",
+    "productRoot": "C:\\Users\\zju20\\ddf560f574",
+    "toolSourceCommit": "f18ea56e65edd81915feca576377aa0f40bcf2fc",
+    "evidenceHeadAtPreparation": "f18ea56e65edd81915feca576377aa0f40bcf2fc",
+    "evidenceCommitIsProductSource": false
+  },
+  "artifact": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": 11534069,
+    "sha256": "8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f",
+    "authenticodeState": "NotSigned",
+    "peCertificatePresent": false,
+    "updaterSignaturePath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+    "updaterSignatureBytes": 428,
+    "updaterSignatureSha256": "11b5ceec3172fbe91c4e342a1a1aa1211a207bef11ef3d3a4697cac621bd5314",
+    "historicalBytesMustRemainUnchanged": true
+  },
+  "staticAudit": {
+    "receiptPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-postbuild-audit-560f574-exact-artifact-v1\\audit-receipt.json",
+    "receiptBytes": 8904,
+    "receiptSha256": "2447677521529871e671053159515a898743d6ee82775f09e030fd5674252ceb",
+    "decision": "pass-static-audit-lifecycle-still-required",
+    "auditCount": 1,
+    "retryCount": 0,
+    "staticAuditComplete": true,
+    "productSource": "560f574a95c8b51bbf34711bfd092d77fd3e166e",
+    "artifactSha256": "8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f",
+    "runnerSourceCommit": "2049b878e18a0f40481747c4e31dec031b4aaeb3",
+    "runnerGitBlob": "bc028589e62214b6e760cb743e5a4441be34e4af",
+    "runnerCanonicalSha256": "8a666c0c1fa87eb2f1b4b668cd4ba167b313cd5f1ceeeef222da3d62e03c77b1"
+  },
+  "plan": {
+    "path": "distribution/editions/field/lifecycle/owned-isolation-560f574-plan.v1.json",
+    "bytes": 7949,
+    "fileSha256": "f7b07d6a9eda40ad25778bfd5e403f81f091749111ad15c16cd7ad8867400d1a"
+  },
+  "ownedPaths": {
+    "runRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-1",
+    "runRootMustBeAbsentAtStart": true,
+    "temporaryRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-1\\temp",
+    "installRoot": "%LOCALAPPDATA%\\DroneDream-Field",
+    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+    "preferenceKey": "HKCU\\Software\\DroneDream\\DroneDream-Field",
+    "roamingData": "%APPDATA%\\io.dronedream.desktop.field",
+    "localData": "%LOCALAPPDATA%\\io.dronedream.desktop.field",
+    "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk",
+    "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk"
+  },
+  "toolBindings": [
+    {
+      "id": "runner",
+      "path": "distribution/editions/field/lifecycle/run-field-owned-isolation-lifecycle.ps1",
+      "relativeToLifecycleDirectory": "run-field-owned-isolation-lifecycle.ps1",
+      "sourceCommit": "f18ea56e65edd81915feca576377aa0f40bcf2fc",
+      "gitBlob": "a0264548c05658c39ef6d0780236b1c0afb4fafb",
+      "lfNormalizedBytes": 22531,
+      "lfNormalizedSha256": "efaec0224f48e10f2f5cc15c43bb57fb86c3b567297504c0bbc2483234b58daa"
+    },
+    {
+      "id": "installerLanguageInspector",
+      "path": "distribution/editions/field/lifecycle/inspect-field-owned-installer-language.ps1",
+      "relativeToLifecycleDirectory": "inspect-field-owned-installer-language.ps1",
+      "sourceCommit": "f18ea56e65edd81915feca576377aa0f40bcf2fc",
+      "gitBlob": "84888fe94a1477500139ed9ab9c0d1031e0b84e0",
+      "lfNormalizedBytes": 4817,
+      "lfNormalizedSha256": "1d7accee0b0897b00f4534b4e7a1972a79d6a747c00a0bfe3123e08217e9d3ce"
+    },
+    {
+      "id": "webView2Inspector",
+      "path": "distribution/editions/field/lifecycle/inspect-field-owned-webview2.mjs",
+      "relativeToLifecycleDirectory": "inspect-field-owned-webview2.mjs",
+      "sourceCommit": "f18ea56e65edd81915feca576377aa0f40bcf2fc",
+      "gitBlob": "1903cb485422764646cf2cdbf3c3521ee8cc88d2",
+      "lfNormalizedBytes": 8233,
+      "lfNormalizedSha256": "72d7faed6d0cf77780329a7a16ff6b037199255511525d96a915ca8097ab529e"
+    }
+  ],
+  "productSourceBindings": [
+    {"path": "frontend/src/field/main.tsx", "gitBlob": "64af47e242a85582d3f08a16b50920f6b3db6e88", "canonicalSha256": "36e9b112441a147585312c1ad822aa8bbd5ccaeed235df0328b188a5a67cbb4d"},
+    {"path": "frontend/src/field/FieldApp.tsx", "gitBlob": "966867c0e7a5903caee36fffadd3ec4471136b67", "canonicalSha256": "7692e503b253dd81818423b2f302f6475e06548d89c744e62cd1f94944d3fdee"},
+    {"path": "frontend/src/field/FieldSettingsDialog.tsx", "gitBlob": "47175625bf754f720c8cf75f34ec30e6df1aebdf", "canonicalSha256": "12b90703c6ecb646c9016bbefc30d1f1f5fa93c96b7ed4f00e3a322466fbefa4"},
+    {"path": "frontend/src/field/field.css", "gitBlob": "573e00467e8e7e35d11ed124a019cb133b6e8266", "canonicalSha256": "f80c8926d3e6fa33b0cfb55ab45bfadd48b35ba81bc7a24b0558dfa0e8bdc2c8"},
+    {"path": "frontend/src/components/EditionSettingsSurface.tsx", "gitBlob": "0ff638b5acb81b400bbf67cfb91bfedacf0ae2dd", "canonicalSha256": "23f0c359b3c1e40d390b176a26a3e4ff75e54d62a6176c0debab7745848016e1"},
+    {"path": "frontend/src/theme/editionTheme.ts", "gitBlob": "e45d57415b3479e73045507d33973782d28c765f", "canonicalSha256": "581febad1997a4d7f0497d6c7df6cb0a203132da32953d8f6f0980c4fe8d866d"},
+    {"path": "frontend/src/theme/EditionThemeProvider.tsx", "gitBlob": "265ff3092a5b5880cc56d08eaf861a13d7ef5617", "canonicalSha256": "d57296710283344d40ed941d38dd74d8bfd97f43adaaba0c3278ae593e86b4fe"},
+    {"path": "frontend/src/components/DroneLaunchScene.tsx", "gitBlob": "a1764778c4ff1dfabfa8c4eb7d140b7d9ca51969", "canonicalSha256": "13e00b683d74dae93718cadc4a17573333417cdbfef6db1ee069cf4060c8d8a2"},
+    {"path": "frontend/src/brand/edition-brand.generated.ts", "gitBlob": "2163d965440f3d073a52d5d90b6580e2e15343cd", "canonicalSha256": "f604d8df528e24c7bd4fcf493663168a667f218c3398029cd280e48060d41284"},
+    {"path": "frontend/src/brand/edition-brand.generated.css", "gitBlob": "f64d226a5fc7fdfb8c175086b44c154fb7982a40", "canonicalSha256": "bb4e12074bd7568fb3fa421f6d7135cb8b29d8e2531e4cacd3ae568643725b78"}
+  ],
+  "uiContract": {
+    "viewport": {"width": 390, "height": 620},
+    "locales": ["en", "zh-CN"],
+    "settingsConsumer": "field-lightweight",
+    "settingsDialogNoVerticalScroll": true,
+    "settingsPanelNoVerticalScroll": true,
+    "theme": ["#FFC247", "#FF754B", "#D746A5", "#FFF8EF", "#28140D"],
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "liveFieldThreeSceneRequired": false,
+    "liveFieldThreeSceneExpected": false,
+    "sharedDroneLaunchSceneConsumesEditionThemeThree": true
+  },
+  "protectedState": {
+    "simPreferenceKey": {
+      "path": "HKCU\\Software\\DroneDream\\DroneDream-Sim",
+      "preparationStableJsonSha256": "bf75c75edf429cfbf5f7aebd453768d9d6b36db82c0a0ba597b0146dbad426d5",
+      "values": {
+        "(default)": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Sim",
+        "DroneDreamRuntimeDrive": "",
+        "DroneDreamRuntimeInstallMode": "install-app-only",
+        "DroneDreamRuntimeOperationProtocol": "2"
+      },
+      "beforeMustMatchPreparation": true,
+      "afterMustMatchBefore": true
+    },
+    "protectedEditionIds": ["universal", "sim", "lab"],
+    "protectedRuntimeRoots": ["C:\\DroneDream", "Z:\\DroneDream"],
+    "sharedParent": "HKCU\\Software\\DroneDream",
+    "otherEditionMutationAllowed": false,
+    "runtimeMutationAllowed": false,
+    "webView2MutationAllowed": false
+  },
+  "execution": {
+    "applicationOrdinal": 1,
+    "lifecycleAttemptOrdinal": 1,
+    "lifecycleCountMaximum": 1,
+    "retryCountMaximum": 0,
+    "currentMessageAuthorizesExecution": false,
+    "requiresNewExactRedStartSignal": true,
+    "failureDecision": "freeze-failed-no-retry",
+    "exactCounts": {
+      "visibleInstallerLanguageProbes": 2,
+      "freshInstallerInvocations": 1,
+      "overlayInstallerInvocations": 1,
+      "applicationLaunches": 2,
+      "shortcutLaunches": 1,
+      "liveWebView2Inspections": 2,
+      "settingsViewportInspections": 4,
+      "languageTransitions": 2,
+      "uninstallerInvocations": 1,
+      "ownedPreferenceCleanupAttempts": 1,
+      "ownedPreferenceCleanupInvocations": 1,
+      "browserLaunches": 0,
+      "oauthTransactions": 0,
+      "accountOrTokenReads": 0,
+      "artifactBuildsOrSigning": 0,
+      "runtimeStartsOrMigrations": 0,
+      "simulatorStarts": 0,
+      "deviceOrHardwareActions": 0
+    }
+  },
+  "exactCommand": {
+    "powershell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "template": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\run-field-owned-isolation-lifecycle.ps1 -Application C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\owned-isolation-560f574-application.v1.json -ExpectedApplicationSha256 <FROZEN_APPLICATION_FILE_SHA256> -Plan C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\owned-isolation-560f574-plan.v1.json -ExpectedPlanSha256 f7b07d6a9eda40ad25778bfd5e403f81f091749111ad15c16cd7ad8867400d1a -ExpectedEvidenceHead <EXACT_EVIDENCE_HEAD_FROM_RED_START_SIGNAL> -Execute",
+    "planOnlySuffix": "replace -Execute with -PlanOnly",
+    "evidenceHeadIsExternalToAvoidCommitSelfReference": true,
+    "commandWithoutNewExactRedStartSignalAllowed": false
+  },
+  "prohibitions": {
+    "browserOrOAuth": true,
+    "providerOrNetwork": true,
+    "runtime": true,
+    "px4GazeboSitlHitl": true,
+    "deviceOrHardware": true,
+    "buildResignRelabel": true,
+    "deployUploadReleaseBranch": true
+  },
+  "rollback": {
+    "failurePolicy": "freeze-evidence-stop-no-retry",
+    "ownedUninstallOnlyAfterFreshInstall": true,
+    "exactFieldPreferenceCleanupMaximum": 1,
+    "fieldOwnedAppDataCleanupOnly": true,
+    "otherEditionSharedParentOrRuntimeCleanupAllowed": false
+  },
+  "nonClaims": {
+    "lifecycleExecuted": false,
+    "lifecyclePassed": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "websiteHandoffAllowed": false
+  }
+}

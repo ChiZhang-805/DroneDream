@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-owned-isolation-lifecycle-plan",
+  "planId": "field-owned-isolation-560f574-attempt-1",
+  "editionId": "field",
+  "status": "green-plan-only-not-authorized",
+  "preparedAt": "2026-08-06T20:15:35.0326944Z",
+  "isolationBoundary": {
+    "class": "host-contained-owned-path-isolation",
+    "isVmGradeIsolation": false,
+    "sufficiencyClaim": "bounded internal-test lifecycle validation only",
+    "systemInstallationAllowed": false,
+    "existingInstallOrRuntimeMutationAllowed": false
+  },
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "560f574a95c8b51bbf34711bfd092d77fd3e166e",
+    "productTree": "0e4535535b7ee339faeaa704069a46bcfe1c350d",
+    "productRoot": "C:\\Users\\zju20\\ddf560f574",
+    "toolSourceCommit": "f18ea56e65edd81915feca576377aa0f40bcf2fc",
+    "evidenceCommitIsProductSource": false
+  },
+  "artifact": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": 11534069,
+    "sha256": "8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f",
+    "authenticodeState": "NotSigned",
+    "peCertificatePresent": false,
+    "rebuildAllowed": false,
+    "resignAllowed": false,
+    "relabelAllowed": false
+  },
+  "staticAudit": {
+    "receiptPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-postbuild-audit-560f574-exact-artifact-v1\\audit-receipt.json",
+    "receiptBytes": 8904,
+    "receiptSha256": "2447677521529871e671053159515a898743d6ee82775f09e030fd5674252ceb",
+    "decision": "pass-static-audit-lifecycle-still-required",
+    "auditCount": 1,
+    "retryCount": 0,
+    "staticAuditComplete": true,
+    "fieldLightweight": true,
+    "largeSimulatorPresent": false,
+    "validatedHardwarePackCount": 0,
+    "hardwareDecision": "deny"
+  },
+  "ownedPaths": {
+    "runRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-1",
+    "runRootMustBeAbsentAtStart": true,
+    "temporaryRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-1\\temp",
+    "installRoot": "%LOCALAPPDATA%\\DroneDream-Field",
+    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+    "preferenceKey": "HKCU\\Software\\DroneDream\\DroneDream-Field",
+    "roamingData": "%APPDATA%\\io.dronedream.desktop.field",
+    "localData": "%LOCALAPPDATA%\\io.dronedream.desktop.field",
+    "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk",
+    "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk"
+  },
+  "identity": {
+    "internalProductName": "DroneDream-Field",
+    "displayName": "DroneDream · FIELD",
+    "bundleId": "io.dronedream.desktop.field",
+    "appUserModelId": "io.dronedream.desktop.field",
+    "mainBinaryName": "drone-dream-desktop.exe",
+    "canonicalLockupNaturalPixels": [2581, 218],
+    "canonicalTheme": {
+      "gradientStops": ["#FFC247", "#FF754B", "#D746A5"],
+      "lightSurface": "#FFF8EF",
+      "darkSurface": "#28140D"
+    }
+  },
+  "orderedSteps": [
+    "revalidate exact application, plan, evidence HEAD/upstream/clean, tool LF hashes, product, artifact, and static-audit receipt",
+    "require fresh Field-owned install/data/registry/shortcut state, no DroneDream desktop process, callback port 49213 unused, and an already usable WebView2 Runtime",
+    "require the protected Sim preference key stable-json fingerprint to equal the GREEN preparation fingerprint",
+    "snapshot protected Universal, Sim, Lab, Runtime, WebView2, registry, install-root, and shortcut state",
+    "create the one fresh Field-owned run root and redirect TEMP/TMP beneath it",
+    "show the exact installer once in English and once in Simplified Chinese, capture only its exact window, close without invoking install, and require Field state remains fresh",
+    "invoke the exact installer silently once for app-only fresh install",
+    "verify Field install root, uninstall registration, display identity, bundle identity, and canonical desktop and Start Menu shortcuts",
+    "launch the installed Field binary once and inspect live WebView2 at 390x620 in EN and ZH",
+    "require Settings dialog and visible panel clientHeight equal scrollHeight, canonical Field theme tokens, presentationOnly true, authority false, zero packs, missing quorum, and all hardware actions disabled",
+    "invoke the exact installer silently once with same-version overlay",
+    "launch once through the canonical Field desktop shortcut and repeat the live checks",
+    "invoke the exact Field uninstaller silently once",
+    "validate exactly four Field-owned preference values, remove that exact preference key once, and remove only Field-owned app-data roots",
+    "require Field owned residue absent and protected before/after state byte-equivalent by stable fingerprint",
+    "write one receipt; any failure freezes evidence, performs only bounded owned rollback, and stops with retry zero"
+  ],
+  "dynamicUiContract": {
+    "installerLocales": ["en", "zh-CN"],
+    "appLocales": ["en", "zh-CN"],
+    "settingsViewport": {"width": 390, "height": 620},
+    "dialogMustFitWithoutVerticalScroll": true,
+    "visiblePanelMustFitWithoutVerticalScroll": true,
+    "canonicalFieldIdentityRequired": true,
+    "canonicalThemeRequired": true,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "live3dRequired": false,
+    "live3dExpected": false,
+    "live3dReason": "FieldApp does not render DroneLaunchScene or a Three.js canvas",
+    "shared3dSourceBindingRequired": true,
+    "shared3dContract": "DroneLaunchScene consumes useEditionTheme and editionTheme.three; no Field-local 3D token fork is allowed"
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "requiredDecisionLayers": ["native", "backend", "runtime"],
+    "hardwareDecision": "deny",
+    "frontendIsAuthority": false,
+    "readOnlyDiscoveryIsAuthorization": false,
+    "parameterWriteAllowed": false,
+    "unlockAllowed": false,
+    "armAllowed": false,
+    "flightAllowed": false
+  },
+  "protectedState": {
+    "simPreferenceKey": {
+      "path": "HKCU\\Software\\DroneDream\\DroneDream-Sim",
+      "observedDuringGreenPreparation": true,
+      "preparationStableJsonSha256": "bf75c75edf429cfbf5f7aebd453768d9d6b36db82c0a0ba597b0146dbad426d5",
+      "requiredBeforeSha256": "bf75c75edf429cfbf5f7aebd453768d9d6b36db82c0a0ba597b0146dbad426d5",
+      "requiredAfterSha256": "bf75c75edf429cfbf5f7aebd453768d9d6b36db82c0a0ba597b0146dbad426d5"
+    },
+    "otherEditionMutationAllowed": false,
+    "sharedParentDeletionAllowed": false,
+    "runtimeMutationAllowed": false,
+    "webView2RepairOrMutationAllowed": false,
+    "parityRequiredAfterEveryMutatingOrLaunchStage": true
+  },
+  "rollback": {
+    "failurePolicy": "freeze-evidence-stop-no-retry",
+    "ownedUninstallAllowedOnlyAfterFreshInstall": true,
+    "preferenceCleanupAllowedOnlyAfterExactFourValueValidation": true,
+    "preferenceCleanupMaximumAttempts": 1,
+    "ownedAppDataCleanupOnly": true,
+    "otherEditionOrSharedParentCleanupAllowed": false,
+    "runtimeCleanupAllowed": false,
+    "artifactMutationAllowed": false
+  },
+  "prohibitions": {
+    "browserOrOAuth": true,
+    "accountOrTokenRead": true,
+    "provider": true,
+    "network": true,
+    "runtimeStartOrMigration": true,
+    "px4GazeboSitlHitl": true,
+    "deviceEnumeration": true,
+    "serialOrUsb": true,
+    "hardware": true,
+    "buildSignRelabel": true,
+    "deployUploadReleaseBranch": true
+  },
+  "nonClaims": {
+    "lifecycleExecuted": false,
+    "lifecyclePassed": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "websiteHandoffAllowed": false
+  }
+}
