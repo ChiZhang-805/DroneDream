@@ -107,7 +107,7 @@ function Assert-Preconditions([object]$Snapshot) {
     foreach ($name in @("fieldStartMenu", "fieldDesktop")) {
         if ($Snapshot.shortcuts.$name.exists) { throw "preexisting Field shortcut: $name" }
     }
-    if ($Snapshot.processes.Count -ne 0) { throw "DroneDream process is already running" }
+    if (@($Snapshot.processes).Count -ne 0) { throw "DroneDream process is already running" }
     if (-not $Snapshot.webView2.healthy) { throw "WebView2 is unhealthy and repair is forbidden" }
     if ($Snapshot.universalRuntimeStatus.operation.exitCode -ne 0) { throw "shared runtime operation is not idle" }
     if ($Snapshot.universalRuntimeStatus.handoff.exitCode -ne 0) { throw "shared installer handoff is not idle" }
@@ -395,8 +395,8 @@ try {
     $baseline = [IO.File]::ReadAllText($BaselineSnapshotPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
     $head = (git rev-parse HEAD).Trim()
     if ($head -ne $ExpectedEvidenceHead) { throw "evidence HEAD drifted: $head" }
-    if ((git status --porcelain).Count -ne 0) { throw "worktree is not clean" }
-    if ($plan.state -ne "yellow-host-contained-requestable" -or $plan.blockers.Count -ne 0) { throw "plan is not requestable" }
+    if (@(git status --porcelain).Count -ne 0) { throw "worktree is not clean" }
+    if ($plan.state -ne "yellow-host-contained-requestable" -or @($plan.blockers).Count -ne 0) { throw "plan is not requestable" }
     if ($plan.artifact.productSourceCommit -ne $ProductSource) { throw "product source drifted" }
     if ((Get-Item -LiteralPath $ArtifactPath).Length -ne 11267482 -or (Get-Sha256 $ArtifactPath) -ne $ArtifactSha256) { throw "artifact identity drifted" }
     $os = Get-CimInstance Win32_OperatingSystem
