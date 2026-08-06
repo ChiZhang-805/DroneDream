@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-red-app-only-readiness",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "green-plan-only-ready-for-red-request",
+  "plan": {
+    "path": "distribution/sim/lifecycle/red-app-only-lifecycle-plan.v1.json",
+    "bytes": 9577,
+    "sha256": "2bb63984660943e6941a96477d2ddd1598854a1f9512ea97e6819d6db191fa0c"
+  },
+  "sourceSeparation": {
+    "productSourceCommit": "f24eb3a1e383c83b8a0b5bed4c044148146f4153",
+    "yellow2EvidenceCommit": "a35ef3227fb20843a92a36c087423cbb03f26cab",
+    "currentToolEvidenceCommitPolicy": "commit-containing-plan-tool-and-readiness-receipt",
+    "toolEvidenceIsProductSource": false
+  },
+  "artifact": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/bundle/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11686921,
+    "sha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "buildReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/receipt/build-receipt.json",
+    "buildReceiptSha256": "9e2d20c42bcc8ea6c39c0db8f61f0fa3b3568fff7d84b3c96b4682a0b095589a"
+  },
+  "identityResolution": {
+    "internalProductName": "DroneDream-Sim",
+    "uninstallRegistryKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+    "productRegistryKey": "HKCU/Software/DroneDream/DroneDream-Sim",
+    "displayName": "DroneDream · SIM",
+    "installLocation": "%LOCALAPPDATA%/DroneDream-Sim",
+    "mainBinaryName": "drone-dream-desktop.exe",
+    "visibleShortcutName": "DroneDream · SIM",
+    "visibleShortcutTarget": "%LOCALAPPDATA%/DroneDream-Sim/drone-dream-desktop.exe",
+    "artifactAppUserModelId": "io.dronedream.sim",
+    "runtimeProfileId": "sim-only",
+    "staleDisplayNameRegistryTemplateRemoved": true,
+    "staleDroneDreamExeTemplateRemoved": true
+  },
+  "manifestVariance": {
+    "currentManifestAppUserModelId": "io.dronedream.desktop.sim",
+    "artifactCompiledAppUserModelId": "io.dronedream.sim",
+    "bothAreSimExclusive": true,
+    "crossEditionCollision": false,
+    "lifecycleMayValidateFrozenArtifact": true,
+    "futurePromotionRequiresProductSourceReconciliation": true
+  },
+  "planOnlyHostBaseline": {
+    "observedAt": "2026-08-06T21:30:30.9202188+08:00",
+    "legacyInstallRootPresent": true,
+    "legacyUninstallKeyPresent": true,
+    "legacyProductKeyPresent": true,
+    "legacyDesktopShortcutPresent": true,
+    "legacyStartMenuShortcutPresent": true,
+    "universalInstallRootPresent": false,
+    "universalProductKeyPresent": true,
+    "labInstallRootPresent": false,
+    "fieldInstallRootPresent": false,
+    "simInstallRootPresent": false,
+    "simUninstallKeyPresent": false,
+    "simProductKeyPresent": false,
+    "simDesktopShortcutPresent": false,
+    "simStartMenuShortcutPresent": false,
+    "artifactAppDataRootPresent": false,
+    "manifestAliasAppDataRootPresent": false,
+    "universalAppDataRootPresent": true,
+    "droneDreamDesktopProcessCount": 0,
+    "oauthCallback49211ListenerCount": 0,
+    "droneDreamRuntimeState": "Stopped",
+    "runtimeStartedByPlanOnlyAudit": false,
+    "webView2Version": "151.0.4129.59",
+    "webView2InstallOrRepairExecuted": false,
+    "refreshImmediatelyBeforeRedExecutionRequired": true
+  },
+  "protectedParity": {
+    "legacyDroneDream": "snapshot-before-and-byte-value-parity-after-every-phase",
+    "universalLabField": "snapshot-before-and-byte-value-parity-after-every-phase",
+    "runtime": "state-and-root-parity-no-start-no-migration",
+    "webView2": "registry-version-location-and-executable-hash-parity",
+    "temporaryFiles": "TEMP-and-TMP-redirected-under-owned-run-root",
+    "validatedDuringPlanOnly": false,
+    "requiredDuringRedExecution": true
+  },
+  "plannedExactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 1,
+    "uninstallerInvocations": 1,
+    "pkceBoundaryChecks": 1,
+    "realTokenExchanges": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "artifactBuilds": 0
+  },
+  "executedExactCounts": {
+    "freshInstallerInvocations": 0,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "pkceBoundaryChecks": 0,
+    "realTokenExchanges": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "artifactBuilds": 0
+  },
+  "installationCount": 0,
+  "rollback": {
+    "planned": true,
+    "executed": false,
+    "maximumOwnUninstallerInvocations": 1,
+    "manualProtectedStateDeletionAllowed": false,
+    "failureRetryAllowed": false
+  },
+  "verification": {
+    "artifactAndBuildReceiptRehash": "pass",
+    "generatedNsiRehash": "pass",
+    "productSourceBlobBinding": "pass",
+    "universalDonorComparison": "pass-read-only",
+    "simInternalIdentity": "pass",
+    "ownedProtectedNamespaceDisjointness": "pass",
+    "sameHostAppOnlyPlan": "pass-plan-only",
+    "protectedSnapshotExecution": "not-executed-red-authorization-required"
+  },
+  "supersedesBlocker": {
+    "path": "distribution/sim/lifecycle/red-f23987ba-preflight-blocked.v1.json",
+    "sha256": "790b546338f31621b4bc6b9f94873b9981aaf3f9871aac32e7f1b07d4fa5d6d1",
+    "providerBlockerResolvedBy": "independently-proven-same-host-app-only-namespace-isolation",
+    "staleTemplateBlockerResolved": true,
+    "historicalRecordModified": false
+  },
+  "remainingGate": "new-chief-control-red-signal",
+  "nonClaims": {
+    "installerExecuted": false,
+    "overlayExecuted": false,
+    "applicationLaunched": false,
+    "webView2LiveValidated": false,
+    "pkceBoundaryValidated": false,
+    "realTokenExchanged": false,
+    "uninstallerExecuted": false,
+    "residueValidated": false,
+    "rollbackExecuted": false,
+    "runtimeStarted": false,
+    "px4OrGazeboStarted": false,
+    "artifactRebuilt": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}

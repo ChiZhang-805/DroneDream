@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-red-app-only-lifecycle-plan",
+  "planVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "green-plan-only-awaiting-red-authorization",
+  "sourceSeparation": {
+    "productSourceCommit": "f24eb3a1e383c83b8a0b5bed4c044148146f4153",
+    "yellow2EvidenceCommit": "a35ef3227fb20843a92a36c087423cbb03f26cab",
+    "currentToolEvidenceCommitPolicy": "commit-containing-plan-tool-and-readiness-receipt",
+    "toolEvidenceIsProductSource": false
+  },
+  "artifact": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/bundle/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11686921,
+    "sha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "buildReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/receipt/build-receipt.json",
+    "buildReceiptSha256": "9e2d20c42bcc8ea6c39c0db8f61f0fa3b3568fff7d84b3c96b4682a0b095589a"
+  },
+  "universalDonorComparison": {
+    "lifecycleProductSource": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
+    "lifecycleVerifierPath": "desktop/scripts/verify-universal-installer-lifecycle.ps1",
+    "lifecycleVerifierBlob": "76dd1be2f06313323e0867db0de91b3eee732635",
+    "editionIdentityToolHead": "350253f8c17def231d81d39860846d1eb4ab1a94",
+    "editionIdentityVerifierPath": "desktop/scripts/verify-edition-identity-nsis.ps1",
+    "editionIdentityVerifierBlob": "8a208b2885164258aa45374c379d899861326bd6",
+    "consumedAsProductSource": false,
+    "commonExecutionLogicCopied": false
+  },
+  "compiledEvidence": {
+    "generatedNsiPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target/x86_64-pc-windows-gnullvm/release/nsis/x64/installer.nsi",
+    "generatedNsiBytes": 34072,
+    "generatedNsiSha256": "3211992f9d04af0bd51fde5b4fb219c68186c308f374c2b527120dcb7a905003",
+    "overlayPath": "distribution/sim/desktop/tauri.sim.conf.json",
+    "overlayBlobAtProductSource": "30cb495d2f396a773058d5c748935731f0b69666",
+    "editionIdentityPath": "desktop/src-tauri/nsis/edition-identity.nsh",
+    "editionIdentityBlobAtProductSource": "b08c552a6b54f1b74535ee5994cc863b88eb1ed8",
+    "installerTemplatePath": "desktop/src-tauri/nsis/installer.nsi",
+    "installerTemplateBlobAtProductSource": "ec46a06bf5dfe418ab1e004b8e2bc56c7e184230",
+    "coexistenceManifestPath": "distribution/desktop/edition-coexistence.v1.json",
+    "coexistenceManifestBlobAtProductSource": "20f3028c7b8b7a3be897b39305c38e464967a5e9"
+  },
+  "identity": {
+    "internalProductName": "DroneDream-Sim",
+    "installMode": "currentUser",
+    "defaultInstallRoot": "%LOCALAPPDATA%/DroneDream-Sim",
+    "uninstallRegistryKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+    "productRegistryKey": "HKCU/Software/DroneDream/DroneDream-Sim",
+    "displayName": "DroneDream · SIM",
+    "displayVersion": "1.0.0",
+    "mainBinaryName": "drone-dream-desktop.exe",
+    "desktopShortcut": "%USERPROFILE%/Desktop/DroneDream · SIM.lnk",
+    "startMenuShortcut": "%APPDATA%/Microsoft/Windows/Start Menu/Programs/DroneDream · SIM.lnk",
+    "shortcutTarget": "%LOCALAPPDATA%/DroneDream-Sim/drone-dream-desktop.exe",
+    "artifactBundleIdentifier": "io.dronedream.sim",
+    "artifactAppUserModelId": "io.dronedream.sim",
+    "artifactAppDataRoots": [
+      "%APPDATA%/io.dronedream.sim",
+      "%LOCALAPPDATA%/io.dronedream.sim"
+    ],
+    "runtimeProfileId": "sim-only"
+  },
+  "expectedVsArtifact": {
+    "internalProductName": {
+      "contractExpected": "DroneDream-Sim",
+      "artifactCompiledActual": "DroneDream-Sim"
+    },
+    "uninstallRegistryKey": {
+      "contractExpected": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+      "artifactCompiledActual": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim"
+    },
+    "displayName": {
+      "contractExpected": "DroneDream · SIM",
+      "artifactCompiledActual": "DroneDream · SIM"
+    },
+    "installLocation": {
+      "contractExpected": "%LOCALAPPDATA%/DroneDream-Sim",
+      "artifactCompiledActual": "%LOCALAPPDATA%/DroneDream-Sim"
+    },
+    "mainBinaryName": {
+      "contractExpected": "drone-dream-desktop.exe",
+      "artifactCompiledActual": "drone-dream-desktop.exe"
+    },
+    "visibleShortcut": {
+      "contractExpected": "DroneDream · SIM -> %LOCALAPPDATA%/DroneDream-Sim/drone-dream-desktop.exe",
+      "artifactCompiledActual": "DroneDream · SIM -> %LOCALAPPDATA%/DroneDream-Sim/drone-dream-desktop.exe"
+    }
+  },
+  "manifestComparison": {
+    "manifestBundleIdentifier": "io.dronedream.desktop.sim",
+    "manifestAppUserModelId": "io.dronedream.desktop.sim",
+    "artifactBundleIdentifier": "io.dronedream.sim",
+    "classification": "artifact-specific-sim-alias-isolated-from-all-other-editions",
+    "crossEditionCollision": false,
+    "redLifecycleBlocking": false,
+    "futureProductSourceMustReconcileBeforePromotion": true
+  },
+  "sameHostIsolation": {
+    "mode": "app-only-edition-namespace-with-protected-state-parity",
+    "traditionalVmProviderRequired": false,
+    "hostSnapshotRequired": false,
+    "freshPreconditions": [
+      "sim-install-root-absent",
+      "sim-uninstall-key-absent",
+      "sim-product-key-absent",
+      "sim-visible-shortcuts-absent",
+      "no-dronedream-desktop-process",
+      "oauth-port-49211-not-listening"
+    ],
+    "temporaryEnvironment": {
+      "TEMP": "%LOCALAPPDATA%/DroneDream-Codex/Sim-RED/{runId}/temp",
+      "TMP": "%LOCALAPPDATA%/DroneDream-Codex/Sim-RED/{runId}/temp"
+    },
+    "protectedStateParityRequiredAfterEveryPhase": true,
+    "failClosedBeforeMutationOnPreconditionMismatch": true
+  },
+  "ownedWriteSurface": {
+    "runRoot": "%LOCALAPPDATA%/DroneDream-Codex/Sim-RED/{runId}",
+    "paths": [
+      "%LOCALAPPDATA%/DroneDream-Sim",
+      "%APPDATA%/io.dronedream.sim",
+      "%LOCALAPPDATA%/io.dronedream.sim",
+      "%USERPROFILE%/Desktop/DroneDream · SIM.lnk",
+      "%APPDATA%/Microsoft/Windows/Start Menu/Programs/DroneDream · SIM.lnk"
+    ],
+    "registryKeys": [
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+      "HKCU/Software/DroneDream/DroneDream-Sim"
+    ],
+    "shortcutOwnershipRequiresExactTarget": true,
+    "registryOwnershipRequiresExactValues": true
+  },
+  "protectedSnapshot": {
+    "captureRequiredImmediatelyBeforeExecution": true,
+    "parityRequiredAfterFreshOverlayLaunchAndUninstall": true,
+    "installAndDataPaths": [
+      "%LOCALAPPDATA%/DroneDream",
+      "%LOCALAPPDATA%/DroneDream-Universal",
+      "%LOCALAPPDATA%/DroneDream-Lab",
+      "%LOCALAPPDATA%/DroneDream-Field",
+      "%LOCALAPPDATA%/io.dronedream.desktop.sim",
+      "%LOCALAPPDATA%/io.dronedream.desktop.universal",
+      "%LOCALAPPDATA%/io.dronedream.desktop.lab",
+      "%LOCALAPPDATA%/io.dronedream.desktop.field",
+      "C:/DroneDream",
+      "Z:/DroneDream"
+    ],
+    "registryKeys": [
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream",
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Universal",
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Lab",
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Field",
+      "HKCU/Software/DroneDream/DroneDream",
+      "HKCU/Software/DroneDream/DroneDream-Universal",
+      "HKCU/Software/DroneDream/DroneDream-Lab",
+      "HKCU/Software/DroneDream/DroneDream-Field"
+    ],
+    "shortcutNames": [
+      "DroneDream",
+      "DroneDream-Universal",
+      "DroneDream-Lab",
+      "DroneDream-Field",
+      "DroneDream · LAB",
+      "DroneDream · FIELD"
+    ],
+    "wslDistributions": [
+      "DroneDreamRuntime"
+    ],
+    "webView2RegistryKeys": [
+      "HKLM/Software/WOW6432Node/Microsoft/EdgeUpdate/Clients/{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+      "HKLM/Software/Microsoft/EdgeUpdate/Clients/{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
+      "HKCU/Software/Microsoft/EdgeUpdate/Clients/{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+    ],
+    "runtimeStartAllowed": false,
+    "webView2InstallOrRepairAllowed": false,
+    "protectedStateDeletionAllowed": false
+  },
+  "exactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 1,
+    "uninstallerInvocations": 1,
+    "pkceBoundaryChecks": 1,
+    "realTokenExchanges": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "artifactBuilds": 0
+  },
+  "rollback": {
+    "mechanism": "verified-sim-uninstaller-then-owned-surface-reverification",
+    "uninstallerPath": "%LOCALAPPDATA%/DroneDream-Sim/uninstall.exe",
+    "uninstallerMustBelongToExactInstallRoot": true,
+    "maximumRollbackUninstallerInvocations": 1,
+    "manualProtectedStateDeletionAllowed": false,
+    "historicalEvidenceDeletionAllowed": false,
+    "runtimeDeletionAllowed": false,
+    "webView2DeletionAllowed": false,
+    "stopAfterFailureWithoutRetry": true
+  },
+  "authorization": {
+    "planOnlyAuthorized": true,
+    "redExecutionAuthorizedByThisRecord": false,
+    "newChiefControlRedSignalRequired": true
+  },
+  "nonClaims": {
+    "directoriesCreated": false,
+    "installerExecuted": false,
+    "overlayExecuted": false,
+    "applicationLaunched": false,
+    "uninstallerExecuted": false,
+    "rollbackExecuted": false,
+    "runtimeStarted": false,
+    "px4OrGazeboStarted": false,
+    "providerUsed": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}
