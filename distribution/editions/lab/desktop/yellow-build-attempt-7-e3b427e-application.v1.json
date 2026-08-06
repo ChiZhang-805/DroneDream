@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-application",
+  "applicationVersion": "1.0.0",
+  "editionId": "lab",
+  "executionClass": "YELLOW",
+  "state": "green-readiness-frozen-yellow-request-submitted",
+  "sourceSeparation": {
+    "productSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+    "productSourceTree": "eec24c0f1d3d537c8f0da5ef1b015bd129c6d39a",
+    "branch": "codex/software-lab",
+    "upstreamExactAtFreeze": true,
+    "cleanAtFreeze": true,
+    "applicationCommitPolicy": "commit-containing-this-application-and-tests",
+    "applicationEvidenceIsProductSource": false,
+    "sourceMustBeCheckedOutExactAndClean": true
+  },
+  "commonCoreAndDonors": {
+    "recordedCommonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "recordedCommonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "commonUiThemeDonorCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "commonUiEvidenceOnlyHead": "2434488bbcc02a8859670edf2f9413f38d17e73a",
+    "frontendDistStrictModeDonorCommit": "bb14c47a43795180cc80305eaf87665a54b9b8e5",
+    "evidenceHeadsAreProductSources": false,
+    "universalFailureEvidenceConsumed": false
+  },
+  "readinessEvidence": {
+    "releaseSourcePolicy": "passed",
+    "releaseSourceTrackedFileCount": 1938,
+    "releaseSourceNpmPackageCount": 390,
+    "releaseSourceRustPackageCount": 532,
+    "labPreviewContract": "passed",
+    "labYellowReadiness": "passed-clean-source-after-verifier-fix",
+    "strictPinnedGnullvmReady": true,
+    "tauriInvoked": false,
+    "cargoBuildInvoked": false,
+    "nsisInvoked": false
+  },
+  "buildInputs": {
+    "profile": {
+      "path": "distribution/build-profiles/lab-preview.v1.json",
+      "bytes": 14224,
+      "sha256": "ff38b8a73bb80ec06d60d77713518e8caa858fb812b1eddccce74a7de277c71e"
+    },
+    "editionManifest": {
+      "path": "distribution/editions/lab.v1.json",
+      "bytes": 2922,
+      "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+    },
+    "tauriOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "bytes": 3648,
+      "sha256": "7d18d4a288d1227cbe2c92bcc3cac4ca8a7ee2383a47e1be7f7bdde178c2c27f"
+    },
+    "buildScript": {
+      "path": "desktop/scripts/build-lab-preview.ps1",
+      "bytes": 14726,
+      "sha256": "bb1cb03d6fc1af5368651b8a865fcc4d6aadf2fc689b986ffc9e651c9c5cb67f"
+    },
+    "sharedLlvmBuildScript": {
+      "path": "desktop/scripts/build-windows-llvm.ps1",
+      "bytes": 16425,
+      "sha256": "4ac9b141b08aae39275d8538d06e11c711b0ce71c3f74ab7baccf11839d2f6dc"
+    },
+    "sharedReleaseDriver": {
+      "path": "desktop/scripts/release-build-driver.psm1",
+      "bytes": 8000,
+      "sha256": "17fe4721d767b2509ae03bd8ae61d64e1eea7fed3caf64d875b7dddd32c25603"
+    },
+    "licenseNotice": {
+      "path": "runtime/THIRD_PARTY_NOTICES.md",
+      "bytes": 4410,
+      "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"
+    },
+    "vehiclePackRegistry": {
+      "path": "distribution/vehicle-packs/registry.v1.json",
+      "bytes": 7750,
+      "sha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"
+    }
+  },
+  "uiAndBrandAcceptance": {
+    "labUiSourceCommit": "5c8bb96dd78df1da921a7b1736871883c7cbc2f6",
+    "fixedThemeEdition": "lab",
+    "palette": [
+      "#A7E84A",
+      "#20C77A",
+      "#087E69"
+    ],
+    "settingsSurfaceSha256": "23f0c359b3c1e40d390b176a26a3e4ff75e54d62a6176c0debab7745848016e1",
+    "editionThemeSha256": "581febad1997a4d7f0497d6c7df6cb0a203132da32953d8f6f0980c4fe8d866d",
+    "droneLaunchSceneSha256": "13e00b683d74dae93718cadc4a17573333417cdbfef6db1ee069cf4060c8d8a2",
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "buildIdentity": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "version": "1.0.0",
+    "displayName": "DroneDream · LAB",
+    "editionId": "lab",
+    "compiledDesktopEditionId": "lab",
+    "runtimeProfileId": "full-lab",
+    "enginePackEditionProfile": "unified-sim-lab",
+    "effectiveFrontendDist": "frontend/dist",
+    "frontendDistAllowed": [
+      "frontend/dist",
+      "frontend/lab-dist"
+    ],
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny"
+  },
+  "publicOAuthRegistration": {
+    "clientId": "0b9e7a8d-2c90-4b76-8842-511363f555bd",
+    "clientIdSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+    "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "redirectUriSha256": "89b7f8cded951255ec63f1dbd1676f769242f258559752c57318f97f266038cb",
+    "clientType": "public",
+    "tokenEndpointAuthMethod": "none",
+    "clientSecretRequired": false,
+    "providerCallPerformed": false,
+    "receipt": {
+      "path": "distribution/build-receipts/lab-oauth-public-registration-1.0.0-fb3afee.controller-confirmed.json",
+      "bytes": 2967,
+      "sha256": "f8c12308c577399a1d73e4e4cec0a6bdae0c504aaa0745f4266641bedaf3194e"
+    }
+  },
+  "updaterSigningSource": {
+    "privateKeyPath": "C:/Users/zju20/.tauri/dronedream-updater.key",
+    "pathExistenceObserved": true,
+    "privateKeyContentRead": false,
+    "privateKeyCopied": false,
+    "expectedKeyId": "BA3FDCAF71CE2FF5",
+    "passwordMode": "empty-process-environment-not-recorded",
+    "productionNamingKeyAllowed": false,
+    "updaterSignatureRequired": true,
+    "authenticodeExpectedState": "NotSigned"
+  },
+  "publicSupabaseInputs": {
+    "approvedSource": "GitHub repository Actions variables",
+    "requiredNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "valuesRecorded": false,
+    "valuesPrinted": false,
+    "singleBuildProcessInjectionRequired": true,
+    "serviceRoleForbidden": true,
+    "providerCallPerformed": false
+  },
+  "attemptAccounting": {
+    "globalBuildAttemptOrdinal": 7,
+    "sourceBuildAttemptOrdinal": 1,
+    "sourceBuildAttemptMaximum": 1,
+    "maximumBuildInvocations": 1,
+    "automaticRetryAllowed": false,
+    "failedAttemptMustFreezeWithoutRetry": true,
+    "serializeAgainstOtherCargoTauriNsisAndInstallWork": true
+  },
+  "ownedBuildSurface": {
+    "runId": "lab-final-e3b427e-attempt7",
+    "ownedBase": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts",
+    "outputRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7",
+    "fixedArtifactPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe",
+    "fixedUpdaterSignaturePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe.sig",
+    "fixedArtifactReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/lab-preview-receipt.json",
+    "stdoutLogPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/build.stdout.log",
+    "stderrLogPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/build.stderr.log",
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target",
+    "cargoTargetPersistentProtectedCache": true,
+    "cargoTargetCleanupAllowed": false,
+    "outputRootObservedAbsentAtFreeze": true,
+    "outputRootCreated": false
+  },
+  "exactInvocation": {
+    "workingDirectory": "C:/Users/zju20/.codex/worktrees/b3db/DroneDream",
+    "executable": "powershell",
+    "arguments": [
+      "-NoProfile",
+      "-ExecutionPolicy",
+      "Bypass",
+      "-File",
+      "desktop/scripts/build-lab-preview.ps1",
+      "-Build",
+      "-Toolchain",
+      "gnullvm",
+      "-OutputRoot",
+      "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7",
+      "-CargoTargetDir",
+      "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target"
+    ],
+    "requiredProcessEnvironment": {
+      "CARGO_BUILD_JOBS": "2",
+      "DRONEDREAM_OAUTH_CLIENT_ID": "0b9e7a8d-2c90-4b76-8842-511363f555bd",
+      "TAURI_SIGNING_PRIVATE_KEY_PATH": "C:/Users/zju20/.tauri/dronedream-updater.key",
+      "TAURI_SIGNING_PRIVATE_KEY_PASSWORD": "empty-value-required",
+      "VITE_SUPABASE_URL": "approved-actions-variable-value-not-recorded",
+      "VITE_SUPABASE_PUBLISHABLE_KEY": "approved-actions-variable-value-not-recorded"
+    },
+    "controllerMustCaptureStdoutAndStderrSeparately": true,
+    "shellDisplayCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop\\scripts\\build-lab-preview.ps1 -Build -Toolchain gnullvm -OutputRoot C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\lab-final-e3b427e-attempt7 -CargoTargetDir C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target"
+  },
+  "resourceSnapshot": {
+    "observedAtUtc": "2026-08-06T17:53:01.2121145Z",
+    "memoryUsedPercent": 57.1,
+    "memoryFreeGiB": 6.75,
+    "cpuLoadPercent": 35,
+    "cDriveFreeGiB": 91.79,
+    "zDriveFreeGiB": 21.93,
+    "heavyProcessCount": 0,
+    "memoryStopGateUsedPercent": 80,
+    "memoryStopGateFreeGiB": 3,
+    "cargoJobs": 2,
+    "resourceGateMustBeRecheckedAtStart": true
+  },
+  "historicalCandidatePreserved": {
+    "productSourceCommit": "debd0647c5883ffe5c9c52037d35a6b567d9fd62",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12080017,
+    "sha256": "b5969f2f287cf729450618e6d3a8232f426b1ac4cbe5c3662904d31bab215a48",
+    "updaterSignatureSha256": "1034d2f0223ac23795fdc258bb03015c7e4b3e91b11973070daa1d59a56cd233",
+    "historicalBuildReceiptPath": "distribution/build-receipts/lab-preview-1.0.0-debd064-yellow-attempt6.exact-artifact.json",
+    "historicalBuildReceiptSha256": "b32e66503da2b15eb164918f2b3fc9abaf513c1e1dfc5c83b8ce39236bba4774",
+    "historicalA2ReceiptPath": "distribution/build-receipts/lab-debd064-red-segment-a2-success.json",
+    "historicalA2ReceiptSha256": "8e199bc27b02f2370c189719fcec81c9196ea8068c12296e03c6469fae940e5d",
+    "relabelAllowed": false,
+    "overwriteAllowed": false,
+    "reuseAsCurrentUiArtifactAllowed": false
+  },
+  "safetyAuthority": {
+    "validatedVehiclePackCount": 0,
+    "workspaceOrThemeSwitchCountsAsAuthority": false,
+    "requiredDecisionLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "hardwareActionsDenied": [
+      "hardware.parameter.write",
+      "hardware.arm",
+      "hardware.flight",
+      "hardware.hitl.execute"
+    ]
+  },
+  "authorization": {
+    "applicationPreparationAuthorized": true,
+    "yellowBuildRequestSubmitted": true,
+    "yellowBuildExecutionAuthorizedByThisApplication": false,
+    "newExactChiefControlStartSignalRequired": true,
+    "requiredSignalBindings": [
+      "productSourceCommit",
+      "productSourceTree",
+      "applicationSha256",
+      "globalBuildAttemptOrdinal",
+      "outputRoot",
+      "fixedArtifactPath",
+      "maximumBuildInvocations"
+    ]
+  },
+  "forbiddenActions": [
+    "build-before-exact-start-signal",
+    "automatic-build-retry",
+    "installer-execution",
+    "runtime-migration-or-start",
+    "px4-or-gazebo-start",
+    "hardware-access",
+    "oauth-provider-execution",
+    "account-or-token-use",
+    "model-api-key-read",
+    "service-role-read",
+    "private-key-print-copy-or-persist",
+    "artifact-upload-or-deployment",
+    "release-branch-creation",
+    "force-push",
+    "historical-artifact-delete-overwrite-or-relabel"
+  ],
+  "executedCounts": {
+    "runRootsCreated": 0,
+    "frontendBuilds": 0,
+    "cargoBuilds": 0,
+    "tauriBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "oauthProviderCalls": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "nonClaims": {
+    "yellowStartSignalReceived": false,
+    "buildStarted": false,
+    "artifactCreated": false,
+    "artifactSignedByAuthenticode": false,
+    "installerExecuted": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}
