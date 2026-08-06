@@ -17,6 +17,7 @@ import {
   autoStartInstallerRuntime,
   beginBrowserAuth,
   cancelBrowserAuth,
+  clearBrowserAuthVault,
   cancelRuntimeInstall,
   discardInstallerRuntimeIntent,
   getInstallerRuntimeIntent,
@@ -25,6 +26,7 @@ import {
   isDesktopRuntime,
   probeRuntimeStatus,
   repairRuntime,
+  restoreBrowserAuthVault,
   startRuntime,
   startRuntimeInstall,
 } from "../desktop/bridge";
@@ -533,7 +535,7 @@ export function DesktopSetup() {
   ]);
 
   const startBrowserSignIn = useCallback(async () => {
-    if (!localChecksReady || browserAuthStatus !== "idle") return;
+    if (!desktopAvailable || !localChecksReady || browserAuthStatus !== "idle") return;
     const configuration = browserAuthConfiguration();
     if (!configuration) {
       setBrowserAuthError(t("launcher.browserAuthNotConfigured"));
@@ -545,11 +547,10 @@ export function DesktopSetup() {
     setDesktopStartupGateState("idle");
     setBrowserAuthStatus("waiting");
     browserAuthActive.current = true;
+    let sessionIssued = false;
     try {
-      const session = await beginBrowserAuth({
-        locale,
-        ...configuration,
-      });
+      const session = await restoreBrowserAuthVault() ?? await beginBrowserAuth({ locale });
+      sessionIssued = true;
       if (!componentMounted.current) return;
       setBrowserAuthStatus("adopting");
       await adoptBrowserAuthSession(session);
@@ -558,6 +559,9 @@ export function DesktopSetup() {
         setBrowserAuthStatus("idle");
       }
     } catch (error) {
+      if (sessionIssued) {
+        await clearBrowserAuthVault().catch(() => false);
+      }
       if (!componentMounted.current) return;
       setBrowserAuthStatus("idle");
       const message = error instanceof Error ? error.message : String(error);
@@ -567,7 +571,7 @@ export function DesktopSetup() {
     } finally {
       browserAuthActive.current = false;
     }
-  }, [browserAuthStatus, localChecksReady, locale, t]);
+  }, [browserAuthStatus, desktopAvailable, localChecksReady, locale, t]);
 
   const cancelBrowserSignIn = useCallback(async () => {
     if (browserAuthStatus === "idle") return;

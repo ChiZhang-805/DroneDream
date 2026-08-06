@@ -14,6 +14,19 @@ vi.mock("../features/auth/supabaseClient", () => ({
 
 import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
 
+const validSession = {
+  protocolVersion: "desktop-browser-auth-pkce-v1" as const,
+  editionId: "universal" as const,
+  authClientId: "dronedream-desktop-universal",
+  accessToken: "header.payload.signature",
+  refreshToken: "refresh-token-value",
+  attemptIdHash: "a".repeat(64),
+  stateHash: "b".repeat(64),
+  subjectHash: "c".repeat(64),
+  issuedAt: "2026-08-05T08:00:00Z",
+  completedAt: "2026-08-05T08:00:01Z",
+};
+
 describe("browser auth session adoption", () => {
   beforeEach(() => {
     authMock.setSession.mockReset();
@@ -22,10 +35,7 @@ describe("browser auth session adoption", () => {
   it("adopts the exact access and refresh token pair once", async () => {
     authMock.setSession.mockResolvedValue({ error: null });
 
-    await expect(adoptBrowserAuthSession({
-      accessToken: "header.payload.signature",
-      refreshToken: "refresh-token-value",
-    })).resolves.toBeUndefined();
+    await expect(adoptBrowserAuthSession(validSession)).resolves.toBeUndefined();
 
     expect(authMock.setSession).toHaveBeenCalledTimes(1);
     expect(authMock.setSession).toHaveBeenCalledWith({
@@ -40,8 +50,23 @@ describe("browser auth session adoption", () => {
     });
 
     await expect(adoptBrowserAuthSession({
+      ...validSession,
       accessToken: "expired-token",
       refreshToken: "expired-refresh-token",
     })).rejects.toThrow("Session is no longer valid.");
+  });
+
+  it.each([
+    { editionId: "sim" as const, authClientId: "dronedream-desktop-sim" },
+    { editionId: "universal" as const, authClientId: "dronedream-desktop-lab" },
+  ])("rejects a cross-edition or cross-client session before adoption", async (binding) => {
+    authMock.setSession.mockResolvedValue({ error: null });
+
+    await expect(adoptBrowserAuthSession({
+      ...validSession,
+      ...binding,
+    })).rejects.toThrow("different DroneDream edition");
+
+    expect(authMock.setSession).not.toHaveBeenCalled();
   });
 });

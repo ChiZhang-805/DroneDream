@@ -4,6 +4,7 @@ import {
   autoStartInstallerRuntime,
   beginBrowserAuth,
   cancelBrowserAuth,
+  clearBrowserAuthVault,
   cancelRuntimeInstall,
   desktopApiRequest,
   DesktopCommandContractError,
@@ -16,6 +17,7 @@ import {
   probeRuntimeStatus,
   probeSystemPrerequisites,
   repairRuntime,
+  restoreBrowserAuthVault,
   startRuntime,
   startRuntimeInstall,
   stopRuntimeForExit,
@@ -55,6 +57,19 @@ const runtimeReport = {
     detail: null,
   })),
   diagnostics: [],
+};
+
+const browserAuthSession = {
+  protocolVersion: "desktop-browser-auth-pkce-v1",
+  editionId: "universal",
+  authClientId: "dronedream-desktop-universal",
+  accessToken: "header.payload.signature",
+  refreshToken: "refresh-token-value",
+  attemptIdHash: "a".repeat(64),
+  stateHash: "b".repeat(64),
+  subjectHash: "c".repeat(64),
+  issuedAt: "2026-08-05T08:00:00Z",
+  completedAt: "2026-08-05T08:00:01Z",
 };
 
 const installPlan = {
@@ -132,6 +147,12 @@ describe("desktop bridge", () => {
     await expect(probeSystemPrerequisites()).rejects.toBeInstanceOf(
       DesktopRuntimeUnavailableError,
     );
+    await expect(restoreBrowserAuthVault()).rejects.toBeInstanceOf(
+      DesktopRuntimeUnavailableError,
+    );
+    await expect(clearBrowserAuthVault()).rejects.toBeInstanceOf(
+      DesktopRuntimeUnavailableError,
+    );
   });
 
   it("routes typed calls through the Tauri global API", async () => {
@@ -159,35 +180,35 @@ describe("desktop bridge", () => {
   });
 
   it("validates the browser-auth command without exposing returned tokens", async () => {
-    const session = {
-      accessToken: "header.payload.signature",
-      refreshToken: "refresh-token-value",
-    };
+    const session = browserAuthSession;
     const invoke = vi.fn(async (command: string) => {
       if (command === "begin_browser_auth") return session;
       if (command === "cancel_browser_auth") return true;
+      if (command === "clear_browser_auth_vault") return true;
+      if (command === "restore_browser_auth_vault") return session;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
 
     await expect(beginBrowserAuth({
       locale: "zh-CN",
-      supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
-      publishableKey: "public-test-key-for-browser-auth",
     })).resolves.toEqual(session);
     await expect(cancelBrowserAuth()).resolves.toBe(true);
+    await expect(clearBrowserAuthVault()).resolves.toBe(true);
+    await expect(restoreBrowserAuthVault()).resolves.toEqual(session);
     expect(invoke).toHaveBeenNthCalledWith(1, "begin_browser_auth", {
       request: {
         locale: "zh-CN",
-        supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
-        publishableKey: "public-test-key-for-browser-auth",
       },
     });
     expect(invoke).toHaveBeenNthCalledWith(2, "cancel_browser_auth", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(3, "clear_browser_auth_vault", undefined);
+    expect(invoke).toHaveBeenNthCalledWith(4, "restore_browser_auth_vault", undefined);
   });
 
   it("rejects malformed browser-auth tokens at the native boundary", async () => {
     const invoke = vi.fn().mockResolvedValue({
+      ...browserAuthSession,
       accessToken: "valid-token",
       refreshToken: "secret refresh token",
     });
@@ -195,11 +216,25 @@ describe("desktop bridge", () => {
 
     const error = await beginBrowserAuth({
       locale: "en",
-      supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
-      publishableKey: "public-test-key-for-browser-auth",
     }).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(DesktopCommandContractError);
     expect(String(error)).not.toContain("secret refresh token");
+  });
+
+  it.each([
+    { stateHash: "B".repeat(64) },
+    { issuedAt: "2026-08-05T08:00:02Z", completedAt: "2026-08-05T08:00:01Z" },
+    { rawCallback: "code=secret&state=secret" },
+  ])("rejects malformed or over-broad browser-auth receipts", async (override) => {
+    const invoke = vi.fn().mockResolvedValue({
+      ...browserAuthSession,
+      ...override,
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(beginBrowserAuth({ locale: "en" })).rejects.toBeInstanceOf(
+      DesktopCommandContractError,
+    );
   });
 
   it("validates the bounded native API response contract", async () => {

@@ -89,13 +89,19 @@ export interface DesktopApiResponse {
 
 export interface BrowserAuthRequest {
   locale: InstallerLocale;
-  supabaseUrl: string;
-  publishableKey: string;
 }
 
 export interface BrowserAuthSession {
+  protocolVersion: "desktop-browser-auth-pkce-v1";
+  editionId: "universal" | "sim" | "lab" | "field";
+  authClientId: string;
   accessToken: string;
   refreshToken: string;
+  attemptIdHash: string;
+  stateHash: string;
+  subjectHash: string;
+  issuedAt: string;
+  completedAt: string;
 }
 
 export interface RuntimeInstallStep {
@@ -363,14 +369,6 @@ export function beginBrowserAuth(
 ): Promise<BrowserAuthSession> {
   const normalizedRequest = {
     locale: request.locale,
-    supabaseUrl: expectSafeNonEmptyString(
-      request.supabaseUrl,
-      "request.supabaseUrl",
-    ),
-    publishableKey: expectSafeNonEmptyString(
-      request.publishableKey,
-      "request.publishableKey",
-    ),
   };
   if (normalizedRequest.locale !== "en" && normalizedRequest.locale !== "zh-CN") {
     return Promise.reject(new Error("Browser sign-in locale must be en or zh-CN."));
@@ -385,6 +383,18 @@ export function beginBrowserAuth(
 export function cancelBrowserAuth(): Promise<boolean> {
   return invokeDesktop("cancel_browser_auth", (value) =>
     expectBoolean(value, "response"));
+}
+
+export function clearBrowserAuthVault(): Promise<boolean> {
+  return invokeDesktop("clear_browser_auth_vault", (value) =>
+    expectBoolean(value, "response"),
+  );
+}
+
+export function restoreBrowserAuthVault(): Promise<BrowserAuthSession | null> {
+  return invokeDesktop("restore_browser_auth_vault", (value) =>
+    value === null ? null : parseBrowserAuthSession(value),
+  );
 }
 
 export function probeSystemPrerequisites(): Promise<SystemPrerequisiteReport> {
@@ -486,8 +496,33 @@ export function desktopApiRequest(
 }
 
 function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
-  const record = expectRecord(value, "response");
+  const record = expectExactRecord(value, "response", [
+    "protocolVersion",
+    "editionId",
+    "authClientId",
+    "accessToken",
+    "refreshToken",
+    "attemptIdHash",
+    "stateHash",
+    "subjectHash",
+    "issuedAt",
+    "completedAt",
+  ]);
+  if (record.protocolVersion !== "desktop-browser-auth-pkce-v1") {
+    throw new Error("response.protocolVersion is unsupported");
+  }
+  if (!(["universal", "sim", "lab", "field"] as unknown[]).includes(record.editionId)) {
+    throw new Error("response.editionId is unsupported");
+  }
+  const issuedAt = expectIsoTimestamp(record.issuedAt, "response.issuedAt");
+  const completedAt = expectIsoTimestamp(record.completedAt, "response.completedAt");
+  if (Date.parse(completedAt) < Date.parse(issuedAt)) {
+    throw new Error("response.completedAt must not precede response.issuedAt");
+  }
   return {
+    protocolVersion: "desktop-browser-auth-pkce-v1",
+    editionId: record.editionId as BrowserAuthSession["editionId"],
+    authClientId: expectIdentifier(record.authClientId, "response.authClientId"),
     accessToken: expectBrowserAuthToken(
       record.accessToken,
       "response.accessToken",
@@ -496,6 +531,15 @@ function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
       record.refreshToken,
       "response.refreshToken",
     ),
+    attemptIdHash: expectLowercaseHex(
+      record.attemptIdHash,
+      "response.attemptIdHash",
+      64,
+    ),
+    stateHash: expectLowercaseHex(record.stateHash, "response.stateHash", 64),
+    subjectHash: expectLowercaseHex(record.subjectHash, "response.subjectHash", 64),
+    issuedAt,
+    completedAt,
   };
 }
 
@@ -1168,6 +1212,23 @@ function expectRecord(value: unknown, path: string): UnknownRecord {
   return value as UnknownRecord;
 }
 
+function expectExactRecord(
+  value: unknown,
+  path: string,
+  expectedKeys: string[],
+): UnknownRecord {
+  const record = expectRecord(value, path);
+  const actualKeys = Object.keys(record).sort();
+  const sortedExpectedKeys = [...expectedKeys].sort();
+  if (
+    actualKeys.length !== sortedExpectedKeys.length ||
+    actualKeys.some((key, index) => key !== sortedExpectedKeys[index])
+  ) {
+    throw new Error(`${path} has unsupported or missing fields`);
+  }
+  return record;
+}
+
 function expectArray(value: unknown, path: string): unknown[] {
   if (!Array.isArray(value)) throw new Error(`${path} must be an array`);
   return value;
@@ -1189,6 +1250,26 @@ function expectSafeNonEmptyString(value: unknown, path: string): string {
     throw new Error(`${path} contains unsafe control characters or is too long`);
   }
   return string;
+}
+
+function expectIdentifier(value: unknown, path: string): string {
+  const identifier = expectString(value, path);
+  if (!/^[a-z0-9][a-z0-9.-]{0,127}$/u.test(identifier)) {
+    throw new Error(`${path} must be a bounded lowercase identifier`);
+  }
+  return identifier;
+}
+
+function expectLowercaseHex(
+  value: unknown,
+  path: string,
+  length: number,
+): string {
+  const digest = expectString(value, path);
+  if (digest.length !== length || !/^[0-9a-f]+$/u.test(digest)) {
+    throw new Error(`${path} must be ${length} lowercase hexadecimal characters`);
+  }
+  return digest;
 }
 
 function normalizeRequestedTargetRoot(value: string): string {
@@ -1255,6 +1336,12 @@ function parseNullableTimestamp(value: unknown, path: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}T/u.test(timestamp) || Number.isNaN(Date.parse(timestamp))) {
     throw new Error(`${path} must be an ISO 8601 timestamp`);
   }
+  return timestamp;
+}
+
+function expectIsoTimestamp(value: unknown, path: string): string {
+  const timestamp = parseNullableTimestamp(value, path);
+  if (timestamp === null) throw new Error(`${path} must not be null`);
   return timestamp;
 }
 

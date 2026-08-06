@@ -33,6 +33,10 @@ const authMock = vi.hoisted(() => {
     signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
     signInWithOtp: vi.fn(async () => ({ data: {}, error: null })),
     verifyOtp: vi.fn(async () => ({ data: {}, error: null })),
+    signOut: vi.fn(async (): Promise<{
+      data: Record<string, never>;
+      error: Error | null;
+    }> => ({ data: {}, error: null })),
     updateUser: vi.fn(async (
       payload: { data?: Record<string, unknown>; password?: string },
     ) => {
@@ -59,6 +63,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
       signInWithPassword: authMock.signInWithPassword,
       signInWithOtp: authMock.signInWithOtp,
       verifyOtp: authMock.verifyOtp,
+      signOut: authMock.signOut,
       updateUser: authMock.updateUser,
     },
   },
@@ -113,6 +118,12 @@ function AccountProbe() {
       >
         Finish registration
       </button>
+      <button
+        type="button"
+        onClick={() => void auth.signOut().catch(() => undefined)}
+      >
+        Sign out
+      </button>
     </>
   );
 }
@@ -130,11 +141,98 @@ describe("AuthContext account profile", () => {
     authMock.signInWithPassword.mockClear();
     authMock.signInWithOtp.mockClear();
     authMock.verifyOtp.mockClear();
+    authMock.signOut.mockReset();
+    authMock.signOut.mockResolvedValue({ data: {}, error: null });
     authMock.unsubscribe.mockClear();
     delete window.__TAURI__;
     window.history.replaceState(null, "", "/");
     window.localStorage.clear();
     window.sessionStorage.clear();
+  });
+
+  it("uses local-only web sign-out without invoking a desktop vault", async () => {
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(screen.getByLabelText("username")).toHaveTextContent("");
+    });
+  });
+
+  it("preserves drafts when local sign-out fails", async () => {
+    const draftKey = "drone-dream:experiment-workspace-draft:v1:workspace-1";
+    window.localStorage.setItem(draftKey, "local-draft");
+    window.sessionStorage.setItem(draftKey, "session-draft");
+    authMock.signOut.mockResolvedValueOnce({
+      data: {},
+      error: new Error("network unavailable"),
+    });
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    await screen.findByLabelText("username");
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(authMock.signOut).toHaveBeenCalledTimes(1));
+    expect(window.localStorage.getItem(draftKey)).toBe("local-draft");
+    expect(window.sessionStorage.getItem(draftKey)).toBe("session-draft");
+  });
+
+  it("clears only the desktop edition vault before local sign-out", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "clear_browser_auth_vault") return true;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("clear_browser_auth_vault", undefined);
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+    });
+    expect(invoke.mock.invocationCallOrder[0])
+      .toBeLessThan(authMock.signOut.mock.invocationCallOrder[0]);
+  });
+
+  it("still closes the local WebView session when vault cleanup fails", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "clear_browser_auth_vault") {
+        throw new Error("credential manager unavailable");
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+    activateDesktopAuthSession();
+    await screen.findByText("pilot.name");
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => {
+      expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(screen.getByLabelText("username")).toHaveTextContent("");
+    });
   });
 
   it("defaults to the email prefix and lets the user save a custom username", async () => {
