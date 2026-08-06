@@ -21,6 +21,12 @@ CANONICAL_GREEN_RECEIPT_PATH = (
     / "build-receipts"
     / "lab-brand-1.0.0-e975223.canonical-green.json"
 )
+LARGE_LABEL_RECEIPT_PATH = (
+    ROOT
+    / "distribution"
+    / "build-receipts"
+    / "lab-canonical-large-label-sync-1.0.0-287f1a6.green.json"
+)
 
 EXPECTED_ASSETS = {
     "mark": {
@@ -314,6 +320,38 @@ class LabBrandAssetTests(unittest.TestCase):
         self.assertFalse(receipt["installerStructure"]["executableExists"])
         self.assertFalse(receipt["installerStructure"]["updaterSignatureExists"])
         self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
+
+    def test_large_label_receipt_binds_clean_render_evidence(self) -> None:
+        receipt = json.loads(LARGE_LABEL_RECEIPT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(
+            receipt["canonicalBrandDonor"]["productCommit"],
+            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+        )
+        self.assertFalse(
+            receipt["canonicalBrandDonor"]["evidence"]["isProductSource"]
+        )
+        self.assertEqual(
+            receipt["labBrand"]["lockup"]["sha256"],
+            "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+        )
+        report_ref = receipt["renderVerification"]["report"]
+        report_path = ROOT / report_ref["path"]
+        report_bytes = report_path.read_bytes()
+        self.assertEqual(len(report_bytes), report_ref["bytes"])
+        self.assertEqual(hashlib.sha256(report_bytes).hexdigest(), report_ref["sha256"])
+        report = json.loads(report_bytes.decode("utf-8"))
+        self.assertEqual(report["sourceCommit"], receipt["source"]["commit"])
+        self.assertEqual(report["sourceStatus"], "clean")
+        self.assertEqual(len(report["screenshots"]), 24)
+        for screenshot in report["screenshots"]:
+            screenshot_path = ROOT / screenshot["path"]
+            self.assertEqual(
+                hashlib.sha256(screenshot_path.read_bytes()).hexdigest(),
+                screenshot["sha256"],
+            )
+        self.assertEqual(report["hardwareActionDecision"], "deny")
+        self.assertFalse(receipt["releaseBoundary"]["exeBuilt"])
+        self.assertFalse(receipt["releaseBoundary"]["releaseReady"])
 
 
 if __name__ == "__main__":

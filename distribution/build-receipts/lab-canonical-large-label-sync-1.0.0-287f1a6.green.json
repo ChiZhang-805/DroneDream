@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-canonical-large-label-sync-receipt",
+  "state": "green-source-and-render-verified",
+  "editionId": "lab",
+  "version": "1.0.0",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "287f1a60cb52554000921f8b060033079020ae5c",
+    "statusAtRender": "clean"
+  },
+  "commonCore": {
+    "authority": "Universal/Core",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "commonCoreHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "brandDonorIsCommonCoreProductSource": false
+  },
+  "canonicalBrandDonor": {
+    "productCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "productParentCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+    "labIntegrationCommit": "a7b23e5bddae72229b6d1c6ddcf6b67fced31a25",
+    "integration": "audited-authorized-brand-only-cherry-pick",
+    "contract": {
+      "path": "brand/brand-editions.v1.json",
+      "bytes": 4488,
+      "sha256": "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33"
+    },
+    "assetManifest": {
+      "path": "brand/generated/brand-assets.v1.json",
+      "bytes": 16607,
+      "sha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471"
+    },
+    "evidence": {
+      "commit": "7482647f1c2fcb92f58aaef009efc99764792297",
+      "path": "brand/receipts/canonical-large-label-donor-v1.json",
+      "bytes": 3367,
+      "sha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+      "isProductSource": false
+    }
+  },
+  "labBrand": {
+    "displayName": "DroneDream · LAB",
+    "separatorCodePoint": "U+00B7",
+    "editionLabelHeightRatio": 0.9,
+    "preserveNaturalEditionLabelWidth": true,
+    "palette": ["#A7E84A", "#20C77A", "#087E69"],
+    "lightSurface": "#F3FCEF",
+    "darkSurface": "#092019",
+    "lockup": {
+      "canonicalSourcePath": "brand/source/approved/lab-large-label-lockup.png",
+      "generatedPath": "brand/generated/lab/lockup-compact.png",
+      "frontendPath": "frontend/src/assets/brand/lab-lockup-compact.png",
+      "bytes": 128948,
+      "width": 2386,
+      "height": 218,
+      "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
+    },
+    "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+    "windowsIconSha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1",
+    "supersededSmallLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+    "supersededSmallLockupIncludedInFuturePayload": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "renderVerification": {
+    "report": {
+      "path": "artifacts/test-runs/lab-ui-287f1a6-canonical-large-label/lab-ui-verification.json",
+      "bytes": 9160,
+      "sha256": "eef93489a2cea4228dc6e628f545afec3044736ae5a23a49e97e09c2dd9f93a6"
+    },
+    "viewports": ["1440-en", "1440-zh", "760-en", "760-zh", "390-en", "390-zh"],
+    "surfaces": ["simulation", "hardware", "evidence", "safety"],
+    "screenshotCount": 24,
+    "horizontalOverflowObserved": false,
+    "clippedTextObserved": false,
+    "applicationLockupLoaded": true
+  },
+  "installerStructure": {
+    "tauriOverlayPath": "desktop/src-tauri/tauri.lab-preview.conf.json",
+    "tauriOverlaySha256": "b98157992326a4ce6701d0c1ac0c8eb7bd00ae2c970e91dfdd7139e722c5288f",
+    "productName": "DroneDream · LAB",
+    "identifier": "io.dronedream.desktop.lab",
+    "canonicalWindowsIconBound": true,
+    "canonicalLargeLabelResourceBound": true,
+    "generatedNsiVerified": false,
+    "executableBuilt": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "frontendIsAuthority": false,
+    "workspaceOrThemeGrantsAuthority": false,
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "hardwareActionDecision": "deny"
+  },
+  "verification": [
+    "python scripts/build-brand-assets.py --check: assetCount 68",
+    "python pytest canonical brand and Lab contracts: 44 passed",
+    "python pytest final Lab contracts: 40 passed",
+    "frontend BrandLockup: 5 passed",
+    "frontend Lab UI: 25 passed",
+    "frontend typecheck: passed",
+    "frontend lint: passed",
+    "frontend production build: passed",
+    "frontend layout render: 6 cases and 24 screenshots passed",
+    "Ruff donor scope and Lab logic scope: passed",
+    "git diff --check: passed"
+  ],
+  "releaseBoundary": {
+    "exeBuilt": false,
+    "installerRun": false,
+    "runtimeMigrated": false,
+    "simulationStarted": false,
+    "hardwareConnected": false,
+    "providerCalled": false,
+    "apiKeyRead": false,
+    "releaseReady": false
+  },
+  "remainingGates": [
+    "consume exact Universal authentication isolation donor",
+    "consume remaining shared runtime, updater, and edition-safety fixture donors",
+    "obtain a new YELLOW approval for final Lab EXE build",
+    "run isolated fresh, overlay, uninstall, shortcut, WebView2, EN/ZH, and rollback lifecycle acceptance",
+    "freeze and deliver the exact Website handoff family"
+  ]
+}
