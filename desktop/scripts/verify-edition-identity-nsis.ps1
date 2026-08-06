@@ -30,13 +30,15 @@ $temporaryRoot = Join-Path $env:TEMP (
     "dronedream-edition-identity-nsis-{0}" -f [guid]::NewGuid().ToString("N")
 )
 New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
-$encoding = [Text.UTF8Encoding]::new($false)
+$encoding = [Text.UTF8Encoding]::new($true)
 $fixtureTemplate = @'
 Unicode true
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
 !define PRODUCTNAME "__PRODUCT_NAME__"
+!define VERSION "1.0.0"
 !define MAINBINARYNAME "drone-dream-desktop"
+!define UNINSTKEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${PRODUCTNAME}"
 !define STARTMENUFOLDER ""
 !define BUNDLEID "__BUNDLE_ID__"
 Var WixMode
@@ -62,6 +64,11 @@ Section
   StrCpy $PassiveMode 0
   StrCpy $AppStartMenuFolder "DroneDream"
   StrCpy $OldMainBinaryName "DroneDream.exe"
+  StrCpy $INSTDIR "$LOCALAPPDATA\${PRODUCTNAME}"
+  WriteRegStr HKCU "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"
+  WriteRegStr HKCU "${UNINSTKEY}" "DisplayVersion" "${VERSION}"
+  WriteRegStr HKCU "${UNINSTKEY}" "InstallLocation" "$\"$INSTDIR$\""
+  WriteRegStr HKCU "${UNINSTKEY}" "MainBinaryName" "${MAINBINARYNAME}.exe"
   !insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT fixture_startmenu_first
   !insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT fixture_startmenu_second
   !insertmacro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT fixture_desktop_first
@@ -73,6 +80,7 @@ function Invoke-FixtureCompile {
     param(
         [Parameter(Mandatory = $true)][string]$EditionId,
         [Parameter(Mandatory = $true)][string]$ProductName,
+        [Parameter(Mandatory = $true)][string]$DisplayName,
         [Parameter(Mandatory = $true)][bool]$ExpectedSuccess
     )
 
@@ -80,6 +88,7 @@ function Invoke-FixtureCompile {
     $outputPath = Join-Path $temporaryRoot "$EditionId.exe"
     $fixture = $fixtureTemplate.
         Replace("__PRODUCT_NAME__", $ProductName).
+        Replace("__DISPLAY_NAME__", $DisplayName).
         Replace("__BUNDLE_ID__", "io.dronedream.desktop.$EditionId").
         Replace("__IDENTITY_PATH__", $identityPath.Replace("\", "\\")).
         Replace("__OUTPUT_PATH__", $outputPath.Replace("\", "\\"))
@@ -101,6 +110,14 @@ function Invoke-FixtureCompile {
         return [ordered]@{
             editionId = $EditionId
             productName = $ProductName
+            displayName = $DisplayName
+            uninstallRegistryKey = "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/$ProductName"
+            uninstallRegistration = [ordered]@{
+                DisplayName = $DisplayName
+                DisplayVersion = "1.0.0"
+                InstallLocation = "%LOCALAPPDATA%/$ProductName"
+                MainBinaryName = "drone-dream-desktop.exe"
+            }
             repeatedExpansionCompiled = $true
             outputBytes = (Get-Item -LiteralPath $outputPath).Length
         }
@@ -119,11 +136,11 @@ function Invoke-FixtureCompile {
 
 try {
     $results = @(
-        Invoke-FixtureCompile -EditionId "universal" -ProductName "DroneDream-Universal" -ExpectedSuccess $true
-        Invoke-FixtureCompile -EditionId "sim" -ProductName "DroneDream-Sim" -ExpectedSuccess $true
-        Invoke-FixtureCompile -EditionId "lab" -ProductName "DroneDream-Lab" -ExpectedSuccess $true
-        Invoke-FixtureCompile -EditionId "field" -ProductName "DroneDream-Field" -ExpectedSuccess $true
-        Invoke-FixtureCompile -EditionId "unknown" -ProductName "DroneDream-Unknown" -ExpectedSuccess $false
+        Invoke-FixtureCompile -EditionId "universal" -ProductName "DroneDream-Universal" -DisplayName "DroneDream" -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "sim" -ProductName "DroneDream-Sim" -DisplayName "DroneDream · SIM" -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "lab" -ProductName "DroneDream-Lab" -DisplayName "DroneDream · LAB" -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "field" -ProductName "DroneDream-Field" -DisplayName "DroneDream · FIELD" -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "unknown" -ProductName "DroneDream-Unknown" -DisplayName "DroneDream · UNKNOWN" -ExpectedSuccess $false
     )
     [ordered]@{
         kind = "dronedream-edition-identity-nsis-compile-check"

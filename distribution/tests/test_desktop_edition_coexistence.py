@@ -190,6 +190,9 @@ def test_nsis_keeps_internal_ownership_but_uses_display_shortcuts() -> None:
     assert 'StrCpy $INSTDIR "$LOCALAPPDATA\\${PRODUCTNAME}"' in template
     assert 'RmDir /r "$LOCALAPPDATA\\${BUNDLEID}"' in template
     assert 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"' in template
+    assert 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayVersion" "${VERSION}"' in template
+    assert r'WriteRegStr SHCTX "${UNINSTKEY}" "InstallLocation" "$\"$INSTDIR$\""' in template
+    assert 'WriteRegStr SHCTX "${UNINSTKEY}" "MainBinaryName" "${MAINBINARYNAME}.exe"' in template
 
     # Shortcut conflicts are retained, reported and never blindly overwritten.
     assert 'IfFileExists "${SHORTCUT_PATH}" 0 ${LABEL_PREFIX}_create' in identity
@@ -224,16 +227,49 @@ def test_nsis_keeps_internal_ownership_but_uses_display_shortcuts() -> None:
     assert ownership_check < rename
 
 
-def test_nsis_compile_check_covers_repeated_expansion_and_unknown_editions() -> None:
+def test_nsis_compile_check_covers_registration_repeated_expansion_and_unknown_editions() -> None:
     script = NSIS_COMPILE_CHECK.read_text(encoding="utf-8")
-    for edition_id, product_name in (
-        ("universal", "DroneDream-Universal"),
-        ("sim", "DroneDream-Sim"),
-        ("lab", "DroneDream-Lab"),
-        ("field", "DroneDream-Field"),
+    for edition_id, product_name, display_name in (
+        ("universal", "DroneDream-Universal", "DroneDream"),
+        ("sim", "DroneDream-Sim", "DroneDream · SIM"),
+        ("lab", "DroneDream-Lab", "DroneDream · LAB"),
+        ("field", "DroneDream-Field", "DroneDream · FIELD"),
     ):
-        assert f'-EditionId "{edition_id}" -ProductName "{product_name}"' in script
+        invocation = (
+            f'-EditionId "{edition_id}" -ProductName "{product_name}" '
+            f'-DisplayName "{display_name}"'
+        )
+        assert invocation in script
+    uninstall_key = (
+        '!define UNINSTKEY "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
+        '\\${PRODUCTNAME}"'
+    )
+    assert uninstall_key in script
+    assert 'WriteRegStr HKCU "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"' in script
+    assert 'WriteRegStr HKCU "${UNINSTKEY}" "DisplayVersion" "${VERSION}"' in script
+    assert r'WriteRegStr HKCU "${UNINSTKEY}" "InstallLocation" "$\"$INSTDIR$\""' in script
+    assert 'WriteRegStr HKCU "${UNINSTKEY}" "MainBinaryName" "${MAINBINARYNAME}.exe"' in script
     assert script.count("DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT fixture_") == 2
     assert script.count("DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT fixture_") == 2
-    assert 'ProductName "DroneDream-Unknown" -ExpectedSuccess $false' in script
+    unknown_invocation = (
+        'ProductName "DroneDream-Unknown" -DisplayName "DroneDream · UNKNOWN" '
+        '-ExpectedSuccess $false'
+    )
+    assert unknown_invocation in script
     assert 'Remove-Item -LiteralPath $resolved -Recurse -Force' in script
+
+
+def test_universal_lifecycle_uses_display_name_and_preserves_legacy_shortcut_collision() -> None:
+    lifecycle = (ROOT / "desktop/scripts/verify-universal-installer-lifecycle.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert '$productName = "DroneDream-Universal"' in lifecycle
+    assert '$displayName = "DroneDream"' in lifecycle
+    assert 'DisplayName = $displayName' in lifecycle
+    assert 'DisplayName = [string]$registration.DisplayName' in lifecycle
+    assert 'mismatches = $registrationMismatches' in lifecycle
+    assert 'protected-legacy-shortcut-preserved' in lifecycle
+    assert 'created a shortcut under the internal product identity' in lifecycle
+    assert 'if (-not $Before.baseDesktopShortcut.exists)' in lifecycle
+    assert 'if (-not $Before.baseStartMenuShortcut.exists)' in lifecycle
+    assert 'displayShortcutPolicy = "preserve-existing-legacy-or-own-when-absent"' in lifecycle
