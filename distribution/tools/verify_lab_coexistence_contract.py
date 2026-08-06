@@ -426,6 +426,7 @@ def validate_contract(
         "universal-large-edition-lockup-brand-v1",
         "universal-runtime-diagnostics-isolation-v1",
         "universal-updater-release-family-isolation-v1",
+        "universal-nsis-duplicate-label-v1",
         "universal-edition-safety-fixture-binding-v1",
     }:
         raise LabCoexistenceContractError("required Universal donor requests are incomplete")
@@ -478,6 +479,11 @@ def validate_contract(
                     "cee0a2cd6bbf889ed07951cfc640e52cb70dee91239237b77c5cec897e2e1663",
                 ),
             }
+            current_runtime_mode_paths = dict(expected_runtime_mode_paths)
+            current_runtime_mode_paths["desktop/scripts/verify-nsis-template.ps1"] = (
+                "2c8929498d87c5da3325a47c1e8a8c0408e6b272",
+                "08ae596f9be981a123ac179539b559b725d03181a509b8cd72e1a3b2e0b5047e",
+            )
             if len(path_audit) != len(expected_runtime_mode_paths):
                 raise LabCoexistenceContractError("NSIS runtime-mode path audit is incomplete")
             for reference in path_audit:
@@ -485,11 +491,12 @@ def validate_contract(
                 if path not in expected_runtime_mode_paths:
                     raise LabCoexistenceContractError("NSIS runtime-mode path audit drifted")
                 expected_blob, expected_sha = expected_runtime_mode_paths[path]
+                current_blob, current_sha = current_runtime_mode_paths[path]
                 if (
                     reference.get("blob") != expected_blob
                     or reference.get("sha256") != expected_sha
-                    or _git_blob(ROOT / path) != expected_blob
-                    or _sha256(ROOT / path) != expected_sha
+                    or _git_blob(ROOT / path) != current_blob
+                    or _sha256(ROOT / path) != current_sha
                 ):
                     raise LabCoexistenceContractError("NSIS runtime-mode bytes drifted")
         if item.get("requestId") == "universal-large-edition-lockup-brand-v1":
@@ -533,22 +540,39 @@ def validate_contract(
                 or canonical.get("labBytesExact") is not True
             ):
                 raise LabCoexistenceContractError("auth donor provenance drifted")
+        if item.get("requestId") == "universal-nsis-duplicate-label-v1":
+            exact = _mapping(item.get("exactDonor"), "NSIS duplicate-label donor")
+            evidence = _mapping(item.get("evidence"), "NSIS duplicate-label evidence")
+            if (
+                item.get("state") != "delivered-exact-donor-forward-synced"
+                or exact.get("commit") != "a11fe7d09fceafaecf102a0cbfba49abb066a557"
+                or exact.get("parent") != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+                or exact.get("integrationCommit") != "575469366a6ba194397f14ccd42637801422d364"
+                or evidence.get("labRepeatedExpansionCompile") != "passed"
+                or evidence.get("unknownProductDecision") != "deny"
+                or evidence.get("temporaryOutputsRetained") is not False
+            ):
+                raise LabCoexistenceContractError("NSIS duplicate-label donor drifted")
         if item.get("requestId") == "universal-edition-safety-fixture-binding-v1":
+            exact = _mapping(item.get("exactDonor"), "edition-safety fixture donor")
             evidence = _mapping(item.get("evidence"), "edition-safety fixture evidence")
             if (
-                item.get("state") != "requested-not-delivered"
+                item.get("state") != "delivered-exact-donor-forward-synced"
+                or exact.get("commit") != "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
+                or exact.get("parent") != "a11fe7d09fceafaecf102a0cbfba49abb066a557"
+                or exact.get("integrationCommit") != "057fc89f460fedaafcef1fcb5bae141121b755ec"
                 or evidence.get("verifiedAtUniversalSource")
-                != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+                != "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
                 or evidence.get("sharedFixtureBlob") != "06731ea2b9ab214e947345473ff0ffcdb95fffa5"
                 or evidence.get("sharedFixtureSha256")
                 != "9eb9117441f930c8f8240306bc52b3b5001f3e85cc4cf33ebaa790aff547171f"
-                or evidence.get("backendRuntimeSafetyTestResult") != "23-passed-3-failed"
-                or evidence.get("failedTestsRequireTestOnlyAllowPrecondition") != 3
-                or evidence.get("nonAllowAndNegativeSubset") != "23-passed-3-deselected"
+                or evidence.get("labSafetyAndCoexistenceTestResult") != "61-passed"
+                or evidence.get("testOnlyAllowPreconditionsPassed") is not True
+                or evidence.get("activeManifestMismatchNegativeDecision") != "deny"
                 or evidence.get("productionDecision") != "deny"
                 or evidence.get("zeroValidatedPackBoundaryPreserved") is not True
             ):
-                raise LabCoexistenceContractError("edition-safety fixture blocker drifted")
+                raise LabCoexistenceContractError("edition-safety fixture donor drifted")
     recovery = _mapping(donor.get("labRecovery"), "labRecovery")
     if (
         recovery.get("rebuildAuthorizedByThisRequest") is not False
@@ -561,9 +585,10 @@ def validate_contract(
     blocker_text = " ".join(str(item) for item in blockers)
     for required in (
         "existing-install/quiesce",
+        "duplicate-label",
         "large LAB suffix",
         "provider, signed-updater",
-        "edition-safety allow-fixture",
+        "edition-safety fixture donor",
         "predates this contract",
     ):
         if required not in blocker_text:

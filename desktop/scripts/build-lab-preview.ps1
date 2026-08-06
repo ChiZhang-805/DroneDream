@@ -73,10 +73,6 @@ if ($LASTEXITCODE -ne 0) {
     throw "Lab preview source must descend from the Universal/Core product source baseline."
 }
 
-if ($env:TAURI_SIGNING_PRIVATE_KEY_PATH -or $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
-    throw "Lab preview is unsigned; clear Tauri signing secret environment variables before building."
-}
-
 if (-not $CargoTargetDir) {
     $CargoTargetDir = Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache\lab-cargo-target"
 }
@@ -107,6 +103,7 @@ if (-not $tauriDisplayName) {
     throw "The Lab Tauri overlay display title is missing."
 }
 $artifactPath = Join-Path $outputRootFull $artifactName
+$artifactSignaturePath = "${artifactPath}.sig"
 $receiptPath = Join-Path $outputRootFull "lab-preview-receipt.json"
 
 $corePaths = @("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
@@ -118,8 +115,13 @@ $coreListingCanonical = $coreListing.Replace("`r`n", "`n").Replace("`r", "`n").T
 $commonCoreHash = Get-Sha256Text $coreListingCanonical
 
 if (-not $Build) {
-    Write-Host "Lab preview contract verified for $sourceCommit with pinned $Toolchain; no EXE was built. Pass -Build to create the unsigned internal preview."
+    Write-Host "Lab preview contract verified for $sourceCommit with pinned $Toolchain; no EXE was built. Pass -Build to create the updater-signed, Authenticode-unsigned internal preview."
     exit 0
+}
+
+if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PATH -or
+    -not (Test-Path -LiteralPath $env:TAURI_SIGNING_PRIVATE_KEY_PATH -PathType Leaf)) {
+    throw "Lab updater signing requires the controller-approved TAURI_SIGNING_PRIVATE_KEY_PATH."
 }
 
 $python = Get-Command python.exe -ErrorAction SilentlyContinue
@@ -166,7 +168,6 @@ if (-not $env:DRONEDREAM_OAUTH_CLIENT_ID -or
     -LlvmRoot $gnullvm.llvmRoot `
     -ExpectedProductName $tauriProductName `
     -EditionId lab `
-    -AllowUnsignedUpdater `
     -PreserveBundleHistory
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
@@ -184,12 +185,14 @@ if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf)) {
     throw "The Lab preview build completed without a Tauri NSIS installer."
 }
 $candidate = Get-Item -LiteralPath $candidatePath
-if (Test-Path -LiteralPath "${candidatePath}.sig" -PathType Leaf) {
-    throw "The unsigned Lab preview unexpectedly has an updater signature."
+$candidateSignaturePath = "${candidatePath}.sig"
+if (-not (Test-Path -LiteralPath $candidateSignaturePath -PathType Leaf)) {
+    throw "The Lab preview build completed without the required updater signature."
 }
 
 New-Item -ItemType Directory -Force -Path $outputRootFull | Out-Null
 Copy-Item -LiteralPath $candidate.FullName -Destination $artifactPath -Force
+Copy-Item -LiteralPath $candidateSignaturePath -Destination $artifactSignaturePath -Force
 $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $artifactPath
 $signature = Get-AuthenticodeSignature -LiteralPath $artifactPath
 
@@ -294,11 +297,17 @@ $receipt = [ordered]@{
             expected = "not-signed"
             observedStatus = [string]$signature.Status
         }
-        tauriUpdaterSignature = "not-issued"
+        tauriUpdaterSignature = [ordered]@{
+            state = "issued"
+            path = $artifactSignaturePath.Replace($repoRoot, "").TrimStart('\', '/').Replace('\', '/')
+            sha256 = Get-FileSha256Lower $artifactSignaturePath
+            keyId = "BA3FDCAF71CE2FF5"
+        }
     }
 }
 $receiptJson = ($receipt | ConvertTo-Json -Depth 8) + "`n"
 $utf8NoBom = New-Object Text.UTF8Encoding($false)
 [IO.File]::WriteAllText($receiptPath, $receiptJson, $utf8NoBom)
-Write-Host "Wrote unsigned Lab preview artifact $artifactPath"
+Write-Host "Wrote Authenticode-unsigned Lab preview artifact $artifactPath"
+Write-Host "Wrote Lab updater signature $artifactSignaturePath"
 Write-Host "Wrote Lab preview receipt $receiptPath"

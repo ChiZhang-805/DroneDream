@@ -268,7 +268,7 @@
       "rustflags": "-C target-feature=+crt-static",
       "additionalConfigTransport": "ordered-repeated-cli-config",
       "preserveBundleHistory": true,
-      "allowUnsignedUpdater": true
+      "allowUnsignedUpdater": false
     }
   },
   "buildGuards": {
@@ -281,18 +281,21 @@
     "forbidRepositoryTargetDirectory": true,
     "forbidReleaseBranchCreation": true,
     "forbidForcePush": true,
-    "forbidSigningSecretRead": true,
+    "forbidSigningSecretPersistence": true,
+    "requireApprovedUpdaterSigner": true,
     "doNotOverwritePublicAssets": true,
     "websiteReceiverReadOnly": true,
     "forbidWebsiteRebuild": true,
     "forbidWebsiteRename": true,
     "requiresStrictPinnedGnullvm": true,
     "forbidMsvcLinkerDependency": true,
-    "requireUnsignedUpdaterSlotEmpty": true
+    "requireUpdaterSignature": true
   },
   "signaturePolicy": {
     "authenticode": "not-signed",
-    "tauriUpdaterSignature": "not-issued",
+    "tauriUpdaterSignature": "required",
+    "updaterKeyId": "BA3FDCAF71CE2FF5",
+    "privateKeyMaterialInSource": false,
     "unsignedInternalPreviewAllowed": true,
     "mustNotClaimSigned": true
   },
@@ -323,9 +326,9 @@
     "No real EXE has been built by this profile.",
     "All Vehicle Packs remain planned or contract-only; zero are validated.",
     "Hardware writes, unlocking, arming, HITL, and flight remain denied by native, backend, and runtime safety gates.",
-    "The canonical parameterized edition-safety fixture donor is not delivered; three test-only allow-precondition tests remain fail-closed on the Lab manifest hash.",
-    "The registered public Lab OAuth client and callback require an externally verifiable approved input receipt before another YELLOW build.",
-    "The preview is unsigned and must not be represented as Authenticode-signed.",
+    "The canonical test-only edition-safety binding and NSIS duplicate-label donors are forward-synced; production zero-pack deny behavior remains unchanged.",
+    "The registered public Lab OAuth client and callback are bound to a controller-confirmed hash receipt without provider access.",
+    "The preview remains Authenticode NotSigned even when the approved updater key produces a Tauri updater signature.",
     "Website remains awaiting-exact-handoff until one clean-source EXE, receipt, manifest, validation boundary, and URL-family inventory are verified.",
     "No release branch may be created from this profile."
   ]

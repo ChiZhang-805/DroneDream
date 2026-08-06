@@ -18,30 +18,33 @@ def inputs() -> dict[str, object]:
     return readiness._load_json(readiness.CONTRACT_PATH)
 
 
-def test_real_source_readiness_is_offline_valid_and_blocked() -> None:
+def test_real_source_readiness_is_offline_valid_and_ready() -> None:
     result = readiness.verify_lab_safety_oauth_readiness()
-    assert result["sourceReady"] is False
+    assert result["sourceReady"] is True
     assert result["releaseReady"] is False
-    assert result["fixture"]["canonicalParameterizationDelivered"] is False
+    assert result["fixture"]["canonicalParameterizationDelivered"] is True
     assert result["fixture"]["reboundContextHashWouldChange"] is True
     assert result["oauth"]["offlineContractValid"] is True
+    assert result["oauth"]["registrationReceiptVerified"] is True
     assert result["oauth"]["providerExecutionEvidenceCollected"] is False
     assert result["oauth"]["actualEnvironmentRead"] is False
-    assert len(result["blockers"]) == 3
+    assert result["blockers"] == []
     assert all(
         item["valueRecordedByThisContract"] is False
         for item in result["yellowBuildInputs"]["publicInputs"]
     )
 
 
-def test_rejects_fixture_match_or_canonical_donor_overstatement() -> None:
+def test_rejects_fixture_match_or_canonical_donor_downgrade() -> None:
     contract = copy.deepcopy(inputs())
-    contract["editionSafetyFixture"]["activeManifestMatchesFixture"] = True
+    contract["editionSafetyFixture"]["rawBaseManifestMatchesActiveLabManifest"] = True
     with pytest.raises(readiness.LabSafetyOauthReadinessError, match="fixture readiness"):
         readiness.validate_contract(contract)
 
     contract = copy.deepcopy(inputs())
-    contract["editionSafetyFixture"]["parameterizedCanonicalDonorState"] = "delivered"
+    contract["editionSafetyFixture"]["parameterizationDonor"]["state"] = (
+        "requested-not-delivered"
+    )
     with pytest.raises(readiness.LabSafetyOauthReadinessError, match="fixture readiness"):
         readiness.validate_contract(contract)
 
@@ -50,6 +53,18 @@ def test_rejects_cross_edition_oauth_or_provider_evidence_claim() -> None:
     contract = copy.deepcopy(inputs())
     contract["oauthSourceContract"]["authClientId"] = "dronedream-desktop-field"
     with pytest.raises(readiness.LabSafetyOauthReadinessError, match="OAuth source"):
+        readiness.validate_contract(contract)
+
+    contract = copy.deepcopy(inputs())
+    contract["oauthSourceContract"]["registrationReceipt"]["clientIdSha256"] = "0" * 64
+    with pytest.raises(readiness.LabSafetyOauthReadinessError, match="OAuth source"):
+        readiness.validate_contract(contract)
+
+
+def test_rejects_nsis_duplicate_label_donor_downgrade() -> None:
+    contract = copy.deepcopy(inputs())
+    contract["nsisDuplicateLabelDonor"]["state"] = "requested-not-delivered"
+    with pytest.raises(readiness.LabSafetyOauthReadinessError, match="NSIS duplicate-label"):
         readiness.validate_contract(contract)
 
     contract = copy.deepcopy(inputs())
@@ -77,6 +92,13 @@ def test_rejects_private_key_or_unregistered_oauth_input_policy() -> None:
     )
     oauth_client["registeredLabCallbackRequired"] = False
     with pytest.raises(readiness.LabSafetyOauthReadinessError, match="OAuth input"):
+        readiness.validate_contract(contract)
+
+    contract = copy.deepcopy(inputs())
+    contract["nextYellowBuildInputs"]["approvedUpdaterSigner"][
+        "productionNamingKeyMayBeUsed"
+    ] = True
+    with pytest.raises(readiness.LabSafetyOauthReadinessError, match="updater signer"):
         readiness.validate_contract(contract)
 
 

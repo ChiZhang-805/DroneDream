@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import copy
 import hashlib
 import json
 from pathlib import Path
@@ -16,6 +15,11 @@ CONTRACT_PATH = ROOT / "distribution/editions/lab/safety-oauth-source-readiness.
 FIXTURE_PATH = ROOT / "distribution/tests/fixtures/edition-safety-cases.v1.json"
 LAB_MANIFEST_PATH = ROOT / "distribution/editions/lab.v1.json"
 AUTH_CONTRACT_PATH = ROOT / "distribution/desktop/edition-browser-auth.v1.json"
+OAUTH_RECEIPT_RELATIVE_PATH = (
+    "distribution/build-receipts/"
+    "lab-oauth-public-registration-1.0.0-fb3afee.controller-confirmed.json"
+)
+OAUTH_RECEIPT_PATH = ROOT / OAUTH_RECEIPT_RELATIVE_PATH
 BUILD_SCRIPT_PATH = ROOT / "desktop/scripts/build-lab-preview.ps1"
 AUTH_CONFIG_VERIFIER_PATH = ROOT / "desktop/scripts/verify-browser-auth-config.mjs"
 
@@ -65,9 +69,14 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     authority = _mapping(contract.get("universalAuthority"), "universalAuthority")
     if (
         authority.get("branch") != "codex/software"
-        or authority.get("verificationSourceCommit") != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
-        or authority.get("verificationSourceTree") != "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d"
-        or authority.get("wholeCommitConsumptionAuthorized") is not False
+        or authority.get("verificationSourceCommit") != "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
+        or authority.get("verificationSourceTree") != "418d165f0ed031458c23f3c54f4f6707b4ca73db"
+        or authority.get("consumedExactPublicDonors")
+        != [
+            "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+            "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+        ]
+        or authority.get("unrelatedCommitConsumptionAuthorized") is not False
     ):
         raise LabSafetyOauthReadinessError("Universal read-only authority drifted")
 
@@ -80,6 +89,7 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     policy = _mapping(request.get("policy"), "fixture policy")
     active_lab_sha = _sha256(LAB_MANIFEST_PATH)
     fixture_edition_sha = str(policy.get("editionManifestSha256"))
+    binding = _mapping(fixture_contract.get("parameterizationDonor"), "parameterizationDonor")
     if (
         fixture_contract.get("sourceCommit") != "b6b3659e112d9bf43b0b01c54dfc32755a12f90c"
         or fixture_contract.get("path")
@@ -90,17 +100,22 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         or fixture_contract.get("fixtureEditionManifestSha256") != fixture_edition_sha
         or _mapping(fixture_contract.get("activeLabManifest"), "activeLabManifest").get("sha256")
         != active_lab_sha
-        or fixture_contract.get("activeManifestMatchesFixture")
+        or fixture_contract.get("rawBaseManifestMatchesActiveLabManifest")
         is not (active_lab_sha == fixture_edition_sha)
-        or fixture_contract.get("parameterizedCanonicalDonorState") != "requested-not-delivered"
-        or fixture_contract.get("inMemoryRewriteCountsAsCanonicalEvidence") is not False
+        or binding.get("commit") != "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
+        or binding.get("parent") != "a11fe7d09fceafaecf102a0cbfba49abb066a557"
+        or binding.get("integrationCommit") != "057fc89f460fedaafcef1fcb5bae141121b755ec"
+        or binding.get("state") != "delivered-exact-donor-forward-synced"
+        or binding.get("testOnly") is not True
+        or fixture_contract.get("boundManifestMatchesActiveLabManifest") is not True
+        or fixture_contract.get("canonicalTestBindingEvidenceReady") is not True
         or fixture_contract.get("mismatchedManifestMustDeny") is not True
         or fixture_contract.get("productionPolicyMayBeRelaxed") is not False
     ):
         raise LabSafetyOauthReadinessError("edition-safety fixture readiness drifted")
     if active_lab_sha == fixture_edition_sha:
         raise LabSafetyOauthReadinessError(
-            "fixture unexpectedly matches Lab without a canonical donor update"
+            "raw fixture unexpectedly matches Lab instead of using the test-only donor binding"
         )
 
     original_context_hash = safety_contract.authorization_context_hash(request)
@@ -110,16 +125,42 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         for receipt in receipts
     ):
         raise LabSafetyOauthReadinessError("fixture context hashes are internally inconsistent")
-    rebound_request = copy.deepcopy(request)
-    _mapping(rebound_request.get("policy"), "rebound fixture policy")["editionManifestSha256"] = (
-        active_lab_sha
+    bound_fixture = safety_contract.bind_test_fixture_to_edition_manifest(
+        fixture,
+        LAB_MANIFEST_PATH,
     )
-    rebound_context_hash = safety_contract.authorization_context_hash(rebound_request)
-    if rebound_context_hash == original_context_hash:
+    bound_request = _mapping(bound_fixture.get("baseRequest"), "bound fixture baseRequest")
+    bound_policy = _mapping(bound_request.get("policy"), "bound fixture policy")
+    bound_context_hash = safety_contract.authorization_context_hash(bound_request)
+    bound_receipts = _sequence(bound_request.get("evidenceReceipts"), "bound evidenceReceipts")
+    if (
+        bound_request.get("editionId") != "lab"
+        or bound_policy.get("editionManifestSha256") != active_lab_sha
+        or not bound_receipts
+        or any(
+            not isinstance(receipt, dict) or receipt.get("contextHash") != bound_context_hash
+            for receipt in bound_receipts
+        )
+    ):
+        raise LabSafetyOauthReadinessError("canonical test-only fixture binding drifted")
+    if bound_context_hash == original_context_hash:
         raise LabSafetyOauthReadinessError("edition fixture rebind did not change context hash")
     dependent_fields = fixture_contract.get("dependentFieldsThatMustBeRefreshed")
     if dependent_fields != ["evidenceReceipts[*].contextHash"]:
         raise LabSafetyOauthReadinessError("fixture dependent hash inventory drifted")
+
+    nsis = _mapping(contract.get("nsisDuplicateLabelDonor"), "nsisDuplicateLabelDonor")
+    if (
+        nsis.get("commit") != "a11fe7d09fceafaecf102a0cbfba49abb066a557"
+        or nsis.get("parent") != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+        or nsis.get("integrationCommit") != "575469366a6ba194397f14ccd42637801422d364"
+        or nsis.get("state") != "delivered-exact-donor-forward-synced"
+        or nsis.get("callSiteLabelPrefixRequired") is not True
+        or nsis.get("nestedShortcutSuffixRequired") is not True
+        or nsis.get("unknownProductMustFailClosed") is not True
+        or nsis.get("repeatedExpansionCompileVerified") is not True
+    ):
+        raise LabSafetyOauthReadinessError("NSIS duplicate-label donor drifted")
 
     oauth = _mapping(contract.get("oauthSourceContract"), "oauthSourceContract")
     auth_contract = _load_json(AUTH_CONTRACT_PATH)
@@ -129,6 +170,12 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     if len(lab_auth) != 1:
         raise LabSafetyOauthReadinessError("Lab OAuth identity is unavailable or ambiguous")
     lab_auth_entry = lab_auth[0]
+    registration = _mapping(oauth.get("registrationReceipt"), "registrationReceipt")
+    receipt = _load_json(OAUTH_RECEIPT_PATH)
+    receipt_registration = _mapping(receipt.get("registration"), "OAuth receipt registration")
+    callback_sha = hashlib.sha256(
+        str(lab_auth_entry.get("redirectUri")).encode("utf-8")
+    ).hexdigest()
     if (
         oauth.get("path") != "distribution/desktop/edition-browser-auth.v1.json"
         or oauth.get("blob") != _git_blob(AUTH_CONTRACT_PATH)
@@ -143,6 +190,18 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         or oauth.get("explicitUserGestureRequired") is not True
         or oauth.get("crossEditionSessionAdoptionAllowed") is not False
         or oauth.get("providerExecutionEvidenceCollected") is not False
+        or registration.get("path")
+        != OAUTH_RECEIPT_RELATIVE_PATH
+        or registration.get("sha256") != _sha256(OAUTH_RECEIPT_PATH)
+        or registration.get("clientIdSha256") != receipt_registration.get("clientIdSha256")
+        or registration.get("callbackSha256") != callback_sha
+        or registration.get("callbackSha256") != receipt_registration.get("callbackSha256")
+        or registration.get("publicClient") is not True
+        or registration.get("tokenEndpointAuthMethod") != "none"
+        or registration.get("clientSecretPresent") is not False
+        or registration.get("providerCalled") is not False
+        or receipt_registration.get("clientIdValueRecorded") is not False
+        or receipt_registration.get("providerCalled") is not False
     ):
         raise LabSafetyOauthReadinessError("Lab OAuth source contract drifted")
 
@@ -164,6 +223,9 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     if (
         by_name["VITE_SUPABASE_PUBLISHABLE_KEY"].get("serviceRoleForbidden") is not True
         or by_name["DRONEDREAM_OAUTH_CLIENT_ID"].get("registeredLabCallbackRequired") is not True
+        or by_name["DRONEDREAM_OAUTH_CLIENT_ID"].get("registrationReceiptVerified") is not True
+        or by_name["DRONEDREAM_OAUTH_CLIENT_ID"].get("valueSha256")
+        != registration.get("clientIdSha256")
         or inputs.get("actualEnvironmentReadByGreenAudit") is not False
         or inputs.get("providerCalledByGreenAudit") is not False
     ):
@@ -187,12 +249,22 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
             "SUPABASE_SERVICE_ROLE_KEY",
             "OPENAI_API_KEY",
             "account-password",
-            "TAURI_SIGNING_PRIVATE_KEY_PATH",
-            "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
+            "production-naming-private-key",
         }
         <= forbidden
     ):
         raise LabSafetyOauthReadinessError("forbidden build input inventory is incomplete")
+    signer = _mapping(inputs.get("approvedUpdaterSigner"), "approvedUpdaterSigner")
+    if (
+        signer.get("keyId") != "BA3FDCAF71CE2FF5"
+        or signer.get("privateKeyPathRecordedByThisContract") is not False
+        or signer.get("privateKeyValueRecordedByThisContract") is not False
+        or signer.get("passwordMode") != "empty"
+        or signer.get("greenAuditMayReadPrivateKey") is not False
+        or signer.get("yellowBuildProcessMayReadApprovedExternalPath") is not True
+        or signer.get("productionNamingKeyMayBeUsed") is not False
+    ):
+        raise LabSafetyOauthReadinessError("approved updater signer boundary drifted")
 
     build_script = BUILD_SCRIPT_PATH.read_text(encoding="utf-8")
     auth_verifier = AUTH_CONFIG_VERIFIER_PATH.read_text(encoding="utf-8")
@@ -215,7 +287,7 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     release_signature = _mapping(signature_gates.get("release"), "release signatures")
     if (
         preview_signature.get("authenticodeState") != "NotSigned"
-        or preview_signature.get("updaterSignatureState") != "not-issued"
+        or preview_signature.get("updaterSignatureState") != "required-for-yellow-attempt"
         or preview_signature.get("allowedOnlyWithExactYellowAuthorization") is not True
         or preview_signature.get("releaseReady") is not False
         or release_signature.get("authenticodeRequired") is not True
@@ -244,13 +316,13 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     readiness = _mapping(contract.get("sourceReadiness"), "sourceReadiness")
     blockers = _sequence(readiness.get("blockers"), "sourceReadiness blockers")
     if (
-        readiness.get("editionSafetyFixtureReady") is not False
+        readiness.get("editionSafetyFixtureReady") is not True
         or readiness.get("oauthOfflineContractReady") is not True
         or readiness.get("installerSourceReady") is not True
-        or readiness.get("yellowBuildSourceReady") is not False
-        or len(blockers) != 3
+        or readiness.get("yellowBuildSourceReady") is not True
+        or blockers
     ):
-        raise LabSafetyOauthReadinessError("YELLOW source readiness is overstated")
+        raise LabSafetyOauthReadinessError("YELLOW source readiness drifted")
 
     safety = _mapping(contract.get("safety"), "safety")
     if (
@@ -262,17 +334,18 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         raise LabSafetyOauthReadinessError("zero-pack safety boundary drifted")
 
     return {
-        "sourceReady": False,
+        "sourceReady": True,
         "releaseReady": False,
         "fixture": {
             "activeLabManifestSha256": active_lab_sha,
             "fixtureEditionManifestSha256": fixture_edition_sha,
-            "canonicalParameterizationDelivered": False,
+            "canonicalParameterizationDelivered": True,
             "reboundContextHashWouldChange": True,
         },
         "oauth": {
             "editionId": "lab",
             "offlineContractValid": True,
+            "registrationReceiptVerified": True,
             "providerExecutionEvidenceCollected": False,
             "actualEnvironmentRead": False,
         },

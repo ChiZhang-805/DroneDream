@@ -250,7 +250,12 @@ def fake_lab_preview_receipt(
                 "expected": "not-signed",
                 "observedStatus": "test-fixture:not-built",
             },
-            "tauriUpdaterSignature": "not-issued",
+            "tauriUpdaterSignature": {
+                "state": "issued",
+                "path": "artifacts/test-fixtures/not-built/DroneDream-Lab-1.0.0.exe.sig",
+                "sha256": "e" * 64,
+                "keyId": "BA3FDCAF71CE2FF5",
+            },
         },
     }
 
@@ -446,10 +451,22 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
         or not SHA256_RE.fullmatch(artifact["sha256"])
         or not isinstance(artifact["bytes"], int)
         or artifact["bytes"] < 0
-        or artifact["tauriUpdaterSignature"] != "not-issued"
     ):
         raise LabPreviewArtifactError("artifact identity or signature state drifted")
     _safe_relative(artifact["path"], "artifact.path")
+    updater_signature = _exact_keys(
+        artifact["tauriUpdaterSignature"],
+        {"state", "path", "sha256", "keyId"},
+        "artifact.tauriUpdaterSignature",
+    )
+    if (
+        updater_signature["state"] != "issued"
+        or updater_signature["keyId"] != "BA3FDCAF71CE2FF5"
+        or not isinstance(updater_signature["sha256"], str)
+        or not SHA256_RE.fullmatch(updater_signature["sha256"])
+    ):
+        raise LabPreviewArtifactError("updater signature identity drifted")
+    _safe_relative(updater_signature["path"], "artifact.tauriUpdaterSignature.path")
     authenticode = _exact_keys(
         artifact["authenticode"], {"expected", "observedStatus"}, "artifact.authenticode"
     )
@@ -461,6 +478,11 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
             raise LabPreviewArtifactError("artifact file is missing")
         if path.stat().st_size != artifact["bytes"] or _sha256_file(path) != artifact["sha256"]:
             raise LabPreviewArtifactError("artifact file bytes do not match the receipt")
+        signature_path = ROOT / updater_signature["path"]
+        if not signature_path.is_file():
+            raise LabPreviewArtifactError("updater signature file is missing")
+        if _sha256_file(signature_path) != updater_signature["sha256"]:
+            raise LabPreviewArtifactError("updater signature bytes do not match the receipt")
     return document
 
 

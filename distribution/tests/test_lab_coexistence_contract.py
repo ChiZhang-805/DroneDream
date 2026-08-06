@@ -42,7 +42,7 @@ class LabCoexistenceContractTests(unittest.TestCase):
             result["labIdentity"]["installerProductName"],
             "DroneDream-Lab",
         )
-        self.assertEqual(result["universalDonorRequestCount"], 6)
+        self.assertEqual(result["universalDonorRequestCount"], 7)
         contract = coexistence._load_json(coexistence.CONTRACT_PATH)
         self.assertEqual(
             contract["brandContinuity"]["dotLockupState"],
@@ -143,7 +143,7 @@ class LabCoexistenceContractTests(unittest.TestCase):
         with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "runtime-mode bytes"):
             coexistence.validate_contract(*inputs)
 
-    def test_rejects_safety_fixture_delivery_or_failure_count_overstatement(self) -> None:
+    def test_rejects_safety_fixture_donor_downgrade_or_result_drift(self) -> None:
         inputs = list(load_inputs())
         donor = copy.deepcopy(inputs[1])
         safety_request = next(
@@ -151,9 +151,9 @@ class LabCoexistenceContractTests(unittest.TestCase):
             for item in donor["requests"]
             if item["requestId"] == "universal-edition-safety-fixture-binding-v1"
         )
-        safety_request["state"] = "delivered-exact-donor-forward-synced"
+        safety_request["state"] = "requested-not-delivered"
         inputs[1] = donor
-        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "fixture blocker"):
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "fixture donor"):
             coexistence.validate_contract(*inputs)
 
         inputs = list(load_inputs())
@@ -163,9 +163,22 @@ class LabCoexistenceContractTests(unittest.TestCase):
             for item in donor["requests"]
             if item["requestId"] == "universal-edition-safety-fixture-binding-v1"
         )
-        safety_request["evidence"]["failedTestsRequireTestOnlyAllowPrecondition"] = 2
+        safety_request["evidence"]["labSafetyAndCoexistenceTestResult"] = "60-passed"
         inputs[1] = donor
-        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "fixture blocker"):
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "fixture donor"):
+            coexistence.validate_contract(*inputs)
+
+    def test_rejects_nsis_duplicate_label_donor_downgrade(self) -> None:
+        inputs = list(load_inputs())
+        donor = copy.deepcopy(inputs[1])
+        nsis_request = next(
+            item
+            for item in donor["requests"]
+            if item["requestId"] == "universal-nsis-duplicate-label-v1"
+        )
+        nsis_request["state"] = "requested-not-delivered"
+        inputs[1] = donor
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "duplicate-label"):
             coexistence.validate_contract(*inputs)
 
     def test_rejects_silent_cross_edition_auth_or_frontend_identity(self) -> None:

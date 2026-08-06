@@ -81,6 +81,9 @@ class LabPreviewContractTests(unittest.TestCase):
                 profile["commonCore"]["productSourceCommit"]
             ),
         )
+        self.assertEqual(profile["signaturePolicy"]["authenticode"], "not-signed")
+        self.assertEqual(profile["signaturePolicy"]["tauriUpdaterSignature"], "required")
+        self.assertEqual(profile["signaturePolicy"]["updaterKeyId"], "BA3FDCAF71CE2FF5")
 
     def test_lab_build_separates_internal_product_and_unicode_display_names(self) -> None:
         script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(
@@ -96,6 +99,10 @@ class LabPreviewContractTests(unittest.TestCase):
             script,
         )
         self.assertIn("displayName = $tauriDisplayName", script)
+        self.assertLess(
+            script.index("if (-not $Build)"),
+            script.index("Test-Path -LiteralPath $env:TAURI_SIGNING_PRIVATE_KEY_PATH"),
+        )
         self.assertNotIn('"DroneDream · LAB"', script)
 
     def test_lab_build_writes_python_compatible_receipt_bytes(self) -> None:
@@ -156,6 +163,12 @@ class LabPreviewContractTests(unittest.TestCase):
         receipt = lab_artifact.fake_lab_preview_receipt()
         receipt["brand"]["grantsHardwareAuthority"] = True
         with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "visual brand"):
+            lab_artifact.validate_receipt(receipt)
+
+    def test_lab_artifact_receipt_rejects_updater_signature_identity_drift(self) -> None:
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["artifact"]["tauriUpdaterSignature"]["keyId"] = "PRODUCTION-NAMING-KEY"
+        with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "updater signature"):
             lab_artifact.validate_receipt(receipt)
 
     def test_lab_artifact_receipt_rejects_brand_asset_drift(self) -> None:
@@ -311,18 +324,18 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertIn("Only a fake test fixture receipt was supplied.", result["blockers"])
         self.assertTrue(all(value is False for value in result["sideEffects"].values()))
 
-    def test_lab_yellow_readiness_audit_is_read_only_and_source_blocked(self) -> None:
+    def test_lab_yellow_readiness_audit_is_read_only_and_requestable(self) -> None:
         result = lab_readiness.evaluate_readiness(
             require_clean=False,
             toolchain_state=fake_gnullvm_toolchain(),
         )
         self.assertEqual(result["kind"], "dronedream-lab-yellow-readiness-audit")
-        self.assertFalse(result["yellowBuildRequest"]["requestable"])
+        self.assertTrue(result["yellowBuildRequest"]["requestable"])
         self.assertEqual(
             result["yellowBuildRequest"]["requestBlockers"],
             result["safetyAndOAuthSourceReadiness"]["blockers"],
         )
-        self.assertFalse(result["safetyAndOAuthSourceReadiness"]["sourceReady"])
+        self.assertTrue(result["safetyAndOAuthSourceReadiness"]["sourceReady"])
         self.assertFalse(
             result["safetyAndOAuthSourceReadiness"]["oauth"][
                 "providerExecutionEvidenceCollected"

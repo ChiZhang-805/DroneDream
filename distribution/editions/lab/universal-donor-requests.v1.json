@@ -278,27 +278,75 @@
       ]
     },
     {
+      "requestId": "universal-nsis-duplicate-label-v1",
+      "ownership": "Universal/Core",
+      "state": "delivered-exact-donor-forward-synced",
+      "exactDonor": {
+        "commit": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+        "parent": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+        "integrationCommit": "575469366a6ba194397f14ccd42637801422d364",
+        "changedPaths": [
+          "desktop/scripts/verify-edition-identity-nsis.ps1",
+          "desktop/scripts/verify-nsis-template.ps1",
+          "desktop/src-tauri/nsis/edition-identity.nsh",
+          "desktop/src-tauri/nsis/installer.nsi",
+          "distribution/tests/test_desktop_edition_coexistence.py"
+        ]
+      },
+      "evidence": {
+        "rootCause": "nested desktop shortcut macro reused the outer desktop completion label",
+        "fix": "call-site label prefixes with nested shortcut suffixes",
+        "labRepeatedExpansionCompile": "passed",
+        "allEditionFixtureCompile": "passed",
+        "unknownProductDecision": "deny",
+        "temporaryOutputsRetained": false
+      },
+      "candidatePaths": [
+        "desktop/scripts/verify-edition-identity-nsis.ps1",
+        "desktop/scripts/verify-nsis-template.ps1",
+        "desktop/src-tauri/nsis/edition-identity.nsh",
+        "desktop/src-tauri/nsis/installer.nsi",
+        "distribution/tests/test_desktop_edition_coexistence.py"
+      ],
+      "acceptance": [
+        "Keep every generated NSIS label unique when Start Menu and desktop shortcut macros expand repeatedly.",
+        "Keep unknown product names fail-closed and preserve Lab product identity.",
+        "Do not treat the temporary makensis fixture as a Lab EXE build or installer lifecycle run."
+      ]
+    },
+    {
       "requestId": "universal-edition-safety-fixture-binding-v1",
       "ownership": "Universal/Core",
-      "state": "requested-not-delivered",
+      "state": "delivered-exact-donor-forward-synced",
+      "exactDonor": {
+        "commit": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+        "parent": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+        "integrationCommit": "057fc89f460fedaafcef1fcb5bae141121b755ec",
+        "changedPaths": [
+          "distribution/tools/edition_safety_contract.py",
+          "distribution/tests/test_edition_safety_contract.py",
+          "backend/tests/test_distribution_safety.py",
+          "runtime/tests/test_edition_safety_gate.py"
+        ]
+      },
       "evidence": {
-        "verifiedAtUniversalSource": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+        "verifiedAtUniversalSource": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
         "sharedFixtureBlob": "06731ea2b9ab214e947345473ff0ffcdb95fffa5",
         "sharedFixtureSha256": "9eb9117441f930c8f8240306bc52b3b5001f3e85cc4cf33ebaa790aff547171f",
         "universalFixtureEditionManifestSha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356",
         "labEditionManifestSha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67",
-        "backendRuntimeSafetyTestResult": "23-passed-3-failed",
-        "failedTestsRequireTestOnlyAllowPrecondition": 3,
-        "failureReason": "backend/runtime edition manifest hash mismatch prevents the test-only allow precondition",
-        "nonAllowAndNegativeSubset": "23-passed-3-deselected",
+        "labSafetyAndCoexistenceTestResult": "61-passed",
+        "testOnlyAllowPreconditionsPassed": true,
+        "activeManifestMismatchNegativeDecision": "deny",
         "readinessContract": "distribution/editions/lab/safety-oauth-source-readiness.v1.json",
         "productionDecision": "deny",
         "zeroValidatedPackBoundaryPreserved": true
       },
       "candidatePaths": [
-        "distribution/tests/fixtures/edition-safety-cases.v1.json",
-        "runtime/tests/test_edition_safety_gate.py",
-        "backend/tests/test_distribution_safety.py"
+        "distribution/tools/edition_safety_contract.py",
+        "distribution/tests/test_edition_safety_contract.py",
+        "backend/tests/test_distribution_safety.py",
+        "runtime/tests/test_edition_safety_gate.py"
       ],
       "acceptance": [
         "Parameterize the test-only allow fixture with the exact active Edition manifest hash and refresh every dependent context hash.",
@@ -308,7 +356,7 @@
     }
   ],
   "labRecovery": {
-    "nextStep": "obtain the edition-safety fixture donor and collect separately authorized auth/updater/lifecycle execution evidence before requesting a new gated Lab build",
+    "nextStep": "freeze the exact clean Lab product source, pass the serialized resource gate, and execute only the separately authorized single YELLOW build attempt",
     "rebuildAuthorizedByThisRequest": false,
     "installAuthorizedByThisRequest": false,
     "frozenArtifactMayBecomeFinalWithoutRebuild": false

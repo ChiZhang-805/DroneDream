@@ -6,9 +6,13 @@
   "auditMode": "green-offline-only",
   "universalAuthority": {
     "branch": "codex/software",
-    "verificationSourceCommit": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
-    "verificationSourceTree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d",
-    "wholeCommitConsumptionAuthorized": false
+    "verificationSourceCommit": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+    "verificationSourceTree": "418d165f0ed031458c23f3c54f4f6707b4ca73db",
+    "consumedExactPublicDonors": [
+      "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+      "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
+    ],
+    "unrelatedCommitConsumptionAuthorized": false
   },
   "editionSafetyFixture": {
     "sourceCommit": "b6b3659e112d9bf43b0b01c54dfc32755a12f90c",
@@ -21,9 +25,16 @@
       "path": "distribution/editions/lab.v1.json",
       "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
     },
-    "activeManifestMatchesFixture": false,
-    "parameterizedCanonicalDonorState": "requested-not-delivered",
-    "inMemoryRewriteCountsAsCanonicalEvidence": false,
+    "rawBaseManifestMatchesActiveLabManifest": false,
+    "parameterizationDonor": {
+      "commit": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+      "parent": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+      "integrationCommit": "057fc89f460fedaafcef1fcb5bae141121b755ec",
+      "state": "delivered-exact-donor-forward-synced",
+      "testOnly": true
+    },
+    "boundManifestMatchesActiveLabManifest": true,
+    "canonicalTestBindingEvidenceReady": true,
     "requiredParameterization": [
       "editionId",
       "editionManifestSha256"
@@ -33,6 +44,16 @@
     ],
     "mismatchedManifestMustDeny": true,
     "productionPolicyMayBeRelaxed": false
+  },
+  "nsisDuplicateLabelDonor": {
+    "commit": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+    "parent": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "integrationCommit": "575469366a6ba194397f14ccd42637801422d364",
+    "state": "delivered-exact-donor-forward-synced",
+    "callSiteLabelPrefixRequired": true,
+    "nestedShortcutSuffixRequired": true,
+    "unknownProductMustFailClosed": true,
+    "repeatedExpansionCompileVerified": true
   },
   "oauthSourceContract": {
     "path": "distribution/desktop/edition-browser-auth.v1.json",
@@ -47,7 +68,17 @@
     "pkceMethod": "S256",
     "explicitUserGestureRequired": true,
     "crossEditionSessionAdoptionAllowed": false,
-    "providerExecutionEvidenceCollected": false
+    "providerExecutionEvidenceCollected": false,
+    "registrationReceipt": {
+      "path": "distribution/build-receipts/lab-oauth-public-registration-1.0.0-fb3afee.controller-confirmed.json",
+      "sha256": "f8c12308c577399a1d73e4e4cec0a6bdae0c504aaa0745f4266641bedaf3194e",
+      "clientIdSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+      "callbackSha256": "89b7f8cded951255ec63f1dbd1676f769242f258559752c57318f97f266038cb",
+      "publicClient": true,
+      "tokenEndpointAuthMethod": "none",
+      "clientSecretPresent": false,
+      "providerCalled": false
+    }
   },
   "nextYellowBuildInputs": {
     "exactCleanProductSourceRequired": true,
@@ -71,6 +102,8 @@
         "classification": "public-oauth-client-id",
         "approvedValueSourceRequired": true,
         "registeredLabCallbackRequired": true,
+        "registrationReceiptVerified": true,
+        "valueSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
         "valueRecordedByThisContract": false
       }
     ],
@@ -88,16 +121,24 @@
       "SUPABASE_SERVICE_ROLE_KEY",
       "OPENAI_API_KEY",
       "account-password",
-      "TAURI_SIGNING_PRIVATE_KEY_PATH",
-      "TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+      "production-naming-private-key"
     ],
+    "approvedUpdaterSigner": {
+      "keyId": "BA3FDCAF71CE2FF5",
+      "privateKeyPathRecordedByThisContract": false,
+      "privateKeyValueRecordedByThisContract": false,
+      "passwordMode": "empty",
+      "greenAuditMayReadPrivateKey": false,
+      "yellowBuildProcessMayReadApprovedExternalPath": true,
+      "productionNamingKeyMayBeUsed": false
+    },
     "actualEnvironmentReadByGreenAudit": false,
     "providerCalledByGreenAudit": false
   },
   "signatureGates": {
     "unsignedInternalPreview": {
       "authenticodeState": "NotSigned",
-      "updaterSignatureState": "not-issued",
+      "updaterSignatureState": "required-for-yellow-attempt",
       "allowedOnlyWithExactYellowAuthorization": true,
       "releaseReady": false
     },
@@ -121,15 +162,11 @@
     "website-exact-four-file-handoff"
   ],
   "sourceReadiness": {
-    "editionSafetyFixtureReady": false,
+    "editionSafetyFixtureReady": true,
     "oauthOfflineContractReady": true,
     "installerSourceReady": true,
-    "yellowBuildSourceReady": false,
-    "blockers": [
-      "canonical parameterized edition-safety fixture donor is not delivered",
-      "registered public Lab OAuth client and callback have no offline-verifiable external registration receipt",
-      "a new exact clean Lab product source and single-attempt YELLOW authorization are not frozen"
-    ]
+    "yellowBuildSourceReady": true,
+    "blockers": []
   },
   "safety": {
     "validatedVehiclePackCount": 0,

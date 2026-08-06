@@ -157,7 +157,17 @@
             "observedStatus": {"type": "string", "minLength": 1, "maxLength": 128}
           }
         },
-        "tauriUpdaterSignature": {"const": "not-issued"}
+        "tauriUpdaterSignature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state", "path", "sha256", "keyId"],
+          "properties": {
+            "state": {"const": "issued"},
+            "path": {"$ref": "#/$defs/safePath"},
+            "sha256": {"$ref": "#/$defs/sha256"},
+            "keyId": {"const": "BA3FDCAF71CE2FF5"}
+          }
+        }
       }
     }
   },

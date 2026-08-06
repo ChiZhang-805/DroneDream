@@ -261,10 +261,10 @@
     "requiredAuthorityLayers": ["native", "backend", "runtime"]
   },
   "crossEditionBlockers": [
-    "The exact Universal existing-install/quiesce donor b099ed0 and installer identity donor 8a8ad6c are forward-synced, but rebuilt Lab bytes and same-version /UPDATE acceptance remain gated.",
+    "The exact Universal existing-install/quiesce, installer identity, and duplicate-label donors are forward-synced, but rebuilt Lab bytes and same-version /UPDATE acceptance remain gated.",
     "The exact large LAB suffix brand donor b8e0d0c is forward-synced, but the frozen Lab EXE predates it and future release bytes require a new gated build.",
     "The exact auth, credential-vault, Runtime diagnostics, and updater donors are forward-synced, but provider, signed-updater, and four-Edition lifecycle execution receipts are not collected.",
-    "Universal edition-safety allow-fixture tests pin the Universal Lab manifest hash and need a canonical parameterized fixture before the branded Lab manifest can pass the test-only allow path.",
+    "The exact Universal edition-safety fixture donor is forward-synced and passes the test-only allow plus active-manifest mismatch deny paths; zero validated packs still deny production hardware actions.",
     "The frozen Lab EXE predates this contract and remains an exact unsigned non-release artifact."
   ],
   "contractReady": true,

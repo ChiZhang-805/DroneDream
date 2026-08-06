@@ -282,7 +282,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         or environment.get("additionalConfigTransport")
         != "ordered-repeated-cli-config"
         or environment.get("preserveBundleHistory") is not True
-        or environment.get("allowUnsignedUpdater") is not True
+        or environment.get("allowUnsignedUpdater") is not False
     ):
         raise LabPreviewContractError("Lab pinned gnullvm toolchain policy drifted")
     expected_llvm_tools = {
@@ -329,20 +329,23 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "forbidRepositoryTargetDirectory",
         "forbidReleaseBranchCreation",
         "forbidForcePush",
-        "forbidSigningSecretRead",
+        "forbidSigningSecretPersistence",
+        "requireApprovedUpdaterSigner",
         "doNotOverwritePublicAssets",
         "websiteReceiverReadOnly",
         "forbidWebsiteRebuild",
         "forbidWebsiteRename",
         "requiresStrictPinnedGnullvm",
         "forbidMsvcLinkerDependency",
-        "requireUnsignedUpdaterSlotEmpty",
+        "requireUpdaterSignature",
     ):
         if guards.get(key) is not True:
             raise LabPreviewContractError(f"Lab preview guard is not enforced: {key}")
     if (
         signature.get("authenticode") != "not-signed"
-        or signature.get("tauriUpdaterSignature") != "not-issued"
+        or signature.get("tauriUpdaterSignature") != "required"
+        or signature.get("updaterKeyId") != "BA3FDCAF71CE2FF5"
+        or signature.get("privateKeyMaterialInSource") is not False
         or signature.get("mustNotClaimSigned") is not True
     ):
         raise LabPreviewContractError("Lab preview signature policy overstates signing")
@@ -421,17 +424,17 @@ def verify_lab_preview_contract() -> dict[str, object]:
         '$excludedPreviewEvidenceCommit = "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"',
         'merge-base --is-ancestor $commonCoreCommit HEAD',
         'TAURI_SIGNING_PRIVATE_KEY_PATH',
-        'TAURI_SIGNING_PRIVATE_KEY_PASSWORD',
         'DroneDream\\codex-cache\\lab-cargo-target',
         'desktop\\src-tauri\\target',
         'Lab preview contract verified',
-        'Pass -Build to create the unsigned internal preview',
+        'Pass -Build to create the updater-signed, Authenticode-unsigned internal preview',
         'commonCoreCommit = $commonCoreCommit',
         'kind = "dronedream-lab-preview-artifact-receipt"',
         'uiSwitchCountsAsAuthority = $false',
         'hardwareActionDecision = "deny"',
         'authenticode',
-        'tauriUpdaterSignature = "not-issued"',
+        'state = "issued"',
+        'keyId = "BA3FDCAF71CE2FF5"',
         'VITE_DRONEDREAM_EDITION = "lab"',
         'DRONEDREAM_DESKTOP_EDITION_ID = "lab"',
         'DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"',
@@ -455,10 +458,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
         '-CargoTargetDir $cargoTargetFull',
         '-LlvmRoot $gnullvm.llvmRoot',
         '-EditionId lab',
-        '-AllowUnsignedUpdater',
         '-PreserveBundleHistory',
         'x86_64-pc-windows-gnullvm\\release\\bundle\\nsis',
-        'unexpectedly has an updater signature',
+        'completed without the required updater signature',
     )
     for fragment in required_script_fragments:
         if fragment not in script:
