@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-build-profile",
+  "profileVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "artifactFileName": "DroneDream-Universal-1.0.0.exe",
+  "tauriConfigOverlay": "desktop/src-tauri/tauri.universal.conf.json",
+  "enginePackProfile": "unified-sim-lab",
+  "enginePackProfileMeaning": "backward-compatible Runtime profile identifier for the full Universal payload",
+  "enginePackPayloadContract": {
+    "contractId": "dronedream-universal-engine-payload/v1",
+    "requiredEditionIds": ["sim", "lab", "field"],
+    "requiredVehiclePackRegistry": "distribution/vehicle-packs/registry.v1.json",
+    "requiredSafetyPolicy": "distribution/safety/edition-execution-gate.v1.json",
+    "forbiddenPathPrefixes": [
+      "distribution/build-planning",
+      "distribution/build-plans",
+      "distribution/tests"
+    ],
+    "profileIdIsCompatibilityIdentity": true,
+    "uiModeNeverGrantsCapability": true
+  },
+  "brand": {
+    "editionId": "universal",
+    "displayName": "DroneDream",
+    "manifest": "brand/brand-editions.v1.json",
+    "windowsIcon": "brand/generated/universal/windows/icon.ico",
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "workspaceModes": ["universal", "sim", "lab", "field"],
+  "capabilityAuthority": {
+    "frontendCanAuthorize": false,
+    "requiredDecisionLayers": ["native", "backend", "runtime"],
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecision": "deny"
+  },
+  "build": {
+    "sharedScript": "desktop/scripts/build-windows-llvm.ps1",
+    "wrapperScript": "desktop/scripts/build-universal-installer.ps1",
+    "targetTriple": "x86_64-pc-windows-gnullvm",
+    "cargoTargetMustBeOutsideRepository": true,
+    "updaterSignatureRequired": true,
+    "authenticodeRequiredForInternalTest": false,
+    "exactCleanSourceRequired": true,
+    "buildCountPerAuthorization": 1
+  },
+  "websiteHandoff": {
+    "contract": "distribution/universal/release/website-exact-exe-handoff.v1.json",
+    "recipientBranch": "codex/website",
+    "receiverMayRebuild": false,
+    "receiverMayRename": false,
+    "publishedFiles": [
+      "DroneDream-Universal-1.0.0.exe",
+      "DroneDream-Universal-1.0.0.exe.sha256",
+      "DroneDream-Universal-1.0.0.exe.sig",
+      "DroneDream-Universal-1.0.0.exe.receipt.json"
+    ]
+  },
+  "lifecycle": {
+    "freshInstall": "requires isolated RED validation before releaseReady",
+    "upgrade": "requires isolated RED validation without replacing the user's current install",
+    "uninstall": "must preserve separately owned Runtime and user data",
+    "shortcut": "must use the canonical Universal icon",
+    "webView2": "embedded bootstrapper and post-install health check required",
+    "locales": ["en", "zh-CN"]
+  }
+}

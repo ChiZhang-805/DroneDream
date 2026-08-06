@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-website-exact-exe-handoff-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "universal",
+  "state": "awaiting-exact-build-and-lifecycle-handoff",
+  "recipient": {
+    "branch": "codex/website",
+    "productSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
+    "evidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
+    "evidenceCommitIsProductSource": false,
+    "behavior": "read-only-receive-no-rebuild-no-rename"
+  },
+  "artifactIdentity": {
+    "fileName": "DroneDream-Universal-1.0.0.exe",
+    "version": "1.0.0",
+    "editionDisplayName": "DroneDream",
+    "previewSubstitutionAllowed": false,
+    "crossEditionSubstitutionAllowed": false
+  },
+  "publishedFiles": [
+    "DroneDream-Universal-1.0.0.exe",
+    "DroneDream-Universal-1.0.0.exe.sha256",
+    "DroneDream-Universal-1.0.0.exe.sig",
+    "DroneDream-Universal-1.0.0.exe.receipt.json"
+  ],
+  "requiredHandoffFields": [
+    "exactCleanProductSourceCommit",
+    "absoluteExePath",
+    "fileName",
+    "version",
+    "bytes",
+    "sha256Lowercase",
+    "authenticodeState",
+    "updaterSigPath",
+    "updaterSigSha256",
+    "receiptPath",
+    "receiptSha256",
+    "manifestPath",
+    "manifestSha256",
+    "buildCount",
+    "freshInstallBoundary",
+    "overlayBoundary",
+    "uninstallBoundary",
+    "shortcutBoundary",
+    "webView2Boundary",
+    "localeBoundary",
+    "releaseReady"
+  ],
+  "consistency": {
+    "sameEditionRequired": true,
+    "sameUrlFamilyRequired": true,
+    "uniqueShaUrlTagRequired": true,
+    "sourceAndEvidenceMustRemainSeparate": true,
+    "updaterSignatureRequired": true,
+    "authenticodeMayBeNotSignedForInternalTest": true
+  }
+}
