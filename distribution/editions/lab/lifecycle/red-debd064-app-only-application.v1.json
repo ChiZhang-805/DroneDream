@@ -3,7 +3,7 @@
   "kind": "dronedream-lab-red-app-only-lifecycle-application",
   "applicationVersion": "1.0.0",
   "editionId": "lab",
-  "state": "prepared-not-executed",
+  "state": "segment-a-prepared-segment-b-blocked-not-executed",
   "sourceSeparation": {
     "artifactProductSourceCommit": "debd0647c5883ffe5c9c52037d35a6b567d9fd62",
     "artifactProductSourceTree": "fa28c390a33835f30d1d7bf88e2b36e68df7f340",
@@ -50,6 +50,16 @@
     "browserAuthBlobAtProductSource": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
     "coexistenceBlobAtProductSource": "20f3028c7b8b7a3be897b39305c38e464967a5e9",
     "editionManifestBlobAtProductSource": "6b6667901a10647e9bde3f3f3cc1640c2ac43262"
+  },
+  "executionTools": {
+    "runner": {
+      "path": "distribution/editions/lab/lifecycle/run-lab-app-only-lifecycle.ps1",
+      "lfNormalizedSha256": "a1d1cf959e78f56685642aa58c07d95619fa5b09c29150d20606692fd25fa031"
+    },
+    "liveWebView2Inspector": {
+      "path": "distribution/editions/lab/lifecycle/inspect-lab-live-webview2.mjs",
+      "lfNormalizedSha256": "0f178cc203434123cf150cedd960237099c462c6568a154df46886ef99ff24da"
+    }
   },
   "identity": {
     "internalProductName": "DroneDream-Lab",
@@ -118,32 +128,58 @@
     "runtimeMutationAllowed": false,
     "otherEditionDeletionAllowed": false
   },
-  "executionSequence": [
-    "revalidate-exact-artifact-and-fresh-preconditions",
-    "snapshot-protected-state",
-    "fresh-silent-current-user-install-once",
-    "verify-install-registration-shortcuts-icon-and-webview2-parity",
-    "launch-once-and-verify-en-zh-sidebar-launcher-and-hardware-deny",
-    "close-owned-lab-processes",
-    "same-version-silent-update-overlay-once",
-    "verify-overlay-registration-shortcuts-and-owned-files",
-    "launch-once-and-verify-lab-oauth-entry-boundary",
-    "close-owned-lab-processes",
-    "uninstall-once",
-    "verify-owned-residue-policy-and-protected-state-parity"
-  ],
-  "exactCounts": {
-    "freshInstallerInvocations": 1,
-    "overlayInstallerInvocations": 1,
-    "applicationLaunches": 2,
-    "uninstallerInvocations": 1,
-    "oauthBoundaryChecks": 1,
-    "realTokenExchanges": 0,
-    "artifactBuilds": 0,
-    "runtimeStarts": 0,
-    "px4Starts": 0,
-    "gazeboStarts": 0,
-    "hardwareActions": 0
+  "segments": {
+    "a": {
+      "name": "owned-app-only-lifecycle",
+      "state": "prepared-under-existing-four-edition-red-authorization",
+      "browserLaunchAllowed": false,
+      "oauthAllowed": false,
+      "accountOrTokenAccessAllowed": false,
+      "sequence": [
+        "revalidate-exact-artifact-and-fresh-preconditions",
+        "snapshot-protected-state",
+        "fresh-silent-current-user-install-once",
+        "verify-install-registration-shortcuts-icon-and-webview2-parity",
+        "launch-once-with-local-webview2-debug-inspection",
+        "verify-en-zh-sidebar-launcher-hardware-deny-and-zero-auth-network",
+        "close-owned-lab-processes",
+        "same-version-silent-update-overlay-once",
+        "verify-overlay-registration-shortcuts-and-owned-files",
+        "launch-once-with-local-webview2-debug-inspection",
+        "verify-language-persistence-and-zero-auth-network",
+        "close-owned-lab-processes",
+        "uninstall-once",
+        "verify-owned-residue-policy-and-protected-state-parity"
+      ],
+      "exactCounts": {
+        "freshInstallerInvocations": 1,
+        "overlayInstallerInvocations": 1,
+        "applicationLaunches": 2,
+        "uninstallerInvocations": 1,
+        "liveWebView2Inspections": 2,
+        "languageTransitions": 2,
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "accountReads": 0,
+        "tokenReadsOrExchanges": 0,
+        "artifactBuilds": 0,
+        "runtimeStarts": 0,
+        "px4Starts": 0,
+        "gazeboStarts": 0,
+        "hardwareActions": 0
+      }
+    },
+    "b": {
+      "name": "real-independent-oauth-boundary",
+      "state": "fail-closed-not-authorized-for-execution",
+      "blocksSegmentA": false,
+      "exactCountsBeforeSeparateAuthorization": {
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "accountReads": 0,
+        "tokenReadsOrExchanges": 0
+      }
+    }
   },
   "oauthBoundary": {
     "clientIdSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
@@ -181,10 +217,13 @@
     "fourEditionRedIsolationAuthorizationRecorded": true,
     "thisApplicationAuthorizesArtifactRebuild": false,
     "thisApplicationAuthorizesProviderCredentialUse": false,
-    "executionDecision": "deny-before-mutation",
-    "executionBlockers": [
+    "segmentAExecutionDecision": "authorized-after-exact-pre-execution-report-and-revalidation",
+    "segmentAExecutionBlockers": [],
+    "segmentBExecutionDecision": "deny-before-real-auth-boundary",
+    "segmentBExecutionBlockers": [
       "disposable-browser-or-provider-boundary-not-proven"
-    ]
+    ],
+    "segmentBMayBlockSegmentA": false
   },
   "nonClaims": {
     "installerExecuted": false,
