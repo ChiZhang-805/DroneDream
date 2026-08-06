@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-universal-donor-provenance-correction",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "green-path-exact",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "6986be42450a79804294a785a6756fcf84affcbc",
+    "statusAtVerification": "clean",
+    "changedPaths": [
+      "distribution/editions/lab/coexistence-and-auth.v1.json",
+      "distribution/editions/lab/universal-donor-requests.v1.json",
+      "distribution/tests/test_lab_coexistence_contract.py",
+      "distribution/tools/verify_lab_coexistence_contract.py"
+    ]
+  },
+  "universalVerificationSource": {
+    "branch": "codex/software",
+    "commit": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "tree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d",
+    "branchUpstreamExactAtHandoff": true,
+    "cleanAtHandoff": true,
+    "wholeCommitConsumedByLab": false
+  },
+  "authSinglePathDonor": {
+    "sourceCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+    "wholeCommitConsumptionForbidden": true,
+    "path": "distribution/desktop/edition-browser-auth.v1.json",
+    "blob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+    "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+    "identityBindingContractSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
+    "labPathExactAtVerificationSource": true,
+    "additionalProductCodeChangeRequired": false
+  },
+  "runtimeModeAtomicDonor": {
+    "sourceCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
+    "atomicPathCount": 3,
+    "paths": [
+      {
+        "path": "desktop/scripts/verify-nsis-template.ps1",
+        "blob": "0e1d94e8de358057cfd0d95bcc0ae332f8d71cf1",
+        "sha256": "d23770d685b3ac41679857e37d3c5e127929ad14b5eef5fc80de139f4dc83432",
+        "labPathExactAtVerificationSource": true
+      },
+      {
+        "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
+        "blob": "9af1787fa8607e725c4495fa14a5763de781a5a3",
+        "sha256": "daa73c6e7f6ea4e4cc05fda1c8602ef358d5e42e7daabf711d357144c600cbfa",
+        "labPathExactAtVerificationSource": true
+      },
+      {
+        "path": "desktop/src-tauri/src/installer_handoff.rs",
+        "blob": "d6ed51beb4730264c835d0b77f10cd14ee448b89",
+        "sha256": "cee0a2cd6bbf889ed07951cfc640e52cb70dee91239237b77c5cec897e2e1663",
+        "labPathExactAtVerificationSource": true
+      }
+    ],
+    "additionalProductCodeChangeRequired": false
+  },
+  "historicalProvenance": {
+    "supersededObservationReceipt": {
+      "path": "distribution/build-receipts/lab-universal-auth-runtime-updater-sync-1.0.0-68db6bc.green.json",
+      "sha256": "e24e49bbf581e2af865cd548c45cb76e3a5b9e6eb0b68b15e4a68adcf4e5a159",
+      "deletedOrRewritten": false
+    },
+    "previousRuntimeUpdaterProductSource": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "previousRuntimeUpdaterEvidenceOnlyHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+    "historicalExecutionSourceRetagged": false,
+    "correction": "The auth identity binding and runtime-mode atomic donor are already canonical in Universal 6f25 and Lab; no Lab-to-Universal backflow is required."
+  },
+  "labBinding": {
+    "editionId": "lab",
+    "displayName": "DroneDream · LAB",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "runtimeProfile": "unified-sim-lab",
+    "authNamespace": "DroneDream/Auth/lab/v1",
+    "updaterNamespace": "desktop-lab-channel/latest-lab.json",
+    "identityOrProfileChangedByCorrection": false
+  },
+  "verification": {
+    "pythonTests": 79,
+    "pythonResult": "passed",
+    "negativeCoverage": [
+      "auth canonical blob drift",
+      "runtime-mode atomic path SHA drift",
+      "cross-edition auth adoption",
+      "cross-edition updater channel",
+      "zero-validated-pack backend deny",
+      "zero-validated-pack runtime deny"
+    ],
+    "nsisTemplateGate": "passed-pinned-tauri-2.11.4-static-only",
+    "desktopReleaseVersionGate": "passed-1.0.0",
+    "universalTargetPathDiffCount": 0,
+    "tauriInvoked": false,
+    "nsisInvoked": false,
+    "installerInvoked": false,
+    "runtimeMigrated": false,
+    "providerInvoked": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "frontendOrBrandCountsAsAuthority": false
+  },
+  "resolvedBlockers": [
+    "Auth coexistence SHA backflow is not required; canonical Universal bytes already match Lab.",
+    "runtime-mode.nsh is not missing; all three b099 runtime-mode paths are present and exact."
+  ],
+  "remainingGates": [
+    "Receive the canonical parameterized edition-safety allow-fixture donor without weakening production deny behavior.",
+    "Provision and validate the registered public Lab OAuth client and hosted callback under a separately authorized provider boundary.",
+    "Request a new exact-clean-source YELLOW Lab build; this correction did not build or relabel an EXE.",
+    "Collect fresh install, overlay, uninstall, shortcut, EN/ZH, WebView2, rollback, updater signature, and four-Edition isolation evidence.",
+    "Validate at least one Vehicle Pack before any hardware write, arm, HITL, or flight can leave deny."
+  ],
+  "sideEffects": {
+    "exeBuilt": false,
+    "installerRun": false,
+    "runtimeMigration": false,
+    "providerReadOrWrite": false,
+    "apiKeyRead": false,
+    "hardwareAccess": false,
+    "releaseBranchCreated": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "releaseReady": false
+}
