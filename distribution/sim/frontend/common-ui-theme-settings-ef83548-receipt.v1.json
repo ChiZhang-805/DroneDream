@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-common-ui-theme-settings-receipt",
+  "editionId": "sim",
+  "sourceSeparation": {
+    "productSourceCommit": "ef8354893b230154204db937df5255d4ede62a0e",
+    "productSourceTree": "5f89a4a4555feb1423e1c9741f02a8e967da960e",
+    "commonUiProductDonorCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "commonUiEvidenceCommit": "2434488bbcc02a8859670edf2f9413f38d17e73a",
+    "evidenceCommitUsedAsProductSource": false
+  },
+  "donorReceipt": {
+    "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json",
+    "sha256": "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4"
+  },
+  "simEdgeAcceptance": {
+    "browser": "Microsoft Edge (Playwright msedge channel)",
+    "scope": "settings-only",
+    "sourceDirty": false,
+    "receiptPath": "frontend/node_modules/.cache/software-ui-layout/ef83548-sim-theme/software-ui-layout-receipt.json",
+    "receiptSha256": "9f502531036fdc067fd750a19be52302ac1b6ab48f79ee49b0f7f3455cca5849",
+    "completedCases": 6,
+    "expectedCases": 6,
+    "locales": [
+      "en",
+      "zh-CN"
+    ],
+    "settingsViewports": [
+      "1440x900",
+      "760x900",
+      "390x700"
+    ],
+    "screenshotCount": 12,
+    "pageErrorCount": 0,
+    "dialogClientHeightEqualsScrollHeight": true,
+    "panelClientHeightEqualsScrollHeight": true,
+    "keyboardFocusOrderVerified": true
+  },
+  "themeBinding": {
+    "fixedEdition": "sim",
+    "modeSwitchExposed": false,
+    "gradient": [
+      "#00D9FF",
+      "#2671FF",
+      "#744CFF"
+    ],
+    "settingsUsesCanonicalSimLockup": true,
+    "droneLaunchSceneUsesEditionTheme": true,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "simAuthority": {
+    "simulationOnly": true,
+    "px4SitlAndGazeboOnly": true,
+    "hardwareDiscoverWriteArmFlightAllowed": false,
+    "hitlAllowed": false,
+    "labOrFieldModeAllowed": false,
+    "validatedPackCount": 0
+  },
+  "execution": {
+    "productionBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "exeArtifactsCreated": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "deployments": 0,
+    "releaseReady": false
+  }
+}

@@ -4,7 +4,7 @@
   "applicationVersion": "1.0.0",
   "editionId": "sim",
   "executionClass": "YELLOW",
-  "state": "green-readiness-frozen-held-for-pending-theme-donor",
+  "state": "superseded-by-common-ui-theme-product-source",
   "sourceSeparation": {
     "productSourceCommit": "b51fcd41d69b9019dee6cf23c39d4a5f7e6a5b47",
     "productSourceTree": "a19d8af943f66cc2a34107a05fa395a1a02aa467",
@@ -125,11 +125,15 @@
   },
   "pendingProductGate": {
     "kind": "universal-settings-edition-theme-and-3d-donor",
-    "exactDonorReceived": false,
+    "exactDonorReceived": true,
+    "receivedProductDonorCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "replacementProductSourceCommit": "ef8354893b230154204db937df5255d4ede62a0e",
+    "replacementUiReceiptPath": "distribution/sim/frontend/common-ui-theme-settings-ef83548-receipt.v1.json",
     "willChangeFinalProductSource": true,
     "currentSourceMayBeUsedForExeBuild": false,
     "yellowRequestSubmissionAllowed": false,
-    "replacementApplicationRequiredAfterDonorSync": true
+    "replacementApplicationRequiredAfterDonorSync": true,
+    "thisApplicationSuperseded": true
   },
   "authorization": {
     "applicationPreparationAuthorized": true,

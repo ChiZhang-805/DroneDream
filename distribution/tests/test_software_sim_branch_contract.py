@@ -106,7 +106,12 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(
             application["authorization"]["yellowBuildRequestSubmitted"]
         )
-        self.assertFalse(application["pendingProductGate"]["exactDonorReceived"])
+        self.assertTrue(application["pendingProductGate"]["exactDonorReceived"])
+        self.assertTrue(application["pendingProductGate"]["thisApplicationSuperseded"])
+        self.assertEqual(
+            application["state"],
+            "superseded-by-common-ui-theme-product-source",
+        )
         self.assertFalse(
             application["pendingProductGate"]["currentSourceMayBeUsedForExeBuild"]
         )
