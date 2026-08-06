@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-owned-isolation-lifecycle-application",
+  "applicationId": "field-owned-isolation-560f574-attempt-2",
+  "editionId": "field",
+  "status": "prepared-awaiting-exact-red-start-signal",
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "560f574a95c8b51bbf34711bfd092d77fd3e166e",
+    "productTree": "0e4535535b7ee339faeaa704069a46bcfe1c350d",
+    "productRoot": "C:\\Users\\zju20\\ddf560f574",
+    "toolSourceCommit": "7586d971176e0e6ecae096aa9a545f8749503819",
+    "evidenceHeadAtPreparation": "7586d971176e0e6ecae096aa9a545f8749503819",
+    "evidenceCommitIsProductSource": false
+  },
+  "artifact": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": 11534069,
+    "sha256": "8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f",
+    "authenticodeState": "NotSigned",
+    "peCertificatePresent": false,
+    "updaterSignaturePath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+    "updaterSignatureBytes": 428,
+    "updaterSignatureSha256": "11b5ceec3172fbe91c4e342a1a1aa1211a207bef11ef3d3a4697cac621bd5314"
+  },
+  "staticAudit": {
+    "receiptPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-postbuild-audit-560f574-exact-artifact-v1\\audit-receipt.json",
+    "receiptBytes": 8904,
+    "receiptSha256": "2447677521529871e671053159515a898743d6ee82775f09e030fd5674252ceb",
+    "decision": "pass-static-audit-lifecycle-still-required",
+    "auditCount": 1,
+    "retryCount": 0,
+    "staticAuditComplete": true
+  },
+  "predecessor": {
+    "applicationId": "field-owned-isolation-560f574-attempt-1",
+    "receiptPath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-1\\lifecycle-receipt.json",
+    "receiptBytes": 36298,
+    "receiptSha256": "3f3c5072016e73e16262da70f1558c29ca37eaf6bac6ec45a6521edec754a2e1",
+    "result": "failed-frozen-no-retry",
+    "retryAllowed": false,
+    "readOnly": true,
+    "diagnosisPath": "distribution/editions/field/lifecycle/attempt1-visible-installer-observer-diagnosis.v1.json",
+    "diagnosisBytes": 4123,
+    "diagnosisSha256": "19d8d3ecf25ef2685fa4453d3e6e8e8a1f0cc7383876015e11bbae4bbeadac9b"
+  },
+  "plan": {
+    "path": "distribution/editions/field/lifecycle/owned-isolation-560f574-attempt2-plan.v1.json",
+    "bytes": 6401,
+    "fileSha256": "a0e5db22a2be38704bf4d2a4cbad7dac7875cbb8d723492d86eb252fe2a85f2f"
+  },
+  "ownedPaths": {
+    "runRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-2",
+    "runRootMustBeAbsentAtStart": true,
+    "temporaryRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-2\\temp",
+    "installRoot": "%LOCALAPPDATA%\\DroneDream-Field",
+    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+    "preferenceKey": "HKCU\\Software\\DroneDream\\DroneDream-Field",
+    "roamingData": "%APPDATA%\\io.dronedream.desktop.field",
+    "localData": "%LOCALAPPDATA%\\io.dronedream.desktop.field",
+    "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk",
+    "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk"
+  },
+  "toolBindings": [
+    {
+      "id": "runner",
+      "path": "distribution/editions/field/lifecycle/run-field-owned-isolation-lifecycle.ps1",
+      "relativeToLifecycleDirectory": "run-field-owned-isolation-lifecycle.ps1",
+      "sourceCommit": "7586d971176e0e6ecae096aa9a545f8749503819",
+      "gitBlob": "a0264548c05658c39ef6d0780236b1c0afb4fafb",
+      "lfNormalizedBytes": 22531,
+      "lfNormalizedSha256": "efaec0224f48e10f2f5cc15c43bb57fb86c3b567297504c0bbc2483234b58daa"
+    },
+    {
+      "id": "installerLanguageInspector",
+      "path": "distribution/editions/field/lifecycle/inspect-field-owned-installer-language.ps1",
+      "relativeToLifecycleDirectory": "inspect-field-owned-installer-language.ps1",
+      "sourceCommit": "7586d971176e0e6ecae096aa9a545f8749503819",
+      "gitBlob": "e1276fd4f04f1bb11e7d3c03e58e9ed7e22abec5",
+      "lfNormalizedBytes": 15731,
+      "lfNormalizedSha256": "8d40f1206115b60c8dc61d876ce99ac6ec2f55548789e38f98485785eb3e0d4e"
+    },
+    {
+      "id": "webView2Inspector",
+      "path": "distribution/editions/field/lifecycle/inspect-field-owned-webview2.mjs",
+      "relativeToLifecycleDirectory": "inspect-field-owned-webview2.mjs",
+      "sourceCommit": "7586d971176e0e6ecae096aa9a545f8749503819",
+      "gitBlob": "1903cb485422764646cf2cdbf3c3521ee8cc88d2",
+      "lfNormalizedBytes": 8233,
+      "lfNormalizedSha256": "72d7faed6d0cf77780329a7a16ff6b037199255511525d96a915ca8097ab529e"
+    }
+  ],
+  "observerContract": {
+    "genericLanguageSelectorTitle": "Installer Language",
+    "genericLanguageSelectorMayOmitProductIdentity": true,
+    "sameInstallerPidAfterSelectionRequired": true,
+    "singleVisibleOwnedWindowRequired": true,
+    "canonicalDisplayName": "DroneDream · FIELD",
+    "canonicalInstallRoot": "%LOCALAPPDATA%\\DroneDream-Field",
+    "maximumNonInstallNextInvocationsPerProbe": 2,
+    "installActionAllowedDuringProbe": false,
+    "failureAccessibilitySnapshotRequired": true
+  },
+  "protectedState": {
+    "simPreferenceKey": {
+      "path": "HKCU\\Software\\DroneDream\\DroneDream-Sim",
+      "preparationStableJsonSha256": "bf75c75edf429cfbf5f7aebd453768d9d6b36db82c0a0ba597b0146dbad426d5",
+      "beforeMustMatchPreparation": true,
+      "afterMustMatchBefore": true
+    },
+    "otherEditionMutationAllowed": false,
+    "runtimeMutationAllowed": false,
+    "webView2MutationAllowed": false
+  },
+  "execution": {
+    "applicationOrdinal": 2,
+    "lifecycleAttemptOrdinal": 2,
+    "lifecycleCountMaximum": 1,
+    "retryCountMaximum": 0,
+    "currentMessageAuthorizesExecution": false,
+    "requiresNewExactRedStartSignal": true,
+    "failureDecision": "freeze-failed-no-retry",
+    "exactCounts": {
+      "visibleInstallerLanguageProbes": 2,
+      "freshInstallerInvocations": 1,
+      "overlayInstallerInvocations": 1,
+      "applicationLaunches": 2,
+      "shortcutLaunches": 1,
+      "liveWebView2Inspections": 2,
+      "settingsViewportInspections": 4,
+      "languageTransitions": 2,
+      "uninstallerInvocations": 1,
+      "ownedPreferenceCleanupAttempts": 1,
+      "ownedPreferenceCleanupInvocations": 1,
+      "browserLaunches": 0,
+      "oauthTransactions": 0,
+      "accountOrTokenReads": 0,
+      "artifactBuildsOrSigning": 0,
+      "runtimeStartsOrMigrations": 0,
+      "simulatorStarts": 0,
+      "deviceOrHardwareActions": 0
+    }
+  },
+  "exactCommand": {
+    "powershell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "template": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\run-field-owned-isolation-lifecycle.ps1 -Application C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\owned-isolation-560f574-attempt2-application.v1.json -ExpectedApplicationSha256 <FROZEN_APPLICATION_FILE_SHA256> -Plan C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\owned-isolation-560f574-attempt2-plan.v1.json -ExpectedPlanSha256 a0e5db22a2be38704bf4d2a4cbad7dac7875cbb8d723492d86eb252fe2a85f2f -ExpectedEvidenceHead <EXACT_EVIDENCE_HEAD_FROM_RED_START_SIGNAL> -Execute",
+    "planOnlySuffix": "replace -Execute with -PlanOnly",
+    "commandWithoutNewExactRedStartSignalAllowed": false
+  },
+  "prohibitions": {
+    "browserOAuthProviderNetwork": true,
+    "accountToken": true,
+    "buildResignRelabel": true,
+    "runtimeWsl": true,
+    "px4GazeboSitlHitl": true,
+    "deviceHardware": true,
+    "deployUploadReleaseBranch": true
+  },
+  "nonClaims": {
+    "attempt2Executed": false,
+    "lifecyclePassed": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "websiteHandoffAllowed": false
+  }
+}
