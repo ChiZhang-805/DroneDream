@@ -442,29 +442,39 @@ _ENTRIES = (
     BenchmarkMethodInventoryEntryV1(
         adapter_id="hebo/v1",
         method_classification="standard_reference",
-        implementation_label="hebo-reference-adapter-pending",
+        implementation_label="hebo-0.3.6-sequential-scalar-contract",
         execution_readiness="blocked",
         environment_boundary="isolated_benchmark",
         sources=(
             BenchmarkMethodSourceV1(
-                source_id="huawei-noah-hebo",
-                source_kind="upstream_repository",
-                locator="https://github.com/huawei-noah/HEBO",
-                dependency_name="hebo",
-                license_status="unverified",
+                source_id="hebo-0.3.6-wheel",
+                source_kind="python_package",
+                locator=(
+                    "https://files.pythonhosted.org/packages/46/21/"
+                    "62d5e593b2b38cc1d2f148e89ad072fe973a3584492eab2d0c47c7b8c8e8/"
+                    "HEBO-0.3.6-py3-none-any.whl"
+                ),
+                version_candidate="0.3.6",
+                dependency_name="HEBO",
+                distribution_filename="HEBO-0.3.6-py3-none-any.whl",
+                distribution_sha256=(
+                    "f3d46a106205eac5340822e5ad1aeb389109ea302dfe35f17d24e69c7c1d0665"
+                ),
+                license_status="verified",
+                license_spdx="MIT",
+                license_locator="https://pypi.org/project/HEBO/0.3.6/",
             ),
         ),
         blocker_codes=(
             "adapter_not_implemented",
             "compatibility_unverified",
             "isolated_environment_missing",
-            "license_unverified",
-            "source_archive_hash_pending",
-            "version_unresolved",
         ),
         reproducibility_notes=(
-            "The repository root does not establish a verified license for the HEBO subtree.",
-            "Mixed-domain, constraint, Python, and NumPy compatibility remain unresolved.",
+            "The exact PyPI wheel contains HEBO-0.3.6.dist-info/LICENSE under MIT.",
+            "HEBO 0.3.6 requires numpy<1.25 and pymoo==0.6.0 in an isolated environment.",
+            "Core HEBO has no native constraint model; only real feasible losses may be observed.",
+            "Unsafe and failed work stays in accounting and never receives a fabricated loss.",
         ),
     ),
     _ready_project(

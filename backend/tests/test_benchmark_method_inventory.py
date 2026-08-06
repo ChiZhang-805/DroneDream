@@ -66,6 +66,7 @@ def test_only_reviewed_project_adapters_are_execution_ready(adapter_id: str) -> 
         ("optuna_tpe/v1", "4.9.0", "MIT"),
         ("reference_turbo/v1", "0.17.0", "MIT"),
         ("reference_scbo/v1", "0.17.0", "MIT"),
+        ("hebo/v1", "0.3.6", "MIT"),
     ),
 )
 def test_external_references_are_pinned_candidates_but_fail_closed_until_locked(
@@ -82,6 +83,7 @@ def test_external_references_are_pinned_candidates_but_fail_closed_until_locked(
         "optuna_tpe/v1",
         "reference_turbo/v1",
         "reference_scbo/v1",
+        "hebo/v1",
     }:
         assert "source_archive_hash_pending" not in entry.blocker_codes
         package_sources = [
@@ -95,14 +97,18 @@ def test_external_references_are_pinned_candidates_but_fail_closed_until_locked(
         require_execution_ready_method(adapter_id)
 
 
-def test_hebo_cannot_execute_while_root_license_and_compatibility_are_unverified() -> None:
+def test_hebo_cannot_execute_until_isolated_compatibility_and_adapter_are_verified() -> None:
     entry = BENCHMARK_METHOD_INVENTORY["hebo/v1"]
     assert entry.execution_readiness == "blocked"
-    assert "license_unverified" in entry.blocker_codes
+    assert "adapter_not_implemented" in entry.blocker_codes
     assert "compatibility_unverified" in entry.blocker_codes
-    assert "version_unresolved" in entry.blocker_codes
-    assert entry.sources[0].license_status == "unverified"
-    assert entry.sources[0].license_spdx is None
+    assert "isolated_environment_missing" in entry.blocker_codes
+    assert "license_unverified" not in entry.blocker_codes
+    assert "version_unresolved" not in entry.blocker_codes
+    assert "source_archive_hash_pending" not in entry.blocker_codes
+    assert entry.sources[0].license_status == "verified"
+    assert entry.sources[0].license_spdx == "MIT"
+    assert entry.sources[0].distribution_sha256
 
 
 def test_reference_and_product_inspired_turbo_bipop_are_distinct_methods() -> None:
