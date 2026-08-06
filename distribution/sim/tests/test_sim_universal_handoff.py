@@ -89,6 +89,22 @@ class SimUniversalHandoffTests(unittest.TestCase):
         with self.assertRaisesRegex(SimUniversalHandoffError, "overlay location"):
             validate_handoff(receipt, ROOT)
 
+    def test_frontend_dist_missing_build_inheritance_overclaim_is_rejected(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["frontendDistResolution"][
+            "overlayWithoutBuildInheritsCanonicalFrontendDist"
+        ] = False
+        with self.assertRaisesRegex(SimUniversalHandoffError, "missing-build"):
+            validate_handoff(receipt, ROOT)
+
+    def test_universal_failure_evidence_cannot_be_consumed(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["frontendDistResolution"][
+            "failureEvidenceConsumed"
+        ] = True
+        with self.assertRaisesRegex(SimUniversalHandoffError, "failure evidence"):
+            validate_handoff(receipt, ROOT)
+
     def test_lifecycle_preference_residue_path_drift_is_rejected(self) -> None:
         receipt = load_receipt()
         receipt["corrections"]["lifecyclePreferenceResidue"]["simConsumedPaths"][0][

@@ -16,7 +16,8 @@ AUTH_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 RUNTIME_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 NSIS_IDENTITY_FIX_COMMIT = "a11fe7d09fceafaecf102a0cbfba49abb066a557"
 RELEASE_BUILD_DRIVER_COMMIT = "f2858e3d2e39f493baab28368b77230e45dd199f"
-FRONTEND_DIST_RESOLUTION_COMMIT = "d80f5f99309668d9d1cd50be51371efaa3c5491d"
+FRONTEND_DIST_RESOLUTION_BASELINE_COMMIT = "d80f5f99309668d9d1cd50be51371efaa3c5491d"
+FRONTEND_DIST_RESOLUTION_COMMIT = "bb14c47a43795180cc80305eaf87665a54b9b8e5"
 LIFECYCLE_PREFERENCE_RESIDUE_COMMIT = "8215a2206ec5e1192792410aaaf2a438f6b6127f"
 COMMON_UI_THEME_SETTINGS_COMMIT = "4933e214a57a048099d8f0bdd11c9748b620ac3e"
 BRAND_PRODUCT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
@@ -497,17 +498,18 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "frontendDist resolution source drifted",
     )
     _require(
-        frontend_dist.get("parentCommit") == RELEASE_BUILD_DRIVER_COMMIT,
-        "frontendDist resolution parent drifted",
+        frontend_dist.get("previousResolutionCommit")
+        == FRONTEND_DIST_RESOLUTION_BASELINE_COMMIT,
+        "frontendDist resolution baseline drifted",
     )
     expected_frontend_dist_rows = {
         "desktop/scripts/release-build-driver.psm1": (
-            "81b41137febb7a4ef8bdf86b97360b88f0904873",
-            "c176773d35a789d54570620bc109364aa8ecf5004b41e6a5abdc149da839df57",
+            "5195887fae97016693466d7f75e466ca4a5e77e2",
+            "9c8dfc3c1a9ea584ea27cab53c23c4ca0b05911e6409b87b01d05297a309fc14",
         ),
         "distribution/tests/test_shared_windows_build_contract.py": (
-            "8f19fe61ae00c8d2358527fee87237da0a227bd7",
-            "db6ca9f8459980c50bec870f91b72417c44e2aa85031f51c37a6a349a97cc957",
+            "c310edc643ef04c6aca41b503a467620ff30d9a0",
+            "f4012d5530b72185dbe51bf779dc250d2f18183058f87451e7349eb67855102d",
         ),
     }
     frontend_dist_rows = frontend_dist.get("paths", [])
@@ -551,6 +553,18 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "frontendDist overlay location overclaim",
     )
     _require(
+        frontend_dist.get("overlayWithoutBuildInheritsCanonicalFrontendDist") is True,
+        "frontendDist missing-build inheritance drifted",
+    )
+    _require(
+        frontend_dist.get("explicitBuildFrontendDistFailsClosed") is True,
+        "frontendDist explicit-build fail-closed drifted",
+    )
+    _require(
+        frontend_dist.get("failureEvidenceConsumed") is False,
+        "Universal failure evidence was consumed",
+    )
+    _require(
         frontend_dist.get("absolutePathsRestrictedToEditionOutputs") is True,
         "frontendDist absolute path restriction drifted",
     )
@@ -570,7 +584,8 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "lifecycle preference residue source drifted",
     )
     _require(
-        lifecycle_preference.get("parentCommit") == FRONTEND_DIST_RESOLUTION_COMMIT,
+        lifecycle_preference.get("parentCommit")
+        == FRONTEND_DIST_RESOLUTION_BASELINE_COMMIT,
         "lifecycle preference residue parent drifted",
     )
     expected_lifecycle_preference_rows = {

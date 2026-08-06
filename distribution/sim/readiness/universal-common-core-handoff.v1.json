@@ -28,7 +28,7 @@
     "nsisIdentityFixCommit": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
     "lifecycleRegistrationVerifierCommit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
     "releaseBuildDriverCommit": "f2858e3d2e39f493baab28368b77230e45dd199f",
-    "frontendDistResolutionCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+    "frontendDistResolutionCommit": "bb14c47a43795180cc80305eaf87665a54b9b8e5",
     "lifecyclePreferenceResidueCommit": "8215a2206ec5e1192792410aaaf2a438f6b6127f",
     "commonUiThemeSettingsProductCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
     "commonUiThemeSettingsEvidenceCommit": "2434488bbcc02a8859670edf2f9413f38d17e73a",
@@ -169,22 +169,26 @@
       "buildAuthorized": false
     },
     "frontendDistResolution": {
-      "sourceCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
-      "parentCommit": "f2858e3d2e39f493baab28368b77230e45dd199f",
+      "sourceCommit": "bb14c47a43795180cc80305eaf87665a54b9b8e5",
+      "previousResolutionCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+      "releaseBuildDriverBaseCommit": "f2858e3d2e39f493baab28368b77230e45dd199f",
       "paths": [
         {
           "path": "desktop/scripts/release-build-driver.psm1",
-          "blob": "81b41137febb7a4ef8bdf86b97360b88f0904873",
-          "objectSha256": "c176773d35a789d54570620bc109364aa8ecf5004b41e6a5abdc149da839df57"
+          "blob": "5195887fae97016693466d7f75e466ca4a5e77e2",
+          "objectSha256": "9c8dfc3c1a9ea584ea27cab53c23c4ca0b05911e6409b87b01d05297a309fc14"
         },
         {
           "path": "distribution/tests/test_shared_windows_build_contract.py",
-          "blob": "8f19fe61ae00c8d2358527fee87237da0a227bd7",
-          "objectSha256": "db6ca9f8459980c50bec870f91b72417c44e2aa85031f51c37a6a349a97cc957"
+          "blob": "c310edc643ef04c6aca41b503a467620ff30d9a0",
+          "objectSha256": "f4012d5530b72185dbe51bf779dc250d2f18183058f87451e7349eb67855102d"
         }
       ],
       "canonicalConfigPath": "desktop/src-tauri/tauri.conf.json",
       "overlayLocationChangesResolution": false,
+      "overlayWithoutBuildInheritsCanonicalFrontendDist": true,
+      "explicitBuildFrontendDistFailsClosed": true,
+      "failureEvidenceConsumed": false,
       "absolutePathsRestrictedToEditionOutputs": true,
       "unknownEditionFailsClosed": true,
       "buildAuthorized": false

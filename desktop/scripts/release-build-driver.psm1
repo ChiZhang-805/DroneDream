@@ -88,7 +88,9 @@ function Resolve-EditionGeneratedFrontendContract {
             -LiteralPath $additionalConfigFull `
             -Raw `
             -Encoding UTF8 | ConvertFrom-Json
-        if ($additionalConfig.build -and
+        $additionalHasBuild = $additionalConfig.PSObject.Properties.Name -ccontains "build"
+        if ($additionalHasBuild -and
+            $additionalConfig.build -and
             $additionalConfig.build.PSObject.Properties.Name -ccontains "frontendDist") {
             $effectiveBuildConfig = $additionalConfig.build
         }
