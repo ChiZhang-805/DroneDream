@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-engine-pack-sync-receipt",
+  "editionId": "field",
+  "productSource": {
+    "branch": "codex/software-field",
+    "commit": "26dd3c141f86bc9cc538336bc3cb6a8155cc88e7",
+    "tree": "1cce23c72274e40cf2c5ce39b7cb4644a04d9d90",
+    "cleanAtReceiptInput": true
+  },
+  "commonCore": {
+    "branch": "codex/software",
+    "commit": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "tree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d"
+  },
+  "provenance": {
+    "sourceCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+    "sourceSubject": "fix(release): bind Universal desktop contracts",
+    "syncMethod": "three-way-reviewed-path-limited-exact-byte-sync",
+    "wholeCommitConsumed": false,
+    "universalReleasePathsConsumed": false
+  },
+  "paths": [
+    {
+      "path": "desktop/src-tauri/build.rs",
+      "gitBlob": "164ab861cfa72f50bbea6b80820bea3f6f62df24",
+      "sha256": "cb6df99581e8aab3d08d79dcc75f4ebb386e6178f7687f4633298c85f2e5e8a6",
+      "role": "desktop-edition-profile-and-auth-build-binding"
+    },
+    {
+      "path": "engine-pack/tests/test_engine_pack.py",
+      "gitBlob": "571cb30da9c19dcda872341f50544e514e753bf3",
+      "sha256": "34664986f6236a4d9388187ef1012734bb6f6d7a3ea29e12ee2a632ef4f0064c",
+      "role": "default-profile-retention-and-edition-exclusion-tests"
+    },
+    {
+      "path": "engine-pack/tools/engine_pack.py",
+      "gitBlob": "6262ca88df1c5fb4dbde74c3f281714440e7fbcd",
+      "sha256": "21ae883bee775369bc4b057138f702bb4bf677d7040d1c053c1e61d10051cb31",
+      "role": "unified-only-desktop-contract-retention"
+    }
+  ],
+  "desktopContractDependencies": [
+    {
+      "path": "distribution/desktop/edition-browser-auth.v1.json",
+      "gitBlob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+      "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345"
+    },
+    {
+      "path": "distribution/desktop/edition-coexistence.v1.json",
+      "gitBlob": "20f3028c7b8b7a3be897b39305c38e464967a5e9",
+      "sha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a"
+    },
+    {
+      "path": "distribution/desktop/edition-runtime-update-families.v1.json",
+      "gitBlob": "35f1e64575d521ba342a1415f0054adf57ddc349",
+      "sha256": "79f421b8ec81a746b7b7ae4df7702d18d3df08e76e89ccbf9e6937e22306ce32"
+    }
+  ],
+  "acceptance": {
+    "backflowGroupCount": 3,
+    "backflowPathDriftCount": 0,
+    "commonCoreBackflowPending": false,
+    "protectedEvidenceDriftCount": 0,
+    "fieldSpecificPathsRemainFieldOwned": true
+  },
+  "fieldPayload": {
+    "runtimeProfileId": "field-lightweight",
+    "observedPathCount": 212,
+    "unifiedDesktopContractPathCount": 0,
+    "simulatorPathCount": 0,
+    "includesLargeSimulator": false
+  },
+  "tests": [
+    {"suite": "engine-pack-and-profile-contracts", "passed": 30, "subtestsPassed": 4},
+    {"suite": "field-contracts", "passed": 103, "subtestsPassed": 9},
+    {"suite": "ruff-scoped", "passed": 1},
+    {"suite": "field-lightweight-static-inventory", "passed": 1},
+    {"suite": "release-source-policy", "passed": 1},
+    {"suite": "nsis-template-static", "passed": 1},
+    {"suite": "zero-validated-pack-build-denial", "passed": 1}
+  ],
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "threeLayerQuorum": "missing",
+    "buildPerformed": false,
+    "installPerformed": false,
+    "runtimeMigrationPerformed": false,
+    "providerUsed": false,
+    "deviceTouched": false,
+    "hardwareActionsAllowed": false,
+    "simulationAllowed": false,
+    "releaseBranchCreated": false,
+    "deploymentPerformed": false
+  },
+  "releaseState": {
+    "previewReady": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "supersededPreviewMayBePromoted": false,
+    "nextGate": "request one YELLOW build authorization for product source 26dd3c141f86bc9cc538336bc3cb6a8155cc88e7"
+  }
+}

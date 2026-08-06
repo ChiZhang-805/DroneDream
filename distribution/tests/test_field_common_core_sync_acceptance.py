@@ -135,7 +135,7 @@ class FieldCommonCoreSyncAcceptanceTests(unittest.TestCase):
 
     def test_current_universal_product_source_is_accepted(self) -> None:
         request = acceptance.build_repository_acceptance_request(
-            universal_commit="a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+            universal_commit="6f25bb5051794842a8dfc6d02d199c5f93afce7c",
             universal_common_core_hash=(
                 "79f421b8ec81a746b7b7ae4df7702d18d3df08e76e89ccbf9e6937e22306ce32"
             ),
@@ -149,7 +149,7 @@ class FieldCommonCoreSyncAcceptanceTests(unittest.TestCase):
         self.assertFalse(receipt["commonCoreBackflowPending"])
         self.assertEqual(
             receipt["source"]["universalCommit"],
-            "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+            "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
         )
         self.assertNotIn("field.common-core-backflow.pending", receipt["blockers"])
         self.assertFalse(receipt["buildAllowed"])
