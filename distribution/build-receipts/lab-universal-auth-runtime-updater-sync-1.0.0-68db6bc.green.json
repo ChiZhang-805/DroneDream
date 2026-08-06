@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-universal-auth-runtime-updater-sync",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "green-source-synced",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "68db6bc6b4a1b6bf1e118a85d188107ad47beb6c",
+    "statusAtVerification": "clean",
+    "commonCoreHistoricalExecutionSourceRetagged": false
+  },
+  "universalAuthority": {
+    "branch": "codex/software",
+    "latestProductSource": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "evidenceOnlyHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+    "evidenceOnlyHeadIsProductSource": false,
+    "evidenceReceiptSha256": "a2a42830b5a235345784e8eb7054c174fea88085b9f1aa4ce8ba5ecb491b3567"
+  },
+  "donorIntegrations": [
+    {
+      "universalCommit": "6355aad351370178a7171b504a5d2f235fb12ceb",
+      "labCommit": "10c912c79807da63ea7d5e4c4a493b0f72721136",
+      "role": "browser-auth-contract"
+    },
+    {
+      "universalCommit": "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
+      "labCommit": "9d88fbb709089111987bfe30110b6b16acd8b09f",
+      "role": "supabase-oauth-binding-prerequisite"
+    },
+    {
+      "universalCommit": "2f1dbc5fef092ae4cf58366e1178684672ae26c2",
+      "labCommit": "1b7059c2de68f78d121fbb73f0af999b6062db6c",
+      "role": "native-and-frontend-oauth-pkce"
+    },
+    {
+      "universalCommit": "bed637c726462e1a38b74eba46915543d007869d",
+      "labCommit": "50352b4f881241d48db16c74c0449a2e2d5fe5c4",
+      "role": "edition-credential-vault"
+    },
+    {
+      "universalCommit": "4c779b7ca316c0953f94f7ef3f4f850881ef2d58",
+      "labCommit": "d372144ddf2a8de9a2537b8ae0ac5e02d7f59325",
+      "role": "redacted-native-auth-audit"
+    },
+    {
+      "universalCommit": "4ea7fd1dfe3a69d90ada1a37a82dd888cba48430",
+      "labCommit": "f40c740d96da10c08c0ecfeea32fe0cc076fd4a7",
+      "role": "runtime-update-family-registry"
+    },
+    {
+      "universalCommit": "8a0828c258782fa77506ee32c7c016e5b18ad292",
+      "labCommit": "b48937205865b303525eea81ca8edb59af5f79aa",
+      "role": "runtime-owner-and-edition-diagnostics"
+    },
+    {
+      "universalCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+      "labCommit": "d93f7426b31609c70b736d8699bb440d79841968",
+      "role": "edition-updater-release-family"
+    }
+  ],
+  "sharedPathAudit": {
+    "donorPathCount": 38,
+    "exactAtUniversalProductSourceCount": 37,
+    "portablePatchCount": 1,
+    "portablePatch": {
+      "labCommit": "169ae40d7b727aa0f89964dd11e2f217a6ca22db",
+      "path": "distribution/desktop/edition-browser-auth.v1.json",
+      "reason": "the Runtime donor changed the coexistence contract but left the auth identityBinding SHA pinned to the previous bytes",
+      "currentCoexistenceSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
+      "patchedAuthContractSha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+      "authFailClosedTestsBeforePatch": "12-failed-21-passed",
+      "authTestsAfterPatch": "13-passed",
+      "mustReturnToUniversal": true,
+      "mayRemainAsLabFork": false
+    }
+  },
+  "labBinding": {
+    "displayName": "DroneDream · LAB",
+    "editionId": "lab",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "installerProductName": "DroneDream-Lab",
+    "runtimeProfile": "unified-sim-lab",
+    "runtimeStateNamespace": "io.dronedream.desktop.lab/runtime",
+    "diagnosticsNamespace": "diagnostics/lab",
+    "authClientId": "dronedream-desktop-lab",
+    "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
+    "callback": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "updaterChannel": "desktop-lab-channel",
+    "updaterMetadata": "latest-lab.json",
+    "updaterUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json",
+    "canonicalBrandLockupSha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+    "brandGrantsHardwareAuthority": false
+  },
+  "verification": {
+    "python": {
+      "result": "passed",
+      "tests": 170,
+      "subtests": 2,
+      "scope": "coexistence, auth, Runtime/update, installer, Lab contracts, Vehicle Packs, and zero-pack backend/runtime deny"
+    },
+    "frontend": {
+      "typecheck": "passed",
+      "lint": "passed",
+      "authTestFiles": 3,
+      "authTests": 12,
+      "desktopBrowserAuthEditionsLocalesViewports": 4,
+      "credentialFields": 0
+    },
+    "nsisTemplateGate": "passed-pinned-tauri-2.11.4-static-only",
+    "tauriInvoked": false,
+    "nsisInvoked": false,
+    "providerInvoked": false,
+    "runtimeMigrated": false,
+    "hardwareConnected": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "frontendOrBrandCountsAsAuthority": false
+  },
+  "frozenPriorArtifact": {
+    "sourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
+    "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe",
+    "bytes": 11815002,
+    "sha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
+    "signatureState": "NotSigned",
+    "overlayInstall": "failed-exit-2",
+    "relabelled": false,
+    "releaseReady": false
+  },
+  "remainingGates": [
+    "Return portable auth identity-binding patch 169ae40 to Universal and forward-sync its canonical replacement.",
+    "Receive the canonical parameterized edition-safety allow-fixture donor without weakening production deny behavior.",
+    "Provision and validate the registered public Lab OAuth client and hosted callback under a separately authorized provider boundary.",
+    "Request a new exact-clean-source YELLOW Lab build; this sync did not build or relabel an EXE.",
+    "Require an updater signature before release and collect fresh install, overlay, uninstall, shortcut, EN/ZH, WebView2, rollback, and four-Edition isolation evidence.",
+    "Validate at least one Vehicle Pack before any hardware write, arm, HITL, or flight can leave deny."
+  ],
+  "sideEffects": {
+    "exeBuilt": false,
+    "installerRun": false,
+    "runtimeMigration": false,
+    "providerReadOrWrite": false,
+    "apiKeyRead": false,
+    "hardwareAccess": false,
+    "releaseBranchCreated": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "releaseReady": false
+}
