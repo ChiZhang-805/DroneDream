@@ -56,7 +56,7 @@ const updaterSigningPreflightIndex = llvmBuildScript.indexOf(
   "verify-updater-signing-contract.ps1",
 );
 const desktopBuildInvocationIndex = llvmBuildScript.indexOf(
-  "& npm.cmd --prefix $desktopRoot run build",
+  "Invoke-CheckedNativeCommand `",
 );
 if (
   updaterSigningPreflightIndex < 0

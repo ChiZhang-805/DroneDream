@@ -67,7 +67,7 @@ $preflightIndex = $buildScriptText.IndexOf(
     [StringComparison]::Ordinal
 )
 $buildInvocationIndex = $buildScriptText.IndexOf(
-    '& npm.cmd --prefix $desktopRoot run build',
+    'Invoke-CheckedNativeCommand `',
     [StringComparison]::Ordinal
 )
 Assert-Contract (
