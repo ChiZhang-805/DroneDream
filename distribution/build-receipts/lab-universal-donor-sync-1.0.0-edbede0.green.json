@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-universal-donor-sync-green-receipt",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "auditMode": "green-source-merge-and-offline-tests",
+  "source": {
+    "branch": "codex/software-lab",
+    "commit": "edbede0bc696e4afb5ad745ef3844ef70f33a5d6",
+    "upstream": "origin/codex/software-lab",
+    "firstParent": "ceb5063cd4c409d7e05dba81dc0aa4a3de01d093",
+    "secondParent": "b099ed00923e9f2b833f812ad79f1614529038de",
+    "clean": true,
+    "upstreamExact": true
+  },
+  "commonCore": {
+    "authority": "Universal/Core",
+    "fixedProductSourceForFrozenArtifact": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "fixedProductSourceHashForFrozenArtifact": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "forwardSyncedDonorCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
+    "forwardSyncMethod": "merge-parent-preserved",
+    "blindCherryPick": false,
+    "manualSharedCodeCopy": false,
+    "nextProductCommonCoreSource": "blocked-until-auth-and-brand-donors-freeze"
+  },
+  "nsisDonor": {
+    "state": "exact-donor-forward-synced-source-only",
+    "commit": "b099ed00923e9f2b833f812ad79f1614529038de",
+    "parent": "39d19414e4ac6649288726195f74afaf6dc58123",
+    "files": [
+      {
+        "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
+        "gitObjectId": "9af1787fa8607e725c4495fa14a5763de781a5a3",
+        "matchesUniversalDonor": true
+      },
+      {
+        "path": "desktop/src-tauri/src/installer_handoff.rs",
+        "gitObjectId": "d6ed51beb4730264c835d0b77f10cd14ee448b89",
+        "matchesUniversalDonor": true
+      },
+      {
+        "path": "desktop/scripts/verify-nsis-template.ps1",
+        "gitObjectId": "4ad1278fad31d319bea3b842149df596894a869f",
+        "matchesUniversalDonor": true
+      }
+    ],
+    "fix": "successful Runtime quiesce revalidation returns ok before the missing-binary failure label",
+    "realInstallerRetestPerformed": false
+  },
+  "labMergeResolution": {
+    "sharedBuildScript": "accepted Universal InstallerProductName updater-manifest argument while preserving prior shared edition parameterization",
+    "frontend": "preserved Lab route and app identity while retaining Universal visual-mode behavior only for non-Lab builds",
+    "universalModeGrantsHardwareAuthority": false,
+    "labModeSwitchExposed": false
+  },
+  "contracts": {
+    "coexistenceAndAuth": {
+      "path": "distribution/editions/lab/coexistence-and-auth.v1.json",
+      "sha256": "7db240540a0ff0af1269e6f229f492e9f85d49c8bfa0d53a10b1e42af238db7b"
+    },
+    "universalDonorRequests": {
+      "path": "distribution/editions/lab/universal-donor-requests.v1.json",
+      "sha256": "26b22cd39a2b1c3a3b7cd2367abe6c411e69ca498186ea8017cf858f752e7bf1"
+    }
+  },
+  "brand": {
+    "displayName": "DroneDream · LAB",
+    "separatorCodePoint": "U+00B7",
+    "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+    "windowsIconUnchanged": true,
+    "palette": ["#A7E84A", "#20C77A", "#087E69", "#F3FCEF", "#092019"],
+    "currentDotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+    "currentDotLockupState": "superseded-awaiting-exact-large-suffix-donor",
+    "approvedEditionSuffixCapHeightRatio": 0.9,
+    "visualizationsOrConceptDirectoryReadForIntegration": false,
+    "grantsHardwareAuthority": false
+  },
+  "tests": {
+    "nsisTemplateStatic": "passed",
+    "updaterBuildContractStatic": "passed",
+    "distributionUnitTests": {"passed": 166, "failed": 0},
+    "frontendLabUniversalFocused": {"passed": 24, "failed": 0},
+    "backendBenchmarkContractGroups": {"passed": 196, "failed": 0},
+    "distributionRuntimeEnginePack": {
+      "passed": 215,
+      "failed": 2,
+      "subtestsPassed": 19,
+      "failureReason": "Universal test-only allow fixture pins the Universal Lab manifest hash; branded Lab source correctly returns runtime.edition.hash-mismatch and deny"
+    },
+    "frontendFull": {
+      "passed": 478,
+      "failed": 2,
+      "failures": [
+        "PublicSite billing test observes only /downloads/latest.json instead of /billing-checkout/availability",
+        "stylesContract.test.ts scans styles.css alone and misses variables defined by imported edition-brand.generated.css"
+      ]
+    },
+    "rustCargoTests": "not-run-no-Rust-compilation-in-this-green-sync",
+    "aggregatePytestAttempt": "timed-out-without-count-before-split-suites-completed",
+    "tauriInvoked": false,
+    "nsisInvoked": false,
+    "installerInvoked": false,
+    "providerInvoked": false,
+    "credentialsRead": false,
+    "hardwareConnected": false,
+    "px4GazeboStarted": false
+  },
+  "frozenArtifact": {
+    "sourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
+    "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe",
+    "bytes": 11815002,
+    "sha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
+    "signatureState": "NotSigned",
+    "updaterSignature": "not-issued",
+    "overlayInstall": "failed-exit-2",
+    "modifiedRelabeledOrRebuilt": false,
+    "releaseReady": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "testFixtureFailureWasConvertedToAllow": false
+  },
+  "remainingGates": [
+    "Wait for the exact Universal Edition-aware auth donor and forward-sync callback, PKCE, state, nonce, vault, and local-session isolation.",
+    "Wait for the exact Universal large-suffix brand donor commit, manifest, hashes, and render receipt; the existing small suffix lockup is superseded for future release bytes.",
+    "Universal must parameterize the edition-safety test-only allow fixture without weakening the manifest mismatch deny path.",
+    "Universal or Website ownership must resolve the two existing public frontend test failures.",
+    "Sim must stop sharing Universal latest.json before four-Edition updater isolation is complete.",
+    "After all donors freeze, update the next common-core product source binding and request a new YELLOW Lab build; this receipt authorizes no build or install.",
+    "A future exact Lab EXE must pass same-version /UPDATE, fresh/upgrade/uninstall isolation, EN/ZH rendered UI, WebView2, rollback, shortcuts/taskbar, canonical brand surfaces, signing policy, and Website exact handoff."
+  ],
+  "contractReady": true,
+  "releaseReady": false
+}
