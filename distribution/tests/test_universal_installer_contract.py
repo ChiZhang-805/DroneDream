@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/universal-1.0.0.v1.json"
 OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
+FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
+LIFECYCLE = ROOT / "desktop/scripts/verify-universal-installer-lifecycle.ps1"
 HANDOFF = ROOT / "distribution/universal/release/website-exact-exe-handoff.v1.json"
 ENGINE_PACK_TOOL = ROOT / "engine-pack/tools/engine_pack.py"
 BROWSER_AUTH_VERIFIER = ROOT / "desktop/scripts/verify-browser-auth-config.mjs"
@@ -119,13 +121,21 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH.',
         'buildCount = 1',
         '$buildReceiptPath = "${artifactPath}.receipt.json"',
+        '$updaterMetadataPath = Join-Path $releaseMetadataDirectory "latest-universal.json"',
+        'desktop-universal-v1\\.0\\.0-build-',
+        'publishedWithWebsiteFiles = $false',
         'payloadContractId = "dronedream-universal-engine-payload/v1"',
         'Multiple incompatible Universal Engine Pack manifests were produced.',
+        "-AdditionalConfigPath $overlayPath",
+        "-CargoTargetDir $cargoTargetFull",
+        "-ExpectedProductName ([string]$overlay.productName)",
+        '-EditionId "universal"',
         'releaseReady = $false',
         'pending-isolated-red-validation',
     ):
         assert fragment in script
     assert "-AllowUnsignedUpdater" not in script
+    assert "$sharedArguments" not in script
 
 
 def test_website_contract_publishes_exact_four_files_without_rename() -> None:
@@ -139,3 +149,51 @@ def test_website_contract_publishes_exact_four_files_without_rename() -> None:
         "DroneDream-Universal-1.0.0.exe.receipt.json",
     ]
     assert handoff["consistency"]["updaterSignatureRequired"] is True  # type: ignore[index]
+
+
+def test_existing_candidate_finalizer_preserves_product_source_and_never_rebuilds() -> None:
+    finalizer = FINALIZER.read_text(encoding="utf-8-sig")
+    for fragment in (
+        'ValidatePattern("^[0-9a-f]{40}$")',
+        'DroneDream-Universal_1.0.0_x64-setup.exe',
+        'DroneDream-Universal-1.0.0.exe',
+        'finalizerToolHeadIsProductSource = $false',
+        'candidate-awaiting-isolated-red-lifecycle-validation',
+        'rebuildProhibited -ne $true',
+        'exactCleanProductSourceCommit = $ProductSourceCommit',
+        'buildCount = 1',
+        'releaseReady = $false',
+    ):
+        assert fragment in finalizer
+    assert "tauri build" not in finalizer
+    assert "npm.cmd" not in finalizer
+    assert "engine_pack.py" not in finalizer
+
+
+def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None:
+    lifecycle = LIFECYCLE.read_text(encoding="utf-8-sig")
+    for fragment in (
+        'ValidatePattern("^[0-9a-f]{40}$")',
+        'ValidatePattern("^[0-9a-f]{64}$")',
+        'DroneDream-Universal-1.0.0.exe',
+        'DroneDream-Universal',
+        'io.dronedream.desktop.universal',
+        'install-app-only',
+        'hardwareActionDecision -cne "deny"',
+        'dronedream-vehicle-pack-registry',
+        '$registry.packs',
+        '$_.currentValidationTier',
+        'validatedVehiclePackCount = 0',
+        '@("/S", "/NS", "/L=1033")',
+        '@("/S", "/NS", "/UPDATE", "/L=1033")',
+        'Close it before isolated lifecycle validation; the verifier will never terminate it.',
+        'Universal lifecycle preflight found pre-existing product state',
+        'Protected existing DroneDream, Runtime, shortcut, registry, or WebView2 state changed',
+        'releaseReady = $false',
+        'if ($Execute)',
+    ):
+        assert fragment in lifecycle
+    assert "Stop-Process" not in lifecycle
+    assert "tauri build" not in lifecycle
+    assert "npm.cmd" not in lifecycle
+    assert "engine_pack.py" not in lifecycle

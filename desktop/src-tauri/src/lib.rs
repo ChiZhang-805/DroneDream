@@ -49,6 +49,9 @@ pub fn run() {
         .plugin(
             tauri_plugin_updater::Builder::new()
                 .default_version_comparator(|current, release| {
+                    if !app_update::release_matches_compiled_edition(release.notes.as_deref()) {
+                        return false;
+                    }
                     if release.version != current {
                         return release.version > current;
                     }
