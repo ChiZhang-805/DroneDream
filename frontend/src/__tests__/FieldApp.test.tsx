@@ -142,6 +142,7 @@ describe("FieldApp", () => {
   it("keeps the Field entry independent from the unified app routes", () => {
     const sources = [
       "src/field/FieldApp.tsx",
+      "src/field/FieldSettingsDialog.tsx",
       "src/field/catalog.ts",
       "src/field/main.tsx",
       "src/field/safety.ts",
@@ -149,11 +150,50 @@ describe("FieldApp", () => {
 
     expect(sources).not.toMatch(/AppShell|react-router|\/assistant|\/scenarios/);
     expect(sources).not.toMatch(/gazebo|sitl|hitl|simulation/i);
+    expect(sources).toContain("EditionThemeProvider");
+    expect(sources).toContain("EditionSettingsSurface");
+    expect(sources).toContain('consumerProfile="field-lightweight"');
   });
 
-  it("parses the responsive Field stylesheet with complete custom properties", () => {
-    const source = readFileSync(resolve(process.cwd(), "src/field/field.css"), "utf8");
-    const root = postcss.parse(source, { from: "field.css" });
+  it("opens the shared Field settings surface without changing authority", () => {
+    const { container } = render(<FieldApp initialLocale="en" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Field settings" });
+    expect(dialog).toHaveAttribute("data-brand-edition", "field");
+    expect(dialog).toHaveAttribute("data-settings-consumer", "field-lightweight");
+    expect(dialog).toHaveAttribute("data-presentation-only", "true");
+    expect(dialog).toHaveAttribute("data-grants-hardware-authority", "false");
+    expect(container.querySelector("[data-validated-pack-count='0']")).toBeTruthy();
+    expect(container.querySelector("[data-quorum='missing']")).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole("tab", { name: "Safety" }));
+    expect(within(dialog).getByText("field-lightweight")).toBeInTheDocument();
+    expect(within(dialog).getByText("Denied")).toBeInTheDocument();
+    expect(within(dialog).getByText("0")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Emergency stop" })).toBeDisabled();
+  });
+
+  it("switches EN/ZH inside Settings and closes with Escape", () => {
+    render(<FieldApp initialLocale="en" />);
+    const trigger = screen.getByRole("button", { name: "Settings" });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole("button", { name: "Simplified Chinese" }));
+
+    expect(screen.getByRole("dialog", { name: "Field 设置" })).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("zh-CN");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("consumes canonical theme tokens without redefining a Field palette", () => {
+    const fieldSource = readFileSync(resolve(process.cwd(), "src/field/field.css"), "utf8");
+    const generatedSource = readFileSync(
+      resolve(process.cwd(), "src/brand/edition-brand.generated.css"),
+      "utf8",
+    );
+    const root = postcss.parse(`${generatedSource}\n${fieldSource}`, { from: "field.css" });
     const defined = new Set<string>();
     const referenced = new Set<string>();
 
@@ -165,8 +205,19 @@ describe("FieldApp", () => {
     });
 
     expect([...referenced].filter((name) => !defined.has(name))).toEqual([]);
-    expect(source).toContain("@media (max-width: 920px)");
-    expect(source).toContain("@media (max-width: 560px)");
-    expect(source).toContain("@media (prefers-reduced-motion: reduce)");
+    expect(fieldSource).not.toMatch(/--field-(yellow|coral|pink|surface|dark)/);
+    expect(fieldSource).not.toMatch(/#ffc247|#ff754b|#d746a5|#fff8ef|#28140d/i);
+    for (const token of [
+      "--dd-brand-start",
+      "--dd-brand-middle",
+      "--dd-brand-end",
+      "--dd-brand-light-surface",
+      "--dd-brand-dark-surface",
+    ]) {
+      expect(fieldSource).toContain(`var(${token})`);
+    }
+    expect(fieldSource).toContain("@media (max-width: 920px)");
+    expect(fieldSource).toContain("@media (max-width: 560px)");
+    expect(fieldSource).toContain("@media (prefers-reduced-motion: reduce)");
   });
 });

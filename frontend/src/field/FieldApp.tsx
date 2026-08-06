@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArchiveRestore,
@@ -9,10 +9,10 @@ import {
   FileClock,
   Gauge,
   HardDrive,
-  Languages,
   PackageCheck,
   RadioTower,
   RotateCcw,
+  Settings,
   ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
@@ -21,6 +21,7 @@ import {
 import { BrandLockup } from "../components/BrandLockup";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
 import { FieldAuthControl } from "./FieldAuthControl";
+import { FieldSettingsDialog } from "./FieldSettingsDialog";
 import {
   evaluateFieldSafety,
   FIELD_HARDWARE_ACTIONS,
@@ -34,6 +35,7 @@ const COPY = {
     edition: "FIELD",
     preview: "Internal safety preview",
     locale: "Language",
+    settings: "Settings",
     nav: "Field navigation",
     overview: "Overview",
     devices: "Device",
@@ -122,6 +124,7 @@ const COPY = {
     edition: "FIELD",
     preview: "内部安全预览",
     locale: "语言",
+    settings: "设置",
     nav: "Field 导航",
     overview: "概览",
     devices: "设备",
@@ -254,6 +257,9 @@ export function FieldApp({
     ),
   );
   const [operatorAcknowledged, setOperatorAcknowledged] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsCloseRef = useRef<HTMLButtonElement>(null);
   const copy = COPY[locale];
   const observation = FIELD_OBSERVATION_FIXTURES[observationState];
   const decision = useMemo(() => evaluateFieldSafety(observation), [observation]);
@@ -269,6 +275,57 @@ export function FieldApp({
       // Locale persistence is optional and has no safety meaning.
     }
   }, [locale]);
+
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false);
+    requestAnimationFrame(() => settingsButtonRef.current?.focus());
+  }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const inertTargets = Array.from(document.querySelectorAll<HTMLElement>(
+      ".field-topbar, .field-layout, .field-skip-link",
+    ));
+    const previousInertStates = inertTargets.map((target) => target.inert);
+    document.body.style.overflow = "hidden";
+    inertTargets.forEach((target) => { target.inert = true; });
+    const focusFrame = requestAnimationFrame(() => settingsCloseRef.current?.focus());
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeSettings();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const dialog = settingsCloseRef.current?.closest<HTMLElement>('[role="dialog"]');
+      if (!dialog) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), '
+          + 'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      )].filter((element) => !element.hasAttribute("hidden"));
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (!first || !last) return;
+      if (!dialog.contains(document.activeElement)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      cancelAnimationFrame(focusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      inertTargets.forEach((target, index) => { target.inert = previousInertStates[index] ?? false; });
+    };
+  }, [closeSettings, settingsOpen]);
 
   return (
     <div
@@ -290,16 +347,36 @@ export function FieldApp({
           <span className="field-preview-badge"><ShieldCheck />{copy.preview}</span>
           <FieldAuthControl locale={locale} />
           <button
-            className="field-language-button"
+            ref={settingsButtonRef}
+            className="field-settings-button"
             type="button"
-            aria-label={copy.locale}
-            onClick={() => setLocale(locale === "en" ? "zh-CN" : "en")}
+            aria-label={copy.settings}
+            title={copy.settings}
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen(true)}
           >
-            <Languages aria-hidden="true" />
-            {locale === "en" ? "中文" : "EN"}
+            <Settings aria-hidden="true" />
           </button>
         </div>
       </header>
+
+      {settingsOpen ? (
+        <div
+          className="launcher-settings-backdrop field-settings-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeSettings();
+          }}
+        >
+          <FieldSettingsDialog
+            closeRef={settingsCloseRef}
+            locale={locale}
+            onClose={closeSettings}
+            onLocaleChange={setLocale}
+          />
+        </div>
+      ) : null}
 
       <div className="field-layout">
         <aside className="field-sidebar">

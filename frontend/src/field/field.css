@@ -5,11 +5,6 @@
   color: #191718;
   background: #f7f6f5;
   font-synthesis: none;
-  --field-yellow: #ffc247;
-  --field-coral: #ff754b;
-  --field-pink: #d746a5;
-  --field-surface: #fff8ef;
-  --field-dark: #28140d;
   --field-ink: #191718;
   --field-muted: #686267;
   --field-line: #ded9d5;
@@ -65,7 +60,7 @@ select:focus-visible {
   left: 8px;
   padding: 8px 12px;
   color: #ffffff;
-  background: var(--field-dark);
+  background: var(--dd-brand-dark-surface);
   border-radius: 4px;
   transform: translateY(-160%);
 }
@@ -97,9 +92,9 @@ select:focus-visible {
   height: 2px;
   background: linear-gradient(
     90deg,
-    var(--field-yellow),
-    var(--field-coral),
-    var(--field-pink)
+    var(--dd-brand-start),
+    var(--dd-brand-middle),
+    var(--dd-brand-end)
   );
   content: "";
 }
@@ -119,7 +114,7 @@ select:focus-visible {
 
 .field-topbar-actions,
 .field-preview-badge,
-.field-language-button {
+.field-settings-button {
   display: flex;
   align-items: center;
 }
@@ -140,7 +135,7 @@ select:focus-visible {
   gap: 7px;
   padding: 6px 10px;
   overflow: hidden;
-  color: var(--field-dark);
+  color: var(--dd-brand-dark-surface);
   background: #ffffff;
   border: 1px solid var(--field-line);
   border-radius: 6px;
@@ -192,22 +187,239 @@ select:focus-visible {
 }
 
 .field-preview-badge svg,
-.field-language-button svg {
+.field-settings-button svg {
   width: 17px;
   height: 17px;
 }
 
-.field-language-button {
-  min-width: 70px;
+.field-settings-button {
+  width: 36px;
+  min-width: 36px;
   min-height: 36px;
   justify-content: center;
-  gap: 7px;
-  padding: 6px 10px;
+  padding: 6px;
   color: var(--field-ink);
   background: #ffffff;
   border: 1px solid var(--field-line);
   border-radius: 6px;
   cursor: pointer;
+}
+
+.field-settings-button[aria-expanded="true"] {
+  color: var(--dd-brand-dark-surface);
+  border-color: var(--dd-brand-middle);
+  background: var(--dd-brand-light-surface);
+}
+
+.field-settings-backdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgb(40 20 13 / 72%);
+  backdrop-filter: blur(10px);
+}
+
+.field-settings-backdrop .launcher-settings-dialog {
+  display: grid;
+  width: min(720px, calc(100vw - 24px));
+  height: min(596px, calc(100dvh - 24px));
+  max-width: 720px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  padding: 14px;
+  color: #ffffff;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--dd-brand-dark-surface) 96%, #000000),
+      color-mix(in srgb, var(--dd-brand-dark-surface) 88%, var(--dd-brand-end))
+    );
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 44%, transparent);
+  border-radius: 8px;
+  box-shadow: 0 22px 64px rgb(20 8 4 / 42%);
+}
+
+.field-settings-backdrop .launcher-settings-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.field-settings-backdrop .launcher-settings-title-lockup {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.field-settings-backdrop .launcher-settings-title-lockup .brand-lockup {
+  width: auto;
+  max-width: min(52vw, 300px);
+  height: 24px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.field-settings-backdrop .launcher-settings-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.field-settings-backdrop .launcher-settings-close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  color: #ffffff;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 34%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.field-settings-backdrop .launcher-settings-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.field-settings-backdrop .launcher-settings-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.field-settings-backdrop .launcher-settings-tabs button {
+  display: flex;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px;
+  color: #d8cbd8;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, transparent);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.field-settings-backdrop .launcher-settings-tabs button[aria-selected="true"] {
+  color: #ffffff;
+  background: linear-gradient(
+    125deg,
+    color-mix(in srgb, var(--dd-brand-start) 22%, transparent),
+    color-mix(in srgb, var(--dd-brand-end) 18%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 62%, transparent);
+}
+
+.field-settings-backdrop .launcher-settings-tabs button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.field-settings-backdrop .launcher-settings-panels,
+.field-settings-backdrop .launcher-settings-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.field-settings-backdrop .launcher-settings-panel {
+  height: 100%;
+  padding: 4px;
+  outline: none;
+}
+
+.field-settings-backdrop .launcher-settings-panel[hidden] {
+  display: none;
+}
+
+.field-settings-languages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 4px;
+  border: 0;
+}
+
+.field-settings-languages button {
+  display: grid;
+  min-height: 72px;
+  grid-template-columns: 24px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: #e9e0eb;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, transparent);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.field-settings-languages button.selected {
+  color: #ffffff;
+  background: linear-gradient(
+    125deg,
+    color-mix(in srgb, var(--dd-brand-start) 20%, transparent),
+    color-mix(in srgb, var(--dd-brand-end) 16%, transparent)
+  );
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 62%, transparent);
+}
+
+.field-settings-languages svg {
+  width: 18px;
+  height: 18px;
+}
+
+.field-settings-safety {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.field-settings-safety div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 14px;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, transparent);
+  border-radius: 8px;
+}
+
+.field-settings-safety dt {
+  color: #c9bdcb;
+  font-size: 12px;
+}
+
+.field-settings-safety dd {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.field-settings-safety svg {
+  width: 17px;
+  height: 17px;
+  color: var(--dd-brand-start);
 }
 
 .field-layout {
@@ -250,16 +462,16 @@ select:focus-visible {
 
 .field-sidebar nav a:hover,
 .field-sidebar nav a:focus-visible {
-  color: var(--field-dark);
+  color: var(--dd-brand-dark-surface);
   background: #ffffff;
   border-color: var(--field-line);
 }
 
 .field-sidebar nav a[aria-current="page"] {
-  color: var(--field-dark);
-  background: var(--field-surface);
+  color: var(--dd-brand-dark-surface);
+  background: var(--dd-brand-light-surface);
   border-color: #edc48f;
-  box-shadow: inset 3px 0 0 var(--field-coral);
+  box-shadow: inset 3px 0 0 var(--dd-brand-middle);
 }
 
 .field-sidebar nav svg {
@@ -321,14 +533,14 @@ select:focus-visible {
 
 .field-kicker {
   margin: 0 0 8px;
-  color: var(--field-coral);
+  color: var(--dd-brand-middle);
   font-size: 13px;
   font-weight: 760;
 }
 
 .field-overview h1 {
   margin: 0;
-  color: var(--field-dark);
+  color: var(--dd-brand-dark-surface);
   font-size: 32px;
   line-height: 1.15;
   letter-spacing: 0;
@@ -380,7 +592,7 @@ select:focus-visible {
   color: #7e251c;
   background: var(--field-danger-bg);
   border: 1px solid #f1b8aa;
-  border-left: 4px solid var(--field-coral);
+  border-left: 4px solid var(--dd-brand-middle);
   border-radius: 4px;
 }
 
@@ -410,13 +622,13 @@ select:focus-visible {
 .field-section > header > svg {
   width: 25px;
   height: 25px;
-  color: var(--field-coral);
+  color: var(--dd-brand-middle);
 }
 
 .field-section h2,
 .field-section h3 {
   margin: 0;
-  color: var(--field-dark);
+  color: var(--dd-brand-dark-surface);
   letter-spacing: 0;
 }
 
@@ -435,7 +647,7 @@ select:focus-visible {
   grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
   gap: 20px;
   padding: 14px 16px;
-  background: var(--field-surface);
+  background: var(--dd-brand-light-surface);
   border: 1px solid #efd8bf;
   border-radius: 6px;
 }
@@ -526,7 +738,7 @@ select:focus-visible {
   gap: 12px;
   margin-bottom: 14px;
   padding: 14px;
-  background: var(--field-surface);
+  background: var(--dd-brand-light-surface);
   border: 1px solid #efd8bf;
   border-radius: 6px;
 }
@@ -714,7 +926,7 @@ select:focus-visible {
   gap: 10px;
   margin-top: 12px;
   padding: 14px;
-  background: var(--field-surface);
+  background: var(--dd-brand-light-surface);
   border: 1px solid #efd8bf;
   border-radius: 6px;
 }
@@ -723,7 +935,7 @@ select:focus-visible {
   width: 16px;
   height: 16px;
   margin: 2px 0 0;
-  accent-color: var(--field-coral);
+  accent-color: var(--dd-brand-middle);
 }
 
 .field-operator-acknowledgement span {
@@ -879,8 +1091,27 @@ select:focus-visible {
     clip: rect(0 0 0 0);
   }
 
-  .field-language-button {
-    min-width: 58px;
+  .field-settings-languages,
+  .field-settings-safety {
+    grid-template-columns: 1fr;
+  }
+
+  .field-settings-languages button {
+    min-height: 60px;
+  }
+
+  .field-settings-backdrop .launcher-settings-dialog {
+    height: calc(100dvh - 24px);
+    padding: 11px;
+  }
+
+  .field-settings-backdrop .launcher-settings-title-lockup .brand-lockup {
+    max-width: 150px;
+    height: 20px;
+  }
+
+  .field-settings-backdrop .launcher-settings-heading h2 {
+    font-size: 17px;
   }
 
   .field-sidebar {
