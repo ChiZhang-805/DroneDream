@@ -41,6 +41,11 @@ describe("ProductPage", () => {
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
+    expect(screen.getByText("Controlled simulation and integration evidence review"))
+      .toBeVisible();
+    expect(screen.getByText("Evidence review for advanced field preparation"))
+      .toBeVisible();
+    expect(screen.queryByText(/vehicle execution|vehicle lab integration/i)).toBeNull();
     const editionMarks = container.querySelectorAll(
       'img.site-product-edition-icon[data-brand-handoff="commander-approved-brand-handoff-v2"]',
     );
@@ -115,6 +120,9 @@ describe("ProductPage", () => {
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
+    expect(screen.getByText("面向受控仿真与集成证据审查")).toBeVisible();
+    expect(screen.getByText("面向高级现场准备的证据审查")).toBeVisible();
+    expect(screen.queryByText(/真机联调|真机执行/)).toBeNull();
     expect(screen.queryByText("正在准备")).toBeNull();
     expect(screen.queryByText("当前内测预览版")).toBeNull();
   });

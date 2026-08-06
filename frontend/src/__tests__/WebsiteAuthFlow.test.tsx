@@ -84,8 +84,11 @@ describe("website account navigation", () => {
     expect(window.location.pathname).toBe("/account/");
     expect(new URLSearchParams(window.location.search).get("source")).toBe("website");
     expect(new URLSearchParams(window.location.search).get("returnTo")).toBe("/");
-    expect(screen.queryByText(/website in this browser only/i)).toBeNull();
-    expect(screen.queryByText(/return to the DroneDream homepage/i)).toBeNull();
+    expect(screen.getByText(
+      /Universal, SIM, LAB, and FIELD each require an explicit Sign in click/i,
+    )).toBeVisible();
+    expect(screen.getByText(/another app's session never signs an app in automatically/i))
+      .toBeVisible();
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
     expect(screen.queryByRole("dialog")).toBeNull();
 
@@ -118,11 +121,11 @@ describe("website account navigation", () => {
     renderSite();
 
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
-    expect(screen.queryByText(/website in this browser only/i)).toBeNull();
+    expect(screen.getByText(/each require an explicit Sign in click/i)).toBeVisible();
     expect(desktopInvoke).not.toHaveBeenCalled();
   });
 
-  it("omits the browser-only explanation from the Chinese registration page", () => {
+  it("explains independent desktop authorization on the Chinese registration page", () => {
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
     window.history.replaceState(
       null,
@@ -133,8 +136,8 @@ describe("website account navigation", () => {
     renderSite();
 
     expect(screen.getByRole("heading", { name: "创建账号" })).toBeVisible();
-    expect(screen.queryByText(/本次登录只用于当前浏览器/)).toBeNull();
-    expect(screen.queryByText(/登录成功后将返回/)).toBeNull();
+    expect(screen.getByText(/都需要在各自应用内点击登录/)).toBeVisible();
+    expect(screen.getByText(/都不会让任何桌面应用自动登录/)).toBeVisible();
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
   });
 });

@@ -70,6 +70,8 @@ const content = {
     account: "Account",
     authTitle: "Sign in",
     registerTitle: "Create account",
+    authSessionNote:
+      "Universal, SIM, LAB, and FIELD each require an explicit Sign in click and their own browser roundtrip. A website session or another app's session never signs an app in automatically.",
     email: "Email address",
     password: "Password",
     passwordPlaceholder: "At least 8 characters",
@@ -260,6 +262,8 @@ const content = {
     account: "账号",
     authTitle: "登录",
     registerTitle: "创建账号",
+    authSessionNote:
+      "Universal、SIM、LAB 与 FIELD 都需要在各自应用内点击登录，并分别完成浏览器往返授权。网站会话或其他应用会话都不会让任何桌面应用自动登录。",
     email: "邮箱地址",
     password: "密码",
     passwordPlaceholder: "至少 8 个字符",
@@ -1133,6 +1137,7 @@ export function SiteApp({
                 ? copy.registerTitle
                 : copy.authTitle}
           </h1>
+          <p>{copy.authSessionNote}</p>
         </div>
         <div className="site-auth-page-panel">
           {auth.account ? (
