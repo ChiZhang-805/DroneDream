@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "dronedream-installer-ui-validation-receipt/v1",
+  "completedAtUtc": "2026-08-06T17:28:03.9830700Z",
+  "productSourceCommit": "bb14c47a43795180cc80305eaf87665a54b9b8e5",
+  "verifierSourceCommit": "c68dc9bd4fd4f5bcfc144e3bb5fd50551da42f4d",
+  "reviewedEvidenceHead": "95acf2a44e7658472ee74ac586d12fc0619b656f",
+  "verifier": {
+    "path": "desktop/scripts/verify-installer-ui.ps1",
+    "sha256": "eb7fc71521f594d01d2f3be5e975f30b8dca61053f3b1b1c7656a4b768ac0f9d"
+  },
+  "artifact": {
+    "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\handoffs\\universal-1.0.0-bb14c47\\DroneDream-Universal-1.0.0.exe",
+    "fileName": "DroneDream-Universal-1.0.0.exe",
+    "bytes": 11823259,
+    "sha256": "0a6768cbc2da344a54bc072be9fc9354d50bdfb0d46713bd1aed02559d1dd609",
+    "rebuiltForThisValidation": false,
+    "relabeledForThisValidation": false
+  },
+  "prerequisiteLifecycleReceipt": {
+    "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\handoffs\\universal-1.0.0-bb14c47\\validation\\universal-lifecycle-red1.json",
+    "bytes": 20703,
+    "sha256": "188905b0495343797ae9ed87fcfddaf37c076cc77b15fb6253d21418ab4427c5"
+  },
+  "supersededFailedAttempt": {
+    "path": "artifacts/test-runs/universal-installer-ui-bb14c47-red1/failure-receipt.json",
+    "bytes": 2107,
+    "sha256": "19e71b0f1d6eb53162d6b0023518c363d56826a39346ad00882aadeaecef2b12",
+    "authorizationReused": false
+  },
+  "authorization": {
+    "resourceClass": "RED",
+    "scope": "visible-installer-ui",
+    "attemptOrdinal": 2,
+    "approvedInstallerProcessCount": 2,
+    "automaticRetryAllowed": false
+  },
+  "execution": {
+    "installerProductName": "DroneDream-Universal",
+    "expectedApplication": "%LOCALAPPDATA%\\DroneDream-Universal",
+    "simulateFreshInstall": true,
+    "validatePathGuard": true,
+    "recoveryControlExecutable": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\handoffs\\universal-1.0.0-bb14c47\\validation\\absent-recovery-control.exe",
+    "recoveryControlExecutableExistedBefore": false,
+    "recoveryControlExecutableExistedAfter": false,
+    "languages": [
+      {
+        "language": "English",
+        "installerProcessCount": 1,
+        "localizedEntryAndWelcome": "passed",
+        "localizedInstallLocation": "passed",
+        "defaultApplicationPath": "passed",
+        "pathGuard": "passed",
+        "exitedBeforeInstallCommit": true
+      },
+      {
+        "language": "SimpChinese",
+        "installerProcessCount": 1,
+        "localizedEntryAndWelcome": "passed",
+        "localizedInstallLocation": "passed",
+        "defaultApplicationPath": "passed",
+        "pathGuard": "passed",
+        "exitedBeforeInstallCommit": true
+      }
+    ]
+  },
+  "counts": {
+    "installerProcesses": 2,
+    "installationCommits": 0,
+    "applicationLaunches": 0,
+    "webView2Launches": 0,
+    "browserLaunches": 0,
+    "browserAuthTransactions": 0,
+    "runtimeOperations": 0,
+    "px4GazeboOperations": 0
+  },
+  "cleanup": {
+    "universalRegistrationKeysPresent": 0,
+    "universalInstallRootPresent": false,
+    "droneDreamProcessesPresent": 0,
+    "temporaryRegistrationSnapshotsRestored": true
+  },
+  "result": {
+    "status": "passed",
+    "visibleInstallerUiReady": true,
+    "releaseReady": false,
+    "remainingGates": [
+      "exact application launch and live WebView2 validation",
+      "exact Universal browser PKCE roundtrip validation",
+      "final Website exact-byte handoff and publication"
+    ]
+  }
+}
