@@ -97,6 +97,12 @@ YELLOW_ATTEMPT_6_PLAN_PATH = (
     / "desktop"
     / "yellow-build-attempt-6-a99f5e8-plan-ready.v1.json"
 )
+YELLOW_ATTEMPT_6_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-6-a99f5e8-tauri-cli-missing-failed.v1.json"
+)
 YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_6_APPLICATION_PATH
 
 
@@ -509,6 +515,10 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             application["executionPlan"]["entryScript"]["path"],
         )
         self.assertTrue(attributes.endswith(": eol: lf"), attributes)
+        root_state_before = {
+            key: Path(plan_receipt["ownedRoots"][key]).exists()
+            for key in ("sourceRoot", "cargoTargetDir", "runRoot", "outputRoot")
+        }
         result = subprocess.run(
             [
                 "powershell",
@@ -534,7 +544,12 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             self.assertEqual(plan["invocationMaximums"][key], 1, key)
         self.assertEqual(plan["invocationMaximums"]["retry"], 0)
         for key in ("sourceRoot", "cargoTargetDir", "runRoot", "outputRoot"):
-            self.assertFalse(Path(plan_receipt["ownedRoots"][key]).exists(), key)
+            self.assertTrue(plan_receipt["ownedRoots"][f"{key}AbsentAfterPlan"], key)
+            self.assertEqual(
+                Path(plan_receipt["ownedRoots"][key]).exists(),
+                root_state_before[key],
+                key,
+            )
 
     def test_yellow_attempt_6_requires_fresh_authorization_and_preserves_history(self) -> None:
         application = load_json(YELLOW_ATTEMPT_6_APPLICATION_PATH)
@@ -562,6 +577,94 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertTrue(protected["ordinalFiveRunRootMustRemainReadOnly"])
         self.assertFalse(protected["reuseAllowed"])
         self.assertFalse(protected["cleanupAllowed"])
+
+    def test_yellow_attempt_6_dependency_failure_consumes_the_only_build_invocation(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_6_FAILURE_PATH)
+        binding = receipt["authorizationBinding"]
+        execution = receipt["execution"]
+        self.assertEqual(receipt["state"], "failed-frozen-no-retry")
+        self.assertEqual(binding["globalCommandApplicationOrdinal"], 6)
+        self.assertEqual(binding["sourceApplicationPreflightOrdinal"], 1)
+        self.assertEqual(binding["sourceBuildInvocationOrdinal"], 1)
+        self.assertEqual(binding["sourceBuildInvocationMaximum"], 1)
+        self.assertTrue(binding["sourceBuildInvocationConsumed"])
+        self.assertFalse(binding["retryAllowed"])
+        self.assertEqual(execution["buildScriptInvocations"], 1)
+        self.assertEqual(execution["npmBuildScriptInvocations"], 1)
+        for key in (
+            "frontendBuilds",
+            "tauriCliProcessInvocations",
+            "tauriBuilds",
+            "cargoBuilds",
+            "nsisBuilds",
+            "artifactBuilds",
+            "signatureArtifactsCreated",
+            "checksumArtifactsCreated",
+            "installations",
+            "runtimeStarts",
+            "px4Starts",
+            "gazeboStarts",
+            "sitlStarts",
+            "hitlStarts",
+            "providerActions",
+            "hardwareActions",
+            "deployments",
+            "automaticRetries",
+        ):
+            self.assertEqual(execution[key], 0, key)
+
+    def test_yellow_attempt_6_failure_is_exactly_bound_and_fail_closed(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_6_FAILURE_PATH)
+        binding = receipt["authorizationBinding"]
+        for path_key, bytes_key, sha_key in (
+            ("applicationPath", "applicationBytes", "applicationSha256"),
+            ("entryScriptPath", "entryScriptBytes", "entryScriptSha256"),
+            ("planReceiptPath", "planReceiptBytes", "planReceiptSha256"),
+        ):
+            path = ROOT / binding[path_key]
+            self.assertEqual(path.stat().st_size, binding[bytes_key], path_key)
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                binding[sha_key],
+                path_key,
+            )
+        failure = receipt["failure"]
+        self.assertEqual(
+            failure["classification"],
+            "detached-source-dependency-provisioning-gap",
+        )
+        self.assertEqual(failure["lockedTauriCliVersion"], "2.11.4")
+        self.assertFalse(failure["desktopNodeModulesPresent"])
+        self.assertFalse(failure["desktopTauriCommandPresent"])
+        self.assertFalse(failure["simLocalDependencyInstallOrDriverPatchAllowed"])
+        self.assertFalse(failure["automaticRetryAttempted"])
+        self.assertFalse(failure["sameAuthorizationMayBeReused"])
+        self.assertTrue(receipt["nextGate"]["requiresCommonCoreOwnershipDecision"])
+        self.assertTrue(receipt["nextGate"]["requiresFreshYellowAuthorization"])
+        self.assertFalse(receipt["nextGate"]["buildMayProceedFromThisReceipt"])
+
+    def test_yellow_attempt_6_failure_preserves_owned_and_historical_evidence(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_6_FAILURE_PATH)
+        owned = receipt["ownedEvidence"]
+        protected = receipt["protectedState"]
+        self.assertEqual(owned["bundleFileCount"], 0)
+        self.assertFalse(owned["cargoTargetDirExistsAfterFailure"])
+        self.assertTrue(owned["sourceCleanAfterFailure"])
+        self.assertTrue(owned["sourceWorktreeRegisteredAfterFailure"])
+        self.assertTrue(owned["runRootPreserved"])
+        self.assertTrue(owned["sourceRootPreserved"])
+        self.assertFalse(owned["cleanupExecuted"])
+        self.assertEqual(
+            protected["frozenArtifactSha256AfterFailure"],
+            "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+        )
+        self.assertFalse(protected["ordinalFiveEvidenceMutated"])
+        self.assertFalse(protected["frozenArtifactMutated"])
+        self.assertFalse(protected["historicalSimRegistryMutated"])
+        self.assertFalse(protected["updaterKeyContentReadOrPrinted"])
+        self.assertFalse(protected["publicSupabaseValuesPrintedOrPersisted"])
+        self.assertFalse(receipt["nonClaims"]["artifactCreated"])
+        self.assertFalse(receipt["nonClaims"]["releaseReady"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
