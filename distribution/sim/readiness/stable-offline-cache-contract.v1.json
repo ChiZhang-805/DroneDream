@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-stable-offline-cache-contract",
+  "state": "green-contract-verified-no-snapshot-created",
+  "editionId": "sim",
+  "ordinalSevenFailure": {
+    "receiptPath": "distribution/sim/desktop/yellow-build-attempt-7-e181d02-cache-drift-preflight-failed.v1.json",
+    "receiptBytes": 4591,
+    "receiptSha256": "1c8a47be33a394e3282d33c2871a8284969d60ea977d1fe18a24f0cccfb2cd90",
+    "approvedWholeCacheFingerprint": "ddd06a60a0345bf03c6f045efa6a7641f316229e0f1186979fc15a0f3b47480d",
+    "observedWholeCacheFingerprint": "171143c14ca18123dd4057145389777b8c8fbeb43987cc0dbe2249b760249c51",
+    "fileCountDelta": -2,
+    "totalBytesDelta": -4416,
+    "authorizationPermanentlyConsumed": true,
+    "prepareInvocations": 0,
+    "buildInvocations": 0
+  },
+  "driftClassification": {
+    "classification": "whole-cache-nonsemantic-churn",
+    "oldGateIncluded": [
+      "_cacache/all-referenced-and-unreferenced-content",
+      "_cacache/all-index-records",
+      "_logs/npm-debug-logs",
+      "_npx/transient-executions",
+      "_update-notifier-last-checked"
+    ],
+    "npmLogsObservedAfterFailure": 11,
+    "npmLogBytesObservedAfterFailure": 11717,
+    "newestLogUtc": "2026-08-06T22:03:17.282Z",
+    "failureWindowContainsNpmLogCreationOrRotation": true,
+    "exactRemovedFileNamesRecoverableFromPriorEvidence": false,
+    "claimingExactRemovedFilesAllowed": false,
+    "explanation": "The prior hash covered npm-managed logs and unrelated cache state. Those files can rotate without changing either lockfile or any Windows-compatible package tarball required by the build.",
+    "productLockOrRequiredTarballDriftObserved": false
+  },
+  "stableSelection": {
+    "toolPath": "distribution/sim/desktop/lockfile-offline-cache.mjs",
+    "operatingSystem": "win32",
+    "architecture": "x64",
+    "sourceInputs": [
+      {
+        "path": "desktop/package.json",
+        "bytes": 1056,
+        "sha256": "ba37f6edb95c454ea0f83130b98f708c0f27990133c705c8c23597ac96fd36b6"
+      },
+      {
+        "path": "desktop/package-lock.json",
+        "bytes": 7449,
+        "sha256": "1138f300f140dfcaf22a6c47d44f676e9ea9294b77a2caabb7fa08ef8340d058"
+      },
+      {
+        "path": "frontend/package.json",
+        "bytes": 2267,
+        "sha256": "cd905e33a1faad2c22b165ba407e16c05d01fbdab1738dd156d616cfee4daf05"
+      },
+      {
+        "path": "frontend/package-lock.json",
+        "bytes": 182857,
+        "sha256": "27b8f36c53be1a02eecbd99801033639662a4697c42ad1141d276c78adbc664a"
+      }
+    ],
+    "compatibleLockRows": 330,
+    "uniqueResolvedTarballs": 323,
+    "contentAddressedObjectCount": 323,
+    "contentAddressedBytes": 55560694,
+    "indexKeyCount": 323,
+    "missingContentObjects": 0,
+    "missingIndexMappings": 0,
+    "invalidIndexMappings": 0,
+    "semanticFingerprintAlgorithm": "sha256-lines-of-integrity-size-content-sha256-and-index-key",
+    "semanticFingerprint": "fa7523cb1a93b4b3626a3b9132139fea8ed7e2c165097a03545b2e58eaf68a91",
+    "excludedFromSelection": [
+      "_logs",
+      "_npx",
+      "_update-notifier-last-checked",
+      "unreferenced-content-addressed-objects",
+      "unreferenced-index-keys",
+      "non-win32-or-non-x64-optional-packages"
+    ],
+    "globalCacheWholeTreeHashRequired": false
+  },
+  "attemptOwnedSnapshot": {
+    "createdDuringThisGreenAtom": false,
+    "creationAuthorizedDuringThisGreenAtom": false,
+    "networkAllowed": false,
+    "npmInvocationRequiredToCreateSnapshot": false,
+    "copySource": "selected-global-cache-content-and-index-files-only",
+    "maximumContentFiles": 323,
+    "maximumIndexFiles": 323,
+    "maximumSelectedContentBytes": 55560694,
+    "copyAllGlobalCacheAllowed": false,
+    "copyLogsNpxOrNotifierAllowed": false,
+    "snapshotRootMustBeNewDirectChildOfExactOwnedBase": true,
+    "snapshotRootMayOverlapRepoGlobalCacheRunCargoOrOutput": false,
+    "existingSnapshotReuseAllowed": false,
+    "copyUsesExclusiveCreate": true,
+    "snapshotSemanticFingerprintMustMatchSelection": true,
+    "snapshotWholeTreeFingerprintFrozenAfterCopy": true,
+    "snapshotWholeTreeFingerprintReverifiedBeforeAndAfterNpmCi": true,
+    "snapshotWholeTreeFingerprintReverifiedBeforeAndAfterBuild": true,
+    "npmLogsMustBeRedirectedOutsideSnapshot": true,
+    "snapshotMutationAllowed": false
+  },
+  "failClosedChecks": [
+    "unsupported-lockfile-version",
+    "resolved-package-without-integrity",
+    "non-registry-tarball-url",
+    "conflicting-integrity-for-one-resolved-url",
+    "unsupported-integrity-algorithm",
+    "missing-content-addressed-object",
+    "content-sha512-mismatch",
+    "missing-index-key",
+    "invalid-index-line-checksum",
+    "index-key-integrity-or-size-mismatch",
+    "semantic-fingerprint-mismatch",
+    "snapshot-root-not-directly-owned",
+    "snapshot-root-overlaps-source-or-global-cache",
+    "preexisting-snapshot-root",
+    "snapshot-symbolic-link-or-junction",
+    "undeclared-or-missing-snapshot-file"
+  ],
+  "execution": {
+    "networkInvocations": 0,
+    "npmCiInvocations": 0,
+    "realCacheFilesCopied": 0,
+    "realSnapshotRootsCreated": 0,
+    "junctionsCreated": 0,
+    "buildInvocations": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "deployments": 0
+  },
+  "nextGate": {
+    "ordinalEightApplicationRequired": true,
+    "newExactProductSourceRequired": true,
+    "newExactYellowAuthorizationRequired": true,
+    "ordinalSevenApplicationReusable": false,
+    "prepareMustFreezeSnapshotReceiptBeforeExecute": true
+  }
+}

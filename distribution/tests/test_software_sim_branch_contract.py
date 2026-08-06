@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
@@ -133,7 +135,13 @@ DETACHED_NODE_DEPENDENCY_SYNC_PATH = (
     / "readiness"
     / "detached-node-dependency-common-core-sync.v1.json"
 )
+STABLE_OFFLINE_CACHE_CONTRACT_PATH = (
+    DISTRIBUTION / "sim" / "readiness" / "stable-offline-cache-contract.v1.json"
+)
 YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_7_APPLICATION_PATH
+LOCKFILE_OFFLINE_CACHE_TOOL = (
+    DISTRIBUTION / "sim" / "desktop" / "lockfile-offline-cache.mjs"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -149,6 +157,69 @@ def git(*args: str) -> str:
         encoding="utf-8",
     )
     return completed.stdout.strip()
+
+
+def write_offline_cache_fixture(root: Path) -> tuple[Path, Path, str, Path, Path]:
+    repo = root / "repo"
+    cache = root / "global-cache"
+    resolved = "https://registry.npmjs.org/example/-/example-1.0.0.tgz"
+    tarball = b"fixture-tarball-content"
+    digest = hashlib.sha512(tarball).digest()
+    integrity = f"sha512-{base64.b64encode(digest).decode()}"
+    lock = {
+        "name": "fixture",
+        "version": "1.0.0",
+        "lockfileVersion": 3,
+        "requires": True,
+        "packages": {
+            "": {"name": "fixture", "version": "1.0.0"},
+            "node_modules/example": {
+                "version": "1.0.0",
+                "resolved": resolved,
+                "integrity": integrity,
+            },
+        },
+    }
+    for workspace in ("desktop", "frontend"):
+        workspace_root = repo / workspace
+        workspace_root.mkdir(parents=True)
+        (workspace_root / "package.json").write_text(
+            json.dumps({"name": f"fixture-{workspace}", "version": "1.0.0"}),
+            encoding="utf-8",
+        )
+        (workspace_root / "package-lock.json").write_text(
+            json.dumps(lock),
+            encoding="utf-8",
+        )
+
+    content_hex = digest.hex()
+    content = (
+        cache
+        / "_cacache"
+        / "content-v2"
+        / "sha512"
+        / content_hex[:2]
+        / content_hex[2:4]
+        / content_hex[4:]
+    )
+    content.parent.mkdir(parents=True)
+    content.write_bytes(tarball)
+    key = f"make-fetch-happen:request-cache:{resolved}"
+    key_hash = hashlib.sha256(key.encode()).hexdigest()
+    index = cache / "_cacache" / "index-v5" / key_hash[:2] / key_hash[2:4] / key_hash[4:]
+    index.parent.mkdir(parents=True)
+    value = json.dumps(
+        {"key": key, "integrity": integrity, "time": 1, "size": len(tarball)},
+        separators=(",", ":"),
+    )
+    index.write_text(f"{hashlib.sha1(value.encode()).hexdigest()}\t{value}\n", encoding="utf-8")
+    content_sha256 = hashlib.sha256(tarball).hexdigest()
+    semantic_lines = (
+        f"content\t{integrity}\t{len(tarball)}\t{content_sha256}\n"
+        f"index\t{key}\t{integrity}"
+    )
+    fingerprint = hashlib.sha256(semantic_lines.encode()).hexdigest()
+    return repo, cache, fingerprint, content, index
 
 
 def run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
@@ -1083,6 +1154,196 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(gate["executeMayProceedFromThisReceipt"])
         self.assertTrue(gate["newExactApplicationRequired"])
         self.assertTrue(gate["newExactYellowAuthorizationRequired"])
+
+    def test_lockfile_offline_cache_contract_ignores_mutable_global_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo, cache, fingerprint, _, _ = write_offline_cache_fixture(root)
+
+            def verify() -> dict[str, Any]:
+                completed = subprocess.run(
+                    [
+                        "node",
+                        str(LOCKFILE_OFFLINE_CACHE_TOOL),
+                        "--mode",
+                        "verify-global",
+                        "--repo-root",
+                        str(repo),
+                        "--cache-root",
+                        str(cache),
+                        "--expected-semantic-fingerprint",
+                        fingerprint,
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                return json.loads(completed.stdout)
+
+            before = verify()
+            logs = cache / "_logs"
+            logs.mkdir()
+            (logs / "mutable-debug.log").write_text("not-a-build-input", encoding="utf-8")
+            unrelated = cache / "_cacache" / "content-v2" / "sha512" / "ff" / "ff" / "unused"
+            unrelated.parent.mkdir(parents=True)
+            unrelated.write_bytes(b"unreferenced")
+            after = verify()
+            self.assertEqual(before["semanticFingerprint"], after["semanticFingerprint"])
+            self.assertEqual(before["contentObjectCount"], 1)
+            self.assertEqual(before["indexKeyCount"], 1)
+            self.assertIn("_logs", after["ignoredGlobalCacheSurfaces"])
+            self.assertEqual(after["networkInvocations"], 0)
+            self.assertEqual(after["npmInvocations"], 0)
+
+    def test_lockfile_offline_cache_contract_creates_minimal_owned_fixture_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo, cache, fingerprint, _, _ = write_offline_cache_fixture(root)
+            owned = root / "owned"
+            snapshot = owned / "attempt-cache"
+            completed = subprocess.run(
+                [
+                    "node",
+                    str(LOCKFILE_OFFLINE_CACHE_TOOL),
+                    "--mode",
+                    "create-snapshot",
+                    "--repo-root",
+                    str(repo),
+                    "--cache-root",
+                    str(cache),
+                    "--expected-semantic-fingerprint",
+                    fingerprint,
+                    "--owned-base",
+                    str(owned),
+                    "--snapshot-root",
+                    str(snapshot),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            receipt = json.loads(completed.stdout)
+            self.assertEqual(receipt["snapshot"]["fileCount"], 2)
+            self.assertTrue(snapshot.is_dir())
+            self.assertFalse((snapshot / "_logs").exists())
+            self.assertFalse((snapshot / "_npx").exists())
+
+            verify = subprocess.run(
+                [
+                    "node",
+                    str(LOCKFILE_OFFLINE_CACHE_TOOL),
+                    "--mode",
+                    "verify-snapshot",
+                    "--repo-root",
+                    str(repo),
+                    "--cache-root",
+                    str(snapshot),
+                    "--expected-semantic-fingerprint",
+                    fingerprint,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(verify.returncode, 0, verify.stderr)
+            verified = json.loads(verify.stdout)
+            self.assertEqual(
+                verified["snapshot"]["fingerprint"],
+                receipt["snapshot"]["fingerprint"],
+            )
+
+    def test_lockfile_offline_cache_contract_fails_closed_on_required_object_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo, cache, fingerprint, content, index = write_offline_cache_fixture(root)
+            content.write_bytes(b"tampered")
+            tampered = subprocess.run(
+                [
+                    "node",
+                    str(LOCKFILE_OFFLINE_CACHE_TOOL),
+                    "--mode",
+                    "verify-global",
+                    "--repo-root",
+                    str(repo),
+                    "--cache-root",
+                    str(cache),
+                    "--expected-semantic-fingerprint",
+                    fingerprint,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(tampered.returncode, 0)
+            self.assertIn("integrity drifted", tampered.stderr)
+
+            repo, cache, fingerprint, _, index = write_offline_cache_fixture(root / "second")
+            index.write_text("invalid-index-line\n", encoding="utf-8")
+            invalid_index = subprocess.run(
+                [
+                    "node",
+                    str(LOCKFILE_OFFLINE_CACHE_TOOL),
+                    "--mode",
+                    "verify-global",
+                    "--repo-root",
+                    str(repo),
+                    "--cache-root",
+                    str(cache),
+                    "--expected-semantic-fingerprint",
+                    fingerprint,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(invalid_index.returncode, 0)
+            self.assertIn("index mapping is invalid", invalid_index.stderr)
+
+    def test_lockfile_offline_cache_tool_has_no_network_or_npm_execution(self) -> None:
+        text = LOCKFILE_OFFLINE_CACHE_TOOL.read_text(encoding="utf-8")
+        for forbidden in (
+            "npm ci",
+            "npm install",
+            "child_process",
+            "fetch(",
+            "http.get",
+            "https.get",
+        ):
+            self.assertNotIn(forbidden, text)
+        self.assertIn("COPYFILE_EXCL", text)
+        self.assertIn("Snapshot root already exists; retry is forbidden.", text)
+
+    def test_stable_offline_cache_contract_excludes_mutable_global_surfaces(self) -> None:
+        contract = load_json(STABLE_OFFLINE_CACHE_CONTRACT_PATH)
+        self.assertEqual(contract["state"], "green-contract-verified-no-snapshot-created")
+        drift = contract["driftClassification"]
+        self.assertEqual(drift["classification"], "whole-cache-nonsemantic-churn")
+        self.assertTrue(drift["failureWindowContainsNpmLogCreationOrRotation"])
+        self.assertFalse(drift["claimingExactRemovedFilesAllowed"])
+        self.assertFalse(drift["productLockOrRequiredTarballDriftObserved"])
+        selection = contract["stableSelection"]
+        self.assertEqual(selection["compatibleLockRows"], 330)
+        self.assertEqual(selection["uniqueResolvedTarballs"], 323)
+        self.assertEqual(selection["contentAddressedObjectCount"], 323)
+        self.assertEqual(selection["indexKeyCount"], 323)
+        self.assertEqual(selection["missingContentObjects"], 0)
+        self.assertEqual(selection["missingIndexMappings"], 0)
+        self.assertEqual(
+            selection["semanticFingerprint"],
+            "fa7523cb1a93b4b3626a3b9132139fea8ed7e2c165097a03545b2e58eaf68a91",
+        )
+        self.assertIn("_logs", selection["excludedFromSelection"])
+        self.assertFalse(selection["globalCacheWholeTreeHashRequired"])
+        snapshot = contract["attemptOwnedSnapshot"]
+        self.assertEqual(snapshot["maximumContentFiles"], 323)
+        self.assertEqual(snapshot["maximumIndexFiles"], 323)
+        self.assertFalse(snapshot["copyAllGlobalCacheAllowed"])
+        self.assertTrue(snapshot["snapshotWholeTreeFingerprintFrozenAfterCopy"])
+        self.assertTrue(snapshot["npmLogsMustBeRedirectedOutsideSnapshot"])
+        self.assertTrue(all(value == 0 for value in contract["execution"].values()))
+        self.assertFalse(contract["nextGate"]["ordinalSevenApplicationReusable"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
