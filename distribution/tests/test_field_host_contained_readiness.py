@@ -36,13 +36,19 @@ CURRENT_EVIDENCE = (
     ROOT
     / "artifacts"
     / "test-runs"
-    / "field-host-contained-readiness-d54c66e-utf8"
+    / "field-host-contained-readiness-07c9262-array"
 )
-PREFLIGHT_FAILURE_EVIDENCE = (
+FIRST_PREFLIGHT_FAILURE_EVIDENCE = (
     ROOT
     / "artifacts"
     / "test-runs"
     / "field-host-contained-preflight-failure-5d62660"
+)
+SECOND_PREFLIGHT_FAILURE_EVIDENCE = (
+    ROOT
+    / "artifacts"
+    / "test-runs"
+    / "field-host-contained-preflight-failure-90a2a3c"
 )
 
 SPEC = importlib.util.spec_from_file_location("field_host_contained_readiness_tests", TOOL_PATH)
@@ -265,7 +271,7 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
 
     def test_first_yellow_attempt_is_preserved_as_preflight_only_failure(self) -> None:
         failure = host_readiness.load_json(
-            PREFLIGHT_FAILURE_EVIDENCE / "preflight-failure-receipt.json"
+            FIRST_PREFLIGHT_FAILURE_EVIDENCE / "preflight-failure-receipt.json"
         )
         self.assertEqual(failure["result"], "fail-before-owned-write")
         self.assertEqual(failure["attempt"]["sourceHead"], "5d6266088b457f5c5dfe82e8d6f7be1df2b7831f")
@@ -279,6 +285,21 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertFalse(any(failure["postFailureState"].values()))
         self.assertFalse(failure["releaseState"]["releaseReady"])
         self.assertFalse(failure["releaseState"]["websiteReady"])
+
+    def test_second_yellow_attempt_is_preserved_as_preflight_only_failure(self) -> None:
+        failure = host_readiness.load_json(
+            SECOND_PREFLIGHT_FAILURE_EVIDENCE / "preflight-failure-receipt.json"
+        )
+        self.assertEqual(failure["result"], "fail-before-owned-write")
+        self.assertEqual(failure["attempt"]["sourceHead"], "90a2a3ce1edfa6092579a0ded7f36ffa49f7d384")
+        self.assertEqual(failure["attempt"]["errorCode"], "field.host.plan.empty-array-powershell51")
+        self.assertFalse(failure["attempt"]["productFailure"])
+        self.assertEqual(
+            failure["remediation"]["fixedExecutorCommit"],
+            "07c9262a132b9d53167952df69f608637297f8b2",
+        )
+        self.assertEqual(set(failure["executionCounts"].values()), {0})
+        self.assertFalse(any(failure["postFailureState"].values()))
 
     def test_snapshot_tool_is_read_only_outside_its_explicit_output(self) -> None:
         source = SNAPSHOT_TOOL_PATH.read_text(encoding="utf-8")
