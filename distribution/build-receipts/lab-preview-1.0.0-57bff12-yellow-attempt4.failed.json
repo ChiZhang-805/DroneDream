@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-preview-1.0.0-57bff12-yellow-attempt4",
+  "editionId": "lab",
+  "result": "failed-frozen",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "57bff123ada2ae91607f7261f2968e6a50050357",
+    "tree": "93e87826c866dfa7826b7dc37480bbd6bb33dba2",
+    "statusAtAttemptStart": "clean",
+    "upstreamExactAtAttemptStart": true
+  },
+  "commonCore": {
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "nsisDuplicateLabelDonor": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+    "editionSafetyFixtureDonor": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b"
+  },
+  "attempt": {
+    "historicalLabYellowAttemptNumber": 4,
+    "exactSourceAttemptNumber": 1,
+    "classification": "YELLOW",
+    "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+    "cargoBuildJobs": 2,
+    "serializedWithOtherEditionBuilds": true,
+    "tauriInvoked": true,
+    "finalArtifactAcceptedCount": 0,
+    "retryAuthorized": false
+  },
+  "resourceGate": {
+    "memoryUsedPercent": 56.2,
+    "memoryFreeGiB": 6.9,
+    "cpuPercent": 4.0,
+    "heavyProcessCount": 0,
+    "cDriveFreeGiB": 95.77,
+    "passed": true
+  },
+  "inputs": {
+    "publicSupabaseActionsVariablesInjected": true,
+    "publicSupabaseValuesRecorded": false,
+    "oauthRegistrationReceipt": "distribution/build-receipts/lab-oauth-public-registration-1.0.0-fb3afee.controller-confirmed.json",
+    "oauthClientValueRecorded": false,
+    "approvedUpdaterKeyId": "BA3FDCAF71CE2FF5",
+    "privateKeyPathRecorded": false,
+    "privateKeyContentReadByEvidenceAudit": false,
+    "actualUpdaterSignerReached": false,
+    "productionNamingKeyUsed": false,
+    "providerCalled": false,
+    "modelApiKeyRead": false,
+    "accountPasswordRead": false
+  },
+  "verificationBeforeAttempt": {
+    "pythonTestsPassed": 148,
+    "oauthFrontendTestsPassed": 12,
+    "desktopBrowserAuthStaticMatrix": "passed-4-edition-locale-viewports",
+    "nsisRepeatedExpansionFixtures": "passed-universal-sim-lab-field-and-unknown-deny",
+    "desktopVersion": "passed-1.0.0",
+    "yellowReadinessRequestable": true,
+    "yellowReadinessBlockerCount": 0,
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny"
+  },
+  "failure": {
+    "stage": "outer-log-wrapper-promoted-tauri-info-stderr",
+    "message": "The external PowerShell logging wrapper treated Tauri package-version Info output on stderr as a terminating NativeCommandError.",
+    "repositoryBuildScriptFailure": false,
+    "rustCompilerFailureObserved": false,
+    "nsisCompilerFailureObserved": false,
+    "automaticRetryAllowed": false
+  },
+  "evidence": {
+    "attemptRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\57bff123ada2ae91607f7261f2968e6a50050357",
+    "attemptStart": {
+      "fileName": "attempt-start.json",
+      "bytes": 363,
+      "sha256": "5ffbf0afb9456739f716b9498db69572c41fdc6732ec7f0eebacc3168bd8ea65"
+    },
+    "log": {
+      "fileName": "build.log",
+      "bytes": 2860,
+      "sha256": "12cb78469f4526e51f75232d4d7d59a42a4a34b7b42f0ee606842dd61e19d833"
+    },
+    "attemptEnd": {
+      "fileName": "attempt-end.json",
+      "bytes": 1609,
+      "sha256": "31f3a2e5b1f02cbed422093c8ef7c4e1ffbd52f6f46df91588b8c1c2249ea650"
+    }
+  },
+  "internalCandidate": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Lab_1.0.0_x64-setup.exe",
+    "bytes": 12078492,
+    "sha256": "0684fb0cdeaa2defa1db9241954d96d794ab5cba8d619ccc3cf1e109e76468cc",
+    "authenticodeStatus": "NotSigned",
+    "updaterSignatureState": "not-issued",
+    "checksumState": "not-issued",
+    "acceptedAsArtifact": false,
+    "mayBeRenamedOrRelabeled": false
+  },
+  "finalArtifact": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "produced": false,
+    "absolutePath": null,
+    "bytes": null,
+    "sha256": null,
+    "authenticodeStatus": null,
+    "updaterSignature": null,
+    "websiteExactHandoffReady": false
+  },
+  "sideEffects": {
+    "installerRun": false,
+    "runtimeMigration": false,
+    "px4OrGazeboStarted": false,
+    "hardwareAccess": false,
+    "releaseBranchCreated": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "remainingGates": [
+    "A fresh explicit YELLOW authorization is required before any retry.",
+    "The logging wrapper must preserve native stderr without promoting normal Tauri Info records to terminating errors.",
+    "A successful attempt must produce the fixed final filename, updater signature, checksum, exact receipt, and static PE evidence.",
+    "Installation, coexistence, login-entry, and Website handoff remain blocked because no accepted final artifact exists."
+  ],
+  "releaseReady": false
+}
