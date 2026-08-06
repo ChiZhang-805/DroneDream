@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-universal-donor-requests",
+  "requestVersion": "1.0.0",
+  "requestingEdition": "lab",
+  "authority": {
+    "branch": "codex/software",
+    "observedHead": "39d19414e4ac6649288726195f74afaf6dc58123",
+    "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "labMayCarrySharedFixLongTerm": false,
+    "integrationRule": "review exact donor ancestry and diff, then forward-sync the canonical change without hand-copying or blindly cherry-picking"
+  },
+  "requests": [
+    {
+      "requestId": "universal-nsis-existing-install-quiesce-v1",
+      "ownership": "Universal/Core",
+      "state": "requested-not-delivered",
+      "evidence": {
+        "labArtifactSourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
+        "artifactSha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
+        "freshInstall": "passed",
+        "nativeQuiesceDirectSequence": "passed-recover-begin-status-end",
+        "sameVersionUpdate": "failed-exit-2",
+        "failedAttemptMayBeDeletedOrRelabeled": false
+      },
+      "candidatePaths": [
+        "desktop/src-tauri/nsis/installer.nsi",
+        "desktop/src-tauri/nsis/runtime-mode.nsh",
+        "desktop/src-tauri/nsis/webview2-health.nsh",
+        "desktop/src-tauri/src/installer_handoff.rs",
+        "desktop/scripts/verify-nsis-template.ps1"
+      ],
+      "acceptance": [
+        "Add stage-specific diagnostics for existing-install quiesce acquire, revalidate, old-uninstaller handoff, replacement, and release without logging tokens.",
+        "Make same-version passive /UPDATE preserve edition-owned files and shortcuts while replacing only the exact product installation.",
+        "Keep cross-process runtime mutation fail-closed and preserve DroneDreamRuntime and all other Edition installations.",
+        "Cover fake existing-install, busy, pending, stale-owner, command-failure, and successful update paths before any real installer attempt.",
+        "Prove Universal, Sim, Lab, Field, and legacy DroneDream product identities are parameters rather than hard-coded cleanup targets."
+      ]
+    },
+    {
+      "requestId": "universal-edition-auth-isolation-v1",
+      "ownership": "Universal/Core",
+      "state": "awaiting-exact-donor",
+      "evidence": {
+        "observedUniversalHead": "39d19414e4ac6649288726195f74afaf6dc58123",
+        "browserAuthPath": "desktop/src-tauri/src/browser_auth.rs",
+        "browserAuthGitObjectId": "8bec964e39a9fed851746d2f35285f8c17e7ce62",
+        "currentCallbackIsEditionBound": false,
+        "currentFlowUsesPkceS256": false,
+        "currentOsCredentialVaultIsEditionScoped": false
+      },
+      "candidatePaths": [
+        "desktop/src-tauri/src/browser_auth.rs",
+        "desktop/src-tauri/browser-auth.html",
+        "frontend/src/features/auth/AuthContext.tsx",
+        "frontend/src/features/auth/browserAuth.ts",
+        "frontend/src/features/auth/supabaseClient.ts",
+        "frontend/src/desktop/bridge.ts"
+      ],
+      "acceptance": [
+        "Derive trusted app identity from the native bundle identifier, never from a frontend mode switch.",
+        "Use an authorization-code PKCE S256 callback whose app identity, state, nonce, and one-time verifier are bound to one user-initiated attempt.",
+        "Use edition-scoped OS credential-vault and local-session namespaces while allowing the same backend account subject.",
+        "A browser account session may avoid password entry but cannot complete Lab authentication until the user clicks Lab sign-in and the Lab callback succeeds.",
+        "Render login and browser callback from the trusted Edition identity using exact canonical Edition assets and tokens; do not redraw, use concept directories, or let branding grant authority.",
+        "Reject callback, state, nonce, verifier, vault, or session material issued for another Edition.",
+        "Add cross-Edition fake tests for Universal, Sim, Lab, and Field plus replay, mismatch, cancellation, and missing-identity negatives."
+      ]
+    }
+  ],
+  "labRecovery": {
+    "nextStep": "wait for exact clean Universal donor commits, audit ancestry and changed paths, then forward-sync and request a new gated Lab build",
+    "rebuildAuthorizedByThisRequest": false,
+    "installAuthorizedByThisRequest": false,
+    "frozenArtifactMayBecomeFinalWithoutRebuild": false
+  }
+}

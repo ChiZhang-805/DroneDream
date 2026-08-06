@@ -15,7 +15,9 @@
     "executionGatePolicy": "distribution/safety/edition-execution-gate.v1.json",
     "vehiclePackRegistry": "distribution/vehicle-packs/registry.v1.json",
     "licenseNotice": "runtime/THIRD_PARTY_NOTICES.md",
-    "websiteExactExeHandoff": "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json"
+    "websiteExactExeHandoff": "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json",
+    "coexistenceAndAuth": "distribution/editions/lab/coexistence-and-auth.v1.json",
+    "universalDonorRequests": "distribution/editions/lab/universal-donor-requests.v1.json"
   },
   "commonCore": {
     "authorityName": "Universal/Core",
@@ -57,10 +59,12 @@
     "distribution/schemas/lab-preview-artifact-receipt.schema.json",
     "distribution/schemas/lab-website-exact-exe-handoff.schema.json",
     "distribution/tests/test_lab_brand_assets.py",
+    "distribution/tests/test_lab_coexistence_contract.py",
     "distribution/tests/test_lab_preview_contract.py",
     "distribution/tests/test_lab_website_handoff.py",
     "distribution/tools/lab_yellow_readiness_audit.py",
     "distribution/tools/lab_preinstall_acceptance.py",
+    "distribution/tools/verify_lab_coexistence_contract.py",
     "distribution/tools/verify_lab_preview_artifact.py",
     "distribution/tools/verify_lab_preview_contract.py",
     "distribution/tools/verify_lab_website_handoff.py",
@@ -132,6 +136,7 @@
     "firmwareFamily": "px4",
     "qualificationReceiptRequired": true,
     "runtimeProfile": "full-lab",
+    "enginePackEditionProfile": "unified-sim-lab",
     "brand": {
       "displayName": "DroneDream · LAB",
       "canonicalDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",

@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-four-edition-coexistence-and-auth",
+  "contractVersion": "1.0.0",
+  "editionId": "lab",
+  "auditMode": "green-source-only",
+  "auditBase": {
+    "labBranch": "codex/software-lab",
+    "labCommit": "a62111eee2b7dc5d64475b9ac207bb599fe13669",
+    "universalBranch": "codex/software",
+    "universalObservedCommit": "39d19414e4ac6649288726195f74afaf6dc58123",
+    "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "simObservedCommit": "c8630332cdad1c1a94155d13d1981c83bdec0d1c",
+    "fieldObservedCommit": "76efd0683c79361cbb7f0e7fc0c8bb66a9569305"
+  },
+  "frozenArtifact": {
+    "sourceCommit": "978b902fbe3038a526ab4970f55ea6eb37685c64",
+    "absolutePath": "C:\\Users\\zju20\\.codex\\worktrees\\b3db\\DroneDream\\artifacts\\test-runs\\lab-preview-978b902\\DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 11815002,
+    "sha256": "8279941763bb393debbf9ab5d4beb2b2ba7c6204ff718e4ed25dbbb80b54c1ab",
+    "signatureState": "NotSigned",
+    "overlayInstall": "failed-exit-2",
+    "mayBeRelabeledForThisContract": false,
+    "releaseReady": false
+  },
+  "identityDerivation": {
+    "defaultInstallRoot": "%LOCALAPPDATA%\\{productName}",
+    "uninstallKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{productName}",
+    "manufacturerProductKey": "HKCU\\Software\\DroneDream\\{productName}",
+    "desktopShortcut": "%USERPROFILE%\\Desktop\\{productName}.lnk",
+    "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\{productName}.lnk",
+    "appUserModelId": "{identifier}",
+    "roamingAppData": "%APPDATA%\\{identifier}",
+    "localAppData": "%LOCALAPPDATA%\\{identifier}",
+    "uninstallDeletionScope": [
+      "the exact product install root",
+      "shortcuts whose target is the exact installed executable",
+      "the exact product uninstall and manufacturer keys",
+      "the exact identifier app-data directories only when the user opts in"
+    ]
+  },
+  "identities": [
+    {
+      "editionId": "universal",
+      "sourceCommit": "39d19414e4ac6649288726195f74afaf6dc58123",
+      "configPath": "desktop/src-tauri/tauri.conf.json",
+      "configGitObjectId": "08e6e6959849f073db594310c07b136ddaac5f84",
+      "productName": "DroneDream",
+      "identifier": "io.dronedream.desktop",
+      "artifactFileName": "DroneDream-1.0.0.exe",
+      "updaterManifest": "latest.json",
+      "enginePackEditionProfile": "unified-sim-lab"
+    },
+    {
+      "editionId": "sim",
+      "sourceCommit": "c8630332cdad1c1a94155d13d1981c83bdec0d1c",
+      "configPath": "distribution/sim/desktop/tauri.sim.conf.json",
+      "configGitObjectId": "6145e4b260bc1591ba63be3adc448d51e08ebe0b",
+      "productName": "DroneDream · SIM",
+      "identifier": "io.dronedream.sim",
+      "artifactFileName": "DroneDream-Sim-1.0.0.exe",
+      "updaterManifest": "latest.json",
+      "enginePackEditionProfile": "sim-only"
+    },
+    {
+      "editionId": "lab",
+      "sourceCommit": "next-clean-lab-source",
+      "configPath": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "configGitObjectIdAtAuditBase": "3a00314b5cd75d1cc965f9f493cf6c640e6f9f8a",
+      "productName": "DroneDream · LAB",
+      "identifier": "io.dronedream.desktop.lab",
+      "artifactFileName": "DroneDream-Lab-1.0.0.exe",
+      "updaterManifest": "lab-latest.json",
+      "enginePackEditionProfile": "unified-sim-lab",
+      "canonicalWindowsIcon": "brand/generated/lab/windows/icon.ico",
+      "canonicalMarkSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+      "canonicalDotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+    },
+    {
+      "editionId": "field",
+      "sourceCommit": "76efd0683c79361cbb7f0e7fc0c8bb66a9569305",
+      "configPath": "desktop/src-tauri/tauri.field.conf.json",
+      "configGitObjectId": "512fed1fb1cc7dcedf512d7846821a43968fc7d9",
+      "productName": "DroneDream · FIELD",
+      "identifier": "io.dronedream.desktop.field",
+      "artifactFileName": "DroneDream-Field-1.0.0.exe",
+      "updaterManifest": "field-latest.json",
+      "enginePackEditionProfile": "field-only"
+    }
+  ],
+  "sharedRuntimeCoordination": {
+    "runtimeProductId": "DroneDreamRuntime",
+    "coordinatorNamespace": "%LOCALAPPDATA%\\io.dronedream.desktop",
+    "purpose": "cross-edition runtime mutation lease and installer quiesce only",
+    "isAccountSessionStorage": false,
+    "isEditionProfileStorage": false,
+    "mayBeDeletedByLabUninstall": false
+  },
+  "brandContinuity": {
+    "canonicalAuthority": "Universal brand system",
+    "displayName": "DroneDream · LAB",
+    "separatorCodePoint": "U+00B7",
+    "markPath": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
+    "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
+    "dotLockupPath": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+    "dotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+    "windowsIconPath": "brand/generated/lab/windows/icon.ico",
+    "tokens": {
+      "gradient": ["#A7E84A", "#20C77A", "#087E69"],
+      "light": "#F3FCEF",
+      "dark": "#092019"
+    },
+    "requiredSurfaces": [
+      "executable",
+      "desktop-shortcut",
+      "start-menu-shortcut",
+      "taskbar",
+      "sidebar",
+      "launcher",
+      "login",
+      "browser-callback",
+      "website-edition-card",
+      "website-download-metadata"
+    ],
+    "copyPolicy": "exact canonical bytes and tokens; no redraw or concept-directory dependency",
+    "grantsHardwareAuthority": false
+  },
+  "authentication": {
+    "accountSubjectPolicy": "the same website account subject may be used in every Edition",
+    "requiredLabAppIdentity": "io.dronedream.desktop.lab",
+    "requiredCallbackNamespace": "io.dronedream.desktop.lab/auth/callback",
+    "requiredCredentialVaultNamespace": "io.dronedream.desktop.lab/auth",
+    "requiredLocalSessionNamespace": "io.dronedream.desktop.lab/session",
+    "requiredFlow": "authorization-code-pkce-s256",
+    "requirements": {
+      "explicitLabLoginGestureEveryLocalSession": true,
+      "browserSessionMayAvoidPasswordEntry": true,
+      "browserSessionMaySilentlyAuthenticateLabWithoutGesture": false,
+      "callbackMustBindAppIdentity": true,
+      "pkceVerifierMustBePerAttempt": true,
+      "stateMustBePerAttemptAndBindAppIdentity": true,
+      "nonceMustBePerAttemptAndBindAppIdentity": true,
+      "credentialVaultMustBeEditionScoped": true,
+      "localSessionMustBeEditionScoped": true,
+      "otherEditionSessionMayBeAdopted": false,
+      "frontendMayAssertEditionIdentity": false
+    },
+    "currentCommonCoreObservation": {
+      "sourceCommit": "39d19414e4ac6649288726195f74afaf6dc58123",
+      "nativePath": "desktop/src-tauri/src/browser_auth.rs",
+      "nativeGitObjectId": "8bec964e39a9fed851746d2f35285f8c17e7ce62",
+      "frontendStoragePath": "frontend/src/features/auth/supabaseClient.ts",
+      "frontendStorageGitObjectId": "2a9819b7e6dcfaf73e8faa3c8a95b76171a0d7fd",
+      "explicitUserGesture": true,
+      "loopbackCallback": true,
+      "cryptographicPerAttemptState": true,
+      "cryptographicPerAttemptNonce": true,
+      "editionBoundCallback": false,
+      "pkceS256": false,
+      "editionBoundStateAndNonce": false,
+      "osCredentialVault": false,
+      "crossEditionSilentAdoptionDenied": "not-proven",
+      "readyAsCanonicalAuthDonor": false
+    }
+  },
+  "safetyBoundary": {
+    "validatedVehiclePackCount": 0,
+    "workspaceOrThemeGrantsHardwareAuthority": false,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"]
+  },
+  "crossEditionBlockers": [
+    "Universal and Sim currently resolve the same latest.json updater manifest; Sim needs an edition-owned endpoint before four-Edition update isolation is accepted.",
+    "Universal has not delivered the exact edition-aware authentication donor required by this contract.",
+    "Universal has not delivered the shared NSIS existing-install/quiesce repair proven against same-version /UPDATE.",
+    "The frozen Lab EXE predates this contract and remains an exact unsigned non-release artifact."
+  ],
+  "contractReady": true,
+  "releaseReady": false
+}

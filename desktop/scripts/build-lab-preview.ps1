@@ -146,6 +146,7 @@ if (-not $gnullvm.strictlyPinnedReady -or $gnullvm.requiresMsvcLinkExe) {
 $env:CARGO_TARGET_DIR = $cargoTargetFull
 $env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $sourceCommit
 $env:DRONEDREAM_LAB_PREVIEW = "1"
+$env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"
 $env:VITE_DRONEDREAM_EDITION = "lab"
 
 & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `

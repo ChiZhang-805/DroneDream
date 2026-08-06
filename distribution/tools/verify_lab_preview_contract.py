@@ -52,6 +52,10 @@ def verify_lab_preview_contract() -> dict[str, object]:
         != "distribution/editions/lab/brand-source-manifest.v1.json"
         or authority.get("websiteExactExeHandoff")
         != "distribution/editions/lab/website-exact-exe-handoff.awaiting.v1.json"
+        or authority.get("coexistenceAndAuth")
+        != "distribution/editions/lab/coexistence-and-auth.v1.json"
+        or authority.get("universalDonorRequests")
+        != "distribution/editions/lab/universal-donor-requests.v1.json"
     ):
         raise LabPreviewContractError("Lab preview source or Website handoff authority is missing")
 
@@ -131,10 +135,12 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "distribution/schemas/lab-preview-artifact-receipt.schema.json",
         "distribution/schemas/lab-website-exact-exe-handoff.schema.json",
         "distribution/tests/test_lab_brand_assets.py",
+        "distribution/tests/test_lab_coexistence_contract.py",
         "distribution/tests/test_lab_preview_contract.py",
         "distribution/tests/test_lab_website_handoff.py",
         "distribution/tools/lab_yellow_readiness_audit.py",
         "distribution/tools/lab_preinstall_acceptance.py",
+        "distribution/tools/verify_lab_coexistence_contract.py",
         "distribution/tools/verify_lab_preview_artifact.py",
         "distribution/tools/verify_lab_preview_contract.py",
         "distribution/tools/verify_lab_website_handoff.py",
@@ -213,6 +219,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         != "distribution/tools/lab_yellow_readiness_audit.py"
         or payload.get("firmwareFamily") != "px4"
         or payload.get("qualificationReceiptRequired") is not True
+        or payload.get("enginePackEditionProfile") != "unified-sim-lab"
         or tuple(payload.get("simulationPayload", ()))
         != (
             "runtime-simulation",
@@ -373,6 +380,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError("Lab Tauri overlay icon set drifted")
     for required_brand_resource in (
         "../../distribution/editions/lab/brand-source-manifest.v1.json",
+        "../../distribution/editions/lab/coexistence-and-auth.v1.json",
+        "../../distribution/editions/lab/universal-donor-requests.v1.json",
         "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
         "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
         "../../brand/brand-editions.v1.json",
@@ -384,6 +393,14 @@ def verify_lab_preview_contract() -> dict[str, object]:
     windows = overlay.get("app", {}).get("windows", []) if isinstance(overlay.get("app"), dict) else []
     if not isinstance(windows, list) or not windows or windows[0].get("title") != "DroneDream · LAB":
         raise LabPreviewContractError("Lab Tauri window title drifted")
+    plugins = overlay.get("plugins")
+    updater = plugins.get("updater") if isinstance(plugins, dict) else None
+    if (
+        not isinstance(updater, dict)
+        or updater.get("endpoints")
+        != ["https://github.com/ChiZhang-805/DroneDream/releases/latest/download/lab-latest.json"]
+    ):
+        raise LabPreviewContractError("Lab updater endpoint is not edition scoped")
 
     required_script_fragments = (
         'param(',
@@ -405,6 +422,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         'authenticode',
         'tauriUpdaterSignature = "not-issued"',
         'VITE_DRONEDREAM_EDITION = "lab"',
+        'DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"',
         '$coreListing.Replace("`r`n", "`n").Replace("`r", "`n").Trim()',
         'Get-Sha256Text $coreListingCanonical',
         '[IO.File]::WriteAllText($receiptPath, $receiptJson, $utf8NoBom)',

@@ -33,11 +33,23 @@
       "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",
       "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json",
       "../../distribution/editions/lab/brand-source-manifest.v1.json": "distribution/editions/lab/brand-source-manifest.v1.json",
+      "../../distribution/editions/lab/coexistence-and-auth.v1.json": "distribution/editions/lab/coexistence-and-auth.v1.json",
+      "../../distribution/editions/lab/universal-donor-requests.v1.json": "distribution/editions/lab/universal-donor-requests.v1.json",
       "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
       "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
       "../../brand/brand-editions.v1.json": "brand/brand-editions.v1.json",
       "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json",
       "../../brand/generated/brand-visual-receipt.v1.json": "brand/generated/brand-visual-receipt.v1.json"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/lab-latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
