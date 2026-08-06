@@ -29,18 +29,25 @@
     "oneTimeCallback": true,
     "oneTimeCodeExchange": true,
     "providerRetryCount": 0,
-    "authorizationEndpoint": "https://getdronedream.com/desktop-auth/v1/authorize",
-    "tokenExchangeEndpoint": "https://getdronedream.com/desktop-auth/v1/token",
+    "authorizationEndpoint": "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize",
+    "tokenExchangeEndpoint": "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/token",
+    "authorizationUiEndpoint": "https://getdronedream.com/oauth/consent",
     "callbackTransport": "loopback-http",
     "loopbackHost": "127.0.0.1",
-    "randomLoopbackPortRequired": true,
+    "fixedRegisteredLoopbackPortRequired": true,
     "strictHostAndOriginRequired": true,
-    "callbackPathTemplate": "/desktop-auth/{editionId}/{attemptId}/callback",
+    "callbackPathTemplate": "/desktop-auth/{editionId}/callback",
     "callbackFields": [
       "code",
-      "state",
+      "state"
+    ],
+    "nativeBoundContext": [
       "editionId",
-      "attemptId"
+      "authClientId",
+      "attemptId",
+      "callbackPort",
+      "codeVerifier",
+      "nonce"
     ],
     "callbackMustNotContain": [
       "accessToken",
@@ -105,8 +112,11 @@
     {
       "editionId": "universal",
       "authClientId": "dronedream-desktop-universal",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
       "bundleIdentifier": "io.dronedream.desktop.universal",
       "loopbackPathPrefix": "/desktop-auth/universal/",
+      "loopbackPort": 49210,
+      "redirectUri": "http://127.0.0.1:49210/desktop-auth/universal/callback",
       "customProtocol": "dronedream-universal",
       "credentialVaultNamespace": "DroneDream/Auth/universal/v1",
       "webViewDataNamespace": "io.dronedream.desktop.universal"
@@ -114,8 +124,11 @@
     {
       "editionId": "sim",
       "authClientId": "dronedream-desktop-sim",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
       "bundleIdentifier": "io.dronedream.desktop.sim",
       "loopbackPathPrefix": "/desktop-auth/sim/",
+      "loopbackPort": 49211,
+      "redirectUri": "http://127.0.0.1:49211/desktop-auth/sim/callback",
       "customProtocol": "dronedream-sim",
       "credentialVaultNamespace": "DroneDream/Auth/sim/v1",
       "webViewDataNamespace": "io.dronedream.desktop.sim"
@@ -123,8 +136,11 @@
     {
       "editionId": "lab",
       "authClientId": "dronedream-desktop-lab",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
       "bundleIdentifier": "io.dronedream.desktop.lab",
       "loopbackPathPrefix": "/desktop-auth/lab/",
+      "loopbackPort": 49212,
+      "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
       "customProtocol": "dronedream-lab",
       "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
       "webViewDataNamespace": "io.dronedream.desktop.lab"
@@ -132,8 +148,11 @@
     {
       "editionId": "field",
       "authClientId": "dronedream-desktop-field",
+      "providerClientIdBuildVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
       "bundleIdentifier": "io.dronedream.desktop.field",
       "loopbackPathPrefix": "/desktop-auth/field/",
+      "loopbackPort": 49213,
+      "redirectUri": "http://127.0.0.1:49213/desktop-auth/field/callback",
       "customProtocol": "dronedream-field",
       "credentialVaultNamespace": "DroneDream/Auth/field/v1",
       "webViewDataNamespace": "io.dronedream.desktop.field"
