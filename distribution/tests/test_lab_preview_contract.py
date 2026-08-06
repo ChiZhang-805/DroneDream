@@ -134,8 +134,8 @@ class LabPreviewContractTests(unittest.TestCase):
         script = (ROOT / "desktop/scripts/build-windows-llvm.ps1").read_text(
             encoding="utf-8"
         )
-        edition_index = script.index("--config $additionalConfig")
-        llvm_index = script.index("--config $llvmBundleConfig", edition_index)
+        edition_index = script.index('"--config", $additionalConfig')
+        llvm_index = script.index('"--config", $llvmBundleConfig', edition_index)
         self.assertLess(edition_index, llvm_index)
         self.assertNotIn("$env:TAURI_CONFIG", script)
 

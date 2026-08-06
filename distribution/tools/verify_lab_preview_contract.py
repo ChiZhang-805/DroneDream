@@ -485,8 +485,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         '[string]$ExpectedProductName = "DroneDream"',
         '[switch]$AllowUnsignedUpdater',
         '[switch]$PreserveBundleHistory',
-        '--config $additionalConfig',
-        '--config $llvmBundleConfig',
+        '"--config", $additionalConfig',
+        '"--config", $llvmBundleConfig',
         '$env:CARGO_TARGET_DIR = $cargoTargetRoot',
         'invoke-tauri-updater-signer.ps1',
         'if (-not $AllowUnsignedUpdater)',
@@ -501,9 +501,11 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError(
             "Shared LLVM build must not transport edition config through TAURI_CONFIG"
         )
-    edition_config_index = shared_llvm_script.index("--config $additionalConfig")
+    edition_config_index = shared_llvm_script.index(
+        '"--config", $additionalConfig'
+    )
     llvm_config_index = shared_llvm_script.index(
-        "--config $llvmBundleConfig",
+        '"--config", $llvmBundleConfig',
         edition_config_index,
     )
     if edition_config_index >= llvm_config_index:
