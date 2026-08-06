@@ -4,7 +4,7 @@
   "planVersion": "1.0.0",
   "editionId": "sim",
   "executionClass": "GREEN-static-ready-yellow2-not-authorized",
-  "state": "common-nsis-fixed-awaiting-serial-yellow2-authorization",
+  "state": "registration-validator-fixed-awaiting-serial-yellow2-authorization",
   "authorization": {
     "yellow1Approved": true,
     "yellow2Approved": false,

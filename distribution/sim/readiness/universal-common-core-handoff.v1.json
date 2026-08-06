@@ -6,8 +6,8 @@
   "state": "green-path-sync-complete-awaiting-yellow-authorization",
   "source": {
     "branch": "origin/codex/software",
-    "observedHead": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
-    "observedTree": "26d913c7098b1a1c3a04e974b17b10ebac03e8ef",
+    "observedHead": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
+    "observedTree": "5d9b060d14e758ba558bb7d4c7a1c04822bde28d",
     "observedHeadIsEvidenceOnly": false,
     "observedHeadUsedAsWholeProductSource": false,
     "brandBaseCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
@@ -26,12 +26,13 @@
     "updaterEvidenceCommit": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
     "runtimeModeFixCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
     "nsisIdentityFixCommit": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+    "lifecycleRegistrationVerifierCommit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
     "wholeLineageMerged": false,
     "evidenceCommitUsedAsProductSource": false
   },
   "pathSync": {
     "canonicalBrandPathCount": 94,
-    "exactCommonPathCount": 48,
+    "exactCommonPathCount": 49,
     "simSemanticAdapterPath": "frontend/src/pages/DesktopSetup.tsx",
     "unrelatedBenchmarkPathsAdopted": false,
     "hardwareAuthorityGranted": false
@@ -125,13 +126,21 @@
       "changedPathCount": 5,
       "rootCause": "duplicate-expanded-desktop-done-label",
       "editionIdentityPreserved": true
+    },
+    "lifecycleRegistrationValidator": {
+      "sourceCommit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
+      "parentCommit": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+      "changedPathCount": 3,
+      "rootCause": "lifecycle-verifier-false-negative",
+      "productNsisChanged": false,
+      "simExecutionToolReplaced": false
     }
   },
   "upstreamBlockers": [],
   "commonCoreClassification": {
     "recordedCommonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
     "recordedCommonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
-    "candidateProductCommit": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+    "candidateProductCommit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
     "baselineUpdated": false,
     "candidateClaimedAsValidatedCommonCore": false
   },

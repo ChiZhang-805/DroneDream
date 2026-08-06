@@ -445,7 +445,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         or plan["executionClass"]
         != "GREEN-static-ready-yellow2-not-authorized"
         or plan["state"]
-        != "common-nsis-fixed-awaiting-serial-yellow2-authorization"
+        != "registration-validator-fixed-awaiting-serial-yellow2-authorization"
     ):
         raise SimYellowLifecycleError("Sim YELLOW execution plan identity drifted")
 

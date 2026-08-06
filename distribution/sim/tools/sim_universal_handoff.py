@@ -10,10 +10,11 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-OBSERVED_HEAD = "a11fe7d09fceafaecf102a0cbfba49abb066a557"
-OBSERVED_TREE = "26d913c7098b1a1c3a04e974b17b10ebac03e8ef"
+OBSERVED_HEAD = "57b74f59ed4164ebefde623fa7f5102e5c24363f"
+OBSERVED_TREE = "5d9b060d14e758ba558bb7d4c7a1c04822bde28d"
 AUTH_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 RUNTIME_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+NSIS_IDENTITY_FIX_COMMIT = "a11fe7d09fceafaecf102a0cbfba49abb066a557"
 BRAND_PRODUCT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
 
 EXACT_GROUPS = {
@@ -80,11 +81,14 @@ EXACT_GROUPS = {
         "desktop/src-tauri/nsis/runtime-mode.nsh",
         "desktop/src-tauri/src/installer_handoff.rs",
     ),
-    OBSERVED_HEAD: (
-        "desktop/scripts/verify-edition-identity-nsis.ps1",
+    NSIS_IDENTITY_FIX_COMMIT: (
         "desktop/scripts/verify-nsis-template.ps1",
         "desktop/src-tauri/nsis/edition-identity.nsh",
         "desktop/src-tauri/nsis/installer.nsi",
+    ),
+    OBSERVED_HEAD: (
+        "desktop/scripts/verify-edition-identity-nsis.ps1",
+        "desktop/scripts/verify-universal-installer-lifecycle.ps1",
         "distribution/tests/test_desktop_edition_coexistence.py",
     ),
 }
@@ -201,13 +205,13 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     for path in brand_paths:
         _validate_exact_path(root, BRAND_PRODUCT, path)
     common_paths = [path for paths in EXACT_GROUPS.values() for path in paths]
-    _require(len(common_paths) == len(set(common_paths)) == 48, "common path inventory drifted")
+    _require(len(common_paths) == len(set(common_paths)) == 49, "common path inventory drifted")
     for commit, paths in EXACT_GROUPS.items():
         for path in paths:
             _validate_exact_path(root, commit, path)
     path_sync = document.get("pathSync", {})
     _require(path_sync.get("canonicalBrandPathCount") == 94, "brand count receipt drifted")
-    _require(path_sync.get("exactCommonPathCount") == 48, "common count receipt drifted")
+    _require(path_sync.get("exactCommonPathCount") == 49, "common count receipt drifted")
     _require(path_sync.get("unrelatedBenchmarkPathsAdopted") is False, "Benchmark overclaim")
     _require(path_sync.get("hardwareAuthorityGranted") is False, "hardware authority overclaim")
 
@@ -372,13 +376,25 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     nsis_fix = corrections.get("nsisIdentityFix", {})
     _require(
         nsis_fix == {
-            "sourceCommit": OBSERVED_HEAD,
+            "sourceCommit": NSIS_IDENTITY_FIX_COMMIT,
             "parentCommit": AUTH_REVIEWED_HEAD,
             "changedPathCount": 5,
             "rootCause": "duplicate-expanded-desktop-done-label",
             "editionIdentityPreserved": True,
         },
         "NSIS identity fix receipt drifted",
+    )
+    lifecycle_fix = corrections.get("lifecycleRegistrationValidator", {})
+    _require(
+        lifecycle_fix == {
+            "sourceCommit": OBSERVED_HEAD,
+            "parentCommit": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+            "changedPathCount": 3,
+            "rootCause": "lifecycle-verifier-false-negative",
+            "productNsisChanged": False,
+            "simExecutionToolReplaced": False,
+        },
+        "lifecycle registration verifier receipt drifted",
     )
 
     _require(document.get("upstreamBlockers") == [], "resolved blocker was retained")
@@ -418,7 +434,7 @@ def main() -> int:
             {
                 "valid": True,
                 "brandPaths": 94,
-                "commonPaths": 48,
+                "commonPaths": 49,
                 "yellow2Ready": True,
             },
             sort_keys=True,
