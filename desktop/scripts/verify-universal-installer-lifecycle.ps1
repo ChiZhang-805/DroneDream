@@ -19,6 +19,7 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 $productName = "DroneDream-Universal"
+$displayName = "DroneDream"
 $mainBinaryName = "drone-dream-desktop.exe"
 $bundleId = "io.dronedream.desktop.universal"
 $installDirectory = Join-Path $env:LOCALAPPDATA $productName
@@ -27,8 +28,10 @@ $productKey = "HKCU:\Software\DroneDream\$productName"
 $baseInstallDirectory = Join-Path $env:LOCALAPPDATA "DroneDream"
 $baseUninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\DroneDream"
 $baseProductKey = "HKCU:\Software\DroneDream\DroneDream"
-$desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "$productName.lnk"
-$startMenuShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "$productName.lnk"
+$internalDesktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "$productName.lnk"
+$internalStartMenuShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "$productName.lnk"
+$desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "$displayName.lnk"
+$startMenuShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "$displayName.lnk"
 $baseDesktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "DroneDream.lnk"
 $baseStartMenuShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "DroneDream.lnk"
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
@@ -160,6 +163,16 @@ function Assert-ProtectedStateUnchanged {
     )
 
     $after = Get-ProtectedState
+    # The Universal display shortcut intentionally uses the mother-brand name.
+    # It is protected when a legacy shortcut existed at preflight, but may be
+    # created by this isolated install when the path was previously absent.
+    # Assert-UniversalInstalled/Uninstalled owns the latter lifecycle check.
+    if (-not $Before.baseDesktopShortcut.exists) {
+        $after.baseDesktopShortcut = $Before.baseDesktopShortcut
+    }
+    if (-not $Before.baseStartMenuShortcut.exists) {
+        $after.baseStartMenuShortcut = $Before.baseStartMenuShortcut
+    }
     if ((ConvertTo-CanonicalJson $Before) -cne (ConvertTo-CanonicalJson $after)) {
         throw "Protected existing DroneDream, Runtime, shortcut, registry, or WebView2 state changed during '$Stage'."
     }
@@ -236,11 +249,32 @@ function Assert-UniversalInstalled {
         throw "$Stage installed unexpected product version '$($versionInfo.ProductVersion)'."
     }
     $registration = Get-ItemProperty -LiteralPath $uninstallKey
-    if ([string]$registration.DisplayName -cne $productName -or
-        [string]$registration.DisplayVersion -cne "1.0.0" -or
-        ([string]$registration.InstallLocation).Trim('"') -cne $installDirectory -or
-        [string]$registration.MainBinaryName -cne $mainBinaryName) {
-        throw "$Stage produced an invalid Universal uninstall registration."
+    $actualRegistration = [ordered]@{
+        DisplayName = [string]$registration.DisplayName
+        DisplayVersion = [string]$registration.DisplayVersion
+        InstallLocation = ([string]$registration.InstallLocation).Trim('"')
+        MainBinaryName = [string]$registration.MainBinaryName
+    }
+    $expectedRegistration = [ordered]@{
+        DisplayName = $displayName
+        DisplayVersion = "1.0.0"
+        InstallLocation = $installDirectory
+        MainBinaryName = $mainBinaryName
+    }
+    $registrationMismatches = @(
+        $expectedRegistration.Keys | Where-Object {
+            [string]$actualRegistration[$_] -cne [string]$expectedRegistration[$_]
+        }
+    )
+    $script:lifecycleEvents.Add([ordered]@{
+        stage = "$Stage-uninstall-registration"
+        internalProductName = $productName
+        expected = $expectedRegistration
+        actual = $actualRegistration
+        mismatches = $registrationMismatches
+    })
+    if ($registrationMismatches.Count -ne 0) {
+        throw "$Stage produced an invalid Universal uninstall registration: $($registrationMismatches -join ', ')."
     }
     $product = Get-ItemProperty -LiteralPath $productKey
     if ([string]$product.DroneDreamRuntimeInstallMode -cne "install-app-only" -or
@@ -290,11 +324,36 @@ function Assert-UniversalInstalled {
     }
 
     $expectedTarget = [IO.Path]::GetFullPath($application)
+    foreach ($internalShortcutPath in @($internalDesktopShortcut, $internalStartMenuShortcut)) {
+        if (Test-Path -LiteralPath $internalShortcutPath -PathType Leaf) {
+            throw "$Stage created a shortcut under the internal product identity: $internalShortcutPath"
+        }
+    }
     foreach ($shortcutPath in @($desktopShortcut, $startMenuShortcut)) {
         $shortcut = Get-ShortcutRecord -Path $shortcutPath
+        $protectedShortcut = if ($shortcutPath -ceq $desktopShortcut) {
+            $protectedBefore.baseDesktopShortcut
+        } else {
+            $protectedBefore.baseStartMenuShortcut
+        }
         if ($ExpectShortcuts) {
-            if (-not $shortcut.exists -or [IO.Path]::GetFullPath([string]$shortcut.target) -cne $expectedTarget) {
+            if ($protectedShortcut.exists) {
+                if ((ConvertTo-CanonicalJson $shortcut) -cne (ConvertTo-CanonicalJson $protectedShortcut)) {
+                    throw "$Stage overwrote a protected legacy shortcut instead of preserving the collision: $shortcutPath"
+                }
+                $script:lifecycleEvents.Add([ordered]@{
+                    stage = "$Stage-shortcut-conflict"
+                    path = $shortcutPath
+                    outcome = "protected-legacy-shortcut-preserved"
+                })
+            }
+            elseif (-not $shortcut.exists -or [IO.Path]::GetFullPath([string]$shortcut.target) -cne $expectedTarget) {
                 throw "$Stage did not create the expected isolated Universal shortcut: $shortcutPath"
+            }
+        }
+        elseif ($protectedShortcut.exists) {
+            if ((ConvertTo-CanonicalJson $shortcut) -cne (ConvertTo-CanonicalJson $protectedShortcut)) {
+                throw "$Stage changed a protected legacy shortcut despite /NS: $shortcutPath"
             }
         }
         elseif ($shortcut.exists) {
@@ -324,9 +383,20 @@ function Assert-UniversalUninstalled {
     if (Test-Path -LiteralPath $uninstallKey) {
         throw "$Stage left the Universal uninstall registration behind."
     }
-    foreach ($shortcutPath in @($desktopShortcut, $startMenuShortcut)) {
+    foreach ($shortcutPath in @($internalDesktopShortcut, $internalStartMenuShortcut)) {
         if (Test-Path -LiteralPath $shortcutPath) {
             throw "$Stage left the Universal shortcut behind: $shortcutPath"
+        }
+    }
+    foreach ($shortcutPath in @($desktopShortcut, $startMenuShortcut)) {
+        $shortcut = Get-ShortcutRecord -Path $shortcutPath
+        $protectedShortcut = if ($shortcutPath -ceq $desktopShortcut) {
+            $protectedBefore.baseDesktopShortcut
+        } else {
+            $protectedBefore.baseStartMenuShortcut
+        }
+        if ((ConvertTo-CanonicalJson $shortcut) -cne (ConvertTo-CanonicalJson $protectedShortcut)) {
+            throw "$Stage did not restore the protected display shortcut state: $shortcutPath"
         }
     }
     $script:lifecycleEvents.Add([ordered]@{
@@ -384,8 +454,8 @@ if ($installDirectory.StartsWith($baseInstallDirectory + [IO.Path]::DirectorySep
 if ((Test-Path -LiteralPath $installDirectory) -or
     (Test-Path -LiteralPath $uninstallKey) -or
     (Test-Path -LiteralPath $productKey) -or
-    (Test-Path -LiteralPath $desktopShortcut) -or
-    (Test-Path -LiteralPath $startMenuShortcut)) {
+    (Test-Path -LiteralPath $internalDesktopShortcut) -or
+    (Test-Path -LiteralPath $internalStartMenuShortcut)) {
     throw "Universal lifecycle preflight found pre-existing product state and will not overwrite or clean it."
 }
 if (@(Get-Process -Name "drone-dream-desktop" -ErrorAction SilentlyContinue).Count -ne 0) {
@@ -410,11 +480,13 @@ $receipt = [ordered]@{
     resourceClass = if ($Execute) { "RED" } else { "GREEN" }
     isolation = [ordered]@{
         productName = $productName
+        displayName = $displayName
         bundleId = $bundleId
         installDirectory = $installDirectory
         uninstallKey = $uninstallKey
         baseInstallDirectory = $baseInstallDirectory
         runtimeMode = "install-app-only"
+        displayShortcutPolicy = "preserve-existing-legacy-or-own-when-absent"
         protectedStateBefore = $protectedBefore
     }
     lifecycle = [ordered]@{
