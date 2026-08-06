@@ -169,6 +169,17 @@ def test_attempt_receipt_freezes_unique_artifact_and_zero_retry() -> None:
     assert receipt["artifact"]["authenticodeStatus"] == "NotSigned"
     assert receipt["updaterSignature"]["state"] == "issued"
     assert receipt["updaterSignature"]["keyId"] == "BA3FDCAF71CE2FF5"
+    assert receipt["updaterSignature"]["cryptographicArtifactVerification"] == {
+        "state": "passed",
+        "algorithm": "minisign-Ed25519-prehashed-blake2b",
+        "publicKeySource": "desktop/src-tauri/tauri.conf.json",
+        "publicKeyId": "BA3FDCAF71CE2FF5",
+        "artifactSha256": (
+            "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4"
+        ),
+        "privateKeyRead": False,
+        "trustedCommentEnvelopeVerificationClaimed": False,
+    }
     assert receipt["sideEffects"] == {
         "installerRun": False,
         "runtimeMigrationOrStart": False,
