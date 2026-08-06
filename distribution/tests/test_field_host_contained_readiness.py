@@ -72,6 +72,13 @@ REPEATED_EXECUTION_FAILURE_EVIDENCE = (
     / "test-runs"
     / "field-host-contained-execution-failure-fb741b0"
 )
+PHASE_SERIALIZATION_CLEARANCE = (
+    ROOT
+    / "artifacts"
+    / "test-runs"
+    / "field-host-phase-serialization-clearance-d5d38cd"
+    / "clearance-receipt.json"
+)
 
 SPEC = importlib.util.spec_from_file_location("field_host_contained_readiness_tests", TOOL_PATH)
 assert SPEC and SPEC.loader
@@ -228,10 +235,14 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertEqual(receipt["decision"], "request-yellow-host-contained")
         self.assertFalse(receipt["executionPerformed"])
 
-    def test_open_dynamic_execution_blocker_denies_another_yellow_attempt(self) -> None:
+    def test_superseded_artifact_denies_another_yellow_attempt(self) -> None:
         plan = self.plan()
         self.assertEqual(plan["state"], "blocked")
-        self.assertIn("field.host.executor-post-install-runaway", plan["blockers"])
+        self.assertIn(
+            "field.host.frozen-artifact-superseded-by-brand-auth-contract",
+            plan["blockers"],
+        )
+        self.assertNotIn("field.host.executor-post-install-runaway", plan["blockers"])
         receipt = host_readiness.create_readiness_receipt(plan)
         self.assertEqual(receipt["decision"], "deny")
 
@@ -321,8 +332,19 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertEqual(plan["state"], "blocked")
         self.assertEqual(plan["blockers"], ["field.host.executor-post-install-runaway"])
         self.assertEqual(plan["source"]["evidenceHead"], "18ccfa997a05665a7bea6cb95da0d416da9c86bc")
-        self.assertEqual(plan["source"]["toolSha256"], host_readiness.file_sha256(TOOL_PATH))
-        self.assertEqual(plan["source"]["contractSha256"], host_readiness.file_sha256(CONTRACT_PATH))
+        self.assertEqual(
+            plan["source"]["toolSha256"],
+            "d941777a57b16356abb5608bce5bfa562824c02cb632ea58a0aca93576480a95",
+        )
+        self.assertEqual(
+            plan["source"]["contractSha256"],
+            "9723160032095835582c56fbd03d855f085f952a00418c0a359b8ab27abb850d",
+        )
+        self.assertNotEqual(plan["source"]["toolSha256"], host_readiness.file_sha256(TOOL_PATH))
+        self.assertNotEqual(
+            plan["source"]["contractSha256"],
+            host_readiness.file_sha256(CONTRACT_PATH),
+        )
         self.assertEqual(
             plan["source"]["hostSnapshotSha256"],
             host_readiness.file_sha256(CURRENT_BLOCKED_EVIDENCE / "host-snapshot.json"),
@@ -451,6 +473,28 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertEqual(evidence["installerInvocations"], 0)
         self.assertEqual(evidence["deviceEnumerations"], 0)
         self.assertEqual(evidence["networkRequests"], 0)
+
+    def test_phase_serialization_clearance_preserves_history_and_denies_release(self) -> None:
+        clearance = host_readiness.load_json(PHASE_SERIALIZATION_CLEARANCE)
+        self.assertEqual(
+            clearance["rootCause"]["clearedBlockerId"],
+            "field.host.executor-post-install-runaway",
+        )
+        self.assertTrue(clearance["offlineFixture"]["passed"])
+        self.assertEqual(clearance["offlineFixture"]["installerInvocations"], 0)
+        self.assertEqual(clearance["offlineFixture"]["deviceEnumerations"], 0)
+        self.assertEqual(clearance["offlineFixture"]["networkRequests"], 0)
+        self.assertFalse(clearance["clearance"]["yellowRetryPerformed"])
+        self.assertFalse(clearance["clearance"]["dynamicLifecycleAccepted"])
+        self.assertEqual(
+            clearance["remainingGate"]["blockerId"],
+            "field.host.frozen-artifact-superseded-by-brand-auth-contract",
+        )
+        self.assertFalse(clearance["remainingGate"]["releaseReady"])
+        self.assertFalse(clearance["remainingGate"]["websiteReady"])
+        for historical in clearance["historicalEvidence"]:
+            path = ROOT / historical["path"]
+            self.assertEqual(host_readiness.file_sha256(path), historical["sha256"])
 
     def test_schema_is_closed_and_covers_plan_readiness_and_execution(self) -> None:
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))

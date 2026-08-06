@@ -221,11 +221,11 @@
   },
   "knownExecutionBlockers": [
     {
-      "blockerId": "field.host.executor-post-install-runaway",
+      "blockerId": "field.host.frozen-artifact-superseded-by-brand-auth-contract",
       "status": "open",
-      "attemptSourceCommit": "fb741b025fc5d75edc92df29a9e1c8c7c02800c3",
-      "failureEvidencePath": "artifacts/test-runs/field-host-contained-execution-failure-fb741b0/execution-failure-receipt.json",
-      "clearanceRequirement": "Offline fixture must isolate the post-install phase and prove bounded memory before another YELLOW request."
+      "artifactProductSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+      "clearanceEvidencePath": "artifacts/test-runs/field-host-phase-serialization-clearance-d5d38cd/clearance-receipt.json",
+      "clearanceRequirement": "A new exact clean source and authorized single build must include the canonical Field large-label brand, synchronized coexistence identity, and independent Field auth transaction and session namespace before lifecycle acceptance can resume."
     }
   ],
   "websiteGate": {

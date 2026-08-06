@@ -220,16 +220,25 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
             {
                 "blockerId",
                 "status",
-                "attemptSourceCommit",
-                "failureEvidencePath",
+                "artifactProductSourceCommit",
+                "clearanceEvidencePath",
                 "clearanceRequirement",
             },
             "known execution blocker",
         )
-        if blocker["status"] != "open" or not blocker["blockerId"].startswith("field.host."):
+        if (
+            blocker["status"] != "open"
+            or blocker["blockerId"]
+            != "field.host.frozen-artifact-superseded-by-brand-auth-contract"
+        ):
             raise FieldHostContainedError("known execution blocker identity drifted")
-        _require_commit(blocker["attemptSourceCommit"], "attemptSourceCommit")
-        if not blocker["failureEvidencePath"].startswith("artifacts/test-runs/field-host-contained-"):
+        _require_commit(
+            blocker["artifactProductSourceCommit"],
+            "artifactProductSourceCommit",
+        )
+        if not blocker["clearanceEvidencePath"].startswith(
+            "artifacts/test-runs/field-host-phase-serialization-clearance-"
+        ):
             raise FieldHostContainedError("known execution blocker evidence path drifted")
     if contract["websiteGate"]["websiteReadyBeforeExecution"] is not False:
         raise FieldHostContainedError("GREEN contract cannot authorize Website handoff")

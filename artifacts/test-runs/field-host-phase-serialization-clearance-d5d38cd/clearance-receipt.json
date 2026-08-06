@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-host-phase-serialization-clearance",
+  "editionId": "field",
+  "source": {
+    "commit": "d5d38cd8516feb0bffc886f302f8db5dcf34d731",
+    "executorPath": "distribution/tools/execute_field_host_contained_acceptance.ps1",
+    "executorSha256": "40c79895d021d7542b89148665a974dd0bab639429f9b7fd9e501bd3d9ccd73f",
+    "fixturePath": "distribution/tools/test_field_phase_evidence_serialization.ps1",
+    "fixtureSha256": "b931665d3c996e8b0f074af83303dde4056ea2a1dd378d41671850b0d643df94"
+  },
+  "rootCause": {
+    "clearedBlockerId": "field.host.executor-post-install-runaway",
+    "failureMode": "PowerShell ConvertTo-Json recursively serialized provider metadata attached to Get-Content output after the installer phase.",
+    "oldDiagnosticReader": "Get-Content -Raw",
+    "fixedDiagnosticReader": "System.IO.File.ReadAllText UTF-8",
+    "scope": "host-contained acceptance executor evidence serialization"
+  },
+  "offlineFixture": {
+    "passed": true,
+    "textType": "System.String",
+    "hasPsPath": false,
+    "jsonLength": 322,
+    "privateMemoryGrowthBytes": 1241088,
+    "privateMemoryGrowthLimitBytes": 16777216,
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "deviceEnumerations": 0,
+    "networkRequests": 0,
+    "hardwareActions": 0,
+    "simulationActions": 0
+  },
+  "historicalEvidence": [
+    {
+      "path": "artifacts/test-runs/field-host-contained-execution-failure-452eed9/execution-failure-receipt.json",
+      "sha256": "0564221f5821e7ae3724d683a0533ec3a8cec35fd34ee0fed38b230d12d80bde",
+      "result": "fail-resource-abort-with-complete-rollback"
+    },
+    {
+      "path": "artifacts/test-runs/field-host-contained-execution-failure-fb741b0/execution-failure-receipt.json",
+      "sha256": "e32a381b1c3eddfb732a4afb98e5bfaa4d6c6adc0e1e3592dbf5b448bc465126",
+      "result": "fail-repeated-post-install-runaway-with-complete-rollback"
+    },
+    {
+      "path": "artifacts/test-runs/field-host-contained-readiness-18ccfa9-blocked/plan.json",
+      "sha256": "fe705d05684871d76a2e878fb61dc0811a8fd2246efdb90f9b7f11a52192c5d3",
+      "result": "blocked"
+    },
+    {
+      "path": "artifacts/test-runs/field-host-contained-readiness-18ccfa9-blocked/green-readiness-receipt.json",
+      "sha256": "173a1772c4e425e99244cb7364fcc2583adeb1985ef9b9cb2a0dca2d674aefd7",
+      "result": "deny"
+    }
+  ],
+  "clearance": {
+    "rootCauseClearedByOfflineFixture": true,
+    "yellowRetryPerformed": false,
+    "dynamicLifecycleAccepted": false,
+    "historicalEvidenceRewritten": false
+  },
+  "remainingGate": {
+    "blockerId": "field.host.frozen-artifact-superseded-by-brand-auth-contract",
+    "status": "open",
+    "artifactSha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "artifactProductSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "canonicalBrandDonorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "canonicalFieldLockupSha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+    "coexistenceDonorCommitPendingSync": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "authDonorStatus": "awaiting-exact-universal-donor",
+    "releaseReady": false,
+    "websiteReady": false
+  }
+}
