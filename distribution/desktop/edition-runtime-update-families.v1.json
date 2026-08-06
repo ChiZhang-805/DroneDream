@@ -9,6 +9,8 @@
     "owner": "runtime-base-manager",
     "managerNamespace": "io.dronedream.runtime-base-manager",
     "operationLeaseFileName": "runtime-operation-v1.lock",
+    "legacyCompatibilityLeaseRelativePath": "io.dronedream.desktop/runtime-operation-v1.lock",
+    "legacyCompatibilityLeaseRequired": true,
     "downloadCacheDirectoryName": "DroneDream.download-cache",
     "diagnosticsRootDirectoryName": "diagnostics",
     "editionUninstallMayRemoveRuntime": false,
@@ -68,7 +70,7 @@
     },
     {
       "editionId": "field",
-      "runtimeProfileId": "field-only",
+      "runtimeProfileId": "field-lightweight",
       "localRuntimeStateNamespace": "io.dronedream.desktop.field/runtime",
       "diagnosticsRelativePath": "diagnostics/field",
       "installerProductName": "DroneDream-Field",
