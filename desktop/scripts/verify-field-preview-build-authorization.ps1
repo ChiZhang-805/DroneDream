@@ -14,6 +14,15 @@ if ($validatedPacks.Count -eq 0) {
 if ($env:DRONEDREAM_EDITION_PROFILE -cne "field-lightweight") {
     throw "Field preview build denied: DRONEDREAM_EDITION_PROFILE must be field-lightweight."
 }
+if ($env:DRONEDREAM_DESKTOP_EDITION_ID -cne "field") {
+    throw "Field preview build denied: DRONEDREAM_DESKTOP_EDITION_ID must be field."
+}
+if ($env:VITE_DRONEDREAM_EDITION -cne "field") {
+    throw "Field preview build denied: VITE_DRONEDREAM_EDITION must be field."
+}
+if ($env:DRONEDREAM_OAUTH_CLIENT_ID -cne "dronedream-desktop-field") {
+    throw "Field preview build denied: DRONEDREAM_OAUTH_CLIENT_ID must identify the Field public client."
+}
 
 $branch = (& git -C $repoRoot branch --show-current).Trim()
 if ($LASTEXITCODE -ne 0 -or $branch -cne "codex/software-field") {

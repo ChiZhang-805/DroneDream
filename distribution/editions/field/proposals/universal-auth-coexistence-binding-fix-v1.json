@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-fix-proposal",
+  "proposalId": "universal-auth-coexistence-binding-field-lightweight-v1",
+  "authorityBranch": "codex/software",
+  "observedUniversalHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+  "sourceCommits": {
+    "coexistenceImplementation": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "authContract": "6355aad351370178a7171b504a5d2f235fb12ceb",
+    "runtimeUpdateRegistry": "4ea7fd1dfe3a69d90ada1a37a82dd888cba48430",
+    "updaterImplementation": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d"
+  },
+  "conflict": {
+    "identityContractPath": "distribution/desktop/edition-coexistence.v1.json",
+    "identityContractActualSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
+    "authContractPath": "distribution/desktop/edition-browser-auth.v1.json",
+    "authContractSha256": "1d49e6833c464d7a7d2dd8ac7c72b1db843e0aedef61a6a1ded1ad44f273162a",
+    "authBoundIdentitySha256": "1af65a86d4f77add7d16d21fe257b7052cb5138de68b6eb3f111f0a32d17bd38",
+    "fieldRuntimeProfileRequired": "field-lightweight",
+    "fieldRuntimeProfileRejected": "field-only"
+  },
+  "minimumUniversalAction": {
+    "strategy": "regenerate-auth-contract-binding-from-current-coexistence-bytes",
+    "paths": [
+      "distribution/desktop/edition-browser-auth.v1.json"
+    ],
+    "dependentHashesAndReceiptsMustBeRegenerated": true,
+    "requiredTests": [
+      "distribution/tests/test_desktop_edition_browser_auth.py",
+      "distribution/tests/test_desktop_edition_coexistence.py",
+      "distribution/tests/test_desktop_runtime_update_families.py"
+    ]
+  },
+  "fieldBoundary": {
+    "sharedPathPatchedOnField": false,
+    "releaseBuildAllowed": false,
+    "installAllowed": false,
+    "providerUseAllowed": false,
+    "hardwareAllowed": false,
+    "validatedHardwarePackCount": 0,
+    "resumeCondition": "consume an exact clean Universal product commit whose auth binding matches the field-lightweight coexistence contract"
+  }
+}

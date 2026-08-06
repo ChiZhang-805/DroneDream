@@ -203,7 +203,11 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
             "DroneDream · FIELD",
         )
         self.assertEqual(contract["fieldNamespaces"]["appUserModelId"], "io.dronedream.desktop.field")
-        self.assertTrue(contract["fieldNamespaces"]["updaterEndpoint"].endswith("/field-latest.json"))
+        self.assertEqual(
+            contract["fieldNamespaces"]["updaterEndpoint"],
+            "https://github.com/ChiZhang-805/DroneDream/releases/download/"
+            "desktop-field-channel/latest-field.json",
+        )
         self.assertEqual(contract["fieldNamespaces"]["enginePackProfileId"], "field-lightweight")
 
     def test_source_audit_enumerates_writes_and_absent_system_surfaces(self) -> None:
@@ -310,11 +314,24 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertEqual(plan["state"], "yellow-host-contained-requestable")
         self.assertEqual(plan["blockers"], [])
         self.assertEqual(plan["artifact"]["sha256"], host_readiness.ARTIFACT_SHA256)
+        self.assertNotEqual(
+            plan["fieldNamespaces"],
+            host_readiness.validate_contract(host_readiness.load_json(CONTRACT_PATH))[
+                "fieldNamespaces"
+            ],
+        )
         self.assertEqual(
             plan["source"]["toolSha256"],
             "4cbb192a6be11e6fba8dc09fc6d8a898a6f4aa57483bc6be4bbf509bb7964e41",
         )
-        self.assertEqual(plan["source"]["schemaSha256"], host_readiness.file_sha256(SCHEMA_PATH))
+        self.assertEqual(
+            plan["source"]["schemaSha256"],
+            "55093c74b1e64690f4b1870ce7e88728b3f563b6bc5bc426046b63644f7265b1",
+        )
+        self.assertNotEqual(
+            plan["source"]["schemaSha256"],
+            host_readiness.file_sha256(SCHEMA_PATH),
+        )
         self.assertEqual(
             plan["source"]["contractSha256"],
             "6eb54675df60796c36bd4e8676e93f352c40e85d5d672435123847aa66299442",

@@ -95,7 +95,7 @@
       "properties": {
         "windowAndDisplayName": {"const": "DroneDream · FIELD"},
         "appUserModelId": {"const": "io.dronedream.desktop.field"},
-        "updaterEndpoint": {"const": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json"},
+        "updaterEndpoint": {"const": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-channel/latest-field.json"},
         "enginePackProfileId": {"const": "field-lightweight"},
         "dataNamespace": {"const": "io.dronedream.desktop.field"},
         "installedIconRelativePath": {"const": "icons\\DroneDream.ico"},

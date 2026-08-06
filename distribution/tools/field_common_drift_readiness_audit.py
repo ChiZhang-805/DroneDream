@@ -407,7 +407,7 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "resourceUpperBound": effective_resource_bytes <= FIELD_RESOURCE_UPPER_BOUND_BYTES,
         "fieldFrontendDist": effective_tauri.get("build", {}).get("frontendDist")
         == "../../frontend/field-dist",
-        "fieldUpdaterManifest": endpoint.endswith("/field-latest.json"),
+        "fieldUpdaterManifest": endpoint.endswith("/latest-field.json"),
         "fieldArtifactBaseName": edition.get("artifactBaseName")
         == "DroneDream-Field-1.0.0.exe",
         "authorityRemainsFalse": 'data-authority="false"' in app_source,
@@ -451,7 +451,7 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
     return {
         "artifactBaseName": edition["artifactBaseName"],
         "frontendDist": effective_tauri["build"]["frontendDist"],
-        "updaterManifestFilename": "field-latest.json",
+        "updaterManifestFilename": "latest-field.json",
         "brandManifestPath": FIELD_BRANDING_MANIFEST.as_posix(),
         "brandManifestSha256": sha256_file(manifest_path),
         "brandCommonCoreCommit": manifest["commonCoreCommit"],

@@ -58,7 +58,7 @@
   "fieldNamespaces": {
     "windowAndDisplayName": "DroneDream · FIELD",
     "appUserModelId": "io.dronedream.desktop.field",
-    "updaterEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json",
+    "updaterEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-channel/latest-field.json",
     "enginePackProfileId": "field-lightweight",
     "dataNamespace": "io.dronedream.desktop.field",
     "installedIconRelativePath": "icons\\DroneDream.ico",

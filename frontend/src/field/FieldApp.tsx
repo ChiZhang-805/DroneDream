@@ -20,6 +20,7 @@ import {
 
 import { BrandLockup } from "../components/BrandLockup";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
+import { FieldAuthControl } from "./FieldAuthControl";
 import {
   evaluateFieldSafety,
   FIELD_HARDWARE_ACTIONS,
@@ -287,6 +288,7 @@ export function FieldApp({
         </div>
         <div className="field-topbar-actions">
           <span className="field-preview-badge"><ShieldCheck />{copy.preview}</span>
+          <FieldAuthControl locale={locale} />
           <button
             className="field-language-button"
             type="button"

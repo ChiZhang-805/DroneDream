@@ -48,8 +48,10 @@ class FieldDesktopProfileTests(unittest.TestCase):
         self.assertEqual((window["width"], window["height"]), (1440, 900))
         self.assertEqual((window["minWidth"], window["minHeight"]), (390, 620))
         endpoints = self.config["plugins"]["updater"]["endpoints"]
-        self.assertEqual(len(endpoints), 1)
-        self.assertTrue(endpoints[0].endswith("/field-latest.json"))
+        self.assertEqual(endpoints, [
+            "https://github.com/ChiZhang-805/DroneDream/releases/download/"
+            "desktop-field-channel/latest-field.json",
+        ])
         self.assertFalse(self.config["bundle"]["createUpdaterArtifacts"])
 
     def test_overlay_binds_the_authorized_field_brand_assets(self) -> None:
@@ -106,6 +108,16 @@ class FieldDesktopProfileTests(unittest.TestCase):
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("zero hardware-validated Vehicle Packs", output)
         self.assertNotIn("frontend:field-build", output)
+
+    def test_build_gate_requires_exact_field_compile_and_auth_namespaces(self) -> None:
+        source = BUILD_GATE.read_text(encoding="utf-8")
+        for binding in (
+            'DRONEDREAM_EDITION_PROFILE -cne "field-lightweight"',
+            'DRONEDREAM_DESKTOP_EDITION_ID -cne "field"',
+            'VITE_DRONEDREAM_EDITION -cne "field"',
+            'DRONEDREAM_OAUTH_CLIENT_ID -cne "dronedream-desktop-field"',
+        ):
+            self.assertIn(binding, source)
 
 
 if __name__ == "__main__":

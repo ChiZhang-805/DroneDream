@@ -232,7 +232,7 @@
       "properties": {
         "artifactBaseName": {"const": "DroneDream-Field-1.0.0.exe"},
         "frontendDist": {"const": "../../frontend/field-dist"},
-        "updaterManifestFilename": {"const": "field-latest.json"},
+        "updaterManifestFilename": {"const": "latest-field.json"},
         "brandManifestPath": {
           "const": "distribution/editions/field/branding/source-manifest.v1.json"
         },

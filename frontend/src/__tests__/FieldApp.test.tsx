@@ -34,6 +34,8 @@ describe("FieldApp", () => {
     );
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
     expect(container.querySelector("[data-validated-pack-count='0']")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sign in to DroneDream · FIELD" }))
+      .toBeDisabled();
   });
 
   it("updates only the visual navigation selection", () => {

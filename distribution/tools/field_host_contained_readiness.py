@@ -53,6 +53,22 @@ PREVIOUS_VM_PLAN_SHA256 = "8fca6e3a5d66749ce9aeabca45edae4424e2548c28d2ca02edf4e
 PREVIOUS_VM_RECEIPT_SHA256 = "5690269c86128300b42bd9537d73261f73172b6218e6002a4fb7d36170134643"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
+LEGACY_FIELD_NAMESPACES = {
+    "windowAndDisplayName": FIELD_DISPLAY_NAME,
+    "appUserModelId": FIELD_BUNDLE_ID,
+    "updaterEndpoint": (
+        "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/"
+        "field-latest.json"
+    ),
+    "enginePackProfileId": "field-lightweight",
+    "dataNamespace": FIELD_BUNDLE_ID,
+    "installedIconRelativePath": "icons\\DroneDream.ico",
+    "canonicalIconSha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",
+}
+LEGACY_CONTRACT_SHA256S = {
+    "6eb54675df60796c36bd4e8676e93f352c40e85d5d672435123847aa66299442",
+    "9723160032095835582c56fbd03d855f085f952a00418c0a359b8ab27abb850d",
+}
 
 
 class FieldHostContainedError(ValueError):
@@ -178,7 +194,7 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     if contract["fieldNamespaces"] != {
         "windowAndDisplayName": FIELD_DISPLAY_NAME,
         "appUserModelId": FIELD_BUNDLE_ID,
-        "updaterEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json",
+        "updaterEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-channel/latest-field.json",
         "enginePackProfileId": "field-lightweight",
         "dataNamespace": FIELD_BUNDLE_ID,
         "installedIconRelativePath": "icons\\DroneDream.ico",
@@ -509,7 +525,18 @@ def validate_plan(plan: dict[str, Any]) -> dict[str, Any]:
         raise FieldHostContainedError("previous VM evidence binding drifted")
     if plan["artifact"]["sha256"] != ARTIFACT_SHA256:
         raise FieldHostContainedError("artifact binding drifted")
-    if plan["fieldNamespaces"] != validate_contract(load_json(CONTRACT_PATH))["fieldNamespaces"]:
+    current_namespaces = validate_contract(load_json(CONTRACT_PATH))["fieldNamespaces"]
+    source_contract_sha = _require_sha(
+        plan.get("source", {}).get("contractSha256"),
+        "source.contractSha256",
+    )
+    if source_contract_sha == file_sha256(CONTRACT_PATH):
+        expected_namespaces = current_namespaces
+    elif source_contract_sha in LEGACY_CONTRACT_SHA256S:
+        expected_namespaces = LEGACY_FIELD_NAMESPACES
+    else:
+        raise FieldHostContainedError("plan references an unknown Field contract revision")
+    if plan["fieldNamespaces"] != expected_namespaces:
         raise FieldHostContainedError("Field namespace binding drifted")
     if plan["environment"]["claimsVmLevelIsolation"] is not False:
         raise FieldHostContainedError("host-contained plan cannot claim VM isolation")

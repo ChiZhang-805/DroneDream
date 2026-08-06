@@ -37,7 +37,7 @@
       "properties": {
         "filename": {"const": "DroneDream-Field-1.0.0.exe"},
         "packaging": {"const": "tauri-nsis"},
-        "updaterManifest": {"const": "field-latest.json"},
+        "updaterManifest": {"const": "latest-field.json"},
         "signatureState": {"const": "not-issued-unsigned-preview"},
         "artifactBuilt": {"const": false},
         "artifactSha256": {"type": "null"},
@@ -92,7 +92,7 @@
       "properties": {
         "artifactBaseName": {"const": "DroneDream-Field-1.0.0.exe"},
         "frontendDist": {"const": "../../frontend/field-dist"},
-        "updaterManifestFilename": {"const": "field-latest.json"},
+        "updaterManifestFilename": {"const": "latest-field.json"},
         "brandManifestPath": {"$ref": "#/$defs/path"},
         "brandManifestSha256": {"$ref": "#/$defs/sha256"},
         "brandCommonCoreCommit": {"$ref": "#/$defs/commit"},

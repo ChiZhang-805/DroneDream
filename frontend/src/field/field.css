@@ -128,6 +128,62 @@ select:focus-visible {
   gap: 10px;
 }
 
+.field-auth-control {
+  position: relative;
+}
+
+.field-auth-control button {
+  display: flex;
+  min-height: 36px;
+  max-width: 290px;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  overflow: hidden;
+  color: var(--field-dark);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.field-auth-control button:disabled {
+  color: var(--field-muted);
+  background: #f4f1ef;
+  cursor: not-allowed;
+}
+
+.field-auth-control button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.field-auth-control svg {
+  width: 17px;
+  min-width: 17px;
+  height: 17px;
+}
+
+.field-auth-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.field-auth-spinner {
+  animation: field-spin 1s linear infinite;
+}
+
+@keyframes field-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .field-preview-badge {
   gap: 7px;
   color: #5d3930;
@@ -810,6 +866,19 @@ select:focus-visible {
     display: none;
   }
 
+  .field-auth-control button {
+    width: 36px;
+    padding: 6px 8px;
+  }
+
+  .field-auth-control button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
   .field-language-button {
     min-width: 58px;
   }
@@ -872,5 +941,9 @@ select:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  .field-auth-spinner {
+    animation: none;
   }
 }

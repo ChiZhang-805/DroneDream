@@ -49,7 +49,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json"
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-channel/latest-field.json"
       ],
       "windows": {
         "installMode": "passive"

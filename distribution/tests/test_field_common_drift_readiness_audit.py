@@ -128,7 +128,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertTrue(structure["verified"])
         self.assertEqual(structure["artifactBaseName"], "DroneDream-Field-1.0.0.exe")
         self.assertEqual(structure["frontendDist"], "../../frontend/field-dist")
-        self.assertEqual(structure["updaterManifestFilename"], "field-latest.json")
+        self.assertEqual(structure["updaterManifestFilename"], "latest-field.json")
         self.assertEqual(
             structure["canonicalDonor"]["commit"],
             "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
