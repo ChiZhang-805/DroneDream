@@ -361,12 +361,27 @@ SIM_DISPLAY_NAME = "DroneDream \u00b7 SIM"
 SURFACE_SOURCE_REQUIREMENTS = {
     "desktop/src-tauri/nsis/installer.nsi": (
         '!define PRODUCTNAME "{{product_name}}"',
-        'Name "${PRODUCTNAME}"',
+        '!define BUNDLEID "{{bundle_id}}"',
+        'Name "${DRONEDREAM_DISPLAYNAME}"',
         'OutFile "${OUTFILE}"',
-        'CreateShortcut "$SMPROGRAMS\\$AppStartMenuFolder\\${PRODUCTNAME}.lnk"',
-        'CreateShortcut "$DESKTOP\\${PRODUCTNAME}.lnk"',
-        'Delete "$DESKTOP\\${PRODUCTNAME}.lnk"',
+        '!define UNINSTKEY "Software\\Microsoft\\Windows\\'
+        'CurrentVersion\\Uninstall\\${PRODUCTNAME}"',
+        'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"',
+        'RmDir /r "$LOCALAPPDATA\\${BUNDLEID}"',
+        "DRONEDREAM_REMOVE_INTERNAL_SHORTCUT",
         'WriteUninstaller "$INSTDIR\\uninstall.exe"',
+    ),
+    "desktop/src-tauri/nsis/edition-identity.nsh": (
+        '!else if "${PRODUCTNAME}" == "DroneDream-Sim"',
+        '!define DRONEDREAM_DISPLAYNAME "DroneDream · SIM"',
+        '!error "Unknown DroneDream installer PRODUCTNAME: ${PRODUCTNAME}"',
+        "!macro DRONEDREAM_CREATE_DISPLAY_SHORTCUT SHORTCUT_PATH LABEL_PREFIX",
+        "IsShortcutTarget",
+        "SetErrors",
+    ),
+    "desktop/src-tauri/nsis/installer-languages.nsh": (
+        "LangString DD_ShortcutConflict ${LANG_ENGLISH}",
+        "LangString DD_ShortcutConflict ${LANG_SIMPCHINESE}",
     ),
     "desktop/src-tauri/nsis/languages/English.nsh": (
         "LangString createDesktop ${LANG_ENGLISH}",
@@ -1137,7 +1152,7 @@ def validate_sim_tauri_overlay_config(
 ) -> dict[str, Any]:
     expected = {
         "$schema": "https://schema.tauri.app/config/2",
-        "productName": SIM_DISPLAY_NAME,
+        "productName": "DroneDream-Sim",
         "identifier": "io.dronedream.sim",
         "app": {
             "windows": [
@@ -1213,7 +1228,7 @@ def validate_installer_surface_contract(
     if (
         overlay["path"] != "distribution/sim/desktop/tauri.sim.conf.json"
         or overlay["sha256"]
-        != "fcbd5f1306ae8e8c9214dba7389df60cbcbf29424e3a10008ba6fbb3517c1dfe"
+        != "718a9c0f8ec10144979f50fc4b06b75bcf68d38a810ced11e9b76384f6621359"
         or overlay["baseConfigPath"] != "desktop/src-tauri/tauri.conf.json"
         or overlay["baseConfigMustRemainUniversal"] is not True
         or overlay["artifactRenameRequired"] is not True

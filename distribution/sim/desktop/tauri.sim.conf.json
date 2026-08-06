@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "DroneDream · SIM",
+  "productName": "DroneDream-Sim",
   "identifier": "io.dronedream.sim",
   "app": {
     "windows": [

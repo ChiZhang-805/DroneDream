@@ -4,6 +4,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $templatePath = Join-Path $repoRoot "desktop\src-tauri\nsis\installer.nsi"
 $runtimeModePath = Join-Path $repoRoot "desktop\src-tauri\nsis\runtime-mode.nsh"
 $pathGuardPath = Join-Path $repoRoot "desktop\src-tauri\nsis\path-guard.nsh"
+$editionIdentityPath = Join-Path $repoRoot "desktop\src-tauri\nsis\edition-identity.nsh"
 $installerLanguagesPath = Join-Path $repoRoot "desktop\src-tauri\nsis\installer-languages.nsh"
 $englishLanguagePath = Join-Path $repoRoot "desktop\src-tauri\nsis\languages\English.nsh"
 $chineseLanguagePath = Join-Path $repoRoot "desktop\src-tauri\nsis\languages\SimpChinese.nsh"
@@ -44,11 +45,84 @@ if ($config.bundle.resources.'icons/icon.ico' -cne "icons/DroneDream.ico") {
 $template = Get-Content -LiteralPath $templatePath -Raw
 $header = "; Vendored from tauri-apps/tauri tag tauri-v2.11.4.`n" +
     "; Upstream SHA-256 (UTF-8): 20f4ecc730defb71f1342eaeaec4021df13be3d843abba0effe88ea5835fa079`n" +
-    "; DroneDream changes are limited to the DRONEDREAM_* anchor macros below.`n"
+    "; DroneDream changes are limited to documented DRONEDREAM_* anchors and`n" +
+    "; presentation-identity substitutions verified by verify-nsis-template.ps1.`n"
 if (-not $template.StartsWith($header, [StringComparison]::Ordinal)) {
     throw "Vendored NSIS template provenance header is missing"
 }
 $upstream = $template.Substring($header.Length)
+$identityAnchor = "; Keep PRODUCTNAME as the internal installation identity. This include derives`n" +
+    "; the user-visible edition name and shortcut name without changing registry,`n" +
+    "; install-root, bundle, app-data, or updater ownership.`n" +
+    "!ifmacrodef DRONEDREAM_EDITION_IDENTITY_TABLE`n" +
+    "  !insertmacro DRONEDREAM_EDITION_IDENTITY_TABLE`n" +
+    "!endif`n`n"
+if (([regex]::Matches($upstream, [regex]::Escape($identityAnchor))).Count -ne 1) {
+    throw "DroneDream edition identity include anchor is missing or duplicated"
+}
+$upstream = $upstream.Replace($identityAnchor, "")
+
+function Restore-TemplateSubstitution {
+    param(
+        [Parameter(Mandatory = $true)][string]$Text,
+        [Parameter(Mandatory = $true)][string]$Modified,
+        [Parameter(Mandatory = $true)][string]$Original,
+        [int]$ExpectedCount = 1
+    )
+    $count = ([regex]::Matches($Text, [regex]::Escape($Modified))).Count
+    if ($count -ne $ExpectedCount) {
+        throw "DroneDream presentation identity substitution drifted: $Modified (found $count, expected $ExpectedCount)"
+    }
+    return $Text.Replace($Modified, $Original)
+}
+
+$substitutions = @(
+    @{ Modified = 'Name "${DRONEDREAM_DISPLAYNAME}"'; Original = 'Name "${PRODUCTNAME}"'; Count = 1 },
+    @{ Modified = 'VIAddVersionKey "ProductName" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'VIAddVersionKey "ProductName" "${PRODUCTNAME}"'; Count = 1 },
+    @{ Modified = 'VIAddVersionKey "FileDescription" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'VIAddVersionKey "FileDescription" "${PRODUCTNAME}"'; Count = 1 },
+    @{ Modified = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"'; Original = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"'; Count = 2 },
+    @{ Modified = '"Open with ${DRONEDREAM_DISPLAYNAME}"'; Original = '"Open with ${PRODUCTNAME}"'; Count = 1 },
+    @{ Modified = 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${PRODUCTNAME}"'; Count = 1 },
+    @{ Modified = '"$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"'; Original = '"$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"'; Count = 3 },
+    @{ Modified = '"$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk"'; Original = '"$SMPROGRAMS\${PRODUCTNAME}.lnk"'; Count = 3 },
+    @{ Modified = '"$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk"'; Original = '"$DESKTOP\${PRODUCTNAME}.lnk"'; Count = 3 }
+)
+foreach ($substitution in $substitutions) {
+    $upstream = Restore-TemplateSubstitution `
+        -Text $upstream `
+        -Modified $substitution.Modified `
+        -Original $substitution.Original `
+        -ExpectedCount $substitution.Count
+}
+
+$startMenuIdentityAnchor = "  !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT`n" +
+    "    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT`n" +
+    "    Return`n" +
+    "  !endif`n`n"
+if (([regex]::Matches($upstream, [regex]::Escape($startMenuIdentityAnchor))).Count -ne 1) {
+    throw "DroneDream Start Menu identity anchor is missing or duplicated"
+}
+$upstream = $upstream.Replace($startMenuIdentityAnchor, "")
+$desktopIdentityAnchor = "  !ifmacrodef DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT`n" +
+    "    !insertmacro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT`n" +
+    "    Return`n" +
+    "  !endif`n`n"
+if (([regex]::Matches($upstream, [regex]::Escape($desktopIdentityAnchor))).Count -ne 1) {
+    throw "DroneDream desktop identity anchor is missing or duplicated"
+}
+$upstream = $upstream.Replace($desktopIdentityAnchor, "")
+$uninstallIdentityAnchor = "`n    ; Early edition candidates used the internal PRODUCTNAME for shortcut`n" +
+    "    ; filenames. Remove only links proven to target this exact installation.`n" +
+    "    !ifmacrodef DRONEDREAM_REMOVE_INTERNAL_SHORTCUT`n" +
+    "      !insertmacro DRONEDREAM_REMOVE_INTERNAL_SHORTCUT `"`$SMPROGRAMS\`$AppStartMenuFolder\`${PRODUCTNAME}.lnk`"`n" +
+    "      !insertmacro DRONEDREAM_REMOVE_INTERNAL_SHORTCUT `"`$SMPROGRAMS\`${PRODUCTNAME}.lnk`"`n" +
+    "      !insertmacro DRONEDREAM_REMOVE_INTERNAL_SHORTCUT `"`$DESKTOP\`${PRODUCTNAME}.lnk`"`n" +
+    "      RMDir `"`$SMPROGRAMS\`$AppStartMenuFolder`"`n" +
+    "    !endif`n"
+if (([regex]::Matches($upstream, [regex]::Escape($uninstallIdentityAnchor))).Count -ne 1) {
+    throw "DroneDream uninstall identity anchor is missing or duplicated"
+}
+$upstream = $upstream.Replace($uninstallIdentityAnchor, "")
 $pageAnchor = "; 7. Optional DroneDream runtime mode page (fresh interactive installs only)`n" +
     "!ifmacrodef DRONEDREAM_RUNTIME_MODE_PAGE`n" +
     "  !insertmacro DRONEDREAM_RUNTIME_MODE_PAGE`n" +
@@ -164,6 +238,13 @@ foreach ($required in @(
 if ($runtimeMode -notmatch '(?ms)dronedream_revalidate_without_binary:\s+.*?Push "error"\s+FunctionEnd') {
     throw "Runtime quiesce revalidation must fail closed when the old binary disappears"
 }
+if (-not $runtimeMode.Contains(
+        "      Push `"ok`"`r`n      Return`r`n    dronedream_revalidate_without_binary:"
+    ) -and -not $runtimeMode.Contains(
+        "      Push `"ok`"`n      Return`n    dronedream_revalidate_without_binary:"
+    )) {
+    throw "Runtime quiesce revalidation must return ok before the missing-binary failure label"
+}
 
 $pathGuard = Get-Content -LiteralPath $pathGuardPath -Raw
 foreach ($required in @(
@@ -176,6 +257,28 @@ foreach ($required in @(
 )) {
     if (-not $pathGuard.Contains($required)) {
         throw "The shared NSIS path guard is missing: $required"
+    }
+}
+
+$editionIdentity = Get-Content -LiteralPath $editionIdentityPath -Raw -Encoding UTF8
+$middleDot = [char]0x00B7
+foreach ($required in @(
+    '!define DRONEDREAM_EDITION_ID "universal"',
+    '!define DRONEDREAM_DISPLAYNAME "DroneDream"',
+    "!define DRONEDREAM_DISPLAYNAME `"DroneDream $middleDot SIM`"",
+    "!define DRONEDREAM_DISPLAYNAME `"DroneDream $middleDot LAB`"",
+    "!define DRONEDREAM_DISPLAYNAME `"DroneDream $middleDot FIELD`"",
+    '!error "Unknown DroneDream installer PRODUCTNAME:',
+    '!macro DRONEDREAM_CREATE_DISPLAY_SHORTCUT SHORTCUT_PATH LABEL_PREFIX',
+    'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"',
+    'DetailPrint "$(DD_ShortcutConflict)"',
+    'SetErrors',
+    '!macro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT',
+    '!macro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT',
+    '!macro DRONEDREAM_REMOVE_INTERNAL_SHORTCUT SHORTCUT_PATH'
+)) {
+    if (-not $editionIdentity.Contains($required)) {
+        throw "Edition identity contract is missing: $required"
     }
 }
 
@@ -214,7 +317,8 @@ foreach ($required in @(
     'DD_AppOnly',
     'DD_InstallButton',
     'DD_NoEligibleDrive',
-    'DD_PlannerUnavailable'
+    'DD_PlannerUnavailable',
+    'DD_ShortcutConflict'
 )) {
     if ($required -notin $englishNames) {
         throw "Installer language contract is missing: $required"
@@ -257,17 +361,22 @@ if (-not $installerHook.Contains(
     throw "The installed binary must advertise durable Runtime protocol 2"
 }
 foreach ($required in @(
+    '!define DRONEDREAM_EDITION_IDENTITY_FILE "${__FILEDIR__}\edition-identity.nsh"',
+    '!macro DRONEDREAM_EDITION_IDENTITY_TABLE',
     '$1 >= 2',
     'Call DroneDreamRevalidateRuntimeQuiesce',
     'Call DroneDreamEndRuntimeQuiesce',
     'Call un.DroneDreamPrepareRuntimeQuiesce',
     '!macro DRONEDREAM_REFRESH_BRANDED_SHORTCUT SHORTCUT_PATH',
+    '!macro DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT DISPLAY_PATH INTERNAL_PATH LABEL_PREFIX',
     'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"',
     'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\$OldMainBinaryName"',
     'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\icons\DroneDream.ico" 0',
-    'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"',
-    'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\${PRODUCTNAME}.lnk"',
+    'DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk" "$DESKTOP\${PRODUCTNAME}.lnk"',
     'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$DESKTOP\${PRODUCTNAME}.lnk"',
+    'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"',
+    'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk"',
+    'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk"',
     "shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)"
 )) {
     if (-not $installerHook.Contains($required)) {
@@ -316,7 +425,7 @@ if ($deleteDataGate -lt 0 -or
     throw "Application data must be deleted only behind the explicit uninstall checkbox"
 }
 
-$packagingSources = @($template, $runtimeMode, $installerHook)
+$packagingSources = @($template, $runtimeMode, $installerHook, $editionIdentity)
 foreach ($pattern in @(
     '(?im)^\s*(?:Delete|RmDir(?:\s+/r)?)\s+.*DroneDream\.download-cache',
     '(?im)^\s*(?:Exec|ExecWait|ExecShell|nsExec::Exec(?:ToStack)?)\s+.*(?:wsl(?:\.exe)?).*--unregister',

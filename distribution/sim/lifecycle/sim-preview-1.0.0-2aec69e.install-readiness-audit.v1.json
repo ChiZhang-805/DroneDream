@@ -22,8 +22,13 @@
   "staticContracts": [
     {
       "path": "desktop/src-tauri/nsis/installer.nsi",
-      "sha256": "29ea70929025661177107c1c0e072e2ac7d9ecc46e188a1ddf4c5de11642e45e",
+      "sha256": "6905075b4d86e610ca74a395362797e04993a677a458738f11f877d1c507be80",
       "coverage": ["fresh-install", "overlay-upgrade", "uninstall", "shortcut", "license-notice"]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/edition-identity.nsh",
+      "sha256": "9e89f8ceaf8f273bf69a1368e1ad91349650fbf8eb871828e3082602cb0af2d9",
+      "coverage": ["fresh-install", "overlay-upgrade", "uninstall", "shortcut"]
     },
     {
       "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
@@ -32,22 +37,22 @@
     },
     {
       "path": "desktop/src-tauri/nsis/webview2-health.nsh",
-      "sha256": "30ac4b811b69038344e0b2be5563d2d01911a78b0efb60937fd09cfac1efda46",
+      "sha256": "625ef94f41f471890ef0e5ecf6458ac421b4bdfccecaf879d391d8d1c12efb0a",
       "coverage": ["webview2"]
     },
     {
       "path": "desktop/src-tauri/nsis/installer-languages.nsh",
-      "sha256": "fc648accb1b26a2e0e1638d6dca63328ffa7a35f0b2fc9d1feb02cf909a09314",
+      "sha256": "9c155f684d0b43e3a35958971953ff54e732697b9fa317f90931be17984f37bd",
       "coverage": ["en-locale", "zh-locale"]
     },
     {
       "path": "desktop/src-tauri/nsis/languages/English.nsh",
-      "sha256": "dc692a717843afeda05a28fb5b572d86e60f2ca337ba1032ed6aa579e9d2f7b8",
+      "sha256": "a218a57a2c6647456afe435bdc8648eb40ea53b4a7e5949b8f1b8622228127da",
       "coverage": ["en-locale"]
     },
     {
       "path": "desktop/src-tauri/nsis/languages/SimpChinese.nsh",
-      "sha256": "b9adb274559b81253176e7fe77fb979b933f88240998a2720fb0e477df7f1e05",
+      "sha256": "d75cc6f734fb7c34d6afe6a7f22cf8e8114f4d32e978578df6eea8d00473ef40",
       "coverage": ["zh-locale"]
     },
     {

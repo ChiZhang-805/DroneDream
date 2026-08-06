@@ -39,6 +39,9 @@ REPLACEMENT_YELLOW2_PATH = (
     / "desktop"
     / "yellow-2-replacement-build-evidence-record.v1.json"
 )
+COEXISTENCE_SYNC_PATH = (
+    DISTRIBUTION / "sim" / "readiness" / "coexistence-common-core-sync.v1.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -176,14 +179,31 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         changed_paths = sorted({path for path in committed_or_modified + untracked if path})
         prefixes = tuple(self.contract["editionSpecificPathPrefixes"])
         synchronized_paths = set(self.contract["synchronizedPaths"])
+        coexistence = load_json(COEXISTENCE_SYNC_PATH)
+        supplemental_paths = {
+            row["path"] for row in coexistence["synchronizedRuntimePaths"]
+        }
         self.assertTrue(changed_paths)
         self.assertTrue(
             all(
-                path in synchronized_paths or path.startswith(prefixes)
+                path in synchronized_paths
+                or path in supplemental_paths
+                or path.startswith(prefixes)
                 for path in changed_paths
             ),
             changed_paths,
         )
+
+    def test_coexistence_sync_does_not_relabel_partial_donor_as_common_core(self) -> None:
+        coexistence = load_json(COEXISTENCE_SYNC_PATH)
+        classification = coexistence["commonCoreClassification"]
+        self.assertEqual(
+            classification["recordedCommonCoreCommit"],
+            self.contract["syncBaseline"]["commonCoreCommit"],
+        )
+        self.assertFalse(classification["baselineUpdated"])
+        self.assertFalse(classification["candidateHashClaimedAsCurrent"])
+        self.assertFalse(coexistence["nonClaims"]["donorPytestExecuted"])
 
     def test_new_readiness_receipt_blocks_failed_exe_reuse_and_execution(self) -> None:
         readiness = load_json(READINESS_PATH)

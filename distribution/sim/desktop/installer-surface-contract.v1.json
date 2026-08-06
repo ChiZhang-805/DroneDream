@@ -13,7 +13,7 @@
   },
   "overlay": {
     "path": "distribution/sim/desktop/tauri.sim.conf.json",
-    "sha256": "fcbd5f1306ae8e8c9214dba7389df60cbcbf29424e3a10008ba6fbb3517c1dfe",
+    "sha256": "718a9c0f8ec10144979f50fc4b06b75bcf68d38a810ced11e9b76384f6621359",
     "baseConfigPath": "desktop/src-tauri/tauri.conf.json",
     "baseConfigSha256": "cbcd45f68670e61c9e221ee292baeb4cefd26c492fb8511a20e9d41c34145cd5",
     "baseConfigMustRemainUniversal": true,
@@ -55,25 +55,47 @@
   "staticSourceRefs": [
     {
       "path": "desktop/src-tauri/nsis/installer.nsi",
-      "sha256": "29ea70929025661177107c1c0e072e2ac7d9ecc46e188a1ddf4c5de11642e45e",
+      "sha256": "6905075b4d86e610ca74a395362797e04993a677a458738f11f877d1c507be80",
       "requiredText": [
         "!define PRODUCTNAME \"{{product_name}}\"",
-        "Name \"${PRODUCTNAME}\"",
+        "!define BUNDLEID \"{{bundle_id}}\"",
+        "Name \"${DRONEDREAM_DISPLAYNAME}\"",
         "OutFile \"${OUTFILE}\"",
-        "CreateShortcut \"$SMPROGRAMS\\$AppStartMenuFolder\\${PRODUCTNAME}.lnk\"",
-        "CreateShortcut \"$DESKTOP\\${PRODUCTNAME}.lnk\"",
-        "Delete \"$DESKTOP\\${PRODUCTNAME}.lnk\"",
+        "!define UNINSTKEY \"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${PRODUCTNAME}\"",
+        "WriteRegStr SHCTX \"${UNINSTKEY}\" \"DisplayName\" \"${DRONEDREAM_DISPLAYNAME}\"",
+        "RmDir /r \"$LOCALAPPDATA\\${BUNDLEID}\"",
+        "DRONEDREAM_REMOVE_INTERNAL_SHORTCUT",
         "WriteUninstaller \"$INSTDIR\\uninstall.exe\""
       ]
     },
     {
+      "path": "desktop/src-tauri/nsis/edition-identity.nsh",
+      "sha256": "9e89f8ceaf8f273bf69a1368e1ad91349650fbf8eb871828e3082602cb0af2d9",
+      "requiredText": [
+        "!else if \"${PRODUCTNAME}\" == \"DroneDream-Sim\"",
+        "!define DRONEDREAM_DISPLAYNAME \"DroneDream · SIM\"",
+        "!error \"Unknown DroneDream installer PRODUCTNAME: ${PRODUCTNAME}\"",
+        "!macro DRONEDREAM_CREATE_DISPLAY_SHORTCUT SHORTCUT_PATH LABEL_PREFIX",
+        "IsShortcutTarget",
+        "SetErrors"
+      ]
+    },
+    {
+      "path": "desktop/src-tauri/nsis/installer-languages.nsh",
+      "sha256": "9c155f684d0b43e3a35958971953ff54e732697b9fa317f90931be17984f37bd",
+      "requiredText": [
+        "LangString DD_ShortcutConflict ${LANG_ENGLISH}",
+        "LangString DD_ShortcutConflict ${LANG_SIMPCHINESE}"
+      ]
+    },
+    {
       "path": "desktop/src-tauri/nsis/languages/English.nsh",
-      "sha256": "dc692a717843afeda05a28fb5b572d86e60f2ca337ba1032ed6aa579e9d2f7b8",
+      "sha256": "a218a57a2c6647456afe435bdc8648eb40ea53b4a7e5949b8f1b8622228127da",
       "requiredText": ["LangString createDesktop ${LANG_ENGLISH}"]
     },
     {
       "path": "desktop/src-tauri/nsis/languages/SimpChinese.nsh",
-      "sha256": "b9adb274559b81253176e7fe77fb979b933f88240998a2720fb0e477df7f1e05",
+      "sha256": "d75cc6f734fb7c34d6afe6a7f22cf8e8114f4d32e978578df6eea8d00473ef40",
       "requiredText": ["LangString createDesktop ${LANG_SIMPCHINESE}"]
     }
   ],
@@ -104,7 +126,7 @@
   },
   "lifecycleReadiness": {
     "path": "distribution/sim/lifecycle/sim-preview-1.0.0-2aec69e.install-readiness-audit.v1.json",
-    "sha256": "3f20369156c00ec4942feb4d42d1dcdc8573e8daaa5b8b66d272b1e29dddad71",
+    "sha256": "9668e88ea3df634f874ef55cccd2d84969585b323a254045deadb467b24800de",
     "requiredPlannedScenarios": [
       "freshInstall",
       "overlayUpgrade",

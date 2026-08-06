@@ -409,7 +409,7 @@ class SimInstallerContractTests(unittest.TestCase):
         overlay = sim_contract.validate_sim_tauri_overlay_config(
             load_json(OVERLAY_PATH), repo_root=ROOT
         )
-        self.assertEqual(overlay["productName"], "DroneDream \u00b7 SIM")
+        self.assertEqual(overlay["productName"], "DroneDream-Sim")
 
         invalid = deepcopy(overlay)
         invalid["productName"] = "DroneDream \u00b7 LAB"

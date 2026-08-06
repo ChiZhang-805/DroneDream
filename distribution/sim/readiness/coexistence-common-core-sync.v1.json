@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-coexistence-common-core-sync",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "green-runtime-blobs-synced-contract-prerequisites-pending",
+  "source": {
+    "donorBranch": "origin/codex/software",
+    "donorCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "donorParentCommit": "7482647f1c2fcb92f58aaef009efc99764792297",
+    "donorTree": "b07389020a5e55e2016612f1ad92ec031706ad26",
+    "donorChangedPathCount": 8,
+    "wholeCommitCherryPicked": false,
+    "unrelatedParentChainAdopted": false
+  },
+  "commonCoreClassification": {
+    "recordedCommonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
+    "recordedCommonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
+    "candidateCommonCoreCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "candidateCommonCoreHash": "2efde20c72d59720070d7090fb1796a24d37bf75d4ec9ffdb5be9eb3bb0ae2af",
+    "baselineUpdated": false,
+    "candidateHashClaimedAsCurrent": false,
+    "blocker": "donor pytest requires four missing common prerequisite paths, and the exact donor verifier requires a newer runtime-mode.nsh inherited from the donor parent chain"
+  },
+  "synchronizedRuntimePaths": [
+    {"path":"desktop/scripts/verify-nsis-template.ps1","blob":"0e1d94e8de358057cfd0d95bcc0ae332f8d71cf1","sha256":"d23770d685b3ac41679857e37d3c5e127929ad14b5eef5fc80de139f4dc83432"},
+    {"path":"desktop/src-tauri/nsis/edition-identity.nsh","blob":"0e0cfb80086bb1d1e680fd6537c2a0e48fca09cd","sha256":"9e89f8ceaf8f273bf69a1368e1ad91349650fbf8eb871828e3082602cb0af2d9"},
+    {"path":"desktop/src-tauri/nsis/installer-languages.nsh","blob":"aa788939d765590a7827a21152c865afc2f62d53","sha256":"9c155f684d0b43e3a35958971953ff54e732697b9fa317f90931be17984f37bd"},
+    {"path":"desktop/src-tauri/nsis/installer.nsi","blob":"53ccf62ef20ab96ea07a316e0995ffbfe5d7f62b","sha256":"6905075b4d86e610ca74a395362797e04993a677a458738f11f877d1c507be80"},
+    {"path":"desktop/src-tauri/nsis/languages/English.nsh","blob":"24d0063bd88afd3724176cbf952e6817d70d8d28","sha256":"a218a57a2c6647456afe435bdc8648eb40ea53b4a7e5949b8f1b8622228127da"},
+    {"path":"desktop/src-tauri/nsis/languages/SimpChinese.nsh","blob":"b9a03ec304e73c2cc0767fbe224f052d25d28d5b","sha256":"d75cc6f734fb7c34d6afe6a7f22cf8e8114f4d32e978578df6eea8d00473ef40"},
+    {"path":"desktop/src-tauri/nsis/webview2-health.nsh","blob":"8aad96dc68c8e0861dbe37a2d38e7086324d27f0","sha256":"625ef94f41f471890ef0e5ecf6458ac421b4bdfccecaf879d391d8d1c12efb0a"}
+  ],
+  "synchronizedRuntimeBlobSetSha256": "3ac820e6de8ec382c751df936a1f50572a82962b150112d3e21e3c4bc5846c39",
+  "observedNotAdoptedTest": {
+    "path": "distribution/tests/test_desktop_edition_coexistence.py",
+    "blob": "63081d38b560e3ba96efa87e3743f9293f8be914",
+    "sha256": "be264b7a5d0c88e0988be6b80e770389c948997dfefe7c85f375199aab3fe15a",
+    "reason": "test collection would import unhanded common prerequisite modules and contracts"
+  },
+  "pendingPrerequisitePaths": [
+    {"path":"distribution/tools/desktop_edition_coexistence.py","state":"missing-in-sim","donorBlob":"1b420d9ba3069a2e410139ca2e575c6b28c70992"},
+    {"path":"distribution/desktop/edition-coexistence.v1.json","state":"missing-in-sim","donorBlob":"9ee2301a074f2c4372ddb133e98eae8335207813"},
+    {"path":"distribution/schemas/desktop-edition-coexistence.schema.json","state":"missing-in-sim","donorBlob":"c4a7017955a036f0577f99f7a94a32f1c4c56f7a"},
+    {"path":"desktop/src-tauri/tauri.universal.conf.json","state":"missing-in-sim","donorBlob":"e789292b92d037893f29e23086a681bfb9c12f54"},
+    {"path":"desktop/src-tauri/nsis/runtime-mode.nsh","state":"present-but-not-donor-blob","currentBlob":"d33b2c059cf7f076fcda94011ff7d86a2601d0ab","currentSha256":"c6f99b0b6627703030aef0637e68a045ccda7fd4aa28ccb0c2c4b3d430c4dfaa","donorBlob":"9af1787fa8607e725c4495fa14a5763de781a5a3","donorSha256":"daa73c6e7f6ea4e4cc05fda1c8602ef358d5e42e7daabf711d357144c600cbfa","lastDonorPathCommit":"e9dcc7eac5bf2a47ce8d50e16ef4f66cc1bb55b6"}
+  ],
+  "verification": {
+    "exactSynchronizedRuntimeBlobsPassed": true,
+    "simOwnedNegativeTestsPassed": true,
+    "donorVendoredNsisVerifierPassed": false,
+    "donorVendoredNsisVerifierBlocker": "Runtime quiesce revalidation must return ok before the missing-binary failure label",
+    "compiledLocaleVerifierExecuted": false,
+    "installerUiVerifierExecuted": false
+  },
+  "simOverlay": {
+    "path": "distribution/sim/desktop/tauri.sim.conf.json",
+    "sha256": "718a9c0f8ec10144979f50fc4b06b75bcf68d38a810ced11e9b76384f6621359",
+    "installerProductName": "DroneDream-Sim",
+    "displayName": "DroneDream \u00b7 SIM",
+    "bundleIdentifier": "io.dronedream.sim",
+    "canonicalWindowsIcoSha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+    "hardwareAuthorityGranted": false
+  },
+  "staticAcceptance": {
+    "unknownProductFailsClosed": true,
+    "installRootUsesInternalProductName": true,
+    "uninstallKeyUsesInternalProductName": true,
+    "appDataUsesBundleIdentifier": true,
+    "shortcutUsesCanonicalDisplayName": true,
+    "shortcutConflictPreserved": true,
+    "legacyShortcutMigrationRequiresOwnedTarget": true,
+    "uninstallDeletesOnlyOwnedShortcutTargets": true,
+    "enZhConflictCopyPresent": true,
+    "validatedVehiclePackCount": 0
+  },
+  "execution": {
+    "nsisBuildExecuted": false,
+    "installerExecuted": false,
+    "shortcutCreatedOrDeleted": false,
+    "registryMutated": false,
+    "runtimeStartedOrMigrated": false,
+    "px4OrGazeboStarted": false,
+    "apiKeyRead": false,
+    "deploymentExecuted": false,
+    "releaseAsset": false
+  },
+  "nonClaims": {
+    "commonCoreBaselineFullyAdvanced": false,
+    "donorPytestExecuted": false,
+    "coexistenceLifecycleValidated": false,
+    "authenticationIsolationIntegrated": false,
+    "runtimeNamespaceIntegrated": false,
+    "updaterNamespaceIntegrated": false,
+    "releaseReady": false
+  }
+}

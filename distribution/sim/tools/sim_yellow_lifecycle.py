@@ -713,7 +713,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         (
             "installerSurfaceContract",
             "distribution/sim/desktop/installer-surface-contract.v1.json",
-            "1ceab6b419eb8b2416d8b744a0face49cab78a96a7601f16b825d8f804d2d88b",
+            "3a251736d9018c24275da1725a42f66852efd43ecaf5a71e23e569833a2fd89d",
         ),
         (
             "websiteHandoffContract",
