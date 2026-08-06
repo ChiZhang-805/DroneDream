@@ -1,0 +1,10 @@
+setupAttempt=1
+result=failed-before-cargo
+cargoBuildCount=0
+nsisInvocationCount=0
+exeProduced=false
+reason=Windows path length while materializing exact product source
+failedPath=
+C:\Users\zju20\.codex\visualizations\2026\08\05\019fd0e2-71cc-7742-bfab-612510f37c39\field-yellow-readiness-26dd3c1\source
+recordedAt=
+2026-08-06T09:42:35.9899062Z

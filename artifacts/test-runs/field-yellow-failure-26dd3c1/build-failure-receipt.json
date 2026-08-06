@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-single-yellow-build-failure-receipt",
+  "editionId": "field",
+  "decision": "failed-before-installer-no-exe",
+  "recordedAt": "2026-08-06T09:53:06.599847Z",
+  "authorization": {
+    "applicationPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\yellow-build-application.json",
+    "applicationSha256": "3395ab7c4429759f16e3e7836579acc45728685ebb7e57c2bb445cccfb73eb4f",
+    "status": "consumed-failed",
+    "retryAuthorized": false
+  },
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "26dd3c141f86bc9cc538336bc3cb6a8155cc88e7",
+    "productTree": "1cce23c72274e40cf2c5ce39b7cb4644a04d9d90",
+    "evidenceHead": "969f4db4b6d46825e0634ddecc56eb8540e41fa1",
+    "universalDonor": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "trackedWorktreeDiff": false,
+    "indexDiff": false
+  },
+  "execution": {
+    "setupAttemptCount": 2,
+    "preCargoTauriAbortCount": 1,
+    "tauriInvocationCount": 1,
+    "cargoBuildCount": 1,
+    "nsisInvocationCount": 1,
+    "secondCargoBuildPerformed": false,
+    "secondNsisInvocationPerformed": false,
+    "installerProduced": false,
+    "fixedFilename": "DroneDream-Field-1.0.0.exe",
+    "fixedFilenameProduced": false
+  },
+  "cargoOutput": {
+    "frozenPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\failure-intermediates\\drone-dream-desktop.exe",
+    "bytes": 24898048,
+    "sha256": "aa1ad17bcf8af8f5ecb743f4af30482998b29798fafc6f5d9af5dd0e1b2c4fee",
+    "authenticodeStatus": "NotSigned",
+    "peCertificateTableSize": 0,
+    "generatedAt": "2026-08-06T09:47:42.2491034Z"
+  },
+  "generatedNsis": {
+    "frozenDirectory": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\failure-intermediates\\nsis-x64",
+    "installerNsiPath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\failure-intermediates\\nsis-x64\\installer.nsi",
+    "installerNsiBytes": 35103,
+    "installerNsiSha256": "69997b7ca8d95d8f412319a65cc580d99e12215bace629756c9d2ce2ae81fa58",
+    "outputExeProduced": false
+  },
+  "failure": {
+    "stage": "makensis-compile",
+    "exitCode": 1,
+    "message": "label dronedream_desktop_done already declared in function",
+    "generatedScriptLine": 991,
+    "macro": "DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT",
+    "rootCausePath": "desktop/src-tauri/nsis/edition-identity.nsh",
+    "rootCauseGitBlob": "0e0cfb80086bb1d1e680fd6537c2a0e48fca09cd",
+    "rootCauseSha256": "9e89f8ceaf8f273bf69a1368e1ad91349650fbf8eb871828e3082602cb0af2d9",
+    "exactToUniversalDonor": true,
+    "minimumFixDisposition": "Universal/common-core must disambiguate the outer desktop completion label; no Field-only patch applied"
+  },
+  "logs": [
+    {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\setup-attempt-1.log",
+      "sha256": "a206d253f06e91dd43ac799d124bd688193d2e718ca3a87c597340cf1630397a"
+    },
+    {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\preflight-context-note.log",
+      "sha256": "ff8860b1f0378f61d6c9469bea390398c1facfc39881279036271b9a98ee2090"
+    },
+    {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\build.stdout.log",
+      "sha256": "b920fa20cc99b90553b35ec4e9122e59a6a1c4e9af6944618e093dcc249e015e"
+    },
+    {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\build.stderr.log",
+      "sha256": "9a86fff270e2b19f30ecdc45de47f81bb9d90aa5b4f800ef24add15ad9ff9a85"
+    },
+    {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\build-process.json",
+      "sha256": "d7f4ea6a193d87a0e4f1f826a857da62fe1ade0c1b5a6b692c4d25bc4f0c7c1d"
+    },
+    {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\makensis.stdout.log",
+      "sha256": "2920c549a1474f929bc33c22a4fc0ad7d231a3e0dbe884363add66fd36088b75"
+    },
+    {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\makensis.stderr.log",
+      "sha256": "c984e3422b1d411cd44ebab42f8b81dc1b9212a192940e1d939173da8be888b5"
+    },
+    {
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-26dd3c1\\makensis-process.json",
+      "sha256": "e776f2315409c2cd5b55088cf7ce33c2f59d282a4b5e079d00ca212c3af27def"
+    }
+  ],
+  "resourceEvidence": {
+    "cargoTargetPath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target",
+    "cargoTargetBytes": 7968006865,
+    "cargoTargetBytesMaximum": 8589934592,
+    "withinCargoTargetLimit": true,
+    "failureEvidenceBytes": 30895788,
+    "workspaceTemporaryBytesMaximum": 1073741824
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "hardwareActionsAllowed": false,
+    "installPerformed": false,
+    "applicationLaunched": false,
+    "runtimeMigrationPerformed": false,
+    "deviceTouched": false,
+    "simulationStarted": false,
+    "apiKeyOrPasswordRead": false,
+    "artifactUploaded": false,
+    "deploymentPerformed": false,
+    "releaseBranchCreated": false
+  },
+  "artifact": {
+    "absolutePath": null,
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": null,
+    "sha256": null,
+    "authenticodeStatus": "not-applicable-no-installer",
+    "peCertificateState": "not-applicable-no-installer",
+    "updaterSignatureState": "not-issued"
+  },
+  "releaseState": {
+    "previewReady": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "websiteHandoffAllowed": false,
+    "remainingGates": [
+      "Universal/common-core NSIS duplicate-label fix and exact donor handoff",
+      "Field path-limited donor sync and new exact product source",
+      "new explicit single YELLOW authorization",
+      "successful unique NSIS installer build and static payload verification",
+      "separately approved install/coexistence/auth-entry lifecycle acceptance"
+    ]
+  },
+  "receiptSha256": "e3d74bff7212555f01e4a6736f27c09368a61abb7f2e5c850654f952bee16a23"
+}

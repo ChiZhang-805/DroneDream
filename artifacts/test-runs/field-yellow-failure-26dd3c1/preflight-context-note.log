@@ -1,0 +1,9 @@
+preflightTestContext=detached-worktree
+result=one-contextual-fixture-failure-before-build
+cargoBuildCount=0
+nsisInvocationCount=0
+failedTest=test_static_candidate_is_ready_to_request_but_not_authorized
+reason=test fixture reads current branch; exact-source build worktree is detached
+productOrSafetyFailure=false
+recordedAt=
+2026-08-06T09:44:13.5060270Z

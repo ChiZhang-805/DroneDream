@@ -1,0 +1,13 @@
+{
+    "schemaVersion":  1,
+    "kind":  "dronedream-field-single-nsis-process",
+    "sourceCommit":  "26dd3c141f86bc9cc538336bc3cb6a8155cc88e7",
+    "generatedNsiSha256":  "69997b7ca8d95d8f412319a65cc580d99e12215bace629756c9d2ce2ae81fa58",
+    "invocationCount":  1,
+    "startedAt":  "2026-08-06T09:50:46.0954202Z",
+    "finishedAt":  "2026-08-06T09:50:48.1116764Z",
+    "durationSeconds":  2.016,
+    "exitCode":  1,
+    "outputPath":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\x86_64-pc-windows-gnullvm\\release\\nsis\\x64\\nsis-output.exe",
+    "outputExists":  false
+}
