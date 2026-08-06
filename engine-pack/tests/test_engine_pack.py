@@ -24,7 +24,11 @@ class EnginePackTests(unittest.TestCase):
         engine_paths = engine_pack.runtime_distribution_paths(ROOT)
         files = engine_pack.production_files(ROOT)
         distribution_files = {path for path, _source in files if path.startswith("distribution/")}
-        expected_distribution = {path for path in engine_paths if path.startswith("distribution/")}
+        expected_distribution = {
+            path
+            for path in (*engine_paths, *engine_pack.UNIFIED_DESKTOP_CONTRACT_PATHS)
+            if path.startswith("distribution/")
+        }
         self.assertEqual(distribution_files, expected_distribution)
         self.assertFalse(
             any(
@@ -39,7 +43,7 @@ class EnginePackTests(unittest.TestCase):
             )
         )
         records = {record["path"]: record for record in engine_pack.file_records(files)}
-        for relative in engine_paths:
+        for relative in (*engine_paths, *engine_pack.UNIFIED_DESKTOP_CONTRACT_PATHS):
             self.assertIn(relative, records)
             self.assertEqual(records[relative]["sha256"], engine_pack.sha256_file(ROOT / relative))
 
@@ -267,6 +271,7 @@ class EnginePackTests(unittest.TestCase):
         self.assertFalse(any(path.startswith("scripts/simulators/") for path in paths))
         self.assertFalse(any(path.startswith("backend/app/simulator/") for path in paths))
         self.assertIn("distribution/editions/field.v1.json", paths)
+        self.assertFalse(set(engine_pack.UNIFIED_DESKTOP_CONTRACT_PATHS) & set(paths))
 
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)
@@ -305,6 +310,7 @@ class EnginePackTests(unittest.TestCase):
         )
         self.assertNotIn("distribution/editions/lab.v1.json", paths)
         self.assertNotIn("distribution/editions/field.v1.json", paths)
+        self.assertFalse(set(engine_pack.UNIFIED_DESKTOP_CONTRACT_PATHS) & set(paths))
         self.assertNotIn("backend/app/distribution_safety.py", paths)
         self.assertFalse(
             any(
