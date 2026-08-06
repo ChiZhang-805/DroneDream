@@ -171,9 +171,13 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
     def test_yellow_attempt_4_is_single_sim_only_build_request(self) -> None:
         application = load_json(YELLOW_APPLICATION_PATH)
         attempt = application["attemptAccounting"]
-        self.assertEqual(attempt["globalBuildAttemptOrdinal"], 4)
-        self.assertEqual(attempt["sourceBuildAttemptOrdinal"], 2)
-        self.assertEqual(attempt["sourceBuildAttemptMaximum"], 1)
+        self.assertEqual(attempt["globalAuthorizedCommandOrdinal"], 4)
+        self.assertEqual(attempt["sourceApplicationPreflightOrdinal"], 2)
+        self.assertEqual(attempt["priorSourceBuildInvocationCount"], 0)
+        self.assertEqual(attempt["sourceBuildInvocationOrdinal"], 1)
+        self.assertEqual(attempt["sourceBuildInvocationMaximum"], 1)
+        self.assertNotIn("sourceBuildAttemptOrdinal", attempt)
+        self.assertNotIn("sourceBuildAttemptMaximum", attempt)
         self.assertEqual(attempt["maximumBuildInvocations"], 1)
         self.assertFalse(attempt["automaticRetryAllowed"])
         self.assertEqual(application["buildIdentity"]["runtimeProfileId"], "sim-only")
@@ -208,7 +212,12 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
     def test_yellow_attempt_3_preflight_failure_is_frozen_before_build(self) -> None:
         receipt = load_json(YELLOW_ATTEMPT_3_FAILURE_PATH)
         self.assertEqual(receipt["state"], "failed-frozen-no-retry")
-        self.assertEqual(receipt["authorizationBinding"]["globalBuildAttemptOrdinal"], 3)
+        binding = receipt["authorizationBinding"]
+        self.assertEqual(binding["globalAuthorizedCommandOrdinal"], 3)
+        self.assertEqual(binding["sourceApplicationPreflightOrdinal"], 1)
+        self.assertFalse(binding["sourceBuildInvocationConsumed"])
+        self.assertEqual(binding["sourceBuildInvocationCount"], 0)
+        self.assertEqual(binding["sourceBuildInvocationMaximum"], 1)
         self.assertFalse(receipt["failure"]["sameAuthorizationMayBeReused"])
         for key in (
             "runRootsCreated",
@@ -240,7 +249,17 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             hashlib.sha256(entry_script.read_bytes()).hexdigest(),
             receipt["entryScript"]["sha256"],
         )
+        prior_failure = ROOT / receipt["priorAttempt"]["failureReceiptPath"]
+        self.assertEqual(
+            hashlib.sha256(prior_failure.read_bytes()).hexdigest(),
+            receipt["priorAttempt"]["failureReceiptSha256"],
+        )
         self.assertEqual(receipt["preflight"]["status"], "pass")
+        self.assertEqual(receipt["application"]["globalAuthorizedCommandOrdinal"], 4)
+        self.assertEqual(receipt["application"]["sourceApplicationPreflightOrdinal"], 2)
+        self.assertEqual(receipt["application"]["priorSourceBuildInvocationCount"], 0)
+        self.assertEqual(receipt["application"]["sourceBuildInvocationOrdinal"], 1)
+        self.assertEqual(receipt["application"]["sourceBuildInvocationMaximum"], 1)
         self.assertTrue(receipt["preflight"]["runRootAbsent"])
         self.assertTrue(receipt["preflight"]["sourceRootAbsent"])
         self.assertFalse(receipt["preflight"]["publicSupabaseValuesRecorded"])

@@ -204,8 +204,11 @@ function Invoke-ExactBuild {
     New-Item -ItemType Directory -Path $BundleRoot, $ReceiptRoot | Out-Null
     Write-JsonFile ([ordered]@{
         productSourceCommit = $ProductSource
-        globalBuildAttemptOrdinal = 4
-        sourceBuildAttemptOrdinal = 2
+        globalAuthorizedCommandOrdinal = 4
+        sourceApplicationPreflightOrdinal = 2
+        priorSourceBuildInvocationCount = 0
+        sourceBuildInvocationOrdinal = 1
+        sourceBuildInvocationMaximum = 1
         retryAllowed = $false
         createdAtUtc = [DateTime]::UtcNow.ToString("o")
     }) $AttemptLock

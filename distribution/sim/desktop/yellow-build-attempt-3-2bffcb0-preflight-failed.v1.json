@@ -13,9 +13,11 @@
     "entryScriptPath": "distribution/sim/desktop/invoke-yellow-build-attempt-3-2bffcb0.ps1",
     "entryScriptBytes": 14789,
     "entryScriptSha256": "3216cee1bee9ad89132f761f8faec028d75a03ccca4988a2e15b55d76b081811",
-    "globalBuildAttemptOrdinal": 3,
-    "sourceAttemptOrdinal": 1,
-    "maximumBuildInvocations": 1,
+    "globalAuthorizedCommandOrdinal": 3,
+    "sourceApplicationPreflightOrdinal": 1,
+    "sourceBuildInvocationConsumed": false,
+    "sourceBuildInvocationCount": 0,
+    "sourceBuildInvocationMaximum": 1,
     "retryAllowed": false
   },
   "execution": {

@@ -11,23 +11,26 @@
   },
   "application": {
     "path": "distribution/sim/desktop/yellow-build-attempt-4-2bffcb0-application.v1.json",
-    "bytes": 11195,
-    "sha256": "13990cc74cf03440548930096d8e7621ea343dbe442afbdcb4989bc1435225fb",
-    "globalBuildAttemptOrdinal": 4,
-    "sourceAttemptOrdinal": 2,
+    "bytes": 11397,
+    "sha256": "14f806474557b35a11b306ef623f1615401fc6889a5df3ce8c76db14bed2f3bd",
+    "globalAuthorizedCommandOrdinal": 4,
+    "sourceApplicationPreflightOrdinal": 2,
+    "priorSourceBuildInvocationCount": 0,
+    "sourceBuildInvocationOrdinal": 1,
+    "sourceBuildInvocationMaximum": 1,
     "maximumBuildInvocations": 1,
     "retryMaximum": 0
   },
   "entryScript": {
     "path": "distribution/sim/desktop/invoke-yellow-build-attempt-4-2bffcb0.ps1",
-    "bytes": 14875,
-    "sha256": "48b1a069453ef6be5947ac7658faca8f2586d4cd3e2b49d44430c2a9b746080b",
+    "bytes": 15014,
+    "sha256": "141d85d49cffab4b085ee4105a9bf405f076b1493953da1816121cbe526c7558",
     "preflightCommand": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-4-2bffcb0.ps1 -Mode Preflight",
     "executeCommand": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-4-2bffcb0.ps1 -Mode Execute"
   },
   "priorAttempt": {
     "failureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-3-2bffcb0-preflight-failed.v1.json",
-    "failureReceiptSha256": "889beba7ff7320277a134c68037ebe0c62d54988625717b041986888b3dd0ef2",
+    "failureReceiptSha256": "7ab9b62590356358b378b2d893f0a358dcd85acdb6b0368a6816cf63e3ab3b7b",
     "sameAuthorizationReusable": false,
     "buildDriverInvocations": 0
   },

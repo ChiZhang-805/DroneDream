@@ -32,9 +32,11 @@
     "grantsHardwareAuthority": false
   },
   "attemptAccounting": {
-    "globalBuildAttemptOrdinal": 4,
-    "sourceBuildAttemptOrdinal": 2,
-    "sourceBuildAttemptMaximum": 1,
+    "globalAuthorizedCommandOrdinal": 4,
+    "sourceApplicationPreflightOrdinal": 2,
+    "priorSourceBuildInvocationCount": 0,
+    "sourceBuildInvocationOrdinal": 1,
+    "sourceBuildInvocationMaximum": 1,
     "maximumBuildInvocations": 1,
     "automaticRetryAllowed": false,
     "failedAttemptMustFreezeWithoutRetry": true
@@ -88,8 +90,8 @@
   "executionPlan": {
     "entryScript": {
       "path": "distribution/sim/desktop/invoke-yellow-build-attempt-4-2bffcb0.ps1",
-      "bytes": 14875,
-      "sha256": "48b1a069453ef6be5947ac7658faca8f2586d4cd3e2b49d44430c2a9b746080b",
+      "bytes": 15014,
+      "sha256": "141d85d49cffab4b085ee4105a9bf405f076b1493953da1816121cbe526c7558",
       "checkoutEolPolicyPath": "distribution/sim/desktop/.gitattributes",
       "checkoutEol": "lf",
       "defaultMode": "Plan",
@@ -161,8 +163,9 @@
   },
   "priorPreflightFailure": {
     "receiptPath": "distribution/sim/desktop/yellow-build-attempt-3-2bffcb0-preflight-failed.v1.json",
-    "globalBuildAttemptOrdinal": 3,
-    "sourceAttemptOrdinal": 1,
+    "globalAuthorizedCommandOrdinal": 3,
+    "sourceApplicationPreflightOrdinal": 1,
+    "sourceBuildInvocationConsumed": false,
     "buildDriverInvocations": 0,
     "sameAuthorizationMayBeReused": false
   },
@@ -202,7 +205,8 @@
       "productSourceCommit",
       "productSourceTree",
       "applicationSha256",
-      "globalBuildAttemptOrdinal",
+      "globalAuthorizedCommandOrdinal",
+      "sourceBuildInvocationOrdinal",
       "ownedRunRoot",
       "fixedArtifactPath",
       "maximumBuildInvocations"
