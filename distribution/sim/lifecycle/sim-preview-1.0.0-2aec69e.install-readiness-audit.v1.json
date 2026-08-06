@@ -22,12 +22,12 @@
   "staticContracts": [
     {
       "path": "desktop/src-tauri/nsis/installer.nsi",
-      "sha256": "6905075b4d86e610ca74a395362797e04993a677a458738f11f877d1c507be80",
+      "sha256": "c7cac9f568c7be3c0485cdb628aa46e85a37f533a988d4f1af660291b32620b0",
       "coverage": ["fresh-install", "overlay-upgrade", "uninstall", "shortcut", "license-notice"]
     },
     {
       "path": "desktop/src-tauri/nsis/edition-identity.nsh",
-      "sha256": "9e89f8ceaf8f273bf69a1368e1ad91349650fbf8eb871828e3082602cb0af2d9",
+      "sha256": "9e361a39c044ec5ae5c87a63000962acde597f672034510de434c2053525e95b",
       "coverage": ["fresh-install", "overlay-upgrade", "uninstall", "shortcut"]
     },
     {

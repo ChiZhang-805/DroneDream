@@ -10,8 +10,10 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-OBSERVED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
-OBSERVED_TREE = "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d"
+OBSERVED_HEAD = "a11fe7d09fceafaecf102a0cbfba49abb066a557"
+OBSERVED_TREE = "26d913c7098b1a1c3a04e974b17b10ebac03e8ef"
+AUTH_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+RUNTIME_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 BRAND_PRODUCT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
 
 EXACT_GROUPS = {
@@ -20,13 +22,10 @@ EXACT_GROUPS = {
         "distribution/tools/desktop_edition_coexistence.py",
     ),
     "8a8ad6ce0ea619a52ec087b7f55142c24311165a": (
-        "desktop/src-tauri/nsis/edition-identity.nsh",
         "desktop/src-tauri/nsis/installer-languages.nsh",
-        "desktop/src-tauri/nsis/installer.nsi",
         "desktop/src-tauri/nsis/languages/English.nsh",
         "desktop/src-tauri/nsis/languages/SimpChinese.nsh",
         "desktop/src-tauri/nsis/webview2-health.nsh",
-        "distribution/tests/test_desktop_edition_coexistence.py",
     ),
     "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75": (
         "distribution/schemas/desktop-edition-browser-auth.schema.json",
@@ -82,7 +81,11 @@ EXACT_GROUPS = {
         "desktop/src-tauri/src/installer_handoff.rs",
     ),
     OBSERVED_HEAD: (
+        "desktop/scripts/verify-edition-identity-nsis.ps1",
         "desktop/scripts/verify-nsis-template.ps1",
+        "desktop/src-tauri/nsis/edition-identity.nsh",
+        "desktop/src-tauri/nsis/installer.nsi",
+        "distribution/tests/test_desktop_edition_coexistence.py",
     ),
 }
 
@@ -109,6 +112,14 @@ def _git(root: Path, *args: str) -> str:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _git_bytes(root: Path, *args: str) -> bytes:
+    return subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True,
+        capture_output=True,
+    ).stdout
 
 
 def _brand_paths(root: Path) -> tuple[str, ...]:
@@ -190,13 +201,13 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     for path in brand_paths:
         _validate_exact_path(root, BRAND_PRODUCT, path)
     common_paths = [path for paths in EXACT_GROUPS.values() for path in paths]
-    _require(len(common_paths) == len(set(common_paths)) == 47, "common path inventory drifted")
+    _require(len(common_paths) == len(set(common_paths)) == 48, "common path inventory drifted")
     for commit, paths in EXACT_GROUPS.items():
         for path in paths:
             _validate_exact_path(root, commit, path)
     path_sync = document.get("pathSync", {})
     _require(path_sync.get("canonicalBrandPathCount") == 94, "brand count receipt drifted")
-    _require(path_sync.get("exactCommonPathCount") == 47, "common count receipt drifted")
+    _require(path_sync.get("exactCommonPathCount") == 48, "common count receipt drifted")
     _require(path_sync.get("unrelatedBenchmarkPathsAdopted") is False, "Benchmark overclaim")
     _require(path_sync.get("hardwareAuthorityGranted") is False, "hardware authority overclaim")
 
@@ -283,7 +294,7 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "auth verifier source drifted",
     )
     _require(
-        auth_verifier_sync.get("reviewedHead") == OBSERVED_HEAD,
+        auth_verifier_sync.get("reviewedHead") == AUTH_REVIEWED_HEAD,
         "auth verifier reviewed head drifted",
     )
     expected_auth_verifier_rows = {
@@ -321,7 +332,7 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "runtime correction source drifted",
     )
     _require(
-        runtime_correction.get("exactTreeCommit") == OBSERVED_HEAD,
+        runtime_correction.get("exactTreeCommit") == RUNTIME_REVIEWED_HEAD,
         "runtime correction exact tree drifted",
     )
     expected_runtime_rows = {
@@ -346,8 +357,29 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         blob, sha256 = expected_runtime_rows[path]
         _require(row.get("blob") == blob, f"runtime correction blob drifted: {path}")
         _require(row.get("sha256") == sha256, f"runtime correction SHA drifted: {path}")
-        _require(_git(root, "hash-object", "--", path) == blob, f"runtime blob drifted: {path}")
-        _require(_sha256(root / path) == sha256, f"runtime bytes drifted: {path}")
+        _require(
+            _git(root, "rev-parse", f"{RUNTIME_REVIEWED_HEAD}:{path}") == blob,
+            f"historical runtime blob drifted: {path}",
+        )
+        _require(
+            hashlib.sha256(
+                _git_bytes(root, "cat-file", "blob", f"{RUNTIME_REVIEWED_HEAD}:{path}")
+            ).hexdigest()
+            == sha256,
+            f"historical runtime bytes drifted: {path}",
+        )
+
+    nsis_fix = corrections.get("nsisIdentityFix", {})
+    _require(
+        nsis_fix == {
+            "sourceCommit": OBSERVED_HEAD,
+            "parentCommit": AUTH_REVIEWED_HEAD,
+            "changedPathCount": 5,
+            "rootCause": "duplicate-expanded-desktop-done-label",
+            "editionIdentityPreserved": True,
+        },
+        "NSIS identity fix receipt drifted",
+    )
 
     _require(document.get("upstreamBlockers") == [], "resolved blocker was retained")
 
@@ -386,7 +418,7 @@ def main() -> int:
             {
                 "valid": True,
                 "brandPaths": 94,
-                "commonPaths": 47,
+                "commonPaths": 48,
                 "yellow2Ready": True,
             },
             sort_keys=True,

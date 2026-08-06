@@ -26,7 +26,7 @@ class SimUniversalHandoffTests(unittest.TestCase):
     def test_exact_handoff_and_sim_adapter_validate(self) -> None:
         receipt = validate_handoff(load_receipt(), ROOT)
         self.assertEqual(receipt["pathSync"]["canonicalBrandPathCount"], 94)
-        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 47)
+        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 48)
         self.assertFalse(receipt["execution"]["buildAuthorized"])
 
     def test_observed_head_cannot_be_relabelled_whole_product_source(self) -> None:
@@ -45,6 +45,12 @@ class SimUniversalHandoffTests(unittest.TestCase):
         receipt = load_receipt()
         receipt["verification"]["nsisTemplateGatePassed"] = False
         with self.assertRaisesRegex(SimUniversalHandoffError, "verification claim"):
+            validate_handoff(receipt, ROOT)
+
+    def test_nsis_identity_fix_cannot_be_relabelled(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["nsisIdentityFix"]["sourceCommit"] = "0" * 40
+        with self.assertRaisesRegex(SimUniversalHandoffError, "NSIS identity fix"):
             validate_handoff(receipt, ROOT)
 
     def test_auth_verifier_migration_order_drift_is_rejected(self) -> None:

@@ -443,9 +443,9 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         or plan["planVersion"] != "1.0.0"
         or plan["editionId"] != "sim"
         or plan["executionClass"]
-        != "GREEN-public-oauth-recorded-nsis-donor-blocked"
+        != "GREEN-static-ready-yellow2-not-authorized"
         or plan["state"]
-        != "public-oauth-recorded-awaiting-common-nsis-identity-fix"
+        != "common-nsis-fixed-awaiting-serial-yellow2-authorization"
     ):
         raise SimYellowLifecycleError("Sim YELLOW execution plan identity drifted")
 
@@ -651,7 +651,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         "canonicalBrandManifestConsumed": True,
         "installerIcoConsumed": True,
         "releaseAsset": False,
-        "yellow2Ready": False,
+        "yellow2Ready": True,
     }
     if sync_gate != expected_sync_gate:
         raise SimYellowLifecycleError("canonical sync gate overclaims readiness")
@@ -738,7 +738,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         or artifact["yellow2ReceiptKind"] != "dronedream-sim-yellow-build-receipt"
         or artifact["yellow3RequiresExactYellow2Receipt"] is not True
         or artifact["yellow2BlockedUntilInstallerDerivativeContract"] is not False
-        or artifact["yellow2StaticReady"] is not False
+        or artifact["yellow2StaticReady"] is not True
         or artifact["unsignedAllowedWithDisclosure"] is not True
         or artifact["validatedVehiclePackCount"] != 0
     ):
@@ -747,7 +747,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         (
             "installerSurfaceContract",
             "distribution/sim/desktop/installer-surface-contract.v1.json",
-            "fb94b2529d686bd66b25e8a0ba967e384fda3174bfe716379995ecd4a774e32a",
+            "e2237a4b1bddde455d3b0b7ef222b331871c36ceec5c8a5535d725a953e97fba",
         ),
         (
             "websiteHandoffContract",

@@ -3,8 +3,8 @@
   "kind": "dronedream-sim-yellow-execution-plan",
   "planVersion": "1.0.0",
   "editionId": "sim",
-  "executionClass": "GREEN-public-oauth-recorded-nsis-donor-blocked",
-  "state": "public-oauth-recorded-awaiting-common-nsis-identity-fix",
+  "executionClass": "GREEN-static-ready-yellow2-not-authorized",
+  "state": "common-nsis-fixed-awaiting-serial-yellow2-authorization",
   "authorization": {
     "yellow1Approved": true,
     "yellow2Approved": false,
@@ -90,17 +90,17 @@
     "canonicalBrandManifestConsumed": true,
     "installerIcoConsumed": true,
     "releaseAsset": false,
-    "yellow2Ready": false
+    "yellow2Ready": true
   },
   "artifactGate": {
     "yellow2OutputFileName": "DroneDream-Sim-1.0.0.exe",
     "yellow2ReceiptKind": "dronedream-sim-yellow-build-receipt",
     "yellow3RequiresExactYellow2Receipt": true,
     "yellow2BlockedUntilInstallerDerivativeContract": false,
-    "yellow2StaticReady": false,
+    "yellow2StaticReady": true,
     "installerSurfaceContract": {
       "path": "distribution/sim/desktop/installer-surface-contract.v1.json",
-      "sha256": "fb94b2529d686bd66b25e8a0ba967e384fda3174bfe716379995ecd4a774e32a"
+      "sha256": "e2237a4b1bddde455d3b0b7ef222b331871c36ceec5c8a5535d725a953e97fba"
     },
     "websiteHandoffContract": {
       "path": "distribution/sim/release/website-exact-exe-handoff.v1.json",

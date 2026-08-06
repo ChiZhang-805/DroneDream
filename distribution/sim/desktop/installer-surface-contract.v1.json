@@ -55,7 +55,7 @@
   "staticSourceRefs": [
     {
       "path": "desktop/src-tauri/nsis/installer.nsi",
-      "sha256": "6905075b4d86e610ca74a395362797e04993a677a458738f11f877d1c507be80",
+      "sha256": "c7cac9f568c7be3c0485cdb628aa46e85a37f533a988d4f1af660291b32620b0",
       "requiredText": [
         "!define PRODUCTNAME \"{{product_name}}\"",
         "!define BUNDLEID \"{{bundle_id}}\"",
@@ -70,7 +70,7 @@
     },
     {
       "path": "desktop/src-tauri/nsis/edition-identity.nsh",
-      "sha256": "9e89f8ceaf8f273bf69a1368e1ad91349650fbf8eb871828e3082602cb0af2d9",
+      "sha256": "9e361a39c044ec5ae5c87a63000962acde597f672034510de434c2053525e95b",
       "requiredText": [
         "!else if \"${PRODUCTNAME}\" == \"DroneDream-Sim\"",
         "!define DRONEDREAM_DISPLAYNAME \"DroneDream · SIM\"",
@@ -126,7 +126,7 @@
   },
   "lifecycleReadiness": {
     "path": "distribution/sim/lifecycle/sim-preview-1.0.0-2aec69e.install-readiness-audit.v1.json",
-    "sha256": "35b7b03ba99af23c8a7683a8d709fbbe6a702b36c1eb59f98394cbad2a3dbb7e",
+    "sha256": "6b743cb8fb35327a0a89e8d34531de050aa145aafbb67f7c04e38d6531374fd6",
     "requiredPlannedScenarios": [
       "freshInstall",
       "overlayUpgrade",
