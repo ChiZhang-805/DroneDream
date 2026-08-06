@@ -173,17 +173,23 @@ function Get-PathRecord {
 
 function Get-ProtectedState {
     $otherProducts = @("DroneDream", "DroneDream-Universal", "DroneDream-Sim", "DroneDream-Lab")
+    $protectedShortcutNames = @(
+        "DroneDream.lnk",
+        "DroneDream-Universal.lnk",
+        "DroneDream-Sim.lnk",
+        "DroneDream-Lab.lnk",
+        "DroneDream $([char]0x00B7) SIM.lnk",
+        "DroneDream $([char]0x00B7) LAB.lnk"
+    )
     return [ordered]@{
         installRoots = @($otherProducts | ForEach-Object { Get-PathRecord (Join-Path $env:LOCALAPPDATA $_) })
         uninstallKeys = @($otherProducts | ForEach-Object { Get-RegistryRecord "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$_" })
         preferenceKeys = @($otherProducts | ForEach-Object { Get-RegistryRecord "HKCU:\Software\DroneDream\$_" })
-        desktopShortcuts = @($otherProducts | ForEach-Object {
-            $name = if ($_ -eq "DroneDream") { "DroneDream.lnk" } else { "$($_.Replace('DroneDream-', 'DroneDream ' + [char]0x00B7 + ' ')).lnk" }
-            Get-PathRecord (Join-Path ([Environment]::GetFolderPath("Desktop")) $name)
+        desktopShortcuts = @($protectedShortcutNames | ForEach-Object {
+            Get-PathRecord (Join-Path ([Environment]::GetFolderPath("Desktop")) $_)
         })
-        startMenuShortcuts = @($otherProducts | ForEach-Object {
-            $name = if ($_ -eq "DroneDream") { "DroneDream.lnk" } else { "$($_.Replace('DroneDream-', 'DroneDream ' + [char]0x00B7 + ' ')).lnk" }
-            Get-PathRecord (Join-Path ([Environment]::GetFolderPath("Programs")) $name)
+        startMenuShortcuts = @($protectedShortcutNames | ForEach-Object {
+            Get-PathRecord (Join-Path ([Environment]::GetFolderPath("Programs")) $_)
         })
         runtimeRoots = @(Get-PathRecord "C:\DroneDream"; Get-PathRecord "Z:\DroneDream")
         sharedProductParentExists = Test-Path -LiteralPath $sharedProductParent
@@ -192,6 +198,16 @@ function Get-ProtectedState {
             "HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}",
             "HKCU:\SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
         ) | ForEach-Object { Get-RegistryRecord $_ }
+    }
+}
+
+function Assert-UsableWebView2 {
+    $state = Get-ProtectedState
+    $records = @($state.webView2) | Where-Object {
+        $_.exists -and $_.values.pv -and $_.values.pv -cne "0.0.0.0"
+    }
+    if ($records.Count -eq 0) {
+        throw "A usable pre-existing WebView2 Runtime is required; repair is forbidden."
     }
 }
 
@@ -349,6 +365,12 @@ try {
     Assert-FreshFieldState
     if (@(Get-Process -Name $mainBinaryName.Replace(".exe", "") -ErrorAction SilentlyContinue).Count -ne 0) { throw "A DroneDream desktop process is already running." }
     if (@(Get-NetTCPConnection -LocalPort 49213 -State Listen -ErrorAction SilentlyContinue).Count -ne 0) { throw "Field OAuth callback port is in use." }
+    Assert-UsableWebView2
+    $simPreferenceRecord = Get-RegistryRecord "HKCU:\Software\DroneDream\DroneDream-Sim"
+    if (-not $simPreferenceRecord.exists -or
+        (Get-ObjectSha256 $simPreferenceRecord) -cne $applicationContract.protectedState.simPreferenceKey.preparationStableJsonSha256) {
+        throw "The protected Sim preference key drifted after GREEN preparation."
+    }
     $protectedBefore = Get-ProtectedState
     $protectedBeforeSha256 = Get-ObjectSha256 $protectedBefore
 

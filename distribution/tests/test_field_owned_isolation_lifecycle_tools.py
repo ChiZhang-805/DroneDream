@@ -91,6 +91,10 @@ def test_runner_freezes_field_identity_counts_and_fail_closed_boundaries() -> No
         'Invoke-LiveInspection "overlay" $desktopShortcut $true',
         '"install-app-only"',
         '"failed-frozen-no-retry"',
+        "Assert-UsableWebView2",
+        "preparationStableJsonSha256",
+        '"DroneDream $([char]0x00B7) SIM.lnk"',
+        '"DroneDream $([char]0x00B7) LAB.lnk"',
     ):
         assert fragment in source
     for forbidden in (
