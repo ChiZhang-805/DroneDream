@@ -53,7 +53,7 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
           '{observer}', [ref]$tokens, [ref]$errors
         )
         if ($errors.Count -ne 0) {{ throw 'observer AST failed' }}
-        foreach ($name in @('Resolve-InstallerWindowStage', 'Select-SingleOwnedWindowRecord')) {{
+        foreach ($name in @('Resolve-InstallerWindowStage', 'Select-SingleOwnedWindowRecord', 'Wait-SingleOwnedWindow')) {{
           $function = $ast.Find({{
             param($node)
             $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
@@ -66,6 +66,21 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
         $pidValue = 4242
         $display = 'DroneDream ' + [char]0x00B7 + ' FIELD'
         $root = 'C:\\Users\\fixture\\AppData\\Local\\DroneDream-Field'
+        $fixtureProcess = [Diagnostics.Process]::GetCurrentProcess()
+        $script:windowTitles = [Collections.Generic.Queue[string]]::new()
+        function Get-SingleOwnedWindow {{
+          param([int]$ProcessId)
+          if ($ProcessId -ne $fixtureProcess.Id) {{ throw 'fixture received foreign process id' }}
+          if ($script:windowTitles.Count -eq 0) {{ throw 'fixture title queue exhausted' }}
+          return [pscustomobject]@{{ Current = [pscustomobject]@{{ Name = $script:windowTitles.Dequeue() }} }}
+        }}
+        $script:windowTitles.Enqueue('Installer Language')
+        $firstWindow = Wait-SingleOwnedWindow -Process $fixtureProcess -DifferentFromTitle ''
+        if ($firstWindow.Current.Name -cne 'Installer Language') {{ throw 'empty exclusion title fixture failed' }}
+        $script:windowTitles.Enqueue('Installer Language')
+        $script:windowTitles.Enqueue("$display Setup")
+        $nextWindow = Wait-SingleOwnedWindow -Process $fixtureProcess -DifferentFromTitle 'Installer Language'
+        if ($nextWindow.Current.Name -cne "$display Setup") {{ throw 'nonempty exclusion title fixture failed' }}
         $selectorControls = @(
           [ordered]@{{ controlType='ControlType.ComboBox'; automationId='1000'; name='English' }},
           [ordered]@{{ controlType='ControlType.Button'; automationId='1'; name='OK' }},

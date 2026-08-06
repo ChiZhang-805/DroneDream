@@ -170,14 +170,15 @@ function Get-SingleOwnedWindow {
 function Wait-SingleOwnedWindow {
     param(
         [Parameter(Mandatory = $true)][Diagnostics.Process]$Process,
-        [Parameter(Mandatory = $true)][string]$DifferentFromTitle
+        [Parameter(Mandatory = $true)][AllowNull()][AllowEmptyString()][string]$DifferentFromTitle
     )
+    $excludedTitle = if ([string]::IsNullOrEmpty($DifferentFromTitle)) { $null } else { $DifferentFromTitle }
     $deadline = [DateTime]::UtcNow.AddSeconds(30)
     do {
         if ($Process.HasExited) { throw "The visible installer exited during observer transition." }
         try {
             $candidate = Get-SingleOwnedWindow -ProcessId $Process.Id
-            if (-not $DifferentFromTitle -or $candidate.Current.Name -cne $DifferentFromTitle) {
+            if ($null -eq $excludedTitle -or $candidate.Current.Name -cne $excludedTitle) {
                 return $candidate
             }
         } catch {
