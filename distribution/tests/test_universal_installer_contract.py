@@ -7,12 +7,15 @@ import subprocess
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/universal-1.0.0.v1.json"
 OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
 FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
 LIFECYCLE = ROOT / "desktop/scripts/verify-universal-installer-lifecycle.ps1"
+LIFECYCLE_CONTRACT = ROOT / "desktop/scripts/edition-installer-lifecycle-contract.ps1"
 INSTALLER_UI = ROOT / "desktop/scripts/verify-installer-ui.ps1"
 HANDOFF = ROOT / "distribution/universal/release/website-exact-exe-handoff.v1.json"
 ENGINE_PACK_TOOL = ROOT / "engine-pack/tools/engine_pack.py"
@@ -239,6 +242,8 @@ def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None
         'installerLifecycleReady = $true',
         'browserAuth = "not-run-separate-headed-gate"',
         'if ($Execute)',
+        'edition-installer-lifecycle-contract.ps1',
+        'productRegistrationAfterStandardUninstall = "retained-unless-delete-app-data-selected"',
     ):
         assert fragment in lifecycle
     assert "Stop-Process" not in lifecycle
@@ -246,6 +251,114 @@ def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None
     assert "npm.cmd" not in lifecycle
     assert "engine_pack.py" not in lifecycle
     assert "releaseReady = $true" not in lifecycle
+
+
+def _run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
+    command = (
+        f". '{LIFECYCLE_CONTRACT}'; "
+        "$ErrorActionPreference='Stop'; "
+        f"{expression}"
+    )
+    return subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize(
+    "edition",
+    _json(ROOT / "distribution/desktop/edition-coexistence.v1.json")["editions"],
+)
+def test_shared_lifecycle_contract_accepts_all_edition_identities(
+    edition: dict[str, object],
+) -> None:
+    display_name = str(edition["displayName"]).replace("'", "''")
+    product_name = str(edition["installerProductName"])
+    install_directory = f"C:\\Users\\Example\\AppData\\Local\\{product_name}"
+    result = _run_lifecycle_contract(
+        f"$e=[ordered]@{{DisplayName='{display_name}';DisplayVersion='1.0.0';"
+        f"InstallLocation='{install_directory}';"
+        "MainBinaryName='drone-dream-desktop.exe'};"
+        f"$a=[ordered]@{{DisplayName='{display_name}';DisplayVersion='1.0.0';"
+        f"InstallLocation='\"{install_directory.lower()}\\\"';"
+        "MainBinaryName='drone-dream-desktop.exe'};"
+        "$r=Compare-DroneDreamUninstallRegistration -Expected $e -Actual $a;"
+        "if(-not $r.passed -or $r.mismatches.Count -ne 0){exit 9}"
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_shared_lifecycle_contract_reports_fields_before_failure() -> None:
+    result = _run_lifecycle_contract(
+        "$e=[ordered]@{DisplayName='DroneDream · LAB';DisplayVersion='1.0.0';"
+        "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Lab';"
+        "MainBinaryName='drone-dream-desktop.exe'};"
+        "$a=[ordered]@{DisplayName='DroneDream-Lab';DisplayVersion='1.0.0';"
+        "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Lab';"
+        "MainBinaryName='drone-dream-desktop.exe'};"
+        "$r=Compare-DroneDreamUninstallRegistration -Expected $e -Actual $a;"
+        "if($r.passed -or $r.mismatches.Count -ne 1 "
+        "-or $r.mismatches[0] -cne 'DisplayName'){exit 9}"
+    )
+    assert result.returncode == 0, result.stderr
+
+    unknown = _run_lifecycle_contract(
+        "$e=[ordered]@{DisplayName='DroneDream';DisplayVersion='1.0.0';"
+        "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Universal';"
+        "MainBinaryName='drone-dream-desktop.exe';Unexpected='value'};"
+        "$a=[ordered]@{DisplayName='DroneDream';DisplayVersion='1.0.0';"
+        "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Universal';"
+        "MainBinaryName='drone-dream-desktop.exe'};"
+        "Compare-DroneDreamUninstallRegistration -Expected $e -Actual $a"
+    )
+    assert unknown.returncode != 0
+    assert "fields drifted" in unknown.stderr
+
+
+def test_shared_lifecycle_contract_allows_only_owned_product_key_residue() -> None:
+    accepted = _run_lifecycle_contract(
+        "$v=[ordered]@{'(default)'='C:\\Users\\Example\\AppData\\Local\\DroneDream-Field';"
+        "'DroneDreamRuntimeInstallMode'='install-app-only';"
+        "'DroneDreamRuntimeDrive'='';'DroneDreamRuntimeOperationProtocol'=2};"
+        "$r=Get-DroneDreamProductRegistrationDisposition -Values $v "
+        "-ExpectedInstallDirectory 'c:\\users\\example\\appdata\\local\\DroneDream-Field' "
+        "-PreflightProductKeyAbsent $true;"
+        "if($r.state -cne 'retained-by-standard-uninstaller' "
+        "-or -not $r.testHarnessRemovalAllowed){exit 9}"
+    )
+    assert accepted.returncode == 0, accepted.stderr
+
+    rejected = _run_lifecycle_contract(
+        "$v=[ordered]@{'(default)'='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim';"
+        "'ForeignValue'='do-not-delete'};"
+        "Get-DroneDreamProductRegistrationDisposition -Values $v "
+        "-ExpectedInstallDirectory 'C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim' "
+        "-PreflightProductKeyAbsent $true"
+    )
+    assert rejected.returncode != 0
+    assert "unowned values" in rejected.stderr
+
+    wrong_owner = _run_lifecycle_contract(
+        "$v=[ordered]@{'(default)'='C:\\Users\\Example\\AppData\\Local\\DroneDream-Lab';"
+        "'DroneDreamRuntimeInstallMode'='install-app-only'};"
+        "Get-DroneDreamProductRegistrationDisposition -Values $v "
+        "-ExpectedInstallDirectory 'C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim' "
+        "-PreflightProductKeyAbsent $true"
+    )
+    assert wrong_owner.returncode != 0
+    assert "different install directory" in wrong_owner.stderr
+
+    preexisting = _run_lifecycle_contract(
+        "$v=[ordered]@{'(default)'='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim'};"
+        "Get-DroneDreamProductRegistrationDisposition -Values $v "
+        "-ExpectedInstallDirectory 'C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim' "
+        "-PreflightProductKeyAbsent $false"
+    )
+    assert preexisting.returncode != 0
+    assert "existed at preflight" in preexisting.stderr
 
 
 def test_visible_locale_verifier_handles_language_selector_in_edition_namespace() -> None:

@@ -267,7 +267,9 @@ def test_universal_lifecycle_uses_display_name_and_preserves_legacy_shortcut_col
     assert '$displayName = "DroneDream"' in lifecycle
     assert 'DisplayName = $displayName' in lifecycle
     assert 'DisplayName = [string]$registration.DisplayName' in lifecycle
-    assert 'mismatches = $registrationMismatches' in lifecycle
+    assert 'comparison = $registrationComparison' in lifecycle
+    assert 'Compare-DroneDreamUninstallRegistration' in lifecycle
+    assert 'Get-DroneDreamProductRegistrationDisposition' in lifecycle
     assert 'protected-legacy-shortcut-preserved' in lifecycle
     assert 'created a shortcut under the internal product identity' in lifecycle
     assert 'if (-not $Before.baseDesktopShortcut.exists)' in lifecycle

@@ -18,6 +18,8 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
+. (Join-Path $PSScriptRoot "edition-installer-lifecycle-contract.ps1")
+
 $productName = "DroneDream-Universal"
 $displayName = "DroneDream"
 $mainBinaryName = "drone-dream-desktop.exe"
@@ -261,20 +263,16 @@ function Assert-UniversalInstalled {
         InstallLocation = $installDirectory
         MainBinaryName = $mainBinaryName
     }
-    $registrationMismatches = @(
-        $expectedRegistration.Keys | Where-Object {
-            [string]$actualRegistration[$_] -cne [string]$expectedRegistration[$_]
-        }
-    )
+    $registrationComparison = Compare-DroneDreamUninstallRegistration `
+        -Expected $expectedRegistration `
+        -Actual $actualRegistration
     $script:lifecycleEvents.Add([ordered]@{
         stage = "$Stage-uninstall-registration"
         internalProductName = $productName
-        expected = $expectedRegistration
-        actual = $actualRegistration
-        mismatches = $registrationMismatches
+        comparison = $registrationComparison
     })
-    if ($registrationMismatches.Count -ne 0) {
-        throw "$Stage produced an invalid Universal uninstall registration: $($registrationMismatches -join ', ')."
+    if (-not $registrationComparison.passed) {
+        throw "$Stage produced an invalid Universal uninstall registration: $($registrationComparison.mismatches -join ', ')."
     }
     $product = Get-ItemProperty -LiteralPath $productKey
     if ([string]$product.DroneDreamRuntimeInstallMode -cne "install-app-only" -or
@@ -421,20 +419,22 @@ function Invoke-UniversalUninstall {
 function Remove-TestCreatedProductRegistration {
     if (-not (Test-Path -LiteralPath $productKey)) { return $false }
     $properties = Get-ItemProperty -LiteralPath $productKey
-    $allowed = @(
-        "Installer Language",
-        "DroneDreamRuntimeInstallMode",
-        "DroneDreamRuntimeDrive",
-        "DroneDreamRuntimeOperationProtocol"
-    )
-    $unexpected = @(
-        $properties.PSObject.Properties.Name | Where-Object {
-            $_ -notmatch '^PS' -and $_ -notin $allowed -and $_ -ne '(default)'
-        }
-    )
-    if ($unexpected.Count -ne 0) {
-        throw "Refusing to remove the test-created Universal product key because it contains unexpected values: $($unexpected -join ', ')"
+    $values = [ordered]@{
+        "(default)" = [string](Get-Item -LiteralPath $productKey).GetValue("")
     }
+    foreach ($property in @($properties.PSObject.Properties | Sort-Object Name)) {
+        if ($property.Name -notmatch '^PS' -and $property.Name -ne '(default)') {
+            $values[$property.Name] = $property.Value
+        }
+    }
+    $disposition = Get-DroneDreamProductRegistrationDisposition `
+        -Values $values `
+        -ExpectedInstallDirectory $installDirectory `
+        -PreflightProductKeyAbsent $true
+    $script:lifecycleEvents.Add([ordered]@{
+        stage = "test-created-product-registration"
+        disposition = $disposition
+    })
     Remove-Item -LiteralPath $productKey -Force
     return $true
 }
@@ -486,6 +486,7 @@ $receipt = [ordered]@{
         uninstallKey = $uninstallKey
         baseInstallDirectory = $baseInstallDirectory
         runtimeMode = "install-app-only"
+        productRegistrationAfterStandardUninstall = "retained-unless-delete-app-data-selected"
         displayShortcutPolicy = "preserve-existing-legacy-or-own-when-absent"
         protectedStateBefore = $protectedBefore
     }
