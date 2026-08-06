@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-lifecycle-registration-verifier-sync-receipt",
+  "editionId": "field",
+  "productSource": {
+    "branch": "codex/software-field",
+    "commit": "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+    "tree": "f14832d84d6fa03fef27e94e09e2178b11834d49",
+    "cleanAndPushedAtReceiptInput": true
+  },
+  "commonCore": {
+    "branch": "codex/software",
+    "lineageBaseCommit": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+    "incrementalDonorCommit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
+    "incrementalDonorParent": "8d60d3d15ca4d454acf5d92196deb63b0dd1314b",
+    "incrementalDonorTree": "5d9b060d14e758ba558bb7d4c7a1c04822bde28d"
+  },
+  "provenance": {
+    "sourceSubject": "fix(desktop): align lifecycle checks with edition identity",
+    "syncMethod": "three-way-reviewed-whole-isolated-common-core-commit",
+    "wholeIsolatedCommitConsumed": true,
+    "modifyDeleteResolution": "retain-exact-donor-common-lifecycle-verifier",
+    "unrelatedUniversalHistoryConsumed": false,
+    "installerTemplateChanged": false,
+    "editionIdentityMacroChanged": false,
+    "productPayloadChanged": false,
+    "fieldSafetyAuthorityChanged": false
+  },
+  "paths": [
+    {
+      "path": "desktop/scripts/verify-edition-identity-nsis.ps1",
+      "gitBlob": "8a208b2885164258aa45374c379d899861326bd6",
+      "sha256": "1f7385c9ad893d284b2f5ffb18b51021ce7bb7047487404bb8ffbb5eb96fbc18",
+      "bytes": 6712,
+      "exactDonorBytes": true
+    },
+    {
+      "path": "desktop/scripts/verify-universal-installer-lifecycle.ps1",
+      "gitBlob": "76dd1be2f06313323e0867db0de91b3eee732635",
+      "sha256": "acd4bcd01aa4401e332a660133f840b6192cdc5dbf6e0dc7f6aca8bdb5f69392",
+      "bytes": 26215,
+      "exactDonorBytes": true
+    },
+    {
+      "path": "distribution/tests/test_desktop_edition_coexistence.py",
+      "gitBlob": "9971a4ec264a08e5606861e39bb8d9bf927b88ba",
+      "sha256": "13da0e25a507a79d75e947a6b9cf9ce85b0a16019d0d80404b37b8e692b19a17",
+      "bytes": 12595,
+      "exactDonorBytes": true
+    }
+  ],
+  "registrationContract": {
+    "internalProductName": "DroneDream-Field",
+    "displayName": "DroneDream \u00b7 FIELD",
+    "uninstallRegistryKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Field",
+    "displayVersion": "1.0.0",
+    "installLocation": "%LOCALAPPDATA%/DroneDream-Field",
+    "mainBinaryName": "drone-dream-desktop.exe",
+    "legacyDisplayShortcutCollisionPolicy": "preserve-existing-never-overwrite",
+    "unknownProductDecision": "deny"
+  },
+  "tests": [
+    {
+      "suite": "desktop-edition-coexistence",
+      "passed": 18
+    },
+    {
+      "suite": "field-lifecycle-and-host-plan",
+      "passed": 25
+    },
+    {
+      "suite": "field-and-shared-desktop-contracts",
+      "passed": 45
+    },
+    {
+      "suite": "backend-and-runtime-hardware-denial",
+      "passed": 26
+    },
+    {
+      "suite": "nsis-registration-and-repeated-expansion-fixture",
+      "compiledEditions": 4,
+      "unknownProductsRejected": 1,
+      "temporaryOutputsRetained": false
+    },
+    {
+      "suite": "powershell-ast",
+      "passed": 2
+    },
+    {
+      "suite": "nsis-vendored-template-static",
+      "passed": 1
+    },
+    {
+      "suite": "ruff-scoped",
+      "passed": 1
+    },
+    {
+      "suite": "release-source-policy",
+      "passed": 1
+    },
+    {
+      "suite": "git-diff-check",
+      "passed": 1
+    }
+  ],
+  "lifecyclePlan": {
+    "contractFileSha256": "dc6851f4a52be07bbead9ab0e8ce9130aaaeb0586c700113ff6ab8d8fbc4d47c",
+    "receiptFileSha256": "a4dc6cdb68cbed410bb21317ef923bffb17fcfcc82ed812194115cdad3a87fd9",
+    "canonicalReceiptSha256": "55fe3e7997014ce769cdcc77bebaa64e97213e7190324ad1c9673765155ed85d",
+    "decision": "deny",
+    "reason": "plan-only-no-installer-built-or-installed",
+    "executeSwitchUsed": false
+  },
+  "readiness": {
+    "fileSha256": "ca93c69090fd59b4ae4e2815dfd694a1902df0ec7fd4148982d55f7e569563a4",
+    "canonicalReceiptSha256": "7fe2f038996fe652cc180791b8ea741f9188191a7b5b9827ccd063750a8b9aa8",
+    "decision": "ready-to-request-yellow",
+    "blockers": []
+  },
+  "supersededApplication": {
+    "productSource": "4b3f679e8673397c55afee940434dc20da8907a0",
+    "applicationSha256": "54dec5c2f6f1ca9ab511955d3b70311a2a0b134651bc316b169122a62e486d6e",
+    "executionAllowed": false,
+    "reason": "product-source-advanced-after-common-validator-donor"
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "threeLayerHardwareDecision": "deny",
+    "buildPerformedForProductSource": false,
+    "installPerformed": false,
+    "runtimeMigrationPerformed": false,
+    "deviceTouched": false,
+    "hardwareActionsAllowed": false,
+    "simulationAllowed": false,
+    "providerOrApiKeyUsed": false,
+    "releaseBranchCreated": false,
+    "deploymentPerformed": false,
+    "serialBuildGateOccupiedByUniversal": true
+  },
+  "releaseState": {
+    "replacementYellowAuthorized": false,
+    "replacementYellowQueued": true,
+    "artifactProducedForProductSource": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "nextGate": "submit an exact replacement YELLOW application and wait for the Universal serial build gate"
+  }
+}
