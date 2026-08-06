@@ -82,10 +82,20 @@ if ($cargoTargetFull.StartsWith($repositoryTargetFull, [StringComparison]::Ordin
     throw "Lab preview must not write the large Cargo target back into the repository."
 }
 
+$ownedOutputBase = [IO.Path]::GetFullPath(
+    (Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache\lab-build-attempts")
+).TrimEnd('\', '/')
 if (-not $OutputRoot) {
-    $OutputRoot = Join-Path $repoRoot ("artifacts\test-runs\lab-preview-{0}" -f $sourceCommit.Substring(0, 7))
+    $OutputRoot = Join-Path $ownedOutputBase ("lab-preview-{0}" -f $sourceCommit.Substring(0, 7))
 }
-$outputRootFull = [IO.Path]::GetFullPath($OutputRoot)
+$outputRootFull = [IO.Path]::GetFullPath($OutputRoot).TrimEnd('\', '/')
+if ($outputRootFull -ceq $ownedOutputBase -or
+    -not $outputRootFull.StartsWith(
+        $ownedOutputBase + [IO.Path]::DirectorySeparatorChar,
+        [StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw "Lab preview OutputRoot must be a descendant of the edition-owned build-attempts root."
+}
 $artifactName = "DroneDream-Lab-1.0.0.exe"
 $tauriOverlayPath = Join-Path $repoRoot "desktop\src-tauri\tauri.lab-preview.conf.json"
 try {
@@ -118,6 +128,37 @@ if (-not $Build) {
     Write-Host "Lab preview contract verified for $sourceCommit with pinned $Toolchain; no EXE was built. Pass -Build to create the updater-signed, Authenticode-unsigned internal preview."
     exit 0
 }
+
+New-Item -ItemType Directory -Force -Path $ownedOutputBase | Out-Null
+if (Test-Path -LiteralPath $outputRootFull) {
+    if (-not (Test-Path -LiteralPath $outputRootFull -PathType Container) -or
+        @(Get-ChildItem -LiteralPath $outputRootFull -Force).Count -ne 0) {
+        throw "Lab preview OutputRoot must be a new or empty owned directory."
+    }
+} else {
+    New-Item -ItemType Directory -Path $outputRootFull | Out-Null
+}
+$ownedBoundaryCursor = $outputRootFull
+while ($ownedBoundaryCursor.Length -gt $ownedOutputBase.Length) {
+    $ownedBoundaryItem = Get-Item -LiteralPath $ownedBoundaryCursor -Force
+    if (($ownedBoundaryItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        throw "Lab preview OutputRoot must not traverse a junction or symbolic link."
+    }
+    $ownedBoundaryCursor = Split-Path -Parent $ownedBoundaryCursor
+}
+$ownedOutputBaseResolved = (Resolve-Path -LiteralPath $ownedOutputBase).Path.TrimEnd('\', '/')
+$outputRootResolved = (Resolve-Path -LiteralPath $outputRootFull).Path.TrimEnd('\', '/')
+if ($outputRootResolved -ceq $ownedOutputBaseResolved -or
+    -not $outputRootResolved.StartsWith(
+        $ownedOutputBaseResolved + [IO.Path]::DirectorySeparatorChar,
+        [StringComparison]::OrdinalIgnoreCase
+    )) {
+    throw "Resolved Lab preview OutputRoot escaped the edition-owned build-attempts root."
+}
+$outputRootFull = $outputRootResolved
+$artifactPath = Join-Path $outputRootFull $artifactName
+$artifactSignaturePath = "${artifactPath}.sig"
+$receiptPath = Join-Path $outputRootFull "lab-preview-receipt.json"
 
 if (-not $env:TAURI_SIGNING_PRIVATE_KEY_PATH -or
     -not (Test-Path -LiteralPath $env:TAURI_SIGNING_PRIVATE_KEY_PATH -PathType Leaf)) {
@@ -197,9 +238,9 @@ $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $artifactPath
 $signature = Get-AuthenticodeSignature -LiteralPath $artifactPath
 
 $receipt = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     kind = "dronedream-lab-preview-artifact-receipt"
-    receiptVersion = "1.0.0"
+    receiptVersion = "1.1.0"
     testOnly = $false
     editionId = "lab"
     productDisplayVersion = "1.0.0"
@@ -288,9 +329,13 @@ $receipt = [ordered]@{
         hardwareActionDecision = "deny"
         requiredDecisionLayers = @("native", "backend", "runtime")
     }
+    artifactRoot = [ordered]@{
+        representation = "relative-to-receipt-parent"
+        ownership = "edition-owned-output-root"
+    }
     artifact = [ordered]@{
         fileName = $artifactName
-        path = $artifactPath.Replace($repoRoot, "").TrimStart('\', '/').Replace('\', '/')
+        path = $artifactName
         sha256 = Get-FileSha256Lower $artifactPath
         bytes = (Get-Item -LiteralPath $artifactPath).Length
         authenticode = [ordered]@{
@@ -299,7 +344,7 @@ $receipt = [ordered]@{
         }
         tauriUpdaterSignature = [ordered]@{
             state = "issued"
-            path = $artifactSignaturePath.Replace($repoRoot, "").TrimStart('\', '/').Replace('\', '/')
+            path = "${artifactName}.sig"
             sha256 = Get-FileSha256Lower $artifactSignaturePath
             keyId = "BA3FDCAF71CE2FF5"
         }

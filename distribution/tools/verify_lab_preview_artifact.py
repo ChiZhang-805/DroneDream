@@ -12,7 +12,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 EDITION_PATH = ROOT / "distribution/editions/lab.v1.json"
@@ -107,6 +106,31 @@ def _safe_relative(value: Any, label: str) -> str:
     return value
 
 
+def _resolved_local_artifact_root(path: Path) -> Path:
+    raw = str(path)
+    if raw.startswith(("\\\\", "//")):
+        raise LabPreviewArtifactError("artifact root must not be a UNC path")
+    if not path.is_absolute():
+        raise LabPreviewArtifactError("artifact root must be an absolute local path")
+    try:
+        resolved = path.resolve(strict=True)
+    except OSError as exc:
+        raise LabPreviewArtifactError("artifact root is missing") from exc
+    if not resolved.is_dir():
+        raise LabPreviewArtifactError("artifact root must be a directory")
+    return resolved
+
+
+def _resolved_artifact_member(root: Path, relative: Any, label: str) -> Path:
+    safe = _safe_relative(relative, label)
+    candidate = root.joinpath(*safe.split("/")).resolve(strict=False)
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise LabPreviewArtifactError(f"{label} escapes the resolved artifact root") from exc
+    return candidate
+
+
 def _exact_keys(value: Any, expected: set[str], label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise LabPreviewArtifactError(f"{label} must be an object")
@@ -169,9 +193,9 @@ def fake_lab_preview_receipt(
     if common_core_hash_value is None:
         common_core_hash_value = "c" * 64
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "kind": "dronedream-lab-preview-artifact-receipt",
-        "receiptVersion": "1.0.0",
+        "receiptVersion": "1.1.0",
         "testOnly": True,
         "editionId": "lab",
         "productDisplayVersion": "1.0.0",
@@ -241,9 +265,13 @@ def fake_lab_preview_receipt(
             "hardwareActionDecision": "deny",
             "requiredDecisionLayers": ["native", "backend", "runtime"],
         },
+        "artifactRoot": {
+            "representation": "relative-to-receipt-parent",
+            "ownership": "edition-owned-output-root",
+        },
         "artifact": {
             "fileName": "DroneDream-Lab-1.0.0.exe",
-            "path": "artifacts/test-fixtures/not-built/DroneDream-Lab-1.0.0.exe",
+            "path": "DroneDream-Lab-1.0.0.exe",
             "sha256": "d" * 64,
             "bytes": 0,
             "authenticode": {
@@ -252,7 +280,7 @@ def fake_lab_preview_receipt(
             },
             "tauriUpdaterSignature": {
                 "state": "issued",
-                "path": "artifacts/test-fixtures/not-built/DroneDream-Lab-1.0.0.exe.sig",
+                "path": "DroneDream-Lab-1.0.0.exe.sig",
                 "sha256": "e" * 64,
                 "keyId": "BA3FDCAF71CE2FF5",
             },
@@ -260,7 +288,12 @@ def fake_lab_preview_receipt(
     }
 
 
-def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict[str, Any]:
+def validate_receipt(
+    receipt: Any,
+    *,
+    verify_artifact_file: bool = True,
+    artifact_root: Path | None = None,
+) -> dict[str, Any]:
     document = _exact_keys(
         receipt,
         {
@@ -285,14 +318,15 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
             "rollback",
             "upgrade",
             "safety",
+            "artifactRoot",
             "artifact",
         },
         "Lab receipt",
     )
     if (
-        document["schemaVersion"] != 1
+        document["schemaVersion"] != 2
         or document["kind"] != "dronedream-lab-preview-artifact-receipt"
-        or document["receiptVersion"] != "1.0.0"
+        or document["receiptVersion"] != "1.1.0"
         or document["editionId"] != "lab"
         or document["productDisplayVersion"] != "1.0.0"
         or document["branch"] != "codex/software-lab"
@@ -305,9 +339,13 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
             raise LabPreviewArtifactError(f"{label} must be a full commit")
     if not document["testOnly"]:
         if document["commonCoreCommit"] != COMMON_CORE_PRODUCT_SOURCE_COMMIT:
-            raise LabPreviewArtifactError("commonCoreCommit must bind the Universal/Core product source")
+            raise LabPreviewArtifactError(
+                "commonCoreCommit must bind the Universal/Core product source"
+            )
         if document["commonCoreCommit"] == EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT:
-            raise LabPreviewArtifactError("Sim preview evidence commit cannot be the common-core product source")
+            raise LabPreviewArtifactError(
+                "Sim preview evidence commit cannot be the common-core product source"
+            )
     if not isinstance(document["commonCoreHash"], str) or not SHA256_RE.fullmatch(
         document["commonCoreHash"]
     ):
@@ -392,12 +430,18 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
     if mixed_modules.intersection(FIELD_ONLY_MODULES) or mixed_modules.intersection(
         UNIVERSAL_BOOTSTRAPPER_MODULES
     ):
-        raise LabPreviewArtifactError("Lab module graph mixes Field-only or Universal bootstrapper content")
+        raise LabPreviewArtifactError(
+            "Lab module graph mixes Field-only or Universal bootstrapper content"
+        )
     if tuple(graph["simulationPayload"]) != SIMULATION_MODULES:
         raise LabPreviewArtifactError("simulation payload module set drifted")
     if tuple(graph["gatedHardwareAdapter"]) != GATED_HARDWARE_MODULES:
         raise LabPreviewArtifactError("gated hardware adapter module set drifted")
-    vehicle_pack_ref = _exact_keys(graph["vehiclePack"], {"path", "sha256"}, "moduleGraph.vehiclePack")
+    vehicle_pack_ref = _exact_keys(
+        graph["vehiclePack"],
+        {"path", "sha256"},
+        "moduleGraph.vehiclePack",
+    )
     if vehicle_pack_ref != _file_ref(VEHICLE_PACK_PATH):
         raise LabPreviewArtifactError("Lab vehicle-pack binding drifted")
     if (
@@ -440,6 +484,17 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
     ):
         raise LabPreviewArtifactError("Lab safety contract overstates authority")
 
+    artifact_root_contract = _exact_keys(
+        document["artifactRoot"],
+        {"representation", "ownership"},
+        "artifactRoot",
+    )
+    if (
+        artifact_root_contract["representation"] != "relative-to-receipt-parent"
+        or artifact_root_contract["ownership"] != "edition-owned-output-root"
+    ):
+        raise LabPreviewArtifactError("artifact root contract drifted")
+
     artifact = _exact_keys(
         document["artifact"],
         {"fileName", "path", "sha256", "bytes", "authenticode", "tauriUpdaterSignature"},
@@ -454,6 +509,8 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
     ):
         raise LabPreviewArtifactError("artifact identity or signature state drifted")
     _safe_relative(artifact["path"], "artifact.path")
+    if artifact["path"] != artifact["fileName"]:
+        raise LabPreviewArtifactError("artifact path must be relative to the output root")
     updater_signature = _exact_keys(
         artifact["tauriUpdaterSignature"],
         {"state", "path", "sha256", "keyId"},
@@ -467,18 +524,29 @@ def validate_receipt(receipt: Any, *, verify_artifact_file: bool = True) -> dict
     ):
         raise LabPreviewArtifactError("updater signature identity drifted")
     _safe_relative(updater_signature["path"], "artifact.tauriUpdaterSignature.path")
+    if updater_signature["path"] != f'{artifact["fileName"]}.sig':
+        raise LabPreviewArtifactError(
+            "updater signature path must be relative to the output root"
+        )
     authenticode = _exact_keys(
         artifact["authenticode"], {"expected", "observedStatus"}, "artifact.authenticode"
     )
     if authenticode["expected"] != "not-signed":
         raise LabPreviewArtifactError("Lab preview must not claim Authenticode signing")
     if verify_artifact_file and not document["testOnly"]:
-        path = ROOT / artifact["path"]
+        if artifact_root is None:
+            raise LabPreviewArtifactError("artifact root is required for real receipt verification")
+        resolved_root = _resolved_local_artifact_root(artifact_root)
+        path = _resolved_artifact_member(resolved_root, artifact["path"], "artifact.path")
         if not path.is_file():
             raise LabPreviewArtifactError("artifact file is missing")
         if path.stat().st_size != artifact["bytes"] or _sha256_file(path) != artifact["sha256"]:
             raise LabPreviewArtifactError("artifact file bytes do not match the receipt")
-        signature_path = ROOT / updater_signature["path"]
+        signature_path = _resolved_artifact_member(
+            resolved_root,
+            updater_signature["path"],
+            "artifact.tauriUpdaterSignature.path",
+        )
         if not signature_path.is_file():
             raise LabPreviewArtifactError("updater signature file is missing")
         if _sha256_file(signature_path) != updater_signature["sha256"]:
@@ -497,9 +565,11 @@ def main() -> int:
     parser = _parser()
     args = parser.parse_args()
     try:
+        receipt_path = args.receipt.resolve()
         validate_receipt(
-            _load_json(args.receipt.resolve()),
+            _load_json(receipt_path),
             verify_artifact_file=not args.skip_artifact_file,
+            artifact_root=receipt_path.parent,
         )
     except LabPreviewArtifactError as exc:
         parser.error(str(exc))

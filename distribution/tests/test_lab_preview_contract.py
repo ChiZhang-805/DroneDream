@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -32,10 +33,10 @@ TOOLS = ROOT / "distribution" / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
-import verify_lab_preview_contract as lab_preview  # noqa: E402
-import verify_lab_preview_artifact as lab_artifact  # noqa: E402
 import lab_preinstall_acceptance as lab_preinstall  # noqa: E402
 import lab_yellow_readiness_audit as lab_readiness  # noqa: E402
+import verify_lab_preview_artifact as lab_artifact  # noqa: E402
+import verify_lab_preview_contract as lab_preview  # noqa: E402
 
 
 def fake_gnullvm_toolchain(*blockers: str) -> dict[str, object]:
@@ -123,6 +124,11 @@ class LabPreviewContractTests(unittest.TestCase):
             script,
         )
         self.assertNotIn("website-exact-exe-handoff.awaiting.v1.json", script)
+        self.assertIn('representation = "relative-to-receipt-parent"', script)
+        self.assertIn("path = $artifactName", script)
+        self.assertIn('path = "${artifactName}.sig"', script)
+        self.assertNotIn('$artifactPath.Replace($repoRoot', script)
+        self.assertIn("edition-owned build-attempts root", script)
 
     def test_shared_llvm_build_uses_ordered_cli_config_overlays(self) -> None:
         script = (ROOT / "desktop/scripts/build-windows-llvm.ps1").read_text(
@@ -205,8 +211,83 @@ class LabPreviewContractTests(unittest.TestCase):
         receipt["commonCoreCommit"] = common_core_commit
         receipt["commonCoreHash"] = lab_artifact.common_core_hash(common_core_commit)
         receipt["testOnly"] = False
-        with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "artifact file is missing"):
+        with tempfile.TemporaryDirectory() as artifact_root, self.assertRaisesRegex(
+            lab_artifact.LabPreviewArtifactError,
+            "artifact file is missing",
+        ):
+            lab_artifact.validate_receipt(
+                receipt,
+                artifact_root=Path(artifact_root),
+            )
+
+    def test_real_lab_artifact_receipt_resolves_inside_external_owned_root(self) -> None:
+        common_core_commit = lab_artifact.COMMON_CORE_PRODUCT_SOURCE_COMMIT
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["commonCoreCommit"] = common_core_commit
+        receipt["commonCoreHash"] = lab_artifact.common_core_hash(common_core_commit)
+        receipt["testOnly"] = False
+        with tempfile.TemporaryDirectory() as artifact_root:
+            root = Path(artifact_root)
+            artifact = root / receipt["artifact"]["path"]
+            signature = root / receipt["artifact"]["tauriUpdaterSignature"]["path"]
+            artifact.write_bytes(b"fake-lab-installer")
+            signature.write_bytes(b"fake-updater-signature")
+            receipt["artifact"]["bytes"] = artifact.stat().st_size
+            receipt["artifact"]["sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+            receipt["artifact"]["tauriUpdaterSignature"]["sha256"] = hashlib.sha256(
+                signature.read_bytes()
+            ).hexdigest()
+            validated = lab_artifact.validate_receipt(receipt, artifact_root=root)
+            self.assertEqual(validated["artifactRoot"]["ownership"], "edition-owned-output-root")
+            preinstall = lab_preinstall.evaluate_preinstall(receipt, artifact_root=root)
+            self.assertIsNotNone(preinstall["receipt"])
+            self.assertEqual(preinstall["receipt"]["artifactFileName"], "DroneDream-Lab-1.0.0.exe")
+            self.assertEqual(preinstall["decision"], "blocked")
+
+    def test_lab_artifact_receipt_rejects_external_root_traversal_forms(self) -> None:
+        unsafe_paths = (
+            "../outside.exe",
+            "subdir/../../outside.exe",
+            "C:/outside.exe",
+            "C:outside.exe",
+            "//server/share/outside.exe",
+            "\\\\server\\share\\outside.exe",
+            "DroneDream-Lab-1.0.0.exe:stream",
+        )
+        for unsafe in unsafe_paths:
+            with self.subTest(path=unsafe):
+                receipt = lab_artifact.fake_lab_preview_receipt()
+                receipt["artifact"]["path"] = unsafe
+                with self.assertRaisesRegex(
+                    lab_artifact.LabPreviewArtifactError,
+                    "artifact.path",
+                ):
+                    lab_artifact.validate_receipt(receipt)
+
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["artifact"]["tauriUpdaterSignature"]["path"] = "../outside.sig"
+        with self.assertRaisesRegex(
+            lab_artifact.LabPreviewArtifactError,
+            "tauriUpdaterSignature.path",
+        ):
             lab_artifact.validate_receipt(receipt)
+
+    def test_real_lab_artifact_receipt_rejects_relative_or_unc_root(self) -> None:
+        common_core_commit = lab_artifact.COMMON_CORE_PRODUCT_SOURCE_COMMIT
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["commonCoreCommit"] = common_core_commit
+        receipt["commonCoreHash"] = lab_artifact.common_core_hash(common_core_commit)
+        receipt["testOnly"] = False
+        with self.assertRaisesRegex(
+            lab_artifact.LabPreviewArtifactError,
+            "absolute local path",
+        ):
+            lab_artifact.validate_receipt(receipt, artifact_root=Path("relative-root"))
+        with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "UNC"):
+            lab_artifact.validate_receipt(
+                receipt,
+                artifact_root=Path("//server/share/lab-output"),
+            )
 
     def test_lab_artifact_receipt_rejects_sim_preview_evidence_as_product_source(self) -> None:
         receipt = lab_artifact.fake_lab_preview_receipt()
@@ -222,7 +303,19 @@ class LabPreviewContractTests(unittest.TestCase):
         schema = lab_artifact._load_json(lab_artifact.SCHEMA_PATH)
         self.assertEqual(schema["$schema"], "https://json-schema.org/draft/2020-12/schema")
         self.assertFalse(schema["additionalProperties"])
-        self.assertEqual(schema["properties"]["kind"]["const"], "dronedream-lab-preview-artifact-receipt")
+        self.assertEqual(
+            schema["properties"]["kind"]["const"],
+            "dronedream-lab-preview-artifact-receipt",
+        )
+        self.assertEqual(schema["properties"]["schemaVersion"]["const"], 2)
+        self.assertEqual(schema["properties"]["receiptVersion"]["const"], "1.1.0")
+        self.assertIn("artifactRoot", schema["required"])
+
+        receipt = lab_artifact.fake_lab_preview_receipt()
+        receipt["schemaVersion"] = 1
+        receipt["receiptVersion"] = "1.0.0"
+        with self.assertRaisesRegex(lab_artifact.LabPreviewArtifactError, "unsupported"):
+            lab_artifact.validate_receipt(receipt)
 
     def test_lab_manifest_has_independent_chinese_copy(self) -> None:
         manifest = json.loads(LAB_EDITION.read_text(encoding="utf-8"))
@@ -230,7 +323,8 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertEqual(manifest["displayName"]["zh-CN"], "DroneDream · LAB")
         self.assertEqual(
             manifest["description"]["zh-CN"],
-            "统一提供仿真、HITL 与真机实验，但所有真机能力都必须通过 native、Runtime 与后端三层安全门。",
+            "统一提供仿真、HITL 与真机实验，"
+            "但所有真机能力都必须通过 native、Runtime 与后端三层安全门。",
         )
         self.assertNotEqual(manifest["description"]["zh-CN"], manifest["description"]["en"])
 

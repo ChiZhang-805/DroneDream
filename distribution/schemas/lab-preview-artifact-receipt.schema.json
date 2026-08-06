@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dronedream.local/schemas/lab-preview-artifact-receipt.v1.json",
+  "$id": "https://dronedream.local/schemas/lab-preview-artifact-receipt.v2.json",
   "title": "DroneDream · LAB preview artifact receipt",
   "type": "object",
   "additionalProperties": false,
@@ -26,12 +26,13 @@
     "rollback",
     "upgrade",
     "safety",
+    "artifactRoot",
     "artifact"
   ],
   "properties": {
-    "schemaVersion": {"const": 1},
+    "schemaVersion": {"const": 2},
     "kind": {"const": "dronedream-lab-preview-artifact-receipt"},
-    "receiptVersion": {"const": "1.0.0"},
+    "receiptVersion": {"const": "1.1.0"},
     "testOnly": {"type": "boolean"},
     "editionId": {"const": "lab"},
     "productDisplayVersion": {"const": "1.0.0"},
@@ -139,13 +140,23 @@
         }
       }
     },
+    "artifactRoot": {
+      "description": "The receipt parent is the resolved edition-owned output root for artifact-family files.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["representation", "ownership"],
+      "properties": {
+        "representation": {"const": "relative-to-receipt-parent"},
+        "ownership": {"const": "edition-owned-output-root"}
+      }
+    },
     "artifact": {
       "type": "object",
       "additionalProperties": false,
       "required": ["fileName", "path", "sha256", "bytes", "authenticode", "tauriUpdaterSignature"],
       "properties": {
         "fileName": {"const": "DroneDream-Lab-1.0.0.exe"},
-        "path": {"$ref": "#/$defs/safePath"},
+        "path": {"$ref": "#/$defs/artifactRelativePath"},
         "sha256": {"$ref": "#/$defs/sha256"},
         "bytes": {"type": "integer", "minimum": 0},
         "authenticode": {
@@ -163,7 +174,7 @@
           "required": ["state", "path", "sha256", "keyId"],
           "properties": {
             "state": {"const": "issued"},
-            "path": {"$ref": "#/$defs/safePath"},
+            "path": {"$ref": "#/$defs/artifactRelativePath"},
             "sha256": {"$ref": "#/$defs/sha256"},
             "keyId": {"const": "BA3FDCAF71CE2FF5"}
           }
@@ -175,6 +186,12 @@
     "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
     "safePath": {
+      "description": "Repository-relative path for source, manifest, profile, brand, payload, or notice inputs.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
+    },
+    "artifactRelativePath": {
+      "description": "Portable path resolved only beneath the receipt parent output root.",
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)*$"
     },

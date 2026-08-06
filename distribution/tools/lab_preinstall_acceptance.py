@@ -16,7 +16,6 @@ from typing import Any
 import verify_lab_preview_artifact as artifact_verifier
 import verify_lab_preview_contract as profile_verifier
 
-
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -34,7 +33,11 @@ def _load_json(path: Path) -> dict[str, Any]:
     return value
 
 
-def evaluate_preinstall(receipt: dict[str, Any] | None = None) -> dict[str, Any]:
+def evaluate_preinstall(
+    receipt: dict[str, Any] | None = None,
+    *,
+    artifact_root: Path | None = None,
+) -> dict[str, Any]:
     """Return a deterministic install decision without side effects."""
 
     profile = profile_verifier.verify_lab_preview_contract()
@@ -49,7 +52,10 @@ def evaluate_preinstall(receipt: dict[str, Any] | None = None) -> dict[str, Any]
         blockers.insert(0, "No Lab artifact receipt was supplied.")
     else:
         try:
-            validated = artifact_verifier.validate_receipt(receipt)
+            validated = artifact_verifier.validate_receipt(
+                receipt,
+                artifact_root=artifact_root,
+            )
         except artifact_verifier.LabPreviewArtifactError as exc:
             blockers.insert(0, f"Lab artifact receipt failed closed: {exc}")
         else:
@@ -96,9 +102,13 @@ def _parser() -> argparse.ArgumentParser:
 def main() -> int:
     parser = _parser()
     args = parser.parse_args()
-    receipt = _load_json(args.receipt.resolve()) if args.receipt else None
+    receipt_path = args.receipt.resolve() if args.receipt else None
+    receipt = _load_json(receipt_path) if receipt_path else None
     try:
-        result = evaluate_preinstall(receipt)
+        result = evaluate_preinstall(
+            receipt,
+            artifact_root=receipt_path.parent if receipt_path else None,
+        )
     except (LabPreinstallAcceptanceError, profile_verifier.LabPreviewContractError) as exc:
         parser.error(str(exc))
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
