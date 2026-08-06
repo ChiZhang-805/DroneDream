@@ -23,7 +23,7 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
 
-use crate::browser_auth_vault;
+use crate::{browser_auth_audit, browser_auth_vault};
 
 const AUTH_RESULT_TEMPLATE: &str = include_str!("../browser-auth.html");
 const UNIVERSAL_BRAND_LOCKUP: &[u8] =
@@ -204,6 +204,12 @@ enum TokenHttpOutcome {
     Rejected,
 }
 
+enum VaultRestoreOutcome {
+    NoSavedSession,
+    ReauthorizationRequired,
+    Restored(Box<BrowserAuthSession>),
+}
+
 fn token_status_is_credential_rejection(status: StatusCode) -> bool {
     matches!(
         status,
@@ -260,7 +266,31 @@ pub fn cancel_browser_auth(
 #[tauri::command]
 pub fn clear_browser_auth_vault() -> Result<bool, String> {
     let identity = compiled_desktop_auth_identity()?;
-    browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace)
+    let attempt_id = random_hex_32();
+    let attempt_id_hash = sha256_hex(attempt_id.as_bytes());
+    let state_hash = sha256_hex(format!("local-logout:{attempt_id}").as_bytes());
+    let issued_at = Utc::now().to_rfc3339();
+    let outcome = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+    let completed_at = Utc::now().to_rfc3339();
+    let (result, failure_code) = match &outcome {
+        Ok(true) => ("local_logout", None),
+        Ok(false) => ("local_logout_no_saved_session", None),
+        Err(_) => ("local_logout_failed", Some("credential_vault_failed")),
+    };
+    let receipt = browser_auth_audit::BrowserAuthAuditReceipt::new(
+        identity.edition_id,
+        identity.auth_client_id,
+        &attempt_id_hash,
+        &state_hash,
+        None,
+        result,
+        failure_code,
+        &issued_at,
+        &completed_at,
+        "native-command",
+    );
+    browser_auth_audit::append_browser_auth_audit(&receipt)?;
+    outcome
 }
 
 #[tauri::command]
@@ -283,84 +313,56 @@ fn run_browser_auth(
     cancelled: Arc<AtomicBool>,
 ) -> Result<BrowserAuthSession, String> {
     let identity = compiled_desktop_auth_identity()?;
-    let oauth_client_id = compiled_oauth_client_id()?;
-    if app.config().identifier != identity.bundle_identifier {
-        return Err(
-            "The desktop bundle identity does not match its browser sign-in client.".to_owned(),
-        );
-    }
-    let listener =
-        TcpListener::bind((Ipv4Addr::LOCALHOST, identity.callback_port)).map_err(|_| {
-            format!(
-                "The {} browser sign-in callback is already in use.",
-                identity.edition_id
-            )
-        })?;
-    listener
-        .set_nonblocking(true)
-        .map_err(|error| format!("Could not configure the local sign-in callback: {error}"))?;
     let state = random_hex_32();
     let nonce = random_hex_32();
     let attempt_id = Uuid::new_v4().simple().to_string();
     let code_verifier = random_hex_32();
-    let code_challenge = pkce_challenge(&code_verifier);
     let issued_at = Utc::now();
-    let authorize_url =
-        build_authorize_url(identity, oauth_client_id, &state, &nonce, &code_challenge)?;
-
-    app.opener()
-        .open_url(authorize_url.as_str(), None::<&str>)
-        .map_err(|error| format!("Could not open the system browser: {error}"))?;
-
-    let deadline = Instant::now() + AUTH_TIMEOUT;
-    loop {
-        if cancelled.load(Ordering::SeqCst) {
-            return Err("Browser sign-in was cancelled.".to_owned());
+    let issued_at_text = issued_at.to_rfc3339();
+    let outcome = (|| -> Result<(BrowserAuthSession, TcpStream), String> {
+        let oauth_client_id = compiled_oauth_client_id()?;
+        if app.config().identifier != identity.bundle_identifier {
+            return Err(
+                "The desktop bundle identity does not match its browser sign-in client.".to_owned(),
+            );
         }
-        if Instant::now() >= deadline {
-            return Err("Browser sign-in timed out. Start it again to retry.".to_owned());
-        }
-        match listener.accept() {
-            Ok((mut stream, peer)) => {
-                if !peer.ip().is_loopback() {
-                    continue;
-                }
-                stream
-                    .set_read_timeout(Some(Duration::from_secs(3)))
-                    .map_err(|error| format!("Could not secure the sign-in connection: {error}"))?;
-                let request_message = match read_http_request(&mut stream) {
-                    Ok(message) => message,
-                    Err(error) => {
-                        let _ = write_text_response(
-                            &mut stream,
-                            400,
-                            "Bad Request",
-                            "text/plain; charset=utf-8",
-                            error.as_bytes(),
-                            &nonce,
-                        );
+        let listener =
+            TcpListener::bind((Ipv4Addr::LOCALHOST, identity.callback_port)).map_err(|_| {
+                format!(
+                    "The {} browser sign-in callback is already in use.",
+                    identity.edition_id
+                )
+            })?;
+        listener
+            .set_nonblocking(true)
+            .map_err(|error| format!("Could not configure the local sign-in callback: {error}"))?;
+        let code_challenge = pkce_challenge(&code_verifier);
+        let authorize_url =
+            build_authorize_url(identity, oauth_client_id, &state, &nonce, &code_challenge)?;
+        app.opener()
+            .open_url(authorize_url.as_str(), None::<&str>)
+            .map_err(|error| format!("Could not open the system browser: {error}"))?;
+
+        let deadline = Instant::now() + AUTH_TIMEOUT;
+        loop {
+            if cancelled.load(Ordering::SeqCst) {
+                return Err("Browser sign-in was cancelled.".to_owned());
+            }
+            if Instant::now() >= deadline {
+                return Err("Browser sign-in timed out. Start it again to retry.".to_owned());
+            }
+            match listener.accept() {
+                Ok((mut stream, peer)) => {
+                    if !peer.ip().is_loopback() {
                         continue;
                     }
-                };
-                if !host_is_exact(&request_message, identity.callback_port) {
-                    let _ = write_text_response(
-                        &mut stream,
-                        421,
-                        "Misdirected Request",
-                        "text/plain; charset=utf-8",
-                        b"Invalid local sign-in host.",
-                        &attempt_id,
-                    );
-                    continue;
-                }
-                if request_message.method == "GET"
-                    && request_message.target.starts_with(identity.callback_path)
-                {
-                    let callback = match parse_authorization_callback(
-                        &request_message.target,
-                        identity.callback_path,
-                    ) {
-                        Ok(callback) => callback,
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(3)))
+                        .map_err(|error| {
+                            format!("Could not secure the sign-in connection: {error}")
+                        })?;
+                    let request_message = match read_http_request(&mut stream) {
+                        Ok(message) => message,
                         Err(error) => {
                             let _ = write_text_response(
                                 &mut stream,
@@ -368,36 +370,54 @@ fn run_browser_auth(
                                 "Bad Request",
                                 "text/plain; charset=utf-8",
                                 error.as_bytes(),
-                                &attempt_id,
+                                &nonce,
                             );
                             continue;
                         }
                     };
-                    if !constant_time_equal(callback.state().as_bytes(), state.as_bytes()) {
+                    if !host_is_exact(&request_message, identity.callback_port) {
                         let _ = write_text_response(
                             &mut stream,
-                            403,
-                            "Forbidden",
+                            421,
+                            "Misdirected Request",
                             "text/plain; charset=utf-8",
-                            b"Invalid sign-in state.",
+                            b"Invalid local sign-in host.",
                             &attempt_id,
                         );
                         continue;
                     }
-                    let AuthorizationCallback::Authorized { code, .. } = callback else {
-                        let page =
-                            render_auth_result_page(&request.locale, identity, false, &attempt_id)?;
-                        let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
-                        return Err("Browser sign-in was denied or cancelled.".to_owned());
-                    };
-                    let token_response = match exchange_authorization_code(
-                        oauth_client_id,
-                        identity.redirect_uri,
-                        &code,
-                        &code_verifier,
-                    ) {
-                        Ok(response) => response,
-                        Err(error) => {
+                    if request_message.method == "GET"
+                        && request_message.target.starts_with(identity.callback_path)
+                    {
+                        let callback = match parse_authorization_callback(
+                            &request_message.target,
+                            identity.callback_path,
+                        ) {
+                            Ok(callback) => callback,
+                            Err(error) => {
+                                let _ = write_text_response(
+                                    &mut stream,
+                                    400,
+                                    "Bad Request",
+                                    "text/plain; charset=utf-8",
+                                    error.as_bytes(),
+                                    &attempt_id,
+                                );
+                                continue;
+                            }
+                        };
+                        if !constant_time_equal(callback.state().as_bytes(), state.as_bytes()) {
+                            let _ = write_text_response(
+                                &mut stream,
+                                403,
+                                "Forbidden",
+                                "text/plain; charset=utf-8",
+                                b"Invalid sign-in state.",
+                                &attempt_id,
+                            );
+                            continue;
+                        }
+                        let AuthorizationCallback::Authorized { code, .. } = callback else {
                             let page = render_auth_result_page(
                                 &request.locale,
                                 identity,
@@ -405,12 +425,15 @@ fn run_browser_auth(
                                 &attempt_id,
                             )?;
                             let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
-                            return Err(error);
-                        }
-                    };
-                    let subject =
-                        match validate_token_response(&token_response, oauth_client_id, &nonce) {
-                            Ok(subject) => subject,
+                            return Err("Browser sign-in was denied or cancelled.".to_owned());
+                        };
+                        let token_response = match exchange_authorization_code(
+                            oauth_client_id,
+                            identity.redirect_uri,
+                            &code,
+                            &code_verifier,
+                        ) {
+                            Ok(response) => response,
                             Err(error) => {
                                 let page = render_auth_result_page(
                                     &request.locale,
@@ -423,57 +446,160 @@ fn run_browser_auth(
                                 return Err(error);
                             }
                         };
-                    let completed_at = Utc::now();
-                    let subject_hash = sha256_hex(subject.as_bytes());
-                    let refresh_token = token_response
-                        .refresh_token
-                        .as_deref()
-                        .ok_or_else(|| {
-                            "Browser sign-in did not return a refresh token.".to_owned()
-                        })?
-                        .to_owned();
-                    if let Err(error) = browser_auth_vault::store_refresh_token(
-                        identity.credential_vault_namespace,
-                        &subject_hash,
-                        &refresh_token,
-                    ) {
-                        let page =
-                            render_auth_result_page(&request.locale, identity, false, &attempt_id)?;
-                        let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
-                        return Err(error);
+                        let subject =
+                            match validate_token_response(&token_response, oauth_client_id, &nonce)
+                            {
+                                Ok(subject) => subject,
+                                Err(error) => {
+                                    let page = render_auth_result_page(
+                                        &request.locale,
+                                        identity,
+                                        false,
+                                        &attempt_id,
+                                    )?;
+                                    let _ = write_html_response(
+                                        &mut stream,
+                                        page.as_bytes(),
+                                        &attempt_id,
+                                    );
+                                    return Err(error);
+                                }
+                            };
+                        let completed_at = Utc::now();
+                        let subject_hash = sha256_hex(subject.as_bytes());
+                        let refresh_token = token_response
+                            .refresh_token
+                            .as_deref()
+                            .ok_or_else(|| {
+                                "Browser sign-in did not return a refresh token.".to_owned()
+                            })?
+                            .to_owned();
+                        if let Err(error) = browser_auth_vault::store_refresh_token(
+                            identity.credential_vault_namespace,
+                            &subject_hash,
+                            &refresh_token,
+                        ) {
+                            let page = render_auth_result_page(
+                                &request.locale,
+                                identity,
+                                false,
+                                &attempt_id,
+                            )?;
+                            let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
+                            return Err(error);
+                        }
+                        return Ok((
+                            BrowserAuthSession {
+                                protocol_version: AUTH_PROTOCOL_VERSION,
+                                edition_id: identity.edition_id,
+                                auth_client_id: identity.auth_client_id,
+                                access_token: token_response.access_token,
+                                refresh_token,
+                                attempt_id_hash: sha256_hex(attempt_id.as_bytes()),
+                                state_hash: sha256_hex(state.as_bytes()),
+                                subject_hash,
+                                issued_at: issued_at_text.clone(),
+                                completed_at: completed_at.to_rfc3339(),
+                            },
+                            stream,
+                        ));
                     }
-                    let page =
-                        render_auth_result_page(&request.locale, identity, true, &attempt_id)?;
-                    let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
-                    return Ok(BrowserAuthSession {
-                        protocol_version: AUTH_PROTOCOL_VERSION,
-                        edition_id: identity.edition_id,
-                        auth_client_id: identity.auth_client_id,
-                        access_token: token_response.access_token,
-                        refresh_token,
-                        attempt_id_hash: sha256_hex(attempt_id.as_bytes()),
-                        state_hash: sha256_hex(state.as_bytes()),
-                        subject_hash,
-                        issued_at: issued_at.to_rfc3339(),
-                        completed_at: completed_at.to_rfc3339(),
-                    });
+                    let _ = write_text_response(
+                        &mut stream,
+                        404,
+                        "Not Found",
+                        "text/plain; charset=utf-8",
+                        b"Not found.",
+                        &attempt_id,
+                    );
                 }
-                let _ = write_text_response(
-                    &mut stream,
-                    404,
-                    "Not Found",
-                    "text/plain; charset=utf-8",
-                    b"Not found.",
-                    &attempt_id,
-                );
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                thread::sleep(Duration::from_millis(25));
-            }
-            Err(error) => {
-                return Err(format!("The local sign-in callback failed: {error}"));
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(25));
+                }
+                Err(error) => {
+                    return Err(format!("The local sign-in callback failed: {error}"));
+                }
             }
         }
+    })();
+
+    let completed_at = outcome
+        .as_ref()
+        .map(|(session, _stream)| session.completed_at.clone())
+        .unwrap_or_else(|_| Utc::now().to_rfc3339());
+    let (result, failure_code, subject_hash) = match &outcome {
+        Ok((session, _stream)) => ("authorized", None, Some(session.subject_hash.as_str())),
+        Err(error) => {
+            let code = browser_auth_failure_code(error);
+            let result = match code {
+                "user_denied" => "denied",
+                "cancelled" => "cancelled",
+                "timeout" => "timed_out",
+                _ => "failed",
+            };
+            (result, Some(code), None)
+        }
+    };
+    let attempt_id_hash = sha256_hex(attempt_id.as_bytes());
+    let state_hash = sha256_hex(state.as_bytes());
+    let receipt = browser_auth_audit::BrowserAuthAuditReceipt::new(
+        identity.edition_id,
+        identity.auth_client_id,
+        &attempt_id_hash,
+        &state_hash,
+        subject_hash,
+        result,
+        failure_code,
+        &issued_at_text,
+        &completed_at,
+        "loopback-http",
+    );
+    if let Err(error) = browser_auth_audit::append_browser_auth_audit(&receipt) {
+        if let Ok((_session, mut stream)) = outcome {
+            let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+            if let Ok(page) = render_auth_result_page(&request.locale, identity, false, &attempt_id)
+            {
+                let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
+            }
+        }
+        return Err(error);
+    }
+    match outcome {
+        Ok((session, mut stream)) => {
+            if let Ok(page) = render_auth_result_page(&request.locale, identity, true, &attempt_id)
+            {
+                let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
+            }
+            Ok(session)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn browser_auth_failure_code(error: &str) -> &'static str {
+    let error = error.to_ascii_lowercase();
+    if error.contains("denied or cancelled") {
+        "user_denied"
+    } else if error.contains("cancelled") {
+        "cancelled"
+    } else if error.contains("timed out") {
+        "timeout"
+    } else if error.contains("callback is already in use") {
+        "callback_in_use"
+    } else if error.contains("bundle identity") || error.contains("not registered") {
+        "edition_identity_mismatch"
+    } else if error.contains("open the system browser") {
+        "browser_open_failed"
+    } else if error.contains("identity binding") || error.contains("account subject") {
+        "account_binding_failed"
+    } else if error.contains("credential") {
+        "credential_vault_failed"
+    } else if error.contains("token") || error.contains("account service") {
+        "token_exchange_failed"
+    } else if error.contains("callback") || error.contains("sign-in connection") {
+        "callback_failed"
+    } else {
+        "internal_failure"
     }
 }
 
@@ -726,55 +852,106 @@ fn validate_claim_expiry(claims: &serde_json::Value) -> Result<(), String> {
 
 fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, String> {
     let identity = compiled_desktop_auth_identity()?;
-    let oauth_client_id = compiled_oauth_client_id()?;
-    let Some(stored) = browser_auth_vault::load_refresh_token(identity.credential_vault_namespace)?
-    else {
-        return Ok(None);
-    };
-    let token_response = match send_token_request(&[
-        ("grant_type", "refresh_token"),
-        ("refresh_token", &stored.refresh_token),
-        ("client_id", oauth_client_id),
-    ])? {
-        TokenHttpOutcome::Accepted(response) => response,
-        TokenHttpOutcome::Rejected => {
-            browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace)?;
-            return Ok(None);
-        }
-    };
-    let subject =
-        validate_access_token_response(&token_response, oauth_client_id).inspect_err(|_error| {
-            let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
-        })?;
-    let subject_hash = sha256_hex(subject.as_bytes());
-    if subject_hash != stored.subject_hash {
-        let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
-        return Err("The stored desktop session belongs to a different account.".to_owned());
-    }
-    let refresh_token = token_response
-        .refresh_token
-        .as_deref()
-        .unwrap_or(&stored.refresh_token)
-        .to_owned();
-    browser_auth_vault::store_refresh_token(
-        identity.credential_vault_namespace,
-        &subject_hash,
-        &refresh_token,
-    )?;
-    let now = Utc::now();
     let attempt_id = random_hex_32();
-    Ok(Some(BrowserAuthSession {
-        protocol_version: AUTH_PROTOCOL_VERSION,
-        edition_id: identity.edition_id,
-        auth_client_id: identity.auth_client_id,
-        access_token: token_response.access_token,
-        refresh_token,
-        attempt_id_hash: sha256_hex(attempt_id.as_bytes()),
-        state_hash: sha256_hex(format!("restore:{attempt_id}").as_bytes()),
+    let attempt_id_hash = sha256_hex(attempt_id.as_bytes());
+    let state_hash = sha256_hex(format!("restore:{attempt_id}").as_bytes());
+    let issued_at = Utc::now().to_rfc3339();
+    let outcome = (|| -> Result<VaultRestoreOutcome, String> {
+        let oauth_client_id = compiled_oauth_client_id()?;
+        let Some(stored) =
+            browser_auth_vault::load_refresh_token(identity.credential_vault_namespace)?
+        else {
+            return Ok(VaultRestoreOutcome::NoSavedSession);
+        };
+        let token_response = match send_token_request(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", &stored.refresh_token),
+            ("client_id", oauth_client_id),
+        ])? {
+            TokenHttpOutcome::Accepted(response) => response,
+            TokenHttpOutcome::Rejected => {
+                browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace)?;
+                return Ok(VaultRestoreOutcome::ReauthorizationRequired);
+            }
+        };
+        let subject = validate_access_token_response(&token_response, oauth_client_id)
+            .inspect_err(|_error| {
+                let _ =
+                    browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+            })?;
+        let subject_hash = sha256_hex(subject.as_bytes());
+        if subject_hash != stored.subject_hash {
+            let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+            return Err("The stored desktop session belongs to a different account.".to_owned());
+        }
+        let refresh_token = token_response
+            .refresh_token
+            .as_deref()
+            .unwrap_or(&stored.refresh_token)
+            .to_owned();
+        browser_auth_vault::store_refresh_token(
+            identity.credential_vault_namespace,
+            &subject_hash,
+            &refresh_token,
+        )?;
+        let completed_at = Utc::now().to_rfc3339();
+        Ok(VaultRestoreOutcome::Restored(Box::new(
+            BrowserAuthSession {
+                protocol_version: AUTH_PROTOCOL_VERSION,
+                edition_id: identity.edition_id,
+                auth_client_id: identity.auth_client_id,
+                access_token: token_response.access_token,
+                refresh_token,
+                attempt_id_hash: attempt_id_hash.clone(),
+                state_hash: state_hash.clone(),
+                subject_hash,
+                issued_at: issued_at.clone(),
+                completed_at,
+            },
+        )))
+    })();
+    let completed_at = match &outcome {
+        Ok(VaultRestoreOutcome::Restored(session)) => session.completed_at.clone(),
+        _ => Utc::now().to_rfc3339(),
+    };
+    let (result, failure_code, subject_hash) = match &outcome {
+        Ok(VaultRestoreOutcome::NoSavedSession) => ("no_saved_session", None, None),
+        Ok(VaultRestoreOutcome::ReauthorizationRequired) => {
+            ("reauthorization_required", Some("refresh_rejected"), None)
+        }
+        Ok(VaultRestoreOutcome::Restored(session)) => {
+            ("restored", None, Some(session.subject_hash.as_str()))
+        }
+        Err(error) => (
+            "restore_failed",
+            Some(browser_auth_failure_code(error)),
+            None,
+        ),
+    };
+    let receipt = browser_auth_audit::BrowserAuthAuditReceipt::new(
+        identity.edition_id,
+        identity.auth_client_id,
+        &attempt_id_hash,
+        &state_hash,
         subject_hash,
-        issued_at: now.to_rfc3339(),
-        completed_at: now.to_rfc3339(),
-    }))
+        result,
+        failure_code,
+        &issued_at,
+        &completed_at,
+        "credential-vault",
+    );
+    if let Err(error) = browser_auth_audit::append_browser_auth_audit(&receipt) {
+        if matches!(&outcome, Ok(VaultRestoreOutcome::Restored(_))) {
+            let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+        }
+        return Err(error);
+    }
+    match outcome? {
+        VaultRestoreOutcome::NoSavedSession | VaultRestoreOutcome::ReauthorizationRequired => {
+            Ok(None)
+        }
+        VaultRestoreOutcome::Restored(session) => Ok(Some(*session)),
+    }
 }
 
 fn render_auth_result_page(
@@ -1214,6 +1391,37 @@ mod tests {
             StatusCode::SERVICE_UNAVAILABLE,
         ] {
             assert!(!token_status_is_credential_rejection(status));
+        }
+    }
+
+    #[test]
+    fn audit_failure_codes_are_stable_and_do_not_embed_error_text() {
+        for (message, code) in [
+            ("Browser sign-in was denied or cancelled.", "user_denied"),
+            ("Browser sign-in was cancelled.", "cancelled"),
+            ("Browser sign-in timed out.", "timeout"),
+            (
+                "The universal browser sign-in callback is already in use.",
+                "callback_in_use",
+            ),
+            (
+                "The desktop bundle identity does not match.",
+                "edition_identity_mismatch",
+            ),
+            ("Could not open the system browser.", "browser_open_failed"),
+            (
+                "The identity binding does not match the account subject.",
+                "account_binding_failed",
+            ),
+            ("Credential vault write failed.", "credential_vault_failed"),
+            ("Token endpoint failed.", "token_exchange_failed"),
+            ("The local callback failed.", "callback_failed"),
+            ("opaque implementation detail", "internal_failure"),
+        ] {
+            assert_eq!(browser_auth_failure_code(message), code);
+            assert!(browser_auth_failure_code(message).bytes().all(|byte| {
+                byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'
+            }));
         }
     }
 
