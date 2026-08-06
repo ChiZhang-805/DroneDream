@@ -110,7 +110,8 @@ $coreListing = (& git -C $repoRoot ls-tree -r --full-tree $commonCoreCommit -- @
 if ($LASTEXITCODE -ne 0 -or -not $coreListing.Trim()) {
     throw "Unable to compute the Lab preview common-core hash."
 }
-$commonCoreHash = Get-Sha256Text $coreListing.Trim()
+$coreListingCanonical = $coreListing.Replace("`r`n", "`n").Replace("`r", "`n").Trim()
+$commonCoreHash = Get-Sha256Text $coreListingCanonical
 
 if (-not $Build) {
     Write-Host "Lab preview contract verified for $sourceCommit with pinned $Toolchain; no EXE was built. Pass -Build to create the unsigned internal preview."
@@ -283,6 +284,8 @@ $receipt = [ordered]@{
         tauriUpdaterSignature = "not-issued"
     }
 }
-$receipt | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath $receiptPath
+$receiptJson = ($receipt | ConvertTo-Json -Depth 8) + "`n"
+$utf8NoBom = New-Object Text.UTF8Encoding($false)
+[IO.File]::WriteAllText($receiptPath, $receiptJson, $utf8NoBom)
 Write-Host "Wrote unsigned Lab preview artifact $artifactPath"
 Write-Host "Wrote Lab preview receipt $receiptPath"

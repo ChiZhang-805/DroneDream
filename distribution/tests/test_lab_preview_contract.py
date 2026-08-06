@@ -93,6 +93,20 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertIn("$tauriProductName = [string]$tauriOverlay.productName", script)
         self.assertNotIn('"DroneDream · LAB"', script)
 
+    def test_lab_build_writes_python_compatible_receipt_bytes(self) -> None:
+        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            '$coreListing.Replace("`r`n", "`n").Replace("`r", "`n").Trim()',
+            script,
+        )
+        self.assertIn("[IO.File]::WriteAllText($receiptPath, $receiptJson, $utf8NoBom)", script)
+        self.assertNotIn(
+            "$receipt | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8",
+            script,
+        )
+
     def test_shared_llvm_build_uses_ordered_cli_config_overlays(self) -> None:
         script = (ROOT / "desktop/scripts/build-windows-llvm.ps1").read_text(
             encoding="utf-8"
