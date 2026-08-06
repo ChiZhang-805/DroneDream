@@ -136,6 +136,10 @@ def test_universal_engine_payload_contains_all_editions_without_build_plans() ->
 def test_universal_build_is_single_source_bound_signed_attempt_with_external_target() -> None:
     script = SCRIPT.read_text(encoding="utf-8-sig")
     for fragment in (
+        '[string]$ExpectedSourceCommit',
+        'Universal builds require an explicit -ExpectedSourceCommit pin.',
+        'Universal HEAD does not match ExpectedSourceCommit.',
+        'explicitSourcePinRequiredForBuild = $true',
         '$branch -cne "codex/software"',
         'Universal builds require an exact clean source tree.',
         'DroneDream-Universal-1.0.0.exe',
@@ -167,6 +171,9 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
     assert "-AllowUnsignedUpdater" not in script
     assert "$sharedArguments" not in script
     assert '$env:DRONEDREAM_OAUTH_CLIENT_ID =' not in script
+    assert script.index('Universal builds require an explicit -ExpectedSourceCommit pin.') < (
+        script.index('Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH.')
+    )
 
 
 def test_website_contract_publishes_exact_four_files_without_rename() -> None:

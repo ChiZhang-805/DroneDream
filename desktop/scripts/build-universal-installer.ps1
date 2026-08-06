@@ -1,5 +1,6 @@
 param(
     [switch]$Build,
+    [string]$ExpectedSourceCommit,
     [string]$OutputRoot,
     [string]$CargoTargetDir,
     [string]$LlvmRoot
@@ -45,6 +46,15 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $sourceCommit = Invoke-GitText @("rev-parse", "--verify", "HEAD")
 if ($sourceCommit -cnotmatch "^[0-9a-f]{40}$") {
     throw "Unable to freeze an exact Universal source commit."
+}
+if ($ExpectedSourceCommit -and $ExpectedSourceCommit -cnotmatch "^[0-9a-f]{40}$") {
+    throw "ExpectedSourceCommit must be a full lowercase Git SHA."
+}
+if ($ExpectedSourceCommit -and $ExpectedSourceCommit -cne $sourceCommit) {
+    throw "Universal HEAD does not match ExpectedSourceCommit."
+}
+if ($Build -and -not $ExpectedSourceCommit) {
+    throw "Universal builds require an explicit -ExpectedSourceCommit pin."
 }
 $branch = Invoke-GitText @("branch", "--show-current")
 if ($branch -cne "codex/software") {
@@ -134,6 +144,8 @@ $manifestPath = Join-Path $outputRootFull "handoff-manifest.json"
 if (-not $Build) {
     [ordered]@{
         sourceCommit = $sourceCommit
+        expectedSourceCommit = if ($ExpectedSourceCommit) { $ExpectedSourceCommit } else { $null }
+        explicitSourcePinRequiredForBuild = $true
         branch = $branch
         artifactFileName = $artifactName
         profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
