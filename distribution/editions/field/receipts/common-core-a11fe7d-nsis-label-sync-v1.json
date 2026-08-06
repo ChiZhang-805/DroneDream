@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-nsis-label-sync-receipt",
+  "editionId": "field",
+  "productSource": {
+    "branch": "codex/software-field",
+    "commit": "4b3f679e8673397c55afee940434dc20da8907a0",
+    "tree": "7661846808b4a14903f2dbf28c50faf20b2d337d",
+    "cleanAndPushedAtReceiptInput": true
+  },
+  "commonCore": {
+    "branch": "codex/software",
+    "lineageBaseCommit": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+    "lineageBaseTree": "11743df0ee14e27b2939543992b589f01a5d90fb",
+    "incrementalDonorCommit": "a11fe7d09fceafaecf102a0cbfba49abb066a557",
+    "incrementalDonorParent": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "incrementalDonorTree": "26d913c7098b1a1c3a04e974b17b10ebac03e8ef"
+  },
+  "provenance": {
+    "sourceSubject": "fix(desktop): namespace NSIS shortcut labels",
+    "syncMethod": "three-way-reviewed-whole-isolated-common-core-commit",
+    "wholeIsolatedCommitConsumed": true,
+    "unrelatedUniversalHistoryConsumed": false,
+    "fieldSpecificIdentityOrSafetyChanged": false
+  },
+  "paths": [
+    {
+      "path": "desktop/scripts/verify-edition-identity-nsis.ps1",
+      "gitBlob": "a678a76c8f8e53794f3de87cb4df5d4fbf4823ef",
+      "sha256": "343dbb09f53c42b77db28a0b5d242e3e6cc30d6b7b0e218167a988ea0b54b09f",
+      "bytes": 5579,
+      "role": "temporary-repeated-expansion-and-unknown-product-compile-fixture"
+    },
+    {
+      "path": "desktop/scripts/verify-nsis-template.ps1",
+      "gitBlob": "2c8929498d87c5da3325a47c1e8a8c0408e6b272",
+      "sha256": "08ae596f9be981a123ac179539b559b725d03181a509b8cd72e1a3b2e0b5047e",
+      "bytes": 22141,
+      "role": "vendored-template-and-namespaced-label-static-gate"
+    },
+    {
+      "path": "desktop/src-tauri/nsis/edition-identity.nsh",
+      "gitBlob": "b08c552a6b54f1b74535ee5994cc863b88eb1ed8",
+      "sha256": "9e361a39c044ec5ae5c87a63000962acde597f672034510de434c2053525e95b",
+      "bytes": 4133,
+      "role": "call-site-label-prefix-shortcut-macros"
+    },
+    {
+      "path": "desktop/src-tauri/nsis/installer.nsi",
+      "gitBlob": "ec46a06bf5dfe418ab1e004b8e2bc56c7e184230",
+      "sha256": "c7cac9f568c7be3c0485cdb628aa46e85a37f533a988d4f1af660291b32620b0",
+      "bytes": 34676,
+      "role": "unique-start-menu-and-desktop-call-site-prefixes"
+    },
+    {
+      "path": "distribution/tests/test_desktop_edition_coexistence.py",
+      "gitBlob": "a4db68b75ecd924bd7ab01774811ea5edf8a92eb",
+      "sha256": "f3f13316e192f89273d271c23c7279257a21f79d3387489556124c8fd7c6db58",
+      "bytes": 10536,
+      "role": "coexistence-and-compile-fixture-contract-tests"
+    }
+  ],
+  "failedAttemptClosure": {
+    "attemptProductSource": "26dd3c141f86bc9cc538336bc3cb6a8155cc88e7",
+    "attemptApplicationSha256": "3395ab7c4429759f16e3e7836579acc45728685ebb7e57c2bb445cccfb73eb4f",
+    "failureEvidenceCommit": "b6031dca1d5940879ff17fbaa103c2e18df95eed",
+    "failureReceiptPath": "artifacts/test-runs/field-yellow-failure-26dd3c1/build-failure-receipt.json",
+    "failureReceiptFileSha256": "ecac045b3bf2fbdb2718b722da98cfa7b8456773ebbdc36e4ece225e75fa071e",
+    "cargoBuildCount": 1,
+    "nsisInvocationCount": 1,
+    "installerProduced": false,
+    "retryAllowed": false,
+    "cargoIntermediateMayBePromoted": false,
+    "rootCause": "fixed-label-collision-in-repeated-desktop-shortcut-macro-expansion",
+    "rootCauseClosedByIncrementalDonor": true
+  },
+  "tests": [
+    {
+      "suite": "desktop-edition-coexistence",
+      "passed": 17
+    },
+    {
+      "suite": "field-and-shared-desktop-contracts",
+      "passed": 45
+    },
+    {
+      "suite": "applicable-universal-installer-template-contracts",
+      "passed": 6,
+      "deselectedUniversalReleaseOnly": 2
+    },
+    {
+      "suite": "nsis-repeated-expansion-fixture",
+      "compiledEditions": 4,
+      "unknownProductsRejected": 1,
+      "temporaryOutputsRetained": false
+    },
+    {
+      "suite": "nsis-vendored-template-static",
+      "passed": 1
+    },
+    {
+      "suite": "ruff-scoped",
+      "passed": 1
+    },
+    {
+      "suite": "release-source-policy",
+      "passed": 1
+    },
+    {
+      "suite": "git-diff-check",
+      "passed": 1
+    }
+  ],
+  "publicConfiguration": {
+    "oauthClientId": "3140bbe2-5f0e-4699-8a9b-295d4030f853",
+    "oauthCallback": "http://127.0.0.1:49213/desktop-auth/field/callback",
+    "oauthClientType": "public",
+    "oauthTokenAuthMethod": "none",
+    "updaterMatchingKeyId": "BA3FDCAF71CE2FF5",
+    "updaterPrivateKeyPathReference": "C:\\Users\\zju20\\.tauri\\dronedream-updater.key",
+    "privateKeyRead": false,
+    "privateKeyCopied": false,
+    "privateKeyHashRecorded": false,
+    "productionNamingKeyAllowed": false
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "threeLayerHardwareDecision": "deny",
+    "buildPerformedForProductSource": false,
+    "installPerformed": false,
+    "runtimeMigrationPerformed": false,
+    "deviceTouched": false,
+    "hardwareActionsAllowed": false,
+    "simulationAllowed": false,
+    "providerOrApiKeyUsed": false,
+    "releaseBranchCreated": false,
+    "deploymentPerformed": false
+  },
+  "releaseState": {
+    "readinessDecision": "ready-to-request-replacement-yellow",
+    "replacementYellowAuthorized": false,
+    "artifactProducedForProductSource": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "nextGate": "exact single replacement YELLOW approval for product source 4b3f679e8673397c55afee940434dc20da8907a0"
+  }
+}
