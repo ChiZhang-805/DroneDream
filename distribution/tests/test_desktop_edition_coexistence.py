@@ -16,6 +16,7 @@ UNIVERSAL_OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 NSIS_IDENTITY = ROOT / "desktop/src-tauri/nsis/edition-identity.nsh"
 NSIS_TEMPLATE = ROOT / "desktop/src-tauri/nsis/installer.nsi"
 NSIS_HOOK = ROOT / "desktop/src-tauri/nsis/webview2-health.nsh"
+NSIS_COMPILE_CHECK = ROOT / "desktop/scripts/verify-edition-identity-nsis.ps1"
 
 SPEC = importlib.util.spec_from_file_location("desktop_edition_coexistence", TOOL_PATH)
 assert SPEC and SPEC.loader
@@ -197,9 +198,42 @@ def test_nsis_keeps_internal_ownership_but_uses_display_shortcuts() -> None:
     assert 'DRONEDREAM_REMOVE_INTERNAL_SHORTCUT' in template
     assert 'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe"' in identity
 
+    # Every outer expansion supplies a call-site prefix. Nested shortcut macros
+    # derive a distinct suffix from that prefix instead of redeclaring the
+    # outer completion label (the previous desktop macro emitted the same
+    # dronedream_desktop_done label twice).
+    assert '!macro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT LABEL_PREFIX' in identity
+    assert '!macro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT LABEL_PREFIX' in identity
+    assert '${LABEL_PREFIX}_shortcut' in identity
+    assert 'dronedream_desktop_done:' not in identity
+    assert 'dronedream_startmenu_done:' not in identity
+    assert (
+        '!insertmacro DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT '
+        'dronedream_startmenu_entry'
+    ) in template
+    assert (
+        '!insertmacro DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT '
+        'dronedream_desktop_entry'
+    ) in template
+
     # A prior internal-name shortcut may move only after target ownership proof.
     ownership_check = hook.index(
         'IsShortcutTarget "${INTERNAL_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe"'
     )
     rename = hook.index('Rename "${INTERNAL_PATH}" "${DISPLAY_PATH}"')
     assert ownership_check < rename
+
+
+def test_nsis_compile_check_covers_repeated_expansion_and_unknown_editions() -> None:
+    script = NSIS_COMPILE_CHECK.read_text(encoding="utf-8")
+    for edition_id, product_name in (
+        ("universal", "DroneDream-Universal"),
+        ("sim", "DroneDream-Sim"),
+        ("lab", "DroneDream-Lab"),
+        ("field", "DroneDream-Field"),
+    ):
+        assert f'-EditionId "{edition_id}" -ProductName "{product_name}"' in script
+    assert script.count("DRONEDREAM_CREATE_OR_UPDATE_STARTMENU_SHORTCUT fixture_") == 2
+    assert script.count("DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT fixture_") == 2
+    assert 'ProductName "DroneDream-Unknown" -ExpectedSuccess $false' in script
+    assert 'Remove-Item -LiteralPath $resolved -Recurse -Force' in script
