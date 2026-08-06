@@ -90,6 +90,8 @@
       "path": "distribution/sim/desktop/invoke-yellow-build-attempt-3-2bffcb0.ps1",
       "bytes": 14789,
       "sha256": "3216cee1bee9ad89132f761f8faec028d75a03ccca4988a2e15b55d76b081811",
+      "checkoutEolPolicyPath": "distribution/sim/desktop/.gitattributes",
+      "checkoutEol": "lf",
       "defaultMode": "Plan",
       "executeRequiresExplicitMode": true
     },

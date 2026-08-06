@@ -97,6 +97,14 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             hashlib.sha256(script.read_bytes()).hexdigest(),
             plan["entryScript"]["sha256"],
         )
+        self.assertEqual(plan["entryScript"]["checkoutEol"], "lf")
+        attributes = git(
+            "check-attr",
+            "eol",
+            "--",
+            plan["entryScript"]["path"],
+        )
+        self.assertTrue(attributes.endswith(": eol: lf"), attributes)
         self.assertEqual(plan["entryScript"]["defaultMode"], "Plan")
         self.assertTrue(plan["entryScript"]["executeRequiresExplicitMode"])
         self.assertTrue(plan["exactCommands"]["preflight"].endswith("-Mode Preflight"))
