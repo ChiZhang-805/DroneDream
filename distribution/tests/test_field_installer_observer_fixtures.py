@@ -112,6 +112,15 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
           throw 'directory fixture failed'
         }}
         Select-SingleOwnedWindowRecord -WindowRecords @([ordered]@{{processId=$pidValue;title='owned'}}) -ExpectedProcessId $pidValue | Out-Null
+        try {{
+          Select-SingleOwnedWindowRecord -WindowRecords @() -ExpectedProcessId $pidValue | Out-Null
+          throw 'zero-window fixture unexpectedly accepted'
+        }} catch {{
+          if ($_.Exception.Message -eq 'zero-window fixture unexpectedly accepted') {{ throw }}
+          if ($_.Exception.Message -cne 'Expected exactly one visible top-level installer window; observed 0.') {{
+            throw "zero-window fixture was not classified for bounded polling: $($_.Exception.Message)"
+          }}
+        }}
 
         $denied = 0
         $negativeCases = @(

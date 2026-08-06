@@ -137,7 +137,7 @@ function Get-WindowRecord {
 
 function Select-SingleOwnedWindowRecord {
     param(
-        [Parameter(Mandatory = $true)]
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()]
         [object[]]$WindowRecords,
         [Parameter(Mandatory = $true)]
         [int]$ExpectedProcessId
