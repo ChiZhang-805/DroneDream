@@ -1,0 +1,293 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-artifact-bound-postbuild-audit-application",
+  "applicationId": "field-postbuild-audit-560f574-exact-artifact-v1",
+  "editionId": "field",
+  "status": "prepared-awaiting-exact-start-signal",
+  "preparedAt": "2026-08-06T19:38:46.9607397Z",
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "560f574a95c8b51bbf34711bfd092d77fd3e166e",
+    "productTree": "0e4535535b7ee339faeaa704069a46bcfe1c350d",
+    "productRoot": "C:\\Users\\zju20\\ddf560f574",
+    "evidenceRepoRoot": "C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream",
+    "evidenceHeadAtPreparation": "2049b878e18a0f40481747c4e31dec031b4aaeb3",
+    "evidenceCommitIsProductSource": false,
+    "applicationAndRunnerRemainExternalToProductCheckout": true
+  },
+  "tool": {
+    "path": "distribution/editions/field/build/run-artifact-bound-postbuild-audit.py",
+    "sourceCommit": "2049b878e18a0f40481747c4e31dec031b4aaeb3",
+    "gitBlob": "bc028589e62214b6e760cb743e5a4441be34e4af",
+    "bytes": 29776,
+    "canonicalBlobSha256": "8a666c0c1fa87eb2f1b4b668cd4ba167b313cd5f1ceeeef222da3d62e03c77b1"
+  },
+  "commonCore": {
+    "uiThemeDonor": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "frontendDistDonor": "bb14c47a43795180cc80305eaf87665a54b9b8e5",
+    "buildDriverDonor": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+    "latestProductDonor": "bb14c47a43795180cc80305eaf87665a54b9b8e5",
+    "bindingSha256": "5fedbfe49238a612ca7f2f42850c1a82288dc213a9afb22906d264a08982ca89"
+  },
+  "artifactIdentity": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": 11534069,
+    "sha256": "8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f",
+    "authenticodeState": "NotSigned",
+    "peCertificatePresent": false,
+    "updaterSignatureState": "sidecar-generated-and-metadata-bound-not-re-signed",
+    "metadataUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-v1.0.0-build-754/DroneDream-Field-1.0.0.exe",
+    "websiteHandoffAllowed": false
+  },
+  "ownedPaths": {
+    "visualizationRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39",
+    "historicalBuildRunRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight",
+    "cargoTarget": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\560f574",
+    "auditRunRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-postbuild-audit-560f574-exact-artifact-v1",
+    "auditRunRootMustBeAbsent": true,
+    "historicalBuildRunRootReadOnly": true,
+    "historicalStaticExtractionReusable": false,
+    "historicalArtifactMayBeMutated": false
+  },
+  "execution": {
+    "applicationOrdinal": 1,
+    "auditCountMaximum": 1,
+    "retryCountMaximum": 0,
+    "createsAuditRootOnlyAfterPrechecks": true,
+    "buildAllowed": false,
+    "signingAllowed": false,
+    "installationAllowed": false,
+    "applicationLaunchAllowed": false,
+    "runtimeMigrationAllowed": false,
+    "deviceOrHardwareAllowed": false,
+    "simulationExecutionAllowed": false,
+    "deploymentAllowed": false,
+    "networkAllowed": false,
+    "failureDecision": "freeze-failed-no-retry"
+  },
+  "exactCommand": {
+    "python": "C:\\Users\\zju20\\miniconda3\\python.exe",
+    "template": "C:\\Users\\zju20\\miniconda3\\python.exe C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\build\\run-artifact-bound-postbuild-audit.py --application C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\build\\postbuild-audit-560f574-application.v1.json --expected-application-sha256 <FROZEN_APPLICATION_FILE_SHA256> --expected-evidence-head <EXACT_EVIDENCE_HEAD_FROM_START_SIGNAL>",
+    "planOnlySuffix": " --plan-only",
+    "startSignalRequiredBeforeCommandWithoutPlanOnly": true,
+    "evidenceHeadArgumentIsExternalToAvoidCommitSelfReference": true
+  },
+  "tools": {
+    "powershell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "python": "C:\\Users\\zju20\\miniconda3\\python.exe"
+  },
+  "bindings": {
+    "artifactFiles": [
+      {
+        "id": "installer",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe",
+        "bytes": 11534069,
+        "sha256": "8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f"
+      },
+      {
+        "id": "updaterSignature",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+        "bytes": 428,
+        "sha256": "11b5ceec3172fbe91c4e342a1a1aa1211a207bef11ef3d3a4697cac621bd5314"
+      },
+      {
+        "id": "checksum",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe.sha256",
+        "bytes": 94,
+        "sha256": "e68aa3a42cd53e50f0ae63232566396b49ef2b1eae9eee645fc2c5b4a774cdfc"
+      },
+      {
+        "id": "metadata",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\latest-field.json",
+        "bytes": 1024,
+        "sha256": "c235cbd58bec3a35d59be5cb6796174661b5abd79ea931379c62eea4cf32a75d"
+      }
+    ],
+    "buildEvidence": [
+      {
+        "id": "buildApplication",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\yellow-build-application.json",
+        "bytes": 11239,
+        "sha256": "68deb738cdac0de939fc1766713aafc3640c48fb1d141767f3806f109f5046c0"
+      },
+      {
+        "id": "preflightReceipt",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\preflight-receipt.json",
+        "bytes": 5197,
+        "sha256": "b67389486bc5dc8758c8d73e767612cc1c81ed108a4ebfe1b750ae88a8f6196b"
+      },
+      {
+        "id": "buildProcessReceipt",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\build-process.json",
+        "bytes": 6209,
+        "sha256": "b8cb490d016f2c8ae2f68ea1fe210cf8bf2f5b118474a8be5dcdebdc3de6b4ca"
+      },
+      {
+        "id": "postbuildFailureReceipt",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\postbuild-failure-receipt.json",
+        "bytes": 8059,
+        "sha256": "5a2c0eff7c7242b456634f679f89f04fdd8ae8dfed8d978632bb3c627ce73db7"
+      },
+      {
+        "id": "buildStdout",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\build.stdout.log",
+        "bytes": 6432,
+        "sha256": "b2f4e1cf2224bbd5d47b047d4b7d1a397fa5bd212a993cfba50b6306eba904ad"
+      },
+      {
+        "id": "buildStderr",
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\build.stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "buildOutputs": [
+      {
+        "id": "stagingApplication",
+        "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\560f574\\x86_64-pc-windows-gnullvm\\release\\drone-dream-desktop.exe",
+        "bytes": 24898560,
+        "sha256": "1d625a4951dbbc8f60ff2b0b77f15c4f95f28c567028dc86ee8f436956d92328"
+      },
+      {
+        "id": "enginePackArchive",
+        "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\560f574\\x86_64-pc-windows-gnullvm\\release\\build\\drone-dream-desktop-69ea8eadbb3e0a2a\\out\\engine-pack\\DroneDreamEnginePack.tar.gz",
+        "bytes": 713154,
+        "sha256": "968062b5bf10f93841abc1d3517e7aab06049345b42a841aae47cb037371c945"
+      },
+      {
+        "id": "enginePackDescriptor",
+        "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\560f574\\x86_64-pc-windows-gnullvm\\release\\build\\drone-dream-desktop-69ea8eadbb3e0a2a\\out\\engine-pack\\engine-pack-bundle.json",
+        "bytes": 494,
+        "sha256": "740f1b832e5a47b8aa148a404800d5c724ce7fda095a609ad359c1c7f4ac1856"
+      },
+      {
+        "id": "enginePackManifest",
+        "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\560f574\\x86_64-pc-windows-gnullvm\\release\\build\\drone-dream-desktop-69ea8eadbb3e0a2a\\out\\engine-pack\\engine-pack-manifest.json",
+        "bytes": 32734,
+        "sha256": "3f973c5e337c59ded86dc4d8877457ffa1de0b5d59659f1487d6ddce1ff51dcc"
+      },
+      {
+        "id": "generatedInstallerNsi",
+        "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\560f574\\x86_64-pc-windows-gnullvm\\release\\nsis\\x64\\installer.nsi",
+        "bytes": 35234,
+        "sha256": "d55986d4f1afd4357e21bb75038695cad06275c2e3734a5185d49b45db32d88b"
+      }
+    ]
+  },
+  "sourceParity": {
+    "validationBasis": "exact-product-git-blob-and-canonical-blob-bytes",
+    "workingTreeLineEndingsGrantAuthority": false,
+    "gitBlobs": [
+      {"path": "desktop/scripts/release-build-driver.psm1", "gitBlob": "5195887fae97016693466d7f75e466ca4a5e77e2", "canonicalBlobSha256": "9c8dfc3c1a9ea584ea27cab53c23c4ca0b05911e6409b87b01d05297a309fc14"},
+      {"path": "distribution/editions/field/build/verify-source-bound-driver.ps1", "gitBlob": "b887a91385c571c565735dbb888bbd3d8ac812af", "canonicalBlobSha256": "ad1187d0e4fd296d6a1cf1fa1b4ff1dd51aa2b82b734dbd1170134da598ba981"},
+      {"path": "distribution/editions/field.v1.json", "gitBlob": "1d7625ae081866d545b992678b434fc66c5cfbaa", "canonicalBlobSha256": "13b585d4cd9adb90b11d6332f4fad796df8fdeeb107581da6903bd134ae2ae27"},
+      {"path": "distribution/safety/edition-execution-gate.v1.json", "gitBlob": "3ba5f9f50fe29e9586501e2fd8cda1c2daf3c8c7", "canonicalBlobSha256": "3d4a4af0dacb184cee0b86d8c92175ff823f607c2c8365450fcb51879bced456"},
+      {"path": "distribution/vehicle-packs/registry.v1.json", "gitBlob": "53a4fe56d3bdeefb1b1313a1833929c81d3c51d4", "canonicalBlobSha256": "7fbe1ec9eb29e3998f48ced5001a34d6423e1de946fb7c5a554a43fed56ee5c7"},
+      {"path": "desktop/src-tauri/tauri.field.conf.json", "gitBlob": "73ddcf9fe9d5349a93c88887bef5c09e322ec204", "canonicalBlobSha256": "923d9499870c6c03837efcc5d7cbe85a2d4947a314a880eda0d440417bba5657"},
+      {"path": "distribution/editions/field/branding/source-manifest.v1.json", "gitBlob": "2609d8871225bd14ad61f8bdd6f83538aa10f341", "canonicalBlobSha256": "e05e2a6a6bade296a30b4a36d889350cee8e200316b305546ad028fb668f2aeb"},
+      {"path": "distribution/tools/field_prerelease_audit.py", "gitBlob": "ae4244865d4e204cccee0d7a3010402e465f6a58", "canonicalBlobSha256": "09aaa0957a99d584381917d6882f4fb34166df43c0f418dbf0c612badf665554"},
+      {"path": "engine-pack/tools/engine_pack.py", "gitBlob": "6262ca88df1c5fb4dbde74c3f281714440e7fbcd", "canonicalBlobSha256": "21ae883bee775369bc4b057138f702bb4bf677d7040d1c053c1e61d10051cb31"}
+    ]
+  },
+  "payloadAudit": {
+    "runtimeProfile": "field-lightweight",
+    "includesLargeSimulator": false,
+    "excludedSourcePaths": ["backend/app/simulator", "scripts/simulators"],
+    "forbiddenTokens": ["gazebo", "hitl", "sitl", "simulator"],
+    "px4ProtocolAndControllerMetadataMayRemain": true,
+    "px4SitlBinaryOrScriptMayRemain": false,
+    "extractor": {
+      "id": "extractor",
+      "path": "C:\\Program Files\\NVIDIA Corporation\\NVIDIA App\\7z.exe",
+      "bytes": 555040,
+      "sha256": "4ff86f2f379544c8fda5453a4cdd9279da084d1a17b12fdda4d284f04b66afc8"
+    },
+    "expectedEntryCount": 21,
+    "expectedEntries": [
+      "$PLUGINSDIR/dronedream-runtime-probe.exe",
+      "$PLUGINSDIR/LangDLL.dll",
+      "$PLUGINSDIR/MicrosoftEdgeWebview2Setup.exe",
+      "$PLUGINSDIR/modern-wizard.bmp",
+      "$PLUGINSDIR/nsDialogs.dll",
+      "$PLUGINSDIR/nsis_tauri_utils.dll",
+      "$PLUGINSDIR/StartMenu.dll",
+      "$PLUGINSDIR/System.dll",
+      "$PLUGINSDIR/WebView2Loader.dll",
+      "$TEMP/MicrosoftEdgeWebview2Setup.exe",
+      "branding/canonical-brand-assets.v1.json",
+      "branding/canonical-brand-visual-receipt.v1.json",
+      "branding/dronedream-field-dot-lockup.png",
+      "branding/dronedream-field-mark.png",
+      "branding/source-manifest.v1.json",
+      "drone-dream-desktop.exe",
+      "icons/DroneDream.ico",
+      "licenses/DroneDream-LICENSE.txt",
+      "licenses/THIRD_PARTY_NOTICES.md",
+      "licenses/Valkey-COPYING.txt",
+      "WebView2Loader.dll"
+    ],
+    "sourceParity": [
+      {"payloadPath": "branding/dronedream-field-mark.png", "sourcePath": "distribution/editions/field/branding/dronedream-field-mark.png", "sha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5"},
+      {"payloadPath": "branding/dronedream-field-dot-lockup.png", "sourcePath": "distribution/editions/field/branding/dronedream-field-dot-lockup.png", "sha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"},
+      {"payloadPath": "branding/source-manifest.v1.json", "sourcePath": "distribution/editions/field/branding/source-manifest.v1.json", "sha256": "e05e2a6a6bade296a30b4a36d889350cee8e200316b305546ad028fb668f2aeb"},
+      {"payloadPath": "branding/canonical-brand-assets.v1.json", "sourcePath": "brand/generated/brand-assets.v1.json", "sha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471"},
+      {"payloadPath": "branding/canonical-brand-visual-receipt.v1.json", "sourcePath": "brand/generated/brand-visual-receipt.v1.json", "sha256": "207ff1a01aaf4fc6ee94d32031b3456b3e1be387216d9ce2d761b4be408bb9ba"},
+      {"payloadPath": "icons/DroneDream.ico", "sourcePath": "brand/generated/field/windows/icon.ico", "sha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559"},
+      {"payloadPath": "licenses/DroneDream-LICENSE.txt", "sourcePath": "LICENSE", "sha256": "d04dd6d500dfbcc5fad9a2f9695a5db8cc95ffc07591a13404fbc996b1e19e76"},
+      {"payloadPath": "licenses/THIRD_PARTY_NOTICES.md", "sourcePath": "runtime/THIRD_PARTY_NOTICES.md", "sha256": "70f74a0cbd038e2a82008c5a052f8064c22e150c71268e397ebb6d9360dbf8aa"},
+      {"payloadPath": "licenses/Valkey-COPYING.txt", "sourcePath": "runtime/licenses/valkey-COPYING", "sha256": "1a53dca3aab7ce048e91e77b03c0342f3075366f9dede8ec4d19d0cf229e12a0"}
+    ],
+    "expectedApplicationByteDifferences": [
+      {"offset": 13922882, "staging": 85, "payload": 78},
+      {"offset": 13922883, "staging": 78, "payload": 83},
+      {"offset": 13922884, "staging": 75, "payload": 83}
+    ]
+  },
+  "contracts": {
+    "applicationValidatedExternally": true,
+    "evidenceOnlyApplicationTestRequiredInProductSource": false,
+    "forbiddenEvidenceOnlyProductTest": "distribution/tests/test_field_yellow_560f574_application.py",
+    "productTests": [
+      "distribution/tests/test_field_prerelease_audit.py",
+      "distribution/tests/test_field_desktop_profile.py",
+      "distribution/tests/test_field_lifecycle_contract.py",
+      "distribution/tests/test_field_brand_assets.py",
+      "distribution/tests/test_field_auth_common_core_proposal.py",
+      "distribution/tests/test_field_source_bound_preflight.py"
+    ],
+    "staticTools": [
+      "desktop/scripts/verify-nsis-template.ps1",
+      "desktop/scripts/verify-updater-build-contract.ps1"
+    ]
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "requiredDecisionLayers": ["native", "backend", "runtime"],
+    "hardwareDecision": "deny",
+    "frontendIsAuthority": false,
+    "readOnlyDiscoveryIsAuthorization": false,
+    "parameterWriteAllowed": false,
+    "unlockAllowed": false,
+    "armAllowed": false,
+    "flightAllowed": false
+  },
+  "readinessOnPass": {
+    "staticAuditComplete": true,
+    "releaseReady": false,
+    "websiteReady": false,
+    "lifecycleStillRequired": true
+  },
+  "historicalFailure": {
+    "receiptSha256": "5a2c0eff7c7242b456634f679f89f04fdd8ae8dfed8d978632bb3c627ce73db7",
+    "classification": "evidence-only-test-path-was-not-present-in-exact-product-source",
+    "testsExecuted": 0,
+    "retryAllowed": false,
+    "preservedReadOnly": true
+  },
+  "integrity": {
+    "canonicalization": "UTF-8 JSON sorted keys compact separators excluding integrity",
+    "canonicalSha256": "a6611da20f44f2d7ec1f74afcedf989e57b9256fae4eb11225a5c30ec5a96ca8"
+  }
+}
