@@ -207,6 +207,8 @@ Var DroneDreamValidatePathOnly
         Push "error"
         Return
       ${EndIf}
+      Push "ok"
+      Return
     dronedream_revalidate_without_binary:
     ; The preinstall hook calls this only after observing the old binary. If it
     ; disappears before or during revalidation, the durable quiesce can no

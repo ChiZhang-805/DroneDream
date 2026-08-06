@@ -2217,6 +2217,12 @@ mod tests {
             .unwrap();
         assert!(custom_languages > mui_languages);
         assert!(!mode_page.contains("dronedream-installer-planner.exe"));
+        assert!(
+            mode_page.contains(
+                "      Push \"ok\"\n      Return\n    dronedream_revalidate_without_binary:"
+            ),
+            "successful Runtime quiesce revalidation must not fall through to the missing-binary failure label"
+        );
         let native = include_str!("installer_handoff.rs");
         assert!(native.contains("with_runtime_operation_lease(clear_receipt)"));
         assert!(native.contains("seal_installer_receipt(mode, target_root)"));
