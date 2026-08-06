@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "dronedream-installer-ui-failure-receipt/v1",
+  "executionSourceCommit": "bb14c47a43795180cc80305eaf87665a54b9b8e5",
+  "artifact": {
+    "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\handoffs\\universal-1.0.0-bb14c47\\DroneDream-Universal-1.0.0.exe",
+    "bytes": 11823259,
+    "sha256": "0a6768cbc2da344a54bc072be9fc9354d50bdfb0d46713bd1aed02559d1dd609"
+  },
+  "prerequisiteLifecycleReceipt": {
+    "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\handoffs\\universal-1.0.0-bb14c47\\validation\\universal-lifecycle-red1.json",
+    "bytes": 20703,
+    "sha256": "188905b0495343797ae9ed87fcfddaf37c076cc77b15fb6253d21418ab4427c5"
+  },
+  "authorization": {
+    "resourceClass": "RED",
+    "scope": "visible-installer-ui",
+    "attemptOrdinal": 1,
+    "consumed": true,
+    "automaticRetryAllowed": false,
+    "approvedInstallerProcessCount": 2,
+    "approvedLanguages": [
+      "English",
+      "SimpChinese"
+    ]
+  },
+  "observed": {
+    "result": "failed-before-installer-launch",
+    "failedLanguage": "English",
+    "installerProcessCount": 0,
+    "englishInstallerProcessCount": 0,
+    "simpChineseInstallerProcessCount": 0,
+    "installationCommitCount": 0,
+    "applicationLaunchCount": 0,
+    "browserAuthTransactionCount": 0,
+    "runtimeOperationCount": 0,
+    "px4GazeboOperationCount": 0,
+    "universalRegistrationPresentAfterFailure": false,
+    "universalInstallRootPresentAfterFailure": false,
+    "droneDreamProcessCountAfterFailure": 0
+  },
+  "failure": {
+    "classification": "verification-tool-native-stderr-classification",
+    "stage": "simulate-fresh-registration-suspend",
+    "message": "An expected missing Universal registration key caused reg.exe query stderr to terminate the verifier under ErrorActionPreference=Stop before the exit-code branch could classify it as a fresh-install state.",
+    "productArtifactImplicated": false,
+    "requiresArtifactRebuild": false
+  },
+  "nextGate": "A new exact RED approval is required before retrying visible English and Simplified Chinese installer UI validation with the corrected verifier tool."
+}
