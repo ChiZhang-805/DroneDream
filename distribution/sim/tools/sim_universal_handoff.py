@@ -18,6 +18,7 @@ NSIS_IDENTITY_FIX_COMMIT = "a11fe7d09fceafaecf102a0cbfba49abb066a557"
 RELEASE_BUILD_DRIVER_COMMIT = "f2858e3d2e39f493baab28368b77230e45dd199f"
 FRONTEND_DIST_RESOLUTION_COMMIT = "d80f5f99309668d9d1cd50be51371efaa3c5491d"
 LIFECYCLE_PREFERENCE_RESIDUE_COMMIT = "8215a2206ec5e1192792410aaaf2a438f6b6127f"
+COMMON_UI_THEME_SETTINGS_COMMIT = "4933e214a57a048099d8f0bdd11c9748b620ac3e"
 BRAND_PRODUCT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
 
 EXACT_GROUPS = {
@@ -103,6 +104,18 @@ EXACT_GROUPS = {
     FRONTEND_DIST_RESOLUTION_COMMIT: (
         "desktop/scripts/release-build-driver.psm1",
         "distribution/tests/test_shared_windows_build_contract.py",
+    ),
+    COMMON_UI_THEME_SETTINGS_COMMIT: (
+        "frontend/src/__tests__/BrandLockup.test.tsx",
+        "frontend/src/__tests__/EditionSettingsSurface.test.tsx",
+        "frontend/src/__tests__/EditionTheme.test.ts",
+        "frontend/src/__tests__/stylesContract.test.ts",
+        "frontend/src/components/BrandLockup.tsx",
+        "frontend/src/components/DroneLaunchScene.tsx",
+        "frontend/src/components/EditionSettingsSurface.tsx",
+        "frontend/src/features/distribution/universalMode.ts",
+        "frontend/src/theme/EditionThemeProvider.tsx",
+        "frontend/src/theme/editionTheme.ts",
     ),
 }
 
@@ -194,6 +207,16 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         == LIFECYCLE_PREFERENCE_RESIDUE_COMMIT,
         "lifecycle preference residue source drifted",
     )
+    _require(
+        source.get("commonUiThemeSettingsProductCommit")
+        == COMMON_UI_THEME_SETTINGS_COMMIT,
+        "common UI theme Settings source drifted",
+    )
+    _require(
+        source.get("commonUiThemeSettingsEvidenceCommit")
+        == "2434488bbcc02a8859670edf2f9413f38d17e73a",
+        "common UI theme Settings evidence drifted",
+    )
     _require(source.get("observedHeadIsEvidenceOnly") is False, "product head relabelled")
     _require(
         source.get("observedHeadUsedAsWholeProductSource") is False,
@@ -227,13 +250,13 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     for path in brand_paths:
         _validate_exact_path(root, BRAND_PRODUCT, path)
     common_paths = [path for paths in EXACT_GROUPS.values() for path in paths]
-    _require(len(common_paths) == len(set(common_paths)) == 53, "common path inventory drifted")
+    _require(len(common_paths) == len(set(common_paths)) == 63, "common path inventory drifted")
     for commit, paths in EXACT_GROUPS.items():
         for path in paths:
             _validate_exact_path(root, commit, path)
     path_sync = document.get("pathSync", {})
     _require(path_sync.get("canonicalBrandPathCount") == 94, "brand count receipt drifted")
-    _require(path_sync.get("exactCommonPathCount") == 53, "common count receipt drifted")
+    _require(path_sync.get("exactCommonPathCount") == 63, "common count receipt drifted")
     _require(path_sync.get("unrelatedBenchmarkPathsAdopted") is False, "Benchmark overclaim")
     _require(path_sync.get("hardwareAuthorityGranted") is False, "hardware authority overclaim")
 
@@ -611,6 +634,48 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "lifecycle preference residue execution overclaim",
     )
 
+    ui_theme = corrections.get("commonUiThemeSettings", {})
+    _require(
+        ui_theme.get("productSourceCommit") == COMMON_UI_THEME_SETTINGS_COMMIT,
+        "common UI theme Settings product source drifted",
+    )
+    _require(
+        ui_theme.get("evidenceCommit")
+        == "2434488bbcc02a8859670edf2f9413f38d17e73a"
+        and ui_theme.get("evidenceUsedAsProductSource") is False,
+        "common UI theme Settings evidence overclaim",
+    )
+    _require(
+        ui_theme.get("receiptSha256")
+        == "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4",
+        "common UI theme Settings receipt drifted",
+    )
+    _require(
+        [row.get("path") for row in ui_theme.get("exactDonorPaths", [])]
+        == list(EXACT_GROUPS[COMMON_UI_THEME_SETTINGS_COMMIT]),
+        "common UI theme Settings exact path inventory drifted",
+    )
+    _require(
+        ui_theme.get("semanticAdapterPaths")
+        == [
+            "frontend/scripts/verify-software-ui-layout.mjs",
+            "frontend/src/AppShell.tsx",
+            "frontend/src/__tests__/AppShellLauncher.test.tsx",
+            "frontend/src/__tests__/DroneLaunchScene.test.tsx",
+            "frontend/src/__tests__/RuntimeAccessUx.test.tsx",
+            "frontend/src/styles.css",
+        ],
+        "common UI theme Settings semantic adapter inventory drifted",
+    )
+    _require(
+        ui_theme.get("fixedEdition") == "sim"
+        and ui_theme.get("modeSwitchRendered") is False
+        and ui_theme.get("presentationOnly") is True
+        and ui_theme.get("grantsHardwareAuthority") is False
+        and ui_theme.get("buildAuthorized") is False,
+        "common UI theme Settings SIM boundary drifted",
+    )
+
     _require(document.get("upstreamBlockers") == [], "resolved blocker was retained")
 
     verification = document.get("verification", {})
@@ -648,7 +713,7 @@ def main() -> int:
             {
                 "valid": True,
                 "brandPaths": 94,
-                "commonPaths": 52,
+                "commonPaths": 61,
                 "yellow2Ready": True,
             },
             sort_keys=True,

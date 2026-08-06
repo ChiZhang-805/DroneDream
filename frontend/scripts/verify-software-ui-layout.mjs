@@ -31,18 +31,25 @@ const port = Number(args.get("--port") || 5197);
 const origin = `http://${host}:${port}`;
 const mobileMenuOnly = Boolean(args.get("--mobile-menu-only"));
 const fixedScenariosOnly = Boolean(args.get("--fixed-scenarios-only"));
+const settingsOnly = Boolean(args.get("--settings-only"));
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 
 const cases = [
-  { id: "desktop-en", locale: "en", viewport: { width: 1440, height: 1000 } },
-  { id: "desktop-zh", locale: "zh-CN", viewport: { width: 1440, height: 1000 } },
-  { id: "tablet-en", locale: "en", viewport: { width: 760, height: 900 } },
-  { id: "tablet-zh", locale: "zh-CN", viewport: { width: 760, height: 900 } },
-  { id: "mobile-en", locale: "en", viewport: { width: 390, height: 844 } },
-  { id: "mobile-zh", locale: "zh-CN", viewport: { width: 390, height: 844 } },
+  { id: "desktop-en", locale: "en", edition: "sim", viewport: { width: 1440, height: 1000 } },
+  { id: "desktop-zh", locale: "zh-CN", edition: "sim", viewport: { width: 1440, height: 1000 } },
+  { id: "tablet-en", locale: "en", edition: "sim", viewport: { width: 760, height: 900 } },
+  { id: "tablet-zh", locale: "zh-CN", edition: "sim", viewport: { width: 760, height: 900 } },
+  { id: "mobile-en", locale: "en", edition: "sim", viewport: { width: 390, height: 844 } },
+  { id: "mobile-zh", locale: "zh-CN", edition: "sim", viewport: { width: 390, height: 844 } },
 ].filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
+const canonicalThemeColors = Object.freeze({
+  universal: ["#FF5574", "#6A4CFF", "#E657D1"],
+  sim: ["#00D9FF", "#2671FF", "#744CFF"],
+  lab: ["#A7E84A", "#20C77A", "#087E69"],
+  field: ["#FFC247", "#FF754B", "#D746A5"],
+});
 const fixedScenarioOnlyCases = [
   {
     id: "tablet-fixed-scenarios-en",
@@ -153,7 +160,30 @@ async function openAccountCropper(page, avatarBytes) {
 }
 
 async function verifySettings(page, testCase) {
+  const settingsViewport = testCase.viewport.width === 1440
+    ? { width: 1440, height: 900 }
+    : testCase.viewport.width === 390
+      ? { width: 390, height: 700 }
+      : testCase.viewport;
+  await page.setViewportSize(settingsViewport);
   await page.goto(`${origin}/assistant?docsPreview=1`, { waitUntil: "networkidle" });
+  const themeBinding = await page.locator("html").evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      edition: element.dataset.brandEdition,
+      presentationOnly: element.dataset.themePresentationOnly,
+      grantsHardwareAuthority: element.dataset.themeGrantsHardwareAuthority,
+      colors: [
+        style.getPropertyValue("--dd-brand-start").trim().toUpperCase(),
+        style.getPropertyValue("--dd-brand-middle").trim().toUpperCase(),
+        style.getPropertyValue("--dd-brand-end").trim().toUpperCase(),
+      ],
+    };
+  });
+  assert.equal(themeBinding.edition, testCase.edition);
+  assert.equal(themeBinding.presentationOnly, "true");
+  assert.equal(themeBinding.grantsHardwareAuthority, "false");
+  assert.deepEqual(themeBinding.colors, canonicalThemeColors[testCase.edition]);
   const assistantModel = page.locator(".assistant-model-button");
   await assistantModel.waitFor();
   assert.equal(await assistantModel.locator("option").count(), 3);
@@ -171,8 +201,60 @@ async function verifySettings(page, testCase) {
   }
   const dialog = page.locator(".launcher-settings-dialog");
   await dialog.waitFor();
+  const layerBinding = await page.locator(".launcher-settings-backdrop").evaluate((element) => {
+    const readZIndex = (target) => {
+      if (!(target instanceof Element)) return 0;
+      const parsed = Number.parseInt(getComputedStyle(target).zIndex, 10);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    return {
+      backdropZIndex: readZIndex(element),
+      mobileHeaderZIndex: readZIndex(document.querySelector(".app-sidebar")),
+    };
+  });
+  assert(
+    layerBinding.backdropZIndex > layerBinding.mobileHeaderZIndex,
+    `${testCase.id}: Settings modal must render above the mobile application header`,
+  );
+  const panelMeasurements = [];
+  for (const tab of await dialog.getByRole("tab").all()) {
+    await tab.click();
+    const measurement = await dialog.evaluate((element) => {
+      const panel = element.querySelector('.launcher-settings-panel:not([hidden])');
+      if (!(panel instanceof HTMLElement)) throw new Error("Active Settings panel is missing");
+      const dialogBounds = element.getBoundingClientRect();
+      const panelBounds = panel.getBoundingClientRect();
+      return {
+        tab: panel.dataset.settingsPanel,
+        dialogClientHeight: element.clientHeight,
+        dialogScrollHeight: element.scrollHeight,
+        dialogTop: dialogBounds.top,
+        dialogBottom: dialogBounds.bottom,
+        panelClientHeight: panel.clientHeight,
+        panelScrollHeight: panel.scrollHeight,
+        panelTop: panelBounds.top,
+        panelBottom: panelBounds.bottom,
+        grantsHardwareAuthority: element.getAttribute("data-grants-hardware-authority"),
+      };
+    });
+    assert(
+      measurement.dialogScrollHeight <= measurement.dialogClientHeight + 1,
+      `${testCase.id}: Settings dialog vertically overflowed on ${measurement.tab}`,
+    );
+    assert(
+      measurement.panelScrollHeight <= measurement.panelClientHeight + 1,
+      `${testCase.id}: Settings panel vertically overflowed on ${measurement.tab}: ${JSON.stringify(measurement)}`,
+    );
+    assert(measurement.dialogTop >= 0 && measurement.dialogBottom <= settingsViewport.height + 1);
+    assert(measurement.panelTop >= measurement.dialogTop - 1);
+    assert(measurement.panelBottom <= measurement.dialogBottom + 1);
+    assert.equal(measurement.grantsHardwareAuthority, "false");
+    panelMeasurements.push(measurement);
+  }
+  await dialog.getByRole("tab", {
+    name: testCase.locale === "en" ? "Model" : "模型",
+  }).click();
   const usage = dialog.locator(".settings-model-usage");
-  await usage.scrollIntoViewIfNeeded();
   const metrics = await usage.evaluate((element) => {
     const rect = (selector) => {
       const target = element.querySelector(selector);
@@ -245,67 +327,17 @@ async function verifySettings(page, testCase) {
   await page.keyboard.press("Tab");
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
-  const distribution = dialog.locator(".distribution-setup-panel-settings");
-  await distribution.scrollIntoViewIfNeeded();
-  const distributionMetrics = await distribution.evaluate((element) => {
-    const bounds = element.getBoundingClientRect();
-    const editionCards = Array.from(
-      element.querySelectorAll(".distribution-edition-options label > span"),
-    );
-    const selects = Array.from(element.querySelectorAll("select"));
-    return {
-      left: bounds.left,
-      right: bounds.right,
-      width: bounds.width,
-      documentWidth: document.documentElement.clientWidth,
-      documentScrollWidth: document.documentElement.scrollWidth,
-      canApply: element.getAttribute("data-can-apply"),
-      buttonCount: element.querySelectorAll("button").length,
-      editionCardCount: editionCards.length,
-      editionCardsFit: editionCards.every(
-        (card) => card.scrollWidth <= card.clientWidth + 1,
-      ),
-      selectsFit: selects.every(
-        (select) => select.scrollWidth <= select.clientWidth + 1,
-      ),
-      textColor: getComputedStyle(element).color,
-      mutedColor: getComputedStyle(
-        element.querySelector(".distribution-edition-options legend"),
-      ).color,
-      columnCount: getComputedStyle(
-        element.querySelector(".distribution-edition-options"),
-      ).gridTemplateColumns.split(" ").filter(Boolean).length,
-    };
-  });
-  assert.equal(distributionMetrics.canApply, "false");
-  assert.equal(distributionMetrics.buttonCount, 0);
-  assert.equal(distributionMetrics.editionCardCount, 3);
-  assert.equal(distributionMetrics.textColor, "rgb(30, 23, 33)");
-  assert.equal(distributionMetrics.mutedColor, "rgb(116, 94, 123)");
-  assert(distributionMetrics.editionCardsFit, `${testCase.id}: edition copy overflowed its cards`);
-  assert(distributionMetrics.selectsFit, `${testCase.id}: distribution selects overflowed`);
-  assert.equal(
-    distributionMetrics.documentScrollWidth,
-    distributionMetrics.documentWidth,
-    `${testCase.id}: Distribution settings caused horizontal document overflow`,
-  );
-  assert(distributionMetrics.left >= 0 && distributionMetrics.right <= testCase.viewport.width + 1);
-  assert.equal(
-    distributionMetrics.columnCount,
-    testCase.viewport.width <= 760 ? 1 : 3,
-    `${testCase.id}: Distribution edition grid did not match its responsive contract`,
-  );
-  const distributionImage = await screenshot(page, testCase.id, "distribution-settings");
   await dialog.locator(".launcher-settings-close").click();
+  await page.setViewportSize(testCase.viewport);
   return {
     ...metrics,
+    themeBinding,
+    layerBinding,
+    settingsViewport,
+    panelMeasurements,
     keyboardFocusOrder: "manage-subscription -> refresh-usage",
     assistantModelImage,
     image,
-    distribution: {
-      ...distributionMetrics,
-      image: distributionImage,
-    },
   };
 }
 
@@ -1089,9 +1121,9 @@ let failure;
 try {
   for (const testCase of cases) {
     const context = await browser.newContext({ viewport: testCase.viewport });
-    await context.addInitScript((locale) => {
+    await context.addInitScript(({ locale }) => {
       window.localStorage.setItem("drone-dream:locale", locale);
-    }, testCase.locale);
+    }, { locale: testCase.locale });
     await context.route("**/api/v1/**", (route) => route.fulfill({
       status: 503,
       contentType: "application/json",
@@ -1103,6 +1135,15 @@ try {
     const entry = { case: testCase };
     try {
       entry.settings = await verifySettings(page, testCase);
+      if (settingsOnly) {
+        entry.scope = "settings-only";
+        entry.pageErrors = pageErrors;
+        assert.deepEqual(pageErrors, [], `${testCase.id}: page errors`);
+        entry.status = "pass";
+        results.push(entry);
+        await context.close();
+        continue;
+      }
       entry.distributionSetup = await verifyDistributionSetup(page, testCase);
       entry.avatar = await verifyAvatar(page, testCase, avatarBytes);
       entry.fixedScenarios = await verifyFixedScenarios(page, testCase);
@@ -1130,7 +1171,7 @@ try {
     await context.close();
     if (failure) break;
   }
-  if (!failure && !mobileMenuOnly) {
+  if (!failure && !mobileMenuOnly && !settingsOnly) {
     for (const testCase of fixedScenarioOnlyCases) {
       const context = await browser.newContext({ viewport: testCase.viewport });
       await context.addInitScript((locale) => {

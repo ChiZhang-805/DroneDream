@@ -30,12 +30,14 @@
     "releaseBuildDriverCommit": "f2858e3d2e39f493baab28368b77230e45dd199f",
     "frontendDistResolutionCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
     "lifecyclePreferenceResidueCommit": "8215a2206ec5e1192792410aaaf2a438f6b6127f",
+    "commonUiThemeSettingsProductCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "commonUiThemeSettingsEvidenceCommit": "2434488bbcc02a8859670edf2f9413f38d17e73a",
     "wholeLineageMerged": false,
     "evidenceCommitUsedAsProductSource": false
   },
   "pathSync": {
     "canonicalBrandPathCount": 94,
-    "exactCommonPathCount": 53,
+    "exactCommonPathCount": 63,
     "simSemanticAdapterPath": "frontend/src/pages/DesktopSetup.tsx",
     "unrelatedBenchmarkPathsAdopted": false,
     "hardwareAuthorityGranted": false
@@ -212,6 +214,81 @@
       "universalOnlyTestRestored": false,
       "simAssertionAdapterPath": "distribution/tests/test_software_sim_branch_contract.py",
       "classification": "validator-evidence-and-standard-edition-preference-residue-false-negative",
+      "productNsisChanged": false,
+      "frozenArtifactReuseAllowed": false,
+      "buildAuthorized": false
+    },
+    "commonUiThemeSettings": {
+      "productSourceCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+      "evidenceCommit": "2434488bbcc02a8859670edf2f9413f38d17e73a",
+      "evidenceUsedAsProductSource": false,
+      "receiptPath": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json",
+      "receiptSha256": "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4",
+      "exactDonorPaths": [
+        {
+          "path": "frontend/src/__tests__/BrandLockup.test.tsx",
+          "blob": "8e8a404a5adb274bcde1e8732b43156263f3cf14",
+          "objectSha256": "30c22dcf065aaf6a8a3fbc0cf5af4f37b4363c530e0e1495ddfeb105d2d870ea"
+        },
+        {
+          "path": "frontend/src/__tests__/EditionSettingsSurface.test.tsx",
+          "blob": "639ff79e99fedc34b63deb8faf5c7495aca2622d",
+          "objectSha256": "08d36dcc1ac9365bc201ae4dc17476beb795a71bd0b0293b6cdb605d17236378"
+        },
+        {
+          "path": "frontend/src/__tests__/EditionTheme.test.ts",
+          "blob": "966ca64217eb04cdfcc8297c76c642fecacf62c0",
+          "objectSha256": "6bea1591c62b0595cdbb90a42b7fb21ee3b2dfcf9660044e899443a850588132"
+        },
+        {
+          "path": "frontend/src/__tests__/stylesContract.test.ts",
+          "blob": "8df7a52597c5a6c267eaf9c24bd0dee96bf64971",
+          "objectSha256": "f94a717f79ed49ac8b4afbaaf044272d60aeaaaa048103d1d67e1031a6d8be32"
+        },
+        {
+          "path": "frontend/src/components/BrandLockup.tsx",
+          "blob": "dfca0c77e379571e2da7de10144a89f1906cfdfe",
+          "objectSha256": "6817c7d1eb1dbe35c42e3e60e728f7ff0f79db623822c04490e7962ab56d46d5"
+        },
+        {
+          "path": "frontend/src/components/DroneLaunchScene.tsx",
+          "blob": "a1764778c4ff1dfabfa8c4eb7d140b7d9ca51969",
+          "objectSha256": "13e00b683d74dae93718cadc4a17573333417cdbfef6db1ee069cf4060c8d8a2"
+        },
+        {
+          "path": "frontend/src/components/EditionSettingsSurface.tsx",
+          "blob": "0ff638b5acb81b400bbf67cfb91bfedacf0ae2dd",
+          "objectSha256": "23f0c359b3c1e40d390b176a26a3e4ff75e54d62a6176c0debab7745848016e1"
+        },
+        {
+          "path": "frontend/src/features/distribution/universalMode.ts",
+          "blob": "970e69da67fd69562e7c48341718bba4fdf2f8aa",
+          "objectSha256": "ba1ec0144c383f9b280876f35219c34d1a089da5628edcbef91e0e8f84670416"
+        },
+        {
+          "path": "frontend/src/theme/EditionThemeProvider.tsx",
+          "blob": "265ff3092a5b5880cc56d08eaf861a13d7ef5617",
+          "objectSha256": "d57296710283344d40ed941d38dd74d8bfd97f43adaaba0c3278ae593e86b4fe"
+        },
+        {
+          "path": "frontend/src/theme/editionTheme.ts",
+          "blob": "e45d57415b3479e73045507d33973782d28c765f",
+          "objectSha256": "581febad1997a4d7f0497d6c7df6cb0a203132da32953d8f6f0980c4fe8d866d"
+        }
+      ],
+      "semanticAdapterPaths": [
+        "frontend/scripts/verify-software-ui-layout.mjs",
+        "frontend/src/AppShell.tsx",
+        "frontend/src/__tests__/AppShellLauncher.test.tsx",
+        "frontend/src/__tests__/DroneLaunchScene.test.tsx",
+        "frontend/src/__tests__/RuntimeAccessUx.test.tsx",
+        "frontend/src/styles.css"
+      ],
+      "fixedEdition": "sim",
+      "modeSwitchRendered": false,
+      "presentationOnly": true,
+      "grantsHardwareAuthority": false,
+      "settingsVerticalScrollAllowed": false,
       "productNsisChanged": false,
       "frozenArtifactReuseAllowed": false,
       "buildAuthorized": false

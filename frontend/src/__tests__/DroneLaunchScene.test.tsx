@@ -4,12 +4,15 @@ import { afterEach, describe, expect, it } from "vitest";
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import { getDroneStarflightPose } from "../components/droneStarflight";
 import { I18nProvider } from "../i18n/I18nProvider";
+import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 
-function renderScene(locale: "en" | "zh-CN") {
+function renderScene(locale: "en" | "zh-CN", edition: "universal" | "sim" | "lab" | "field" = "universal") {
   window.localStorage.setItem("drone-dream:locale", locale);
   return render(
     <I18nProvider>
-      <DroneLaunchScene active />
+      <EditionThemeProvider edition={edition}>
+        <DroneLaunchScene active />
+      </EditionThemeProvider>
     </I18nProvider>,
   );
 }
@@ -21,6 +24,16 @@ function poseDistance(first: ReturnType<typeof getDroneStarflightPose>, second: 
 afterEach(() => window.localStorage.clear());
 
 describe("DroneLaunchScene localization", () => {
+  it("exposes the fixed canonical SIM 3D palette and preserves the no-authority boundary", () => {
+    const { container } = renderScene("en", "sim");
+    const scene = container.querySelector(".drone-launch-scene");
+    expect(scene).toHaveAttribute("data-theme-edition", "sim");
+    expect(scene).toHaveAttribute("data-theme-primary", "#00d9ff");
+    expect(scene).toHaveAttribute("data-theme-secondary", "#2671ff");
+    expect(scene).toHaveAttribute("data-theme-tertiary", "#744cff");
+    expect(scene).toHaveAttribute("data-theme-grants-hardware-authority", "false");
+  });
+
   it("renders an English-only telemetry overlay in English", () => {
     renderScene("en");
 

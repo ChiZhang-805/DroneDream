@@ -26,7 +26,7 @@ class SimUniversalHandoffTests(unittest.TestCase):
     def test_exact_handoff_and_sim_adapter_validate(self) -> None:
         receipt = validate_handoff(load_receipt(), ROOT)
         self.assertEqual(receipt["pathSync"]["canonicalBrandPathCount"], 94)
-        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 53)
+        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 63)
         self.assertFalse(receipt["execution"]["buildAuthorized"])
 
     def test_observed_head_cannot_be_relabelled_whole_product_source(self) -> None:
@@ -106,6 +106,14 @@ class SimUniversalHandoffTests(unittest.TestCase):
             "universalOnlyTestRestored"
         ] = True
         with self.assertRaisesRegex(SimUniversalHandoffError, "Universal-only"):
+            validate_handoff(receipt, ROOT)
+
+    def test_common_ui_theme_cannot_grant_hardware_authority(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["commonUiThemeSettings"][
+            "grantsHardwareAuthority"
+        ] = True
+        with self.assertRaisesRegex(SimUniversalHandoffError, "SIM boundary"):
             validate_handoff(receipt, ROOT)
 
     def test_auth_verifier_migration_order_drift_is_rejected(self) -> None:

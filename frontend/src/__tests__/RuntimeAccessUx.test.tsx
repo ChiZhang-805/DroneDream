@@ -263,6 +263,7 @@ afterEach(() => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
@@ -326,6 +327,7 @@ afterEach(() => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     expect(await screen.findByText("The local runtime could not start"))
       .toBeInTheDocument();
@@ -418,6 +420,7 @@ afterEach(() => {
     fireEvent.click(screen.getByRole("button", { name: "English" }));
     expect(invoke.mock.calls.filter(([command]) => command !== "get_installer_locale"))
       .toHaveLength(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
@@ -484,6 +487,7 @@ afterEach(() => {
     )).toHaveLength(initialRuntimeProbeCount);
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
 
     expect(await screen.findByText("Environment unavailable")).toBeInTheDocument();
