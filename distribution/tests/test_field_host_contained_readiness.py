@@ -38,6 +38,12 @@ LAST_REQUESTABLE_EVIDENCE = (
     / "test-runs"
     / "field-host-contained-readiness-6afa14a-wait"
 )
+CURRENT_BLOCKED_EVIDENCE = (
+    ROOT
+    / "artifacts"
+    / "test-runs"
+    / "field-host-contained-readiness-18ccfa9-blocked"
+)
 FIRST_PREFLIGHT_FAILURE_EVIDENCE = (
     ROOT
     / "artifacts"
@@ -300,6 +306,24 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         )
         self.assertEqual(receipt["planSha256"], plan["planSha256"])
         self.assertEqual(receipt["decision"], "request-yellow-host-contained")
+        self.assertFalse(receipt["executionPerformed"])
+
+    def test_current_exact_evidence_denies_dynamic_retry(self) -> None:
+        plan = host_readiness.load_json(CURRENT_BLOCKED_EVIDENCE / "plan.json")
+        receipt = host_readiness.load_json(
+            CURRENT_BLOCKED_EVIDENCE / "green-readiness-receipt.json"
+        )
+        host_readiness.validate_plan(plan)
+        self.assertEqual(plan["state"], "blocked")
+        self.assertEqual(plan["blockers"], ["field.host.executor-post-install-runaway"])
+        self.assertEqual(plan["source"]["evidenceHead"], "18ccfa997a05665a7bea6cb95da0d416da9c86bc")
+        self.assertEqual(plan["source"]["toolSha256"], host_readiness.file_sha256(TOOL_PATH))
+        self.assertEqual(plan["source"]["contractSha256"], host_readiness.file_sha256(CONTRACT_PATH))
+        self.assertEqual(
+            plan["source"]["hostSnapshotSha256"],
+            host_readiness.file_sha256(CURRENT_BLOCKED_EVIDENCE / "host-snapshot.json"),
+        )
+        self.assertEqual(receipt["decision"], "deny")
         self.assertFalse(receipt["executionPerformed"])
 
     def test_first_yellow_attempt_is_preserved_as_preflight_only_failure(self) -> None:

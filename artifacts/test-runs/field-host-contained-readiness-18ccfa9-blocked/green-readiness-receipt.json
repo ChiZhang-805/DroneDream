@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-host-contained-green-readiness-receipt",
+  "editionId": "field",
+  "decision": "deny",
+  "planSha256": "644d6fe679cc2048de9c011cc44cbd22b50acb1a98c50ad9b2884f6521da868b",
+  "source": {
+    "productSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "evidenceHead": "18ccfa997a05665a7bea6cb95da0d416da9c86bc",
+    "contractSha256": "9723160032095835582c56fbd03d855f085f952a00418c0a359b8ab27abb850d",
+    "toolSha256": "d941777a57b16356abb5608bce5bfa562824c02cb632ea58a0aca93576480a95",
+    "schemaSha256": "55093c74b1e64690f4b1870ce7e88728b3f563b6bc5bc426046b63644f7265b1",
+    "hostSnapshotSha256": "c50cf8d04135d6e33ae4e1bcd822364109fdb9c554e659bf8233ea9fdb0a1035"
+  },
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "bytes": 11267482,
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "authenticodeStatus": "NotSigned",
+    "productSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "absolutePath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-c7e25b3\\artifact\\DroneDream-Field-1.0.0.exe"
+  },
+  "environment": {
+    "isolationClass": "host-contained-owned-paths",
+    "claimsVmLevelIsolation": false,
+    "processEnvironment": {
+      "LOCALAPPDATA": "ownedPaths.redirectedLocalAppData",
+      "APPDATA": "ownedPaths.redirectedRoamingAppData",
+      "TEMP": "ownedPaths.redirectedTemp",
+      "TMP": "ownedPaths.redirectedTemp",
+      "HTTP_PROXY": "http://127.0.0.1:9",
+      "HTTPS_PROXY": "http://127.0.0.1:9",
+      "NO_PROXY": "127.0.0.1,localhost",
+      "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS": "--disable-background-networking --disable-component-update --disable-domain-reliability --disable-sync --metrics-recording-only --no-first-run --proxy-server=127.0.0.1:9 --proxy-bypass-list=<-loopback>"
+    },
+    "ownedPaths": {
+      "hostRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3",
+      "installRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\install",
+      "redirectedLocalAppData": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\env\\LocalAppData",
+      "redirectedRoamingAppData": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\env\\RoamingAppData",
+      "redirectedTemp": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\temp",
+      "evidenceRoot": "%LOCALAPPDATA%\\DroneDreamCodexTest\\field-host-acceptance-c7e25b3\\evidence"
+    },
+    "protectedState": [
+      "%LOCALAPPDATA%\\DroneDream",
+      "%LOCALAPPDATA%\\DroneDream · SIM",
+      "%LOCALAPPDATA%\\DroneDream · LAB",
+      "%LOCALAPPDATA%\\DroneDream · FIELD",
+      "E:\\DroneDream",
+      "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream",
+      "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · SIM",
+      "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · LAB",
+      "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream.lnk",
+      "%USERPROFILE%\\Desktop\\DroneDream.lnk",
+      "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · SIM.lnk",
+      "%USERPROFILE%\\Desktop\\DroneDream · SIM.lnk",
+      "Microsoft Edge WebView2 shared runtime"
+    ]
+  },
+  "executionCounts": {
+    "installerExe": 0,
+    "uninstaller": 0,
+    "applicationLaunch": 0,
+    "rebuild": 0,
+    "networkRequest": 0,
+    "deviceEnumeration": 0,
+    "hardwareAction": 0,
+    "simulation": 0
+  },
+  "executionPerformed": false,
+  "websiteReady": false,
+  "blockers": [
+    "field.host.executor-post-install-runaway"
+  ],
+  "receiptSha256": "c80ca2a8ca06b058aa50d9589f910c8be5759132a2d351c60481393e0550878e"
+}
