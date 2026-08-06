@@ -1,0 +1,8 @@
+﻿The frontend build output must remain inside the repository.
+At C:\Users\zju20\ddf323\desktop\scripts\release-build-driver.psm1:104 char:9
++         throw "The frontend build output must remain inside the repos ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (The frontend bu...the repository.:String) [], RuntimeException
+    + FullyQualifiedErrorId : The frontend build output must remain inside the repository.
+ 
+

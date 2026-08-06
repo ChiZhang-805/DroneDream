@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-fresh-replacement-yellow-build-failure-audit",
+  "editionId": "field",
+  "decision": "freeze-failure-no-retry",
+  "source": {
+    "productCommit": "323fd05313527c0edec481d7e09acb5ac4735d22",
+    "productTree": "55d6be926353cb375bbed1b0a9d8a4fa3c71e11c",
+    "evidenceHeadAtStart": "c4313c87203cd200432683351ae7fae7e2b83376",
+    "headAfterAttempt": "323fd05313527c0edec481d7e09acb5ac4735d22",
+    "trackedSourceChanged": false,
+    "generatedUntrackedPath": "frontend/field-dist"
+  },
+  "authorization": {
+    "applicationCanonicalSha256": "3b3334b56e5feb362c2f599777fa69190a4113598da5a094a5e3a30ce49a5ecc",
+    "applicationFileSha256": "40b6e3c2bcca8afe4e11858fccc30d12456566afd2139b5de0de4d19708fba92",
+    "preflightReceiptSha256": "ac0f23fe8791f4cd8f64f71389819ec2c9c6b0ab9e2f28869fa0ec2c51bf15c5",
+    "preflightScriptSha256": "62209fc9bb06f5c1bac67c55ddb76e0f5a6298114758874acb2cb64d87b3e241",
+    "invokeScriptSha256": "f14efaa5e9e803d57a226cef169ce2c1e5a9058b957e7ee5a42608a89e5d5cb8",
+    "relocatedOverlaySha256": "c65a0c7ed411ca3a5f52629a0500ff785e3d221f377a94bfca07c5b00efa31cb",
+    "commonCoreDonor": "f2858e3d2e39f493baab28368b77230e45dd199f",
+    "cargoBuildJobs": 2
+  },
+  "executionCounts": {
+    "preCargoGateFailures": 1,
+    "tauriBuildInvocations": 1,
+    "fieldFrontendBuildInvocations": 1,
+    "cargoMetadataInvocations": 2,
+    "cargoBuildInvocations": 0,
+    "nsisInvocations": 0,
+    "updaterSignerInvocations": 0,
+    "retryAllowed": false
+  },
+  "process": {
+    "startedAt": "2026-08-06T13:33:25.8457374Z",
+    "finishedAt": "2026-08-06T13:33:36.7771451Z",
+    "durationSeconds": 10.931,
+    "exitCode": 1,
+    "exception": "Tauri desktop build failed with native exit code 1.",
+    "processReceiptSha256": "ca776ec8ef3bb6cf0c20b4dbf6b9047d0931e4b797057e0d547ce18d1d6ec827",
+    "failureReceiptSha256": "b1be2fc76e89b6878518f3bc4e23e5cee24dcf62270fa30444662ccf2b670547",
+    "stdoutSha256": "215de6cc0ce7928ad5b13e057f70b0934c33ae4900e32b232b2c0618481b6e14",
+    "stderrSha256": "971195ee354777c7b2c8b1564a55632cb7b4a19ca6c3b22b3b3607afd90291f8"
+  },
+  "failure": {
+    "stage": "tauri-before-build-command-completed-before-rust-cargo-build",
+    "classification": "shared-release-driver-and-tauri-relative-config-path-semantics-disagree",
+    "driverResolution": "C:\\Users\\zju20\\ddf323\\frontend\\field-dist",
+    "tauriResolution": "C:\\Users\\zju20\\frontend\\field-dist",
+    "observedDiagnostic": "Unable to find your web assets; frontendDist ../../../frontend/field-dist resolved from desktop/src-tauri outside the product worktree.",
+    "fieldFrontendBuildCompleted": true,
+    "rustCompilationStarted": false,
+    "nsisStarted": false,
+    "commonCoreFixRequired": true,
+    "fieldLocalBuildDriverPatchAllowed": false
+  },
+  "generatedFrontend": {
+    "path": "C:\\Users\\zju20\\ddf323\\frontend\\field-dist",
+    "fileCount": 29,
+    "bytes": 5945331,
+    "manifestSha256": "8d63658f4107c933236418409b10b340c78df2387259f6256a8582779447f19d",
+    "canonicalFieldLargeLabelSha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+    "preserved": true
+  },
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "installerProduced": false,
+    "updaterSignatureProduced": false,
+    "checksumProduced": false,
+    "updaterMetadataProduced": false,
+    "externalArtifactRootCreated": false,
+    "cargoTargetCreated": false
+  },
+  "historicalFrozenArtifact": {
+    "sha256": "90d867aedf728a70e55d6df349da1ce96b80e6f37b4689224eebdc4fd8cfa2c3",
+    "bytes": 11531940,
+    "unchanged": true,
+    "mayBeInstalled": false,
+    "mayBeHandedOff": false
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "hardwareDecision": "deny",
+    "installExecuted": false,
+    "runtimeMigrationExecuted": false,
+    "deviceOrHardwareTouched": false,
+    "simulationExecuted": false,
+    "deploymentExecuted": false,
+    "providerOrModelKeyRead": false
+  },
+  "release": {
+    "previewReady": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "currentApplicationConsumed": true,
+    "nextGate": "Universal common-core must fix external edition overlay path semantics; Field must consume an exact donor, freeze a new product source, and obtain a new single YELLOW approval."
+  }
+}

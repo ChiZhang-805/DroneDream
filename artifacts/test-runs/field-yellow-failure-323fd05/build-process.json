@@ -1,0 +1,47 @@
+{
+    "schemaVersion":  1,
+    "kind":  "dronedream-field-replacement-yellow-build-process",
+    "sourceCommit":  "323fd05313527c0edec481d7e09acb5ac4735d22",
+    "upstreamEvidenceCommit":  "c4313c87203cd200432683351ae7fae7e2b83376",
+    "startedAt":  "2026-08-06T13:33:25.8457374Z",
+    "finishedAt":  "2026-08-06T13:33:36.7771451Z",
+    "durationSeconds":  10.931,
+    "exitCode":  1,
+    "exception":  "Tauri desktop build failed with native exit code 1.",
+    "cargoBuildCountMaximum":  1,
+    "nsisInvocationMaximum":  1,
+    "cargoBuildJobs":  2,
+    "stdoutPath":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-323fd05-fresh-replacement\\build.stdout.log",
+    "stderrPath":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-323fd05-fresh-replacement\\build.stderr.log",
+    "cargoTarget":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\323fd05",
+    "externalOutputRoot":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-323fd05-fresh-replacement\\artifact",
+    "candidate":  {
+                      "installer":  {
+                                        "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\323fd05\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Field_1.0.0_x64-setup.exe",
+                                        "exists":  false,
+                                        "bytes":  null,
+                                        "sha256":  null
+                                    },
+                      "updaterSignature":  {
+                                               "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\323fd05\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Field_1.0.0_x64-setup.exe.sig",
+                                               "exists":  false,
+                                               "bytes":  null,
+                                               "sha256":  null
+                                           },
+                      "checksum":  {
+                                       "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\323fd05\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Field_1.0.0_x64-setup.exe.sha256",
+                                       "exists":  false,
+                                       "bytes":  null,
+                                       "sha256":  null
+                                   },
+                      "updaterMetadata":  {
+                                              "path":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\323fd05\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\latest-field.json",
+                                              "exists":  false,
+                                              "bytes":  null,
+                                              "sha256":  null
+                                          }
+                  },
+    "frozen":  {
+
+               }
+}

@@ -1,0 +1,8 @@
+﻿Tauri desktop build failed with native exit code 1.
+At C:\Users\zju20\ddf323\desktop\scripts\release-build-driver.psm1:52 char:9
++         throw "$DisplayName failed with native exit code $nativeExitC ...
++         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Tauri desktop b...ve exit code 1.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Tauri desktop build failed with native exit code 1.
+ 
+

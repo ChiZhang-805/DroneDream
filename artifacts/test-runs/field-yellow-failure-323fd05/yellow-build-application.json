@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-fresh-replacement-yellow-build-application",
+  "applicationId": "field-yellow-323fd05-fresh-replacement-single-nsis-v1",
+  "editionId": "field",
+  "status": "pending-total-control-yellow-approval",
+  "requestedAt": "2026-08-06T13:08:15.4387819Z",
+  "historicalAttempts": [
+    {
+      "productSource": "26dd3c141f86bc9cc538336bc3cb6a8155cc88e7",
+      "installerProduced": false,
+      "state": "frozen-failed-no-retry"
+    },
+    {
+      "productSource": "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+      "frozenArtifactSha256": "90d867aedf728a70e55d6df349da1ce96b80e6f37b4689224eebdc4fd8cfa2c3",
+      "updaterSignatureProduced": false,
+      "state": "frozen-failed-no-retry-no-install-no-handoff"
+    }
+  ],
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "323fd05313527c0edec481d7e09acb5ac4735d22",
+    "productTree": "55d6be926353cb375bbed1b0a9d8a4fa3c71e11c",
+    "evidenceCommit": "c4313c87203cd200432683351ae7fae7e2b83376",
+    "evidenceTree": "153b0af6804a5229aae8c59c2cb6d972b171eb98",
+    "upstreamCommit": "c4313c87203cd200432683351ae7fae7e2b83376",
+    "ahead": 0,
+    "behind": 0,
+    "clean": true,
+    "commonCoreLineageBase": "cabcde3903ccceaf19119824af227bebeb7dd5be",
+    "commonCoreIncrementalDonor": "f2858e3d2e39f493baab28368b77230e45dd199f",
+    "commonCoreIncrementalDonorTree": "bedb3fe091fe1910575bdda9343f4c1be8558a05"
+  },
+  "donorSyncEvidence": {
+    "path": "distribution/editions/field/receipts/common-core-f2858e3-release-build-driver-sync-v1.json",
+    "sha256": "127c1c15039d3fa4fe4e8710dab5ba184fb0f2199cd3e41cae1756d061f1060f",
+    "syncedPathCount": 5,
+    "pathDriftCount": 0,
+    "nativeStderrExitZeroVerified": true,
+    "nativeNonzeroFailClosedVerified": true,
+    "fieldGeneratedFrontendContract": "frontend/field-dist-only",
+    "trackedEscapeOtherUnknownDenied": true
+  },
+  "readinessEvidence": {
+    "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-readiness-323fd05-fresh-replacement\\readiness-receipt.json",
+    "fileSha256": "bb1321b5843e4c806dee1c019564b4a54e881fd19200076765311c872fe6c6d1",
+    "canonicalReceiptSha256": "75e315e1c893602f1fa1033d5aa3461eab81fc59a8357b5d5ff60546bc656919",
+    "decision": "ready-to-request-yellow",
+    "blockers": []
+  },
+  "lifecyclePlanEvidence": {
+    "contractFileSha256": "dc6851f4a52be07bbead9ab0e8ce9130aaaeb0586c700113ff6ab8d8fbc4d47c",
+    "receiptFileSha256": "a4dc6cdb68cbed410bb21317ef923bffb17fcfcc82ed812194115cdad3a87fd9",
+    "canonicalReceiptSha256": "55fe3e7997014ce769cdcc77bebaa64e97213e7190324ad1c9673765155ed85d",
+    "decision": "deny",
+    "executeSwitchUsed": false,
+    "reason": "plan-only-no-installer-built-or-installed"
+  },
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "authenticodeStateRequested": "unsigned",
+    "updaterSignatureRequested": true,
+    "freshReplacementBuildCountMaximum": 1,
+    "cargoBuildCountMaximum": 1,
+    "nsisInvocationMaximum": 1,
+    "installDuringBuildAllowed": false,
+    "uploadAllowed": false,
+    "websiteHandoffAllowedBeforeLifecycleAcceptance": false
+  },
+  "publicConfiguration": {
+    "oauthClientIdEnvironmentVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
+    "oauthClientId": "3140bbe2-5f0e-4699-8a9b-295d4030f853",
+    "oauthCallback": "http://127.0.0.1:49213/desktop-auth/field/callback",
+    "oauthClientType": "public",
+    "oauthTokenAuthMethod": "none",
+    "oauthClientSecretPresent": false,
+    "oauthInjectionScope": "single-build-process-only",
+    "supabasePublicVariablesSource": "tracked-frontend-production-environment",
+    "supabasePrivateOrServiceRoleAllowed": false,
+    "updaterMatchingKeyId": "BA3FDCAF71CE2FF5",
+    "updaterPrivateKeyPathReference": "C:\\Users\\zju20\\.tauri\\dronedream-updater.key",
+    "updaterPrivateKeyPasswordMode": "empty-as-user-confirmed",
+    "privateKeyReadDuringGreen": false,
+    "privateKeyCopiedIntoEvidence": false,
+    "productionNamingKeyAllowed": false
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "hardwareActionsAllowed": false,
+    "frontendIsAuthority": false,
+    "requiredDecisionLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "deniedActions": [
+      "hardware.parameter.write",
+      "hardware.unlock",
+      "hardware.arm",
+      "hardware.flight"
+    ],
+    "deviceAccessAllowed": false,
+    "simulationAllowed": false,
+    "providerOrApiKeyAccessAllowed": false
+  },
+  "resourceObservation": {
+    "capturedAt": "2026-08-06T13:08:15.4387819Z",
+    "memoryTotalBytes": 16907100160,
+    "memoryFreeBytes": 7152840704,
+    "memoryUsedPercent": 57.7,
+    "cFreeBytes": 98844901376,
+    "zFreeBytes": 23571161088,
+    "heavyProcessCount": 0
+  },
+  "resourceRequest": {
+    "scope": "Field frontend plus one Rust/Tauri/NSIS fresh replacement build with updater signature",
+    "expectedCpuImpact": "high-transient",
+    "expectedMemoryUpperBoundBytes": 8589934592,
+    "ownedSourceRoot": "C:\\Users\\zju20\\ddf323",
+    "ownedOutputRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-323fd05-fresh-replacement",
+    "cargoTargetPath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\323fd05",
+    "cargoTargetDiskUpperBoundBytes": 8589934592,
+    "workspaceTemporaryDiskUpperBoundBytes": 1073741824,
+    "cargoBuildJobs": 2,
+    "expectedDurationMinutes": {
+      "minimum": 8,
+      "maximum": 35
+    },
+    "preExecutionResourceRecheckRequired": true,
+    "abortBeforeCargoIfAnyGateFails": true,
+    "networkAllowed": false,
+    "deviceAccessAllowed": false,
+    "installationAllowed": false,
+    "runtimeMigrationAllowed": false,
+    "simulationAllowed": false,
+    "providerOrApiKeyAccessAllowed": false
+  },
+  "authorizedExecutionMethod": {
+    "state": "not-created-until-approved",
+    "exactSourceRequired": true,
+    "sourceChangeInvalidatesApproval": true,
+    "newOwnedSourceTargetAndOutputRequired": true,
+    "reuseHistoricalRunRootAllowed": false,
+    "reuseHistoricalCargoTargetAllowed": false,
+    "reuseFrozenHistoricalExeAllowed": false,
+    "tauriOverrideScope": "build.beforeBuildCommand=npm run frontend:field-build only",
+    "sharedReleaseDriverRequired": "desktop/scripts/release-build-driver.psm1",
+    "doesNotModifyHardwareAuthority": true,
+    "doesNotModifyProductSource": true
+  },
+  "failurePolicy": {
+    "preCargoGateFailureConsumesBuild": false,
+    "postCargoOrNsisFailureRetryAllowed": false,
+    "generatedBytesMustBeFrozenOnFailure": true,
+    "postHocSigningAfterFailureAllowed": false
+  },
+  "postBuildMinimumVerification": [
+    "freeze the unique EXE and updater signature bytes without rebuilding",
+    "filename version bytes and lowercase SHA-256",
+    "Authenticode state and PE certificate table",
+    "updater signature presence and SHA-256 bound to Key ID BA3FDCAF71CE2FF5",
+    "payload exclusion for PX4 Gazebo SITL HITL simulator backend and scripts",
+    "license NOTICE Field brand and Unicode display-name resources",
+    "uninstall registration internal identity display name version install location and main binary",
+    "OAuth client ID and exact Field callback contract without secret",
+    "zero-pack native backend runtime hardware denial",
+    "record product source separately from evidence HEAD"
+  ],
+  "remainingGates": [
+    "explicit total-control fresh replacement YELLOW approval for this exact application",
+    "single build must succeed before any installer lifecycle validation",
+    "fresh install overlay launch shortcut WebView2 EN-ZH independent browser PKCE uninstall and residue rollback remain RED after successful artifact freeze",
+    "Website exact four-file handoff remains pending lifecycle acceptance",
+    "real USB serial flight controller motor arm and flight remain prohibited"
+  ],
+  "nextGate": "explicit total-control fresh replacement YELLOW approval; no build has run for product source 323fd05313527c0edec481d7e09acb5ac4735d22",
+  "applicationSha256": "3b3334b56e5feb362c2f599777fa69190a4113598da5a094a5e3a30ce49a5ecc"
+}
