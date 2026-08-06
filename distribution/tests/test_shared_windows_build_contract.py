@@ -1,14 +1,38 @@
 from __future__ import annotations
 
+import json
+import subprocess
+import textwrap
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "desktop" / "scripts" / "build-windows-llvm.ps1"
+DRIVER = ROOT / "desktop" / "scripts" / "release-build-driver.psm1"
+RELEASE_POLICY = ROOT / "desktop" / "scripts" / "verify-release-source-policy.mjs"
+SIGNING_POLICY = ROOT / "desktop" / "scripts" / "verify-updater-signing-contract.ps1"
 
 
 def _script() -> str:
     return SCRIPT.read_text(encoding="utf-8-sig")
+
+
+def _run_powershell(script: str, *, cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ],
+        cwd=cwd,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
 
 
 def test_shared_llvm_build_exposes_edition_safe_inputs_without_changing_defaults() -> None:
@@ -32,8 +56,8 @@ def test_shared_llvm_build_exposes_edition_safe_inputs_without_changing_defaults
 
 def test_shared_llvm_build_merges_edition_before_llvm_resources_on_cli() -> None:
     script = _script()
-    edition_index = script.index("--config $additionalConfig")
-    llvm_index = script.index("--config $llvmBundleConfig", edition_index)
+    edition_index = script.index('"--config", $additionalConfig')
+    llvm_index = script.index('"--config", $llvmBundleConfig', edition_index)
     assert edition_index < llvm_index
     assert "$env:TAURI_CONFIG" not in script
 
@@ -49,5 +73,154 @@ def test_shared_llvm_build_keeps_signing_and_source_guards_fail_closed() -> None
         'The compiled desktop edition does not match its updater family.',
         'Signed updater builds require an explicit edition config overlay.',
         'Refusing to prune installer artifacts outside the LLVM NSIS bundle directory.',
+        'Invoke-CheckedNativeCommand',
+        'Resolve-EditionGeneratedFrontendContract',
+        'Test-PostBuildSourceStatus',
     ):
         assert fragment in script
+
+
+def test_release_policies_anchor_the_wrapped_native_build_boundary() -> None:
+    expected_anchor = "Invoke-CheckedNativeCommand `"
+    assert expected_anchor in RELEASE_POLICY.read_text(encoding="utf-8-sig")
+    assert expected_anchor in SIGNING_POLICY.read_text(encoding="utf-8-sig")
+
+
+def test_native_driver_allows_informational_stderr_but_rejects_nonzero(tmp_path: Path) -> None:
+    module = str(DRIVER).replace("'", "''")
+    success = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Invoke-CheckedNativeCommand -FilePath $env:ComSpec -DisplayName 'fixture' `
+              -ArgumentList @('/d', '/c', 'echo Info: normal progress 1>&2 & exit /b 0')
+            Write-Output 'native-success'
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert success.returncode == 0, success.stderr
+    assert "normal progress" in success.stderr
+    assert "NativeCommandError" not in success.stderr
+    assert "native-success" in success.stdout
+
+    failure = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Invoke-CheckedNativeCommand -FilePath $env:ComSpec -DisplayName 'fixture' `
+              -ArgumentList @('/d', '/c', 'echo fatal build error 1>&2 & exit /b 23')
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert failure.returncode != 0
+    assert "native exit code 23" in failure.stderr
+
+
+def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    config_dir = repo / "desktop" / "src-tauri"
+    config_dir.mkdir(parents=True)
+    base = config_dir / "tauri.conf.json"
+    base.write_text(
+        json.dumps({"build": {"frontendDist": "../../frontend/dist"}}),
+        encoding="utf-8",
+    )
+
+    cases = {
+        "universal": "../../frontend/dist",
+        "sim": "../../frontend/sim-dist",
+        "lab": "../../frontend/lab-dist",
+        "field": "../../frontend/field-dist",
+    }
+    module = str(DRIVER).replace("'", "''")
+    for edition, frontend_dist in cases.items():
+        overlay = config_dir / f"tauri.{edition}.conf.json"
+        overlay.write_text(
+            json.dumps({"build": {"frontendDist": frontend_dist}}),
+            encoding="utf-8",
+        )
+        command = textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Resolve-EditionGeneratedFrontendContract `
+              -RepoRoot '{repo}' -BaseConfigPath '{base}' `
+              -AdditionalConfigPath '{overlay}' -EditionId '{edition}' |
+              ConvertTo-Json -Compress
+            """
+        )
+        result = _run_powershell(command, cwd=tmp_path)
+        assert result.returncode == 0, result.stderr
+        payload = json.loads(result.stdout)
+        expected_path = (
+            f"frontend/{edition}-dist" if edition != "universal" else "frontend/dist"
+        )
+        assert payload["relativePath"] == expected_path
+
+        status_result = _run_powershell(
+            textwrap.dedent(
+                f"""
+                $ErrorActionPreference = 'Stop'
+                Import-Module '{module}' -Force
+                Test-PostBuildSourceStatus `
+                  -AllowedGeneratedPath '{expected_path}' `
+                  -StatusLines @('?? {expected_path}/index.html') |
+                  ConvertTo-Json -Compress
+                """
+            ),
+            cwd=tmp_path,
+        )
+        assert status_result.returncode == 0, status_result.stderr
+        status_payload = json.loads(status_result.stdout)
+        assert status_payload["allowedGeneratedCount"] == 1
+        assert status_payload["unexpectedCount"] == 0
+
+    invalid = config_dir / "tauri.field.invalid.conf.json"
+    invalid.write_text(
+        json.dumps({"build": {"frontendDist": "../../artifacts/field-dist"}}),
+        encoding="utf-8",
+    )
+    result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Resolve-EditionGeneratedFrontendContract `
+              -RepoRoot '{repo}' -BaseConfigPath '{base}' `
+              -AdditionalConfigPath '{invalid}' -EditionId 'field'
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode != 0
+    assert "outside the explicit generated-output contract" in result.stderr
+
+
+def test_postbuild_status_allows_only_exact_untracked_generated_files(tmp_path: Path) -> None:
+    module = str(DRIVER).replace("'", "''")
+    command = textwrap.dedent(
+        f"""
+        $ErrorActionPreference = 'Stop'
+        Import-Module '{module}' -Force
+        Test-PostBuildSourceStatus `
+          -AllowedGeneratedPath 'frontend/field-dist' `
+          -StatusLines @(
+            '?? frontend/field-dist/index.html',
+            '?? frontend/field-dist/assets/app.js',
+            ' M frontend/field-dist/tracked.js',
+            '?? frontend/field-dist-escape/file.js',
+            '?? unexpected.txt'
+          ) | ConvertTo-Json -Compress
+        """
+    )
+    result = _run_powershell(command, cwd=tmp_path)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["allowedGeneratedCount"] == 2
+    assert payload["unexpectedCount"] == 3
+    assert " M frontend/field-dist/tracked.js" in payload["unexpected"]
+    assert "?? unexpected.txt" in payload["unexpected"]
