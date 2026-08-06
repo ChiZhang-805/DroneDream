@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-coexistence-sync-receipt",
+  "editionId": "field",
+  "source": {
+    "fieldProductCommit": "f45a8fc548a6634e313b5de4c63244bb819e332f",
+    "fieldProductTree": "56b1eb25566b89c524a6ce3551e013e2eb485a66",
+    "branch": "codex/software-field"
+  },
+  "canonicalDonors": [
+    {
+      "role": "universal-installer-overlay-prerequisite",
+      "commit": "d4f6417bed9285e60d744538a3b54397788550cc",
+      "fieldIntegrationCommit": "a878bc5463fe96afd864f4288b88f970cda2eeed"
+    },
+    {
+      "role": "desktop-coexistence-contract-prerequisite",
+      "commit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+      "fieldIntegrationCommit": "f34fbaea605334673dc7d21968772c692e64f151"
+    },
+    {
+      "role": "edition-installer-identity",
+      "commit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+      "fieldIntegrationCommit": "b4bea000b559b3d9dfd84f246b6ea099efc18944"
+    },
+    {
+      "role": "runtime-quiesce-revalidation-prerequisite",
+      "commit": "b099ed00923e9f2b833f812ad79f1614529038de",
+      "fieldIntegrationCommit": "f45a8fc548a6634e313b5de4c63244bb819e332f"
+    }
+  ],
+  "excludedEvidenceCommit": {
+    "commit": "7482647f1c2fcb92f58aaef009efc99764792297",
+    "consumed": false,
+    "reason": "receipt-only brand evidence is not a product source"
+  },
+  "donorPathVerification": {
+    "donorCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "pathCount": 8,
+    "allGitBlobsExact": true,
+    "paths": [
+      {
+        "path": "desktop/scripts/verify-nsis-template.ps1",
+        "gitBlob": "0e1d94e8de358057cfd0d95bcc0ae332f8d71cf1",
+        "sha256": "d23770d685b3ac41679857e37d3c5e127929ad14b5eef5fc80de139f4dc83432",
+        "bytes": 21771
+      },
+      {
+        "path": "desktop/src-tauri/nsis/edition-identity.nsh",
+        "gitBlob": "0e0cfb80086bb1d1e680fd6537c2a0e48fca09cd",
+        "sha256": "9e89f8ceaf8f273bf69a1368e1ad91349650fbf8eb871828e3082602cb0af2d9",
+        "bytes": 4127
+      },
+      {
+        "path": "desktop/src-tauri/nsis/installer-languages.nsh",
+        "gitBlob": "aa788939d765590a7827a21152c865afc2f62d53",
+        "sha256": "9c155f684d0b43e3a35958971953ff54e732697b9fa317f90931be17984f37bd",
+        "bytes": 12918
+      },
+      {
+        "path": "desktop/src-tauri/nsis/installer.nsi",
+        "gitBlob": "53ccf62ef20ab96ea07a316e0995ffbfe5d7f62b",
+        "sha256": "6905075b4d86e610ca74a395362797e04993a677a458738f11f877d1c507be80",
+        "bytes": 34624
+      },
+      {
+        "path": "desktop/src-tauri/nsis/languages/English.nsh",
+        "gitBlob": "24d0063bd88afd3724176cbf952e6817d70d8d28",
+        "sha256": "a218a57a2c6647456afe435bdc8648eb40ea53b4a7e5949b8f1b8622228127da",
+        "bytes": 2678
+      },
+      {
+        "path": "desktop/src-tauri/nsis/languages/SimpChinese.nsh",
+        "gitBlob": "b9a03ec304e73c2cc0767fbe224f052d25d28d5b",
+        "sha256": "d75cc6f734fb7c34d6afe6a7f22cf8e8114f4d32e978578df6eea8d00473ef40",
+        "bytes": 2755
+      },
+      {
+        "path": "desktop/src-tauri/nsis/webview2-health.nsh",
+        "gitBlob": "8aad96dc68c8e0861dbe37a2d38e7086324d27f0",
+        "sha256": "625ef94f41f471890ef0e5ecf6458ac421b4bdfccecaf879d391d8d1c12efb0a",
+        "bytes": 11799
+      },
+      {
+        "path": "distribution/tests/test_desktop_edition_coexistence.py",
+        "gitBlob": "63081d38b560e3ba96efa87e3743f9293f8be914",
+        "sha256": "be264b7a5d0c88e0988be6b80e770389c948997dfefe7c85f375199aab3fe15a",
+        "bytes": 8806
+      }
+    ]
+  },
+  "fieldOverlay": {
+    "adaptationCommit": "72cbe99a69b3145ae458091bd6515fb7862e0204",
+    "path": "desktop/src-tauri/tauri.field.conf.json",
+    "sha256": "038ed40fc50abba7a5f32fc81af5ead95d101e9617714284f746a901d39ff20a",
+    "installerProductName": "DroneDream-Field",
+    "displayName": "DroneDream · FIELD",
+    "bundleIdentifier": "io.dronedream.desktop.field",
+    "appUserModelId": "io.dronedream.desktop.field",
+    "commonCoexistenceContractSha256": "1af65a86d4f77add7d16d21fe257b7052cb5138de68b6eb3f111f0a32d17bd38",
+    "fieldHostContractSha256": "117e4919322813f43220e947e3ba312d9f4793e59332684caf2e0b61ed6db135"
+  },
+  "brand": {
+    "canonicalDonorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "fieldLockupSha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+    "fieldWindowsIconSha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",
+    "presentationOnly": true
+  },
+  "verification": {
+    "donorReportedPytestCount": 23,
+    "localCollectedCommonPytestCount": 21,
+    "localCommonPytestPassed": 21,
+    "localFieldUnittestPassed": 79,
+    "ruffCommonPathsPassed": true,
+    "vendoredNsisTemplatePassed": true,
+    "middleDotCodePoint": "U+00B7",
+    "gitDiffCheckPassed": true,
+    "exeBuilt": false,
+    "installerExecuted": false,
+    "deviceEnumerated": false,
+    "networkRequested": false
+  },
+  "frozenArtifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "productSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "status": "superseded-preview",
+    "releaseReady": false,
+    "websiteReady": false
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "buildAllowed": false,
+    "installAllowed": false,
+    "deviceEnumerationAllowed": false,
+    "hardwareActionsAllowed": false,
+    "simulationAllowed": false,
+    "releaseBranchAllowed": false,
+    "websiteHandoffAllowed": false
+  },
+  "remainingGates": [
+    "field.auth.awaiting-exact-universal-donor",
+    "field.new-preview-build.requires-yellow",
+    "field.dynamic-lifecycle.requires-new-artifact",
+    "field.website-handoff.requires-release-ready-artifact"
+  ]
+}
