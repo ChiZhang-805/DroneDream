@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-request-origin-source-audit",
+  "editionId": "lab",
+  "artifactProductSourceCommit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+  "auditEvidenceBaseCommit": "f4e6c5650370670906c4c22facbea168c15730e4",
+  "scope": [
+    "packaged Lab application startup",
+    "launcher Settings open",
+    "EN and ZH Settings transition"
+  ],
+  "origins": [
+    {
+      "id": "tauri-app-assets",
+      "sourcePaths": [
+        "frontend/src/main.tsx",
+        "frontend/src/styles.css",
+        "frontend/src/components/BrandLockup.tsx"
+      ],
+      "originClass": "tauri-app-origin-or-embedded-resource",
+      "trigger": "packaged application document and static asset load",
+      "expectedDuringSegmentA": true,
+      "networkAuthority": false
+    },
+    {
+      "id": "tauri-ipc",
+      "sourcePaths": [
+        "frontend/src/desktop/bridge.ts",
+        "frontend/src/desktop/updater.ts"
+      ],
+      "originClass": "tauri-ipc-origin",
+      "trigger": "native command or plugin invocation, including automatic updater check",
+      "expectedDuringSegmentA": true,
+      "externalProviderOrigin": false,
+      "networkAuthority": false
+    },
+    {
+      "id": "updater-external-endpoint",
+      "sourcePaths": [
+        "frontend/src/desktop/updater.ts",
+        "desktop/src-tauri/tauri.lab-preview.conf.json"
+      ],
+      "originClass": "external-update-origin",
+      "trigger": "automatic packaged desktop updater check on AppUpdaterProvider mount",
+      "expectedDuringSegmentA": "possible-through-native-plugin",
+      "segmentADecision": "deny-and-persist-redacted-classification",
+      "networkAuthority": false
+    },
+    {
+      "id": "desktop-auth-provider",
+      "sourcePaths": [
+        "frontend/src/features/auth/AuthContext.tsx",
+        "frontend/src/features/auth/supabaseClient.ts"
+      ],
+      "originClass": "external-supabase-auth-origin",
+      "trigger": "desktop auth activation after explicit user sign-in action",
+      "expectedDuringSegmentA": false,
+      "segmentADecision": "deny",
+      "networkAuthority": false
+    },
+    {
+      "id": "settings-cloud-model",
+      "sourcePaths": [
+        "frontend/src/AppShell.tsx",
+        "frontend/src/features/settings/cloudModelAccess.ts"
+      ],
+      "originClass": "external-supabase-function-origin",
+      "trigger": "Settings mount only when an authenticated account uses platform model access",
+      "expectedDuringSegmentA": false,
+      "segmentADecision": "deny",
+      "networkAuthority": false
+    },
+    {
+      "id": "settings-local-backend",
+      "sourcePaths": [
+        "frontend/src/AppShell.tsx",
+        "frontend/src/api/client.ts"
+      ],
+      "originClass": "local-loopback",
+      "trigger": "Settings experience preferences only when desktop runtime access is ready",
+      "expectedDuringSegmentA": false,
+      "segmentADecision": "allow-loopback-without-starting-runtime",
+      "networkAuthority": false
+    },
+    {
+      "id": "settings-pricing-link",
+      "sourcePaths": [
+        "frontend/src/AppShell.tsx"
+      ],
+      "originClass": "external-browser-origin",
+      "trigger": "explicit user click only",
+      "expectedDuringSegmentA": false,
+      "segmentADecision": "deny-browser-launch",
+      "networkAuthority": false
+    },
+    {
+      "id": "configured-model-provider",
+      "sourcePaths": [
+        "frontend/src/features/settings/ModelAccessProvider.tsx"
+      ],
+      "originClass": "external-model-provider-origin",
+      "trigger": "model operation after explicit provider configuration and user action",
+      "expectedDuringSegmentA": false,
+      "segmentADecision": "deny",
+      "networkAuthority": false
+    }
+  ],
+  "conclusion": {
+    "settingsSurfaceDirectNetworkCall": false,
+    "automaticUpdaterCheckPresent": true,
+    "desktopAuthDeferredUntilExplicitActivation": true,
+    "externalOriginAllowlistForSegmentA": [],
+    "unknownOrExternalRequestDecision": "fail-closed",
+    "productNetworkSemanticsChangedByAudit": false
+  }
+}

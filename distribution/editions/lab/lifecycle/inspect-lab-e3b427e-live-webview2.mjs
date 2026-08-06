@@ -3,6 +3,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 
+import {
+  classifyRequest,
+  requestDiagnosticsEvidence,
+} from "./lab-request-origin-diagnostics.mjs";
+
 const require = createRequire(import.meta.url);
 const { chromium } = require("../../../../frontend/node_modules/playwright");
 const { PNG } = require("../../../../frontend/node_modules/pngjs");
@@ -22,28 +27,34 @@ if (!/^(fresh|overlay)$/.test(phase)) {
 
 const LAB_GRADIENT = ["#A7E84A", "#20C77A", "#087E69"];
 const LAB_APP_SHELL_SELECTOR = 'html[data-brand-edition="lab"] .app-shell';
-const authPattern = /(?:\/auth\/v1\/|oauth|authorize|token|session)/i;
 const observedRequests = [];
 const forbiddenAuthRequests = [];
 const forbiddenProviderRequests = [];
+const requestDiagnosticsPath = resolve(
+  dirname(outputPath),
+  `${phase}-request-diagnostics.json`,
+);
 let browser;
 
-function isLocalAppRequest(rawUrl) {
-  if (/^(?:data|blob|tauri):/i.test(rawUrl)) return true;
-  try {
-    const url = new URL(rawUrl);
-    return ["tauri.localhost", "127.0.0.1", "localhost"].includes(url.hostname);
-  } catch {
-    return false;
-  }
+function recordRequest(rawUrl, metadata = {}) {
+  const record = classifyRequest(rawUrl, {
+    cdpEndpoint: endpoint,
+    ...metadata,
+  });
+  observedRequests.push(record);
+  if (record.authSensitive) forbiddenAuthRequests.push(record);
+  if (record.decision === "deny") forbiddenProviderRequests.push(record);
 }
 
-function recordRequest(rawUrl) {
-  observedRequests.push(rawUrl);
-  if (authPattern.test(rawUrl)) forbiddenAuthRequests.push(rawUrl);
-  if (/^https?:/i.test(rawUrl) && !isLocalAppRequest(rawUrl)) {
-    forbiddenProviderRequests.push(rawUrl);
-  }
+function persistRequestDiagnostics(status, failureClass = null) {
+  const evidence = requestDiagnosticsEvidence(observedRequests, {
+    phase,
+    status,
+    failureClass,
+  });
+  mkdirSync(dirname(requestDiagnosticsPath), { recursive: true });
+  writeFileSync(requestDiagnosticsPath, `${JSON.stringify(evidence, null, 2)}\n`, "utf8");
+  return evidence;
 }
 
 function pngStats(buffer) {
@@ -81,11 +92,23 @@ try {
   const page = pages.find((candidate) => !candidate.url().startsWith("devtools://"));
   if (!page) throw new Error("No inspectable DroneDream WebView2 page was found.");
 
-  page.on("request", (request) => recordRequest(request.url()));
+  page.on("request", (request) => recordRequest(request.url(), {
+    resourceType: request.resourceType(),
+    observationSource: "playwright-request",
+    isNavigationRequest: request.isNavigationRequest(),
+  }));
   const priorResourceUrls = await page.evaluate(() =>
-    performance.getEntriesByType("resource").map((entry) => entry.name),
+    performance.getEntriesByType("resource").map((entry) => ({
+      name: entry.name,
+      initiatorType: entry.initiatorType,
+    })),
   );
-  for (const url of priorResourceUrls) recordRequest(url);
+  for (const resource of priorResourceUrls) {
+    recordRequest(resource.name, {
+      resourceType: resource.initiatorType,
+      observationSource: "performance-resource",
+    });
+  }
 
   await page.waitForSelector(LAB_APP_SHELL_SELECTOR, {
     state: "visible",
@@ -232,7 +255,7 @@ try {
     /auth|oauth|token|session/i.test(key),
   );
   if (authStorageKeys.length !== 0) {
-    throw new Error(`Segment A found forbidden auth/session storage keys: ${authStorageKeys.join(", ")}`);
+    throw new Error("Segment A found forbidden auth/session storage keys.");
   }
 
   await page.waitForTimeout(500);
@@ -243,6 +266,8 @@ try {
     throw new Error("Segment A observed a forbidden non-local provider request.");
   }
 
+  const requestDiagnostics = persistRequestDiagnostics("passed");
+
   const screenshotPath = resolve(dirname(outputPath), `${phase}-lab-webview2.png`);
   mkdirSync(dirname(outputPath), { recursive: true });
   await page.screenshot({ path: screenshotPath, fullPage: false });
@@ -250,9 +275,17 @@ try {
   const result = {
     schemaVersion: 1,
     phase,
-    endpoint,
-    pageUrl: page.url(),
-    title: await page.title(),
+    cdpOrigin: classifyRequest(endpoint, {
+      cdpEndpoint: endpoint,
+      resourceType: "document",
+      observationSource: "playwright-request",
+    }),
+    pageLocation: classifyRequest(page.url(), {
+      cdpEndpoint: endpoint,
+      resourceType: "document",
+      observationSource: "playwright-request",
+      isNavigationRequest: true,
+    }),
     initialLocale,
     finalLocale: targetLocale,
     languageTransitionCount: 1,
@@ -276,9 +309,13 @@ try {
       existingRuntimeReadOnly: true,
       installRepairOrUpdateCount: 0,
     },
-    storage,
+    storageKeyCounts: {
+      local: storage.local.length,
+      session: storage.session.length,
+    },
     authStorageKeyCount: 0,
-    observedRequestCount: observedRequests.length,
+    requestDiagnosticsPath,
+    observedRequestCount: requestDiagnostics.observedCount,
     forbiddenAuthRequestCount: 0,
     forbiddenProviderRequestCount: 0,
     browserLaunchCount: 0,
@@ -290,6 +327,14 @@ try {
   };
   writeFileSync(outputPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
   console.log(JSON.stringify(result));
+} catch (error) {
+  const failureClass = forbiddenAuthRequests.length > 0
+    ? "forbidden-auth-sensitive-request"
+    : forbiddenProviderRequests.length > 0
+      ? "forbidden-external-or-unknown-request"
+      : "live-inspector-assertion-failed";
+  persistRequestDiagnostics("failed", failureClass);
+  throw error;
 } finally {
   if (browser) await browser.close();
 }

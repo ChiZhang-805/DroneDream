@@ -58,6 +58,7 @@ $localAppData = Join-Path $env:LOCALAPPDATA $bundleId
 $desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "$displayName.lnk"
 $startMenuShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "$displayName.lnk"
 $inspector = Join-Path $PSScriptRoot "inspect-lab-e3b427e-live-webview2.mjs"
+$requestDiagnosticsClassifier = Join-Path $PSScriptRoot "lab-request-origin-diagnostics.mjs"
 $adapterPath = $MyInvocation.MyCommand.Path
 
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
@@ -87,6 +88,7 @@ $targetReceiptSha256 = (
 ).Hash.ToLowerInvariant()
 $adapterSha256 = Get-LfNormalizedSha256 -Path $adapterPath
 $inspectorSha256 = Get-LfNormalizedSha256 -Path $inspector
+$requestDiagnosticsClassifierSha256 = Get-LfNormalizedSha256 -Path $requestDiagnosticsClassifier
 if ($installerItem.Length -ne $ExpectedInstallerBytes -or $installerSha256 -cne $ExpectedInstallerSha256) {
     throw "The exact frozen Lab installer identity does not match the application."
 }
@@ -113,8 +115,10 @@ if ($applicationContract.artifact.sha256 -cne $ExpectedInstallerSha256 -or
     throw "The RED application is not bound to the exact frozen Lab artifact."
 }
 if ($applicationContract.executionTools.adapter.lfNormalizedSha256 -cne $adapterSha256 -or
-    $applicationContract.executionTools.liveInspector.lfNormalizedSha256 -cne $inspectorSha256) {
-    throw "The RED application is not bound to the exact execution adapter and live inspector."
+    $applicationContract.executionTools.liveInspector.lfNormalizedSha256 -cne $inspectorSha256 -or
+    $applicationContract.executionTools.requestDiagnosticsClassifier.lfNormalizedSha256 -cne
+        $requestDiagnosticsClassifierSha256) {
+    throw "The RED application is not bound to the exact lifecycle diagnostics tools."
 }
 if ($applicationContract.authorization.segmentAExecutionDecision -cne
     "prepared-awaiting-new-exact-red-authorization") {
@@ -124,9 +128,9 @@ if ($applicationContract.authorization.segmentBExecutionDecision -cne
     "deny-before-real-auth-boundary") {
     throw "Segment B must remain fail-closed."
 }
-if ($applicationContract.attempt.segmentAOrdinal -ne 2 -or
+if ($applicationContract.attempt.segmentAOrdinal -ne 3 -or
     $applicationContract.attempt.priorAttemptResult -cne "segment-a-failed-no-retry" -or
-    $applicationContract.ownedIsolation.runId -cne "lab-e3b427e-segment-a-red2" -or
+    $applicationContract.ownedIsolation.runId -cne "lab-e3b427e-segment-a-red3" -or
     [IO.Path]::GetFullPath($applicationContract.ownedIsolation.runRoot).TrimEnd("\") -cne
         $outputPath) {
     throw "The fresh RED attempt ordinal or owned output root binding does not match."
@@ -466,7 +470,8 @@ function Invoke-LiveInspection {
             inspectionPath = $inspectionPath
             initialLocale = $inspection.initialLocale
             finalLocale = $inspection.finalLocale
-            webView2PageUrl = $inspection.pageUrl
+            webView2PageLocation = $inspection.pageLocation
+            requestDiagnosticsPath = $inspection.requestDiagnosticsPath
             brandNaturalWidth = $inspection.brand.naturalWidth
             brandNaturalHeight = $inspection.brand.naturalHeight
             forbiddenAuthRequestCount = 0
@@ -575,8 +580,6 @@ $protectedBefore = $null
 $oldTemp = $env:TEMP
 $oldTmp = $env:TMP
 Assert-FreshPreconditions
-$protectedBefore = Get-ProtectedState
-$counters.protectedStateSnapshots++
 if (-not $Execute) {
     $result = "green-plan-only-preflight-passed-no-execute"
     [ordered]@{
@@ -588,11 +591,14 @@ if (-not $Execute) {
         targetReceiptSha256 = $targetReceiptSha256
         adapterSha256 = $adapterSha256
         liveInspectorSha256 = $inspectorSha256
+        requestDiagnosticsClassifierSha256 = $requestDiagnosticsClassifierSha256
         outputRootCreated = $false
         executionAuthorized = $false
     } | ConvertTo-Json -Depth 5
     exit 0
 }
+$protectedBefore = Get-ProtectedState
+$counters.protectedStateSnapshots++
 try {
 
     New-Item -ItemType Directory -Path $outputPath | Out-Null
@@ -673,6 +679,10 @@ try {
         executionTools = [ordered]@{
             adapter = [ordered]@{ path = $adapterPath; sha256 = $adapterSha256 }
             liveInspector = [ordered]@{ path = $inspector; sha256 = $inspectorSha256 }
+            requestDiagnosticsClassifier = [ordered]@{
+                path = $requestDiagnosticsClassifier
+                sha256 = $requestDiagnosticsClassifierSha256
+            }
         }
         ownedIdentity = [ordered]@{
             productName = $productName

@@ -5,14 +5,17 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LIFECYCLE = ROOT / "distribution/editions/lab/lifecycle"
-APPLICATION = LIFECYCLE / "red-e3b427e-app-only-application-v2.v1.json"
-COMMAND = LIFECYCLE / "red-e3b427e-app-only-command-v2.v1.json"
+APPLICATION = LIFECYCLE / "red-e3b427e-app-only-application-v3.v1.json"
+COMMAND = LIFECYCLE / "red-e3b427e-app-only-command-v3.v1.json"
 PLAN = LIFECYCLE / "red-e3b427e-app-only-plan.v1.json"
 TARGET = LIFECYCLE / "red-e3b427e-app-only-target-receipt.v1.json"
 ADAPTER = LIFECYCLE / "run-lab-e3b427e-app-only-lifecycle.ps1"
 INSPECTOR = LIFECYCLE / "inspect-lab-e3b427e-live-webview2.mjs"
 SELECTOR_FIXTURE = LIFECYCLE / "verify-lab-e3b427e-selector-v2.mjs"
-CONSUMED_COMMAND = LIFECYCLE / "red-e3b427e-app-only-command.v1.json"
+REQUEST_DIAGNOSTICS = LIFECYCLE / "lab-request-origin-diagnostics.mjs"
+REQUEST_FIXTURE = LIFECYCLE / "verify-lab-e3b427e-request-diagnostics-v3.mjs"
+SOURCE_AUDIT = LIFECYCLE / "request-origin-source-audit.v1.json"
+CONSUMED_COMMAND = LIFECYCLE / "red-e3b427e-app-only-command-v2.v1.json"
 FAILURE_RECEIPT = (
     ROOT
     / "distribution/build-receipts/"
@@ -62,7 +65,8 @@ def test_application_binds_exact_product_artifact_plan_target_and_tools() -> Non
     for key, path in (
         ("adapter", ADAPTER),
         ("liveInspector", INSPECTOR),
-        ("selectorFixture", SELECTOR_FIXTURE),
+        ("requestDiagnosticsClassifier", REQUEST_DIAGNOSTICS),
+        ("requestDiagnosticsFixture", REQUEST_FIXTURE),
     ):
         tool = application["executionTools"][key]
         assert tool["lfNormalizedBytes"] == len(_lf_bytes(path))
@@ -100,11 +104,11 @@ def test_application_and_command_freeze_exact_counts_without_execution() -> None
         assert counts[forbidden_count] == 0
 
     assert application["authorization"]["executionAuthorized"] is False
-    assert application["attempt"]["segmentAOrdinal"] == 2
+    assert application["attempt"]["segmentAOrdinal"] == 3
     assert application["attempt"]["priorCommandConsumed"] is True
     assert command["authorization"]["redCommandAuthorizedNow"] is False
     assert command["executedCounts"] == {
-        "selectorFixtureInvocations": 1,
+        "requestDiagnosticsFixtureInvocations": 1,
         "planOnlyCommandInvocations": 1,
         "redCommandInvocations": 0,
         "installerInvocations": 0,
@@ -133,10 +137,14 @@ def test_command_contract_binds_application_and_separates_plan_only_from_red() -
     for tool, path in (
         ("adapter", ADAPTER),
         ("liveInspector", INSPECTOR),
-        ("selectorFixture", SELECTOR_FIXTURE),
+        ("requestDiagnosticsClassifier", REQUEST_DIAGNOSTICS),
+        ("requestDiagnosticsFixture", REQUEST_FIXTURE),
     ):
         assert command["tools"][tool]["lfNormalizedSha256"] == _lf_sha256(path)
-    assert command["attempt"]["segmentAOrdinal"] == 2
+    assert command["tools"]["requestOriginSourceAudit"]["sha256"] == _sha256(
+        SOURCE_AUDIT
+    )
+    assert command["attempt"]["segmentAOrdinal"] == 3
     assert command["attempt"]["priorCommandConsumed"] is True
     assert command["attempt"]["priorCommandSha256"] == _sha256(CONSUMED_COMMAND)
 
@@ -144,12 +152,13 @@ def test_command_contract_binds_application_and_separates_plan_only_from_red() -
 def test_adapter_has_a_no_write_plan_only_gate_and_owned_a1_a2_a3_sequence() -> None:
     source = ADAPTER.read_text(encoding="utf-8-sig")
     plan_gate = source.index("if (-not $Execute)")
+    protected_snapshot = source.index("$protectedBefore = Get-ProtectedState", plan_gate)
     execution_try = source.index("try {", plan_gate)
     first_execution_write = source.index(
         "New-Item -ItemType Directory -Path $outputPath", execution_try
     )
 
-    assert plan_gate < execution_try < first_execution_write
+    assert plan_gate < protected_snapshot < execution_try < first_execution_write
     assert "green-plan-only-preflight-passed-no-execute" in source
     assert "outputRootCreated = $false" in source
     assert "exit 0" in source[plan_gate:first_execution_write]
@@ -164,6 +173,8 @@ def test_adapter_has_a_no_write_plan_only_gate_and_owned_a1_a2_a3_sequence() -> 
         "$counters.protectedStateSnapshots++",
         "$counters.protectedStateParityChecks++",
         "segment-a-failed-no-retry",
+        '"lab-e3b427e-segment-a-red3"',
+        "$requestDiagnosticsClassifierSha256",
     ):
         assert fragment in source
     for forbidden in (
@@ -197,12 +208,17 @@ def test_live_inspector_asserts_settings_lab_theme_3d_and_zero_provider() -> Non
         "grantsHardwareAuthority",
         "existingRuntimeReadOnly: true",
         "forbiddenProviderRequestCount: 0",
+        "persistRequestDiagnostics",
+        "requestDiagnosticsPath",
+        "pageLocation: classifyRequest(page.url()",
         "providerTokenExchangeCount: 0",
         "browserLaunchCount: 0",
     ):
         assert fragment in source
     assert "chromium.launch" not in source
     assert "page.goto(" not in source
+    assert "pageUrl: page.url()" not in source
+    assert "observedRequests.push(rawUrl)" not in source
     assert ".click();" in source  # Settings and language only.
     assert "sign in" not in source.casefold()
 
@@ -230,6 +246,50 @@ def test_selector_fixture_accepts_lab_and_rejects_drift_without_browser() -> Non
         },
         {"id": "missing-app-shell", "expected": False, "accepted": False},
     ]
+
+
+def test_request_diagnostics_fixture_classifies_and_redacts_without_browser() -> None:
+    result = subprocess.run(
+        ["node.exe", str(REQUEST_FIXTURE)],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["fixtureCount"] == 9
+    assert payload["allowedCount"] == 5
+    assert payload["deniedCount"] == 4
+    assert payload["authSensitiveCount"] == 2
+    assert payload["redactionPassed"] is True
+    decisions = {item["id"]: item for item in payload["results"]}
+    assert decisions["tauri-app-asset"]["decision"] == "allow"
+    assert decisions["tauri-ipc-http-origin"]["hostClass"] == "tauri-ipc-origin"
+    assert decisions["exact-execution-cdp"]["hostClass"] == "execution-owned-cdp"
+    assert decisions["external-supabase"]["decision"] == "deny"
+    assert decisions["external-model-api"]["decision"] == "deny"
+    assert decisions["unknown-scheme"]["decision"] == "deny"
+
+
+def test_request_origin_source_audit_keeps_external_origins_fail_closed() -> None:
+    audit = _load(SOURCE_AUDIT)
+    origins = {item["id"]: item for item in audit["origins"]}
+
+    assert audit["artifactProductSourceCommit"] == (
+        "e3b427e9d1d6209495d629c399a1962913f2d00c"
+    )
+    assert origins["tauri-ipc"]["expectedDuringSegmentA"] is True
+    assert origins["updater-external-endpoint"]["segmentADecision"] == (
+        "deny-and-persist-redacted-classification"
+    )
+    assert origins["desktop-auth-provider"]["expectedDuringSegmentA"] is False
+    assert origins["settings-cloud-model"]["segmentADecision"] == "deny"
+    assert origins["settings-local-backend"]["originClass"] == "local-loopback"
+    assert audit["conclusion"]["externalOriginAllowlistForSegmentA"] == []
+    assert audit["conclusion"]["unknownOrExternalRequestDecision"] == "fail-closed"
+    assert audit["conclusion"]["productNetworkSemanticsChangedByAudit"] is False
 
 
 def test_zero_pack_deny_and_protected_parity_are_explicit() -> None:
