@@ -1,8 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { DroneDreamAccount } from "../features/auth/AuthContext";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { SiteApp } from "../site/SiteApp";
+import { oauthConsentPath } from "../site/oauthConsent";
 import { websiteAuthUrl } from "../site/websiteAuth";
 
 const authState = vi.hoisted(() => ({
@@ -11,6 +13,10 @@ const authState = vi.hoisted(() => ({
     configured: true,
     loading: false,
     account: null,
+  } as {
+    configured: boolean;
+    loading: boolean;
+    account: DroneDreamAccount | null;
   },
 }));
 
@@ -52,6 +58,11 @@ describe("website account navigation", () => {
     });
     authState.signInWithPassword.mockReset();
     authState.signInWithPassword.mockResolvedValue(undefined);
+    authState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
     desktopInvoke.mockReset();
   });
 
@@ -122,6 +133,44 @@ describe("website account navigation", () => {
 
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
     expect(screen.getByText(/each require an explicit Sign in click/i)).toBeVisible();
+    expect(desktopInvoke).not.toHaveBeenCalled();
+  });
+
+  it("preserves an OAuth authorization identifier through website sign-in", async () => {
+    const authorizationId = "authorization_1234567890abcdef";
+    window.history.replaceState(null, "", oauthConsentPath(authorizationId));
+
+    renderSite();
+
+    await waitFor(() => expect(window.location.pathname).toBe("/account/"));
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    expect(returnTo).toBe(oauthConsentPath(authorizationId));
+    authState.signInWithPassword.mockImplementationOnce(async () => {
+      authState.current = {
+        configured: true,
+        loading: false,
+        account: {
+          id: "user-1",
+          email: "pilot@example.test",
+          displayName: "Pilot",
+          avatarUrl: null,
+        },
+      };
+    });
+
+    fireEvent.change(screen.getByLabelText("Email address"), {
+      target: { value: "pilot@example.test" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "safe-password" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/oauth/consent/");
+      expect(new URLSearchParams(window.location.search).get("authorization_id"))
+        .toBe(authorizationId);
+    });
     expect(desktopInvoke).not.toHaveBeenCalled();
   });
 

@@ -1,4 +1,13 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
@@ -12,6 +21,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { sensitiveCloudActionsAllowed } from "../security/sensitiveOrigin";
 import { CommunityPage } from "./CommunityPage";
 import { ManualPage } from "./ManualPage";
+import { OAuthConsentPage } from "./OAuthConsentPage";
 import { PricingPage } from "./PricingPage";
 import { ProductPage } from "./ProductPage";
 import {
@@ -31,6 +41,10 @@ import {
   isWebsiteRelease,
   type WebsiteRelease,
 } from "./release";
+import {
+  oauthAuthorizationId,
+  oauthConsentPath,
+} from "./oauthConsent";
 import {
   type WebsiteAuthMode,
   websiteAuthReturnPath,
@@ -824,6 +838,8 @@ export function SiteApp({
       ? "pricing"
       : path === "/community"
         ? "community"
+        : path === "/oauth/consent"
+          ? "oauth-consent"
         : path === "/account"
           ? "account"
           : "home";
@@ -832,6 +848,7 @@ export function SiteApp({
     ? "all"
     : "recent";
   const authReturnPath = websiteAuthReturnPath(currentSiteUrl.searchParams);
+  const currentOAuthAuthorizationId = oauthAuthorizationId(currentSiteUrl.searchParams);
 
   useEffect(() => {
     document.title = copy.metaTitle;
@@ -998,13 +1015,19 @@ export function SiteApp({
   };
 
   const closeMenu = () => setMenuOpen(false);
-  const navigateWithinSite = (target: string, replace = false) => {
+  const navigateWithinSite = useCallback((target: string, replace = false) => {
     if (replace) window.history.replaceState(null, "", target);
     else window.history.pushState(null, "", target);
     setSiteLocation(`${window.location.pathname}${window.location.search}`);
     setMenuOpen(false);
     window.scrollTo({ top: 0 });
-  };
+  }, []);
+  const requireOAuthSignIn = useCallback((authorizationId: string) => {
+    navigateWithinSite(
+      websiteAuthUrl("sign-in", oauthConsentPath(authorizationId)),
+      true,
+    );
+  }, [navigateWithinSite]);
   const openAccount = (
     mode: WebsiteAuthMode = "sign-in",
     returnPath = "/",
@@ -1427,7 +1450,16 @@ export function SiteApp({
       </header>
 
       <main id="main-content">
-        {sitePage === "account" && accountCommunityActionsEnabled ? (
+        {sitePage === "oauth-consent" ? (
+          <OAuthConsentPage
+            locale={locale}
+            account={auth.account}
+            authLoading={auth.loading}
+            cloudActionsEnabled={sensitiveCloudActionsEnabled}
+            authorizationId={currentOAuthAuthorizationId}
+            onRequireSignIn={requireOAuthSignIn}
+          />
+        ) : sitePage === "account" && accountCommunityActionsEnabled ? (
           authPage
         ) : sitePage === "manual" ? (
           <ManualPage locale={locale} />

@@ -1,3 +1,5 @@
+import { isSafeOAuthConsentReturnPath } from "./oauthConsent";
+
 const SAFE_WEBSITE_AUTH_RETURN_PATHS = new Set([
   "/",
   "/community/",
@@ -8,7 +10,10 @@ const SAFE_WEBSITE_AUTH_RETURN_PATHS = new Set([
 export type WebsiteAuthMode = "sign-in" | "register";
 
 function safeWebsiteAuthReturnPath(candidate: string | null): string {
-  return candidate && SAFE_WEBSITE_AUTH_RETURN_PATHS.has(candidate)
+  return candidate && (
+    SAFE_WEBSITE_AUTH_RETURN_PATHS.has(candidate)
+    || isSafeOAuthConsentReturnPath(candidate)
+  )
     ? candidate
     : "/";
 }
