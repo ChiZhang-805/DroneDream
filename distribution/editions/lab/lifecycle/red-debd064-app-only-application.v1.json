@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-red-app-only-lifecycle-application",
+  "applicationVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "prepared-not-executed",
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "debd0647c5883ffe5c9c52037d35a6b567d9fd62",
+    "artifactProductSourceTree": "fa28c390a33835f30d1d7bf88e2b36e68df7f340",
+    "preparationBaseCommit": "e510933109b31133ccbf8a5cd4fe515ba3913b71",
+    "applicationEvidenceCommitPolicy": "commit-containing-this-application-and-test",
+    "applicationEvidenceIsArtifactSource": false,
+    "productRuntimeSemanticsChanged": false,
+    "allowedPostArtifactChangedPaths": [
+      "desktop/scripts/build-windows-llvm.ps1",
+      "desktop/scripts/release-build-driver.psm1",
+      "desktop/scripts/verify-release-source-policy.mjs",
+      "desktop/scripts/verify-updater-signing-contract.ps1",
+      "distribution/build-receipts/lab-preview-1.0.0-debd064-yellow-attempt6.exact-artifact.json",
+      "distribution/tests/test_shared_windows_build_contract.py"
+    ],
+    "unchangedProductSurfaces": [
+      "frontend",
+      "backend",
+      "runtime",
+      "desktop/src-tauri",
+      "distribution/editions/lab.v1.json",
+      "brand"
+    ]
+  },
+  "artifact": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\debd064-yellow-attempt6\\artifact\\DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12080017,
+    "sha256": "b5969f2f287cf729450618e6d3a8232f426b1ac4cbe5c3662904d31bab215a48",
+    "version": "1.0.0",
+    "authenticodeStatus": "NotSigned",
+    "buildReceiptPath": "distribution/build-receipts/lab-preview-1.0.0-debd064-yellow-attempt6.exact-artifact.json",
+    "externalReceiptSha256": "85cf862870bb9ece1ac5561517aea2b87704cd6b38a2ef5bfa1960028f2b3876",
+    "updaterSignatureSha256": "1034d2f0223ac23795fdc258bb03015c7e4b3e91b11973070daa1d59a56cd233",
+    "mayBeRebuiltOrRelabeledByThisApplication": false
+  },
+  "compiledEvidence": {
+    "generatedNsiPath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target\\x86_64-pc-windows-gnullvm\\release\\nsis\\x64\\installer.nsi",
+    "generatedNsiBytes": 40699,
+    "generatedNsiSha256": "f695086b4f1b0b527e4e855c529fc91fbc7c54a43e030891ebde9fd2779fc854",
+    "overlayBlobAtProductSource": "a30178ccad9c8dfae20cd4d1a742832d2809ff5f",
+    "editionIdentityBlobAtProductSource": "b08c552a6b54f1b74535ee5994cc863b88eb1ed8",
+    "installerTemplateBlobAtProductSource": "ec46a06bf5dfe418ab1e004b8e2bc56c7e184230",
+    "browserAuthBlobAtProductSource": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+    "coexistenceBlobAtProductSource": "20f3028c7b8b7a3be897b39305c38e464967a5e9",
+    "editionManifestBlobAtProductSource": "6b6667901a10647e9bde3f3f3cc1640c2ac43262"
+  },
+  "identity": {
+    "internalProductName": "DroneDream-Lab",
+    "displayName": "DroneDream · LAB",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "appUserModelId": "io.dronedream.desktop.lab",
+    "installMode": "currentUser",
+    "installRoot": "%LOCALAPPDATA%/DroneDream-Lab",
+    "uninstallRegistryKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Lab",
+    "productRegistryKey": "HKCU/Software/DroneDream/DroneDream-Lab",
+    "mainBinaryName": "drone-dream-desktop.exe",
+    "desktopShortcut": "%USERPROFILE%/Desktop/DroneDream · LAB.lnk",
+    "startMenuShortcut": "%APPDATA%/Microsoft/Windows/Start Menu/Programs/DroneDream · LAB.lnk",
+    "roamingAppData": "%APPDATA%/io.dronedream.desktop.lab",
+    "localAppData": "%LOCALAPPDATA%/io.dronedream.desktop.lab"
+  },
+  "freshPreflightObserved": {
+    "observedAtUtc": "2026-08-06T14:05:25.0029470Z",
+    "installRootAbsent": true,
+    "roamingAppDataAbsent": true,
+    "localAppDataAbsent": true,
+    "uninstallRegistryKeyAbsent": true,
+    "productRegistryKeyAbsent": true,
+    "desktopShortcutAbsent": true,
+    "startMenuShortcutAbsent": true,
+    "oauthPort49212ListenerCount": 0,
+    "droneDreamProcessCount": 0,
+    "webView2Version": "151.0.4129.59",
+    "mustBeRevalidatedImmediatelyBeforeMutation": true
+  },
+  "ownedMutationSurface": {
+    "runRoot": "%LOCALAPPDATA%/DroneDream-Codex/Lab-RED/{runId}",
+    "paths": [
+      "%LOCALAPPDATA%/DroneDream-Lab",
+      "%APPDATA%/io.dronedream.desktop.lab",
+      "%LOCALAPPDATA%/io.dronedream.desktop.lab",
+      "%USERPROFILE%/Desktop/DroneDream · LAB.lnk",
+      "%APPDATA%/Microsoft/Windows/Start Menu/Programs/DroneDream · LAB.lnk"
+    ],
+    "registryKeys": [
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Lab",
+      "HKCU/Software/DroneDream/DroneDream-Lab"
+    ],
+    "shortcutOwnershipRequiresExactTarget": true,
+    "registryOwnershipRequiresExactIdentity": true
+  },
+  "protectedState": {
+    "parityRequiredAfterEveryStage": true,
+    "otherEditionInstallRoots": [
+      "%LOCALAPPDATA%/DroneDream",
+      "%LOCALAPPDATA%/DroneDream-Universal",
+      "%LOCALAPPDATA%/DroneDream-Sim",
+      "%LOCALAPPDATA%/DroneDream-Field"
+    ],
+    "otherEditionRegistryKeys": [
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream",
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Universal",
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+      "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Field"
+    ],
+    "runtimeRoots": [
+      "C:/DroneDream",
+      "Z:/DroneDream"
+    ],
+    "webView2InstallOrRepairAllowed": false,
+    "runtimeMutationAllowed": false,
+    "otherEditionDeletionAllowed": false
+  },
+  "executionSequence": [
+    "revalidate-exact-artifact-and-fresh-preconditions",
+    "snapshot-protected-state",
+    "fresh-silent-current-user-install-once",
+    "verify-install-registration-shortcuts-icon-and-webview2-parity",
+    "launch-once-and-verify-en-zh-sidebar-launcher-and-hardware-deny",
+    "close-owned-lab-processes",
+    "same-version-silent-update-overlay-once",
+    "verify-overlay-registration-shortcuts-and-owned-files",
+    "launch-once-and-verify-lab-oauth-entry-boundary",
+    "close-owned-lab-processes",
+    "uninstall-once",
+    "verify-owned-residue-policy-and-protected-state-parity"
+  ],
+  "exactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "uninstallerInvocations": 1,
+    "oauthBoundaryChecks": 1,
+    "realTokenExchanges": 0,
+    "artifactBuilds": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0
+  },
+  "oauthBoundary": {
+    "clientIdSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+    "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "redirectUriSha256": "89b7f8cded951255ec63f1dbd1676f769242f258559752c57318f97f266038cb",
+    "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
+    "pkceMethod": "S256",
+    "explicitUserGestureRequired": true,
+    "crossEditionSessionAdoptionAllowed": false,
+    "accountPasswordMayBeRead": false,
+    "existingDefaultBrowserSessionMayBeUsedAutomatically": false,
+    "providerTokenExchangeAllowed": false,
+    "disposableBrowserOrProviderBoundaryProven": false,
+    "missingExecutionPrerequisite": "A disposable browser/provider boundary that cannot adopt an existing account session has not been provided."
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "frontendOrWorkspaceCountsAsAuthority": false
+  },
+  "rollback": {
+    "mechanism": "exact-installed-uninstaller-then-owned-surface-verification",
+    "uninstallerPath": "%LOCALAPPDATA%/DroneDream-Lab/uninstall.exe",
+    "maximumUninstallerInvocations": 1,
+    "manualProtectedStateDeletionAllowed": false,
+    "historicalEvidenceDeletionAllowed": false,
+    "stopAfterFirstFailureWithoutRetry": true
+  },
+  "authorization": {
+    "fourEditionRedIsolationAuthorizationRecorded": true,
+    "thisApplicationAuthorizesArtifactRebuild": false,
+    "thisApplicationAuthorizesProviderCredentialUse": false,
+    "executionDecision": "deny-before-mutation",
+    "executionBlockers": [
+      "disposable-browser-or-provider-boundary-not-proven"
+    ]
+  },
+  "nonClaims": {
+    "installerExecuted": false,
+    "overlayExecuted": false,
+    "applicationLaunched": false,
+    "uninstallerExecuted": false,
+    "providerCalled": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}
