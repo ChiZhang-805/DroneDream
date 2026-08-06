@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-safety-oauth-source-readiness-receipt",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "displayName": "DroneDream · LAB",
+  "state": "green-source-frozen-yellow-blocked",
+  "verifiedAt": "2026-08-06T17:40:06.8639858+08:00",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "fb3afee6b3cc43bcbc0e4fb9118d79fc513051ef",
+    "tree": "4f57b4e5dc62b9683decd7f1f571a44a99ae0868",
+    "statusAtVerification": "clean",
+    "previousProductSource": "6986be42450a79804294a785a6756fcf84affcbc",
+    "previousEvidenceHead": "c331c40f45d227fc511252e04772ee5a2bd39e9c",
+    "evidenceCommitMayBeProductSource": false,
+    "changedPaths": [
+      "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "distribution/build-profiles/lab-preview.v1.json",
+      "distribution/editions/lab/safety-oauth-source-readiness.v1.json",
+      "distribution/editions/lab/universal-donor-requests.v1.json",
+      "distribution/tests/test_lab_coexistence_contract.py",
+      "distribution/tests/test_lab_preview_contract.py",
+      "distribution/tests/test_lab_safety_oauth_readiness.py",
+      "distribution/tools/lab_yellow_readiness_audit.py",
+      "distribution/tools/verify_lab_coexistence_contract.py",
+      "distribution/tools/verify_lab_preview_contract.py",
+      "distribution/tools/verify_lab_safety_oauth_readiness.py"
+    ]
+  },
+  "commonCore": {
+    "authorityBranch": "codex/software",
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "verificationSourceCommit": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "verificationSourceTree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d",
+    "wholeVerificationCommitConsumed": false,
+    "publicCoreImplementationChangedByThisProductCommit": false
+  },
+  "sourceContracts": {
+    "readiness": {
+      "path": "distribution/editions/lab/safety-oauth-source-readiness.v1.json",
+      "sha256": "46cf3bc651de6eafd11cf50c5ad829e8649c3a3f6ab8c8f5b3653eda5e93d683"
+    },
+    "buildProfile": {
+      "path": "distribution/build-profiles/lab-preview.v1.json",
+      "sha256": "f3928cf116ae371fbffd922f5242ca5d4f5f717ea4e2c85c0ebeb35bc7982c6e"
+    },
+    "tauriOverlay": {
+      "path": "desktop/src-tauri/tauri.lab-preview.conf.json",
+      "sha256": "7d18d4a288d1227cbe2c92bcc3cac4ca8a7ee2383a47e1be7f7bdde178c2c27f"
+    },
+    "donorRequests": {
+      "path": "distribution/editions/lab/universal-donor-requests.v1.json",
+      "sha256": "56334f5a7d89dd2663a4e7849f950554c747227732661ae7111473e05f8fffbb"
+    }
+  },
+  "editionSafetyFixture": {
+    "path": "distribution/tests/fixtures/edition-safety-cases.v1.json",
+    "blob": "06731ea2b9ab214e947345473ff0ffcdb95fffa5",
+    "sha256": "9eb9117441f930c8f8240306bc52b3b5001f3e85cc4cf33ebaa790aff547171f",
+    "activeLabManifestSha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67",
+    "fixtureManifestSha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356",
+    "canonicalParameterizedDonorState": "requested-not-delivered",
+    "inMemoryRewriteAcceptedAsEvidence": false,
+    "productionDecision": "deny"
+  },
+  "oauth": {
+    "contractPath": "distribution/desktop/edition-browser-auth.v1.json",
+    "contractBlob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+    "contractSha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+    "authClientId": "dronedream-desktop-lab",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "redirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "credentialVaultNamespace": "DroneDream/Auth/lab/v1",
+    "flow": "hosted-authorization-code-pkce",
+    "pkceMethod": "S256",
+    "offlineContractValid": true,
+    "providerExecutionEvidenceCollected": false,
+    "providerInvoked": false,
+    "actualEnvironmentRead": false
+  },
+  "verification": {
+    "pythonCriticalSuite": {
+      "passed": 116,
+      "deselected": 3,
+      "result": "passed"
+    },
+    "fullBackendRuntimeSafetySuite": {
+      "passed": 23,
+      "failed": 3,
+      "result": "expected-fail-closed-blocker",
+      "failedTests": [
+        "test_test_only_validated_fixture_can_reach_backend_allow",
+        "test_test_only_validated_fixture_can_reach_runtime_allow",
+        "test_backend_allow_runtime_deny_cannot_become_joint_allow"
+      ]
+    },
+    "oauthFrontend": {
+      "filesPassed": 3,
+      "testsPassed": 12,
+      "result": "passed"
+    },
+    "desktopBrowserAuthStaticMatrix": {
+      "editionLocaleViewportCases": 4,
+      "credentialFields": 0,
+      "result": "passed"
+    },
+    "ruff": "passed",
+    "jsonSyntax": "passed",
+    "nsisTemplateGate": "passed-pinned-tauri-2.11.4-static-only",
+    "desktopVersionGate": "passed-1.0.0"
+  },
+  "yellowBuildRequest": {
+    "classification": "YELLOW",
+    "state": "prepared-blocked-not-authorized",
+    "exactProductSource": "fb3afee6b3cc43bcbc0e4fb9118d79fc513051ef",
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop\\scripts\\build-lab-preview.ps1 -Build -Toolchain gnullvm",
+    "fixedEnvironment": {
+      "CARGO_BUILD_JOBS": "2",
+      "DRONEDREAM_DESKTOP_EDITION_ID": "lab",
+      "DRONEDREAM_EDITION_PROFILE": "unified-sim-lab",
+      "VITE_DRONEDREAM_EDITION": "lab",
+      "CARGO_TARGET_DIR": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target"
+    },
+    "publicInputsRequiredWithoutRecordingValues": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY",
+      "DRONEDREAM_OAUTH_CLIENT_ID"
+    ],
+    "artifactFileName": "DroneDream-Lab-1.0.0.exe",
+    "attemptLimit": 1,
+    "serializeWithOtherEditionBuilds": true,
+    "freezeFailureWithoutAutomaticRetry": true,
+    "buildAttemptPerformed": false,
+    "blockers": [
+      "canonical parameterized edition-safety fixture donor is not delivered",
+      "registered public Lab OAuth client and callback have no offline-verifiable external registration receipt",
+      "single-attempt YELLOW execution authorization for this exact product source is pending"
+    ]
+  },
+  "signatureAndLifecycleGates": {
+    "unsignedInternalPreviewMayOnlyBeNotSigned": true,
+    "unsignedInternalPreviewReleaseReady": false,
+    "authenticodeRequiredForRelease": true,
+    "updaterSignatureRequiredForRelease": true,
+    "pendingAfterSuccessfulBuild": [
+      "fresh-install-owned-root",
+      "same-version-overlay-update",
+      "uninstall-preserves-runtime-and-other-editions",
+      "desktop-and-start-menu-shortcuts",
+      "webview2-health",
+      "en-zh",
+      "login-entry-and-callback",
+      "rollback-and-owned-residue",
+      "website-exact-four-file-handoff"
+    ]
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "frontendOrWorkspaceCountsAsAuthority": false
+  },
+  "sideEffects": {
+    "exeBuilt": false,
+    "tauriInvoked": false,
+    "nsisInvoked": false,
+    "installerRun": false,
+    "runtimeMigration": false,
+    "providerReadOrWrite": false,
+    "apiKeyRead": false,
+    "hardwareAccess": false,
+    "releaseBranchCreated": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "releaseReady": false
+}
