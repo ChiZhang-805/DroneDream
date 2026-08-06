@@ -16,41 +16,41 @@
   "productIdentities": [
     {
       "editionId": "universal",
-      "productName": "DroneDream",
+      "productName": "DroneDream-Universal",
       "bundleId": "io.dronedream.desktop",
-      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream",
-      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream",
-      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream",
+      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream-Universal",
+      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Universal",
+      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream-Universal",
       "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream.lnk",
       "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream.lnk"
     },
     {
       "editionId": "sim",
-      "productName": "DroneDream · SIM",
+      "productName": "DroneDream-Sim",
       "bundleId": "io.dronedream.sim",
-      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream · SIM",
-      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · SIM",
-      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream · SIM",
+      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream-Sim",
+      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Sim",
+      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream-Sim",
       "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · SIM.lnk",
       "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · SIM.lnk"
     },
     {
       "editionId": "lab",
-      "productName": "DroneDream · LAB",
+      "productName": "DroneDream-Lab",
       "bundleId": "io.dronedream.desktop.lab",
-      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream · LAB",
-      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · LAB",
-      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream · LAB",
+      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream-Lab",
+      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Lab",
+      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream-Lab",
       "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · LAB.lnk",
       "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · LAB.lnk"
     },
     {
       "editionId": "field",
-      "productName": "DroneDream · FIELD",
+      "productName": "DroneDream-Field",
       "bundleId": "io.dronedream.desktop.field",
-      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream · FIELD",
-      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · FIELD",
-      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream · FIELD",
+      "defaultInstallRoot": "%LOCALAPPDATA%\\DroneDream-Field",
+      "uninstallRegistryKey": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+      "manufacturerRegistryKey": "HKCU\\Software\\DroneDream\\DroneDream-Field",
       "startMenuShortcut": "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk",
       "desktopShortcut": "%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk"
     }
@@ -82,14 +82,14 @@
     },
     {
       "surfaceId": "uninstall-registry",
-      "target": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · FIELD",
+      "target": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
       "operation": "create-replace-delete",
       "collisionBoundary": "field-product-name",
       "rollback": "exact-key-delete-after-value-proof"
     },
     {
       "surfaceId": "manufacturer-registry",
-      "target": "HKCU\\Software\\DroneDream\\DroneDream · FIELD",
+      "target": "HKCU\\Software\\DroneDream\\DroneDream-Field",
       "operation": "create-replace-delete",
       "collisionBoundary": "field-product-name",
       "rollback": "exact-key-delete-after-value-proof"
@@ -110,7 +110,7 @@
     },
     {
       "surfaceId": "autostart-cleanup",
-      "target": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run::DroneDream · FIELD",
+      "target": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run::DroneDream-Field",
       "operation": "delete-if-present-on-uninstall",
       "collisionBoundary": "field-product-name",
       "rollback": "precondition-value-absent"
@@ -155,13 +155,13 @@
   },
   "protectedState": [
     "%LOCALAPPDATA%\\DroneDream",
-    "%LOCALAPPDATA%\\DroneDream · SIM",
-    "%LOCALAPPDATA%\\DroneDream · LAB",
-    "%LOCALAPPDATA%\\DroneDream · FIELD",
+    "%LOCALAPPDATA%\\DroneDream-Sim",
+    "%LOCALAPPDATA%\\DroneDream-Lab",
+    "%LOCALAPPDATA%\\DroneDream-Field",
     "E:\\DroneDream",
     "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream",
-    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · SIM",
-    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream · LAB",
+    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Sim",
+    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Lab",
     "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream.lnk",
     "%USERPROFILE%\\Desktop\\DroneDream.lnk",
     "%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · SIM.lnk",

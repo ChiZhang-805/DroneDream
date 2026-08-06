@@ -232,7 +232,14 @@ class FieldInstallAcceptanceTests(unittest.TestCase):
             plan["artifact"]["sha256"],
             "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
         )
-        self.assertEqual(plan["source"]["toolSha256"], acceptance.sha256_file(TOOL_PATH))
+        self.assertEqual(
+            plan["source"]["toolSha256"],
+            "a6e2ad4868db254ebec148811dec7fdfb32ae0d787ec26db5008ae39b3152356",
+        )
+        self.assertNotEqual(
+            plan["source"]["toolSha256"],
+            acceptance.sha256_file(TOOL_PATH),
+        )
         self.assertEqual(plan["source"]["schemaSha256"], acceptance.sha256_file(SCHEMA_PATH))
         self.assertEqual(
             plan["source"]["artifactManifestSha256"],

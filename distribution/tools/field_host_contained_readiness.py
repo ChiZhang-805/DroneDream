@@ -25,6 +25,7 @@ SCHEMA_PATH = (
 FIELD_CONFIG_PATH = ROOT / "desktop" / "src-tauri" / "tauri.field.conf.json"
 BASE_CONFIG_PATH = ROOT / "desktop" / "src-tauri" / "tauri.conf.json"
 NSIS_PATH = ROOT / "desktop" / "src-tauri" / "nsis" / "installer.nsi"
+NSIS_IDENTITY_PATH = ROOT / "desktop" / "src-tauri" / "nsis" / "edition-identity.nsh"
 HANDOFF_PATH = ROOT / "desktop" / "src-tauri" / "src" / "installer_handoff.rs"
 FIELD_APP_PATH = ROOT / "frontend" / "src" / "field" / "FieldApp.tsx"
 FIELD_SAFETY_PATH = ROOT / "frontend" / "src" / "field" / "safety.ts"
@@ -43,7 +44,8 @@ PLAN_KIND = "dronedream-field-host-contained-install-plan"
 READINESS_KIND = "dronedream-field-host-contained-green-readiness-receipt"
 EXECUTION_KIND = "dronedream-field-host-contained-execution-receipt"
 FIELD_ARTIFACT = "DroneDream-Field-1.0.0.exe"
-FIELD_PRODUCT = "DroneDream · FIELD"
+FIELD_INSTALLER_PRODUCT = "DroneDream-Field"
+FIELD_DISPLAY_NAME = "DroneDream · FIELD"
 FIELD_BUNDLE_ID = "io.dronedream.desktop.field"
 PRODUCT_SOURCE = "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3"
 ARTIFACT_SHA256 = "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317"
@@ -168,10 +170,13 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         values = [item[key].casefold() for item in identities]
         if len(values) != len(set(values)):
             raise FieldHostContainedError(f"edition identity collision: {key}")
-    if identities[-1]["productName"] != FIELD_PRODUCT or identities[-1]["bundleId"] != FIELD_BUNDLE_ID:
+    if (
+        identities[-1]["productName"] != FIELD_INSTALLER_PRODUCT
+        or identities[-1]["bundleId"] != FIELD_BUNDLE_ID
+    ):
         raise FieldHostContainedError("Field product identity drifted")
     if contract["fieldNamespaces"] != {
-        "windowAndDisplayName": FIELD_PRODUCT,
+        "windowAndDisplayName": FIELD_DISPLAY_NAME,
         "appUserModelId": FIELD_BUNDLE_ID,
         "updaterEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/latest/download/field-latest.json",
         "enginePackProfileId": "field-lightweight",
@@ -250,6 +255,7 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
     field = load_json(FIELD_CONFIG_PATH)
     base = load_json(BASE_CONFIG_PATH)
     nsis = NSIS_PATH.read_text(encoding="utf-8")
+    nsis_identity = NSIS_IDENTITY_PATH.read_text(encoding="utf-8")
     handoff = HANDOFF_PATH.read_text(encoding="utf-8")
     field_app = FIELD_APP_PATH.read_text(encoding="utf-8")
     field_safety = FIELD_SAFETY_PATH.read_text(encoding="utf-8")
@@ -261,7 +267,17 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
     def check(check_id: str, passed: bool, evidence: str) -> None:
         checks.append({"checkId": check_id, "passed": passed, "evidence": evidence})
 
-    check("field-product-name", field.get("productName") == FIELD_PRODUCT, "tauri.field.conf.json:productName")
+    check(
+        "field-product-name",
+        field.get("productName") == FIELD_INSTALLER_PRODUCT,
+        "tauri.field.conf.json:productName",
+    )
+    check(
+        "field-display-name",
+        field.get("app", {}).get("windows", [{}])[0].get("title")
+        == FIELD_DISPLAY_NAME,
+        "tauri.field.conf.json:app.windows.title",
+    )
     check("field-bundle-id", field.get("identifier") == FIELD_BUNDLE_ID, "tauri.field.conf.json:identifier")
     check(
         "field-updater-endpoint",
@@ -280,11 +296,21 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
         '!define UNINSTKEY "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\${PRODUCTNAME}"',
         '!define MANUPRODUCTKEY "${MANUKEY}\\${PRODUCTNAME}"',
         'StrCpy $INSTDIR "$LOCALAPPDATA\\${PRODUCTNAME}"',
-        'CreateShortcut "$SMPROGRAMS\\${PRODUCTNAME}.lnk"',
-        'CreateShortcut "$DESKTOP\\${PRODUCTNAME}.lnk"',
+        'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"',
         'DeleteRegValue HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Run" "${PRODUCTNAME}"',
     )
-    check("nsis-product-scoped-writes", all(marker in nsis for marker in required_nsis), "installer.nsi product-scoped markers")
+    required_identity = (
+        '!else if "${PRODUCTNAME}" == "DroneDream-Field"',
+        '!define DRONEDREAM_DISPLAYNAME "DroneDream · FIELD"',
+        '!define DRONEDREAM_SHORTCUTNAME "${DRONEDREAM_DISPLAYNAME}"',
+        '!error "Unknown DroneDream installer PRODUCTNAME:',
+    )
+    check(
+        "nsis-product-scoped-writes",
+        all(marker in nsis for marker in required_nsis)
+        and all(marker in nsis_identity for marker in required_identity),
+        "installer.nsi and edition-identity.nsh product-scoped markers",
+    )
     forbidden_create = ("CreateService", "New-Service", "schtasks /Create", "WriteRegStr HKLM \"Software\\Microsoft\\Windows\\CurrentVersion\\Run")
     check("no-service-task-autorun-create", not any(marker in nsis for marker in forbidden_create), "installer.nsi forbidden create markers")
     check("shared-handoff-identified", 'const RECEIPT_DIRECTORY: &str = "io.dronedream.desktop";' in handoff, "installer_handoff.rs:RECEIPT_DIRECTORY")
@@ -357,7 +383,7 @@ def host_blockers(snapshot: dict[str, Any]) -> list[str]:
     for key in ("fieldStartMenu", "fieldDesktop"):
         if shortcuts[key]["exists"]:
             blockers.append(f"field.host.preexisting-shortcut:{key}")
-    field_run_name = FIELD_PRODUCT
+    field_run_name = FIELD_INSTALLER_PRODUCT
     if field_run_name in registry["fieldAutorun"]["values"]:
         blockers.append("field.host.preexisting-autorun")
     if snapshot["processes"]:

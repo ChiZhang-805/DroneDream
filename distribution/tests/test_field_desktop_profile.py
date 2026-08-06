@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIELD_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.field.conf.json"
 DESKTOP_PACKAGE = ROOT / "desktop" / "package.json"
 BUILD_GATE = ROOT / "desktop" / "scripts" / "verify-field-preview-build-authorization.ps1"
+COEXISTENCE_CONTRACT = ROOT / "distribution" / "desktop" / "edition-coexistence.v1.json"
 
 
 class FieldDesktopProfileTests(unittest.TestCase):
@@ -16,11 +17,24 @@ class FieldDesktopProfileTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.config = json.loads(FIELD_CONFIG.read_text(encoding="utf-8"))
         cls.package = json.loads(DESKTOP_PACKAGE.read_text(encoding="utf-8"))
+        coexistence = json.loads(COEXISTENCE_CONTRACT.read_text(encoding="utf-8"))
+        cls.field_identity = next(
+            edition
+            for edition in coexistence["editions"]
+            if edition["editionId"] == "field"
+        )
 
     def test_field_overlay_uses_the_independent_frontend_and_identity(self) -> None:
-        self.assertEqual(self.config["productName"], "DroneDream · FIELD")
+        self.assertEqual(
+            self.config["productName"],
+            self.field_identity["installerProductName"],
+        )
         self.assertEqual(self.config["version"], "1.0.0")
-        self.assertEqual(self.config["identifier"], "io.dronedream.desktop.field")
+        self.assertEqual(self.config["identifier"], self.field_identity["bundleIdentifier"])
+        self.assertEqual(
+            self.config["app"]["windows"][0]["title"],
+            self.field_identity["displayName"],
+        )
         self.assertEqual(self.config["build"], {
             "beforeDevCommand": "npm run frontend:field-dev",
             "beforeBuildCommand": "npm run frontend:field-build-gated",

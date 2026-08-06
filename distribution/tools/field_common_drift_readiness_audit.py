@@ -60,6 +60,7 @@ FIELD_EVIDENCE_PREFIXES = (
     "artifacts/test-runs/field-preview-",
     "artifacts/test-runs/field-install-acceptance-",
     "artifacts/test-runs/field-host-contained-",
+    "artifacts/test-runs/field-host-phase-",
 )
 FIELD_BRANDING_MANIFEST = Path("distribution/editions/field/branding/source-manifest.v1.json")
 FIELD_TAURI_CONFIG = Path("desktop/src-tauri/tauri.field.conf.json")
@@ -68,6 +69,9 @@ FIELD_VITE_CONFIG = Path("frontend/vite.field.config.ts")
 BASE_TAURI_CONFIG = Path("desktop/src-tauri/tauri.conf.json")
 FIELD_SHORTCUT_PROPOSAL = Path(
     "distribution/editions/field/installer-shortcut-icon-common-core-proposal.v1.json"
+)
+DESKTOP_COEXISTENCE_CONTRACT = Path(
+    "distribution/desktop/edition-coexistence.v1.json"
 )
 
 
@@ -260,6 +264,10 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
     vite_source = (repo_root / FIELD_VITE_CONFIG).read_text(encoding="utf-8")
     proposal_path = repo_root / FIELD_SHORTCUT_PROPOSAL
     proposal = load_json(proposal_path)
+    coexistence = load_json(repo_root / DESKTOP_COEXISTENCE_CONTRACT)
+    field_identity = next(
+        edition for edition in coexistence["editions"] if edition["editionId"] == "field"
+    )
     hook_relative = effective_tauri["bundle"]["windows"]["nsis"]["installerHooks"]
     hook_path = repo_root / "desktop" / "src-tauri" / hook_relative
     hook_source = hook_path.read_text(encoding="utf-8")
@@ -364,8 +372,10 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
     nsis = windows.get("nsis", {})
     webview = windows.get("webviewInstallMode", {})
     consumer_checks = {
-        "displayName": effective_tauri.get("productName") == manifest.get("displayName"),
+        "installerProductName": effective_tauri.get("productName")
+        == field_identity["installerProductName"],
         "windowTitle": effective_tauri.get("app", {}).get("windows", [{}])[0].get("title")
+        == field_identity["displayName"]
         == manifest.get("displayName"),
         "frontendCanonicalLockup": "BrandLockup" in app_source
         and 'edition="field"' in app_source,

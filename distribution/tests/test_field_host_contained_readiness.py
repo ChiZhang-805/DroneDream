@@ -196,8 +196,12 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
             values = [item[key].casefold() for item in identities]
             self.assertEqual(len(values), len(set(values)), key)
         self.assertEqual([item["editionId"] for item in identities], ["universal", "sim", "lab", "field"])
-        self.assertEqual(identities[-1]["productName"], "DroneDream · FIELD")
+        self.assertEqual(identities[-1]["productName"], "DroneDream-Field")
         self.assertEqual(identities[-1]["bundleId"], "io.dronedream.desktop.field")
+        self.assertEqual(
+            contract["fieldNamespaces"]["windowAndDisplayName"],
+            "DroneDream · FIELD",
+        )
         self.assertEqual(contract["fieldNamespaces"]["appUserModelId"], "io.dronedream.desktop.field")
         self.assertTrue(contract["fieldNamespaces"]["updaterEndpoint"].endswith("/field-latest.json"))
         self.assertEqual(contract["fieldNamespaces"]["enginePackProfileId"], "field-lightweight")

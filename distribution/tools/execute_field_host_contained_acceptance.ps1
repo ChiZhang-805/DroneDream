@@ -14,7 +14,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
-$FieldProduct = "DroneDream $([char]0x00b7) FIELD"
+$FieldInstallerProduct = "DroneDream-Field"
+$FieldDisplayName = "DroneDream $([char]0x00b7) FIELD"
 $FieldBundleId = "io.dronedream.desktop.field"
 $FieldIconSha256 = "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559"
 $ChineseTitle = -join ([char[]](0x771F, 0x673A, 0x5C31, 0x7EEA, 0x72B6, 0x6001))
@@ -31,10 +32,10 @@ $InstallRoot = Join-Path $OwnedRoot "install"
 $RedirectedLocal = Join-Path $OwnedRoot "env\LocalAppData"
 $RedirectedRoaming = Join-Path $OwnedRoot "env\RoamingAppData"
 $RedirectedTemp = Join-Path $OwnedRoot "temp"
-$FieldStartMenu = Join-Path $ActualStartMenu "$FieldProduct.lnk"
-$FieldDesktop = Join-Path $ActualDesktop "$FieldProduct.lnk"
-$FieldUninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$FieldProduct"
-$FieldProductKey = "HKCU:\Software\DroneDream\$FieldProduct"
+$FieldStartMenu = Join-Path $ActualStartMenu "$FieldDisplayName.lnk"
+$FieldDesktop = Join-Path $ActualDesktop "$FieldDisplayName.lnk"
+$FieldUninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$FieldInstallerProduct"
+$FieldProductKey = "HKCU:\Software\DroneDream\$FieldInstallerProduct"
 $FieldBundleLocal = Join-Path $ActualLocalAppData "io.dronedream.desktop.field"
 $FieldBundleRoaming = Join-Path $ActualRoamingAppData "io.dronedream.desktop.field"
 $SnapshotTool = Join-Path $PSScriptRoot "capture_field_host_snapshot.ps1"
@@ -327,7 +328,7 @@ function Invoke-FieldUi([string]$PhaseId, [string]$ExpectedTitle, [bool]$SwitchT
         $Counts.applicationLaunch++
         $process = Wait-MainWindow $process.Id
         $window = [System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
-        if ($window.Current.Name -ne $FieldProduct) { throw "Field window identity drifted" }
+        if ($window.Current.Name -ne $FieldDisplayName) { throw "Field window identity drifted" }
         if (-not (Find-UiElementByName $window $ExpectedTitle)) { throw "expected UI title is missing: $ExpectedTitle" }
         $takeover = Find-UiElementByName $window $(if ($ExpectedTitle -eq "Field readiness") { "Request takeover" } else { $ChineseTakeover })
         $emergency = Find-UiElementByName $window $(if ($ExpectedTitle -eq "Field readiness") { "Emergency stop" } else { $ChineseEmergency })
@@ -385,7 +386,7 @@ function Remove-ProvenNewPath([string]$Path) {
 function Remove-ProvenNewRegistry {
     if (Test-Path -LiteralPath $FieldUninstallKey) {
         $item = Get-ItemProperty -LiteralPath $FieldUninstallKey
-        if ([string]$item.DisplayName -ne $FieldProduct) { throw "Field uninstall key ownership proof failed" }
+        if ([string]$item.DisplayName -ne $FieldDisplayName) { throw "Field uninstall key ownership proof failed" }
         Remove-Item -LiteralPath $FieldUninstallKey -Recurse -Force
     }
     if (Test-Path -LiteralPath $FieldProductKey) {
@@ -450,7 +451,7 @@ try {
     $InstallObserved = Test-Path -LiteralPath (Join-Path $InstallRoot "drone-dream-desktop.exe")
     if (-not $InstallObserved) { throw "fresh install did not create the owned executable" }
     $freshRegistry = Get-ItemProperty -LiteralPath $FieldUninstallKey
-    if ([string]$freshRegistry.DisplayName -ne $FieldProduct) { throw "fresh install product identity drifted" }
+    if ([string]$freshRegistry.DisplayName -ne $FieldDisplayName) { throw "fresh install product identity drifted" }
     if ([string]$freshRegistry.InstallLocation -notmatch [regex]::Escape($InstallRoot)) { throw "fresh install root drifted" }
     $freshStartMenu = Assert-FieldShortcut $FieldStartMenu
     $freshDesktop = Assert-FieldShortcut $FieldDesktop

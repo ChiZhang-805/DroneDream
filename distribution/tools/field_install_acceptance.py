@@ -14,7 +14,8 @@ PLAN_KIND = "dronedream-field-isolated-install-acceptance-plan"
 READINESS_KIND = "dronedream-field-isolated-install-green-readiness-receipt"
 EXECUTION_KIND = "dronedream-field-isolated-install-execution-receipt"
 FIELD_ARTIFACT = "DroneDream-Field-1.0.0.exe"
-FIELD_PRODUCT_NAME = "DroneDream · FIELD"
+FIELD_INSTALLER_PRODUCT = "DroneDream-Field"
+FIELD_DISPLAY_NAME = "DroneDream · FIELD"
 FIELD_BUNDLE_ID = "io.dronedream.desktop.field"
 WEBSITE_SOURCE = "afdcdee5b60883290c9d1cc0c036141920066659"
 WEBSITE_EVIDENCE = "1a82e36b362c95983473c4a0d0d967d8c7415f92"
@@ -358,18 +359,18 @@ def create_plan(
             "hostOwnedRoot": host_root,
             "hostEvidenceRoot": host_root + r"\evidence",
             "guestOwnedRoot": r"C:\FieldAcceptance",
-            "guestInstallDirectory": rf"%LOCALAPPDATA%\{FIELD_PRODUCT_NAME}",
+            "guestInstallDirectory": rf"%LOCALAPPDATA%\{FIELD_INSTALLER_PRODUCT}",
             "guestBundleData": [
                 rf"%APPDATA%\{FIELD_BUNDLE_ID}",
                 rf"%LOCALAPPDATA%\{FIELD_BUNDLE_ID}",
             ],
             "guestShortcuts": [
-                rf"%APPDATA%\Microsoft\Windows\Start Menu\Programs\{FIELD_PRODUCT_NAME}.lnk",
-                rf"%USERPROFILE%\Desktop\{FIELD_PRODUCT_NAME}.lnk",
+                rf"%APPDATA%\Microsoft\Windows\Start Menu\Programs\{FIELD_DISPLAY_NAME}.lnk",
+                rf"%USERPROFILE%\Desktop\{FIELD_DISPLAY_NAME}.lnk",
             ],
             "guestRegistryKeys": [
-                rf"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{FIELD_PRODUCT_NAME}",
-                rf"HKCU\Software\DroneDream\{FIELD_PRODUCT_NAME}",
+                rf"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\{FIELD_INSTALLER_PRODUCT}",
+                rf"HKCU\Software\DroneDream\{FIELD_INSTALLER_PRODUCT}",
             ],
             "writesOutsideDisposableGuestAllowed": False,
         },
@@ -382,8 +383,8 @@ def create_plan(
         },
         "phases": phases,
         "shortcutGate": {
-            "target": rf"%LOCALAPPDATA%\{FIELD_PRODUCT_NAME}\drone-dream-desktop.exe",
-            "icon": rf"%LOCALAPPDATA%\{FIELD_PRODUCT_NAME}\icons\DroneDream.ico",
+            "target": rf"%LOCALAPPDATA%\{FIELD_INSTALLER_PRODUCT}\drone-dream-desktop.exe",
+            "icon": rf"%LOCALAPPDATA%\{FIELD_INSTALLER_PRODUCT}\icons\DroneDream.ico",
             "startMenuRequired": True,
             "desktopRequiredWhenSelected": True,
             "appUserModelIdRequired": True,

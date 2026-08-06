@@ -79,6 +79,10 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertTrue(
             any("field-host-contained-" in item["path"] for item in field_evidence)
         )
+        self.assertIn(
+            "artifacts/test-runs/field-host-phase-serialization-clearance-d5d38cd/clearance-receipt.json",
+            {item["path"] for item in field_evidence},
+        )
 
     def test_backflow_plan_excludes_field_specific_contract_implementations(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)
@@ -132,6 +136,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertEqual(structure["simulatorReferences"], [])
         self.assertEqual(structure["verificationErrors"], [])
         self.assertTrue(all(structure["consumerChecks"].values()))
+        self.assertTrue(structure["consumerChecks"]["installerProductName"])
         self.assertLessEqual(
             structure["effectiveResourceBytes"],
             structure["resourceUpperBoundBytes"],

@@ -4,9 +4,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$productName = "DroneDream $([char]0x00b7) FIELD"
-$simProductName = "DroneDream $([char]0x00b7) SIM"
-$labProductName = "DroneDream $([char]0x00b7) LAB"
+$fieldProductName = "DroneDream-Field"
+$fieldDisplayName = "DroneDream $([char]0x00b7) FIELD"
+$simProductName = "DroneDream-Sim"
+$simDisplayName = "DroneDream $([char]0x00b7) SIM"
+$labProductName = "DroneDream-Lab"
+$labDisplayName = "DroneDream $([char]0x00b7) LAB"
 $fieldBundleId = "io.dronedream.desktop.field"
 $local = [Environment]::GetFolderPath("LocalApplicationData")
 $roaming = [Environment]::GetFolderPath("ApplicationData")
@@ -147,7 +150,7 @@ $snapshot = [ordered]@{
         universalInstall = [ordered]@{ path = (Join-Path $local "DroneDream"); digest = Get-TreeDigest (Join-Path $local "DroneDream") }
         simDefaultInstall = [ordered]@{ path = (Join-Path $local $simProductName); digest = Get-TreeDigest (Join-Path $local $simProductName) }
         labDefaultInstall = [ordered]@{ path = (Join-Path $local $labProductName); digest = Get-TreeDigest (Join-Path $local $labProductName) }
-        fieldDefaultInstall = [ordered]@{ path = (Join-Path $local $productName); digest = Get-TreeDigest (Join-Path $local $productName) }
+        fieldDefaultInstall = [ordered]@{ path = (Join-Path $local $fieldProductName); digest = Get-TreeDigest (Join-Path $local $fieldProductName) }
         ownedRoot = [ordered]@{ path = $ownedRoot; digest = Get-TreeDigest $ownedRoot }
         sharedHandoff = [ordered]@{
             path = $sharedHandoffRoot
@@ -166,19 +169,19 @@ $snapshot = [ordered]@{
         universalUninstall = Get-RegistryState "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\DroneDream"
         simUninstall = Get-RegistryState "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$simProductName"
         labUninstall = Get-RegistryState "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$labProductName"
-        fieldUninstall = Get-RegistryState "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$productName"
-        fieldProduct = Get-RegistryState "HKCU:\Software\DroneDream\$productName"
+        fieldUninstall = Get-RegistryState "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$fieldProductName"
+        fieldProduct = Get-RegistryState "HKCU:\Software\DroneDream\$fieldProductName"
         fieldAutorun = Get-RegistryState "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
     }
     shortcuts = [ordered]@{
         universalStartMenu = Get-ShortcutState (Join-Path $startMenu "DroneDream.lnk")
         universalDesktop = Get-ShortcutState (Join-Path $desktop "DroneDream.lnk")
-        simStartMenu = Get-ShortcutState (Join-Path $startMenu "$simProductName.lnk")
-        simDesktop = Get-ShortcutState (Join-Path $desktop "$simProductName.lnk")
-        labStartMenu = Get-ShortcutState (Join-Path $startMenu "$labProductName.lnk")
-        labDesktop = Get-ShortcutState (Join-Path $desktop "$labProductName.lnk")
-        fieldStartMenu = Get-ShortcutState (Join-Path $startMenu "$productName.lnk")
-        fieldDesktop = Get-ShortcutState (Join-Path $desktop "$productName.lnk")
+        simStartMenu = Get-ShortcutState (Join-Path $startMenu "$simDisplayName.lnk")
+        simDesktop = Get-ShortcutState (Join-Path $desktop "$simDisplayName.lnk")
+        labStartMenu = Get-ShortcutState (Join-Path $startMenu "$labDisplayName.lnk")
+        labDesktop = Get-ShortcutState (Join-Path $desktop "$labDisplayName.lnk")
+        fieldStartMenu = Get-ShortcutState (Join-Path $startMenu "$fieldDisplayName.lnk")
+        fieldDesktop = Get-ShortcutState (Join-Path $desktop "$fieldDisplayName.lnk")
     }
     runtime = [ordered]@{
         root = $runtimeRoot
