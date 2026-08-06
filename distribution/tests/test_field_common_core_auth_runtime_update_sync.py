@@ -33,7 +33,8 @@ def _sha256(path: str) -> str:
 def test_receipt_binds_exact_product_donors_and_common_profile_dependencies() -> None:
     receipt = json.loads(RECEIPT.read_text(encoding="utf-8"))
     assert receipt["kind"] == "dronedream-field-common-core-auth-runtime-update-sync-receipt"
-    assert _git("merge-base", "--is-ancestor", receipt["productSource"]["commit"], "HEAD") == ""
+    product_source = receipt["productSource"]["commit"]
+    assert _git("merge-base", "--is-ancestor", product_source, "HEAD") == ""
     for donor in receipt["canonicalProductDonors"]:
         assert _git("merge-base", "--is-ancestor", donor["integrationCommit"], "HEAD") == ""
 
@@ -42,7 +43,7 @@ def test_receipt_binds_exact_product_donors_and_common_profile_dependencies() ->
     assert dependency["benchmarkPathsConsumed"] is False
     for path in dependency["paths"]:
         assert _git("rev-parse", f'{dependency["canonicalCommit"]}:{path}') == _git(
-            "rev-parse", f"HEAD:{path}"
+            "rev-parse", f"{product_source}:{path}"
         )
 
     union = receipt["sharedDonorUnionAudit"]
@@ -50,7 +51,7 @@ def test_receipt_binds_exact_product_donors_and_common_profile_dependencies() ->
     assert len(paths) == union["pathCount"] == 38
     for path in paths:
         assert _git("rev-parse", f'{union["tipCommit"]}:{path}') == _git(
-            "rev-parse", f"HEAD:{path}"
+            "rev-parse", f"{product_source}:{path}"
         )
 
 
