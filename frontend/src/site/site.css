@@ -2886,7 +2886,8 @@ html[lang="zh-CN"] .site-hero h1 {
   animation: site-dialog-backdrop 220ms ease both;
 }
 
-.dd-site[data-page="account"] {
+.dd-site[data-page="account"],
+.dd-site[data-page="oauth-consent"] {
   min-height: 100svh;
   color: #151526;
   background:
