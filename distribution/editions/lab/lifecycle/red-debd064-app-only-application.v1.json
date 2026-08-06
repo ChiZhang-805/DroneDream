@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "kind": "dronedream-lab-red-app-only-lifecycle-application",
-  "applicationVersion": "1.0.0",
+  "applicationVersion": "1.1.0",
   "editionId": "lab",
-  "state": "segment-a-prepared-segment-b-blocked-not-executed",
+  "state": "segment-a2-prepared-not-authorized-segment-b-blocked",
   "sourceSeparation": {
     "artifactProductSourceCommit": "debd0647c5883ffe5c9c52037d35a6b567d9fd62",
     "artifactProductSourceTree": "fa28c390a33835f30d1d7bf88e2b36e68df7f340",
-    "preparationBaseCommit": "e510933109b31133ccbf8a5cd4fe515ba3913b71",
+    "preparationBaseCommit": "0d1184723c0ed807c6fb1abf98f408c1a66d43c0",
     "applicationEvidenceCommitPolicy": "commit-containing-this-application-and-test",
     "applicationEvidenceIsArtifactSource": false,
     "productRuntimeSemanticsChanged": false,
@@ -27,6 +27,17 @@
       "distribution/editions/lab.v1.json",
       "brand"
     ]
+  },
+  "a1Evidence": {
+    "attemptId": "debd064-segment-a-red1-20260806T143000Z",
+    "result": "failed-no-retry",
+    "functionalStagesPassed": true,
+    "failureClassification": "edition-lifecycle-validator-policy-mismatch",
+    "receiptPath": "distribution/build-receipts/lab-debd064-red-segment-a1-failure.json",
+    "receiptSha256": "a2617487a629a8850abc979a6ca75e99fc95f1558b8b221fa55bda82b7ec6cd7",
+    "externalReceiptSha256": "1626d92d04d2235fe897bd289877960c2ec4365d70eaffbc4b4c80110ff5a2f2",
+    "rollbackRestoredFreshState": true,
+    "retryPerformed": false
   },
   "artifact": {
     "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\debd064-yellow-attempt6\\artifact\\DroneDream-Lab-1.0.0.exe",
@@ -54,7 +65,7 @@
   "executionTools": {
     "runner": {
       "path": "distribution/editions/lab/lifecycle/run-lab-app-only-lifecycle.ps1",
-      "lfNormalizedSha256": "a1d1cf959e78f56685642aa58c07d95619fa5b09c29150d20606692fd25fa031"
+      "lfNormalizedSha256": "1e5e78111453417e8d9d041cca286b53af7618fbf9014a73c058b25e2fbaad31"
     },
     "liveWebView2Inspector": {
       "path": "distribution/editions/lab/lifecycle/inspect-lab-live-webview2.mjs",
@@ -77,7 +88,7 @@
     "localAppData": "%LOCALAPPDATA%/io.dronedream.desktop.lab"
   },
   "freshPreflightObserved": {
-    "observedAtUtc": "2026-08-06T14:05:25.0029470Z",
+    "observedAtUtc": "2026-08-06T14:51:07.7398015Z",
     "installRootAbsent": true,
     "roamingAppDataAbsent": true,
     "localAppDataAbsent": true,
@@ -130,8 +141,8 @@
   },
   "segments": {
     "a": {
-      "name": "owned-app-only-lifecycle",
-      "state": "prepared-under-existing-four-edition-red-authorization",
+      "name": "owned-app-only-lifecycle-a2",
+      "state": "prepared-awaiting-new-exact-red-authorization",
       "browserLaunchAllowed": false,
       "oauthAllowed": false,
       "accountOrTokenAccessAllowed": false,
@@ -149,6 +160,8 @@
         "verify-language-persistence-and-zero-auth-network",
         "close-owned-lab-processes",
         "uninstall-once",
+        "verify-exact-owned-product-preference-residue",
+        "remove-exact-owned-product-preference-key-once",
         "verify-owned-residue-policy-and-protected-state-parity"
       ],
       "exactCounts": {
@@ -156,6 +169,7 @@
         "overlayInstallerInvocations": 1,
         "applicationLaunches": 2,
         "uninstallerInvocations": 1,
+        "ownedPreferenceKeyCleanupInvocations": 1,
         "liveWebView2Inspections": 2,
         "languageTransitions": 2,
         "browserLaunches": 0,
@@ -209,6 +223,27 @@
     "mechanism": "exact-installed-uninstaller-then-owned-surface-verification",
     "uninstallerPath": "%LOCALAPPDATA%/DroneDream-Lab/uninstall.exe",
     "maximumUninstallerInvocations": 1,
+    "ownedProductPreferenceCleanup": {
+      "allowed": true,
+      "maximumInvocations": 1,
+      "exactRegistryKey": "HKCU/Software/DroneDream/DroneDream-Lab",
+      "exactValueNames": [
+        "(default)",
+        "DroneDreamRuntimeDrive",
+        "DroneDreamRuntimeInstallMode",
+        "DroneDreamRuntimeOperationProtocol"
+      ],
+      "exactValues": {
+        "(default)": "%LOCALAPPDATA%/DroneDream-Lab",
+        "DroneDreamRuntimeDrive": "",
+        "DroneDreamRuntimeInstallMode": "install-app-only",
+        "DroneDreamRuntimeOperationProtocol": "2"
+      },
+      "extraValueDecision": "deny",
+      "missingValueDecision": "deny",
+      "otherEditionKeyDecision": "deny",
+      "sharedParentDeletionAllowed": false
+    },
     "manualProtectedStateDeletionAllowed": false,
     "historicalEvidenceDeletionAllowed": false,
     "stopAfterFirstFailureWithoutRetry": true
@@ -217,8 +252,10 @@
     "fourEditionRedIsolationAuthorizationRecorded": true,
     "thisApplicationAuthorizesArtifactRebuild": false,
     "thisApplicationAuthorizesProviderCredentialUse": false,
-    "segmentAExecutionDecision": "authorized-after-exact-pre-execution-report-and-revalidation",
-    "segmentAExecutionBlockers": [],
+    "segmentAExecutionDecision": "prepared-awaiting-new-exact-red-authorization",
+    "segmentAExecutionBlockers": [
+      "new-exact-red-authorization-not-recorded"
+    ],
     "segmentBExecutionDecision": "deny-before-real-auth-boundary",
     "segmentBExecutionBlockers": [
       "disposable-browser-or-provider-boundary-not-proven"

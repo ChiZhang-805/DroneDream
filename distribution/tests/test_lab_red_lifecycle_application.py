@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import textwrap
 from hashlib import sha256
 from pathlib import Path
 
@@ -43,13 +45,13 @@ def test_red_application_preserves_exact_artifact_source_separation() -> None:
     receipt = _load(BUILD_RECEIPT_PATH)
 
     assert application["state"] == (
-        "segment-a-prepared-segment-b-blocked-not-executed"
+        "segment-a2-prepared-not-authorized-segment-b-blocked"
     )
     assert application["sourceSeparation"]["artifactProductSourceCommit"] == (
         receipt["productSource"]["commit"]
     )
     assert application["sourceSeparation"]["preparationBaseCommit"] == (
-        "e510933109b31133ccbf8a5cd4fe515ba3913b71"
+        "0d1184723c0ed807c6fb1abf98f408c1a66d43c0"
     )
     assert application["sourceSeparation"]["applicationEvidenceIsArtifactSource"] is False
     assert application["sourceSeparation"]["productRuntimeSemanticsChanged"] is False
@@ -98,6 +100,7 @@ def test_red_application_has_one_shot_counts_and_no_high_risk_side_effects() -> 
         "overlayInstallerInvocations": 1,
         "applicationLaunches": 2,
         "uninstallerInvocations": 1,
+        "ownedPreferenceKeyCleanupInvocations": 1,
         "liveWebView2Inspections": 2,
         "languageTransitions": 2,
         "browserLaunches": 0,
@@ -134,9 +137,11 @@ def test_red_application_splits_oauth_without_blocking_app_only_lifecycle() -> N
     assert oauth["providerTokenExchangeAllowed"] is False
     assert oauth["disposableBrowserOrProviderBoundaryProven"] is False
     assert authorization["segmentAExecutionDecision"] == (
-        "authorized-after-exact-pre-execution-report-and-revalidation"
+        "prepared-awaiting-new-exact-red-authorization"
     )
-    assert authorization["segmentAExecutionBlockers"] == []
+    assert authorization["segmentAExecutionBlockers"] == [
+        "new-exact-red-authorization-not-recorded"
+    ]
     assert authorization["segmentBExecutionDecision"] == (
         "deny-before-real-auth-boundary"
     )
@@ -173,12 +178,14 @@ def test_segment_a_runner_binds_exact_artifact_and_owned_namespaces() -> None:
         '"debd0647c5883ffe5c9c52037d35a6b567d9fd62"',
         '"DroneDream-Lab"',
         '"io.dronedream.desktop.lab"',
-        '"authorized-after-exact-pre-execution-report-and-revalidation"',
+        '"prepared-awaiting-new-exact-red-authorization"',
         '"deny-before-real-auth-boundary"',
         'Invoke-ProcessOnce -Executable $installerPath -Arguments @("/S")',
         'Invoke-ProcessOnce -Executable $installerPath -Arguments @("/S", "/UPDATE")',
         'Invoke-ProcessOnce -Executable $uninstaller -Arguments @("/S")',
         "Assert-ProtectedParity",
+        "Assert-OwnedProductPreferenceValues",
+        "Assert-AndRemoveOwnedProductPreferenceKey",
         "Remove-OwnedAppData",
         "segment-a-failed-no-retry",
     ):
@@ -244,3 +251,139 @@ def test_first_segment_a_attempt_is_frozen_failed_without_retry() -> None:
     }
     assert receipt["releaseReady"] is False
     assert receipt["websiteHandoffReady"] is False
+
+
+def test_a2_binds_a1_and_limits_owned_preference_cleanup() -> None:
+    application = _load(APPLICATION_PATH)
+    a1 = application["a1Evidence"]
+    cleanup = application["rollback"]["ownedProductPreferenceCleanup"]
+
+    assert a1 == {
+        "attemptId": "debd064-segment-a-red1-20260806T143000Z",
+        "result": "failed-no-retry",
+        "functionalStagesPassed": True,
+        "failureClassification": "edition-lifecycle-validator-policy-mismatch",
+        "receiptPath": (
+            "distribution/build-receipts/"
+            "lab-debd064-red-segment-a1-failure.json"
+        ),
+        "receiptSha256": (
+            "a2617487a629a8850abc979a6ca75e99fc95f1558b8b221fa55bda82b7ec6cd7"
+        ),
+        "externalReceiptSha256": (
+            "1626d92d04d2235fe897bd289877960c2ec4365d70eaffbc4b4c80110ff5a2f2"
+        ),
+        "rollbackRestoredFreshState": True,
+        "retryPerformed": False,
+    }
+    assert cleanup["allowed"] is True
+    assert cleanup["maximumInvocations"] == 1
+    assert cleanup["exactRegistryKey"] == (
+        "HKCU/Software/DroneDream/DroneDream-Lab"
+    )
+    assert cleanup["exactValueNames"] == [
+        "(default)",
+        "DroneDreamRuntimeDrive",
+        "DroneDreamRuntimeInstallMode",
+        "DroneDreamRuntimeOperationProtocol",
+    ]
+    assert cleanup["exactValues"] == {
+        "(default)": "%LOCALAPPDATA%/DroneDream-Lab",
+        "DroneDreamRuntimeDrive": "",
+        "DroneDreamRuntimeInstallMode": "install-app-only",
+        "DroneDreamRuntimeOperationProtocol": "2",
+    }
+    assert cleanup["extraValueDecision"] == "deny"
+    assert cleanup["missingValueDecision"] == "deny"
+    assert cleanup["otherEditionKeyDecision"] == "deny"
+    assert cleanup["sharedParentDeletionAllowed"] is False
+
+
+def test_a2_owned_preference_value_validator_denies_drift() -> None:
+    runner = str(RUNNER_PATH).replace("'", "''")
+    script = textwrap.dedent(
+        f"""
+        $ErrorActionPreference = 'Stop'
+        $tokens = $null
+        $errors = $null
+        $ast = [Management.Automation.Language.Parser]::ParseFile(
+          '{runner}', [ref]$tokens, [ref]$errors
+        )
+        if ($errors.Count -ne 0) {{ throw 'runner AST failed' }}
+        $function = $ast.Find({{
+          param($node)
+          $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'Assert-OwnedProductPreferenceValues'
+        }}, $true)
+        if ($null -eq $function) {{ throw 'validator function missing' }}
+        Invoke-Expression $function.Extent.Text
+        $root = 'C:\\Users\\fixture\\AppData\\Local\\DroneDream-Lab'
+        $good = [ordered]@{{
+          '(default)' = $root
+          DroneDreamRuntimeDrive = ''
+          DroneDreamRuntimeInstallMode = 'install-app-only'
+          DroneDreamRuntimeOperationProtocol = '2'
+        }}
+        Assert-OwnedProductPreferenceValues -Values $good -ExpectedInstallRoot $root
+        $cases = @(
+          [ordered]@{{
+            '(default)' = $root
+            DroneDreamRuntimeDrive = ''
+            DroneDreamRuntimeInstallMode = 'install-app-only'
+          }},
+          [ordered]@{{
+            '(default)' = $root
+            DroneDreamRuntimeDrive = ''
+            DroneDreamRuntimeInstallMode = 'install-app-only'
+            DroneDreamRuntimeOperationProtocol = '2'
+            Unexpected = 'deny'
+          }},
+          [ordered]@{{
+            '(default)' = 'C:\\Users\\fixture\\AppData\\Local\\DroneDream-Field'
+            DroneDreamRuntimeDrive = ''
+            DroneDreamRuntimeInstallMode = 'install-app-only'
+            DroneDreamRuntimeOperationProtocol = '2'
+          }},
+          [ordered]@{{
+            '(default)' = $root
+            DroneDreamRuntimeDrive = ''
+            DroneDreamRuntimeInstallMode = 'install-all'
+            DroneDreamRuntimeOperationProtocol = '2'
+          }},
+          [ordered]@{{
+            '(default)' = $root
+            DroneDreamRuntimeDrive = ''
+            DroneDreamRuntimeInstallMode = 'install-app-only'
+            DroneDreamRuntimeOperationProtocol = '3'
+          }}
+        )
+        foreach ($case in $cases) {{
+          $denied = $false
+          try {{
+            Assert-OwnedProductPreferenceValues -Values $case -ExpectedInstallRoot $root
+          }} catch {{
+            $denied = $true
+          }}
+          if (-not $denied) {{ throw 'drift fixture was accepted' }}
+        }}
+        Write-Output 'owned-preference-fixtures-passed'
+        """
+    )
+    result = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            script,
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    assert "owned-preference-fixtures-passed" in result.stdout

@@ -68,8 +68,8 @@ if ($applicationContract.artifact.sha256 -cne $ExpectedInstallerSha256 -or
     throw "The RED application is not bound to the exact frozen Lab artifact."
 }
 if ($applicationContract.authorization.segmentAExecutionDecision -cne
-    "authorized-after-exact-pre-execution-report-and-revalidation") {
-    throw "Segment A is not authorized by the exact RED application."
+    "prepared-awaiting-new-exact-red-authorization") {
+    throw "Segment A2 is not in its exact prepared state."
 }
 if ($applicationContract.authorization.segmentBExecutionDecision -cne
     "deny-before-real-auth-boundary") {
@@ -81,6 +81,7 @@ $counters = [ordered]@{
     overlayInstallerInvocations = 0
     applicationLaunches = 0
     uninstallerInvocations = 0
+    ownedPreferenceKeyCleanupInvocations = 0
     liveWebView2Inspections = 0
     languageTransitions = 0
     browserLaunches = 0
@@ -346,6 +347,59 @@ function Remove-OwnedAppData {
     }
 }
 
+function Assert-OwnedProductPreferenceValues {
+    param(
+        [Parameter(Mandatory = $true)]
+        [Collections.IDictionary]$Values,
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedInstallRoot
+    )
+    $actualNames = @($Values.Keys | ForEach-Object { [string]$_ } | Sort-Object)
+    $expectedNames = @(
+        "(default)",
+        "DroneDreamRuntimeDrive",
+        "DroneDreamRuntimeInstallMode",
+        "DroneDreamRuntimeOperationProtocol"
+    ) | Sort-Object
+    if (($actualNames -join "`n") -cne ($expectedNames -join "`n")) {
+        throw "The Lab product preference residue contains missing or unexpected values."
+    }
+    if ([string]$Values["(default)"] -cne $ExpectedInstallRoot -or
+        [string]$Values["DroneDreamRuntimeInstallMode"] -cne "install-app-only" -or
+        [string]$Values["DroneDreamRuntimeDrive"] -cne "" -or
+        [string]$Values["DroneDreamRuntimeOperationProtocol"] -cne "2") {
+        throw "The Lab product preference residue values do not match this exact app-only install."
+    }
+}
+
+function Assert-AndRemoveOwnedProductPreferenceKey {
+    if (-not (Test-Path -LiteralPath $productKey)) {
+        throw "The exact Lab product preference residue was not present after silent uninstall."
+    }
+    $properties = Get-ItemProperty -LiteralPath $productKey
+    $values = [ordered]@{}
+    foreach ($property in $properties.PSObject.Properties) {
+        if ($property.Name -match '^PS') { continue }
+        $values[$property.Name] = $property.Value
+    }
+    Assert-OwnedProductPreferenceValues -Values $values -ExpectedInstallRoot $installRoot
+    Remove-Item -LiteralPath $productKey -Recurse -Force
+    if (Test-Path -LiteralPath $productKey) {
+        throw "The exact owned Lab product preference key was not removed."
+    }
+    if (-not (Test-Path -LiteralPath "HKCU:\Software\DroneDream")) {
+        throw "The shared DroneDream registry parent was removed unexpectedly."
+    }
+    $counters.ownedPreferenceKeyCleanupInvocations++
+    $events.Add([ordered]@{
+        stage = "owned-product-preference-cleanup"
+        path = $productKey
+        exactValueNames = $expectedNames
+        exactValuesAccepted = $true
+        sharedParentPreserved = $true
+    })
+}
+
 function Assert-LabUninstalled {
     foreach ($path in @($installRoot, $desktopShortcut, $startMenuShortcut)) {
         if (Test-Path -LiteralPath $path) { throw "Lab uninstall residue remains: $path" }
@@ -391,6 +445,7 @@ try {
 
     $counters.uninstallerInvocations++
     Invoke-ProcessOnce -Executable $uninstaller -Arguments @("/S") -Stage "uninstall"
+    Assert-AndRemoveOwnedProductPreferenceKey
     Remove-OwnedAppData
     Assert-LabUninstalled
     Assert-ProtectedParity -Before $protectedBefore -Stage "uninstall-and-owned-cleanup"
@@ -413,6 +468,13 @@ try {
             Invoke-ProcessOnce -Executable $uninstaller -Arguments @("/S") -Stage "failure-rollback-uninstall"
         } catch {
             $events.Add([ordered]@{ stage = "failure-rollback-uninstall"; error = $_.Exception.Message })
+        }
+    }
+    if (Test-Path -LiteralPath $productKey) {
+        try {
+            Assert-AndRemoveOwnedProductPreferenceKey
+        } catch {
+            $events.Add([ordered]@{ stage = "failure-owned-preference-cleanup"; error = $_.Exception.Message })
         }
     }
     try { Remove-OwnedAppData } catch { $events.Add([ordered]@{ stage = "failure-owned-cleanup"; error = $_.Exception.Message }) }
