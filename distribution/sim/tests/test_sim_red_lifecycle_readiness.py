@@ -21,6 +21,10 @@ APPLICATION_PATH = (
     ROOT
     / "distribution/sim/lifecycle/red-f23987ba-continuation-application.v1.json"
 )
+ATTEMPT_2_FAILURE_PATH = (
+    ROOT
+    / "distribution/sim/lifecycle/red-f23987ba-execution-attempt-2-failed.v1.json"
+)
 TOOL_PATH = ROOT / "distribution/sim/tools/sim_red_lifecycle_readiness.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_red_lifecycle_readiness", TOOL_PATH)
@@ -167,6 +171,45 @@ class SimRedLifecycleReadinessTests(unittest.TestCase):
         ] = True
         with self.assertRaisesRegex(readiness.SimRedReadinessError, "OAuth boundary"):
             readiness.validate_continuation_application(application, plan, ROOT)
+
+    def test_attempt_2_failure_is_frozen_without_retry_or_release_claim(self) -> None:
+        receipt = load(ATTEMPT_2_FAILURE_PATH)
+        self.assertEqual(receipt["authorizationBinding"]["continuationOrdinal"], 2)
+        self.assertTrue(receipt["authorizationBinding"]["authorizationConsumed"])
+        self.assertFalse(receipt["authorizationBinding"]["automaticRetryExecuted"])
+        self.assertEqual(receipt["executedExactCounts"]["freshInstallerInvocations"], 1)
+        self.assertEqual(receipt["executedExactCounts"]["uninstallerInvocations"], 1)
+        for key in (
+            "overlayInstallerInvocations",
+            "applicationLaunches",
+            "pkceBoundaryChecks",
+            "builds",
+            "tokenExchanges",
+            "runtimeStarts",
+            "px4Starts",
+            "gazeboStarts",
+            "hardwareActions",
+        ):
+            self.assertEqual(receipt["executedExactCounts"][key], 0, key)
+        self.assertTrue(receipt["ownedStateAfterFailure"]["simProductKeyPresent"])
+        self.assertFalse(receipt["rollback"]["cleanupComplete"])
+        self.assertFalse(receipt["failurePolicy"]["sameAuthorizationMayBeRetried"])
+        self.assertFalse(receipt["failurePolicy"]["artifactMayBeHandedToWebsite"])
+        self.assertFalse(receipt["failurePolicy"]["releaseReady"])
+        self.assertTrue(
+            all(value is False for value in receipt["nonClaims"].values())
+        )
+
+    def test_attempt_2_does_not_claim_field_level_registration_root_cause(self) -> None:
+        receipt = load(ATTEMPT_2_FAILURE_PATH)
+        self.assertFalse(
+            receipt["failure"]["registrationFieldActualValuesCapturedBeforeRollback"]
+        )
+        self.assertFalse(receipt["failure"]["fieldLevelRootCauseClaimed"])
+        self.assertTrue(
+            receipt["protectedStateAfterFailure"]["protectedStateMutationObserved"]
+            is False
+        )
 
 
 if __name__ == "__main__":

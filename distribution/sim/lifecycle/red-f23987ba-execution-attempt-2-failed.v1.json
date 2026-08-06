@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-red-lifecycle-execution-attempt",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "failed-after-fresh-install-owned-uninstaller-cleanup-incomplete",
+  "sourceSeparation": {
+    "productSourceCommit": "f24eb3a1e383c83b8a0b5bed4c044148146f4153",
+    "authorizationEvidenceHead": "fe84d82abc760d85afe6fe1c3b9cdf88a5ea07a1",
+    "receiptCommitPolicy": "commit-containing-this-failure-receipt-and-tests",
+    "receiptCommitIsProductSource": false
+  },
+  "artifact": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/bundle/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11686921,
+    "sha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "rehashAfterFailure": "pass",
+    "rebuilt": false,
+    "relabelled": false
+  },
+  "authorizationBinding": {
+    "applicationPath": "distribution/sim/lifecycle/red-f23987ba-continuation-application.v1.json",
+    "applicationBytes": 7430,
+    "applicationSha256": "a8e75e77f40bdaa79eea3b7e6ffb71ed911ab5c413b7b493dcd3c648fed9d4de",
+    "continuationOrdinal": 2,
+    "maximumNewExecutionAttempts": 1,
+    "authorizationConsumed": true,
+    "automaticRetryExecuted": false
+  },
+  "priorAttempt": {
+    "ordinal": 1,
+    "receiptPath": "distribution/sim/lifecycle/red-f23987ba-execution-attempt-1-aborted.v1.json",
+    "receiptSha256": "71ddc8fa94af207a2d2c1f309dde8311535cbf6690933abbf4f15a3fe0a2da47",
+    "state": "aborted-before-owned-root-or-installer-mutation",
+    "mutationCount": 0
+  },
+  "runner": {
+    "path": "C:/Users/zju20/.codex/visualizations/2026/08/05/019fd125-8282-79a2-ba79-50167513b5d0/sim-red-lifecycle-runner-f23987ba-continuation-2.ps1",
+    "bytes": 30063,
+    "sha256": "a23bdffac08b57cf4b90bd67e96bf7d9044ea7b233a3f56ca897ce778ca6a2f9",
+    "astPassed": true,
+    "commandStarted": true,
+    "commandExitCode": 1,
+    "automaticRetryExecuted": false
+  },
+  "externalExecutionReceipt": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-continuation-2-f23987ba/evidence/lifecycle-receipt.json",
+    "bytes": 28977,
+    "sha256": "d0d641257f52bee082a535f8e2884291d0ab4cd1bdb351a8c50209eaad684419",
+    "success": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  },
+  "executedExactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 1,
+    "pkceBoundaryChecks": 0,
+    "builds": 0,
+    "tokenExchanges": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0
+  },
+  "failure": {
+    "stage": "fresh-en-app-only-post-install-contract",
+    "installerExitCode": 0,
+    "message": "fresh-en-app-only uninstall registration drifted.",
+    "classification": "frozen-artifact-lifecycle-contract-failure",
+    "registrationFieldActualValuesCapturedBeforeRollback": false,
+    "fieldLevelRootCauseClaimed": false,
+    "overlayLaunchWebView2OrOauthReached": false
+  },
+  "rollback": {
+    "ownedUninstallerInvocationConsumed": true,
+    "ownedUninstallerExitCode": 0,
+    "runnerRollbackExecuted": true,
+    "cleanupComplete": false,
+    "failureRecovery": "owned-sim-uninstaller-failed-manual-attention-required",
+    "failureRecoveryError": "failure-recovery-owned-uninstaller left owned Sim state behind: HKCU:/Software/DroneDream/DroneDream-Sim",
+    "additionalUninstallerInvocationAllowed": false,
+    "manualDeletionExecuted": false,
+    "historicalEvidenceDeletionExecuted": false
+  },
+  "ownedStateAfterFailure": {
+    "runRootPresent": true,
+    "simInstallRootPresent": false,
+    "simUninstallKeyPresent": false,
+    "simProductKeyPresent": true,
+    "simDesktopShortcutPresent": false,
+    "simStartMenuShortcutPresent": false,
+    "simRoamingAppDataPresent": false,
+    "simLocalAppDataPresent": false,
+    "simApplicationOrInstallerProcessCount": 0,
+    "oauthCallback49211ListenerCount": 0,
+    "remainingOwnedProductKey": {
+      "path": "HKCU:/Software/DroneDream/DroneDream-Sim",
+      "values": {
+        "(default)": "C:/Users/zju20/AppData/Local/DroneDream-Sim",
+        "DroneDreamRuntimeDrive": "",
+        "DroneDreamRuntimeInstallMode": "install-app-only",
+        "DroneDreamRuntimeOperationProtocol": 2
+      }
+    },
+    "manualAttentionRequired": true
+  },
+  "ownedRunEvidence": {
+    "installerDiagnosticPath": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-continuation-2-f23987ba/temp/DroneDream/installer-diagnostics.log",
+    "installerDiagnosticBytes": 30,
+    "installerDiagnosticSha256": "d9b574711f8020e050916757214c0510ba34ae93c9a6876baf4416a017517bdd",
+    "installerDiagnosticWasOverwrittenByRollbackLanguage2052": true,
+    "temporaryUninstallerPath": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-continuation-2-f23987ba/temp/~nsu1.tmp/Un.exe",
+    "temporaryUninstallerBytes": 82381,
+    "temporaryUninstallerSha256": "d0d9099783c98e4371f67a51f47e91b886712b854ef31f4ad6cbdb2679685cfc",
+    "evidencePreserved": true
+  },
+  "protectedStateAfterFailure": {
+    "observedAt": "2026-08-06T23:17:36.1347264+08:00",
+    "comparisonMode": "read-only-presence-file-sha-and-registry-name-value-string-parity",
+    "legacyApplicationAndUninstallerParity": true,
+    "legacyInstallRootTimestampParity": true,
+    "legacyUniversalLabFieldRegistryParity": true,
+    "legacyUniversalLabFieldShortcutParity": true,
+    "universalAppDataInventoryBefore": "28ceaaaf46109ecb96d6c5828e55c56efff0c5a859af111ac9da048d94416e61",
+    "universalAppDataInventoryAfter": "28ceaaaf46109ecb96d6c5828e55c56efff0c5a859af111ac9da048d94416e61",
+    "runtimeState": "Stopped",
+    "runtimeStarted": false,
+    "webView2Version": "151.0.4129.59",
+    "webView2VersionLocationExecutableParity": true,
+    "protectedStateMutationObserved": false
+  },
+  "failurePolicy": {
+    "sameAuthorizationMayBeRetried": false,
+    "sameArtifactFurtherLifecycleExecutionAllowed": false,
+    "newProductSourceRequiredAfterCommonInstallerRootCauseFix": true,
+    "newBuildAndRedAuthorizationsRequired": true,
+    "artifactMayBeHandedToWebsite": false,
+    "releaseReady": false,
+    "resumeEntry": "common-installer-root-cause-and-donor-then-new-exact-source-build-and-lifecycle"
+  },
+  "nonClaims": {
+    "freshInstallValidated": false,
+    "overlayValidated": false,
+    "applicationLaunched": false,
+    "webView2LiveValidated": false,
+    "englishPathValidated": false,
+    "simplifiedChinesePathValidated": false,
+    "pkceBoundaryValidated": false,
+    "browserLoginStarted": false,
+    "realTokenExchanged": false,
+    "uninstallValidated": false,
+    "residueFree": false,
+    "rollbackComplete": false,
+    "runtimeStarted": false,
+    "px4OrGazeboStarted": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}
