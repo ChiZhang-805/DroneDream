@@ -74,6 +74,26 @@ class VolatileAuthStorage implements Storage {
 const volatileAuthStorage = new VolatileAuthStorage();
 const STORAGE_PROBE_KEY = "__dronedream_auth_storage_probe__";
 
+export function supabaseAuthClientOptions({
+  desktop,
+  storage,
+  storageKey,
+}: {
+  desktop: boolean;
+  storage: Storage | undefined;
+  storageKey: string | null | undefined;
+}) {
+  const sharedOptions = {
+    autoRefreshToken: true,
+    detectSessionInUrl: !desktop,
+    persistSession: true,
+    storage,
+  };
+  return desktop && storageKey
+    ? { ...sharedOptions, storageKey }
+    : sharedOptions;
+}
+
 function authStorage(): Storage | undefined {
   if (typeof window === "undefined") return undefined;
   // Native owns the persistent refresh grant in an edition-scoped Windows
@@ -98,13 +118,11 @@ const clientHost = globalThis as typeof globalThis & DroneDreamGlobal;
 export const supabaseClient: SupabaseClient | null = cloudAuthConfigured
   ? (clientHost.__droneDreamSupabaseClient ??=
       createClient(supabaseUrl ?? "", supabasePublishableKey ?? "", {
-        auth: {
-          autoRefreshToken: true,
-          detectSessionInUrl: !isDesktopRuntime(),
-          persistSession: true,
+        auth: supabaseAuthClientOptions({
+          desktop: desktopRuntime,
           storage: authStorage(),
-          storageKey: desktopStorageKey ?? undefined,
-        },
+          storageKey: desktopStorageKey,
+        }),
       }))
   : null;
 
