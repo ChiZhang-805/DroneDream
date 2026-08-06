@@ -26,6 +26,9 @@ use crate::runtime_cache::{
 };
 
 const RUNTIME_NAME: &str = "DroneDreamRuntime";
+const RUNTIME_BASE_MANAGER_NAMESPACE: &str = "io.dronedream.runtime-base-manager";
+const COMPILED_DESKTOP_EDITION_ID: &str = env!("DRONEDREAM_DESKTOP_EDITION_ID");
+const COMPILED_EDITION_PROFILE: &str = env!("DRONEDREAM_EDITION_PROFILE");
 const DEFAULT_RELEASE_MANIFEST_URL: &str =
     env!("DRONEDREAM_PRODUCTION_RUNTIME_RELEASE_MANIFEST_URL");
 const TRUSTED_KEYRING: &str = include_str!("../../../runtime/release-public-keys.json");
@@ -636,12 +639,19 @@ pub(crate) struct PreparedRuntimeOperation {
 }
 
 #[cfg(target_os = "windows")]
-struct CrossProcessOperationLease(windows_sys::Win32::Foundation::HANDLE);
+struct CrossProcessOperationLease(Vec<windows_sys::Win32::Foundation::HANDLE>);
 
 #[cfg(target_os = "windows")]
 impl CrossProcessOperationLease {
     fn acquire() -> Result<Self, String> {
-        Self::acquire_at(&runtime_operation_lease_path()?)
+        let [legacy_path, global_path] = runtime_operation_lease_paths()?;
+        // Acquire in one fixed order. All new editions therefore serialize
+        // with one another through the global lease and with an installed
+        // pre-edition desktop through its legacy lease.
+        let mut lease = Self::acquire_at(&legacy_path)?;
+        let mut global_lease = Self::acquire_at(&global_path)?;
+        lease.0.append(&mut global_lease.0);
+        Ok(lease)
     }
 
     fn acquire_at(path: &Path) -> Result<Self, String> {
@@ -712,7 +722,7 @@ impl CrossProcessOperationLease {
             unsafe { CloseHandle(handle) };
             return Err("Runtime operation lease is not a safe ordinary file.".to_string());
         }
-        Ok(Self(handle))
+        Ok(Self(vec![handle]))
     }
 }
 
@@ -725,21 +735,40 @@ unsafe impl Send for CrossProcessOperationLease {}
 impl Drop for CrossProcessOperationLease {
     fn drop(&mut self) {
         use windows_sys::Win32::Foundation::CloseHandle;
-        // SAFETY: this wrapper uniquely owns the valid CreateFileW handle.
-        unsafe {
-            CloseHandle(self.0);
+        for handle in self.0.drain(..) {
+            // SAFETY: this wrapper uniquely owns every valid CreateFileW
+            // handle in the vector.
+            unsafe {
+                CloseHandle(handle);
+            }
         }
     }
 }
 
 #[cfg(target_os = "windows")]
-fn runtime_operation_lease_path() -> Result<PathBuf, String> {
+fn runtime_operation_lease_paths() -> Result<[PathBuf; 2], String> {
     let local = std::env::var_os("LOCALAPPDATA")
         .filter(|value| !value.is_empty())
         .ok_or_else(|| "LOCALAPPDATA is unavailable.".to_string())?;
-    Ok(PathBuf::from(local)
+    let local = PathBuf::from(local);
+    Ok([
+        legacy_runtime_operation_lease_path_at(&local),
+        runtime_operation_lease_path_at(&local),
+    ])
+}
+
+#[cfg(target_os = "windows")]
+fn runtime_operation_lease_path_at(local_app_data: &Path) -> PathBuf {
+    local_app_data
+        .join(RUNTIME_BASE_MANAGER_NAMESPACE)
+        .join("runtime-operation-v1.lock")
+}
+
+#[cfg(target_os = "windows")]
+fn legacy_runtime_operation_lease_path_at(local_app_data: &Path) -> PathBuf {
+    local_app_data
         .join("io.dronedream.desktop")
-        .join("runtime-operation-v1.lock"))
+        .join("runtime-operation-v1.lock")
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -2036,7 +2065,7 @@ fn collect_production_runtime_diagnostics(
     failure_message: &str,
 ) -> Result<PathBuf, String> {
     let cache_root = crate::runtime_cache::validate_managed_cache(runtime_target)?;
-    let diagnostics_root = prepare_diagnostics_directory(&cache_root)?;
+    let diagnostics_root = prepare_diagnostics_directory(&cache_root, COMPILED_DESKTOP_EDITION_ID)?;
     let mut command = windows_command("wsl.exe");
     let bounded_script = bounded_diagnostic_script(DIAGNOSTIC_SCRIPT);
     command.args(diagnostic_wsl_command_args(bounded_script.as_str()));
@@ -2117,7 +2146,9 @@ fn diagnostic_report_header(
     failure_message: &str,
 ) -> String {
     format!(
-        "DroneDreamRuntime failure diagnostics\ncollectedAt={}\ncollectorLimitBytes={}\nfailureCode={}\nfailureMessage={}\n\n",
+        "DroneDreamRuntime failure diagnostics\ndesktopEditionId={}\neditionProfileId={}\ncollectedAt={}\ncollectorLimitBytes={}\nfailureCode={}\nfailureMessage={}\n\n",
+        COMPILED_DESKTOP_EDITION_ID,
+        COMPILED_EDITION_PROFILE,
         collected_at,
         MAX_DIAGNOSTIC_BYTES,
         failure_code,
@@ -2181,42 +2212,49 @@ fn decode_diagnostic_output(bytes: &[u8]) -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn prepare_diagnostics_directory(cache_root: &Path) -> Result<PathBuf, String> {
-    let canonical_cache = fs::canonicalize(cache_root)
-        .map_err(|error| format!("Unable to resolve the managed runtime cache: {error}"))?;
-    let diagnostics_root = cache_root.join("diagnostics");
-    match fs::symlink_metadata(&diagnostics_root) {
+fn prepare_real_child_directory(
+    parent: &Path,
+    child_name: &str,
+    label: &str,
+) -> Result<PathBuf, String> {
+    let canonical_parent = fs::canonicalize(parent)
+        .map_err(|error| format!("Unable to resolve the {label} parent directory: {error}"))?;
+    let child = parent.join(child_name);
+    match fs::symlink_metadata(&child) {
         Ok(metadata) => {
             if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
-                return Err(
-                    "Runtime diagnostics path is not a real managed-cache directory.".to_string(),
-                );
+                return Err(format!("{label} path is not a real directory."));
             }
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-            fs::create_dir(&diagnostics_root).map_err(|error| {
-                format!("Unable to create the runtime diagnostics directory: {error}")
-            })?;
+            fs::create_dir(&child)
+                .map_err(|error| format!("Unable to create the {label} directory: {error}"))?;
         }
-        Err(error) => {
-            return Err(format!(
-                "Unable to inspect the runtime diagnostics directory: {error}"
-            ))
-        }
+        Err(error) => return Err(format!("Unable to inspect the {label} directory: {error}")),
     }
-    let metadata = fs::symlink_metadata(&diagnostics_root)
-        .map_err(|error| format!("Unable to verify the runtime diagnostics directory: {error}"))?;
+    let metadata = fs::symlink_metadata(&child)
+        .map_err(|error| format!("Unable to verify the {label} directory: {error}"))?;
     if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
-        return Err("Runtime diagnostics directory failed its safety check.".to_string());
+        return Err(format!("{label} directory failed its safety check."));
     }
-    let canonical_diagnostics = fs::canonicalize(&diagnostics_root)
-        .map_err(|error| format!("Unable to resolve the runtime diagnostics directory: {error}"))?;
-    if canonical_diagnostics.parent() != Some(canonical_cache.as_path()) {
-        return Err(
-            "Runtime diagnostics directory resolved outside the managed runtime cache.".to_string(),
-        );
+    let canonical_child = fs::canonicalize(&child)
+        .map_err(|error| format!("Unable to resolve the {label} directory: {error}"))?;
+    if canonical_child.parent() != Some(canonical_parent.as_path()) {
+        return Err(format!(
+            "{label} directory resolved outside its managed parent."
+        ));
     }
-    Ok(diagnostics_root)
+    Ok(child)
+}
+
+#[cfg(target_os = "windows")]
+fn prepare_diagnostics_directory(cache_root: &Path, edition_id: &str) -> Result<PathBuf, String> {
+    if !matches!(edition_id, "universal" | "sim" | "lab" | "field") {
+        return Err("Desktop edition is not allowed to own runtime diagnostics.".to_string());
+    }
+    let diagnostics_root =
+        prepare_real_child_directory(cache_root, "diagnostics", "runtime diagnostics root")?;
+    prepare_real_child_directory(&diagnostics_root, edition_id, "edition runtime diagnostics")
 }
 
 #[cfg(target_os = "windows")]
@@ -4525,7 +4563,8 @@ mod tests {
                 .parent()
                 .expect("test runtime target has a parent")
                 .join("DroneDream.download-cache")
-                .join("diagnostics");
+                .join("diagnostics")
+                .join(COMPILED_DESKTOP_EDITION_ID);
             fs::create_dir_all(&root).map_err(|error| error.to_string())?;
             let path = root.join("fake-runtime-health.log");
             fs::write(&path, b"fake diagnostics\n").map_err(|error| error.to_string())?;
@@ -4854,7 +4893,8 @@ mod tests {
     fn handoff_cleanup_failure_preserves_exported_health_diagnostics_in_snapshot() {
         let installer = RuntimeInstaller::default();
         let diagnostics_path =
-            r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log".to_string();
+            r"E:\DroneDream.download-cache\diagnostics\universal\runtime-health-test.log"
+                .to_string();
 
         set_receipt_cleanup_failure(
             &installer,
@@ -5329,14 +5369,15 @@ mod tests {
             message: "service did not become ready".to_string(),
             retryable: true,
             diagnostics_path: Some(
-                r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log".to_string(),
+                r"E:\DroneDream.download-cache\diagnostics\universal\runtime-health-test.log"
+                    .to_string(),
             ),
         })
         .unwrap();
         assert_eq!(value["code"], "runtime_service_unhealthy");
         assert_eq!(
             value["diagnosticsPath"],
-            r"E:\DroneDream.download-cache\diagnostics\runtime-health-test.log"
+            r"E:\DroneDream.download-cache\diagnostics\universal\runtime-health-test.log"
         );
     }
 
@@ -5380,11 +5421,55 @@ mod tests {
         let header =
             diagnostic_report_header("2026-07-14T00:00:00Z", "runtime_service_unhealthy", detail);
         assert!(header.contains(detail));
+        assert!(header.contains(&format!(
+            "desktopEditionId={COMPILED_DESKTOP_EDITION_ID}\neditionProfileId={COMPILED_EDITION_PROFILE}\n"
+        )));
 
         let persisted = String::from_utf8(sanitize_and_bound_diagnostics(&header)).unwrap();
         assert!(persisted.contains(
             "failureMessage=runtime-internal readiness request failed: curl: (7) refused\ncurl: (28) timed out"
         ));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn runtime_operation_lock_has_one_global_runtime_base_owner() {
+        let sandbox = Sandbox::new();
+        assert_eq!(
+            runtime_operation_lease_path_at(&sandbox.0),
+            sandbox
+                .0
+                .join("io.dronedream.runtime-base-manager")
+                .join("runtime-operation-v1.lock")
+        );
+        assert_eq!(
+            legacy_runtime_operation_lease_path_at(&sandbox.0),
+            sandbox
+                .0
+                .join("io.dronedream.desktop")
+                .join("runtime-operation-v1.lock")
+        );
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn runtime_diagnostics_are_isolated_by_validated_desktop_edition() {
+        let sandbox = Sandbox::new();
+        let cache = sandbox.0.join("DroneDream.download-cache");
+        fs::create_dir(&cache).unwrap();
+
+        let mut paths = BTreeSet::new();
+        for edition_id in ["universal", "sim", "lab", "field"] {
+            let path = prepare_diagnostics_directory(&cache, edition_id).unwrap();
+            assert_eq!(path, cache.join("diagnostics").join(edition_id));
+            assert!(path.is_dir());
+            paths.insert(path);
+        }
+        assert_eq!(paths.len(), 4);
+
+        let error = prepare_diagnostics_directory(&cache, "unknown").unwrap_err();
+        assert!(error.contains("not allowed"));
+        assert!(!cache.join("diagnostics").join("unknown").exists());
     }
 
     #[test]
