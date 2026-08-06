@@ -56,7 +56,8 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
         foreach ($name in @(
           'Resolve-InstallerWindowStage', 'Protect-DiagnosticText',
           'Get-DiagnosticWindowRecord', 'Add-PreclassificationSnapshot',
-          'Select-SingleOwnedWindowRecord', 'Wait-SingleOwnedWindow'
+          'Select-SingleOwnedWindowRecord', 'Wait-SingleOwnedWindow',
+          'Wait-ExpectedStageAfterLoading'
         )) {{
           $function = $ast.Find({{
             param($node)
@@ -112,6 +113,61 @@ def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
           if ((Resolve-InstallerWindowStage -WindowRecord $loading -ExpectedProcessId $pidValue -ExpectedDisplayName $display -ExpectedInstallRoot $root) -cne 'loading-progress') {{
             throw "loading progress fixture failed: $percent"
           }}
+        }}
+        $sequenceLoadingTitle = 'unpacking data: 60%'
+        $sequenceLoadingText = 'Please wait while Setup is loading...'
+        $sequenceLoading = [ordered]@{{
+          processId=$fixtureProcess.Id; className='#32770'; title=$sequenceLoadingTitle
+          visibleText=@($sequenceLoadingTitle,$sequenceLoadingText); controls=@(
+            [ordered]@{{processId=$fixtureProcess.Id;controlType='ControlType.Text';automationId='1030';name=$sequenceLoadingTitle;value=''}},
+            [ordered]@{{processId=$fixtureProcess.Id;controlType='ControlType.Image';automationId='65535';name=$sequenceLoadingTitle;value=''}},
+            [ordered]@{{processId=$fixtureProcess.Id;controlType='ControlType.Text';automationId='76';name=$sequenceLoadingText;value=''}}
+          )
+        }}
+        $sequenceSelector = [ordered]@{{
+          processId=$fixtureProcess.Id; className='#32770'; title='Installer Language'
+          visibleText=@('Please select a language.'); controls=$selectorControls
+        }}
+        $sequenceBranded = [ordered]@{{
+          processId=$fixtureProcess.Id; className='#32770'; title="$display Setup"
+          visibleText=@($display,'Welcome'); controls=@()
+        }}
+        $script:recordQueue = [Collections.Generic.Queue[object]]::new()
+        $sequenceProvider = {{
+          param($BoundProcess,$ExcludedTitle,$Deadline)
+          if ($script:recordQueue.Count -eq 0) {{ throw 'sequence provider exhausted' }}
+          return [ordered]@{{window=$null;record=$script:recordQueue.Dequeue()}}
+        }}
+        $preSnapshots = [Collections.Generic.List[object]]::new()
+        $script:recordQueue.Enqueue($sequenceLoading)
+        $script:recordQueue.Enqueue($sequenceSelector)
+        $preResult = Wait-ExpectedStageAfterLoading -Process $fixtureProcess -DifferentFromTitle '' -ExpectedStage 'language-selector' -ExpectedDisplayName $display -ExpectedInstallRoot $root -Snapshots $preSnapshots -TimeoutMilliseconds 1000 -PollMilliseconds 0 -WindowRecordProvider $sequenceProvider
+        if ($preResult.stage -cne 'language-selector' -or @($preSnapshots.stage) -notcontains 'loading-progress') {{
+          throw 'pre-selector loading sequence failed'
+        }}
+        $postSnapshots = [Collections.Generic.List[object]]::new()
+        $script:recordQueue.Enqueue($sequenceLoading)
+        $script:recordQueue.Enqueue($sequenceBranded)
+        $postResult = Wait-ExpectedStageAfterLoading -Process $fixtureProcess -DifferentFromTitle 'Installer Language' -ExpectedStage 'branded' -ExpectedDisplayName $display -ExpectedInstallRoot $root -Snapshots $postSnapshots -TimeoutMilliseconds 1000 -PollMilliseconds 0 -WindowRecordProvider $sequenceProvider
+        if ($postResult.stage -cne 'branded' -or @($postSnapshots.stage) -notcontains 'loading-progress') {{
+          throw 'post-selector loading sequence failed'
+        }}
+        $timeoutSnapshots = [Collections.Generic.List[object]]::new()
+        $repeatLoadingProvider = {{ param($BoundProcess,$ExcludedTitle,$Deadline); [ordered]@{{window=$null;record=$sequenceLoading}} }}
+        try {{
+          Wait-ExpectedStageAfterLoading -Process $fixtureProcess -DifferentFromTitle '' -ExpectedStage 'language-selector' -ExpectedDisplayName $display -ExpectedInstallRoot $root -Snapshots $timeoutSnapshots -TimeoutMilliseconds 1 -PollMilliseconds 0 -WindowRecordProvider $repeatLoadingProvider | Out-Null
+          throw 'loading timeout fixture unexpectedly accepted'
+        }} catch {{
+          if ($_.Exception.Message -eq 'loading timeout fixture unexpectedly accepted') {{ throw }}
+          if ($_.Exception.Message -notlike 'Timed out waiting for language-selector*') {{ throw }}
+        }}
+        $wrongFirstSnapshots = [Collections.Generic.List[object]]::new()
+        $script:recordQueue.Enqueue([ordered]@{{processId=$fixtureProcess.Id;className='#32770';title='Unexpected Dialog';visibleText=@();controls=@()}})
+        try {{
+          Wait-ExpectedStageAfterLoading -Process $fixtureProcess -DifferentFromTitle '' -ExpectedStage 'language-selector' -ExpectedDisplayName $display -ExpectedInstallRoot $root -Snapshots $wrongFirstSnapshots -TimeoutMilliseconds 1000 -PollMilliseconds 0 -WindowRecordProvider $sequenceProvider | Out-Null
+          throw 'wrong first window fixture unexpectedly accepted'
+        }} catch {{
+          if ($_.Exception.Message -eq 'wrong first window fixture unexpectedly accepted') {{ throw }}
         }}
 
         $welcome = [ordered]@{{

@@ -265,10 +265,13 @@ function Get-SingleOwnedWindow {
 function Wait-SingleOwnedWindow {
     param(
         [Parameter(Mandatory = $true)][Diagnostics.Process]$Process,
-        [Parameter(Mandatory = $true)][AllowNull()][AllowEmptyString()][string]$DifferentFromTitle
+        [Parameter(Mandatory = $true)][AllowNull()][AllowEmptyString()][string]$DifferentFromTitle,
+        [DateTime]$DeadlineUtc = [DateTime]::MinValue
     )
     $excludedTitle = if ([string]::IsNullOrEmpty($DifferentFromTitle)) { $null } else { $DifferentFromTitle }
-    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    $deadline = if ($DeadlineUtc -eq [DateTime]::MinValue) {
+        [DateTime]::UtcNow.AddSeconds(30)
+    } else { $DeadlineUtc }
     do {
         if ($Process.HasExited) { throw "The visible installer exited during observer transition." }
         try {
@@ -282,6 +285,52 @@ function Wait-SingleOwnedWindow {
         Start-Sleep -Milliseconds 250
     } while ([DateTime]::UtcNow -lt $deadline)
     throw "Timed out waiting for the exact owned installer window transition."
+}
+
+function Wait-ExpectedStageAfterLoading {
+    param(
+        [Parameter(Mandatory = $true)][Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)][AllowNull()][AllowEmptyString()][string]$DifferentFromTitle,
+        [Parameter(Mandatory = $true)][ValidateSet("language-selector", "branded")][string]$ExpectedStage,
+        [Parameter(Mandatory = $true)][string]$ExpectedDisplayName,
+        [Parameter(Mandatory = $true)][string]$ExpectedInstallRoot,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][Collections.Generic.List[object]]$Snapshots,
+        [ValidateRange(1, 30000)][int]$TimeoutMilliseconds = 30000,
+        [ValidateRange(0, 1000)][int]$PollMilliseconds = 250,
+        [scriptblock]$WindowRecordProvider
+    )
+    $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMilliseconds)
+    if ($null -eq $WindowRecordProvider) {
+        $WindowRecordProvider = {
+            param($BoundProcess, $ExcludedTitle, $Deadline)
+            $window = Wait-SingleOwnedWindow -Process $BoundProcess -DifferentFromTitle $ExcludedTitle -DeadlineUtc $Deadline
+            return [ordered]@{ window = $window; record = Get-WindowRecord -Window $window }
+        }
+    }
+    $loadingSnapshotKept = $false
+    do {
+        $candidate = & $WindowRecordProvider $Process $DifferentFromTitle $deadline
+        if ($null -eq $candidate -or $null -eq $candidate.record) {
+            throw "Installer window provider returned no classifiable record."
+        }
+        $snapshot = Add-PreclassificationSnapshot -WindowRecord $candidate.record -ExpectedProcessId $Process.Id -ExpectedInstallRoot $ExpectedInstallRoot -Snapshots $Snapshots
+        $stage = Resolve-InstallerWindowStage -WindowRecord $candidate.record -ExpectedProcessId $Process.Id -ExpectedDisplayName $ExpectedDisplayName -ExpectedInstallRoot $ExpectedInstallRoot
+        $snapshot["stage"] = $stage
+        if ($stage -ceq "loading-progress") {
+            if ($loadingSnapshotKept) { $Snapshots.Remove($snapshot) | Out-Null }
+            else { $loadingSnapshotKept = $true }
+            if ([DateTime]::UtcNow -ge $deadline) {
+                throw "Timed out waiting for $ExpectedStage after exact NSIS loading progress."
+            }
+            if ($PollMilliseconds -gt 0) { Start-Sleep -Milliseconds $PollMilliseconds }
+            continue
+        }
+        if ($stage -cne $ExpectedStage) {
+            throw "The first non-loading installer window was not the expected $ExpectedStage stage."
+        }
+        return [ordered]@{ window = $candidate.window; record = $candidate.record; stage = $stage }
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "Timed out waiting for $ExpectedStage after exact NSIS loading progress."
 }
 
 function Invoke-ExactButton {
@@ -375,33 +424,12 @@ $failure = $null
 try {
     $process = Start-Process -FilePath $installerPath -ArgumentList "/LANG=$LanguageId" -PassThru
     $processId = $process.Id
-    $languageWindow = Wait-SingleOwnedWindow -Process $process -DifferentFromTitle ""
-    $languageRecord = Get-WindowRecord -Window $languageWindow
-    $languageSnapshot = Add-PreclassificationSnapshot -WindowRecord $languageRecord -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
-    $languageStage = Resolve-InstallerWindowStage -WindowRecord $languageRecord -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
-    $languageSnapshot["stage"] = $languageStage
-    if ($languageStage -ne "language-selector") {
-        throw "The first owned window was not the exact generic NSIS language selector."
-    }
+    $languageResult = Wait-ExpectedStageAfterLoading -Process $process -DifferentFromTitle "" -ExpectedStage "language-selector" -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
+    $languageWindow = $languageResult.window
     Select-ExactLanguage -Window $languageWindow -ExpectedProcessId $process.Id -ExpectedLanguageId $LanguageId
 
-    $welcomeDeadline = [DateTime]::UtcNow.AddSeconds(30)
-    $loadingSnapshotKept = $false
-    do {
-        $mainWindow = Wait-SingleOwnedWindow -Process $process -DifferentFromTitle "Installer Language"
-        $welcomeRecord = Get-WindowRecord -Window $mainWindow
-        $welcomeSnapshot = Add-PreclassificationSnapshot -WindowRecord $welcomeRecord -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
-        $welcomeStage = Resolve-InstallerWindowStage -WindowRecord $welcomeRecord -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
-        $welcomeSnapshot["stage"] = $welcomeStage
-        if ($welcomeStage -cne "loading-progress") { break }
-        if ($loadingSnapshotKept) { $snapshots.Remove($welcomeSnapshot) | Out-Null }
-        else { $loadingSnapshotKept = $true }
-        Start-Sleep -Milliseconds 250
-    } while ([DateTime]::UtcNow -lt $welcomeDeadline)
-    if ($welcomeStage -ceq "loading-progress") {
-        throw "Timed out waiting for the exact branded Field window after NSIS loading progress."
-    }
-    if ($welcomeStage -ne "branded") { throw "Expected the branded Field welcome stage." }
+    $welcomeResult = Wait-ExpectedStageAfterLoading -Process $process -DifferentFromTitle "Installer Language" -ExpectedStage "branded" -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
+    $mainWindow = $welcomeResult.window
 
     foreach ($step in 1..2) {
         $priorText = @((Get-WindowRecord -Window $mainWindow).visibleText) -join "`n"
