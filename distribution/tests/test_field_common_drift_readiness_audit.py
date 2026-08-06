@@ -56,7 +56,15 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
             self.assertIn(required_subject, subjects)
         by_path = {item["path"]: item for item in audit["changedPaths"]}
         self.assertNotIn("distribution/tools/edition_build_planner.py", by_path)
-        self.assertNotIn("engine-pack/tools/engine_pack.py", by_path)
+        for pending_path in (
+            "desktop/src-tauri/build.rs",
+            "engine-pack/tests/test_engine_pack.py",
+            "engine-pack/tools/engine_pack.py",
+        ):
+            self.assertEqual(
+                by_path[pending_path]["classification"],
+                "universal-common-core-backflow",
+            )
         self.assertEqual(
             by_path["distribution/tools/field_prerelease_audit.py"]["classification"],
             "field-specific-contract",
@@ -65,7 +73,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
             by_path["distribution/runtime-contract-registry.v1.json"]["classification"],
             "field-specific-contract",
         )
-        self.assertEqual(audit["summary"]["universalCommonCorePathCount"], 0)
+        self.assertEqual(audit["summary"]["universalCommonCorePathCount"], 3)
         self.assertEqual(audit["summary"]["protectedEvidenceDriftCount"], 0)
         field_evidence = [
             item
@@ -118,7 +126,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertEqual(receipt["registry"]["validatedHardwarePackCount"], 0)
         self.assertEqual(receipt["registry"]["validatedHardwarePackIds"], [])
         self.assertIn("field.registry.zero-validated-packs", receipt["blockers"])
-        self.assertNotIn("field.common-core-backflow.pending", receipt["blockers"])
+        self.assertIn("field.common-core-backflow.pending", receipt["blockers"])
         self.assertIn("build DroneDream-Field-1.0.0.exe", receipt["prohibitedOperations"])
         self.assertIn("read OPENAI_API_KEY or provider credentials", receipt["prohibitedOperations"])
 
