@@ -36,7 +36,13 @@ CURRENT_EVIDENCE = (
     ROOT
     / "artifacts"
     / "test-runs"
-    / "field-host-contained-readiness-76efd06-coexistence"
+    / "field-host-contained-readiness-d54c66e-utf8"
+)
+PREFLIGHT_FAILURE_EVIDENCE = (
+    ROOT
+    / "artifacts"
+    / "test-runs"
+    / "field-host-contained-preflight-failure-5d62660"
 )
 
 SPEC = importlib.util.spec_from_file_location("field_host_contained_readiness_tests", TOOL_PATH)
@@ -256,6 +262,23 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertEqual(receipt["planSha256"], plan["planSha256"])
         self.assertEqual(receipt["decision"], "request-yellow-host-contained")
         self.assertFalse(receipt["executionPerformed"])
+
+    def test_first_yellow_attempt_is_preserved_as_preflight_only_failure(self) -> None:
+        failure = host_readiness.load_json(
+            PREFLIGHT_FAILURE_EVIDENCE / "preflight-failure-receipt.json"
+        )
+        self.assertEqual(failure["result"], "fail-before-owned-write")
+        self.assertEqual(failure["attempt"]["sourceHead"], "5d6266088b457f5c5dfe82e8d6f7be1df2b7831f")
+        self.assertEqual(failure["attempt"]["errorCode"], "field.host.snapshot.utf8-codepage-parse")
+        self.assertFalse(failure["attempt"]["productFailure"])
+        self.assertEqual(
+            failure["remediation"]["fixedExecutorCommit"],
+            "d54c66e2e9e34184b9aa230e8740ac4f05bc9d7a",
+        )
+        self.assertEqual(set(failure["executionCounts"].values()), {0})
+        self.assertFalse(any(failure["postFailureState"].values()))
+        self.assertFalse(failure["releaseState"]["releaseReady"])
+        self.assertFalse(failure["releaseState"]["websiteReady"])
 
     def test_snapshot_tool_is_read_only_outside_its_explicit_output(self) -> None:
         source = SNAPSHOT_TOOL_PATH.read_text(encoding="utf-8")
