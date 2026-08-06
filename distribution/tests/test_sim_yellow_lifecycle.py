@@ -211,20 +211,28 @@ class SimYellowLifecycleTests(unittest.TestCase):
         self.assertTrue(sync_gate["formalHandoffReceived"])
         self.assertTrue(sync_gate["installerIcoConsumed"])
         self.assertFalse(sync_gate["releaseAsset"])
-        self.assertTrue(sync_gate["yellow2Ready"])
+        self.assertFalse(sync_gate["yellow2Ready"])
         self.assertFalse(
             self.contract["artifactGate"][
                 "yellow2BlockedUntilInstallerDerivativeContract"
             ]
         )
-        self.assertTrue(self.contract["artifactGate"]["yellow2StaticReady"])
+        self.assertFalse(self.contract["artifactGate"]["yellow2StaticReady"])
         self.assertEqual(
             self.contract["buildEnvironment"],
             {
                 "DRONEDREAM_DESKTOP_EDITION_ID": "sim",
                 "DRONEDREAM_EDITION_PROFILE": "sim-only",
                 "VITE_DRONEDREAM_EDITION": "sim",
-                "DRONEDREAM_OAUTH_CLIENT_ID": "dronedream-desktop-sim",
+                "DRONEDREAM_OAUTH_CLIENT_ID": "0c2ad943-a0cb-4a2f-9eda-eba44b7f58df",
+                "oauthClientIdSource": "user-confirmed-public-client-id",
+                "oauthClientIdSha256": (
+                    "10598a5c1712b32e2bfe8d5cb4bf97f563ceb3a9eabb5846445e3ab593eac08f"
+                ),
+                "oauthTokenEndpointAuthMethod": "none",
+                "oauthRedirectUri": (
+                    "http://127.0.0.1:49211/desktop-auth/sim/callback"
+                ),
                 "singleProcessInjectionRequired": True,
                 "providerNetworkUseAllowed": False,
                 "secretReadAllowed": False,
@@ -278,6 +286,23 @@ class SimYellowLifecycleTests(unittest.TestCase):
                 with self.assertRaisesRegex(sim_yellow.SimYellowLifecycleError, "YELLOW-3"):
                     self.validate(invalid)
 
+    def test_rejects_public_oauth_build_input_drift(self) -> None:
+        for key, value in (
+            ("DRONEDREAM_OAUTH_CLIENT_ID", "dronedream-desktop-sim"),
+            ("oauthClientIdSha256", "0" * 64),
+            ("oauthTokenEndpointAuthMethod", "client_secret_post"),
+            ("oauthRedirectUri", "http://127.0.0.1:49210/desktop-auth/sim/callback"),
+            ("secretReadAllowed", True),
+        ):
+            with self.subTest(key=key):
+                invalid = deepcopy(load_json(PLAN_PATH))
+                invalid["buildEnvironment"][key] = value
+                with self.assertRaisesRegex(
+                    sim_yellow.SimYellowLifecycleError,
+                    "build environment identity",
+                ):
+                    self.validate(invalid)
+
     def test_rejects_visual_contract_hash_or_matrix_status_drift(self) -> None:
         invalid = deepcopy(load_json(PLAN_PATH))
         invalid["yellow1VisualBinding"]["sha256"] = "0" * 64
@@ -303,7 +328,7 @@ class SimYellowLifecycleTests(unittest.TestCase):
             ("canonicalBrandManifestConsumed", False),
             ("installerIcoConsumed", False),
             ("releaseAsset", True),
-            ("yellow2Ready", False),
+            ("yellow2Ready", True),
             ("brandDonorCommitIsCommonCore", True),
             ("adoptionReceiptSha256", "0" * 64),
         ):
