@@ -47,7 +47,8 @@ describe("ProductPage", () => {
       .toBeVisible();
     expect(screen.queryByText(/vehicle execution|vehicle lab integration/i)).toBeNull();
     const editionMarks = container.querySelectorAll(
-      'img.site-product-edition-icon[data-brand-handoff="commander-approved-brand-handoff-v2"]',
+      'img.site-product-edition-icon[data-brand-handoff="commander-approved-brand-handoff-v2"]'
+      + '[data-brand-surface="product-card"][data-brand-asset="mark"]',
     );
     expect(editionMarks).toHaveLength(3);
     expect([...editionMarks].map((image) => image.getAttribute("src"))).toEqual([

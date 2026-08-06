@@ -62,6 +62,10 @@ describe("DroneDream public website", () => {
       "src",
       expect.stringContaining("drone-dream-mark.png"),
     );
+    expect(universalDownload.querySelector("img"))
+      .toHaveAttribute("data-brand-surface", "download-chooser");
+    expect(universalDownload.querySelector("img"))
+      .toHaveAttribute("data-brand-asset", "mark");
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
     expect(starflightButton).not.toHaveTextContent("+");

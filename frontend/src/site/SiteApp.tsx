@@ -1381,7 +1381,13 @@ export function SiteApp({
               download={universalRelease.artifact.fileName}
               aria-label={`DroneDream Universal — ${copy.downloadShort}`}
             >
-              <img alt="" aria-hidden="true" src={editionBrandAssets.universal.mark} />
+              <img
+                alt=""
+                aria-hidden="true"
+                data-brand-asset="mark"
+                data-brand-surface="download-chooser"
+                src={editionBrandAssets.universal.mark}
+              />
               {copy.downloadShort}
             </a>
           ) : (
@@ -1395,7 +1401,13 @@ export function SiteApp({
               title={universalPendingLabel}
               aria-label={universalPendingLabel}
             >
-              <img alt="" aria-hidden="true" src={editionBrandAssets.universal.mark} />
+              <img
+                alt=""
+                aria-hidden="true"
+                data-brand-asset="mark"
+                data-brand-surface="download-chooser"
+                src={editionBrandAssets.universal.mark}
+              />
               {copy.downloadShort}
             </button>
           )}

@@ -110,7 +110,9 @@ export function ProductPage({
                     alt=""
                     aria-hidden="true"
                     className="site-product-edition-icon"
+                    data-brand-asset="mark"
                     data-brand-handoff="commander-approved-brand-handoff-v2"
+                    data-brand-surface="product-card"
                     height="1024"
                     src={brandAssets.mark}
                     width="1024"
