@@ -391,8 +391,8 @@ try {
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
 
-    $plan = Get-Content -LiteralPath $PlanPath -Raw | ConvertFrom-Json
-    $baseline = Get-Content -LiteralPath $BaselineSnapshotPath -Raw | ConvertFrom-Json
+    $plan = [IO.File]::ReadAllText($PlanPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+    $baseline = [IO.File]::ReadAllText($BaselineSnapshotPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
     $head = (git rev-parse HEAD).Trim()
     if ($head -ne $ExpectedEvidenceHead) { throw "evidence HEAD drifted: $head" }
     if ((git status --porcelain).Count -ne 0) { throw "worktree is not clean" }
@@ -409,7 +409,7 @@ try {
     New-Item -ItemType Directory -Path $OutputRoot | Out-Null
 
     $preflightPath = Capture-Snapshot "before-snapshot"
-    $before = Get-Content -LiteralPath $preflightPath -Raw | ConvertFrom-Json
+    $before = [IO.File]::ReadAllText($preflightPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
     Assert-Preconditions $before
     Assert-ProtectedState $baseline $before "preflight"
     Add-Phase "host-baseline" "pass" ([ordered]@{
@@ -470,7 +470,7 @@ try {
     })
 
     $afterPath = Capture-Snapshot "after-snapshot"
-    $after = Get-Content -LiteralPath $afterPath -Raw | ConvertFrom-Json
+    $after = [IO.File]::ReadAllText($afterPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
     Assert-ProtectedState $before $after "final"
     Assert-Preconditions $after
     Add-Phase "protected-state-rollback-audit" "pass" ([ordered]@{

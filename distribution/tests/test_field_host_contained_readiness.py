@@ -275,6 +275,8 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertIn("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", source)
         self.assertIn("System.AppUserModel.ID", source)
         self.assertIn("$FieldIconSha256", source)
+        self.assertIn("[IO.File]::ReadAllText", source)
+        self.assertNotIn("Get-Content -LiteralPath $PlanPath -Raw", source)
         self.assertNotIn("New-NetFirewallRule", source)
         self.assertNotIn("Start-Service", source)
         self.assertNotIn("Get-PnpDevice", source)
