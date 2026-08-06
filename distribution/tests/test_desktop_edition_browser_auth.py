@@ -52,8 +52,8 @@ def test_every_edition_requires_an_explicit_isolated_transaction() -> None:
     assert account["automaticCrossEditionAuthentication"] is False
     assert account["desktopTokenImport"] is False
     for field in (
-        "authClientId", "bundleIdentifier", "loopbackPathPrefix", "customProtocol",
-        "credentialVaultNamespace", "webViewDataNamespace",
+        "authClientId", "bundleIdentifier", "loopbackPathPrefix", "loopbackPort",
+        "redirectUri", "customProtocol", "credentialVaultNamespace", "webViewDataNamespace",
     ):
         values = [edition[field] for edition in document["editions"]]
         assert len(values) == len(set(values)), field
@@ -63,7 +63,13 @@ def test_authorization_callback_is_code_only_pkce_and_one_time() -> None:
     protocol = contract_tool.load_contract(ROOT)["authorizationProtocol"]
     assert protocol["flow"] == "hosted-authorization-code-pkce"
     assert protocol["pkceMethod"] == "S256"
-    assert protocol["callbackFields"] == ["code", "state", "editionId", "attemptId"]
+    assert protocol["authorizationEndpoint"].endswith("/auth/v1/oauth/authorize")
+    assert protocol["tokenExchangeEndpoint"].endswith("/auth/v1/oauth/token")
+    assert protocol["authorizationUiEndpoint"] == "https://getdronedream.com/oauth/consent"
+    assert protocol["callbackFields"] == ["code", "state"]
+    assert protocol["nativeBoundContext"] == [
+        "editionId", "authClientId", "attemptId", "callbackPort", "codeVerifier", "nonce"
+    ]
     assert protocol["callbackMustNotContain"] == [
         "accessToken", "refreshToken", "password", "cookie"
     ]
@@ -116,11 +122,26 @@ def test_security_or_release_gate_drift_fails_closed(mutation, message: str) -> 
 
 
 def test_cross_edition_client_callback_or_vault_collision_fails_closed() -> None:
-    for field in ("authClientId", "loopbackPathPrefix", "credentialVaultNamespace"):
+    for field in (
+        "authClientId", "loopbackPathPrefix", "loopbackPort", "redirectUri",
+        "credentialVaultNamespace",
+    ):
         document = _document()
         document["editions"][1][field] = document["editions"][0][field]
         with pytest.raises(contract_tool.DesktopEditionBrowserAuthError, match="drifted|collide"):
             contract_tool.validate_contract(document, root=ROOT)
+
+
+def test_each_oauth_client_has_an_exact_registered_loopback_redirect() -> None:
+    document = contract_tool.load_contract(ROOT)
+    for offset, edition in enumerate(document["editions"]):
+        expected_port = 49210 + offset
+        assert edition["loopbackPort"] == expected_port
+        assert edition["redirectUri"] == (
+            f"http://127.0.0.1:{expected_port}/desktop-auth/"
+            f"{edition['editionId']}/callback"
+        )
+        assert edition["providerClientIdBuildVariable"] == "DRONEDREAM_OAUTH_CLIENT_ID"
 
 
 def test_audit_receipt_cannot_allow_tokens_passwords_cookies_or_raw_callback() -> None:

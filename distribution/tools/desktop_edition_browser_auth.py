@@ -93,19 +93,20 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
         or protocol.get("providerRetryCount") != 0
         or protocol.get("callbackTransport") != "loopback-http"
         or protocol.get("loopbackHost") != "127.0.0.1"
-        or protocol.get("callbackPathTemplate")
-        != "/desktop-auth/{editionId}/{attemptId}/callback"
+        or protocol.get("callbackPathTemplate") != "/desktop-auth/{editionId}/callback"
     ):
         raise DesktopEditionBrowserAuthError("authorization protocol identity drifted")
     if protocol.get("authorizationEndpoint") != (
-        "https://getdronedream.com/desktop-auth/v1/authorize"
+        "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize"
     ) or protocol.get("tokenExchangeEndpoint") != (
-        "https://getdronedream.com/desktop-auth/v1/token"
+        "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/token"
+    ) or protocol.get("authorizationUiEndpoint") != (
+        "https://getdronedream.com/oauth/consent"
     ):
         raise DesktopEditionBrowserAuthError("hosted authorization broker drifted")
     required_true = {
         "singleActiveAttemptPerEdition", "oneTimeCallback", "oneTimeCodeExchange",
-        "randomLoopbackPortRequired", "strictHostAndOriginRequired",
+        "fixedRegisteredLoopbackPortRequired", "strictHostAndOriginRequired",
         "browserConfirmationRequired", "uninitiatedCallbackDenied",
         "crossEditionCallbackDenied", "crossPortCallbackDenied", "expiredCallbackDenied",
         "replayedCallbackDenied",
@@ -116,8 +117,12 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
         "rawTokenLoopbackAllowed"
     ) is not False:
         raise DesktopEditionBrowserAuthError("legacy raw-token browser flow cannot be released")
-    if protocol.get("callbackFields") != ["code", "state", "editionId", "attemptId"]:
+    if protocol.get("callbackFields") != ["code", "state"]:
         raise DesktopEditionBrowserAuthError("callback field allowlist drifted")
+    if protocol.get("nativeBoundContext") != [
+        "editionId", "authClientId", "attemptId", "callbackPort", "codeVerifier", "nonce"
+    ]:
+        raise DesktopEditionBrowserAuthError("native transaction binding drifted")
     if protocol.get("callbackMustNotContain") != [
         "accessToken", "refreshToken", "password", "cookie"
     ]:
@@ -154,8 +159,9 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
         raise DesktopEditionBrowserAuthError("browser auth editions must be canonical and ordered")
     identity_by_id = {entry["editionId"]: entry for entry in identity_editions}
     edition_keys = {
-        "editionId", "authClientId", "bundleIdentifier", "loopbackPathPrefix",
-        "customProtocol", "credentialVaultNamespace", "webViewDataNamespace",
+        "editionId", "authClientId", "providerClientIdBuildVariable", "bundleIdentifier",
+        "loopbackPathPrefix", "loopbackPort", "redirectUri", "customProtocol",
+        "credentialVaultNamespace", "webViewDataNamespace",
     }
     for edition in editions:
         edition_id = edition["editionId"]
@@ -163,12 +169,26 @@ def validate_contract(document: Any, *, root: Path) -> dict[str, Any]:
         identity_edition = identity_by_id.get(edition_id)
         if not isinstance(identity_edition, dict):
             raise DesktopEditionBrowserAuthError(f"identity edition {edition_id} is unavailable")
-        for field in edition_keys - {"editionId"}:
+        for field in edition_keys - {
+            "editionId", "providerClientIdBuildVariable", "loopbackPort", "redirectUri"
+        }:
             if edition[field] != identity_edition.get(field):
                 raise DesktopEditionBrowserAuthError(
                     f"browser auth edition {edition_id} {field} drifted"
                 )
-    for field in edition_keys - {"editionId"}:
+        if edition["providerClientIdBuildVariable"] != "DRONEDREAM_OAUTH_CLIENT_ID":
+            raise DesktopEditionBrowserAuthError(
+                f"browser auth edition {edition_id} provider client source drifted"
+            )
+        expected_port = 49210 + EDITION_IDS.index(edition_id)
+        expected_redirect = (
+            f"http://127.0.0.1:{expected_port}/desktop-auth/{edition_id}/callback"
+        )
+        if edition["loopbackPort"] != expected_port or edition["redirectUri"] != expected_redirect:
+            raise DesktopEditionBrowserAuthError(
+                f"browser auth edition {edition_id} registered redirect drifted"
+            )
+    for field in edition_keys - {"editionId", "providerClientIdBuildVariable"}:
         values = [edition[field] for edition in editions]
         if len(values) != len(set(values)):
             raise DesktopEditionBrowserAuthError(f"browser auth edition {field} values collide")
