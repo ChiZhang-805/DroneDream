@@ -21,6 +21,12 @@ BUILD_RECEIPT_PATH = (
 )
 RUNNER_PATH = APPLICATION_PATH.with_name("run-lab-app-only-lifecycle.ps1")
 INSPECTOR_PATH = APPLICATION_PATH.with_name("inspect-lab-live-webview2.mjs")
+FAILURE_RECEIPT_PATH = (
+    ROOT
+    / "distribution"
+    / "build-receipts"
+    / "lab-debd064-red-segment-a1-failure.json"
+)
 
 
 def _load(path: Path) -> dict:
@@ -210,3 +216,31 @@ def test_live_webview2_inspector_switches_language_without_auth_or_browser() -> 
         assert fragment in inspector
     assert "page.goto(" not in inspector
     assert "page.getByRole(\"button\", { name: /sign in/i" not in inspector
+
+
+def test_first_segment_a_attempt_is_frozen_failed_without_retry() -> None:
+    receipt = _load(FAILURE_RECEIPT_PATH)
+
+    assert receipt["result"] == "failed-no-retry"
+    assert receipt["productSource"]["commit"] == (
+        "debd0647c5883ffe5c9c52037d35a6b567d9fd62"
+    )
+    assert receipt["artifact"]["sha256"] == (
+        "b5969f2f287cf729450618e6d3a8232f426b1ac4cbe5c3662904d31bab215a48"
+    )
+    assert receipt["failure"]["classification"] == (
+        "edition-lifecycle-validator-policy-mismatch"
+    )
+    assert receipt["failure"]["artifactInvalidatedByThisFailure"] is False
+    assert receipt["rollback"]["ownedProductKeyAbsentAfterCleanup"] is True
+    assert receipt["rollback"][
+        "protectedOtherEditionsRuntimeAndWebView2Parity"
+    ] is True
+    assert receipt["oauthSegmentB"]["state"] == "fail-closed-not-executed"
+    assert receipt["retry"] == {
+        "performed": False,
+        "authorized": False,
+        "requiresNewExactApplicationAndSeparateReport": True,
+    }
+    assert receipt["releaseReady"] is False
+    assert receipt["websiteHandoffReady"] is False

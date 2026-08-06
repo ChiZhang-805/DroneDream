@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-red-segment-a-lifecycle-evidence",
+  "receiptVersion": "1.0.0",
+  "editionId": "lab",
+  "attemptId": "debd064-segment-a-red1-20260806T143000Z",
+  "classification": "RED",
+  "result": "failed-no-retry",
+  "productSource": {
+    "commit": "debd0647c5883ffe5c9c52037d35a6b567d9fd62",
+    "tree": "fa28c390a33835f30d1d7bf88e2b36e68df7f340",
+    "mayBeRelabeled": false
+  },
+  "executionEvidenceSource": {
+    "commit": "5ec7508f33cafc7a89e85c18b8c68a7ca406d473",
+    "applicationPath": "distribution/editions/lab/lifecycle/red-debd064-app-only-application.v1.json",
+    "applicationBytes": 10165,
+    "applicationSha256": "29b58c7d553d110e1073fc6d9592108d6128cf7b05fc35b99392d93e64ac3088",
+    "isProductSource": false
+  },
+  "artifact": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\debd064-yellow-attempt6\\artifact\\DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12080017,
+    "sha256": "b5969f2f287cf729450618e6d3a8232f426b1ac4cbe5c3662904d31bab215a48",
+    "authenticodeStatus": "NotSigned",
+    "rebuilt": false
+  },
+  "exactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "uninstallerInvocations": 1,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "accountReads": 0,
+    "tokenReadsOrExchanges": 0,
+    "artifactBuilds": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0
+  },
+  "stageResults": {
+    "freshInstall": {
+      "exitCode": 0,
+      "identityAccepted": true,
+      "shortcutsAccepted": true,
+      "protectedStateParity": true
+    },
+    "freshLiveWebView2": {
+      "passed": true,
+      "pageUrl": "http://tauri.localhost/#/desktop/setup",
+      "initialLocale": "en",
+      "finalLocale": "zh-CN",
+      "brandNaturalWidth": 2386,
+      "brandNaturalHeight": 218,
+      "forbiddenAuthRequestCount": 0,
+      "authStorageKeyCount": 0,
+      "protectedStateParity": true
+    },
+    "overlayInstall": {
+      "arguments": [
+        "/S",
+        "/UPDATE"
+      ],
+      "exitCode": 0,
+      "identityAccepted": true,
+      "shortcutsAccepted": true,
+      "protectedStateParity": true
+    },
+    "overlayLiveWebView2": {
+      "passed": true,
+      "pageUrl": "http://tauri.localhost/#/desktop/setup",
+      "initialLocale": "zh-CN",
+      "finalLocale": "en",
+      "brandNaturalWidth": 2386,
+      "brandNaturalHeight": 218,
+      "forbiddenAuthRequestCount": 0,
+      "authStorageKeyCount": 0,
+      "protectedStateParity": true
+    },
+    "uninstall": {
+      "exitCode": 0,
+      "installRootRemoved": true,
+      "uninstallRegistrationRemoved": true,
+      "desktopShortcutRemoved": true,
+      "startMenuShortcutRemoved": true,
+      "appDataRemoved": true
+    }
+  },
+  "failure": {
+    "stage": "post-uninstall-owned-residue-validator",
+    "message": "Lab uninstall registry residue remains: HKCU:\\Software\\DroneDream\\DroneDream-Lab",
+    "classification": "edition-lifecycle-validator-policy-mismatch",
+    "productUninstallerExitCodeWasZero": true,
+    "observedOwnedPreferenceValues": {
+      "default": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Lab",
+      "DroneDreamRuntimeInstallMode": "install-app-only",
+      "DroneDreamRuntimeDrive": "",
+      "DroneDreamRuntimeOperationProtocol": "2"
+    },
+    "explanation": "The silent Tauri uninstaller preserves its Edition product preference key unless the interactive delete-app-data checkbox is selected. The application expected the key to be absent after separately removing owned app data.",
+    "commonProductNsisChangeRequired": false,
+    "artifactInvalidatedByThisFailure": false
+  },
+  "rollback": {
+    "automaticUninstallerRetryCount": 0,
+    "manualOwnedProductKeyCleanupCount": 1,
+    "ownedProductKeyValuesValidatedBeforeCleanup": true,
+    "ownedProductKeyAbsentAfterCleanup": true,
+    "installRootAbsent": true,
+    "roamingAppDataAbsent": true,
+    "localAppDataAbsent": true,
+    "uninstallKeyAbsent": true,
+    "desktopShortcutAbsent": true,
+    "startMenuShortcutAbsent": true,
+    "droneDreamProcessCount": 0,
+    "oauthPort49212ListenerCount": 0,
+    "protectedOtherEditionsRuntimeAndWebView2Parity": true
+  },
+  "externalEvidence": {
+    "root": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Lab-RED\\debd064-segment-a-red1-20260806T143000Z",
+    "receipt": {
+      "fileName": "lab-red-segment-a-lifecycle-receipt.json",
+      "bytes": 23664,
+      "sha256": "1626d92d04d2235fe897bd289877960c2ec4365d70eaffbc4b4c80110ff5a2f2"
+    },
+    "freshInspection": {
+      "fileName": "fresh-live-webview2.json",
+      "bytes": 961,
+      "sha256": "85dea383c566c5bb884a649e579df3cc9e72d93ea01981b8d1bec73b5432d76e"
+    },
+    "freshScreenshot": {
+      "fileName": "fresh-lab-webview2.png",
+      "bytes": 675063,
+      "sha256": "d3990a0b155d47059bc712498c95181064cdd6685b14620880841f516f8081d1"
+    },
+    "overlayInspection": {
+      "fileName": "overlay-live-webview2.json",
+      "bytes": 965,
+      "sha256": "be5cbea9d9193c8a4f69f277b3679bb5a39886bab6036ef0da19729ff53d9f39"
+    },
+    "overlayScreenshot": {
+      "fileName": "overlay-lab-webview2.png",
+      "bytes": 642235,
+      "sha256": "32125567d1b59452cae998ff2998d5a643eb5de3606424f2efb8863a3713fb02"
+    }
+  },
+  "oauthSegmentB": {
+    "state": "fail-closed-not-executed",
+    "blocksSegmentA": false,
+    "providerCalled": false,
+    "browserOpened": false
+  },
+  "retry": {
+    "performed": false,
+    "authorized": false,
+    "requiresNewExactApplicationAndSeparateReport": true
+  },
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}
