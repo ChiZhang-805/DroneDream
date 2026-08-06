@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from distribution.tools import edition_safety_contract
 
 from app.distribution_safety import (
     BackendDistributionSafetyError,
@@ -15,10 +16,13 @@ from app.distribution_safety import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURE = json.loads(
-    (ROOT / "distribution/tests/fixtures/edition-safety-cases.v1.json").read_text(
-        encoding="utf-8"
-    )
+FIXTURE = edition_safety_contract.bind_test_fixture_to_edition_manifest(
+    json.loads(
+        (ROOT / "distribution/tests/fixtures/edition-safety-cases.v1.json").read_text(
+            encoding="utf-8"
+        )
+    ),
+    ROOT / "distribution/editions/lab.v1.json",
 )
 
 
@@ -94,6 +98,24 @@ def test_test_only_validated_fixture_can_reach_backend_allow() -> None:
     assert result.decision == "allow"
     assert result.reason_codes == ("backend.contract.allow",)
     assert result.receipt["testOnly"] is True
+
+
+def test_mismatched_active_edition_manifest_is_denied() -> None:
+    request = request_fixture()
+    context = allow_override(trusted_context(request))
+    policy = request["policy"]
+    receipts = request["evidenceReceipts"]
+    assert isinstance(policy, dict)
+    assert isinstance(receipts, list)
+    policy["editionManifestSha256"] = "0" * 64
+    context_hash = edition_safety_contract.authorization_context_hash(request)
+    for receipt in receipts:
+        assert isinstance(receipt, dict)
+        receipt["contextHash"] = context_hash
+
+    result = evaluate_backend_authorization(request, context)
+    assert result.decision == "deny"
+    assert "backend.edition.manifest-mismatch" in result.reason_codes
 
 
 @pytest.mark.parametrize(
