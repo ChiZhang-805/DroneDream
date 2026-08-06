@@ -15,6 +15,8 @@ describe("UniversalModeSwitch", () => {
     window.localStorage.clear();
     delete document.documentElement.dataset.brandEdition;
     delete document.documentElement.dataset.productMode;
+    delete document.documentElement.dataset.themePresentationOnly;
+    delete document.documentElement.dataset.themeGrantsHardwareAuthority;
   });
 
   it("fails unknown persisted values back to the Universal mother brand", () => {
@@ -32,6 +34,8 @@ describe("UniversalModeSwitch", () => {
       .toBe("frozen-selection");
     expect(document.documentElement.dataset.brandEdition).toBe("field");
     expect(document.documentElement.dataset.productMode).toBe("field");
+    expect(document.documentElement.dataset.themePresentationOnly).toBe("true");
+    expect(document.documentElement.dataset.themeGrantsHardwareAuthority).toBe("false");
   });
 
   it("offers all four modes and never represents the switch as authority", () => {

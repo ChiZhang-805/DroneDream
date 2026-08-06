@@ -40,8 +40,14 @@ import {
   type AvatarCropCopy,
 } from "./components/AvatarCropDialog";
 import { BrandLockup } from "./components/BrandLockup";
-import { DistributionSetupPanel } from "./components/DistributionSetupPanel";
+import {
+  EditionSettingsPanel,
+  EditionSettingsSurface,
+  type SettingsSurfaceTab,
+  type SettingsSurfaceTabId,
+} from "./components/EditionSettingsSurface";
 import { UniversalModeSwitch } from "./components/UniversalModeSwitch";
+import type { BrandEditionId } from "./brand/edition-brand.generated";
 import {
   getDesktopWindowHandle,
   isDesktopRuntime,
@@ -108,6 +114,7 @@ import type {
 } from "./types/api";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
 import { appDisplayName, appEdition, labEditionEnabled } from "./edition";
+import { EditionThemeProvider } from "./theme/EditionThemeProvider";
 
 type NavigationItem = {
   to: string;
@@ -407,10 +414,12 @@ function runtimeHealthLevel(access: DesktopRuntimeAccess): RuntimeHealthLevel {
 function SettingsDialog({
   access,
   closeRef,
+  edition,
   onClose,
 }: {
   access: DesktopRuntimeAccess;
   closeRef: RefObject<HTMLButtonElement>;
+  edition: BrandEditionId;
   onClose: () => void;
 }) {
   const { locale, setLocale, t } = useI18n();
@@ -634,6 +643,16 @@ function SettingsDialog({
         ),
       )
     : 0;
+  const [activeSettingsTab, setActiveSettingsTab] =
+    useState<SettingsSurfaceTabId>("general");
+  const settingsTabs: readonly SettingsSurfaceTab[] = [
+    { id: "general", label: locale === "zh-CN" ? "常规" : "General" },
+    { id: "memory", label: locale === "zh-CN" ? "记忆" : "Memory" },
+    { id: "model", label: locale === "zh-CN" ? "模型" : "Model" },
+    ...(access.desktopRuntime
+      ? [{ id: "runtime", label: locale === "zh-CN" ? "运行环境" : "Runtime" } as const]
+      : []),
+  ];
   const level = runtimeHealthLevel(access);
   const snapshot = access.snapshot;
   const details: string[] = [];
@@ -686,25 +705,19 @@ function SettingsDialog({
     : t("settings.runtime.neverChecked");
 
   return (
-    <section
-      className="launcher-settings-dialog"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="launcher-settings-title"
+    <EditionSettingsSurface
+      activeTab={activeSettingsTab}
+      closeLabel={t("app.closeSettings")}
+      closeRef={closeRef}
+      edition={edition}
+      onClose={onClose}
+      onTabChange={setActiveSettingsTab}
+      tabs={settingsTabs}
+      title={t("app.settingsTitle")}
+      consumerProfile={labEditionEnabled ? "lab" : "universal"}
     >
-      <div className="launcher-settings-heading">
-        <h2 id="launcher-settings-title">{t("app.settingsTitle")}</h2>
-        <button
-          ref={closeRef}
-          type="button"
-          className="launcher-settings-close"
-          aria-label={t("app.closeSettings")}
-          onClick={onClose}
-        >
-          <span aria-hidden="true">×</span>
-        </button>
-      </div>
-      <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
+      <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
+        <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
         <button
           type="button"
           className={locale === "en" ? "selected" : undefined}
@@ -727,9 +740,10 @@ function SettingsDialog({
           <strong>{t("app.languageChinese")}</strong>
           <i aria-hidden="true">✓</i>
         </button>
-      </fieldset>
-      <DistributionSetupPanel variant="settings" />
-      <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
+        </fieldset>
+      </EditionSettingsPanel>
+      <EditionSettingsPanel active={activeSettingsTab === "memory"} id="memory">
+        <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
         <div className="settings-memory-heading">
           <div>
             <h3 id="settings-memory-title">{t("settings.memory.title")}</h3>
@@ -878,8 +892,10 @@ function SettingsDialog({
               : experiencePreferenceMessage}
           </p>
         ) : null}
-      </section>
-      <section className="settings-model-panel" aria-labelledby="settings-model-title">
+        </section>
+      </EditionSettingsPanel>
+      <EditionSettingsPanel active={activeSettingsTab === "model"} id="model">
+        <section className="settings-model-panel" aria-labelledby="settings-model-title">
         <div className="settings-model-heading">
           <h3 id="settings-model-title">{t("settings.model.title")}</h3>
           <span className={
@@ -1128,9 +1144,11 @@ function SettingsDialog({
             <p className="settings-model-security-note">{t("settings.model.securityNote")}</p>
           </>
         )}
-      </section>
+        </section>
+      </EditionSettingsPanel>
       {access.desktopRuntime ? (
-        <section className="settings-runtime-panel" aria-labelledby="settings-runtime-title">
+        <EditionSettingsPanel active={activeSettingsTab === "runtime"} id="runtime">
+          <section className="settings-runtime-panel" aria-labelledby="settings-runtime-title">
           <div className="settings-runtime-heading">
             <div>
               <h3 id="settings-runtime-title">{t("settings.runtime.title")}</h3>
@@ -1162,14 +1180,20 @@ function SettingsDialog({
               <summary>{t("settings.runtime.viewDetails")}</summary>
               <div className="settings-runtime-details-scroll">
                 <ul>
-                  {uniqueDetails.map((detail) => <li key={detail}>{detail}</li>)}
+                  {uniqueDetails.slice(0, 4).map((detail) => <li key={detail}>{detail}</li>)}
+                  {uniqueDetails.length > 4 ? (
+                    <li>{locale === "zh-CN"
+                      ? `另有 ${uniqueDetails.length - 4} 项诊断信息`
+                      : `${uniqueDetails.length - 4} more diagnostic items`}</li>
+                  ) : null}
                 </ul>
               </div>
             </details>
           ) : null}
-        </section>
+          </section>
+        </EditionSettingsPanel>
       ) : null}
-    </section>
+    </EditionSettingsSurface>
   );
 }
 
@@ -2535,7 +2559,8 @@ function AppShellContent() {
 
   if (launcherMode) {
     return (
-      <div className="app-shell app-shell-launcher" data-brand-edition={shellBrandEdition}>
+      <EditionThemeProvider edition={shellBrandEdition}>
+        <div className="app-shell app-shell-launcher">
         <a
           className="skip-link"
           href="#main-content"
@@ -2584,6 +2609,7 @@ function AppShellContent() {
             <SettingsDialog
               access={runtimeAccess}
               closeRef={launcherSettingsCloseRef}
+              edition={shellBrandEdition}
               onClose={closeSettings}
             />
           </div>
@@ -2592,15 +2618,14 @@ function AppShellContent() {
         <main id="main-content" className="launcher-main" tabIndex={-1}>
           <Outlet />
         </main>
-      </div>
+        </div>
+      </EditionThemeProvider>
     );
   }
 
   return (
-    <div
-      className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}
-      data-brand-edition={shellBrandEdition}
-    >
+    <EditionThemeProvider edition={shellBrandEdition}>
+      <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}>
       <a
         className="skip-link"
         href="#main-content"
@@ -2846,6 +2871,7 @@ function AppShellContent() {
             <SettingsDialog
               access={runtimeAccess}
               closeRef={launcherSettingsCloseRef}
+              edition={shellBrandEdition}
               onClose={closeSettings}
             />
           </div>
@@ -2874,6 +2900,7 @@ function AppShellContent() {
           </div>
         </footer>
       </div>
-    </div>
+      </div>
+    </EditionThemeProvider>
   );
 }

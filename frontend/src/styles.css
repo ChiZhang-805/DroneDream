@@ -14,16 +14,21 @@
   --text: #e8ecf1;
   --text-muted: #8892b0;
   --text-dim: #b8c2d8;
-  --primary: #5b8dff;
-  --primary-strong: #2f6bff;
+  --primary: var(--dd-brand-middle);
+  --primary-strong: var(--dd-brand-end);
   --accent: var(--primary);
   --muted: var(--text-muted);
   --panel: var(--bg-elev);
   --success: #3ecf8e;
   --warning: #f0b429;
   --danger: #ef5a5a;
-  --active: #6fbcff;
-  --focus-ring: 0 0 0 2px rgba(91, 141, 255, 0.45);
+  --active: var(--dd-brand-start);
+  --focus-ring: 0 0 0 2px color-mix(in srgb, var(--dd-brand-middle) 48%, transparent);
+  --dd-theme-control: var(--dd-brand-middle);
+  --dd-theme-control-strong: var(--dd-brand-end);
+  --dd-theme-selection: color-mix(in srgb, var(--dd-brand-start) 30%, transparent);
+  --dd-theme-border: color-mix(in srgb, var(--dd-brand-middle) 32%, var(--border));
+  --dd-theme-panel: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, var(--bg-elev));
 }
 
 * {
@@ -35,6 +40,11 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
+}
+
+::selection {
+  color: var(--text);
+  background: var(--dd-theme-selection);
 }
 
 a {
@@ -5830,16 +5840,27 @@ a {
 }
 
 .launcher-settings-dialog {
-  width: min(620px, 100%);
-  max-height: min(86vh, 760px);
-  overflow-y: auto;
-  padding: 1.25rem;
-  border: 1px solid rgba(190, 133, 255, 0.28);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  width: min(840px, calc(100vw - 24px));
+  height: min(650px, calc(100dvh - 24px));
+  max-height: none;
+  overflow: hidden;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 38%, transparent);
   border-radius: 18px;
   color: #f7f2ff;
   background:
-    radial-gradient(circle at 90% 5%, rgba(92, 224, 255, 0.1), transparent 34%),
-    linear-gradient(150deg, rgba(27, 9, 50, 0.98), rgba(10, 3, 24, 0.99));
+    radial-gradient(
+      circle at 90% 5%,
+      color-mix(in srgb, var(--dd-brand-start) 14%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      150deg,
+      color-mix(in srgb, var(--dd-brand-dark-surface) 92%, #160a24),
+      color-mix(in srgb, var(--dd-brand-dark-surface) 96%, #05020b)
+    );
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.62), inset 0 1px rgba(255, 255, 255, 0.06);
   animation: launcher-settings-rise 180ms ease-out;
 }
@@ -5849,7 +5870,22 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1.1rem;
+  margin-bottom: 0.65rem;
+}
+
+.launcher-settings-title-lockup {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.launcher-settings-title-lockup .brand-lockup {
+  width: auto;
+  height: 24px;
+  max-width: min(42vw, 240px);
+  object-fit: contain;
+  object-position: left center;
 }
 
 .launcher-settings-heading h2 {
@@ -5872,16 +5908,85 @@ a {
   cursor: pointer;
 }
 
+.launcher-settings-close svg {
+  width: 18px;
+  height: 18px;
+}
+
 .launcher-settings-close:hover,
 .launcher-settings-close:focus-visible {
   color: #fff;
-  border-color: rgba(255, 112, 221, 0.42);
+  border-color: color-mix(in srgb, var(--dd-brand-start) 54%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--dd-brand-middle) 56%, transparent);
+  outline-offset: 2px;
+}
+
+.launcher-settings-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.launcher-settings-tabs button {
+  display: flex;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  padding: 0.48rem 0.58rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 20%, transparent);
+  border-radius: 11px;
+  color: #cfc4db;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 55%, transparent);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.launcher-settings-tabs button svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
+.launcher-settings-tabs button[aria-selected="true"] {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 62%, transparent);
+  background: linear-gradient(
+    125deg,
+    color-mix(in srgb, var(--dd-brand-start) 24%, transparent),
+    color-mix(in srgb, var(--dd-brand-end) 18%, transparent)
+  );
+}
+
+.launcher-settings-tabs button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--dd-brand-start) 74%, transparent);
+  outline-offset: 2px;
+}
+
+.launcher-settings-panels,
+.launcher-settings-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.launcher-settings-panel {
+  height: 100%;
+  outline: none;
+}
+
+.launcher-settings-panel[hidden] {
+  display: none;
 }
 
 .launcher-language-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.7rem;
+  gap: 0.55rem;
   margin: 0;
   padding: 0;
   border: 0;
@@ -5893,8 +5998,8 @@ a {
   grid-template-columns: 34px 1fr auto;
   align-items: center;
   gap: 0.65rem;
-  min-height: 62px;
-  padding: 0.65rem 0.75rem;
+  min-height: 52px;
+  padding: 0.5rem 0.65rem;
   border: 1px solid rgba(206, 174, 255, 0.14);
   border-radius: 13px;
   color: #d7cce2;
@@ -6366,17 +6471,17 @@ a {
 .settings-model-panel {
   display: grid;
   gap: 0.75rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(206, 174, 255, 0.14);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .settings-memory-panel {
   display: grid;
   gap: 0.72rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(206, 174, 255, 0.14);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .settings-memory-heading {
@@ -6779,9 +6884,9 @@ a {
 .settings-runtime-panel {
   display: grid;
   gap: 0.85rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid rgba(206, 174, 255, 0.14);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .settings-runtime-heading {
@@ -6884,10 +6989,9 @@ a {
 }
 
 .settings-runtime-details-scroll {
-  max-height: 180px;
-  overflow: auto;
+  max-height: none;
+  overflow: hidden;
   padding: 0 0.85rem 0.8rem;
-  scrollbar-color: rgba(178, 113, 255, 0.5) rgba(255, 255, 255, 0.03);
 }
 
 .settings-runtime-details-scroll ul {
@@ -8882,6 +8986,7 @@ a {
    launcher's cinematic treatment, but present it as a light workspace dialog
    once the user is inside the operational application. */
 .app-shell:not(.app-shell-launcher) .launcher-settings-backdrop {
+  z-index: 900;
   background: rgba(31, 18, 35, 0.42);
   backdrop-filter: blur(5px);
 }
@@ -12272,5 +12377,248 @@ a {
 
   .app-shell:not(.app-shell-launcher) .app-header {
     display: none;
+  }
+}
+
+/* ---------- Canonical Edition presentation layer ---------- */
+:root {
+  --primary: var(--dd-brand-middle);
+  --primary-strong: var(--dd-brand-end);
+  --active: var(--dd-brand-start);
+  --accent: var(--dd-brand-middle);
+  --focus-ring:
+    0 0 0 2px color-mix(in srgb, var(--dd-brand-middle) 52%, transparent),
+    0 0 24px color-mix(in srgb, var(--dd-brand-end) 28%, transparent);
+}
+
+body {
+  background:
+    radial-gradient(circle at 14% 8%, color-mix(in srgb, var(--dd-brand-start) 22%, transparent), transparent 28%),
+    radial-gradient(circle at 88% 6%, color-mix(in srgb, var(--dd-brand-middle) 28%, transparent), transparent 30%),
+    radial-gradient(circle at 68% 92%, color-mix(in srgb, var(--dd-brand-end) 18%, transparent), transparent 34%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--dd-brand-dark-surface) 94%, #020207),
+      color-mix(in srgb, var(--dd-brand-dark-surface) 82%, var(--dd-brand-middle))
+    );
+}
+
+.app-sidebar {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dd-brand-dark-surface) 88%, var(--dd-brand-middle)),
+    color-mix(in srgb, var(--dd-brand-dark-surface) 96%, #020207)
+  );
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--dd-brand-start) 16%, transparent);
+}
+
+.app-header {
+  border-bottom-color: color-mix(in srgb, var(--dd-brand-start) 24%, transparent);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 84%, transparent);
+}
+
+.app-nav a:hover,
+.app-nav a.active {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--dd-brand-middle) 22%, transparent),
+    color-mix(in srgb, var(--dd-brand-start) 12%, transparent)
+  );
+}
+
+.btn {
+  border-color: color-mix(in srgb, var(--dd-brand-start) 36%, transparent);
+  background: color-mix(in srgb, var(--dd-brand-middle) 34%, var(--dd-brand-dark-surface));
+}
+
+.btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--dd-brand-start) 62%, transparent);
+  background: color-mix(in srgb, var(--dd-brand-middle) 54%, var(--dd-brand-dark-surface));
+}
+
+.btn-primary,
+.progress-bar-fill,
+.settings-model-quota-track > span {
+  border-color: color-mix(in srgb, var(--dd-brand-start) 72%, transparent);
+  background: var(--dd-brand-gradient);
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--dd-brand-gradient);
+}
+
+.launcher-settings-dialog,
+.launcher-settings-dialog .settings-model-panel,
+.launcher-settings-dialog .settings-memory-panel,
+.launcher-settings-dialog .settings-runtime-panel {
+  --accent: var(--dd-brand-middle);
+  --active: var(--dd-brand-start);
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-settings-tabs button {
+  color: #4e4352;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 24%, #d9cddd);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 82%, #e5dfe7);
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-settings-tabs button[aria-selected="true"] {
+  color: #211722;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 68%, #c9b9cd);
+  background: linear-gradient(
+    125deg,
+    color-mix(in srgb, var(--dd-brand-start) 28%, #ffffff),
+    color-mix(in srgb, var(--dd-brand-end) 20%, #ffffff)
+  );
+}
+
+.app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
+.app-shell:not(.app-shell-launcher) .settings-model-usage {
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 58%, #33253d);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--dd-brand-dark-surface) 88%, var(--dd-brand-middle)),
+    color-mix(in srgb, var(--dd-brand-dark-surface) 92%, var(--dd-brand-end))
+  );
+}
+
+.app-shell:not(.app-shell-launcher) .settings-model-access-mode > button.selected {
+  border-color: color-mix(in srgb, var(--dd-brand-start) 78%, #ffffff);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--dd-brand-dark-surface) 78%, var(--dd-brand-start)),
+    color-mix(in srgb, var(--dd-brand-dark-surface) 88%, var(--dd-brand-middle))
+  );
+}
+
+.launcher-settings-dialog input:focus,
+.launcher-settings-dialog select:focus,
+.launcher-settings-dialog button:focus-visible,
+.launcher-settings-dialog summary:focus-visible {
+  outline-color: var(--dd-brand-start);
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 66%, transparent);
+}
+
+.drone-launch-aura {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--dd-brand-start) 22%, transparent),
+    color-mix(in srgb, var(--dd-brand-end) 12%, transparent) 38%,
+    transparent 72%
+  );
+}
+
+@media (max-width: 520px) {
+  .launcher-settings-dialog {
+    width: calc(100vw - 2.5rem);
+    height: calc(100dvh - 2.5rem);
+    padding: 0.72rem;
+    border-radius: 14px;
+  }
+
+  .launcher-settings-title-lockup .brand-lockup {
+    height: 20px;
+    max-width: 150px;
+  }
+
+  .launcher-settings-heading h2 {
+    font-size: 1.08rem;
+  }
+
+  .launcher-settings-tabs {
+    gap: 0.3rem;
+  }
+
+  .launcher-settings-tabs button {
+    min-height: 40px;
+    gap: 0.28rem;
+    padding-inline: 0.35rem;
+    font-size: 0.7rem;
+  }
+
+  .launcher-settings-tabs button svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .settings-memory-panel,
+  .settings-model-panel,
+  .settings-runtime-panel {
+    gap: 0.38rem;
+  }
+
+  .settings-memory-heading {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .settings-memory-heading p,
+  .settings-memory-consent small,
+  .settings-memory-policy {
+    display: none;
+  }
+
+  .settings-memory-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+
+  .settings-memory-grid label {
+    gap: 0.18rem;
+  }
+
+  .settings-memory-grid label > span {
+    overflow: hidden;
+    font-size: 0.62rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .settings-memory-grid input,
+  .settings-memory-grid select {
+    min-height: 34px;
+    padding: 0.34rem 0.4rem;
+    font-size: 0.7rem;
+  }
+
+  .settings-memory-actions {
+    flex-wrap: nowrap;
+  }
+
+  .settings-memory-actions > .btn {
+    min-width: 0;
+    flex: 1 1 0;
+    justify-content: center;
+    padding-inline: 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .settings-model-access-mode > button {
+    min-height: 54px;
+    padding: 0.5rem 0.58rem;
+  }
+
+  .settings-model-usage {
+    gap: 0.46rem;
+    padding: 0.62rem;
+  }
+
+  .settings-model-usage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35rem;
+  }
+
+  .settings-model-usage-grid > div,
+  .settings-runtime-status,
+  .settings-memory-consent {
+    padding: 0.48rem 0.55rem;
+  }
+
+  .settings-memory-heading p,
+  .settings-model-security-note,
+  .settings-memory-policy {
+    font-size: 0.64rem;
+    line-height: 1.3;
   }
 }

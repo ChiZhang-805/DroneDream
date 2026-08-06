@@ -4,6 +4,7 @@ import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "../AppShell";
+import { appDisplayName } from "../edition";
 import {
   AVATAR_OUTPUT_SIZE,
   avatarCropGeometry,
@@ -137,7 +138,7 @@ describe("workspace profile photo editor", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { container, router } = renderWorkspace();
 
-    expect(screen.getByRole("link", { name: "DroneDream" }))
+    expect(screen.getByRole("link", { name: appDisplayName }))
       .toHaveAttribute("href", "/");
     expect(getUserMedia).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Account" }));

@@ -3,6 +3,7 @@ import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "../AppShell";
+import { labEditionEnabled } from "../edition";
 import { I18nProvider } from "../i18n/I18nProvider";
 
 vi.mock("../features/auth/supabaseClient", () => ({
@@ -80,7 +81,7 @@ describe("workspace account entry", () => {
     const { container, router } = renderWorkspace();
 
     const links = container.querySelectorAll(".app-nav a");
-    expect(links).toHaveLength(5);
+    expect(links).toHaveLength(labEditionEnabled ? 6 : 5);
     links.forEach((link) => {
       expect(link.querySelector(".app-nav-entry > svg")).not.toBeNull();
     });
@@ -105,7 +106,7 @@ describe("workspace account entry", () => {
     expect(panel).not.toHaveAttribute("hidden");
     expect(within(panel!).getByRole("button", { name: "Account" }))
       .toHaveTextContent("Local user");
-    expect(within(panel!).getAllByRole("link")).toHaveLength(5);
+    expect(within(panel!).getAllByRole("link")).toHaveLength(labEditionEnabled ? 6 : 5);
 
     fireEvent.click(within(panel!).getByRole("button", { name: "Settings" }));
     expect(panel).toHaveAttribute("hidden");

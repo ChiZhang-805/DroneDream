@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { labEditionEnabled } from "../edition";
+
 const requiredComponentIds = [
   "wsl-runtime",
   "host-ownership",
@@ -238,12 +240,14 @@ describe("environment-aware routing", () => {
   });
 
   it("recovers unknown desktop and browser routes inside the product", async () => {
+    const desktopFallbackPath = labEditionEnabled ? "/lab/setup" : "/dashboard";
+    const browserFallbackPath = labEditionEnabled ? "/lab/setup" : "/assistant";
     installDesktopBridge();
     window.history.replaceState(null, "", "/#/desktop/setup");
     vi.resetModules();
     const desktop = await import("../router");
     await desktop.router.navigate("/removed-route");
-    expect(desktop.router.state.location.pathname).toBe("/dashboard");
+    expect(desktop.router.state.location.pathname).toBe(desktopFallbackPath);
     desktop.router.dispose();
 
     delete window.__TAURI__;
@@ -251,7 +255,7 @@ describe("environment-aware routing", () => {
     vi.resetModules();
     const browser = await import("../router");
     await browser.router.navigate("/removed-route");
-    expect(browser.router.state.location.pathname).toBe("/assistant");
+    expect(browser.router.state.location.pathname).toBe(browserFallbackPath);
     expect(window.location.hash).toBe("");
     browser.router.dispose();
   });

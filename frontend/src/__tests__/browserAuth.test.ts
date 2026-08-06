@@ -13,11 +13,12 @@ vi.mock("../features/auth/supabaseClient", () => ({
 }));
 
 import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
+import { appEdition } from "../edition";
 
 const validSession = {
   protocolVersion: "desktop-browser-auth-pkce-v1" as const,
-  editionId: "universal" as const,
-  authClientId: "dronedream-desktop-universal",
+  editionId: appEdition,
+  authClientId: `dronedream-desktop-${appEdition}`,
   accessToken: "header.payload.signature",
   refreshToken: "refresh-token-value",
   attemptIdHash: "a".repeat(64),
