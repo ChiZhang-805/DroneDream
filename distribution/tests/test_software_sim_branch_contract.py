@@ -180,7 +180,18 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertEqual(readiness["nextYellow"]["enginePackProfileId"], "sim-only")
         self.assertEqual(
             readiness["nextYellow"]["enginePackProfileEnvironmentVariable"],
-            "DRONEDREAM_ENGINE_PACK_EDITION_PROFILE",
+            "DRONEDREAM_EDITION_PROFILE",
+        )
+        build_script = (ROOT / "desktop" / "src-tauri" / "build.rs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            'std::env::var("DRONEDREAM_EDITION_PROFILE")',
+            build_script,
+        )
+        self.assertNotIn(
+            'std::env::var("DRONEDREAM_ENGINE_PACK_EDITION_PROFILE")',
+            build_script,
         )
         self.assertEqual(
             readiness["nextYellow"]["enginePackProfileEnvironmentValue"],

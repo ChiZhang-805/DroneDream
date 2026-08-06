@@ -80,7 +80,7 @@
     "buildStarted": false,
     "artifactFileName": "DroneDream-Sim-1.0.0.exe",
     "enginePackProfileId": "sim-only",
-    "enginePackProfileEnvironmentVariable": "DRONEDREAM_ENGINE_PACK_EDITION_PROFILE",
+    "enginePackProfileEnvironmentVariable": "DRONEDREAM_EDITION_PROFILE",
     "enginePackProfileEnvironmentValue": "sim-only",
     "historicalFailedBuildAttemptCount": 1,
     "plannedGlobalBuildAttemptOrdinal": 2,

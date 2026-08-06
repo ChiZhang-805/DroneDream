@@ -14,7 +14,7 @@
   },
   "replacementReadiness": {
     "path": "distribution/sim/readiness/sim-only-common-core-sync.v1.json",
-    "sha256": "0d1c01a9df571b48178730e0922324a4f6932717221158557a019e0d71488743",
+    "sha256": "a95b0204ad7c21f858302d4abb9af7b2adb652d4ae4e93345266a2f6cffee392",
     "commonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
     "commonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
     "priorAttemptEvidencePath": "distribution/sim/desktop/yellow-2-build-evidence-record.v1.json",
