@@ -225,14 +225,24 @@ function Advance-InstallerPage {
 
 function Suspend-DroneDreamRegistration {
     $keys = @(
-        "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerProductName",
-        "HKCU\Software\DroneDream\$InstallerProductName"
+        @{
+            Key = "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerProductName"
+            ProviderPath = "Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerProductName"
+        },
+        @{
+            Key = "HKCU\Software\DroneDream\$InstallerProductName"
+            ProviderPath = "Registry::HKEY_CURRENT_USER\Software\DroneDream\$InstallerProductName"
+        }
     )
-    foreach ($key in $keys) {
-        & reg.exe query $key *> $null
-        if ($LASTEXITCODE -ne 0) {
+    foreach ($entry in $keys) {
+        # An absent registration is the expected fresh-install state. Use the
+        # Registry provider for this check so reg.exe's normal "not found"
+        # stderr cannot become a terminating NativeCommandError under Stop.
+        # Export/delete still use reg.exe and remain fail-closed below.
+        if (-not (Test-Path -LiteralPath $entry.ProviderPath)) {
             continue
         }
+        $key = $entry.Key
         $backup = Join-Path $env:TEMP ("dronedream-installer-ui-{0}.reg" -f [Guid]::NewGuid().ToString("N"))
         & reg.exe export $key $backup /y *> $null
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $backup)) {

@@ -408,6 +408,13 @@ def test_visible_locale_verifier_handles_language_selector_in_edition_namespace(
         '[string]$InstallerProductName = "DroneDream"',
         '"HKCU:\\Software\\DroneDream\\$InstallerProductName"',
         '"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$InstallerProductName"',
+        '"Registry::HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$InstallerProductName"',
+        '"Registry::HKEY_CURRENT_USER\\Software\\DroneDream\\$InstallerProductName"',
+        "Test-Path -LiteralPath $entry.ProviderPath",
+        "& reg.exe export $key $backup /y *> $null",
+        "& reg.exe delete $key /f *> $null",
+        'throw "Could not back up installer registration \'$key\'"',
+        'throw "Could not suspend installer registration \'$key\'"',
         '[DroneDreamInstallerUi]::GetDlgItem($handle, 1002)',
         '$languageIndex = if ($Language -eq "English") { 0 } else { 1 }',
         'SendMessage($languageCombo, $CB_SETCURSEL',
@@ -417,3 +424,63 @@ def test_visible_locale_verifier_handles_language_selector_in_edition_namespace(
     ):
         assert fragment in verifier
     assert 'HKCU:\\Software\\DroneDream\\DroneDream"' not in verifier
+    assert "reg.exe query" not in verifier
+
+
+def _run_installer_ui_registration_guard(body: str) -> subprocess.CompletedProcess[str]:
+    verifier_path = str(INSTALLER_UI).replace("'", "''")
+    command = (
+        "$ErrorActionPreference='Stop';"
+        "$tokens=$null;$parseErrors=$null;"
+        f"$ast=[Management.Automation.Language.Parser]::ParseFile('{verifier_path}',"
+        "[ref]$tokens,[ref]$parseErrors);"
+        "if($parseErrors.Count -ne 0){exit 8};"
+        "$wanted=@('Suspend-DroneDreamRegistration','Restore-DroneDreamRegistration');"
+        "$functions=$ast.FindAll({param($node) "
+        "$node -is [Management.Automation.Language.FunctionDefinitionAst] "
+        "-and $wanted -contains $node.Name},$true);"
+        "if($functions.Count -ne 2){exit 8};"
+        "$functions | ForEach-Object { Invoke-Expression $_.Extent.Text };"
+        "$InstallerProductName=('DroneDream-UiGuard-' + [Guid]::NewGuid().ToString('N'));"
+        "$script:registryBackups=@();"
+        + body
+    )
+    return subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_visible_locale_registration_guard_accepts_absent_fresh_state() -> None:
+    result = _run_installer_ui_registration_guard(
+        "Suspend-DroneDreamRegistration;"
+        "if($script:registryBackups.Count -ne 0){exit 9}"
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_visible_locale_registration_guard_round_trips_owned_registration() -> None:
+    result = _run_installer_ui_registration_guard(
+        "$owned=('HKCU:\\Software\\DroneDream\\' + $InstallerProductName);"
+        "try {"
+        "New-Item -Path $owned -Force | Out-Null;"
+        "New-ItemProperty -Path $owned -Name 'ContractSentinel' -Value 'preserve' "
+        "-PropertyType String -Force | Out-Null;"
+        "Suspend-DroneDreamRegistration;"
+        "if(Test-Path -LiteralPath $owned){exit 9};"
+        "if($script:registryBackups.Count -ne 1){exit 9};"
+        "Restore-DroneDreamRegistration;"
+        "if(-not (Test-Path -LiteralPath $owned)){exit 9};"
+        "$value=Get-ItemPropertyValue -LiteralPath $owned -Name 'ContractSentinel';"
+        "if($value -cne 'preserve'){exit 9}"
+        "} finally {"
+        "Remove-Item -LiteralPath $owned -Recurse -Force -ErrorAction SilentlyContinue;"
+        "$script:registryBackups | ForEach-Object {"
+        "Remove-Item -LiteralPath $_.Backup -Force -ErrorAction SilentlyContinue"
+        "}"
+        "}"
+    )
+    assert result.returncode == 0, result.stderr
