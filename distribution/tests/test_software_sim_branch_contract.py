@@ -33,6 +33,12 @@ READINESS_PATH = (
 FAILED_YELLOW2_PATH = (
     DISTRIBUTION / "sim" / "desktop" / "yellow-2-build-evidence-record.v1.json"
 )
+REPLACEMENT_YELLOW2_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-2-replacement-build-evidence-record.v1.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -51,6 +57,36 @@ def git(*args: str) -> str:
 
 
 class SoftwareSimBranchContractTests(unittest.TestCase):
+    def test_replacement_yellow2_preserves_product_source_and_failure_genealogy(self) -> None:
+        evidence = load_json(REPLACEMENT_YELLOW2_PATH)
+
+        self.assertEqual(evidence["editionId"], "sim")
+        self.assertEqual(
+            evidence["source"]["productSourceCommit"],
+            "bd4ad3820f957e8f0ce5686e5dc06d636e4e4af1",
+        )
+        self.assertFalse(evidence["source"]["evidenceCommitIsProductSource"])
+        self.assertEqual(evidence["attempt"]["globalAttemptOrdinal"], 2)
+        self.assertEqual(evidence["attempt"]["sourceAttemptOrdinal"], 1)
+        self.assertEqual(evidence["attempt"]["sourceAttemptMaximum"], 1)
+        self.assertFalse(evidence["attempt"]["secondBuildAttempted"])
+        self.assertEqual(evidence["artifact"]["fileName"], "DroneDream-Sim-1.0.0.exe")
+        self.assertEqual(len(evidence["artifact"]["sha256"]), 64)
+        self.assertEqual(evidence["artifact"]["authenticodeState"], "NotSigned")
+        self.assertEqual(evidence["artifact"]["peCertificateTableSize"], 0)
+        self.assertIsNone(evidence["artifact"]["updaterSignaturePath"])
+        self.assertEqual(evidence["payloadAudit"]["enginePackProfileId"], "sim-only")
+        self.assertTrue(evidence["payloadAudit"]["simPayloadContractPassed"])
+        self.assertEqual(evidence["payloadAudit"]["forbiddenFindingCount"], 0)
+        self.assertEqual(evidence["payloadAudit"]["validatedVehiclePackCount"], 0)
+        self.assertFalse(evidence["payloadAudit"]["runtimeBaseEmbedded"])
+        self.assertTrue(evidence["priorFailedAttempt"]["preserved"])
+        self.assertFalse(evidence["priorFailedAttempt"]["reuseAllowed"])
+        self.assertTrue(evidence["lifecycle"]["eligible"])
+        self.assertFalse(evidence["lifecycle"]["validated"])
+        self.assertFalse(evidence["nonClaims"]["releaseReady"])
+        self.assertFalse(evidence["websiteHandoff"]["exactExeReceived"])
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.contract = load_json(CONTRACT_PATH)
