@@ -66,10 +66,20 @@ function Resolve-EditionGeneratedFrontendContract {
         [string]$EditionId
     )
 
+    $repoRootFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
     $baseConfigFull = (Resolve-Path -LiteralPath $BaseConfigPath -ErrorAction Stop).Path
-    $selectedConfigPath = $baseConfigFull
-    $selectedConfig = Get-Content -LiteralPath $baseConfigFull -Raw -Encoding UTF8 |
+    $expectedBaseConfig = [IO.Path]::GetFullPath(
+        (Join-Path $repoRootFull "desktop\src-tauri\tauri.conf.json")
+    )
+    if (-not $baseConfigFull.Equals(
+        $expectedBaseConfig,
+        [StringComparison]::OrdinalIgnoreCase
+    )) {
+        throw "The canonical Tauri base config must be desktop/src-tauri/tauri.conf.json."
+    }
+    $baseConfig = Get-Content -LiteralPath $baseConfigFull -Raw -Encoding UTF8 |
         ConvertFrom-Json
+    $effectiveBuildConfig = $baseConfig.build
     if ($AdditionalConfigPath) {
         $additionalConfigFull = (
             Resolve-Path -LiteralPath $AdditionalConfigPath -ErrorAction Stop
@@ -80,21 +90,28 @@ function Resolve-EditionGeneratedFrontendContract {
             -Encoding UTF8 | ConvertFrom-Json
         if ($additionalConfig.build -and
             $additionalConfig.build.PSObject.Properties.Name -ccontains "frontendDist") {
-            $selectedConfigPath = $additionalConfigFull
-            $selectedConfig = $additionalConfig
+            $effectiveBuildConfig = $additionalConfig.build
         }
     }
 
-    if (-not $selectedConfig.build -or
-        -not $selectedConfig.build.PSObject.Properties.Name -ccontains "frontendDist" -or
-        -not $selectedConfig.build.frontendDist) {
+    if (-not $effectiveBuildConfig -or
+        -not $effectiveBuildConfig.PSObject.Properties.Name -ccontains "frontendDist" -or
+        -not $effectiveBuildConfig.frontendDist) {
         throw "The effective Tauri config does not declare build.frontendDist."
     }
 
-    $repoRootFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
-    $configDirectory = Split-Path -Parent $selectedConfigPath
+    # Tauri --config files are merged into the canonical tauri.conf.json. A
+    # relative frontendDist remains relative to that canonical config directory;
+    # relocating an authorization overlay must never change path semantics.
+    $canonicalConfigDirectory = Split-Path -Parent $baseConfigFull
+    $frontendDistValue = [string]$effectiveBuildConfig.frontendDist
+    $frontendDistCandidate = if ([IO.Path]::IsPathRooted($frontendDistValue)) {
+        $frontendDistValue
+    } else {
+        Join-Path $canonicalConfigDirectory $frontendDistValue
+    }
     $frontendDistFull = [IO.Path]::GetFullPath(
-        (Join-Path $configDirectory ([string]$selectedConfig.build.frontendDist))
+        $frontendDistCandidate
     ).TrimEnd('\', '/')
     $repoPrefix = "$repoRootFull\"
     if (-not $frontendDistFull.StartsWith(
