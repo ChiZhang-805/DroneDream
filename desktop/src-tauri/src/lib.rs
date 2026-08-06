@@ -1,5 +1,6 @@
 mod app_update;
 mod browser_auth;
+mod browser_auth_audit;
 mod browser_auth_vault;
 mod desktop_api_bridge;
 mod distribution_plan;
