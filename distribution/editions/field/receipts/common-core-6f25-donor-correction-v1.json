@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-donor-correction-receipt",
+  "editionId": "field",
+  "productSource": {
+    "branch": "codex/software-field",
+    "commit": "6ff87f89281b17a3bb5c65436ebb64b90dae6d63",
+    "clean": true
+  },
+  "commonCore": {
+    "branch": "codex/software",
+    "commit": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "tree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d"
+  },
+  "authCorrection": {
+    "provenanceCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+    "syncMethod": "single-path-exact-byte-sync-from-common-core",
+    "path": "distribution/desktop/edition-browser-auth.v1.json",
+    "gitBlob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+    "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+    "identityBindingSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
+    "changed": true,
+    "universalReleasePathsConsumed": false
+  },
+  "runtimeModeAtomicReview": {
+    "provenanceCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
+    "authoritativeByteSource": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "pathCount": 3,
+    "changedPathCount": 0,
+    "allPathsExactAtInput": true,
+    "paths": [
+      {
+        "path": "desktop/scripts/verify-nsis-template.ps1",
+        "gitBlob": "0e1d94e8de358057cfd0d95bcc0ae332f8d71cf1",
+        "sha256": "d23770d685b3ac41679857e37d3c5e127929ad14b5eef5fc80de139f4dc83432"
+      },
+      {
+        "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
+        "gitBlob": "9af1787fa8607e725c4495fa14a5763de781a5a3",
+        "sha256": "daa73c6e7f6ea4e4cc05fda1c8602ef358d5e42e7daabf711d357144c600cbfa"
+      },
+      {
+        "path": "desktop/src-tauri/src/installer_handoff.rs",
+        "gitBlob": "d6ed51beb4730264c835d0b77f10cd14ee448b89",
+        "sha256": "cee0a2cd6bbf889ed07951cfc640e52cb70dee91239237b77c5cec897e2e1663"
+      }
+    ]
+  },
+  "historicalEvidence": {
+    "supersededProposalPath": "distribution/editions/field/proposals/universal-auth-coexistence-binding-fix-v1.json",
+    "preserved": true,
+    "oldA918BlockerClearedByThisDonor": true,
+    "oldReceiptRewritten": false
+  },
+  "fieldBindings": {
+    "compiledEditionId": "field",
+    "runtimeProfileId": "field-lightweight",
+    "authClientId": "dronedream-desktop-field",
+    "updaterMetadataFilename": "latest-field.json",
+    "validatedHardwarePackCount": 0
+  },
+  "tests": [
+    {"suite": "desktop-auth-coexistence-and-historical-receipt", "passed": 32},
+    {"suite": "field-negative-lifecycle-contracts", "passed": 38},
+    {"suite": "rust-installer-handoff-gnullvm", "passed": 11},
+    {"suite": "nsis-template-static", "passed": 1},
+    {"suite": "release-source-policy", "passed": 1}
+  ],
+  "safety": {
+    "buildPerformed": false,
+    "installPerformed": false,
+    "runtimeMigrationPerformed": false,
+    "providerUsed": false,
+    "deviceTouched": false,
+    "hardwareActionsAllowed": false,
+    "simulationAllowed": false,
+    "releaseBranchCreated": false,
+    "deploymentPerformed": false
+  },
+  "releaseState": {
+    "authCommonCoreBlockerCleared": true,
+    "previewReady": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "nextGate": "new exact YELLOW build authorization for the corrected product source"
+  }
+}
