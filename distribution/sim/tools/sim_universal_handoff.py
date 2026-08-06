@@ -28,7 +28,7 @@ EXACT_GROUPS = {
         "desktop/src-tauri/nsis/webview2-health.nsh",
         "distribution/tests/test_desktop_edition_coexistence.py",
     ),
-    "6355aad351370178a7171b504a5d2f235fb12ceb": (
+    "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75": (
         "distribution/schemas/desktop-edition-browser-auth.schema.json",
         "distribution/tests/test_desktop_edition_browser_auth.py",
         "distribution/tools/desktop_edition_browser_auth.py",
@@ -276,6 +276,43 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         == coexistence_sha,
         "auth binding correction is not exact",
     )
+    auth_verifier_sync = corrections.get("authVerifierAtomicSync", {})
+    _require(
+        auth_verifier_sync.get("sourceCommit")
+        == "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
+        "auth verifier source drifted",
+    )
+    _require(
+        auth_verifier_sync.get("reviewedHead") == OBSERVED_HEAD,
+        "auth verifier reviewed head drifted",
+    )
+    expected_auth_verifier_rows = {
+        "distribution/schemas/desktop-edition-browser-auth.schema.json": (
+            "57087ee0f3bd5d3f9fd99d69fbcf8a29b6d4b09e",
+            "1d5a9c2a5ba3a4ebc77d8f35897e145d52f95f310a6a6d1ef0a59a8667fd1af2",
+        ),
+        "distribution/tools/desktop_edition_browser_auth.py": (
+            "be2d864e7cd8db2c3a5788f515364c7cb0517bbf",
+            "752661e552a0b2a07c007492b62c45319ab89d0a6ff985b3e317d324495fac56",
+        ),
+        "distribution/tests/test_desktop_edition_browser_auth.py": (
+            "4a922be5189e7690b5bf1da4f21ed649ede292f9",
+            "1e5e99ea095800a55365e181d42b65491702ac891e5a6d347a88b7200ee07a44",
+        ),
+    }
+    auth_rows = auth_verifier_sync.get("paths", [])
+    _require(
+        [row.get("path") for row in auth_rows]
+        == list(expected_auth_verifier_rows),
+        "auth verifier migration order drifted",
+    )
+    for row in auth_rows:
+        path = row["path"]
+        blob, sha256 = expected_auth_verifier_rows[path]
+        _require(row.get("blob") == blob, f"auth verifier blob drifted: {path}")
+        _require(row.get("sha256") == sha256, f"auth verifier SHA drifted: {path}")
+        _require(_git(root, "hash-object", "--", path) == blob, f"auth verifier drifted: {path}")
+        _require(_sha256(root / path) == sha256, f"auth verifier bytes drifted: {path}")
 
     runtime_correction = corrections.get("runtimeModeAtomicReview", {})
     _require(
@@ -312,63 +349,13 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         _require(_git(root, "hash-object", "--", path) == blob, f"runtime blob drifted: {path}")
         _require(_sha256(root / path) == sha256, f"runtime bytes drifted: {path}")
 
-    blockers = document.get("upstreamBlockers", [])
-    _require(
-        len(blockers) == 1
-        and blockers[0].get("id") == "AUTH-CONTRACT-VERIFIER-DONOR-OMITTED",
-        "upstream auth verifier blocker drifted",
-    )
-    blocker = blockers[0]
-    _require(blocker.get("owner") == "codex/software", "auth blocker owner drifted")
-    _require(
-        blocker.get("contractSourceCommit")
-        == "c322cda1c968d15b09e8ac93364f885777b619e8",
-        "auth blocker contract source drifted",
-    )
-    _require(
-        blocker.get("observedVerifierCommit")
-        == "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
-        "auth blocker observed verifier source drifted",
-    )
-    expected_observed = {
-        "distribution/schemas/desktop-edition-browser-auth.schema.json": (
-            "e128362bf6ec2f71ed20e4ccb7c7843a63334de8",
-            "57087ee0f3bd5d3f9fd99d69fbcf8a29b6d4b09e",
-        ),
-        "distribution/tools/desktop_edition_browser_auth.py": (
-            "03dfc8f00ec3b487df65c173c105ce2738f57e8a",
-            "be2d864e7cd8db2c3a5788f515364c7cb0517bbf",
-        ),
-        "distribution/tests/test_desktop_edition_browser_auth.py": (
-            "52815b8a755d87551c786ec81b84ddb8a7070a52",
-            "4a922be5189e7690b5bf1da4f21ed649ede292f9",
-        ),
-    }
-    observed_rows = blocker.get("observedNotAdoptedPaths", [])
-    _require(len(observed_rows) == 3, "auth blocker path count drifted")
-    for row in observed_rows:
-        path = row.get("path")
-        _require(path in expected_observed, "auth blocker path drifted")
-        current_blob, observed_blob = expected_observed[path]
-        _require(row.get("currentBlob") == current_blob, f"auth current blob drifted: {path}")
-        _require(row.get("observedBlob") == observed_blob, f"auth observed blob drifted: {path}")
-        _require(
-            _git(root, "hash-object", "--", path) == current_blob,
-            f"auth path drifted: {path}",
-        )
-        _require(
-            _git(root, "rev-parse", f"{OBSERVED_HEAD}:{path}") == observed_blob,
-            f"observed auth path drifted: {path}",
-        )
-    _require(
-        blocker.get("simMayImportWithoutExactHandoff") is False,
-        "auth handoff boundary drifted",
-    )
+    _require(document.get("upstreamBlockers") == [], "resolved blocker was retained")
 
     verification = document.get("verification", {})
-    for key, value in verification.items():
-        expected = key != "authContractSuitePassed"
-        _require(value is expected, f"verification claim drifted: {key}")
+    _require(
+        verification and all(value is True for value in verification.values()),
+        "verification claim drifted",
+    )
     classification = document.get("commonCoreClassification", {})
     _require(classification.get("baselineUpdated") is False, "commonCore update overclaim")
     _require(
@@ -381,7 +368,7 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         "execution overclaim",
     )
     non_claims = document.get("nonClaims", {})
-    expected_validated = {"nsisTemplateValidated"}
+    expected_validated = {"authContractValidated", "nsisTemplateValidated"}
     for key, value in non_claims.items():
         _require(value is (key in expected_validated), f"release overclaim: {key}")
     return document
@@ -400,7 +387,7 @@ def main() -> int:
                 "valid": True,
                 "brandPaths": 94,
                 "commonPaths": 47,
-                "yellow2Ready": False,
+                "yellow2Ready": True,
             },
             sort_keys=True,
         )

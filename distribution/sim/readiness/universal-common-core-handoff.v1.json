@@ -3,7 +3,7 @@
   "kind": "dronedream-sim-universal-common-core-handoff",
   "receiptVersion": "1.0.0",
   "editionId": "sim",
-  "state": "green-path-sync-complete-upstream-auth-verifier-blocked",
+  "state": "green-path-sync-complete-awaiting-yellow-authorization",
   "source": {
     "branch": "origin/codex/software",
     "observedHead": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
@@ -16,6 +16,7 @@
     "coexistenceContractCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
     "coexistenceImplementationCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
     "authContractCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+    "authVerifierCommit": "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
     "authImplementationCommit": "2f1dbc5fef092ae4cf58366e1178684672ae26c2",
     "credentialVaultCommit": "bed637c726462e1a38b74eba46915543d007869d",
     "authAuditCommit": "4c779b7ca316c0953f94f7ef3f4f850881ef2d58",
@@ -64,7 +65,7 @@
     "offlineBrowserAuthConfigGatePassed": true,
     "cargoFormatCheckPassed": true,
     "authContractBindingPassed": true,
-    "authContractSuitePassed": false,
+    "authContractSuitePassed": true,
     "nsisTemplateGatePassed": true
   },
   "corrections": {
@@ -74,6 +75,27 @@
       "blob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
       "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
       "identityBindingContractSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a"
+    },
+    "authVerifierAtomicSync": {
+      "sourceCommit": "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
+      "reviewedHead": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+      "paths": [
+        {
+          "path": "distribution/schemas/desktop-edition-browser-auth.schema.json",
+          "blob": "57087ee0f3bd5d3f9fd99d69fbcf8a29b6d4b09e",
+          "sha256": "1d5a9c2a5ba3a4ebc77d8f35897e145d52f95f310a6a6d1ef0a59a8667fd1af2"
+        },
+        {
+          "path": "distribution/tools/desktop_edition_browser_auth.py",
+          "blob": "be2d864e7cd8db2c3a5788f515364c7cb0517bbf",
+          "sha256": "752661e552a0b2a07c007492b62c45319ab89d0a6ff985b3e317d324495fac56"
+        },
+        {
+          "path": "distribution/tests/test_desktop_edition_browser_auth.py",
+          "blob": "4a922be5189e7690b5bf1da4f21ed649ede292f9",
+          "sha256": "1e5e99ea095800a55365e181d42b65491702ac891e5a6d347a88b7200ee07a44"
+        }
+      ]
     },
     "runtimeModeAtomicReview": {
       "sourceCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
@@ -97,33 +119,7 @@
       ]
     }
   },
-  "upstreamBlockers": [
-    {
-      "id": "AUTH-CONTRACT-VERIFIER-DONOR-OMITTED",
-      "owner": "codex/software",
-      "contractSourceCommit": "c322cda1c968d15b09e8ac93364f885777b619e8",
-      "observedVerifierCommit": "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
-      "reason": "The corrected contract changes callback and registered-port semantics, while the handed-off 6355 verifier still enforces the superseded callback template.",
-      "observedNotAdoptedPaths": [
-        {
-          "path": "distribution/schemas/desktop-edition-browser-auth.schema.json",
-          "currentBlob": "e128362bf6ec2f71ed20e4ccb7c7843a63334de8",
-          "observedBlob": "57087ee0f3bd5d3f9fd99d69fbcf8a29b6d4b09e"
-        },
-        {
-          "path": "distribution/tools/desktop_edition_browser_auth.py",
-          "currentBlob": "03dfc8f00ec3b487df65c173c105ce2738f57e8a",
-          "observedBlob": "be2d864e7cd8db2c3a5788f515364c7cb0517bbf"
-        },
-        {
-          "path": "distribution/tests/test_desktop_edition_browser_auth.py",
-          "currentBlob": "52815b8a755d87551c786ec81b84ddb8a7070a52",
-          "observedBlob": "4a922be5189e7690b5bf1da4f21ed649ede292f9"
-        }
-      ],
-      "simMayImportWithoutExactHandoff": false
-    }
-  ],
+  "upstreamBlockers": [],
   "commonCoreClassification": {
     "recordedCommonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
     "recordedCommonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
@@ -143,7 +139,7 @@
     "releaseAsset": false
   },
   "nonClaims": {
-    "authContractValidated": false,
+    "authContractValidated": true,
     "nsisTemplateValidated": true,
     "lifecycleValidated": false,
     "websiteHandoffReady": false,

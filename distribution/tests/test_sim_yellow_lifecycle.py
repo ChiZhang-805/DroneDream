@@ -211,13 +211,13 @@ class SimYellowLifecycleTests(unittest.TestCase):
         self.assertTrue(sync_gate["formalHandoffReceived"])
         self.assertTrue(sync_gate["installerIcoConsumed"])
         self.assertFalse(sync_gate["releaseAsset"])
-        self.assertFalse(sync_gate["yellow2Ready"])
+        self.assertTrue(sync_gate["yellow2Ready"])
         self.assertFalse(
             self.contract["artifactGate"][
                 "yellow2BlockedUntilInstallerDerivativeContract"
             ]
         )
-        self.assertFalse(self.contract["artifactGate"]["yellow2StaticReady"])
+        self.assertTrue(self.contract["artifactGate"]["yellow2StaticReady"])
         self.assertEqual(
             self.contract["buildEnvironment"],
             {
@@ -303,7 +303,7 @@ class SimYellowLifecycleTests(unittest.TestCase):
             ("canonicalBrandManifestConsumed", False),
             ("installerIcoConsumed", False),
             ("releaseAsset", True),
-            ("yellow2Ready", True),
+            ("yellow2Ready", False),
             ("brandDonorCommitIsCommonCore", True),
             ("adoptionReceiptSha256", "0" * 64),
         ):

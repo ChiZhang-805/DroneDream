@@ -47,10 +47,10 @@ class SimUniversalHandoffTests(unittest.TestCase):
         with self.assertRaisesRegex(SimUniversalHandoffError, "verification claim"):
             validate_handoff(receipt, ROOT)
 
-    def test_auth_verifier_blocker_cannot_be_hidden(self) -> None:
+    def test_auth_verifier_migration_order_drift_is_rejected(self) -> None:
         receipt = load_receipt()
-        receipt["upstreamBlockers"] = []
-        with self.assertRaisesRegex(SimUniversalHandoffError, "auth verifier blocker"):
+        receipt["corrections"]["authVerifierAtomicSync"]["paths"].reverse()
+        with self.assertRaisesRegex(SimUniversalHandoffError, "migration order"):
             validate_handoff(receipt, ROOT)
 
     def test_runtime_atomic_path_drift_is_rejected(self) -> None:
