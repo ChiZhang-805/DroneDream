@@ -112,7 +112,9 @@ Var DroneDreamValidatePathOnly
   Var DroneDreamModePageVisited
   Var DroneDreamRuntimeProtocol
 
-  Page custom DroneDreamRuntimeModePageCreate DroneDreamRuntimeModePageLeave
+  !if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
+    Page custom DroneDreamRuntimeModePageCreate DroneDreamRuntimeModePageLeave
+  !endif
 
   Function DroneDreamAppendInstallerDiagnostic
     Exch $0
@@ -304,6 +306,7 @@ Var DroneDreamValidatePathOnly
     Push "ok"
   FunctionEnd
 
+  !if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
   Function DroneDreamRunPlanner
     Exch $0
     StrCpy $8 "0"
@@ -640,6 +643,7 @@ Var DroneDreamValidatePathOnly
 
     dronedream_app_path_safe:
   FunctionEnd
+  !endif
 !macroend
 
 ; Interactive application launch is owned exclusively by Tauri's standard

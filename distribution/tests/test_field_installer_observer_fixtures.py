@@ -42,6 +42,19 @@ def test_attempt1_diagnosis_separates_direct_facts_from_static_inference() -> No
     assert diagnosis["authorization"]["currentMessageAuthorizesRed"] is False
 
 
+def test_live_observer_stops_at_the_first_exact_directory_page() -> None:
+    source = OBSERVER.read_text(encoding="utf-8-sig")
+    assert 'Action "Next-directory"' in source
+    assert 'foreach ($step in 1..2)' not in source
+    assert 'Action "Next-2"' not in source
+    directory_assertion = (
+        'if ($stage -ne "directory") { throw "The bounded observer did not reach '
+        'the exact Field directory stage." }'
+    )
+    assert source.count(directory_assertion) == 1
+    assert source.index('Action "Next-directory"') < source.index(directory_assertion)
+
+
 def test_window_stage_and_ownership_fixtures_fail_closed() -> None:
     observer = str(OBSERVER).replace("'", "''")
     script = textwrap.dedent(

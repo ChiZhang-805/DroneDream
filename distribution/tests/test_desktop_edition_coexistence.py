@@ -229,15 +229,15 @@ def test_nsis_keeps_internal_ownership_but_uses_display_shortcuts() -> None:
 
 def test_nsis_compile_check_covers_registration_repeated_expansion_and_unknown_editions() -> None:
     script = NSIS_COMPILE_CHECK.read_text(encoding="utf-8")
-    for edition_id, product_name, display_name in (
-        ("universal", "DroneDream-Universal", "DroneDream"),
-        ("sim", "DroneDream-Sim", "DroneDream · SIM"),
-        ("lab", "DroneDream-Lab", "DroneDream · LAB"),
-        ("field", "DroneDream-Field", "DroneDream · FIELD"),
+    for edition_id, product_name, display_name, runtime_page in (
+        ("universal", "DroneDream-Universal", "DroneDream", "$true"),
+        ("sim", "DroneDream-Sim", "DroneDream · SIM", "$true"),
+        ("lab", "DroneDream-Lab", "DroneDream · LAB", "$true"),
+        ("field", "DroneDream-Field", "DroneDream · FIELD", "$false"),
     ):
         invocation = (
             f'-EditionId "{edition_id}" -ProductName "{product_name}" '
-            f'-DisplayName "{display_name}"'
+            f'-DisplayName "{display_name}" -ExpectedRuntimeModePage {runtime_page}'
         )
         assert invocation in script
     uninstall_key = (
@@ -253,7 +253,7 @@ def test_nsis_compile_check_covers_registration_repeated_expansion_and_unknown_e
     assert script.count("DRONEDREAM_CREATE_OR_UPDATE_DESKTOP_SHORTCUT fixture_") == 2
     unknown_invocation = (
         'ProductName "DroneDream-Unknown" -DisplayName "DroneDream · UNKNOWN" '
-        '-ExpectedSuccess $false'
+        '-ExpectedRuntimeModePage $false -ExpectedSuccess $false'
     )
     assert unknown_invocation in script
     assert 'Remove-Item -LiteralPath $resolved -Recurse -Force' in script

@@ -12,6 +12,7 @@ LangString DD_DowngradeBlocked ${LANG_SIMPCHINESE} "电脑上已安装更新版�
 LangString DD_ShortcutConflict ${LANG_ENGLISH} "The requested shortcut name is already owned by another DroneDream installation. Setup preserved the existing shortcut and did not replace it."
 LangString DD_ShortcutConflict ${LANG_SIMPCHINESE} "所需的快捷方式名称已属于另一个 DroneDream 安装。安装程序已保留现有快捷方式，未进行覆盖。"
 
+!if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
 LangString DD_ModeHeader ${LANG_ENGLISH} "Choose what to install"
 LangString DD_ModeHeader ${LANG_SIMPCHINESE} "选择安装内容"
 LangString DD_ModeRequirements ${LANG_ENGLISH} "PX4/Gazebo downloads up to 8 GiB, uses about 24 GiB after installation, and requires at least 52 GiB free."
@@ -58,6 +59,7 @@ LangString DD_AppBelowRuntimeRoot ${LANG_ENGLISH} "The desktop application canno
 LangString DD_AppBelowRuntimeRoot ${LANG_SIMPCHINESE} "桌面程序不能安装到 $DroneDreamPlanTarget 的子目录。请返回并选择其他桌面安装目录。"
 LangString DD_AppPathCheckFailed ${LANG_ENGLISH} "The desktop application path could not be validated safely. Go back and choose the default application folder, or cancel setup."
 LangString DD_AppPathCheckFailed ${LANG_SIMPCHINESE} "无法安全验证桌面程序路径。请返回并选择默认的桌面安装目录，或取消安装。"
+!endif
 
 LangString DD_UpdatePending ${LANG_ENGLISH} "Runtime setup is waiting to continue. Open DroneDream to finish or cancel it before updating or reinstalling."
 LangString DD_UpdatePending ${LANG_SIMPCHINESE} "Runtime 安装正在等待续传。请先打开 DroneDream 完成或取消安装，再升级或重装。"

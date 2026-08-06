@@ -431,21 +431,19 @@ try {
     $welcomeResult = Wait-ExpectedStageAfterLoading -Process $process -DifferentFromTitle "Installer Language" -ExpectedStage "branded" -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
     $mainWindow = $welcomeResult.window
 
-    foreach ($step in 1..2) {
-        $priorText = @((Get-WindowRecord -Window $mainWindow).visibleText) -join "`n"
-        Invoke-ExactButton -Window $mainWindow -AutomationId "1" -ExpectedProcessId $process.Id -Action "Next-$step"
-        $deadline = [DateTime]::UtcNow.AddSeconds(15)
-        do {
-            Start-Sleep -Milliseconds 200
-            $mainWindow = Get-SingleOwnedWindow -ProcessId $process.Id
-            $record = Get-WindowRecord -Window $mainWindow
-            $currentText = @($record.visibleText) -join "`n"
-        } while ($currentText -ceq $priorText -and [DateTime]::UtcNow -lt $deadline)
-        if ($currentText -ceq $priorText) { throw "The exact Next-$step transition did not advance." }
-        $stepSnapshot = Add-PreclassificationSnapshot -WindowRecord $record -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
-        $stage = Resolve-InstallerWindowStage -WindowRecord $record -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
-        $stepSnapshot["stage"] = $stage
-    }
+    $priorText = @((Get-WindowRecord -Window $mainWindow).visibleText) -join "`n"
+    Invoke-ExactButton -Window $mainWindow -AutomationId "1" -ExpectedProcessId $process.Id -Action "Next-directory"
+    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    do {
+        Start-Sleep -Milliseconds 200
+        $mainWindow = Get-SingleOwnedWindow -ProcessId $process.Id
+        $record = Get-WindowRecord -Window $mainWindow
+        $currentText = @($record.visibleText) -join "`n"
+    } while ($currentText -ceq $priorText -and [DateTime]::UtcNow -lt $deadline)
+    if ($currentText -ceq $priorText) { throw "The exact Next-directory transition did not advance." }
+    $directorySnapshot = Add-PreclassificationSnapshot -WindowRecord $record -ExpectedProcessId $process.Id -ExpectedInstallRoot $expectedInstallRoot -Snapshots $snapshots
+    $stage = Resolve-InstallerWindowStage -WindowRecord $record -ExpectedProcessId $process.Id -ExpectedDisplayName $displayName -ExpectedInstallRoot $expectedInstallRoot
+    $directorySnapshot["stage"] = $stage
     if ($stage -ne "directory") { throw "The bounded observer did not reach the exact Field directory stage." }
 
     $screenshot = Join-Path $outputPath "installer-$ExpectedLocale.png"

@@ -8,20 +8,25 @@
 !if "${PRODUCTNAME}" == "DroneDream-Universal"
   !define DRONEDREAM_EDITION_ID "universal"
   !define DRONEDREAM_DISPLAYNAME "DroneDream"
+  !define DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED "1"
 !else if "${PRODUCTNAME}" == "DroneDream-Sim"
   !define DRONEDREAM_EDITION_ID "sim"
   !define DRONEDREAM_DISPLAYNAME "DroneDream · SIM"
+  !define DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED "1"
 !else if "${PRODUCTNAME}" == "DroneDream-Lab"
   !define DRONEDREAM_EDITION_ID "lab"
   !define DRONEDREAM_DISPLAYNAME "DroneDream · LAB"
+  !define DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED "1"
 !else if "${PRODUCTNAME}" == "DroneDream-Field"
   !define DRONEDREAM_EDITION_ID "field"
   !define DRONEDREAM_DISPLAYNAME "DroneDream · FIELD"
+  !define DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED "0"
 !else if "${PRODUCTNAME}" == "DroneDream"
   ; Retain source-build compatibility for the pre-edition development config.
   ; This identity is never promotion-eligible under the four-edition contract.
   !define DRONEDREAM_EDITION_ID "legacy-development"
   !define DRONEDREAM_DISPLAYNAME "DroneDream"
+  !define DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED "1"
 !else
   !error "Unknown DroneDream installer PRODUCTNAME: ${PRODUCTNAME}"
 !endif

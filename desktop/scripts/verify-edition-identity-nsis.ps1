@@ -54,6 +54,17 @@ Var OldMainBinaryName
 !macroend
 LangString DD_ShortcutConflict ${LANG_ENGLISH} "Shortcut conflict"
 !include "__IDENTITY_PATH__"
+!if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" != "__EXPECT_RUNTIME_MODE_PAGE__"
+  !error "Runtime mode page policy drifted for ${PRODUCTNAME}"
+!endif
+!if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
+  Page custom FixtureRuntimeModePage
+  Function FixtureRuntimeModePage
+    nsDialogs::Create 1018
+    Pop $0
+    nsDialogs::Show
+  FunctionEnd
+!endif
 Name "${DRONEDREAM_DISPLAYNAME} identity fixture"
 OutFile "__OUTPUT_PATH__"
 RequestExecutionLevel user
@@ -81,6 +92,7 @@ function Invoke-FixtureCompile {
         [Parameter(Mandatory = $true)][string]$EditionId,
         [Parameter(Mandatory = $true)][string]$ProductName,
         [Parameter(Mandatory = $true)][string]$DisplayName,
+        [Parameter(Mandatory = $true)][bool]$ExpectedRuntimeModePage,
         [Parameter(Mandatory = $true)][bool]$ExpectedSuccess
     )
 
@@ -90,6 +102,7 @@ function Invoke-FixtureCompile {
         Replace("__PRODUCT_NAME__", $ProductName).
         Replace("__DISPLAY_NAME__", $DisplayName).
         Replace("__BUNDLE_ID__", "io.dronedream.desktop.$EditionId").
+        Replace("__EXPECT_RUNTIME_MODE_PAGE__", $(if ($ExpectedRuntimeModePage) { "1" } else { "0" })).
         Replace("__IDENTITY_PATH__", $identityPath.Replace("\", "\\")).
         Replace("__OUTPUT_PATH__", $outputPath.Replace("\", "\\"))
     [IO.File]::WriteAllText($fixturePath, $fixture, $encoding)
@@ -111,6 +124,7 @@ function Invoke-FixtureCompile {
             editionId = $EditionId
             productName = $ProductName
             displayName = $DisplayName
+            runtimeModePageEnabled = $ExpectedRuntimeModePage
             uninstallRegistryKey = "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/$ProductName"
             uninstallRegistration = [ordered]@{
                 DisplayName = $DisplayName
@@ -136,11 +150,11 @@ function Invoke-FixtureCompile {
 
 try {
     $results = @(
-        Invoke-FixtureCompile -EditionId "universal" -ProductName "DroneDream-Universal" -DisplayName "DroneDream" -ExpectedSuccess $true
-        Invoke-FixtureCompile -EditionId "sim" -ProductName "DroneDream-Sim" -DisplayName "DroneDream · SIM" -ExpectedSuccess $true
-        Invoke-FixtureCompile -EditionId "lab" -ProductName "DroneDream-Lab" -DisplayName "DroneDream · LAB" -ExpectedSuccess $true
-        Invoke-FixtureCompile -EditionId "field" -ProductName "DroneDream-Field" -DisplayName "DroneDream · FIELD" -ExpectedSuccess $true
-        Invoke-FixtureCompile -EditionId "unknown" -ProductName "DroneDream-Unknown" -DisplayName "DroneDream · UNKNOWN" -ExpectedSuccess $false
+        Invoke-FixtureCompile -EditionId "universal" -ProductName "DroneDream-Universal" -DisplayName "DroneDream" -ExpectedRuntimeModePage $true -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "sim" -ProductName "DroneDream-Sim" -DisplayName "DroneDream · SIM" -ExpectedRuntimeModePage $true -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "lab" -ProductName "DroneDream-Lab" -DisplayName "DroneDream · LAB" -ExpectedRuntimeModePage $true -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "field" -ProductName "DroneDream-Field" -DisplayName "DroneDream · FIELD" -ExpectedRuntimeModePage $false -ExpectedSuccess $true
+        Invoke-FixtureCompile -EditionId "unknown" -ProductName "DroneDream-Unknown" -DisplayName "DroneDream · UNKNOWN" -ExpectedRuntimeModePage $false -ExpectedSuccess $false
     )
     [ordered]@{
         kind = "dronedream-edition-identity-nsis-compile-check"

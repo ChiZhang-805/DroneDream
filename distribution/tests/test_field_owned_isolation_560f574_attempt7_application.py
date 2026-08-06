@@ -67,17 +67,14 @@ def test_attempt7_tools_bind_exact_shared_wait_source() -> None:
         assert blob == binding["gitBlob"]
         assert len(content) == binding["lfNormalizedBytes"]
         assert sha256(content).hexdigest() == binding["lfNormalizedSha256"]
-        working = (ROOT / binding["path"]).read_text(encoding="utf-8-sig")
-        assert sha256(working.replace("\r\n", "\n").encode()).hexdigest() == (
-            binding["lfNormalizedSha256"]
-        )
 
 
 def test_attempt7_reuses_loading_wait_before_and_after_selector() -> None:
     application = load(APPLICATION)
     plan = load(PLAN)
     contract = application["observerContract"]
-    source = OBSERVER.read_text(encoding="utf-8-sig")
+    _, source_bytes = git_blob(TOOL_SOURCE, OBSERVER.relative_to(ROOT).as_posix())
+    source = source_bytes.decode("utf-8")
     assert contract["sharedLoadingWaitFunction"] == "Wait-ExpectedStageAfterLoading"
     assert contract["absoluteDeadlineRequired"] is True
     assert contract["preSelectorExpectedStage"] == "language-selector"
@@ -92,7 +89,7 @@ def test_attempt7_reuses_loading_wait_before_and_after_selector() -> None:
     assert "Timed out waiting for $ExpectedStage" in source
 
 
-def test_attempt7_is_unconsumed_and_hardware_denied() -> None:
+def test_attempt7_preparation_was_unconsumed_and_hardware_denied() -> None:
     application = load(APPLICATION)
     plan = load(PLAN)
     execution = application["execution"]
