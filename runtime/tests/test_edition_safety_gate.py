@@ -33,7 +33,10 @@ engine_pack = load_module(
     "runtime_engine_pack_tool_tests",
     ROOT / "engine-pack/tools/engine_pack.py",
 )
-FIXTURE = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+FIXTURE = contract.bind_test_fixture_to_edition_manifest(
+    json.loads(FIXTURE_PATH.read_text(encoding="utf-8")),
+    ROOT / "distribution/editions/lab.v1.json",
+)
 
 
 def request_fixture() -> dict[str, object]:
@@ -220,6 +223,19 @@ def test_test_only_validated_fixture_can_reach_runtime_allow(tmp_path: Path) -> 
     result = gate.evaluate_runtime_authorization(request, observation)
     assert result.decision == "allow"
     assert result.reason_codes == ("runtime.contract.allow",)
+
+
+def test_mismatched_active_edition_manifest_is_denied(tmp_path: Path) -> None:
+    request = request_fixture()
+    observation = allow_override(active_observation(tmp_path, request))
+    policy = request["policy"]
+    assert isinstance(policy, dict)
+    policy["editionManifestSha256"] = "0" * 64
+    refresh_context_hashes(request)
+
+    result = gate.evaluate_runtime_authorization(request, observation)
+    assert result.decision == "deny"
+    assert "runtime.edition.hash-mismatch" in result.reason_codes
 
 
 @pytest.mark.parametrize(

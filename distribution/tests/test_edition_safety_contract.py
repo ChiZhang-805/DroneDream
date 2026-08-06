@@ -16,6 +16,7 @@ AUTHORIZATION_SCHEMA_PATH = (
 )
 GATE_SCHEMA_PATH = DISTRIBUTION / "schemas" / "edition-execution-gate-policy.schema.json"
 FIXTURE_PATH = DISTRIBUTION / "tests" / "fixtures" / "edition-safety-cases.v1.json"
+LAB_MANIFEST_PATH = DISTRIBUTION / "editions" / "lab.v1.json"
 
 SPEC = importlib.util.spec_from_file_location(
     "edition_safety_contract_tests",
@@ -154,6 +155,40 @@ class EditionSafetyContractTests(unittest.TestCase):
                 execution_gate_policy_sha256=self.gate_sha256,
                 capability_policy_sha256=self.capability_sha256,
                 app_env="production",
+            )
+
+    def test_fixture_rebinds_to_exact_active_edition_without_mutating_source(self) -> None:
+        original = deepcopy(self.fixture)
+        rebound = contract.bind_test_fixture_to_edition_manifest(
+            self.fixture,
+            LAB_MANIFEST_PATH,
+        )
+        request = rebound["baseRequest"]
+        self.assertEqual(self.fixture, original)
+        self.assertEqual(request["editionId"], "lab")
+        self.assertEqual(
+            request["policy"]["editionManifestSha256"],
+            contract.sha256_file(LAB_MANIFEST_PATH),
+        )
+        expected_context_hash = contract.authorization_context_hash(request)
+        self.assertTrue(
+            all(
+                receipt["contextHash"] == expected_context_hash
+                for receipt in request["evidenceReceipts"]
+            )
+        )
+        self.validate_request(request)
+
+    def test_fixture_rebind_rejects_non_test_only_input(self) -> None:
+        fixture = deepcopy(self.fixture)
+        fixture["baseRequest"]["testOnly"] = False
+        with self.assertRaisesRegex(
+            contract.EditionSafetyContractError,
+            "not test-only",
+        ):
+            contract.bind_test_fixture_to_edition_manifest(
+                fixture,
+                LAB_MANIFEST_PATH,
             )
 
     def test_request_rejects_unknown_or_sensitive_fields(self) -> None:

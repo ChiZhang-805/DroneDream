@@ -15,6 +15,7 @@ import json
 import os
 import re
 from collections.abc import Iterable, Mapping
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,60 @@ TIMESTAMP_RE = re.compile(
     r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
     r"(?:\.[0-9]{1,6})?Z$"
 )
+
+
+def bind_test_fixture_to_edition_manifest(
+    fixture_set: Mapping[str, Any],
+    edition_manifest_path: Path,
+) -> dict[str, Any]:
+    """Bind the closed test-only safety fixture to exact active Edition bytes.
+
+    This helper is deliberately limited to a fixture whose request and every
+    evidence issuer are explicitly test-only.  It does not change production
+    validation or catalog state; it only keeps cross-branch contract tests
+    bound to the Edition manifest that those tests actually load.
+    """
+
+    if fixture_set.get("kind") != "dronedream-edition-safety-test-fixture-set":
+        raise EditionSafetyContractError("edition safety test fixture kind is invalid")
+    request_value = fixture_set.get("baseRequest")
+    if not isinstance(request_value, Mapping):
+        raise EditionSafetyContractError("edition safety test fixture request is invalid")
+    request = deepcopy(dict(request_value))
+    if request.get("testOnly") is not True or not str(request.get("issuer", "")).startswith(
+        "test-fixture:"
+    ):
+        raise EditionSafetyContractError("edition safety fixture is not test-only")
+
+    receipts = request.get("evidenceReceipts")
+    if not isinstance(receipts, list) or not receipts:
+        raise EditionSafetyContractError("edition safety fixture evidence is invalid")
+    if any(
+        not isinstance(receipt, Mapping)
+        or not str(receipt.get("issuer", "")).startswith("test-fixture:")
+        for receipt in receipts
+    ):
+        raise EditionSafetyContractError("edition safety fixture evidence is not test-only")
+
+    manifest = load_json(edition_manifest_path)
+    if manifest.get("kind") != "dronedream-edition-manifest":
+        raise EditionSafetyContractError("active Edition manifest kind is invalid")
+    edition_id = manifest.get("editionId")
+    if not isinstance(edition_id, str) or not DOTTED_IDENTIFIER_RE.fullmatch(edition_id):
+        raise EditionSafetyContractError("active Edition manifest identity is invalid")
+
+    policy = request.get("policy")
+    if not isinstance(policy, dict):
+        raise EditionSafetyContractError("edition safety fixture policy is invalid")
+    request["editionId"] = edition_id
+    policy["editionManifestSha256"] = sha256_file(edition_manifest_path)
+    context_hash = authorization_context_hash(request)
+    for receipt in receipts:
+        receipt["contextHash"] = context_hash
+
+    rebound = deepcopy(dict(fixture_set))
+    rebound["baseRequest"] = request
+    return rebound
 
 POLICY_KEYS = {
     "schemaVersion",
