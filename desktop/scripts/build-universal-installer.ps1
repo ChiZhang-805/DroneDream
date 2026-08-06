@@ -77,6 +77,8 @@ $artifactName = "DroneDream-Universal-1.0.0.exe"
 $artifactPath = Join-Path $outputRootFull $artifactName
 $checksumPath = "${artifactPath}.sha256"
 $signaturePath = "${artifactPath}.sig"
+$releaseMetadataDirectory = Join-Path $outputRootFull "release-metadata"
+$updaterMetadataPath = Join-Path $releaseMetadataDirectory "latest-universal.json"
 $buildReceiptPath = "${artifactPath}.receipt.json"
 $manifestPath = Join-Path $outputRootFull "handoff-manifest.json"
 
@@ -124,12 +126,14 @@ if ($LlvmRoot) {
         -CargoTargetDir $cargoTargetFull `
         -LlvmRoot $LlvmRoot `
         -ExpectedProductName ([string]$overlay.productName) `
+        -EditionId "universal" `
         -PreserveBundleHistory
 } else {
     & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
         -AdditionalConfigPath $overlayPath `
         -CargoTargetDir $cargoTargetFull `
         -ExpectedProductName ([string]$overlay.productName) `
+        -EditionId "universal" `
         -PreserveBundleHistory
 }
 if ($LASTEXITCODE -ne 0) {
@@ -145,9 +149,23 @@ if ($postBuildCommit -cne $sourceCommit -or $postBuildStatus) {
 $bundleDirectory = Join-Path $cargoTargetFull "x86_64-pc-windows-gnullvm\release\bundle\nsis"
 $candidatePath = Join-Path $bundleDirectory "DroneDream-Universal_1.0.0_x64-setup.exe"
 $candidateSignaturePath = "${candidatePath}.sig"
+$candidateUpdaterMetadataPath = Join-Path $bundleDirectory "latest-universal.json"
 if (-not (Test-Path -LiteralPath $candidatePath -PathType Leaf) -or
-    -not (Test-Path -LiteralPath $candidateSignaturePath -PathType Leaf)) {
-    throw "Universal build completed without the NSIS installer and updater signature pair."
+    -not (Test-Path -LiteralPath $candidateSignaturePath -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $candidateUpdaterMetadataPath -PathType Leaf)) {
+    throw "Universal build completed without its NSIS, signature, and updater metadata family."
+}
+$candidateUpdaterMetadata = Get-Content -LiteralPath $candidateUpdaterMetadataPath -Raw `
+    -Encoding UTF8 | ConvertFrom-Json
+if ($candidateUpdaterMetadata.version -cne "1.0.0" -or
+    $candidateUpdaterMetadata.notes -cnotmatch '(?m)^edition-id: universal$' -or
+    $candidateUpdaterMetadata.notes -cnotmatch "(?m)^source-commit: $sourceCommit`$" -or
+    $candidateUpdaterMetadata.platforms.'windows-x86_64'.url -cnotmatch (
+        '^https://github\.com/ChiZhang-805/DroneDream/releases/download/' +
+        'desktop-universal-v1\.0\.0-build-[1-9][0-9]*/' +
+        'DroneDream-Universal-1\.0\.0\.exe$'
+    )) {
+    throw "Universal updater metadata is not bound to the exact edition/source/URL family."
 }
 
 $engineManifestCandidates = @(Get-ChildItem -LiteralPath $cargoTargetFull -Recurse `
@@ -201,8 +219,10 @@ if ($missingEnginePayloadPaths.Count -gt 0 -or $forbiddenEnginePayloadPaths.Coun
 }
 
 New-Item -ItemType Directory -Path $outputRootFull | Out-Null
+New-Item -ItemType Directory -Path $releaseMetadataDirectory | Out-Null
 Copy-Item -LiteralPath $candidatePath -Destination $artifactPath
 Copy-Item -LiteralPath $candidateSignaturePath -Destination $signaturePath
+Copy-Item -LiteralPath $candidateUpdaterMetadataPath -Destination $updaterMetadataPath
 $artifactSha = Get-FileSha256Lower $artifactPath
 "$artifactSha  $artifactName" | Set-Content -Encoding ascii -LiteralPath $checksumPath
 $authenticode = Get-AuthenticodeSignature -LiteralPath $artifactPath
@@ -231,6 +251,13 @@ $buildReceipt = [ordered]@{
         bytes = (Get-Item -LiteralPath $signaturePath).Length
         sha256 = Get-FileSha256Lower $signaturePath
         state = "issued"
+    }
+    updaterMetadata = [ordered]@{
+        absolutePath = $updaterMetadataPath
+        bytes = (Get-Item -LiteralPath $updaterMetadataPath).Length
+        sha256 = Get-FileSha256Lower $updaterMetadataPath
+        channel = "desktop-universal-channel"
+        fileName = "latest-universal.json"
     }
     profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
     overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
@@ -280,6 +307,12 @@ $manifest = [ordered]@{
         [ordered]@{ path = $signaturePath; sha256 = Get-FileSha256Lower $signaturePath; bytes = (Get-Item $signaturePath).Length },
         [ordered]@{ path = $buildReceiptPath; sha256 = Get-FileSha256Lower $buildReceiptPath; bytes = (Get-Item $buildReceiptPath).Length }
     )
+    releaseMetadata = [ordered]@{
+        path = $updaterMetadataPath
+        sha256 = Get-FileSha256Lower $updaterMetadataPath
+        bytes = (Get-Item $updaterMetadataPath).Length
+        publishedWithWebsiteFiles = $false
+    }
     releaseReady = $false
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 -LiteralPath $manifestPath

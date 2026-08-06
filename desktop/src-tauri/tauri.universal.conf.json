@@ -38,5 +38,15 @@
       "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json",
       "../../brand/generated/brand-visual-receipt.v1.json": "brand/generated/brand-visual-receipt.v1.json"
     }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-universal-channel/latest-universal.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
