@@ -3,6 +3,8 @@ param(
     [string]$CargoTargetDir,
     [string]$LlvmRoot,
     [string]$ExpectedProductName = "DroneDream",
+    [ValidateSet("universal", "sim", "lab", "field")]
+    [string]$EditionId = "universal",
     [switch]$AllowUnsignedUpdater,
     [switch]$PreserveBundleHistory
 )
@@ -169,6 +171,28 @@ if ($AdditionalConfigPath) {
         throw "The additional edition config productName does not match $ExpectedProductName."
     }
 }
+$runtimeUpdateFamilies = Get-Content -LiteralPath (
+    Join-Path $repoRoot "distribution\desktop\edition-runtime-update-families.v1.json"
+) -Raw -Encoding UTF8 | ConvertFrom-Json
+$editionFamilies = @($runtimeUpdateFamilies.editions | Where-Object {
+    $_.editionId -ceq $EditionId
+})
+if ($runtimeUpdateFamilies.kind -cne "dronedream-desktop-runtime-update-families" -or
+    $editionFamilies.Count -ne 1) {
+    throw "The desktop updater family contract is unavailable or ambiguous."
+}
+$editionFamily = $editionFamilies[0]
+if ($env:DRONEDREAM_DESKTOP_EDITION_ID -and
+    $env:DRONEDREAM_DESKTOP_EDITION_ID -cne $EditionId) {
+    throw "The compiled desktop edition does not match its updater family."
+}
+if ($AdditionalConfigPath -and
+    $ExpectedProductName -cne [string]$editionFamily.installerProductName) {
+    throw "The edition overlay productName does not match its updater family."
+}
+if (-not $AdditionalConfigPath -and -not $AllowUnsignedUpdater) {
+    throw "Signed updater builds require an explicit edition config overlay."
+}
 
 & (Join-Path $PSScriptRoot "verify-desktop-version.ps1")
 & (Join-Path $PSScriptRoot "verify-nsis-template.ps1")
@@ -302,7 +326,7 @@ if (-not $AllowUnsignedUpdater) {
     }
     & (Join-Path $PSScriptRoot "write-updater-manifest.ps1") `
         -BundleDirectory $bundleDirectory `
-        -InstallerProductName $ExpectedProductName `
+        -EditionId $EditionId `
         -SourceCommit $releaseSourceCommit `
         -BuildNumber ([UInt64]$releaseBuildNumber)
 }
@@ -327,7 +351,8 @@ $currentArtifacts = @(
 if (-not $PreserveBundleHistory) {
     Get-ChildItem -LiteralPath $bundleDirectoryFull -File |
         Where-Object {
-            $_.Name -match '^DroneDream_.+_x64-setup\.exe(?:\.sha256|\.sig)?$' -and
+            $_.Name -match ("^" + [regex]::Escape($ExpectedProductName) +
+                "_.+_x64-setup\.exe(?:\.sha256|\.sig)?$") -and
             $_.FullName -notin $currentArtifacts
         } |
         ForEach-Object {

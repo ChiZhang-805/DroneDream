@@ -18,10 +18,12 @@ def test_shared_llvm_build_exposes_edition_safe_inputs_without_changing_defaults
         '[string]$CargoTargetDir',
         '[string]$LlvmRoot',
         '[string]$ExpectedProductName = "DroneDream"',
+        '[string]$EditionId = "universal"',
         '[switch]$AllowUnsignedUpdater',
         '[switch]$PreserveBundleHistory',
         '$env:CARGO_TARGET_DIR = $cargoTargetRoot',
         '${ExpectedProductName}_$($tauriConfig.version)_x64-setup.exe',
+        '-EditionId $EditionId',
         'if (-not $AllowUnsignedUpdater)',
         'if (-not $PreserveBundleHistory)',
     ):
@@ -44,6 +46,8 @@ def test_shared_llvm_build_keeps_signing_and_source_guards_fail_closed() -> None
         'invoke-tauri-updater-signer.ps1',
         'Unsigned builds require an empty updater-signature slot',
         'The signed Tauri updater artifact is missing',
+        'The compiled desktop edition does not match its updater family.',
+        'Signed updater builds require an explicit edition config overlay.',
         'Refusing to prune installer artifacts outside the LLVM NSIS bundle directory.',
     ):
         assert fragment in script
