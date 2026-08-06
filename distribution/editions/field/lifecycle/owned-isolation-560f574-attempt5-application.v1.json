@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-owned-isolation-lifecycle-application",
+  "applicationId": "field-owned-isolation-560f574-attempt-5",
+  "editionId": "field",
+  "status": "prepared-awaiting-exact-red-start-signal",
+  "source": {
+    "branch":"codex/software-field","productCommit":"560f574a95c8b51bbf34711bfd092d77fd3e166e",
+    "productTree":"0e4535535b7ee339faeaa704069a46bcfe1c350d","productRoot":"C:\\Users\\zju20\\ddf560f574",
+    "toolSourceCommit":"6c3dd377af91ee6a96069d672109ae0d4e6500fa",
+    "evidenceHeadAtPreparation":"6c3dd377af91ee6a96069d672109ae0d4e6500fa",
+    "evidenceCommitIsProductSource":false
+  },
+  "artifact": {
+    "path":"C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe",
+    "filename":"DroneDream-Field-1.0.0.exe","version":"1.0.0","bytes":11534069,
+    "sha256":"8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f",
+    "authenticodeState":"NotSigned","peCertificatePresent":false,
+    "updaterSignaturePath":"C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-560f574-source-bound-preflight\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+    "updaterSignatureBytes":428,"updaterSignatureSha256":"11b5ceec3172fbe91c4e342a1a1aa1211a207bef11ef3d3a4697cac621bd5314"
+  },
+  "staticAudit": {
+    "receiptPath":"C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-postbuild-audit-560f574-exact-artifact-v1\\audit-receipt.json",
+    "receiptBytes":8904,"receiptSha256":"2447677521529871e671053159515a898743d6ee82775f09e030fd5674252ceb",
+    "decision":"pass-static-audit-lifecycle-still-required","auditCount":1,"retryCount":0,"staticAuditComplete":true
+  },
+  "predecessors": [
+    {"applicationId":"field-owned-isolation-560f574-attempt-1","receiptBytes":36298,"receiptSha256":"3f3c5072016e73e16262da70f1558c29ca37eaf6bac6ec45a6521edec754a2e1","readOnly":true,"retryAllowed":false},
+    {"applicationId":"field-owned-isolation-560f574-attempt-2","receiptBytes":35734,"receiptSha256":"4eda662da0ad1430f463794f38ba4725a058b4f32d9d62fde50e236fa90a9456","readOnly":true,"retryAllowed":false},
+    {"applicationId":"field-owned-isolation-560f574-attempt-3","receiptBytes":35734,"receiptSha256":"7cc23b0ceca2bdd655b12306673500dea5cfba6b81aac61ffa48307d951e175f","readOnly":true,"retryAllowed":false},
+    {"applicationId":"field-owned-isolation-560f574-attempt-4","receiptPath":"C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-4\\lifecycle-receipt.json","receiptBytes":35734,"receiptSha256":"d5a74565b216f73adf9bc5a536969f61e830e099c89563b75035d71e4fe10598","failurePath":"C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-4\\installer-en.json","failureBytes":338,"failureSha256":"25322d11c7ef7a1862705b63b25392f34a83d91f672c6f7da1269c372c3a1044","readOnly":true,"retryAllowed":false}
+  ],
+  "plan": {
+    "path":"distribution/editions/field/lifecycle/owned-isolation-560f574-attempt5-plan.v1.json",
+    "bytes":6200,"fileSha256":"4d70c1f5b9b87bdd090ab33cf1c10273ea2e1e2b0c6cf28b8492a670495c3715"
+  },
+  "ownedPaths": {
+    "runRoot":"C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-5",
+    "runRootMustBeAbsentAtStart":true,
+    "temporaryRoot":"C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-5\\temp",
+    "installRoot":"%LOCALAPPDATA%\\DroneDream-Field",
+    "uninstallKey":"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\DroneDream-Field",
+    "preferenceKey":"HKCU\\Software\\DroneDream\\DroneDream-Field",
+    "roamingData":"%APPDATA%\\io.dronedream.desktop.field","localData":"%LOCALAPPDATA%\\io.dronedream.desktop.field",
+    "desktopShortcut":"%USERPROFILE%\\Desktop\\DroneDream · FIELD.lnk",
+    "startMenuShortcut":"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\DroneDream · FIELD.lnk"
+  },
+  "toolBindings": [
+    {"id":"runner","path":"distribution/editions/field/lifecycle/run-field-owned-isolation-lifecycle.ps1","relativeToLifecycleDirectory":"run-field-owned-isolation-lifecycle.ps1","sourceCommit":"6c3dd377af91ee6a96069d672109ae0d4e6500fa","gitBlob":"a0264548c05658c39ef6d0780236b1c0afb4fafb","lfNormalizedBytes":22531,"lfNormalizedSha256":"efaec0224f48e10f2f5cc15c43bb57fb86c3b567297504c0bbc2483234b58daa"},
+    {"id":"installerLanguageInspector","path":"distribution/editions/field/lifecycle/inspect-field-owned-installer-language.ps1","relativeToLifecycleDirectory":"inspect-field-owned-installer-language.ps1","sourceCommit":"6c3dd377af91ee6a96069d672109ae0d4e6500fa","gitBlob":"8a71d55a107b547ec2139902ac53fbf702b1e394","lfNormalizedBytes":19179,"lfNormalizedSha256":"12ca52db54cf84d66d12fb155844de9ad73ec56b99b54178b8105b67fcc569a1"},
+    {"id":"webView2Inspector","path":"distribution/editions/field/lifecycle/inspect-field-owned-webview2.mjs","relativeToLifecycleDirectory":"inspect-field-owned-webview2.mjs","sourceCommit":"6c3dd377af91ee6a96069d672109ae0d4e6500fa","gitBlob":"1903cb485422764646cf2cdbf3c3521ee8cc88d2","lfNormalizedBytes":8233,"lfNormalizedSha256":"72d7faed6d0cf77780329a7a16ff6b037199255511525d96a915ca8097ab529e"}
+  ],
+  "observerContract": {
+    "preclassificationSnapshotRequired":true,"snapshotPersistedOnClassificationFailure":true,
+    "sameInstallerPidRequiredBeforeSnapshot":true,"singleWindowRequiredBeforeSnapshot":true,
+    "nsisClassRequiredBeforeSnapshot":"#32770","sensitiveTextRedacted":true,"urlsRedacted":true,
+    "nonFieldAbsolutePathsRedacted":true,"diagnosticSnapshotGrantsAcceptance":false,
+    "canonicalDisplayName":"DroneDream · FIELD","canonicalInstallRoot":"%LOCALAPPDATA%\\DroneDream-Field",
+    "maximumNonInstallNextInvocationsPerProbe":2,"installActionAllowedDuringProbe":false
+  },
+  "protectedState": {
+    "simPreferenceKey":{"path":"HKCU\\Software\\DroneDream\\DroneDream-Sim","preparationStableJsonSha256":"bf75c75edf429cfbf5f7aebd453768d9d6b36db82c0a0ba597b0146dbad426d5","beforeMustMatchPreparation":true,"afterMustMatchBefore":true},
+    "otherEditionMutationAllowed":false,"runtimeMutationAllowed":false,"webView2MutationAllowed":false
+  },
+  "execution": {
+    "applicationOrdinal":5,"lifecycleAttemptOrdinal":5,"lifecycleCountMaximum":1,
+    "lifecycleAttemptsConsumedAtPreparation":0,"retryCountMaximum":0,
+    "currentMessageAuthorizesExecution":false,"requiresNewExactRedStartSignal":true,
+    "failureDecision":"freeze-failed-no-retry",
+    "exactCounts": {
+      "visibleInstallerLanguageProbes":2,"freshInstallerInvocations":1,"overlayInstallerInvocations":1,
+      "applicationLaunches":2,"shortcutLaunches":1,"liveWebView2Inspections":2,
+      "settingsViewportInspections":4,"languageTransitions":2,"uninstallerInvocations":1,
+      "ownedPreferenceCleanupAttempts":1,"ownedPreferenceCleanupInvocations":1,
+      "browserLaunches":0,"oauthTransactions":0,"accountOrTokenReads":0,"artifactBuildsOrSigning":0,
+      "runtimeStartsOrMigrations":0,"simulatorStarts":0,"deviceOrHardwareActions":0
+    }
+  },
+  "exactCommand": {
+    "powershell":"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "template":"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\run-field-owned-isolation-lifecycle.ps1 -Application C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\owned-isolation-560f574-attempt5-application.v1.json -ExpectedApplicationSha256 <FROZEN_APPLICATION_FILE_SHA256> -Plan C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\lifecycle\\owned-isolation-560f574-attempt5-plan.v1.json -ExpectedPlanSha256 4d70c1f5b9b87bdd090ab33cf1c10273ea2e1e2b0c6cf28b8492a670495c3715 -ExpectedEvidenceHead <EXACT_EVIDENCE_HEAD_FROM_RED_START_SIGNAL> -Execute",
+    "planOnlySuffix":"replace -Execute with -PlanOnly","commandWithoutNewExactRedStartSignalAllowed":false
+  },
+  "prohibitions": {"browserOAuthProviderNetwork":true,"accountToken":true,"buildResignRelabel":true,"runtimeWsl":true,"px4GazeboSitlHitl":true,"deviceHardware":true,"deployUploadReleaseBranch":true},
+  "nonClaims": {"attempt5Executed":false,"lifecyclePassed":false,"releaseReady":false,"websiteReady":false,"websiteHandoffAllowed":false,"attempt4ProvesProductIdentityDefect":false}
+}
