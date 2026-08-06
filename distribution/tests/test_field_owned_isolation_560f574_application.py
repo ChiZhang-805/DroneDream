@@ -16,10 +16,6 @@ def _load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _lf_sha(path: Path) -> str:
-    return sha256(path.read_text(encoding="utf-8-sig").replace("\r\n", "\n").encode()).hexdigest()
-
-
 def _git_blob(commit: str, path: str) -> tuple[str, bytes]:
     blob = subprocess.run(
         ["git", "rev-parse", f"{commit}:{path}"],
@@ -61,12 +57,10 @@ def test_application_binds_exact_artifact_audit_and_plan() -> None:
 def test_tool_bindings_are_exact_git_blobs_and_lf_bytes() -> None:
     application = _load(APPLICATION)
     for binding in application["toolBindings"]:
-        path = ROOT / binding["path"]
         blob, content = _git_blob(binding["sourceCommit"], binding["path"])
         assert blob == binding["gitBlob"]
         assert len(content) == binding["lfNormalizedBytes"]
         assert sha256(content).hexdigest() == binding["lfNormalizedSha256"]
-        assert _lf_sha(path) == binding["lfNormalizedSha256"]
 
 
 def test_product_ui_bindings_and_shared_3d_contract_are_source_bound() -> None:

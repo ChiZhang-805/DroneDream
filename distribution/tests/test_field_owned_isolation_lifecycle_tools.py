@@ -108,13 +108,15 @@ def test_runner_freezes_field_identity_counts_and_fail_closed_boundaries() -> No
         assert forbidden not in source
 
 
-def test_visible_installer_probe_never_invokes_install_controls() -> None:
+def test_visible_installer_probe_has_bounded_navigation_but_never_installs() -> None:
     source = INSTALLER_INSPECTOR.read_text(encoding="utf-8-sig")
     assert 'Start-Process -FilePath $installerPath -ArgumentList "/LANG=$LanguageId"' in source
     assert "installActionInvoked = $false" in source
     assert "CloseMainWindow()" in source
-    assert "InvokePattern" not in source
-    assert "Click" not in source
+    assert "Select-ExactLanguage" in source
+    assert "boundedNextInvocations = 2" in source
+    assert 'throw "Observer refuses to invoke an Install action."' in source
+    assert 'Invoke-ProcessOnce' not in source
 
 
 def test_webview_inspector_covers_field_ui_without_browser_or_provider_navigation() -> None:

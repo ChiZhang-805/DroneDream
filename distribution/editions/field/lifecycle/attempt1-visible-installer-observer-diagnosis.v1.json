@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-visible-installer-observer-diagnosis",
+  "editionId": "field",
+  "attemptId": "field-owned-isolation-560f574-attempt-1",
+  "decision": "observer-false-negative-supported-requires-new-application",
+  "productSource": "560f574a95c8b51bbf34711bfd092d77fd3e166e",
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "bytes": 11534069,
+    "sha256": "8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f",
+    "mutated": false
+  },
+  "attemptReceipt": {
+    "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-1\\lifecycle-receipt.json",
+    "bytes": 36298,
+    "sha256": "3f3c5072016e73e16262da70f1558c29ca37eaf6bac6ec45a6521edec754a2e1",
+    "result": "failed-frozen-no-retry",
+    "failure": "Visible installer language probe failed for en.",
+    "freshInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0
+  },
+  "dynamicEvidenceBoundary": {
+    "installerProcessStarted": true,
+    "firstProbeCompleted": false,
+    "accessibilityTreePersistedBeforeFailure": false,
+    "exactHistoricalWindowTitleKnown": false,
+    "exactHistoricalControlIdsKnown": false,
+    "retroactiveDynamicClaimsAllowed": false
+  },
+  "staticCorroboration": {
+    "generatedInstaller": {
+      "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\560f574\\x86_64-pc-windows-gnullvm\\release\\nsis\\x64\\installer.nsi",
+      "bytes": 35234,
+      "sha256": "d55986d4f1afd4357e21bb75038695cad06275c2e3734a5185d49b45db32d88b",
+      "facts": [
+        "DISPLAYLANGUAGESELECTOR is true",
+        "MUI_LANGDLL_DISPLAY runs in .onInit before SetContext and before default install location",
+        "installer Name is DRONEDREAM_DISPLAYNAME",
+        "language insertion order is English then SimpChinese"
+      ]
+    },
+    "modernUiLocalizationMacro": {
+      "path": "C:\\Users\\zju20\\AppData\\Local\\tauri\\NSIS\\Contrib\\Modern UI 2\\Localization.nsh",
+      "bytes": 4821,
+      "sha256": "608bbc728d486fa9267fbf4be3e8961d6cc752ff6b89d990dbd8afb515712b35",
+      "facts": [
+        "default language window title is Installer Language",
+        "default information text is Please select a language.",
+        "LangDLL dialog precedes the branded installer pages when no stored language exists"
+      ]
+    },
+    "extractedAttemptComponent": {
+      "path": "C:\\Users\\zju20\\AppData\\Local\\DroneDream-Codex\\Field-Owned-Isolation\\560f574-attempt-1\\temp\\nsu287E.tmp\\LangDLL.dll",
+      "bytes": 5632,
+      "sha256": "4cf25411f28f639f72156c24b0f66ea42f5aee5973f6c137d901da6ae42d5b7e",
+      "matchesBuildToolLangDll": true
+    },
+    "oldObserver": {
+      "sourceCommit": "f18ea56e65edd81915feca576377aa0f40bcf2fc",
+      "gitBlob": "84888fe94a1477500139ed9ab9c0d1031e0b84e0",
+      "canonicalSha256": "1d7accee0b0897b00f4534b4e7a1972a79d6a747c00a0bfe3123e08217e9d3ce",
+      "defect": "required canonical Field identity on the first owned top-level window before classifying the generic language selector"
+    }
+  },
+  "remediationContract": {
+    "genericLanguageSelector": {
+      "exactTitle": "Installer Language",
+      "exactClassName": "#32770",
+      "requiredInformationText": "Please select a language.",
+      "comboCount": 1,
+      "okAutomationId": "1",
+      "cancelAutomationId": "2",
+      "productIdentityRequired": false,
+      "processIdMustEqualInstallerPid": true
+    },
+    "postSelection": {
+      "sameInstallerPidRequired": true,
+      "singleVisibleTopLevelWindowRequired": true,
+      "canonicalDisplayName": "DroneDream · FIELD",
+      "canonicalInstallRoot": "%LOCALAPPDATA%\\DroneDream-Field",
+      "maximumNonInstallNextInvocations": 2,
+      "installActionAllowed": false
+    },
+    "unknownTitleDecision": "deny",
+    "foreignPidDecision": "deny",
+    "extraOwnedWindowDecision": "deny",
+    "identityMissingDecision": "deny",
+    "pathDriftDecision": "deny"
+  },
+  "authorization": {
+    "attempt1RetryAllowed": false,
+    "currentMessageAuthorizesRed": false,
+    "newExactApplicationRequired": true
+  }
+}
