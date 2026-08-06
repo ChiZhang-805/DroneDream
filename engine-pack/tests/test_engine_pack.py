@@ -23,14 +23,8 @@ class EnginePackTests(unittest.TestCase):
     def test_runtime_distribution_contract_whitelist_is_exact_and_hashed(self) -> None:
         engine_paths = engine_pack.runtime_distribution_paths(ROOT)
         files = engine_pack.production_files(ROOT)
-        distribution_files = {
-            path for path, _source in files if path.startswith("distribution/")
-        }
-        expected_distribution = {
-            path
-            for path in engine_paths
-            if path.startswith("distribution/")
-        }
+        distribution_files = {path for path, _source in files if path.startswith("distribution/")}
+        expected_distribution = {path for path in engine_paths if path.startswith("distribution/")}
         self.assertEqual(distribution_files, expected_distribution)
         self.assertFalse(
             any(
@@ -294,6 +288,97 @@ class EnginePackTests(unittest.TestCase):
                     "excludedSourcePaths": list(engine_pack.FIELD_EXCLUDED_SOURCE_PATHS),
                 },
             )
+
+    def test_sim_only_profile_is_x500_scoped_and_excludes_hardware_contracts(self) -> None:
+        files = engine_pack.production_files(
+            ROOT,
+            edition_profile=engine_pack.SIM_EDITION_PROFILE,
+        )
+        sources = dict(files)
+        paths = list(sources)
+        self.assertIn("backend/app/simulator/real_cli.py", paths)
+        self.assertIn("scripts/simulators/px4_gazebo_runner.py", paths)
+        self.assertIn("distribution/editions/sim.v1.json", paths)
+        self.assertIn(
+            "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+            paths,
+        )
+        self.assertNotIn("distribution/editions/lab.v1.json", paths)
+        self.assertNotIn("distribution/editions/field.v1.json", paths)
+        self.assertNotIn("backend/app/distribution_safety.py", paths)
+        self.assertFalse(
+            any(
+                path.startswith("distribution/vehicle-packs/")
+                and path.endswith(".v1.json")
+                and path
+                not in {
+                    "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+                    "distribution/vehicle-packs/registry.v1.json",
+                }
+                for path in paths
+            )
+        )
+        self.assertTrue(
+            sources["distribution/vehicle-packs/registry.v1.json"].name.startswith(
+                "registry.sim-only."
+            )
+        )
+        self.assertTrue(
+            sources["distribution/runtime-contract-registry.v1.json"].name.startswith(
+                "runtime-contract-registry.sim-only."
+            )
+        )
+
+    def test_sim_only_build_is_deterministic_verifiable_and_profile_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            first = Path(temporary) / "first"
+            second = Path(temporary) / "second"
+            self.build(first, edition_profile=engine_pack.SIM_EDITION_PROFILE)
+            self.build(second, edition_profile=engine_pack.SIM_EDITION_PROFILE)
+            self.assertEqual(
+                (first / engine_pack.ARCHIVE_FILENAME).read_bytes(),
+                (second / engine_pack.ARCHIVE_FILENAME).read_bytes(),
+            )
+            self.verify(first)
+            manifest = json.loads(
+                (first / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
+            )
+            profile = manifest["editionProfile"]
+            self.assertEqual(profile["profileId"], engine_pack.SIM_EDITION_PROFILE)
+            self.assertEqual(profile["profileVersion"], "1.0.0")
+            self.assertEqual(
+                profile["profileManifestPath"],
+                "distribution/engine-pack-profiles/sim-only.v1.json",
+            )
+            records = {record["path"]: record for record in manifest["files"]}
+            self.assertEqual(
+                records[profile["profileManifestPath"]]["sha256"],
+                profile["profileManifestSha256"],
+            )
+
+    def test_sim_only_manifest_rejects_profile_hash_and_extra_hardware_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            self.build(output, edition_profile=engine_pack.SIM_EDITION_PROFILE)
+            manifest = json.loads(
+                (output / engine_pack.MANIFEST_FILENAME).read_text(encoding="utf-8")
+            )
+            bad_hash = json.loads(json.dumps(manifest))
+            bad_hash["editionProfile"]["profileManifestSha256"] = "0" * 64
+            with self.assertRaisesRegex(engine_pack.EnginePackError, "profile hash drifted"):
+                engine_pack.validate_manifest(bad_hash)
+
+            extra = json.loads(json.dumps(manifest))
+            extra["files"].append(
+                {
+                    "path": "distribution/editions/lab.v1.json",
+                    "sizeBytes": 0,
+                    "sha256": "0" * 64,
+                }
+            )
+            extra["files"] = sorted(extra["files"], key=lambda item: item["path"])
+            with self.assertRaisesRegex(engine_pack.EnginePackError, "forbidden payload"):
+                engine_pack.validate_manifest(extra)
 
     def test_descriptor_cannot_redirect_the_manifest_sidecar(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -22,6 +22,15 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def sha256_git_file(commit: str, path: str) -> str:
+    completed = subprocess.run(
+        ["git", "-C", str(ROOT), "show", f"{commit}:{path}"],
+        check=True,
+        capture_output=True,
+    )
+    return hashlib.sha256(completed.stdout).hexdigest()
+
+
 def git(*args: str) -> str:
     return subprocess.run(
         ["git", "-C", str(ROOT), *args],
@@ -66,12 +75,16 @@ class FieldCommonCoreCoexistenceSyncTests(unittest.TestCase):
 
     def test_receipt_binds_exact_donor_paths_and_field_overlay(self) -> None:
         validate_receipt(self.receipt)
+        source_commit = self.receipt["source"]["fieldProductCommit"]
         self.assertEqual(
-            sha256_file(ROOT / self.receipt["fieldOverlay"]["path"]),
+            sha256_git_file(source_commit, self.receipt["fieldOverlay"]["path"]),
             self.receipt["fieldOverlay"]["sha256"],
         )
         self.assertEqual(
-            sha256_file(ROOT / "distribution/desktop/edition-coexistence.v1.json"),
+            sha256_git_file(
+                source_commit,
+                "distribution/desktop/edition-coexistence.v1.json",
+            ),
             self.receipt["fieldOverlay"]["commonCoexistenceContractSha256"],
         )
         self.assertEqual(self.receipt["fieldOverlay"]["installerProductName"], "DroneDream-Field")

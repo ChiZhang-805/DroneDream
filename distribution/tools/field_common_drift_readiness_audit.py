@@ -16,6 +16,7 @@ RECEIPT_KIND = "dronedream-field-preview-build-readiness-receipt"
 DEFAULT_BASE_REF = "cabcde3903ccceaf19119824af227bebeb7dd5be"
 FIELD_BRANCH = "codex/software-field"
 FIELD_RELEASE_BRANCH = "codex/release-field"
+UNIVERSAL_COMMON_CORE_REF = "origin/codex/software"
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 FIELD_RESOURCE_UPPER_BOUND_BYTES = 4 * 1024 * 1024
@@ -172,6 +173,26 @@ def changed_paths(repo_root: Path, base_ref: str, head_ref: str = "HEAD") -> lis
         status, path = line.split("\t", 1)
         paths.append({"status": status, "path": path})
     return paths
+
+
+def path_matches_ref(repo_root: Path, path: str, head_ref: str, target_ref: str) -> bool:
+    head_blob = _run_git(
+        repo_root,
+        "rev-parse",
+        f"{head_ref}:{path}",
+        allow_failure=True,
+    )
+    target_blob = _run_git(
+        repo_root,
+        "rev-parse",
+        f"{target_ref}:{path}",
+        allow_failure=True,
+    )
+    return (
+        head_blob.returncode == 0
+        and target_blob.returncode == 0
+        and head_blob.stdout.strip() == target_blob.stdout.strip()
+    )
 
 
 def classify_path(path: str) -> dict[str, str]:
@@ -522,8 +543,23 @@ def common_core_drift_audit(
         for path_record in changed_paths(repo_root, base_ref, head_ref)
     ]
     common_paths = [
-        item for item in all_paths if item["classification"] == "universal-common-core-backflow"
+        item
+        for item in all_paths
+        if item["classification"] == "universal-common-core-backflow"
+        and not path_matches_ref(
+            repo_root,
+            item["path"],
+            head_ref,
+            UNIVERSAL_COMMON_CORE_REF,
+        )
     ]
+    integrated_common_paths = {
+        item["path"]
+        for item in all_paths
+        if item["classification"] == "universal-common-core-backflow"
+        and item not in common_paths
+    }
+    all_paths = [item for item in all_paths if item["path"] not in integrated_common_paths]
     field_paths = [item for item in all_paths if item["classification"] == "field-specific-contract"]
     protected_paths = [item for item in all_paths if item["classification"] == "protected-evidence-drift"]
     audit = {

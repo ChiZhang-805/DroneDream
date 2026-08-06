@@ -150,7 +150,7 @@ def _catalog(repository_root: Path, pack_id: str) -> tuple[
     packs_by_path: dict[str, dict[str, Any]] = {}
     pack_hashes: dict[str, str] = {}
     for candidate in sorted((distribution / "vehicle-packs").glob("*.v1.json")):
-        if candidate.name == "registry.v1.json":
+        if candidate.name.startswith("registry."):
             continue
         relative = candidate.relative_to(repository_root).as_posix()
         packs_by_path[relative] = distribution_contract.validate_vehicle_pack_manifest(

@@ -35,8 +35,14 @@
       "properties": {
         "profileId": {
           "type": "string",
-          "enum": ["field-lightweight", "unified-sim-lab"]
+          "enum": ["field-lightweight", "sim-only", "unified-sim-lab"]
         },
+        "profileVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "profileManifestPath": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*$"
+        },
+        "profileManifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "includesLargeSimulator": {"type": "boolean"},
         "excludedSourcePaths": {
           "type": "array",
@@ -58,6 +64,35 @@
               "excludedSourcePaths": {
                 "const": ["backend/app/simulator", "scripts/simulators"]
               }
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["profileVersion"]},
+                {"required": ["profileManifestPath"]},
+                {"required": ["profileManifestSha256"]}
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"profileId": {"const": "sim-only"}}
+          },
+          "then": {
+            "required": [
+              "profileVersion",
+              "profileManifestPath",
+              "profileManifestSha256"
+            ],
+            "properties": {
+              "profileVersion": {"const": "1.0.0"},
+              "profileManifestPath": {
+                "const": "distribution/engine-pack-profiles/sim-only.v1.json"
+              },
+              "includesLargeSimulator": {"const": true},
+              "excludedSourcePaths": {
+                "const": ["backend/app/distribution_safety.py"]
+              }
             }
           }
         },
@@ -69,6 +104,13 @@
             "properties": {
               "includesLargeSimulator": {"const": true},
               "excludedSourcePaths": {"const": []}
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["profileVersion"]},
+                {"required": ["profileManifestPath"]},
+                {"required": ["profileManifestSha256"]}
+              ]
             }
           }
         }
