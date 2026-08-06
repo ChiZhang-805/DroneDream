@@ -13,6 +13,7 @@ from typing import Any
 DONOR = "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
 DONOR_PARENT = "7482647f1c2fcb92f58aaef009efc99764792297"
 DONOR_TREE = "b07389020a5e55e2016612f1ad92ec031706ad26"
+HISTORICAL_CHECKPOINT = "b65002252033ebe2adf7656234eea19e1a4ea9bf"
 DONOR_TEST_PATH = "distribution/tests/test_desktop_edition_coexistence.py"
 EXPECTED_RUNTIME_PATHS = (
     "desktop/scripts/verify-nsis-template.ps1",
@@ -56,6 +57,15 @@ def _sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _git_exists(repo_root: Path, spec: str) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "cat-file", "-e", spec],
+        check=False,
+        capture_output=True,
+    )
+    return result.returncode == 0
+
+
 def validate_sync(document: dict[str, Any], repo_root: Path) -> dict[str, Any]:
     _require(document.get("schemaVersion") == 1, "schemaVersion must be 1")
     _require(
@@ -72,6 +82,23 @@ def validate_sync(document: dict[str, Any], repo_root: Path) -> dict[str, Any]:
     _require(_git(repo_root, "rev-parse", f"{DONOR}^") == DONOR_PARENT, "observed parent drifted")
     _require(
         _git(repo_root, "show", "-s", "--format=%T", DONOR) == DONOR_TREE, "observed tree drifted"
+    )
+    _require(
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "merge-base",
+                "--is-ancestor",
+                HISTORICAL_CHECKPOINT,
+                "HEAD",
+            ],
+            check=False,
+            capture_output=True,
+        ).returncode
+        == 0,
+        "historical coexistence checkpoint is not an ancestor",
     )
 
     donor_paths = str(
@@ -95,8 +122,12 @@ def validate_sync(document: dict[str, Any], repo_root: Path) -> dict[str, Any]:
     for row in rows:
         path = row["path"]
         donor_blob = str(_git(repo_root, "rev-parse", f"{DONOR}:{path}"))
-        current_blob = str(_git(repo_root, "hash-object", "--", path))
-        payload = (repo_root / path).read_bytes()
+        current_blob = str(
+            _git(repo_root, "rev-parse", f"{HISTORICAL_CHECKPOINT}:{path}")
+        )
+        payload = _git(
+            repo_root, "show", f"{HISTORICAL_CHECKPOINT}:{path}", binary=True
+        )
         _require(row.get("blob") == donor_blob == current_blob, f"runtime blob drifted: {path}")
         _require(row.get("sha256") == _sha256(payload), f"runtime SHA drifted: {path}")
         canonical_rows.append({"path": path, "blob": donor_blob})
@@ -114,7 +145,10 @@ def validate_sync(document: dict[str, Any], repo_root: Path) -> dict[str, Any]:
         "observed test blob drifted",
     )
     _require(observed_test.get("sha256") == _sha256(test_payload), "observed test SHA drifted")
-    _require(not (repo_root / DONOR_TEST_PATH).exists(), "unclosed donor test was adopted")
+    _require(
+        not _git_exists(repo_root, f"{HISTORICAL_CHECKPOINT}:{DONOR_TEST_PATH}"),
+        "unclosed donor test was adopted at the historical checkpoint",
+    )
 
     prerequisites = document.get("pendingPrerequisitePaths")
     _require(
@@ -122,16 +156,24 @@ def validate_sync(document: dict[str, Any], repo_root: Path) -> dict[str, Any]:
         "prerequisite path set drifted",
     )
     for row in prerequisites:
-        path = repo_root / row["path"]
+        path = row["path"]
         _require(
             row.get("donorBlob") == _git(repo_root, "rev-parse", f"{DONOR}:{row['path']}"),
             f"prerequisite donor blob drifted: {row['path']}",
         )
         if row.get("state") == "missing-in-sim":
-            _require(not path.exists(), f"unhanded prerequisite adopted: {row['path']}")
+            _require(
+                not _git_exists(repo_root, f"{HISTORICAL_CHECKPOINT}:{path}"),
+                f"unhanded prerequisite adopted at checkpoint: {path}",
+            )
         elif row.get("state") == "present-but-not-donor-blob":
-            _require(path.is_file(), f"divergent prerequisite disappeared: {row['path']}")
-            current_blob = str(_git(repo_root, "hash-object", "--", row["path"]))
+            _require(
+                _git_exists(repo_root, f"{HISTORICAL_CHECKPOINT}:{path}"),
+                f"divergent prerequisite disappeared: {path}",
+            )
+            current_blob = str(
+                _git(repo_root, "rev-parse", f"{HISTORICAL_CHECKPOINT}:{path}")
+            )
             _require(
                 row.get("currentBlob") == current_blob,
                 f"current prerequisite blob drifted: {row['path']}",
@@ -141,7 +183,15 @@ def validate_sync(document: dict[str, Any], repo_root: Path) -> dict[str, Any]:
                 f"unhanded prerequisite silently adopted: {row['path']}",
             )
             _require(
-                row.get("currentSha256") == _sha256(path.read_bytes()),
+                row.get("currentSha256")
+                == _sha256(
+                    _git(
+                        repo_root,
+                        "show",
+                        f"{HISTORICAL_CHECKPOINT}:{path}",
+                        binary=True,
+                    )
+                ),
                 f"current prerequisite SHA drifted: {row['path']}",
             )
             donor_payload = _git(repo_root, "show", f"{DONOR}:{row['path']}", binary=True)
@@ -159,9 +209,12 @@ def validate_sync(document: dict[str, Any], repo_root: Path) -> dict[str, Any]:
         "candidate hash relabeled",
     )
     overlay = document.get("simOverlay", {})
-    overlay_path = repo_root / overlay.get("path", "")
-    overlay_document = json.loads(overlay_path.read_text(encoding="utf-8"))
-    _require(_sha256(overlay_path.read_bytes()) == overlay.get("sha256"), "overlay SHA drifted")
+    overlay_path = overlay.get("path", "")
+    overlay_payload = _git(
+        repo_root, "show", f"{HISTORICAL_CHECKPOINT}:{overlay_path}", binary=True
+    )
+    overlay_document = json.loads(overlay_payload.decode("utf-8"))
+    _require(_sha256(overlay_payload) == overlay.get("sha256"), "overlay SHA drifted")
     _require(
         overlay.get("installerProductName") == "DroneDream-Sim",
         "internal name receipt drifted",
@@ -177,10 +230,16 @@ def validate_sync(document: dict[str, Any], repo_root: Path) -> dict[str, Any]:
     )
     _require(overlay.get("hardwareAuthorityGranted") is False, "hardware authority overclaim")
 
-    identity = (repo_root / "desktop/src-tauri/nsis/edition-identity.nsh").read_text(
-        encoding="utf-8"
+    identity = _git(
+        repo_root,
+        "show",
+        f"{HISTORICAL_CHECKPOINT}:desktop/src-tauri/nsis/edition-identity.nsh",
     )
-    installer = (repo_root / "desktop/src-tauri/nsis/installer.nsi").read_text(encoding="utf-8")
+    installer = _git(
+        repo_root,
+        "show",
+        f"{HISTORICAL_CHECKPOINT}:desktop/src-tauri/nsis/installer.nsi",
+    )
     for required in (
         '!else if "${PRODUCTNAME}" == "DroneDream-Sim"',
         '!define DRONEDREAM_DISPLAYNAME "DroneDream \u00b7 SIM"',

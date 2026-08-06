@@ -341,7 +341,7 @@ class SimInstallerContractTests(unittest.TestCase):
         self.assertFalse(validated["brandDonor"]["commonCoreUpdated"])
         self.assertEqual(
             validated["brandDonor"]["canonicalDonorCommit"],
-            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
         )
         self.assertEqual(
             validated["brandDonor"]["approvedEditionAssetState"],

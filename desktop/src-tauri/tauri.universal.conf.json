@@ -1,0 +1,52 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DroneDream-Universal",
+  "identifier": "io.dronedream.desktop.universal",
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DroneDream",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 390,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ]
+  },
+  "bundle": {
+    "publisher": "DroneDream",
+    "shortDescription": "Unified DroneDream workspace for simulation, lab and field workflows",
+    "longDescription": "DroneDream Universal uses one shared core and presentation-only workspace modes. Hardware actions remain unavailable unless installed modules, a validated Vehicle Pack, and native, backend and Runtime policy all authorize the exact action.",
+    "icon": [
+      "../../brand/generated/universal/windows/32x32.png",
+      "../../brand/generated/universal/windows/128x128.png",
+      "../../brand/generated/universal/windows/128x128@2x.png",
+      "../../brand/generated/universal/windows/icon.ico"
+    ],
+    "resources": {
+      "../../distribution/build-profiles/universal-1.0.0.v1.json": "distribution/universal-build-profile.v1.json",
+      "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",
+      "../../distribution/editions/sim.v1.json": "distribution/editions/sim.v1.json",
+      "../../distribution/editions/lab.v1.json": "distribution/editions/lab.v1.json",
+      "../../distribution/editions/field.v1.json": "distribution/editions/field.v1.json",
+      "../../distribution/safety/edition-execution-gate.v1.json": "distribution/safety/edition-execution-gate.v1.json",
+      "../../distribution/vehicle-packs/registry.v1.json": "distribution/vehicle-packs/registry.v1.json",
+      "../../brand/brand-editions.v1.json": "brand/brand-editions.v1.json",
+      "../../brand/generated/brand-assets.v1.json": "brand/generated/brand-assets.v1.json",
+      "../../brand/generated/brand-visual-receipt.v1.json": "brand/generated/brand-visual-receipt.v1.json"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-universal-channel/latest-universal.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

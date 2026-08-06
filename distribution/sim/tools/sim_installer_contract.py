@@ -1064,6 +1064,16 @@ def _load_brand_donor_module() -> Any:
     return module
 
 
+def _load_large_label_module() -> Any:
+    tool_path = Path(__file__).with_name("sim_large_label_adoption.py")
+    spec = importlib.util.spec_from_file_location("sim_large_label_for_installer", tool_path)
+    if spec is None or spec.loader is None:
+        raise SimInstallerContractError("could not load Sim large-label verifier")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def _validate_surface_source_refs(value: Any, *, repo_root: Path) -> None:
     if not isinstance(value, list) or len(value) != len(SURFACE_SOURCE_REQUIREMENTS):
         raise SimInstallerContractError("installer surface source refs are incomplete")
@@ -1276,21 +1286,21 @@ def validate_installer_surface_contract(
         "approvedEditionAssetState": "vendored-exact-bytes",
         "approvedEditionAssetHashesVerified": True,
         "approvedEditionApplicationSourceWired": True,
-        "canonicalDonorState": "adopted-path-limited-brand-only",
+        "canonicalDonorState": "adopted-canonical-large-label-v1.1.0",
         "canonicalDonorReceiptPath": (
-            "distribution/sim/brand/canonical-donor-adoption-receipt.v1.json"
+            "distribution/sim/brand/canonical-large-label-adoption-receipt.v1.json"
         ),
         "canonicalDonorReceiptSha256": (
-            "81decef72e0028baecfee0e130d521cd2b7de34e9224883358ac1ebcdff27026"
+            "2c5230750a98d184304b102de491623190cf738e13985e14e4c0b331ab92fb65"
         ),
         "canonicalDonorManifestPath": "brand/generated/brand-assets.v1.json",
         "canonicalDonorManifestSha256": (
-            "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34"
+            "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471"
         ),
-        "canonicalDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
-        "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+        "canonicalDonorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+        "commonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
         "commonCoreHash": (
-            "8e0e0507f4d9fb3c5567af464df7586520c66c3650457b19724a974f9e7ff82b"
+            "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8"
         ),
         "commonCoreUpdated": False,
         "commonCoreBindingVerified": True,
@@ -1311,6 +1321,7 @@ def validate_installer_surface_contract(
     ):
         raise SimInstallerContractError("Sim brand donor intake SHA-256 drifted")
     brand_module = _load_brand_donor_module()
+    large_label_module = _load_large_label_module()
     try:
         brand_module.validate_donor_intake(
             brand_module.load_json(intake_path), repo_root=repo_root
@@ -1338,21 +1349,20 @@ def validate_installer_surface_contract(
         )
         if sha256_file(adoption_path) != brand["canonicalDonorReceiptSha256"]:
             raise SimInstallerContractError("canonical donor adoption receipt drifted")
-        adoption = brand_module.validate_canonical_donor_adoption_receipt(
-            brand_module.load_json(adoption_path), repo_root=repo_root
+        adoption = large_label_module.validate_adoption(
+            load_json(adoption_path), repo_root
         )
         if (
-            adoption["source"]["brandDonorCommit"] != brand["canonicalDonorCommit"]
+            adoption["source"]["productDonorCommit"] != brand["canonicalDonorCommit"]
             or adoption["source"]["commonCoreCommit"] != brand["commonCoreCommit"]
             or adoption["source"]["commonCoreHash"] != brand["commonCoreHash"]
-            or adoption["canonicalRefs"]["assetManifest"]
-            != {
-                "path": brand["canonicalDonorManifestPath"],
-                "sha256": brand["canonicalDonorManifestSha256"],
-            }
+            or adoption["source"]["brandManifestPath"]
+            != brand["canonicalDonorManifestPath"]
+            or adoption["source"]["brandManifestSha256"]
+            != brand["canonicalDonorManifestSha256"]
         ):
             raise SimInstallerContractError("canonical donor adoption binding drifted")
-    except brand_module.SimBrandDonorError as exc:
+    except (brand_module.SimBrandDonorError, large_label_module.LargeLabelAdoptionError) as exc:
         raise SimInstallerContractError(f"Sim brand donor verification failed: {exc}") from exc
     if donor_manifest is not None:
         raise SimInstallerContractError(

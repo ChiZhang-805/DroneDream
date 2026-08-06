@@ -69,6 +69,97 @@ fn emit_git_provenance_reruns(repository_root: &std::path::Path) {
     println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_SOURCE_COMMIT");
     println!("cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_BUILD_NUMBER");
     println!("cargo:rerun-if-env-changed=DRONEDREAM_EDITION_PROFILE");
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_DESKTOP_EDITION_ID");
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_OAUTH_CLIENT_ID");
+}
+
+fn expected_engine_pack_profile(manifest_dir: &std::path::Path, edition_id: &str) -> String {
+    let registry_path =
+        manifest_dir.join("../../distribution/desktop/edition-runtime-update-families.v1.json");
+    println!("cargo:rerun-if-changed={}", registry_path.display());
+    let registry: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(&registry_path)
+            .expect("desktop Runtime/update family registry must be readable"),
+    )
+    .expect("desktop Runtime/update family registry must be valid JSON");
+    assert_eq!(
+        registry.get("kind").and_then(serde_json::Value::as_str),
+        Some("dronedream-desktop-runtime-update-families"),
+        "desktop Runtime/update family registry kind is invalid"
+    );
+    let matches = registry
+        .get("editions")
+        .and_then(serde_json::Value::as_array)
+        .expect("desktop Runtime/update family registry has no editions")
+        .iter()
+        .filter(|entry| {
+            entry.get("editionId").and_then(serde_json::Value::as_str) == Some(edition_id)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        matches.len(),
+        1,
+        "desktop edition must have exactly one Runtime/update family"
+    );
+    let profile = matches[0]
+        .get("runtimeProfileId")
+        .and_then(serde_json::Value::as_str)
+        .expect("desktop Runtime/update family has no runtimeProfileId");
+    assert!(
+        matches!(
+            profile,
+            "unified-sim-lab" | "sim-only" | "field-lightweight"
+        ),
+        "desktop Runtime/update family selected an unsupported Engine Pack profile"
+    );
+    profile.to_owned()
+}
+
+fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
+    let release_build = std::env::var_os("DRONEDREAM_RELEASE_SOURCE_COMMIT").is_some();
+    let edition_id = std::env::var("DRONEDREAM_DESKTOP_EDITION_ID").unwrap_or_else(|_| {
+        assert!(
+            !release_build,
+            "release builds require DRONEDREAM_DESKTOP_EDITION_ID"
+        );
+        "universal".to_owned()
+    });
+    assert!(
+        matches!(edition_id.as_str(), "universal" | "sim" | "lab" | "field"),
+        "DRONEDREAM_DESKTOP_EDITION_ID is not a supported desktop edition"
+    );
+    let expected_profile = expected_engine_pack_profile(manifest_dir, &edition_id);
+    let edition_profile =
+        std::env::var("DRONEDREAM_EDITION_PROFILE").unwrap_or_else(|_| expected_profile.clone());
+    assert_eq!(
+        edition_profile, expected_profile,
+        "DRONEDREAM_EDITION_PROFILE does not match the desktop edition identity"
+    );
+
+    let oauth_client_id = std::env::var("DRONEDREAM_OAUTH_CLIENT_ID").unwrap_or_else(|_| {
+        assert!(
+            !release_build,
+            "release builds require the registered public DRONEDREAM_OAUTH_CLIENT_ID"
+        );
+        "unregistered-development-client".to_owned()
+    });
+    assert!(
+        oauth_client_id.len() >= 8
+            && oauth_client_id.len() <= 512
+            && oauth_client_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')),
+        "DRONEDREAM_OAUTH_CLIENT_ID is malformed"
+    );
+    assert!(
+        !release_build || !oauth_client_id.starts_with("unregistered-"),
+        "release builds cannot use an unregistered OAuth client"
+    );
+
+    println!("cargo:rustc-env=DRONEDREAM_DESKTOP_EDITION_ID={edition_id}");
+    println!("cargo:rustc-env=DRONEDREAM_EDITION_PROFILE={edition_profile}");
+    println!("cargo:rustc-env=DRONEDREAM_OAUTH_CLIENT_ID={oauth_client_id}");
+    edition_profile
 }
 
 fn prepare_generated_directory(path: &std::path::Path) {
@@ -100,7 +191,7 @@ fn prepare_generated_directory(path: &std::path::Path) {
     });
 }
 
-fn build_engine_pack(manifest_dir: &std::path::Path) {
+fn build_engine_pack(manifest_dir: &std::path::Path, edition_profile: &str) {
     let repository_root = manifest_dir
         .join("../..")
         .canonicalize()
@@ -171,10 +262,7 @@ fn build_engine_pack(manifest_dir: &std::path::Path) {
         .arg("--source-commit")
         .arg(&source_commit)
         .arg("--edition-profile")
-        .arg(
-            std::env::var("DRONEDREAM_EDITION_PROFILE")
-                .unwrap_or_else(|_| "unified-sim-lab".to_string()),
-        )
+        .arg(edition_profile)
         .env("SOURCE_DATE_EPOCH", &source_date_epoch)
         .status()
         .unwrap_or_else(|error| {
@@ -200,7 +288,8 @@ fn main() {
     let manifest_dir = PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("Cargo must set CARGO_MANIFEST_DIR"),
     );
-    build_engine_pack(&manifest_dir);
+    let edition_profile = configure_desktop_auth_identity(&manifest_dir);
+    build_engine_pack(&manifest_dir, &edition_profile);
     let frontend_environment = manifest_dir.join("../../frontend/.env.production");
     println!("cargo:rerun-if-changed={}", frontend_environment.display());
     let raw = std::fs::read_to_string(&frontend_environment)

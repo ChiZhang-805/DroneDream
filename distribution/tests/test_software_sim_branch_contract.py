@@ -13,9 +13,13 @@ DISTRIBUTION = ROOT / "distribution"
 TOOLS = DISTRIBUTION / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
+SIM_TOOLS = DISTRIBUTION / "sim" / "tools"
+if str(SIM_TOOLS) not in sys.path:
+    sys.path.insert(0, str(SIM_TOOLS))
 
 import distribution_contract as distribution  # noqa: E402
 import edition_build_planner as planner  # noqa: E402
+from sim_universal_handoff import exact_synchronized_paths  # noqa: E402
 
 CONTRACT_PATH = DISTRIBUTION / "branch-contracts" / "software-sim.v1.json"
 SIM_MANIFEST_PATH = DISTRIBUTION / "editions" / "sim.v1.json"
@@ -183,6 +187,8 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         supplemental_paths = {
             row["path"] for row in coexistence["synchronizedRuntimePaths"]
         }
+        supplemental_paths.update(exact_synchronized_paths(ROOT))
+        supplemental_paths.add("frontend/src/pages/DesktopSetup.tsx")
         self.assertTrue(changed_paths)
         self.assertTrue(
             all(

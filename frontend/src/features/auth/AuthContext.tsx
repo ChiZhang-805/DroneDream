@@ -10,7 +10,10 @@ import {
 } from "react";
 import type { Provider, User } from "@supabase/supabase-js";
 
-import { isDesktopRuntime } from "../../desktop/bridge";
+import {
+  clearBrowserAuthVault,
+  isDesktopRuntime,
+} from "../../desktop/bridge";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
 import { ACTIVATE_DESKTOP_AUTH_EVENT } from "./desktopAuthActivation";
 import { setAuthAccessToken } from "./authTokenStore";
@@ -328,9 +331,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [account]);
 
   const signOut = useCallback(async () => {
-    const { error } = await requireClient().auth.signOut();
+    let vaultClearFailed = false;
+    if (isDesktopRuntime()) {
+      try {
+        await clearBrowserAuthVault();
+      } catch {
+        vaultClearFailed = true;
+      }
+    }
+    // This action means "sign out of this app". It must not revoke the shared
+    // account sessions belonging to the website or another desktop edition.
+    const { error } = await requireClient().auth.signOut({ scope: "local" });
     if (error) throw error;
     adoptUser(null, null);
+    if (vaultClearFailed) {
+      throw new Error("The desktop session closed, but its saved sign-in could not be removed.");
+    }
   }, [adoptUser]);
 
   const value = useMemo<AuthContextValue>(

@@ -8,9 +8,26 @@ const supabaseUrl = (
 const supabasePublishableKey = (
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
 )?.trim();
+const desktopRuntime = isDesktopRuntime();
+
+export function editionAuthStorageKey(editionId: string | undefined): string | null {
+  const normalized = editionId?.trim().toLowerCase();
+  if (!normalized || !["universal", "sim", "lab", "field"].includes(normalized)) {
+    return null;
+  }
+  return `dronedream-desktop-auth:${normalized}:v1`;
+}
+
+const desktopStorageKey = desktopRuntime
+  ? editionAuthStorageKey(
+      import.meta.env.VITE_DRONEDREAM_EDITION as string | undefined,
+    )
+  : undefined;
 
 export const cloudAuthConfigured = Boolean(
-  supabaseUrl && supabasePublishableKey,
+  supabaseUrl &&
+  supabasePublishableKey &&
+  (!desktopRuntime || desktopStorageKey),
 );
 
 export interface BrowserAuthConfiguration {
@@ -19,7 +36,7 @@ export interface BrowserAuthConfiguration {
 }
 
 export function browserAuthConfiguration(): BrowserAuthConfiguration | null {
-  if (!supabaseUrl || !supabasePublishableKey) return null;
+  if (!cloudAuthConfigured || !supabaseUrl || !supabasePublishableKey) return null;
   return {
     supabaseUrl,
     publishableKey: supabasePublishableKey,
@@ -59,12 +76,11 @@ const STORAGE_PROBE_KEY = "__dronedream_auth_storage_probe__";
 
 function authStorage(): Storage | undefined {
   if (typeof window === "undefined") return undefined;
-  // The desktop WebView does not yet have an OS-keychain-backed storage
-  // adapter. Keep its refresh token session-scoped instead of writing it to
-  // persistent WebView localStorage. Browser deployments may use the normal
-  // origin-scoped localStorage session.
+  // Native owns the persistent refresh grant in an edition-scoped Windows
+  // credential namespace. The WebView keeps only its active process session;
+  // browser deployments may use normal origin-scoped localStorage.
   try {
-    const storage = isDesktopRuntime() ? window.sessionStorage : window.localStorage;
+    const storage = desktopRuntime ? window.sessionStorage : window.localStorage;
     storage.setItem(STORAGE_PROBE_KEY, "1");
     storage.removeItem(STORAGE_PROBE_KEY);
     return storage;
@@ -91,6 +107,7 @@ export const supabaseClient: SupabaseClient | null = cloudAuthConfigured
           detectSessionInUrl: !isDesktopRuntime(),
           persistSession: true,
           storage: authStorage(),
+          storageKey: desktopStorageKey ?? undefined,
         },
       }))
   : null;

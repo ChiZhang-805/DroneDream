@@ -211,13 +211,25 @@ class SimYellowLifecycleTests(unittest.TestCase):
         self.assertTrue(sync_gate["formalHandoffReceived"])
         self.assertTrue(sync_gate["installerIcoConsumed"])
         self.assertFalse(sync_gate["releaseAsset"])
-        self.assertTrue(sync_gate["yellow2Ready"])
+        self.assertFalse(sync_gate["yellow2Ready"])
         self.assertFalse(
             self.contract["artifactGate"][
                 "yellow2BlockedUntilInstallerDerivativeContract"
             ]
         )
-        self.assertTrue(self.contract["artifactGate"]["yellow2StaticReady"])
+        self.assertFalse(self.contract["artifactGate"]["yellow2StaticReady"])
+        self.assertEqual(
+            self.contract["buildEnvironment"],
+            {
+                "DRONEDREAM_DESKTOP_EDITION_ID": "sim",
+                "DRONEDREAM_EDITION_PROFILE": "sim-only",
+                "VITE_DRONEDREAM_EDITION": "sim",
+                "DRONEDREAM_OAUTH_CLIENT_ID": "dronedream-desktop-sim",
+                "singleProcessInjectionRequired": True,
+                "providerNetworkUseAllowed": False,
+                "secretReadAllowed": False,
+            },
+        )
 
     def test_stage_plans_expand_only_owned_run_paths_without_execution(self) -> None:
         yellow2 = sim_yellow.create_stage_plan(
@@ -291,7 +303,7 @@ class SimYellowLifecycleTests(unittest.TestCase):
             ("canonicalBrandManifestConsumed", False),
             ("installerIcoConsumed", False),
             ("releaseAsset", True),
-            ("yellow2Ready", False),
+            ("yellow2Ready", True),
             ("brandDonorCommitIsCommonCore", True),
             ("adoptionReceiptSha256", "0" * 64),
         ):

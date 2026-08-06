@@ -1,5 +1,7 @@
 mod app_update;
 mod browser_auth;
+mod browser_auth_audit;
+mod browser_auth_vault;
 mod desktop_api_bridge;
 mod distribution_plan;
 mod edition_safety;
@@ -47,6 +49,9 @@ pub fn run() {
         .plugin(
             tauri_plugin_updater::Builder::new()
                 .default_version_comparator(|current, release| {
+                    if !app_update::release_matches_compiled_edition(release.notes.as_deref()) {
+                        return false;
+                    }
                     if release.version != current {
                         return release.version > current;
                     }
@@ -70,6 +75,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             browser_auth::begin_browser_auth,
             browser_auth::cancel_browser_auth,
+            browser_auth::clear_browser_auth_vault,
+            browser_auth::restore_browser_auth_vault,
             prerequisites::probe_system_prerequisites,
             preferences::get_installer_locale,
             installer_handoff::get_installer_runtime_intent,

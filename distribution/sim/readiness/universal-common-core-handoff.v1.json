@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-universal-common-core-handoff",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "green-path-sync-complete-upstream-contract-blocked",
+  "source": {
+    "branch": "origin/codex/software",
+    "observedHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+    "observedHeadIsEvidenceOnly": true,
+    "brandBaseCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+    "brandProductCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "brandEvidenceCommit": "7482647f1c2fcb92f58aaef009efc99764792297",
+    "coexistenceContractCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+    "coexistenceImplementationCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "authContractCommit": "6355aad351370178a7171b504a5d2f235fb12ceb",
+    "authImplementationCommit": "2f1dbc5fef092ae4cf58366e1178684672ae26c2",
+    "credentialVaultCommit": "bed637c726462e1a38b74eba46915543d007869d",
+    "authAuditCommit": "4c779b7ca316c0953f94f7ef3f4f850881ef2d58",
+    "runtimeRegistryCommit": "4ea7fd1dfe3a69d90ada1a37a82dd888cba48430",
+    "runtimeOwnershipCommit": "8a0828c258782fa77506ee32c7c016e5b18ad292",
+    "updaterProductCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "updaterEvidenceCommit": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+    "wholeLineageMerged": false,
+    "evidenceCommitUsedAsProductSource": false
+  },
+  "pathSync": {
+    "canonicalBrandPathCount": 94,
+    "exactCommonPathCount": 45,
+    "simSemanticAdapterPath": "frontend/src/pages/DesktopSetup.tsx",
+    "unrelatedBenchmarkPathsAdopted": false,
+    "hardwareAuthorityGranted": false
+  },
+  "brand": {
+    "manifestPath": "brand/generated/brand-assets.v1.json",
+    "manifestSha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471",
+    "simLargeLabelPath": "brand/source/approved/sim-large-label-lockup.png",
+    "simLargeLabelSha256": "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233",
+    "simIcoPath": "brand/generated/sim/windows/icon.ico",
+    "simIcoSha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "simBuildIdentity": {
+    "desktopEditionId": "sim",
+    "runtimeProfileId": "sim-only",
+    "frontendEditionId": "sim",
+    "oauthClientId": "dronedream-desktop-sim",
+    "installerProductName": "DroneDream-Sim",
+    "displayName": "DroneDream \u00b7 SIM",
+    "bundleIdentifier": "io.dronedream.sim",
+    "validatedVehiclePackCount": 0
+  },
+  "verification": {
+    "brandDeterministicTestsPassed": true,
+    "coexistenceRuntimeUpdaterTestsPassed": true,
+    "authFrontendTestsPassed": true,
+    "frontendTypecheckPassed": true,
+    "frontendLintPassed": true,
+    "updaterStaticGatePassed": true,
+    "offlineBrowserAuthConfigGatePassed": true,
+    "cargoFormatCheckPassed": true,
+    "authContractBindingPassed": false,
+    "nsisTemplateGatePassed": false
+  },
+  "upstreamBlockers": [
+    {
+      "id": "AUTH-COEXISTENCE-SHA-DRIFT",
+      "owner": "codex/software",
+      "contractPath": "distribution/desktop/edition-browser-auth.v1.json",
+      "boundCoexistenceSha256": "1af65a86d4f77add7d16d21fe257b7052cb5138de68b6eb3f111f0a32d17bd38",
+      "currentCoexistenceSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
+      "simMayPatchCommonContract": false
+    },
+    {
+      "id": "NSIS-RUNTIME-MODE-DONOR-OMITTED",
+      "owner": "codex/software",
+      "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
+      "currentBlob": "d33b2c059cf7f076fcda94011ff7d86a2601d0ab",
+      "requiredObservedBlob": "9af1787fa8607e725c4495fa14a5763de781a5a3",
+      "simMayImportUnlistedParentCommit": false
+    }
+  ],
+  "commonCoreClassification": {
+    "recordedCommonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
+    "recordedCommonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
+    "candidateProductCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "baselineUpdated": false,
+    "candidateClaimedAsValidatedCommonCore": false
+  },
+  "execution": {
+    "buildAuthorized": false,
+    "buildExecuted": false,
+    "installerExecuted": false,
+    "runtimeStartedOrMigrated": false,
+    "px4OrGazeboStarted": false,
+    "providerUsed": false,
+    "apiKeyRead": false,
+    "deploymentExecuted": false,
+    "releaseAsset": false
+  },
+  "nonClaims": {
+    "authContractValidated": false,
+    "nsisTemplateValidated": false,
+    "lifecycleValidated": false,
+    "websiteHandoffReady": false,
+    "releaseReady": false
+  }
+}

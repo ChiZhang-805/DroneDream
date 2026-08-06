@@ -3,14 +3,23 @@
   "kind": "dronedream-sim-yellow-execution-plan",
   "planVersion": "1.0.0",
   "editionId": "sim",
-  "executionClass": "GREEN-static-ready-replacement-yellow2-not-authorized",
-  "state": "yellow1-complete-yellow2-attempt1-failed-new-source-ready-awaiting-authorization",
+  "executionClass": "GREEN-static-integration-blocked-yellow2-not-authorized",
+  "state": "common-core-sync-blocked-awaiting-auth-binding-and-nsis-runtime-donor",
   "authorization": {
     "yellow1Approved": true,
     "yellow2Approved": false,
     "yellow3Approved": false,
     "separateApprovalRequiredForEachStage": true,
     "redRuntimeOrSimulatorApproved": false
+  },
+  "buildEnvironment": {
+    "DRONEDREAM_DESKTOP_EDITION_ID": "sim",
+    "DRONEDREAM_EDITION_PROFILE": "sim-only",
+    "VITE_DRONEDREAM_EDITION": "sim",
+    "DRONEDREAM_OAUTH_CLIENT_ID": "dronedream-desktop-sim",
+    "singleProcessInjectionRequired": true,
+    "providerNetworkUseAllowed": false,
+    "secretReadAllowed": false
   },
   "replacementReadiness": {
     "path": "distribution/sim/readiness/sim-only-common-core-sync.v1.json",
@@ -77,17 +86,17 @@
     "canonicalBrandManifestConsumed": true,
     "installerIcoConsumed": true,
     "releaseAsset": false,
-    "yellow2Ready": true
+    "yellow2Ready": false
   },
   "artifactGate": {
     "yellow2OutputFileName": "DroneDream-Sim-1.0.0.exe",
     "yellow2ReceiptKind": "dronedream-sim-yellow-build-receipt",
     "yellow3RequiresExactYellow2Receipt": true,
     "yellow2BlockedUntilInstallerDerivativeContract": false,
-    "yellow2StaticReady": true,
+    "yellow2StaticReady": false,
     "installerSurfaceContract": {
       "path": "distribution/sim/desktop/installer-surface-contract.v1.json",
-      "sha256": "3a251736d9018c24275da1725a42f66852efd43ecaf5a71e23e569833a2fd89d"
+      "sha256": "0e5e717e3b3e36a1147a4ac9f753e1b0349aa31728f7e2afb84342bca35a4c3d"
     },
     "websiteHandoffContract": {
       "path": "distribution/sim/release/website-exact-exe-handoff.v1.json",

@@ -27,6 +27,7 @@ PLAN_KEYS = {
     "executionClass",
     "state",
     "authorization",
+    "buildEnvironment",
     "replacementReadiness",
     "yellow1VisualBinding",
     "approvedEditionAssetGate",
@@ -38,6 +39,15 @@ PLAN_KEYS = {
     "yellow3Matrix",
     "rollback",
     "nonClaims",
+}
+BUILD_ENVIRONMENT_KEYS = {
+    "DRONEDREAM_DESKTOP_EDITION_ID",
+    "DRONEDREAM_EDITION_PROFILE",
+    "VITE_DRONEDREAM_EDITION",
+    "DRONEDREAM_OAUTH_CLIENT_ID",
+    "singleProcessInjectionRequired",
+    "providerNetworkUseAllowed",
+    "secretReadAllowed",
 }
 AUTHORIZATION_KEYS = {
     "yellow1Approved",
@@ -429,9 +439,9 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         or plan["planVersion"] != "1.0.0"
         or plan["editionId"] != "sim"
         or plan["executionClass"]
-        != "GREEN-static-ready-replacement-yellow2-not-authorized"
+        != "GREEN-static-integration-blocked-yellow2-not-authorized"
         or plan["state"]
-        != "yellow1-complete-yellow2-attempt1-failed-new-source-ready-awaiting-authorization"
+        != "common-core-sync-blocked-awaiting-auth-binding-and-nsis-runtime-donor"
     ):
         raise SimYellowLifecycleError("Sim YELLOW execution plan identity drifted")
 
@@ -444,6 +454,20 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         "redRuntimeOrSimulatorApproved": False,
     }:
         raise SimYellowLifecycleError("YELLOW/RED authorization state drifted")
+
+    build_environment = _exact_keys(
+        plan["buildEnvironment"], BUILD_ENVIRONMENT_KEYS, "buildEnvironment"
+    )
+    if build_environment != {
+        "DRONEDREAM_DESKTOP_EDITION_ID": "sim",
+        "DRONEDREAM_EDITION_PROFILE": "sim-only",
+        "VITE_DRONEDREAM_EDITION": "sim",
+        "DRONEDREAM_OAUTH_CLIENT_ID": "dronedream-desktop-sim",
+        "singleProcessInjectionRequired": True,
+        "providerNetworkUseAllowed": False,
+        "secretReadAllowed": False,
+    }:
+        raise SimYellowLifecycleError("SIM build environment identity drifted")
 
     replacement = _exact_keys(
         plan["replacementReadiness"],
@@ -617,7 +641,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         "canonicalBrandManifestConsumed": True,
         "installerIcoConsumed": True,
         "releaseAsset": False,
-        "yellow2Ready": True,
+        "yellow2Ready": False,
     }
     if sync_gate != expected_sync_gate:
         raise SimYellowLifecycleError("canonical sync gate overclaims readiness")
@@ -704,7 +728,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         or artifact["yellow2ReceiptKind"] != "dronedream-sim-yellow-build-receipt"
         or artifact["yellow3RequiresExactYellow2Receipt"] is not True
         or artifact["yellow2BlockedUntilInstallerDerivativeContract"] is not False
-        or artifact["yellow2StaticReady"] is not True
+        or artifact["yellow2StaticReady"] is not False
         or artifact["unsignedAllowedWithDisclosure"] is not True
         or artifact["validatedVehiclePackCount"] != 0
     ):
@@ -713,7 +737,7 @@ def validate_execution_plan(document: Any, *, repo_root: Path) -> dict[str, Any]
         (
             "installerSurfaceContract",
             "distribution/sim/desktop/installer-surface-contract.v1.json",
-            "3a251736d9018c24275da1725a42f66852efd43ecaf5a71e23e569833a2fd89d",
+            "0e5e717e3b3e36a1147a4ac9f753e1b0349aa31728f7e2afb84342bca35a4c3d",
         ),
         (
             "websiteHandoffContract",
