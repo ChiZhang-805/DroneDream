@@ -32,7 +32,7 @@ EXECUTOR_PATH = (
 PREVIOUS_EVIDENCE = (
     ROOT / "artifacts" / "test-runs" / "field-install-acceptance-readiness-0f86ba8"
 )
-CURRENT_EVIDENCE = (
+LAST_REQUESTABLE_EVIDENCE = (
     ROOT
     / "artifacts"
     / "test-runs"
@@ -55,6 +55,12 @@ EXECUTION_FAILURE_EVIDENCE = (
     / "artifacts"
     / "test-runs"
     / "field-host-contained-execution-failure-452eed9"
+)
+REPEATED_EXECUTION_FAILURE_EVIDENCE = (
+    ROOT
+    / "artifacts"
+    / "test-runs"
+    / "field-host-contained-execution-failure-fb741b0"
 )
 
 SPEC = importlib.util.spec_from_file_location("field_host_contained_readiness_tests", TOOL_PATH)
@@ -193,7 +199,15 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertTrue(checks["executor-budget-and-rollback"])
 
     def test_requestable_plan_preserves_vm_evidence_and_claims_no_vm_isolation(self) -> None:
-        plan = self.plan()
+        contract = self.contract()
+        contract["knownExecutionBlockers"] = []
+        plan = host_readiness.create_plan(
+            contract=contract,
+            snapshot=self.snapshot(),
+            evidence_head="f" * 40,
+            artifact_absolute_path=r"C:\evidence\DroneDream-Field-1.0.0.exe",
+            snapshot_sha256="1" * 64,
+        )
         self.assertEqual(plan["state"], "yellow-host-contained-requestable")
         self.assertFalse(plan["environment"]["claimsVmLevelIsolation"])
         self.assertEqual(plan["previousVmEvidence"]["decision"], "deny-before-yellow")
@@ -203,6 +217,13 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         receipt = host_readiness.create_readiness_receipt(plan)
         self.assertEqual(receipt["decision"], "request-yellow-host-contained")
         self.assertFalse(receipt["executionPerformed"])
+
+    def test_open_dynamic_execution_blocker_denies_another_yellow_attempt(self) -> None:
+        plan = self.plan()
+        self.assertEqual(plan["state"], "blocked")
+        self.assertIn("field.host.executor-post-install-runaway", plan["blockers"])
+        receipt = host_readiness.create_readiness_receipt(plan)
+        self.assertEqual(receipt["decision"], "deny")
 
     def test_preexisting_field_state_and_shared_busy_state_fail_closed(self) -> None:
         snapshot = self.snapshot()
@@ -257,19 +278,25 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
             host_readiness.PREVIOUS_VM_RECEIPT_SHA256,
         )
 
-    def test_current_evidence_binds_tool_schema_contract_snapshot_and_artifact(self) -> None:
-        plan = host_readiness.load_json(CURRENT_EVIDENCE / "plan.json")
-        receipt = host_readiness.load_json(CURRENT_EVIDENCE / "green-readiness-receipt.json")
+    def test_last_requestable_evidence_is_preserved_as_historical(self) -> None:
+        plan = host_readiness.load_json(LAST_REQUESTABLE_EVIDENCE / "plan.json")
+        receipt = host_readiness.load_json(LAST_REQUESTABLE_EVIDENCE / "green-readiness-receipt.json")
         host_readiness.validate_plan(plan)
         self.assertEqual(plan["state"], "yellow-host-contained-requestable")
         self.assertEqual(plan["blockers"], [])
         self.assertEqual(plan["artifact"]["sha256"], host_readiness.ARTIFACT_SHA256)
-        self.assertEqual(plan["source"]["toolSha256"], host_readiness.file_sha256(TOOL_PATH))
+        self.assertEqual(
+            plan["source"]["toolSha256"],
+            "4cbb192a6be11e6fba8dc09fc6d8a898a6f4aa57483bc6be4bbf509bb7964e41",
+        )
         self.assertEqual(plan["source"]["schemaSha256"], host_readiness.file_sha256(SCHEMA_PATH))
-        self.assertEqual(plan["source"]["contractSha256"], host_readiness.file_sha256(CONTRACT_PATH))
+        self.assertEqual(
+            plan["source"]["contractSha256"],
+            "6eb54675df60796c36bd4e8676e93f352c40e85d5d672435123847aa66299442",
+        )
         self.assertEqual(
             plan["source"]["hostSnapshotSha256"],
-            host_readiness.file_sha256(CURRENT_EVIDENCE / "host-snapshot.json"),
+            host_readiness.file_sha256(LAST_REQUESTABLE_EVIDENCE / "host-snapshot.json"),
         )
         self.assertEqual(receipt["planSha256"], plan["planSha256"])
         self.assertEqual(receipt["decision"], "request-yellow-host-contained")
@@ -322,6 +349,20 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertEqual(failure["rollback"]["protectedChecksTotal"], 16)
         self.assertTrue(failure["rollback"]["ownedRootAbsent"])
         self.assertFalse(failure["releaseState"]["releaseReady"])
+
+    def test_repeated_runaway_blocks_retry_after_complete_rollback(self) -> None:
+        failure = host_readiness.load_json(
+            REPEATED_EXECUTION_FAILURE_EVIDENCE / "execution-failure-receipt.json"
+        )
+        self.assertEqual(
+            failure["result"],
+            "fail-repeated-post-install-runaway-with-complete-rollback",
+        )
+        self.assertEqual(failure["executionGate"]["status"], "open")
+        self.assertFalse(failure["executionGate"]["retryAllowed"])
+        self.assertTrue(failure["rollback"]["protectedStateMatched"])
+        self.assertEqual(failure["rollback"]["protectedChecksPassed"], 16)
+        self.assertTrue(failure["rollback"]["ownedRootAbsent"])
 
     def test_snapshot_tool_is_read_only_outside_its_explicit_output(self) -> None:
         source = SNAPSHOT_TOOL_PATH.read_text(encoding="utf-8")

@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-host-contained-execution-failure",
+  "editionId": "field",
+  "result": "fail-repeated-post-install-runaway-with-complete-rollback",
+  "recordedAt": "2026-08-06T11:49:23.941+08:00",
+  "attempt": {
+    "sourceHead": "fb741b025fc5d75edc92df29a9e1c8c7c02800c3",
+    "readinessSourceHead": "6afa14a6bed94568a441904462cc393c231f4d76",
+    "planFileSha256": "c87277a243789abb1aa1d6d4af9af149451a0b45a2f81de1df9a6019f3c07dd9",
+    "baselineSnapshotSha256": "c50cf8d04135d6e33ae4e1bcd822364109fdb9c554e659bf8233ea9fdb0a1035",
+    "failureCode": "field.host.executor-post-install-runaway-repeat",
+    "failureStage": "fresh-installer-return-before-phase-receipt",
+    "forcedExecutorTermination": true,
+    "productFailure": false,
+    "productResult": "indeterminate-after-owned-fresh-install"
+  },
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "bytes": 11267482,
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "authenticodeStatus": "NotSigned",
+    "productSourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "rebuilt": false
+  },
+  "resourceAbort": {
+    "executorProcessId": 30716,
+    "executorPrivateGiB": 4.54,
+    "systemMemoryUsedPercent": 66.9,
+    "proactiveAbort": true,
+    "reason": "The bounded-wait revision reproduced post-install CPU and memory growth with no child process and no fresh-install phase receipt."
+  },
+  "executionCounts": {
+    "installerExe": 1,
+    "uninstaller": 1,
+    "applicationLaunch": 0,
+    "rebuild": 0,
+    "networkRequest": 0,
+    "deviceEnumeration": 0,
+    "hardwareAction": 0,
+    "simulation": 0
+  },
+  "frozenEvidence": {
+    "beforeSnapshotSha256": "de5528b14e0359578c2406093764dd9c3461a2075ae445718c4035213e01fcb3",
+    "hostBaselinePhaseSha256": "24ddd116e009ca9e2a95901e670f5007aad14a2b165926bfeede489c1b32db49",
+    "installerDiagnosticsSha256": "8613df3277ba5f46832a45ed1fdb47e0c7e6513e659ef8fad74ef20fb06bbd8c",
+    "afterRollbackSnapshotSha256": "1883ce75d6025d694f1fb3853c6cfeac3cd4f5217e8c71694dd855e1f4a4b4e1"
+  },
+  "rollback": {
+    "uninstallerExitCode": 0,
+    "initialOwnedDeleteResult": "retry-required-after-uninstaller-temp-residue",
+    "finalOwnedDeleteResult": "pass-after-process-and-path-proof",
+    "ownedRootAbsent": true,
+    "fieldDefaultInstallAbsent": true,
+    "fieldUninstallRegistryAbsent": true,
+    "fieldProductRegistryAbsent": true,
+    "fieldStartMenuShortcutAbsent": true,
+    "fieldDesktopShortcutAbsent": true,
+    "fieldProcessCount": 0,
+    "protectedStateMatched": true,
+    "protectedChecksPassed": 16,
+    "protectedChecksTotal": 16,
+    "runtimeMatched": true,
+    "webView2Matched": true
+  },
+  "executionGate": {
+    "blockerId": "field.host.executor-post-install-runaway",
+    "status": "open",
+    "retryAllowed": false,
+    "clearanceRequirement": "Offline fixture must isolate the post-install phase and prove bounded memory before another YELLOW request."
+  },
+  "releaseState": {
+    "previewReady": true,
+    "releaseReady": false,
+    "websiteReady": false
+  }
+}

@@ -130,6 +130,7 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
             "phases",
             "preconditions",
             "rollback",
+            "knownExecutionBlockers",
             "websiteGate",
         },
         "contract",
@@ -213,6 +214,23 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         raise FieldHostContainedError("shared WebView2 repair cannot be allowed")
     if contract["rollback"]["evidenceDeletionAllowed"] is not False:
         raise FieldHostContainedError("evidence deletion cannot be allowed")
+    for blocker in contract["knownExecutionBlockers"]:
+        _exact_keys(
+            blocker,
+            {
+                "blockerId",
+                "status",
+                "attemptSourceCommit",
+                "failureEvidencePath",
+                "clearanceRequirement",
+            },
+            "known execution blocker",
+        )
+        if blocker["status"] != "open" or not blocker["blockerId"].startswith("field.host."):
+            raise FieldHostContainedError("known execution blocker identity drifted")
+        _require_commit(blocker["attemptSourceCommit"], "attemptSourceCommit")
+        if not blocker["failureEvidencePath"].startswith("artifacts/test-runs/field-host-contained-"):
+            raise FieldHostContainedError("known execution blocker evidence path drifted")
     if contract["websiteGate"]["websiteReadyBeforeExecution"] is not False:
         raise FieldHostContainedError("GREEN contract cannot authorize Website handoff")
     return contract
@@ -358,6 +376,11 @@ def create_plan(
     _require_sha(snapshot_sha256, "snapshotSha256")
     source_audit = audit_source(contract)
     blockers = host_blockers(snapshot)
+    blockers.extend(
+        item["blockerId"]
+        for item in contract["knownExecutionBlockers"]
+        if item["status"] == "open"
+    )
     if not source_audit["passed"]:
         blockers.extend(
             f"field.host.source-audit:{item['checkId']}"

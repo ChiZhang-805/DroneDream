@@ -219,6 +219,15 @@
     "protectedStateMustMatchBaseline": true,
     "evidenceDeletionAllowed": false
   },
+  "knownExecutionBlockers": [
+    {
+      "blockerId": "field.host.executor-post-install-runaway",
+      "status": "open",
+      "attemptSourceCommit": "fb741b025fc5d75edc92df29a9e1c8c7c02800c3",
+      "failureEvidencePath": "artifacts/test-runs/field-host-contained-execution-failure-fb741b0/execution-failure-receipt.json",
+      "clearanceRequirement": "Offline fixture must isolate the post-install phase and prove bounded memory before another YELLOW request."
+    }
+  ],
   "websiteGate": {
     "websiteReadyBeforeExecution": false,
     "exactFourFileHandoffRequired": true,
