@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-final-e3b427e-attempt7",
+  "editionId": "lab",
+  "result": "build-and-static-artifact-validation-passed",
+  "sourceSeparation": {
+    "productSource": {
+      "branch": "codex/software-lab",
+      "commit": "e3b427e9d1d6209495d629c399a1962913f2d00c",
+      "tree": "eec24c0f1d3d537c8f0da5ef1b015bd129c6d39a"
+    },
+    "buildCheckout": {
+      "branch": "codex/software-lab",
+      "commit": "8885212d2702ae933c5e62fbb5a3c22d1bda8a2b",
+      "tree": "297341f5af3d0bc478ea3e8a581a713163b7c7f6",
+      "statusAtAttemptStart": "clean",
+      "upstreamExactAtAttemptStart": true
+    },
+    "evidenceOnlyPathsAfterProductSource": [
+      "distribution/editions/lab/desktop/yellow-build-attempt-7-e3b427e-application.v1.json",
+      "distribution/tests/test_lab_yellow_build_application.py"
+    ],
+    "evidencePathsBundledAsProductPayload": false,
+    "artifactReceiptObservedSourceCommit": "8885212d2702ae933c5e62fbb5a3c22d1bda8a2b",
+    "applicationEvidenceIsProductSource": false
+  },
+  "commonCore": {
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "productSourceHash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9",
+    "commonUiThemeDonor": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "frontendDistStrictModeDonor": "bb14c47a43795180cc80305eaf87665a54b9b8e5"
+  },
+  "application": {
+    "path": "distribution/editions/lab/desktop/yellow-build-attempt-7-e3b427e-application.v1.json",
+    "bytes": 12051,
+    "sha256": "4e1f8cf5f580ee26b23090970e7f099bd8a98f23fe9c8a18cbd3596346c9efc9",
+    "globalBuildAttemptOrdinal": 7,
+    "sourceBuildAttemptOrdinal": 1,
+    "sourceBuildAttemptMaximum": 1,
+    "maximumBuildInvocations": 1
+  },
+  "attempt": {
+    "classification": "YELLOW",
+    "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+    "cargoBuildJobs": 2,
+    "serializedWithOtherEditionBuilds": true,
+    "buildInvocationCount": 1,
+    "frontendBuildCount": 1,
+    "tauriBuildCount": 1,
+    "cargoReleaseBuildCount": 1,
+    "nsisBundleCount": 1,
+    "artifactWriteCount": 1,
+    "buildExitCode": 0,
+    "automaticRetryCount": 0,
+    "automaticRetryAllowed": false
+  },
+  "resourceGate": {
+    "memoryUsedPercent": 53.3,
+    "memoryFreeGiB": 7.35,
+    "cpuPercent": 13,
+    "cDriveFreeGiB": 91.28,
+    "zDriveFreeGiB": 21.93,
+    "heavyProcessCount": 0,
+    "passed": true
+  },
+  "inputs": {
+    "publicSupabaseActionsVariablesInjected": true,
+    "publicSupabaseValuesRecorded": false,
+    "publicSupabaseValuesPrinted": false,
+    "publicOauthClientInjected": true,
+    "publicOauthClientValue": "0b9e7a8d-2c90-4b76-8842-511363f555bd",
+    "publicOauthClientValueSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+    "oauthRedirectUri": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "approvedUpdaterKeyPath": "C:/Users/zju20/.tauri/dronedream-updater.key",
+    "approvedUpdaterKeyId": "BA3FDCAF71CE2FF5",
+    "updaterPasswordMode": "empty-process-environment-not-recorded",
+    "privateKeyContentRead": false,
+    "privateKeyContentRecorded": false,
+    "productionNamingKeyUsed": false,
+    "providerCalled": false,
+    "modelApiKeyRead": false,
+    "accountPasswordRead": false,
+    "serviceRoleRead": false
+  },
+  "evidence": {
+    "attemptRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7",
+    "attemptStart": {
+      "fileName": "attempt-start.json",
+      "bytes": 994,
+      "sha256": "49e803511e08bb285ab6db2e0ad9b6466eb0206e91737dbff2fa72a790564736"
+    },
+    "stdout": {
+      "fileName": "build.stdout.log",
+      "bytes": 9114,
+      "sha256": "db768fd70eacc8daffad5459dba4a89ce425d3a2ae87c20ecd76c9a935fb16c7"
+    },
+    "stderr": {
+      "fileName": "build.stderr.log",
+      "bytes": 1653,
+      "sha256": "8c5449559069b576322e7a545450a1dcc5684990643e22bf0d371346ed53bb4f",
+      "containedExpectedDriverOrCompilerInformation": true,
+      "causedFailure": false
+    },
+    "attemptEnd": {
+      "fileName": "attempt-end.json",
+      "bytes": 3287,
+      "sha256": "b085803bd31446c8d813dfd8759a63e3ab13ff72cacf46327cb0351ae5c858a4"
+    },
+    "artifactReceipt": {
+      "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/lab-preview-receipt.json",
+      "bytes": 9183,
+      "sha256": "23bcd55642aa1bfae1043b09cd24be30a7ad3aab7ecba7fec1186fb81aea0b0c",
+      "schemaVersion": 2,
+      "receiptVersion": "1.1.0",
+      "artifactRootRepresentation": "relative-to-receipt-parent",
+      "artifactRootOwnership": "edition-owned-output-root",
+      "verified": true
+    }
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "uniqueAttemptArtifactCount": 1,
+    "bytes": 12081900,
+    "sha256": "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4",
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0",
+    "productName": "DroneDream · LAB",
+    "peMachine": "0x014C",
+    "peOptionalMagic": "0x010B",
+    "peCertificateTableOffset": 0,
+    "peCertificateTableSize": 0,
+    "authenticodeStatus": "NotSigned",
+    "staticPreviewReady": true,
+    "installAuthorized": false,
+    "websiteHandoffReady": false
+  },
+  "updaterSignature": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e3b427e-attempt7/DroneDream-Lab-1.0.0.exe.sig",
+    "bytes": 428,
+    "sha256": "722be7a85928c7b601917418fab7899170bd5bd855b88d4db7b17f0093c109c9",
+    "state": "issued",
+    "keyId": "BA3FDCAF71CE2FF5"
+  },
+  "staticAcceptance": {
+    "artifactVerifier": "passed",
+    "artifactVerifierPath": "distribution/tools/verify_lab_preview_artifact.py",
+    "filenameVersionProductNamePe": "passed",
+    "brandPayloadLicenseNotice": "passed",
+    "forbiddenLogPatternHits": 0,
+    "preinstallAcceptance": "blocked-expected-policy",
+    "preinstallCliInvocationCount": 2,
+    "firstPreinstallInvocation": "argument-error-no-side-effects",
+    "secondPreinstallInvocation": "passed",
+    "preinstallBlockers": [
+      "Lab preview remains unsigned internal-test material.",
+      "There are zero validated Vehicle Packs.",
+      "Hardware parameter write, arm, HITL, and flight actions are denied.",
+      "No release-lab promotion is authorized by pre-install acceptance."
+    ]
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "workspaceOrThemeSwitchCountsAsAuthority": false,
+    "hardwareActionDecision": "deny",
+    "requiredDecisionLayers": [
+      "native",
+      "backend",
+      "runtime"
+    ],
+    "oauthCallbackPortListenerCountAtFreeze": 0
+  },
+  "historicalEvidencePreserved": {
+    "priorArtifactSource": "debd0647c5883ffe5c9c52037d35a6b567d9fd62",
+    "priorArtifactSha256": "b5969f2f287cf729450618e6d3a8232f426b1ac4cbe5c3662904d31bab215a48",
+    "priorA2ReceiptPath": "distribution/build-receipts/lab-debd064-red-segment-a2-success.json",
+    "deleted": false,
+    "overwritten": false,
+    "relabeled": false
+  },
+  "sideEffects": {
+    "installerRun": false,
+    "runtimeMigrationOrStart": false,
+    "px4OrGazeboStarted": false,
+    "oauthProviderCalled": false,
+    "hardwareAccess": false,
+    "releaseBranchCreated": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "remainingGates": [
+    "A separate exact RED lifecycle authorization is required before fresh, overlay, launch, shortcut, WebView2, EN/ZH, login-entry, uninstall, residue, or rollback execution.",
+    "OAuth provider execution remains a separate authorization boundary.",
+    "Website exact four-file handoff remains blocked until required lifecycle and release-signature policy gates are accepted.",
+    "Zero validated Vehicle Packs keep hardware write, arm, HITL, and flight denied through native, backend, and runtime authority."
+  ],
+  "releaseReady": false
+}

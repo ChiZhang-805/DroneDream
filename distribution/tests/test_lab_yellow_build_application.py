@@ -8,10 +8,19 @@ APPLICATION = (
     / "distribution/editions/lab/desktop/"
     "yellow-build-attempt-7-e3b427e-application.v1.json"
 )
+ATTEMPT_RECEIPT = (
+    ROOT
+    / "distribution/build-receipts/"
+    "lab-preview-1.0.0-e3b427e-yellow-attempt7.exact-artifact.json"
+)
 
 
 def _load() -> dict:
     return json.loads(APPLICATION.read_text(encoding="utf-8"))
+
+
+def _load_attempt_receipt() -> dict:
+    return json.loads(ATTEMPT_RECEIPT.read_text(encoding="utf-8"))
 
 
 def _sha256(path: str) -> str:
@@ -125,3 +134,62 @@ def test_application_authorizes_no_execution_and_preserves_history() -> None:
     )
     assert application["historicalCandidatePreserved"]["overwriteAllowed"] is False
     assert "historical-artifact-delete-overwrite-or-relabel" in application["forbiddenActions"]
+
+
+def test_attempt_receipt_separates_product_source_from_build_evidence() -> None:
+    receipt = _load_attempt_receipt()
+    separation = receipt["sourceSeparation"]
+
+    assert separation["productSource"]["commit"] == (
+        "e3b427e9d1d6209495d629c399a1962913f2d00c"
+    )
+    assert separation["buildCheckout"]["commit"] == (
+        "8885212d2702ae933c5e62fbb5a3c22d1bda8a2b"
+    )
+    assert separation["evidenceOnlyPathsAfterProductSource"] == [
+        "distribution/editions/lab/desktop/"
+        "yellow-build-attempt-7-e3b427e-application.v1.json",
+        "distribution/tests/test_lab_yellow_build_application.py",
+    ]
+    assert separation["evidencePathsBundledAsProductPayload"] is False
+    assert separation["applicationEvidenceIsProductSource"] is False
+
+
+def test_attempt_receipt_freezes_unique_artifact_and_zero_retry() -> None:
+    receipt = _load_attempt_receipt()
+
+    assert receipt["attempt"]["buildInvocationCount"] == 1
+    assert receipt["attempt"]["automaticRetryCount"] == 0
+    assert receipt["artifact"]["fileName"] == "DroneDream-Lab-1.0.0.exe"
+    assert receipt["artifact"]["uniqueAttemptArtifactCount"] == 1
+    assert receipt["artifact"]["bytes"] == 12081900
+    assert receipt["artifact"]["sha256"] == (
+        "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4"
+    )
+    assert receipt["artifact"]["authenticodeStatus"] == "NotSigned"
+    assert receipt["updaterSignature"]["state"] == "issued"
+    assert receipt["updaterSignature"]["keyId"] == "BA3FDCAF71CE2FF5"
+    assert receipt["sideEffects"] == {
+        "installerRun": False,
+        "runtimeMigrationOrStart": False,
+        "px4OrGazeboStarted": False,
+        "oauthProviderCalled": False,
+        "hardwareAccess": False,
+        "releaseBranchCreated": False,
+        "artifactUploaded": False,
+        "deployed": False,
+    }
+
+
+def test_attempt_receipt_keeps_zero_pack_hardware_actions_denied() -> None:
+    receipt = _load_attempt_receipt()
+
+    assert receipt["safety"]["validatedVehiclePackCount"] == 0
+    assert receipt["safety"]["workspaceOrThemeSwitchCountsAsAuthority"] is False
+    assert receipt["safety"]["hardwareActionDecision"] == "deny"
+    assert receipt["safety"]["requiredDecisionLayers"] == [
+        "native",
+        "backend",
+        "runtime",
+    ]
+    assert receipt["releaseReady"] is False
