@@ -112,16 +112,20 @@ $env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $sourceCommit
 $env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"
 $env:VITE_DRONEDREAM_EDITION = "universal"
 
-$sharedArguments = @(
-    "-AdditionalConfigPath", $overlayPath,
-    "-CargoTargetDir", $cargoTargetFull,
-    "-ExpectedProductName", ([string]$overlay.productName),
-    "-PreserveBundleHistory"
-)
 if ($LlvmRoot) {
-    $sharedArguments += @("-LlvmRoot", $LlvmRoot)
+    & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
+        -AdditionalConfigPath $overlayPath `
+        -CargoTargetDir $cargoTargetFull `
+        -LlvmRoot $LlvmRoot `
+        -ExpectedProductName ([string]$overlay.productName) `
+        -PreserveBundleHistory
+} else {
+    & (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") `
+        -AdditionalConfigPath $overlayPath `
+        -CargoTargetDir $cargoTargetFull `
+        -ExpectedProductName ([string]$overlay.productName) `
+        -PreserveBundleHistory
 }
-& (Join-Path $repoRoot "desktop\scripts\build-windows-llvm.ps1") @sharedArguments
 if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }

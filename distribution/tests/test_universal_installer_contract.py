@@ -92,11 +92,15 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         '$buildReceiptPath = "${artifactPath}.receipt.json"',
         'payloadContractId = "dronedream-universal-engine-payload/v1"',
         'Multiple incompatible Universal Engine Pack manifests were produced.',
+        "-AdditionalConfigPath $overlayPath",
+        "-CargoTargetDir $cargoTargetFull",
+        "-ExpectedProductName ([string]$overlay.productName)",
         'releaseReady = $false',
         'pending-isolated-red-validation',
     ):
         assert fragment in script
     assert "-AllowUnsignedUpdater" not in script
+    assert "$sharedArguments" not in script
 
 
 def test_website_contract_publishes_exact_four_files_without_rename() -> None:
