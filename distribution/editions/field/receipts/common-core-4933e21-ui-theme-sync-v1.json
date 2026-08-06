@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-ui-theme-sync-receipt",
+  "editionId": "field",
+  "productSource": {
+    "commit": "18faa327201a36d8111c4a3c6864c53063a43e85",
+    "tree": "fd3b07e1bb6d0a690cc5f9861d0afec12e39c410",
+    "branch": "codex/software-field",
+    "pushed": true
+  },
+  "commonCore": {
+    "productDonor": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "evidenceOnlyHead": "2434488bbcc02a8859670edf2f9413f38d17e73a",
+    "evidenceHeadIsProductSource": false,
+    "donorReceipt": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json",
+    "donorReceiptSha256": "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4"
+  },
+  "donorPathReview": {
+    "pathCount": 15,
+    "exactSharedPaths": [
+      "frontend/src/__tests__/DroneLaunchScene.test.tsx",
+      "frontend/src/__tests__/EditionSettingsSurface.test.tsx",
+      "frontend/src/__tests__/EditionTheme.test.ts",
+      "frontend/src/__tests__/stylesContract.test.ts",
+      "frontend/src/components/DroneLaunchScene.tsx",
+      "frontend/src/components/EditionSettingsSurface.tsx",
+      "frontend/src/features/distribution/universalMode.ts",
+      "frontend/src/styles.css",
+      "frontend/src/theme/EditionThemeProvider.tsx",
+      "frontend/src/theme/editionTheme.ts"
+    ],
+    "universalOnlyPathsNotIntegrated": [
+      "frontend/scripts/verify-software-ui-layout.mjs",
+      "frontend/src/AppShell.tsx",
+      "frontend/src/__tests__/AppShellLauncher.test.tsx",
+      "frontend/src/__tests__/RuntimeAccessUx.test.tsx",
+      "frontend/src/__tests__/UniversalModeSwitch.test.tsx"
+    ],
+    "universalOnlyReason": "Field uses its standalone field/main.tsx to FieldApp entry and does not bundle Universal AppShell routes or runtime surfaces."
+  },
+  "exactSharedSha256": {
+    "frontend/src/components/EditionSettingsSurface.tsx": "23f0c359b3c1e40d390b176a26a3e4ff75e54d62a6176c0debab7745848016e1",
+    "frontend/src/theme/editionTheme.ts": "581febad1997a4d7f0497d6c7df6cb0a203132da32953d8f6f0980c4fe8d866d",
+    "frontend/src/theme/EditionThemeProvider.tsx": "d57296710283344d40ed941d38dd74d8bfd97f43adaaba0c3278ae593e86b4fe",
+    "frontend/src/components/DroneLaunchScene.tsx": "13e00b683d74dae93718cadc4a17573333417cdbfef6db1ee069cf4060c8d8a2",
+    "frontend/src/styles.css": "5e437cf714bc74fc01a897ee623be86a25f97d6466a8289d4413d98f5e45b2ca"
+  },
+  "fieldIntegration": {
+    "entry": "frontend/src/field/main.tsx",
+    "application": "frontend/src/field/FieldApp.tsx",
+    "settingsConsumer": "frontend/src/field/FieldSettingsDialog.tsx",
+    "consumerProfile": "field-lightweight",
+    "themeProviderEdition": "field",
+    "canonicalGradient": [
+      "#FFC247",
+      "#FF754B",
+      "#D746A5"
+    ],
+    "fieldCssRedefinesCanonicalPalette": false,
+    "sharedStylesRepositoryCopyExact": true,
+    "sharedStylesBundledByField": false,
+    "sharedStylesBundleReason": "The shared monolithic stylesheet contains Gazebo selectors. Field consumes the exact shared React surface and canonical generated tokens, with edition-owned layout CSS, to keep simulator presentation out of field-dist.",
+    "threeSceneRequiredByFieldProduct": false,
+    "sharedThreeThemeConsumerExact": true
+  },
+  "verification": {
+    "typecheck": "pass",
+    "lint": {
+      "errors": 0,
+      "warnings": 1,
+      "warning": "Exact donor EditionThemeProvider Fast Refresh warning"
+    },
+    "targetedFrontend": {
+      "passed": 28,
+      "failed": 0
+    },
+    "fullFrontend": {
+      "passed": 505,
+      "failed": 1,
+      "knownUnrelatedFailure": "PublicSite billing-checkout availability mock expects a second fetch after downloads/latest.json"
+    },
+    "fieldAndDesktopContracts": {
+      "passed": 62,
+      "failed": 0
+    },
+    "allFieldHistoricalContracts": {
+      "passed": 99,
+      "subtestsPassed": 9,
+      "failed": 5,
+      "knownStaleFailures": [
+        "6f25 correction receipt expects pre-later-donor NSIS blob",
+        "coexistence receipt expects pre-later-donor integrated blobs",
+        "common drift audit expects zero protected evidence after later Field evidence commits"
+      ]
+    },
+    "releaseSourcePolicy": "pass: 2006 tracked files, 390 npm packages, 532 external Rust packages",
+    "fieldFrontendBuild": "pass: 1855 modules transformed",
+    "edgeLayout": {
+      "cases": 6,
+      "viewports": [
+        "1440x900 EN",
+        "1440x900 ZH",
+        "760x900 EN",
+        "760x900 ZH",
+        "390x620 EN",
+        "390x620 ZH"
+      ],
+      "dialogAndPanelNoVerticalScroll": true,
+      "localReceipt": "frontend/node_modules/.cache/field-ui-layout/18faa32-exact/field-ui-layout-receipt.json",
+      "localReceiptSha256": "c034f3e25aefc36f9931ec5328c5db37af6ee0fadcf525adbe867385106c3668"
+    },
+    "fieldBundle": {
+      "sharedSettingsReachable": true,
+      "forbiddenTermsAbsent": [
+        "PX4 SITL",
+        "Gazebo",
+        "SITL",
+        "HITL"
+      ],
+      "threeSceneChunkAbsent": true,
+      "allowedProtocolMetadata": "PX4 controller and firmware compatibility labels remain read-only"
+    }
+  },
+  "authority": {
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "validatedPackCount": 0,
+    "threeLayerQuorum": "missing",
+    "hardwareActions": "deny"
+  },
+  "buildGate": {
+    "exeBuildStarted": false,
+    "newYellowRequired": true,
+    "oldArtifactsMayBeRelabeled": false
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-red-application-supersession",
+  "editionId": "field",
+  "supersededApplication": {
+    "path": "distribution/editions/field/lifecycle/red-edc7aa1-app-only-application.v1.json",
+    "sha256": "b6a6d1dcf8ab77f4010bc4a045adb45ef2594037db3d93f860be1b4cd076ec59",
+    "preparedAtCommit": "6d9c23c7961e5a8f71da90afa0a0d8f1cd5fd6c7",
+    "productSource": "edc7aa124e058fda3bb143dc66cd7c208a601cef",
+    "artifactSha256": "b87a020df957aeca7b179779a2400a2dfeb0fc2d43e655aa5bf8969db7c46dbd",
+    "executionStatus": "never-executed",
+    "historicalEvidencePreserved": true
+  },
+  "supersedingProduct": {
+    "source": "18faa327201a36d8111c4a3c6864c53063a43e85",
+    "commonCoreUiDonor": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "reason": "The Field product now includes the canonical shared Settings and Edition theme surface, so the old artifact and its lifecycle application no longer represent the current product."
+  },
+  "gates": {
+    "executeOldApplication": false,
+    "installOldArtifact": false,
+    "relabelOldArtifact": false,
+    "newExeBuildRequired": true,
+    "newLifecycleApplicationRequired": true,
+    "newYellowApprovalRequired": true,
+    "newRedApprovalRequired": true
+  },
+  "safety": {
+    "validatedPackCount": 0,
+    "hardwareActions": "deny",
+    "deviceActionsPerformed": false,
+    "runtimeActionsPerformed": false
+  }
+}
