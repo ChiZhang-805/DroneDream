@@ -1,0 +1,165 @@
+{
+  "schema_id": "dronedream.benchmark-hebo-isolated-adapter-receipt/v1",
+  "receipt_id": "benchmark-hebo-isolated-adapter-7cf9507",
+  "generated_at_utc": "2026-08-06T06:27:39.176Z",
+  "execution_subject": {
+    "repository_commit": "7cf95073ddaa871fd079178e1d0de1239b2acc19",
+    "repository_tree": "d6f162ab1aab32f34ae0dc97744338262569cfab",
+    "branch": "codex/software",
+    "upstream": "origin/codex/software",
+    "upstream_commit_before_evidence": "7cf95073ddaa871fd079178e1d0de1239b2acc19",
+    "worktree_clean_before_evidence": true,
+    "ahead": 0,
+    "behind": 0,
+    "evidence_commit": null,
+    "evidence_commit_semantics": "This receipt is committed after the execution subject and must not be treated as tested source."
+  },
+  "protocol": {
+    "path": "Z:\\DroneDream\\work\\DRONEDREAM_MODEL_HARNESS_BENCHMARK_PROTOCOL.md",
+    "sha256": "734bb6b42ec25ffc92bd9f15bb6fa27bc3482b4ce0841ce9aa3b080eafb8caee"
+  },
+  "resource_class": "GREEN",
+  "source_closure": {
+    "summary": "Add a content-addressed, byte-bounded JSON-stdio boundary for a separately provisioned HEBO 0.3.6 runner without installing or importing HEBO in the product environment.",
+    "files": [
+      {
+        "path": "backend/app/benchmarking/hebo_isolated_adapter.py",
+        "sha256": "4885ed0c52624d27387697ec7b5e9e20dab8b5f4f0ed0e656c709818304f948a"
+      },
+      {
+        "path": "backend/app/benchmarking/hebo_reference_contract.py",
+        "sha256": "3b755fdd2fc48707cf163177ac1e74d43cf0eb52a2d9aa649e45cd5f997b66a8"
+      },
+      {
+        "path": "backend/app/benchmarking/method_inventory.py",
+        "sha256": "67cf1ec4ed4070afaa3d0468b3fee3a672c719ba62d8f32663ef74e2fc0045d8"
+      },
+      {
+        "path": "backend/app/benchmarking/registry.py",
+        "sha256": "5b1584122ec062705243d5ce24757899b01c9274229cbed53d45b24be724fe15"
+      },
+      {
+        "path": "backend/tests/test_benchmark_hebo_isolated_adapter.py",
+        "sha256": "b0961e0a32a5d4e0c78d311fb717f6de2308dcedcff31d816791caae79f6941a"
+      },
+      {
+        "path": "backend/tests/test_benchmark_hebo_reference_contract.py",
+        "sha256": "4c1550cb3793cb6997276bd503227007182d8efc0094bd6d1b44ed4ea835d21b"
+      },
+      {
+        "path": "backend/tests/test_benchmark_method_inventory.py",
+        "sha256": "9f611f8a950f2e625dbc287918d68fe44b3f3b4e1b883be60038e49ea4a87d3d"
+      }
+    ]
+  },
+  "contract": {
+    "request_schema": "dronedream.benchmark-hebo-runner-request/v1",
+    "response_schema": "dronedream.benchmark-hebo-runner-response/v1",
+    "transport_protocol": "hebo-isolated-json-stdio/v1",
+    "maximum_request_bytes": 262144,
+    "maximum_response_bytes": 65536,
+    "maximum_stderr_bytes": 16384,
+    "maximum_timeout_seconds": 300,
+    "properties": [
+      "The product process does not import HEBO; a future exact isolated interpreter and runner must be bound by hashes.",
+      "Only real feasible scalar losses are exposed for learning; unsafe, failed, indeterminate, and non-objective work stays in hashed accounting and never receives a fabricated loss.",
+      "Holdout outcomes are not exposed through the runner request.",
+      "Interpreter, runner script, request, response, package distribution lock, policy, and runner environment identities are content-addressed.",
+      "stdin, stdout, and stderr use bounded streaming; output storms and stalled runners are terminated without unbounded in-memory capture.",
+      "The child receives a minimal environment and does not inherit OPENAI_API_KEY or other provider credentials.",
+      "Cross-request, cross-environment, history-count, Sobol-replay, domain, candidate-repeat, schema, hash, path, timeout, and output-cap drift fail closed."
+    ]
+  },
+  "verification": [
+    {
+      "name": "all current Benchmark offline tests",
+      "command": "python -m pytest <all backend/tests/test_benchmark_*.py> -q",
+      "result": "passed",
+      "passed": 304,
+      "failed": 0,
+      "duration_seconds": 210.0
+    },
+    {
+      "name": "HEBO and method-inventory focused regression",
+      "result": "passed",
+      "passed": 63,
+      "failed": 0,
+      "duration_seconds": 1.19
+    },
+    {
+      "name": "changed-source Ruff",
+      "result": "passed",
+      "summary": "All checks passed!"
+    },
+    {
+      "name": "changed-source strict Mypy",
+      "result": "passed",
+      "summary": "Success: no issues found in 4 source files"
+    },
+    {
+      "name": "git diff check",
+      "result": "passed"
+    },
+    {
+      "name": "changed-scope sensitive-literal scan",
+      "result": "passed",
+      "sensitive_values_found": 0
+    }
+  ],
+  "preserved_failure_lineage": [
+    {
+      "stage": "first focused collection",
+      "result": "collection failed",
+      "root_cause": "The new isolated_runner_not_bound inventory blocker had not yet been added to the strict blocker-code schema.",
+      "fix": "Added the explicit blocker code; HEBO remains blocked."
+    },
+    {
+      "stage": "strict request model construction",
+      "result": "9 failed, 5 passed",
+      "root_cause": "Strict tuple fields received JSON-style lists during Python-object construction.",
+      "fix": "Kept tuple semantics through request construction without weakening strict validation."
+    },
+    {
+      "stage": "method inventory regression",
+      "result": "1 failed, 46 passed",
+      "root_cause": "The historical test still required adapter_not_implemented after the adapter boundary was implemented.",
+      "fix": "Replaced the stale assertion with the exact remaining compatibility, environment, and runner-binding blockers."
+    },
+    {
+      "stage": "strict Mypy",
+      "result": "3 errors",
+      "root_cause": "The shared parameter-domain types are wider than the HEBO protocol literals, and feasible outcome loss is optional at the base schema layer.",
+      "fix": "Added explicit fail-closed scale, value-type, and non-null feasible-loss checks before typed protocol construction."
+    }
+  ],
+  "execution_boundaries": {
+    "hebo_packages_installed": 0,
+    "isolated_hebo_environments_created": 0,
+    "provider_logical_turns": 0,
+    "provider_network_requests": 0,
+    "api_keys_read": false,
+    "account_credentials_read": false,
+    "physical_trials_attempted": 0,
+    "px4_runs": 0,
+    "gazebo_runs": 0,
+    "headed_browser_runs": 0,
+    "global_mouse_moved": false,
+    "runtime_installations_or_migrations": 0,
+    "installer_builds": 0,
+    "production_deployments": 0,
+    "website_or_technical_report_writes": 0
+  },
+  "remaining_boundaries": {
+    "execution_readiness": "blocked",
+    "blocker_codes": [
+      "compatibility_unverified",
+      "isolated_environment_missing",
+      "isolated_runner_not_bound"
+    ],
+    "exact_hebo_environment": "not_created",
+    "actual_hebo_ask_observe_compatibility": "not_verified",
+    "campaign_composite_inventory_binding": "not_implemented_for_hebo",
+    "physical_or_provider_execution": "not_authorized_or_run"
+  },
+  "scope_claim": "This receipt proves the isolated HEBO request/response and subprocess boundary under offline fixtures. It does not prove that HEBO 0.3.6 can execute in a locked environment, that its ask/observe APIs match the adapter, or that it has proposed or qualified a PX4/Gazebo candidate."
+}
