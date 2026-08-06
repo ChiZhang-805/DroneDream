@@ -39,4 +39,6 @@ export function applyUniversalMode(
 ) {
   root.dataset.brandEdition = mode;
   root.dataset.productMode = mode;
+  root.dataset.themePresentationOnly = "true";
+  root.dataset.themeGrantsHardwareAuthority = "false";
 }

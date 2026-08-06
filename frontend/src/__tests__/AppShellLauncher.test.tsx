@@ -194,6 +194,7 @@ describe("desktop launcher chrome", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     const dialog = screen.getByRole("dialog", { name: "Settings" });
+    fireEvent.click(within(dialog).getByRole("tab", { name: "Memory" }));
     const memory = await within(dialog).findByLabelText(
       /Learn from my verified experiment outcomes/,
     );
@@ -280,6 +281,7 @@ describe("desktop launcher chrome", () => {
       .toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "简体中文" }).querySelector("svg"))
       .toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("tab", { name: "Model" }));
     expect(within(dialog).getByRole("button", { name: /Included allowance/ }))
       .toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).getByRole("link", { name: "Manage subscription" }))
@@ -316,6 +318,7 @@ describe("desktop launcher chrome", () => {
         .not.toContain("second-memory-only-key");
     });
 
+    fireEvent.click(within(dialog).getByRole("tab", { name: "General" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "简体中文" }));
     await waitFor(() => {
       expect(window.localStorage.getItem("drone-dream:locale")).toBe("zh-CN");
@@ -323,6 +326,7 @@ describe("desktop launcher chrome", () => {
     const chineseDialog = screen.getByRole("dialog", { name: "设置" });
     expect(within(chineseDialog).getByRole("button", { name: "English" })).toBeInTheDocument();
     expect(within(chineseDialog).getByRole("button", { name: "简体中文" })).toBeInTheDocument();
+    fireEvent.click(within(chineseDialog).getByRole("tab", { name: "运行环境" }));
     expect(within(chineseDialog).getByRole("button", { name: "检查运行环境" }))
       .toBeInTheDocument();
     expect(within(chineseDialog).getByText("运行环境正常")).toBeInTheDocument();
@@ -438,6 +442,7 @@ describe("desktop launcher chrome", () => {
     const { router } = renderLauncher();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     expect(await screen.findByText("Ready with warnings")).toBeInTheDocument();
     fireEvent.click(screen.getByText("View details"));
     expect(screen.getByText("Optional GPU telemetry is unavailable.")).toBeInTheDocument();
