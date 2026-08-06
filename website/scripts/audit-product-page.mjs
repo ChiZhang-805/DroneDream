@@ -309,10 +309,42 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
   });
   if (new Set(themeTokens).size !== 3) violations.push("edition cards do not expose three unique themes");
 
+  const desktopBrandHeadings = cards.map((card) => (
+    card.querySelector(".site-product-edition-brand h2")
+  ));
+  if (desktopLockup) {
+    for (const heading of desktopBrandHeadings) {
+      if (!heading) {
+        violations.push("desktop lockup is missing its accessible heading");
+        continue;
+      }
+      const style = getComputedStyle(heading);
+      const rect = heading.getBoundingClientRect();
+      if (
+        heading.hidden ||
+        heading.getAttribute("aria-hidden") === "true" ||
+        style.display === "none" ||
+        style.visibility === "hidden"
+      ) {
+        violations.push("desktop lockup heading is absent from the accessibility tree");
+      }
+      if (
+        style.position !== "absolute" ||
+        !["hidden", "clip"].includes(style.overflowX) ||
+        rect.width > 1 + tolerance ||
+        rect.height > 1 + tolerance
+      ) {
+        violations.push("desktop lockup heading is not visually hidden");
+      }
+    }
+  }
+
   const critical = [...document.querySelectorAll(
     ".site-header,.site-nav,.site-product-page-shell,.site-product-page-header,"
     + ".site-product-page-grid,.site-product-edition,h1,h2",
-  )].filter(visible);
+  )].filter((node) => (
+    visible(node) && !(desktopLockup && desktopBrandHeadings.includes(node))
+  ));
   for (const [index, node] of critical.entries()) {
     const rect = node.getBoundingClientRect();
     const label = node.getAttribute("class") || node.tagName.toLowerCase() || `node-${index}`;
