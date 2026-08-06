@@ -106,10 +106,41 @@
     "approval": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["handoffSha256", "conceptAssetsAreReleaseAssets"],
+      "required": [
+        "handoffSha256",
+        "conceptAssetsAreReleaseAssets",
+        "largeLabelLockupsAreCanonicalSources",
+        "largeLabelReviewPreviewPath",
+        "largeLabelReviewPreviewSha256",
+        "largeLabelReviewPreviewDimensions",
+        "largeLabelReviewStudySha256",
+        "editionLabelHeightRatio",
+        "preserveNaturalLabelWidth"
+      ],
       "properties": {
         "handoffSha256": {"const": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"},
-        "conceptAssetsAreReleaseAssets": {"const": false}
+        "conceptAssetsAreReleaseAssets": {"const": false},
+        "largeLabelLockupsAreCanonicalSources": {"const": true},
+        "largeLabelReviewPreviewPath": {
+          "const": "brand/source/approved/edition-brand-large-label-approved-preview.png"
+        },
+        "largeLabelReviewPreviewSha256": {
+          "const": "8963661c81db8f9115b37114eccf80580b7bbed02d865e4e648c8503f355a01f"
+        },
+        "largeLabelReviewPreviewDimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": {"const": 5200},
+            "height": {"const": 1680}
+          }
+        },
+        "largeLabelReviewStudySha256": {
+          "const": "9b3e9a274ef51393ffbf8ba3cf5d41224a0cafc9990deddeafcef1a92122353a"
+        },
+        "editionLabelHeightRatio": {"const": 0.9},
+        "preserveNaturalLabelWidth": {"const": true}
       }
     },
     "approvedEditionAssets": {
@@ -120,7 +151,15 @@
         "^(sim|lab|field)$": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["markPath", "markSha256", "dotLockupPath", "dotLockupSha256"],
+          "required": [
+            "markPath",
+            "markSha256",
+            "dotLockupPath",
+            "dotLockupSha256",
+            "dotLockupDimensions",
+            "dotLockupStyle",
+            "supersededDotLockup"
+          ],
           "properties": {
             "markPath": {
               "type": "string",
@@ -129,9 +168,32 @@
             "markSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "dotLockupPath": {
               "type": "string",
-              "pattern": "^brand/source/approved/(sim|lab|field)-dot-lockup\\.png$"
+              "pattern": "^brand/source/approved/(sim|lab|field)-large-label-lockup\\.png$"
             },
-            "dotLockupSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+            "dotLockupSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "dotLockupDimensions": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["width", "height"],
+              "properties": {
+                "width": {"type": "integer", "minimum": 2000, "maximum": 3000},
+                "height": {"const": 218}
+              }
+            },
+            "dotLockupStyle": {"const": "large-edition-label-v1"},
+            "supersededDotLockup": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256", "status"],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "pattern": "^brand/source/approved/(sim|lab|field)-dot-lockup\\.png$"
+                },
+                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "status": {"const": "superseded"}
+              }
+            }
           }
         }
       }
