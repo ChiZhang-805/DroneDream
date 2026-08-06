@@ -49,7 +49,7 @@ COEXISTENCE_SYNC_PATH = (
 LIFECYCLE_CONTRACT_PATH = (
     ROOT / "desktop" / "scripts" / "edition-installer-lifecycle-contract.ps1"
 )
-YELLOW_APPLICATION_PATH = (
+YELLOW_ATTEMPT_5_APPLICATION_PATH = (
     DISTRIBUTION
     / "sim"
     / "desktop"
@@ -85,6 +85,19 @@ YELLOW_ATTEMPT_5_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-5-2bffcb0-common-core-prebuild-failed.v1.json"
 )
+YELLOW_ATTEMPT_6_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-6-a99f5e8-application.v1.json"
+)
+YELLOW_ATTEMPT_6_PLAN_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-6-a99f5e8-plan-ready.v1.json"
+)
+YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_6_APPLICATION_PATH
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -119,7 +132,7 @@ def run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
 
 class SoftwareSimBranchContractTests(unittest.TestCase):
     def test_yellow_attempt_5_freezes_exact_commands_without_execution(self) -> None:
-        application = load_json(YELLOW_APPLICATION_PATH)
+        application = load_json(YELLOW_ATTEMPT_5_APPLICATION_PATH)
         plan = application["executionPlan"]
         script = ROOT / plan["entryScript"]["path"]
         self.assertEqual(script.stat().st_size, plan["entryScript"]["bytes"])
@@ -158,7 +171,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         )
 
     def test_yellow_attempt_5_application_separates_product_source_and_evidence(self) -> None:
-        application = load_json(YELLOW_APPLICATION_PATH)
+        application = load_json(YELLOW_ATTEMPT_5_APPLICATION_PATH)
         source = application["sourceSeparation"]
         self.assertEqual(
             source["productSourceCommit"],
@@ -192,7 +205,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         )
 
     def test_yellow_attempt_5_is_single_sim_only_build_request(self) -> None:
-        application = load_json(YELLOW_APPLICATION_PATH)
+        application = load_json(YELLOW_ATTEMPT_5_APPLICATION_PATH)
         attempt = application["attemptAccounting"]
         self.assertEqual(attempt["globalAuthorizedCommandOrdinal"], 5)
         self.assertEqual(attempt["sourceApplicationPreflightOrdinal"], 3)
@@ -213,7 +226,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         )
 
     def test_yellow_attempt_5_preserves_frozen_artifact_and_product_key(self) -> None:
-        application = load_json(YELLOW_APPLICATION_PATH)
+        application = load_json(YELLOW_ATTEMPT_5_APPLICATION_PATH)
         frozen = application["permanentlyFrozenPriorArtifact"]
         self.assertEqual(
             frozen["sha256"],
@@ -402,6 +415,153 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(protected["historicalSimRegistryMutated"])
         self.assertFalse(protected["updaterKeyContentReadOrPrinted"])
         self.assertFalse(protected["publicSupabaseValuesPrintedOrPersisted"])
+
+    def test_yellow_attempt_6_binds_new_product_source_and_updater_donor(self) -> None:
+        self.assertEqual(YELLOW_APPLICATION_PATH, YELLOW_ATTEMPT_6_APPLICATION_PATH)
+        application = load_json(YELLOW_APPLICATION_PATH)
+        source = application["sourceSeparation"]
+        donor = application["commonCoreAndDonor"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "a99f5e81893f5001ebd571d09e95b72d8afa070a",
+        )
+        self.assertEqual(
+            git("show", "-s", "--format=%T", source["productSourceCommit"]),
+            source["productSourceTree"],
+        )
+        self.assertEqual(
+            donor["updaterSigningStrictModeDonorCommit"],
+            "7ce7542991a1edf53105b31588da64b953603c41",
+        )
+        self.assertEqual(
+            git("rev-parse", "HEAD:desktop/scripts/verify-updater-signing-contract.ps1"),
+            donor["updaterSigningStrictModeDonorBlob"],
+        )
+        donor_path = ROOT / donor["updaterSigningStrictModeDonorPath"]
+        self.assertEqual(donor_path.stat().st_size, donor["updaterSigningStrictModeDonorBytes"])
+        self.assertEqual(
+            hashlib.sha256(donor_path.read_bytes()).hexdigest(),
+            donor["updaterSigningStrictModeDonorSha256"],
+        )
+
+    def test_yellow_attempt_6_freezes_unique_roots_and_single_invocation(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_6_APPLICATION_PATH)
+        attempt = application["attemptAccounting"]
+        owned = application["ownedBuildSurface"]
+        maximums = application["executionPlan"]["singleBuildInvocation"]
+        self.assertEqual(attempt["globalCommandApplicationOrdinal"], 6)
+        self.assertEqual(attempt["sourceApplicationPreflightOrdinal"], 1)
+        self.assertEqual(attempt["priorSourceBuildInvocationCount"], 0)
+        self.assertEqual(attempt["sourceBuildInvocationOrdinal"], 1)
+        self.assertEqual(attempt["sourceBuildInvocationMaximum"], 1)
+        self.assertFalse(attempt["automaticRetryAllowed"])
+        self.assertEqual(owned["sourceRoot"], "C:/Users/zju20/dds6")
+        self.assertIn("sim-cargo-target-a99f5e8-ordinal6", owned["cargoTargetDir"])
+        self.assertIn("sim-y2-ordinal6-a99f5e8", owned["runRoot"])
+        for key in (
+            "sourceRootExistsAtPlanFreeze",
+            "cargoTargetDirExistsAtPlanFreeze",
+            "runRootExistsAtPlanFreeze",
+            "bundleRootExistsAtPlanFreeze",
+        ):
+            self.assertFalse(owned[key], key)
+        for key in (
+            "buildScriptMaximum",
+            "frontendMaximum",
+            "tauriMaximum",
+            "cargoMaximum",
+            "nsisMaximum",
+            "artifactMaximum",
+        ):
+            self.assertEqual(maximums[key], 1, key)
+        self.assertEqual(maximums["retryMaximum"], 0)
+
+    def test_yellow_attempt_6_plan_is_non_mutating_and_hash_bound(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_6_APPLICATION_PATH)
+        plan_receipt = load_json(YELLOW_ATTEMPT_6_PLAN_PATH)
+        entry = ROOT / application["executionPlan"]["entryScript"]["path"]
+        self.assertEqual(
+            hashlib.sha256(YELLOW_ATTEMPT_6_APPLICATION_PATH.read_bytes()).hexdigest(),
+            plan_receipt["application"]["sha256"],
+        )
+        self.assertEqual(
+            YELLOW_ATTEMPT_6_APPLICATION_PATH.stat().st_size,
+            plan_receipt["application"]["bytes"],
+        )
+        self.assertEqual(entry.stat().st_size, plan_receipt["entryScript"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(entry.read_bytes()).hexdigest(),
+            plan_receipt["entryScript"]["sha256"],
+        )
+        entry_text = entry.read_text(encoding="utf-8")
+        self.assertIn(
+            "Assert-True (-not (Test-Path -LiteralPath $CargoTargetDir))",
+            entry_text,
+        )
+        self.assertIn(
+            "Assert-True (-not (Test-Path -LiteralPath $BundleRoot))",
+            entry_text,
+        )
+        attributes = git(
+            "check-attr",
+            "eol",
+            "--",
+            application["executionPlan"]["entryScript"]["path"],
+        )
+        self.assertTrue(attributes.endswith(": eol: lf"), attributes)
+        result = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(entry),
+                "-Mode",
+                "Plan",
+            ],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan["mode"], "Plan")
+        self.assertFalse(plan["mutationsPlanned"])
+        for key in ("buildScript", "frontend", "tauri", "cargo", "nsis", "artifact"):
+            self.assertEqual(plan["invocationMaximums"][key], 1, key)
+        self.assertEqual(plan["invocationMaximums"]["retry"], 0)
+        for key in ("sourceRoot", "cargoTargetDir", "runRoot", "outputRoot"):
+            self.assertFalse(Path(plan_receipt["ownedRoots"][key]).exists(), key)
+
+    def test_yellow_attempt_6_requires_fresh_authorization_and_preserves_history(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_6_APPLICATION_PATH)
+        plan = load_json(YELLOW_ATTEMPT_6_PLAN_PATH)
+        self.assertFalse(
+            application["authorization"]["yellowBuildExecutionAuthorizedByThisApplication"]
+        )
+        self.assertFalse(plan["authorization"]["yellowBuildExecutionAuthorizedByThisReceipt"])
+        self.assertTrue(plan["authorization"]["exactChiefControlStartSignalRequired"])
+        self.assertTrue(all(value == 0 for value in plan["executedCounts"].values()))
+        prior = application["priorCommonCorePrebuildFailure"]
+        self.assertEqual(prior["buildDriverInvocations"], 1)
+        for key in (
+            "frontendBuilds",
+            "tauriBuilds",
+            "cargoBuilds",
+            "nsisBuilds",
+            "artifactBuilds",
+        ):
+            self.assertEqual(prior[key], 0, key)
+        self.assertFalse(prior["sameAuthorizationReusable"])
+        protected = application["protectedPriorEvidence"]
+        self.assertEqual(protected["detachedSourceRoot"], "C:/Users/zju20/dds5")
+        self.assertTrue(protected["detachedSourceMustRemainReadOnly"])
+        self.assertTrue(protected["ordinalFiveRunRootMustRemainReadOnly"])
+        self.assertFalse(protected["reuseAllowed"])
+        self.assertFalse(protected["cleanupAllowed"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(

@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-application",
+  "applicationVersion": "1.0.0",
+  "editionId": "sim",
+  "executionClass": "YELLOW",
+  "state": "green-plan-frozen-awaiting-exact-yellow-authorization",
+  "sourceSeparation": {
+    "productSourceCommit": "a99f5e81893f5001ebd571d09e95b72d8afa070a",
+    "productSourceTree": "dcc4343919d4104059a02a0327d0d4671c2b7088",
+    "applicationCommitPolicy": "commit-containing-this-application-entry-plan-and-tests",
+    "applicationEvidenceIsProductSource": false,
+    "sourceMustBeCheckedOutExactAndClean": true
+  },
+  "commonCoreAndDonor": {
+    "recordedCommonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
+    "recordedCommonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
+    "commonUiThemeDonorCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "frontendDistStrictModeDonorCommit": "bb14c47a43795180cc80305eaf87665a54b9b8e5",
+    "updaterSigningStrictModeDonorCommit": "7ce7542991a1edf53105b31588da64b953603c41",
+    "updaterSigningStrictModeDonorPath": "desktop/scripts/verify-updater-signing-contract.ps1",
+    "updaterSigningStrictModeDonorBlob": "4fb046aac8ab729d7c53a31d4588865c2cd2addd",
+    "updaterSigningStrictModeDonorBytes": 10643,
+    "updaterSigningStrictModeDonorSha256": "808a610c1287fa098d0c81d013aad89987bf969b306b9324c4157b0369cb7b59",
+    "universalFailureEvidenceConsumed": false,
+    "handoffPath": "distribution/sim/readiness/universal-common-core-handoff.v1.json",
+    "handoffBytes": 14859,
+    "handoffSha256": "602e21ded6007cdae174d7fb6ea429ad7157e07fa7176e6476a838cf4a3bb2eb"
+  },
+  "uiAcceptance": {
+    "productSourceCommit": "ef8354893b230154204db937df5255d4ede62a0e",
+    "receiptPath": "distribution/sim/frontend/common-ui-theme-settings-ef83548-receipt.v1.json",
+    "receiptSha256": "c41949346e08549fde28de3dfcc5758c0ce2f0821d817b63398d789c403ea68d",
+    "edgeSettingsCasesPassed": 6,
+    "edgeSettingsCasesExpected": 6,
+    "fixedThemeEdition": "sim",
+    "grantsHardwareAuthority": false
+  },
+  "attemptAccounting": {
+    "globalCommandApplicationOrdinal": 6,
+    "sourceApplicationPreflightOrdinal": 1,
+    "priorSourceBuildInvocationCount": 0,
+    "sourceBuildInvocationOrdinal": 1,
+    "sourceBuildInvocationMaximum": 1,
+    "maximumBuildInvocations": 1,
+    "automaticRetryAllowed": false,
+    "failedAttemptMustFreezeWithoutRetry": true,
+    "ordinalFiveBuildInvocationConsumedForPriorProductSource": true
+  },
+  "buildIdentity": {
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "version": "1.0.0",
+    "displayName": "DroneDream · SIM",
+    "editionId": "sim",
+    "runtimeProfileId": "sim-only",
+    "frontendDistAllowed": [
+      "frontend/dist",
+      "frontend/sim-dist"
+    ],
+    "validatedVehiclePackCount": 0,
+    "hardwareHitlLabFieldPayloadAllowed": false
+  },
+  "environmentContract": {
+    "DRONEDREAM_DESKTOP_EDITION_ID": "sim",
+    "DRONEDREAM_EDITION_PROFILE": "sim-only",
+    "VITE_DRONEDREAM_EDITION": "sim",
+    "CARGO_BUILD_JOBS": "2",
+    "DRONEDREAM_OAUTH_CLIENT_ID": "0c2ad943-a0cb-4a2f-9eda-eba44b7f58df",
+    "oauthRedirectUri": "http://127.0.0.1:49211/desktop-auth/sim/callback",
+    "oauthClientIsPublicNoSecret": true,
+    "updaterPrivateKeyPath": "C:/Users/zju20/.tauri/dronedream-updater.key",
+    "updaterExpectedKeyId": "BA3FDCAF71CE2FF5",
+    "updaterPasswordMode": "empty-process-environment-not-recorded",
+    "singleProcessInjectionRequired": true,
+    "secretValuePrintingAllowed": false,
+    "modelApiKeyReadAllowed": false,
+    "providerNetworkUseAllowed": false
+  },
+  "ownedBuildSurface": {
+    "runId": "sim-y2-ordinal6-a99f5e8",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8",
+    "sourceRoot": "C:/Users/zju20/dds6",
+    "bundleRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8/bundle",
+    "receiptRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8/receipt",
+    "fixedArtifactPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8/bundle/DroneDream-Sim-1.0.0.exe",
+    "fixedSignaturePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8/bundle/DroneDream-Sim-1.0.0.exe.sig",
+    "fixedChecksumPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8/bundle/DroneDream-Sim-1.0.0.exe.sha256",
+    "fixedBuildReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8/receipt/yellow-build-receipt.json",
+    "fixedBuildLogPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8/receipt/build-transcript.log",
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-a99f5e8-ordinal6",
+    "sourceRootExistsAtPlanFreeze": false,
+    "cargoTargetDirExistsAtPlanFreeze": false,
+    "runRootExistsAtPlanFreeze": false,
+    "bundleRootExistsAtPlanFreeze": false,
+    "cargoTargetCleanupAllowed": false,
+    "creationPolicy": "execute-mode-only-create-new-and-fail-if-any-owned-root-exists"
+  },
+  "executionPlan": {
+    "entryScript": {
+      "path": "distribution/sim/desktop/invoke-yellow-build-attempt-6-a99f5e8.ps1",
+      "bytes": 15397,
+      "sha256": "0922f01ab79c1416569207d5862feb11a778a481b2773b9d20a0514c919710dd",
+      "checkoutEolPolicyPath": "distribution/sim/desktop/.gitattributes",
+      "checkoutEol": "lf",
+      "defaultMode": "Plan",
+      "executeRequiresExplicitMode": true
+    },
+    "exactCommands": {
+      "plan": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-6-a99f5e8.ps1 -Mode Plan",
+      "preflight": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-6-a99f5e8.ps1 -Mode Preflight",
+      "build": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-6-a99f5e8.ps1 -Mode Execute"
+    },
+    "sourceCheckout": {
+      "strategy": "git-command-local-longpaths-worktree-add-detach-exact-commit",
+      "exactCommand": "git -c core.longpaths=true -C C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream worktree add --detach C:\\Users\\zju20\\dds6 a99f5e81893f5001ebd571d09e95b72d8afa070a",
+      "postCheckoutHead": "a99f5e81893f5001ebd571d09e95b72d8afa070a",
+      "postCheckoutTree": "dcc4343919d4104059a02a0327d0d4671c2b7088",
+      "postCheckoutStatusMustBeClean": true,
+      "sourceRootMustBeAbsentBeforeExecution": true,
+      "globalOrSystemGitConfigModificationAllowed": false
+    },
+    "singleBuildInvocation": {
+      "exactPowerShell": "& <sourceRoot>\\desktop\\scripts\\build-windows-llvm.ps1 -AdditionalConfigPath <sourceRoot>\\distribution\\sim\\desktop\\tauri.sim.conf.json -CargoTargetDir C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\sim-cargo-target-a99f5e8-ordinal6 -ExpectedProductName DroneDream-Sim -EditionId sim -PreserveBundleHistory",
+      "buildScriptMaximum": 1,
+      "frontendMaximum": 1,
+      "tauriMaximum": 1,
+      "cargoMaximum": 1,
+      "nsisMaximum": 1,
+      "artifactMaximum": 1,
+      "retryMaximum": 0,
+      "failureFreezesRunRoot": true
+    },
+    "publicConfigurationInjection": {
+      "source": "chief-control-approved-launching-process-environment",
+      "requiredVariableNames": [
+        "VITE_SUPABASE_URL",
+        "VITE_SUPABASE_PUBLISHABLE_KEY"
+      ],
+      "inheritedBySingleEntryProcess": true,
+      "valuesPersistedInApplication": false,
+      "valuesPrintedByEntryScript": false,
+      "serviceRoleAllowed": false
+    },
+    "preflightChecks": [
+      "evidence-worktree-clean",
+      "product-commit-tree-and-updater-donor-exact",
+      "entry-script-bytes-and-sha-exact",
+      "run-source-cargo-and-output-roots-absent",
+      "public-supabase-contract-valid-without-value-output",
+      "updater-key-path-present-without-read-or-copy",
+      "memory-below-80-percent-and-at-least-3-gib-free",
+      "c-at-least-10-gib-and-z-at-least-5-gib-free",
+      "no-heavy-processes",
+      "frozen-f23987ba-artifact-byte-exact-and-read-only",
+      "historical-sim-registry-presence-read-only",
+      "dds5-and-all-prior-attempt-evidence-read-only"
+    ],
+    "planOnlyVerified": true,
+    "preflightExecutedDuringThisGreenAtom": false,
+    "buildExecutedDuringThisGreenAtom": false
+  },
+  "priorCommonCorePrebuildFailure": {
+    "productSourceCommit": "2bffcb0d26d080107144441f1c356f45dc4320ec",
+    "branchReceiptPath": "distribution/sim/desktop/yellow-build-attempt-5-2bffcb0-common-core-prebuild-failed.v1.json",
+    "branchReceiptBytes": 5115,
+    "branchReceiptSha256": "1dea14ce237fd9db224e1c97c88bd13c0a0b889ad19b348f7dee08a282fdd7b2",
+    "externalReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal5-2bffcb0/receipt/yellow-build-receipt.json",
+    "externalReceiptSha256": "a340b506949b7415e20f32a82d9052d028ac614a71cfaaf096d219b31132511c",
+    "transcriptSha256": "9f1f61c72fe39d349133d85fc75cca63a037d809f4dc9b572aa2e5085cfde02f",
+    "attemptLockSha256": "2d6a8831fa0009fa32c9b9677dd6a17b0839345bcd6170d9dcbce09a9cb1f3e7",
+    "buildDriverInvocations": 1,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "sameAuthorizationReusable": false
+  },
+  "protectedPriorEvidence": {
+    "detachedSourceRoot": "C:/Users/zju20/dds5",
+    "detachedSourceMustRemainReadOnly": true,
+    "ordinalFiveRunRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal5-2bffcb0",
+    "ordinalFiveRunRootMustRemainReadOnly": true,
+    "allPriorFailureEvidenceMustRemainReadOnly": true,
+    "reuseAllowed": false,
+    "cleanupAllowed": false
+  },
+  "permanentlyFrozenPriorArtifact": {
+    "productSourceCommit": "f24eb3a1e383c83b8a0b5bed4c044148146f4153",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11686921,
+    "sha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/bundle/DroneDream-Sim-1.0.0.exe",
+    "preflightAndPostBuildHashMustMatch": true,
+    "readOnlyProtectionRequired": true,
+    "reuseAllowed": false,
+    "relabelAllowed": false,
+    "furtherLifecycleExecutionAllowed": false,
+    "websiteHandoffAllowed": false
+  },
+  "historicalSimProductKeyResidue": {
+    "path": "HKCU/Software/DroneDream/DroneDream-Sim",
+    "observedPresentDuringApplicationPreparation": true,
+    "buildReadsOrMutatesResidue": false,
+    "cleanupAuthorizedByThisApplication": false,
+    "cleanupExecuted": false
+  },
+  "pendingProductGate": {
+    "kind": "updater-signing-strictmode-common-core-donor",
+    "exactDonorReceived": true,
+    "currentSourceMayBeUsedForExeBuildAfterAuthorization": true,
+    "thisApplicationSuperseded": false
+  },
+  "authorization": {
+    "applicationPreparationAuthorized": true,
+    "yellowBuildRequestSubmitted": true,
+    "yellowBuildExecutionAuthorizedByThisApplication": false,
+    "newExactChiefControlStartSignalRequired": true,
+    "requiredSignalBindings": [
+      "productSourceCommit",
+      "productSourceTree",
+      "applicationSha256",
+      "entryScriptSha256",
+      "globalCommandApplicationOrdinal",
+      "sourceApplicationPreflightOrdinal",
+      "sourceBuildInvocationOrdinal",
+      "ownedRunRoot",
+      "ownedSourceRoot",
+      "ownedCargoTargetDir",
+      "fixedArtifactPath",
+      "maximumBuildInvocations"
+    ]
+  },
+  "executedCounts": {
+    "runRootsCreated": 0,
+    "sourceRootsCreated": 0,
+    "cargoRootsCreated": 0,
+    "outputRootsCreated": 0,
+    "buildScriptInvocations": 0,
+    "frontendBuilds": 0,
+    "cargoBuilds": 0,
+    "tauriBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0
+  },
+  "nonClaims": {
+    "yellowStartSignalReceived": false,
+    "runRootCreated": false,
+    "sourceRootCreated": false,
+    "cargoRootCreated": false,
+    "buildStarted": false,
+    "artifactCreated": false,
+    "installerExecuted": false,
+    "runtimeStarted": false,
+    "px4OrGazeboStarted": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}

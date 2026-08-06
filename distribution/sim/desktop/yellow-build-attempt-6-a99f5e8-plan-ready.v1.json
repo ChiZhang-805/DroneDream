@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-plan-readiness",
+  "editionId": "sim",
+  "state": "green-plan-passed-awaiting-exact-yellow-authorization",
+  "sourceSeparation": {
+    "productSourceCommit": "a99f5e81893f5001ebd571d09e95b72d8afa070a",
+    "productSourceTree": "dcc4343919d4104059a02a0327d0d4671c2b7088",
+    "planEvidenceBaseHead": "a99f5e81893f5001ebd571d09e95b72d8afa070a",
+    "planReceiptIsProductSource": false
+  },
+  "updaterSigningDonor": {
+    "commit": "7ce7542991a1edf53105b31588da64b953603c41",
+    "path": "desktop/scripts/verify-updater-signing-contract.ps1",
+    "gitBlob": "4fb046aac8ab729d7c53a31d4588865c2cd2addd",
+    "bytes": 10643,
+    "sha256": "808a610c1287fa098d0c81d013aad89987bf969b306b9324c4157b0369cb7b59",
+    "exactAtPlanFreeze": true
+  },
+  "application": {
+    "path": "distribution/sim/desktop/yellow-build-attempt-6-a99f5e8-application.v1.json",
+    "bytes": 12893,
+    "sha256": "10d5a4267be8479057df55b573af39bbec2f687dc29d628f6fca307f734c3df4",
+    "globalCommandApplicationOrdinal": 6,
+    "sourceApplicationPreflightOrdinal": 1,
+    "priorSourceBuildInvocationCount": 0,
+    "sourceBuildInvocationOrdinal": 1,
+    "sourceBuildInvocationMaximum": 1,
+    "retryMaximum": 0
+  },
+  "entryScript": {
+    "path": "distribution/sim/desktop/invoke-yellow-build-attempt-6-a99f5e8.ps1",
+    "bytes": 15397,
+    "sha256": "0922f01ab79c1416569207d5862feb11a778a481b2773b9d20a0514c919710dd",
+    "planCommand": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-6-a99f5e8.ps1 -Mode Plan"
+  },
+  "exactTwoStepCommands": {
+    "step1Preflight": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-6-a99f5e8.ps1 -Mode Preflight",
+    "step2Build": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-6-a99f5e8.ps1 -Mode Execute",
+    "executionAuthorizedByThisReceipt": false,
+    "step2MaximumInvocations": 1,
+    "retryMaximum": 0
+  },
+  "ownedRoots": {
+    "sourceRoot": "C:/Users/zju20/dds6",
+    "sourceRootAbsentAfterPlan": true,
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-a99f5e8-ordinal6",
+    "cargoTargetDirAbsentAfterPlan": true,
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8",
+    "runRootAbsentAfterPlan": true,
+    "outputRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal6-a99f5e8/bundle",
+    "outputRootAbsentAfterPlan": true,
+    "createOnlyDuringAuthorizedExecute": true
+  },
+  "invocationMaximums": {
+    "buildScript": 1,
+    "frontend": 1,
+    "tauri": 1,
+    "cargo": 1,
+    "nsis": 1,
+    "artifact": 1,
+    "retry": 0
+  },
+  "publicConfiguration": {
+    "oauthClientId": "0c2ad943-a0cb-4a2f-9eda-eba44b7f58df",
+    "oauthCallback": "http://127.0.0.1:49211/desktop-auth/sim/callback",
+    "oauthClientIsPublicNoSecret": true,
+    "updaterKeyPath": "C:/Users/zju20/.tauri/dronedream-updater.key",
+    "updaterKeyContentReadOrPrintedDuringPlan": false,
+    "supabaseVariableNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "supabaseValuesReadPrintedOrPersistedDuringPlan": false,
+    "modelApiKeyAllowed": false,
+    "serviceRoleAllowed": false
+  },
+  "protectedHistoricalEvidence": {
+    "ordinalFiveBranchReceiptPath": "distribution/sim/desktop/yellow-build-attempt-5-2bffcb0-common-core-prebuild-failed.v1.json",
+    "ordinalFiveBranchReceiptSha256": "1dea14ce237fd9db224e1c97c88bd13c0a0b889ad19b348f7dee08a282fdd7b2",
+    "ordinalFiveExternalReceiptSha256": "a340b506949b7415e20f32a82d9052d028ac614a71cfaaf096d219b31132511c",
+    "ordinalFiveTranscriptSha256": "9f1f61c72fe39d349133d85fc75cca63a037d809f4dc9b572aa2e5085cfde02f",
+    "ordinalFiveAttemptLockSha256": "2d6a8831fa0009fa32c9b9677dd6a17b0839345bcd6170d9dcbce09a9cb1f3e7",
+    "ordinalFiveDetachedSourceRoot": "C:/Users/zju20/dds5",
+    "ordinalFiveDetachedSourcePreserved": true,
+    "ordinalFiveRunRootPreserved": true,
+    "cleanupExecuted": false,
+    "reuseAllowed": false
+  },
+  "frozenPriorArtifact": {
+    "sha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "readOnly": true,
+    "reuseAllowed": false,
+    "relabelAllowed": false
+  },
+  "planVerification": {
+    "planCommandExecuted": true,
+    "planCommandExitCode": 0,
+    "mutationsPlanned": false,
+    "newRootsCreated": 0,
+    "productSourceAndTreeExact": true,
+    "donorBlobAndShaExact": true,
+    "applicationAndEntryHashesExact": true
+  },
+  "executedCounts": {
+    "preflights": 0,
+    "buildScriptInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "providerActions": 0,
+    "hardwareActions": 0,
+    "deployments": 0
+  },
+  "authorization": {
+    "yellowBuildExecutionAuthorizedByThisReceipt": false,
+    "exactChiefControlStartSignalRequired": true
+  }
+}
