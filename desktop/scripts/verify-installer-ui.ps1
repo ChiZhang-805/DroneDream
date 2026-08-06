@@ -3,6 +3,8 @@ param(
     [string]$Installer,
     [ValidateSet("English", "SimpChinese")]
     [string]$Language = "English",
+    [ValidatePattern("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]
+    [string]$InstallerProductName = "DroneDream",
     [string]$ExpectedTarget = "E:\DroneDream",
     [string]$ExpectedApplication = (Join-Path $env:LOCALAPPDATA "DroneDream"),
     [string]$RecoveryControlExecutable = "",
@@ -96,7 +98,7 @@ $CB_SETCURSEL = 0x014E
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
 $process = $null
 $registryBackups = @()
-$installerLanguageRegistryPath = "HKCU:\Software\DroneDream\DroneDream"
+$installerLanguageRegistryPath = "HKCU:\Software\DroneDream\$InstallerProductName"
 $installerLanguageValueName = "Installer Language"
 $installerLanguageWasPresent = $false
 $originalInstallerLanguage = $null
@@ -223,8 +225,8 @@ function Advance-InstallerPage {
 
 function Suspend-DroneDreamRegistration {
     $keys = @(
-        "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\DroneDream",
-        "HKCU\Software\DroneDream\DroneDream"
+        "HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\$InstallerProductName",
+        "HKCU\Software\DroneDream\$InstallerProductName"
     )
     foreach ($key in $keys) {
         & reg.exe query $key *> $null

@@ -13,6 +13,7 @@ OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
 FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
 LIFECYCLE = ROOT / "desktop/scripts/verify-universal-installer-lifecycle.ps1"
+INSTALLER_UI = ROOT / "desktop/scripts/verify-installer-ui.ps1"
 HANDOFF = ROOT / "distribution/universal/release/website-exact-exe-handoff.v1.json"
 ENGINE_PACK_TOOL = ROOT / "engine-pack/tools/engine_pack.py"
 BROWSER_AUTH_VERIFIER = ROOT / "desktop/scripts/verify-browser-auth-config.mjs"
@@ -245,3 +246,21 @@ def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None
     assert "npm.cmd" not in lifecycle
     assert "engine_pack.py" not in lifecycle
     assert "releaseReady = $true" not in lifecycle
+
+
+def test_visible_locale_verifier_handles_language_selector_in_edition_namespace() -> None:
+    verifier = INSTALLER_UI.read_text(encoding="utf-8-sig")
+    for fragment in (
+        '[ValidatePattern("^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")]',
+        '[string]$InstallerProductName = "DroneDream"',
+        '"HKCU:\\Software\\DroneDream\\$InstallerProductName"',
+        '"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\$InstallerProductName"',
+        '[DroneDreamInstallerUi]::GetDlgItem($handle, 1002)',
+        '$languageIndex = if ($Language -eq "English") { 0 } else { 1 }',
+        'SendMessage($languageCombo, $CB_SETCURSEL',
+        'Invoke-DialogButton -Dialog $entryPage.Handle -ControlId 1',
+        '$installerArguments += "/DRONEDREAMVALIDATEPATHONLY"',
+        'The installer path-only validation did not exit',
+    ):
+        assert fragment in verifier
+    assert 'HKCU:\\Software\\DroneDream\\DroneDream"' not in verifier
