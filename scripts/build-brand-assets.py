@@ -25,6 +25,9 @@ FONT_LICENSE_PATH = REPO / "brand" / "source" / "Space-Grotesk-OFL-1.1.txt"
 REQUIREMENTS_PATH = REPO / "brand" / "requirements.lock.txt"
 MANIFEST_PATH = REPO / "brand" / "generated" / "brand-assets.v1.json"
 VISUAL_RECEIPT_PATH = REPO / "brand" / "generated" / "brand-visual-receipt.v1.json"
+APPROVED_PREVIEW_PATH = (
+    REPO / "brand" / "source" / "approved" / "edition-brand-large-label-approved-preview.png"
+)
 
 EDITION_IDS = ("universal", "sim", "lab", "field")
 
@@ -58,8 +61,9 @@ def load_contract() -> dict[str, Any]:
     if (
         contract.get("schemaVersion") != 1
         or contract.get("kind") != "dronedream-edition-brand-system"
+        or contract.get("brandVersion") != "1.1.0"
         or tuple(contract.get("editions", {})) != EDITION_IDS
-        or contract.get("separator") != "·"
+        or contract.get("separator") != "\u00b7"
         or contract.get("safety") != {"presentationOnly": True, "grantsHardwareAuthority": False}
     ):
         raise BrandBuildError("brand contract identity or safety boundary drifted")
@@ -77,6 +81,19 @@ def load_contract() -> dict[str, Any]:
     approved_assets = contract.get("approvedEditionAssets")
     if not isinstance(approved_assets, dict) or tuple(approved_assets) != EDITION_IDS[1:]:
         raise BrandBuildError("approved edition asset inventory drifted")
+    approval = contract.get("approval", {})
+    if (
+        approval.get("largeLabelLockupsAreCanonicalSources") is not True
+        or approval.get("largeLabelReviewPreviewPath")
+        != APPROVED_PREVIEW_PATH.relative_to(REPO).as_posix()
+        or approval.get("largeLabelReviewPreviewSha256")
+        != "8963661c81db8f9115b37114eccf80580b7bbed02d865e4e648c8503f355a01f"
+        or approval.get("largeLabelReviewStudySha256")
+        != "9b3e9a274ef51393ffbf8ba3cf5d41224a0cafc9990deddeafcef1a92122353a"
+        or approval.get("editionLabelHeightRatio") != 0.9
+        or approval.get("preserveNaturalLabelWidth") is not True
+    ):
+        raise BrandBuildError("large-label approval identity drifted")
     return contract
 
 
@@ -90,6 +107,7 @@ def require_inputs() -> None:
             FONT_PATH,
             FONT_LICENSE_PATH,
             REQUIREMENTS_PATH,
+            APPROVED_PREVIEW_PATH,
         )
         if not path.is_file()
     ]
@@ -320,36 +338,38 @@ def ico_bytes(mark: Image.Image, sizes: list[int]) -> bytes:
 
 def preview_board(
     contract: dict[str, Any],
-    marks: dict[str, Image.Image],
     lockups: dict[tuple[str, str], Image.Image],
     font_path: Path,
 ) -> Image.Image:
-    width, height = 2100, 1640
-    canvas = Image.new("RGBA", (width, height), "#EFF0F5")
+    width, height = 5200, 1680
+    canvas = Image.new("RGBA", (width, height), "#EFF1F7")
     draw = ImageDraw.Draw(canvas)
-    title_font = font_at(font_path, 50, 700)
-    body_font = font_at(font_path, 22, 500)
-    label_font = font_at(font_path, 25, 700)
+    title_font = font_at(font_path, 74, 700)
+    body_font = font_at(font_path, 34, 520)
+    label_font = font_at(font_path, 30, 650)
     draw.text(
-        (72, 54), "DRONEDREAM · CANONICAL EDITION BRAND DONOR", font=title_font, fill="#171225"
+        (100, 58),
+        "DRONEDREAM \u00b7 CANONICAL LARGE EDITION LABELS",
+        font=title_font,
+        fill="#171225",
     )
     draw.text(
-        (74, 120),
-        "One shared geometry · exact palettes · light and dark surface verification",
+        (104, 146),
+        "Approved exact-byte lockups; edition labels use about 90% of the main wordmark height.",
         font=body_font,
-        fill="#6E6877",
+        fill="#6B6676",
     )
-    row_height = 346
+    row_height = 330
     for index, edition_id in enumerate(EDITION_IDS):
         edition = contract["editions"][edition_id]
-        top = 180 + index * row_height
-        draw.rounded_rectangle((70, top, 2030, top + 306), radius=30, fill="#FFFFFF")
-        draw.text((98, top + 28), edition["productName"], font=label_font, fill="#4E4855")
-        light = (250, top + 28, 1110, top + 278)
-        dark = (1134, top + 28, 2002, top + 278)
-        draw.rounded_rectangle(light, radius=24, fill=edition["lightSurface"])
-        draw.rounded_rectangle(dark, radius=24, fill=edition["darkSurface"])
-        item = fit(lockups[(edition_id, "primary")], 790, 154)
+        top = 235 + index * 355
+        draw.rounded_rectangle((70, top, 5130, top + row_height), radius=34, fill="#FFFFFF")
+        draw.text((105, top + 24), edition["productName"], font=label_font, fill="#4E4855")
+        light = (260, top + 55, 2470, top + 295)
+        dark = (2530, top + 55, 5040, top + 295)
+        draw.rounded_rectangle(light, radius=28, fill=edition["lightSurface"])
+        draw.rounded_rectangle(dark, radius=28, fill=edition["darkSurface"])
+        item = fit(lockups[(edition_id, "primary")], 2200, 158)
         for bounds in (light, dark):
             left, upper, right, lower = bounds
             canvas.alpha_composite(
@@ -358,14 +378,6 @@ def preview_board(
                     left + (right - left - item.width) // 2,
                     upper + (lower - upper - item.height) // 2,
                 ),
-            )
-        mark = fit(marks[edition_id], 70, 70)
-        canvas.alpha_composite(mark, (98, top + 204))
-        for color_index, color in enumerate(edition["gradientStops"]):
-            draw.rounded_rectangle(
-                (98 + color_index * 38, top + 166, 126 + color_index * 38, top + 194),
-                radius=9,
-                fill=color,
             )
     return canvas.convert("RGB")
 
@@ -414,6 +426,17 @@ def add_image(outputs: dict[Path, bytes], path: str, image: Image.Image) -> byte
 def build_outputs() -> dict[Path, bytes]:
     require_inputs()
     contract = load_contract()
+    approved_preview = APPROVED_PREVIEW_PATH.read_bytes()
+    if sha256_bytes(approved_preview) != contract["approval"]["largeLabelReviewPreviewSha256"]:
+        raise BrandBuildError("approved large-label review preview hash drifted")
+    with Image.open(io.BytesIO(approved_preview)) as preview_source:
+        expected_preview = contract["approval"]["largeLabelReviewPreviewDimensions"]
+        if (
+            preview_source.format != "PNG"
+            or preview_source.mode != "RGB"
+            or preview_source.size != (expected_preview["width"], expected_preview["height"])
+        ):
+            raise BrandBuildError("approved large-label review preview format drifted")
     outputs: dict[Path, bytes] = {}
     source = Image.open(SOURCE_PATH).convert("RGBA")
     standard_master = square_mark(source, 1024, 0.09)
@@ -470,7 +493,14 @@ def build_outputs() -> dict[Path, bytes]:
                     edition_id,
                     "dotLockupPath",
                     "dotLockupSha256",
-                    (1840, 340),
+                    (
+                        contract["approvedEditionAssets"][edition_id]["dotLockupDimensions"][
+                            "width"
+                        ],
+                        contract["approvedEditionAssets"][edition_id]["dotLockupDimensions"][
+                            "height"
+                        ],
+                    ),
                 )
                 compact_lockup = primary_lockup.copy()
                 compact_lockup_payload = primary_lockup_payload
@@ -516,7 +546,7 @@ def build_outputs() -> dict[Path, bytes]:
                 compact_lockup_payload
             )
 
-        preview = preview_board(contract, marks, lockups, font_path)
+        preview = preview_board(contract, lockups, font_path)
         preview_bytes = add_image(outputs, "brand/generated/edition-brand-preview.png", preview)
 
     universal_mark = marks["universal"]
@@ -556,10 +586,17 @@ def build_outputs() -> dict[Path, bytes]:
         "previewPath": "brand/generated/edition-brand-preview.png",
         "previewBytes": len(preview_bytes),
         "previewSha256": sha256_bytes(preview_bytes),
-        "previewDimensions": {"width": 2100, "height": 1640},
+        "previewDimensions": {"width": 5200, "height": 1680},
+        "approvedReviewPreviewPath": contract["approval"]["largeLabelReviewPreviewPath"],
+        "approvedReviewPreviewSha256": contract["approval"][
+            "largeLabelReviewPreviewSha256"
+        ],
+        "approvedReviewStudySha256": contract["approval"]["largeLabelReviewStudySha256"],
         "verifiedEditions": list(EDITION_IDS),
         "verifiedSurfaces": ["light", "dark"],
         "singleLineCenteredDotLockups": True,
+        "editionLabelHeightRatio": contract["approval"]["editionLabelHeightRatio"],
+        "naturalEditionLabelWidths": contract["approval"]["preserveNaturalLabelWidth"],
         "sharedGeometry": True,
         "approvedExactByteEditions": list(EDITION_IDS[1:]),
         "presentationOnly": True,
@@ -594,6 +631,13 @@ def build_outputs() -> dict[Path, bytes]:
         descriptor = contract["approvedEditionAssets"][edition_id]
         mark_path = REPO / descriptor["markPath"]
         lockup_path = REPO / descriptor["dotLockupPath"]
+        superseded = descriptor["supersededDotLockup"]
+        superseded_path = REPO / superseded["path"]
+        if (
+            not superseded_path.is_file()
+            or sha256_bytes(superseded_path.read_bytes()) != superseded["sha256"]
+        ):
+            raise BrandBuildError(f"superseded {edition_id} lockup evidence drifted")
         approved_asset_records[edition_id] = {
             "mark": {
                 "path": descriptor["markPath"],
@@ -606,9 +650,11 @@ def build_outputs() -> dict[Path, bytes]:
                 "path": descriptor["dotLockupPath"],
                 "bytes": lockup_path.stat().st_size,
                 "sha256": descriptor["dotLockupSha256"],
-                "dimensions": {"width": 1840, "height": 340},
+                "dimensions": descriptor["dotLockupDimensions"],
+                "style": descriptor["dotLockupStyle"],
                 "canonicalOutputPath": f"brand/generated/{edition_id}/lockup-primary.png",
             },
+            "supersededDotLockup": superseded,
         }
 
     manifest = {
@@ -643,6 +689,14 @@ def build_outputs() -> dict[Path, bytes]:
         },
         "approvedEditionAssets": approved_asset_records,
         "approvalHandoffSha256": contract["approval"]["handoffSha256"],
+        "largeLabelApproval": {
+            "canonicalSources": contract["approval"]["largeLabelLockupsAreCanonicalSources"],
+            "reviewPreviewPath": contract["approval"]["largeLabelReviewPreviewPath"],
+            "reviewPreviewSha256": contract["approval"]["largeLabelReviewPreviewSha256"],
+            "reviewStudySha256": contract["approval"]["largeLabelReviewStudySha256"],
+            "editionLabelHeightRatio": contract["approval"]["editionLabelHeightRatio"],
+            "preserveNaturalLabelWidth": contract["approval"]["preserveNaturalLabelWidth"],
+        },
         "conceptAssetsAreReleaseAssets": False,
         "universalIsCanonical": True,
         "presentationOnly": True,

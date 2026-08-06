@@ -8,9 +8,12 @@ no production build reads from `work/`.
 `brand-editions.v1.json` freezes the names, centered-dot lockup contract,
 palettes, surfaces, export dimensions, font source, and the presentation-only
 safety boundary. `source/approved/` contains the exact user-approved SIM, LAB,
-and FIELD mark and centered-dot lockup bytes. They are copied into canonical
-1024 px/primary outputs without re-rendering; smaller PNG, favicon, and ICO
-outputs are deterministic derivatives. `source/` also contains the Universal
+and FIELD mark and large-edition-label lockup bytes. Edition labels use the
+approved roughly 90% wordmark-height treatment and preserve natural text width.
+They are copied into canonical 1024 px/primary outputs without re-rendering;
+smaller PNG, favicon, and ICO outputs remain deterministic derivatives of the
+unchanged marks. The earlier small-label lockups remain in the repository as
+superseded review evidence and are not silently deleted. `source/` also contains the Universal
 mother-brand master and the OFL-licensed Space Grotesk input.
 `generated/brand-assets.v1.json` binds every canonical output to exact source,
 generator, locked requirements, font, bytes, dimensions, and SHA-256.
