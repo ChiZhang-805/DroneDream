@@ -1,0 +1,67 @@
+{
+    "schemaVersion":  1,
+    "kind":  "dronedream-field-replacement-yellow-preflight-receipt",
+    "decision":  "allow-one-build-after-preflight",
+    "source":  {
+                   "productCommit":  "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+                   "upstreamEvidenceCommit":  "1b4d1b3b191dc58544767d692a6f5c652d5019aa",
+                   "clean":  true,
+                   "pushedLineage":  true
+               },
+    "authorization":  {
+                          "applicationSha256":  "0a9810d340fd6174609e83ce27d9e059f77028bc40997bf39abfe28394125360",
+                          "serialGateReleased":  true,
+                          "cargoBuildCountMaximum":  1,
+                          "nsisInvocationMaximum":  1,
+                          "cargoBuildJobs":  2
+                      },
+    "paths":  {
+                  "sourceRoot":  "C:\\Users\\zju20\\ddf351",
+                  "runRoot":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement",
+                  "cargoTarget":  "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\351b918",
+                  "overlay":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\tauri-yellow-authorized.json",
+                  "plannedOutputs":  {
+                                         "outputRoot":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\artifact",
+                                         "artifact":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\artifact\\DroneDream-Field-1.0.0.exe",
+                                         "updaterSignature":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sig",
+                                         "checksum":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\artifact\\DroneDream-Field-1.0.0.exe.sha256",
+                                         "updaterMetadata":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\artifact\\latest-field.json",
+                                         "buildReceipt":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\artifact\\build-receipt.json",
+                                         "handoffManifest":  "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\artifact\\handoff-manifest.json"
+                                     },
+                  "allOutputPathsOwned":  true,
+                  "outputSlotsEmpty":  true
+              },
+    "configuration":  {
+                          "editionId":  "field",
+                          "editionProfile":  "field-lightweight",
+                          "artifactFileName":  "DroneDream-Field-1.0.0.exe",
+                          "oauthClientId":  "3140bbe2-5f0e-4699-8a9b-295d4030f853",
+                          "oauthCallback":  "http://127.0.0.1:49213/desktop-auth/field/callback",
+                          "supabasePublicSourcePath":  "C:\\Users\\zju20\\ddf351\\frontend\\.env.production",
+                          "supabasePublicSourceSha256":  "ff86b10a9d55bb6c67d677e6a5e04939d241ee469fd479e0806046a7007b0cf8",
+                          "updaterKeyPath":  "C:\\Users\\zju20\\.tauri\\dronedream-updater.key",
+                          "updaterKeyId":  "BA3FDCAF71CE2FF5",
+                          "updaterKeyReadDuringPreflight":  false,
+                          "updaterKeyPasswordMode":  "empty",
+                          "overlaySha256":  "dfbfddb4dc50f856f97f3f33112a9e62f0c1359a93afbfe950970e802961d586",
+                          "overlayOnlySemanticChange":  "build.beforeBuildCommand=npm run frontend:field-build"
+                      },
+    "resources":  {
+                      "memoryFreeBytes":  6713442304,
+                      "cFreeBytes":  101151248384,
+                      "zFreeBytes":  23568490496,
+                      "heavyProcessCount":  0
+                  },
+    "safety":  {
+                   "networkAllowed":  false,
+                   "installAllowed":  false,
+                   "runtimeMigrationAllowed":  false,
+                   "deviceOrHardwareAllowed":  false,
+                   "simulationAllowed":  false,
+                   "deploymentAllowed":  false,
+                   "validatedHardwarePackCount":  0,
+                   "hardwareDecision":  "deny"
+               },
+    "buildInvoked":  false
+}

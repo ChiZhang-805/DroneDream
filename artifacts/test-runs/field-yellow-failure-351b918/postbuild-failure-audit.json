@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-replacement-yellow-postbuild-failure-audit",
+  "editionId": "field",
+  "decision": "freeze-failure-evidence-no-retry",
+  "source": {
+    "productCommit": "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+    "productTree": "f14832d84d6fa03fef27e94e09e2178b11834d49",
+    "evidenceHeadAtStart": "1b4d1b3b191dc58544767d692a6f5c652d5019aa",
+    "headAfterBuild": "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+    "cleanBeforeBuild": true,
+    "generatedUntrackedAfterBuild": [
+      {
+        "path": "frontend/field-dist",
+        "fileCount": 29,
+        "bytes": 5945331
+      }
+    ]
+  },
+  "authorization": {
+    "applicationSha256": "0a9810d340fd6174609e83ce27d9e059f77028bc40997bf39abfe28394125360",
+    "preflightReceiptSha256": "f4541aa5090f1a41308d19e883a31861e342356260c35b011e77e8f8a064e1e5",
+    "invokeScriptSha256": "83107064337fd57662eb5bfdb765f319f314b586bb3e18dd7110724b118229b7",
+    "cargoBuildJobs": 2,
+    "buildInvocationCount": 1,
+    "cargoBuildCount": 1,
+    "nsisInvocationCount": 1,
+    "retryAllowed": false
+  },
+  "process": {
+    "startedAt": "2026-08-06T12:35:48.9235313Z",
+    "finishedAt": "2026-08-06T12:41:58.6781971Z",
+    "durationSeconds": 369.755,
+    "exitCode": 1,
+    "processReceiptSha256": "0ce48c017fdfd63ea3428b5bf8875c258539cac0656be6a6ee7822ae63a5a7bc",
+    "stdoutSha256": "bea4493380343f65a499d5f281623c37ad88c6f9b8cf54194142569eaf338f17",
+    "stderrSha256": "bdce4aac8df47333955bd2cf1ba857e2d331e0e918e1a4b96a539d63317e9e8c"
+  },
+  "failure": {
+    "stage": "tauri-build-return-before-postbuild-signing-and-verification",
+    "errorType": "System.Management.Automation.RemoteException.NativeCommandError",
+    "observedMessage": "Info Looking up installed tauri packages to check mismatched versions",
+    "primaryClassification": "informational-native-stderr-treated-as-terminating-error",
+    "primaryEvidence": [
+      "desktop/scripts/build-windows-llvm.ps1 line 205 invokes npm.cmd under ErrorActionPreference Stop",
+      "the only stderr record is a normal Tauri Info line",
+      "the application and NSIS candidate were produced before the exception was surfaced",
+      "the updater signing block and updater metadata writer were not reached"
+    ],
+    "secondaryFailClosedBlocker": {
+      "classification": "generated-field-dist-would-fail-postbuild-clean-source-check",
+      "path": "frontend/field-dist",
+      "observedAsUntracked": true,
+      "sourceCommitChanged": false
+    },
+    "commonCoreFixRequired": true,
+    "fieldSpecificProductNsisDefectObserved": false
+  },
+  "frozenArtifact": {
+    "absolutePath": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-351b918-replacement\\artifact\\DroneDream-Field-1.0.0.exe",
+    "candidateAbsolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\351b918\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Field_1.0.0_x64-setup.exe",
+    "candidateExact": true,
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "bytes": 11531940,
+    "sha256": "90d867aedf728a70e55d6df349da1ce96b80e6f37b4689224eebdc4fd8cfa2c3",
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0",
+    "productName": "DroneDream \u00b7 FIELD",
+    "authenticodeStatus": "NotSigned",
+    "signerCertificatePresent": false,
+    "peCertificateTableOffset": 0,
+    "peCertificateTableBytes": 0,
+    "updaterSignatureExists": false,
+    "updaterMetadataExists": false,
+    "frozenChecksumSha256": "d41ad14221dafeab90a11f0963cf6fb0ff619d7b4871fbb39f7fb2d2d51272b2",
+    "mayBeInstalled": false,
+    "mayBeSignedPostHoc": false,
+    "mayBePromoted": false
+  },
+  "compiledApplication": {
+    "bytes": 24899072,
+    "sha256": "06bfa849bc21650446751406be885e86284251a7fad973f872e61d2f8bdc29cb",
+    "webView2LoaderImported": true,
+    "forbiddenLlvmRuntimeImports": []
+  },
+  "payload": {
+    "engineManifestSha256": "0de7e5bc194f3ff83390269d2e2a3610b9ab66090dcc6d8f61f44069bd59f1ed",
+    "engineManifestSourceCommit": "351b918611e42cb9fe45c0034f5c29f5c312fad2",
+    "profileId": "field-lightweight",
+    "fileCount": 212,
+    "includesLargeSimulator": false,
+    "forbiddenSimulatorPaths": [],
+    "generatedNsisSha256": "8dbcd8477786f2d0f974902a4fce2373e001575a65567a36c61057e312deaf31",
+    "generatedNsisBytes": 35190,
+    "licenseIncluded": true,
+    "thirdPartyNoticeIncluded": true,
+    "valkeyLicenseIncluded": true,
+    "fieldBrandIncluded": true,
+    "webView2LoaderIncluded": true
+  },
+  "updater": {
+    "expectedKeyId": "BA3FDCAF71CE2FF5",
+    "realUpdaterSignerInvocationObserved": false,
+    "signatureState": "not-issued-build-aborted-before-signer",
+    "metadataState": "not-issued-build-aborted-before-writer",
+    "privateKeyContentRecorded": false
+  },
+  "resourceAndBoundary": {
+    "cargoTarget": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\351b918",
+    "cargoTargetBytes": 1528567594,
+    "heavyProcessCountAfterFailure": 0,
+    "offlineEnvironmentConfigured": true,
+    "downloadReferenceCount": 0,
+    "networkTrafficIndependentlyMeasured": false,
+    "installExecuted": false,
+    "runtimeMigrationExecuted": false,
+    "deviceOrHardwareTouched": false,
+    "simulationExecuted": false,
+    "deploymentExecuted": false
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "hardwareDecision": "deny",
+    "frontendIsAuthority": false
+  },
+  "release": {
+    "previewReady": false,
+    "releaseReady": false,
+    "websiteReady": false,
+    "lifecycleValidationAllowedForThisArtifact": false,
+    "nextGate": "Universal common-core build-driver classification and exact donor; a new build requires a new exact source and new YELLOW approval"
+  }
+}

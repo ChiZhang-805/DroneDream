@@ -1,0 +1,8 @@
+﻿npm.cmd :         Info Looking up installed tauri packages to check mismatched versions...
+At C:\Users\zju20\ddf351\desktop\scripts\build-windows-llvm.ps1:205 char:5
++     & npm.cmd --prefix $desktopRoot run build -- `
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (        Info Lo...hed versions...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
