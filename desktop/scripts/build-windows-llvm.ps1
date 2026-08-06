@@ -11,6 +11,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+Import-Module (Join-Path $PSScriptRoot "release-build-driver.psm1") -Force
+
 & (Join-Path $PSScriptRoot "verify-updater-signing-contract.ps1")
 & (Join-Path $PSScriptRoot "verify-updater-build-contract.ps1")
 
@@ -171,6 +173,11 @@ if ($AdditionalConfigPath) {
         throw "The additional edition config productName does not match $ExpectedProductName."
     }
 }
+$frontendDistContract = Resolve-EditionGeneratedFrontendContract `
+    -RepoRoot $repoRoot `
+    -BaseConfigPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") `
+    -AdditionalConfigPath $additionalConfig `
+    -EditionId $EditionId
 $runtimeUpdateFamilies = Get-Content -LiteralPath (
     Join-Path $repoRoot "distribution\desktop\edition-runtime-update-families.v1.json"
 ) -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -202,25 +209,44 @@ $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ($additionalConfig) {
     # Tauri merges repeated --config values in order. Keep the edition overlay
     # first and add the LLVM resource overlay without replacing edition fields.
-    & npm.cmd --prefix $desktopRoot run build -- `
-        --target x86_64-pc-windows-gnullvm `
-        --config $additionalConfig `
-        --config $llvmBundleConfig
+    Invoke-CheckedNativeCommand `
+        -FilePath "npm.cmd" `
+        -DisplayName "Tauri desktop build" `
+        -ArgumentList @(
+            "--prefix", $desktopRoot, "run", "build", "--",
+            "--target", "x86_64-pc-windows-gnullvm",
+            "--config", $additionalConfig,
+            "--config", $llvmBundleConfig
+        )
 } else {
-    & npm.cmd --prefix $desktopRoot run build -- `
-        --target x86_64-pc-windows-gnullvm `
-        --config $llvmBundleConfig
-}
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+    Invoke-CheckedNativeCommand `
+        -FilePath "npm.cmd" `
+        -DisplayName "Tauri desktop build" `
+        -ArgumentList @(
+            "--prefix", $desktopRoot, "run", "build", "--",
+            "--target", "x86_64-pc-windows-gnullvm",
+            "--config", $llvmBundleConfig
+        )
 }
 
 $postBuildCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
-$postBuildStatus = (& git -C $repoRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
-if ($LASTEXITCODE -ne 0 -or
+$postBuildStatusLines = @(
+    & git -C $repoRoot status --porcelain=v1 --untracked-files=all
+)
+$postBuildStatusExitCode = $LASTEXITCODE
+$postBuildStatus = Test-PostBuildSourceStatus `
+    -StatusLines $postBuildStatusLines `
+    -AllowedGeneratedPath $frontendDistContract.relativePath
+if ($postBuildStatusExitCode -ne 0 -or
     $postBuildCommit -cne $releaseSourceCommit -or
-    $postBuildStatus) {
+    $postBuildStatus.unexpectedCount -ne 0) {
     throw "The release source changed while the desktop installer was building."
+}
+if ($postBuildStatus.allowedGeneratedCount -gt 0) {
+    Write-Host (
+        "Accepted $($postBuildStatus.allowedGeneratedCount) generated frontend files " +
+        "under $($frontendDistContract.relativePath)."
+    )
 }
 
 $application = Join-Path $targetOutputRoot "drone-dream-desktop.exe"
