@@ -17,6 +17,10 @@ ABORT_RECEIPT_PATH = (
     ROOT
     / "distribution/sim/lifecycle/red-f23987ba-execution-attempt-1-aborted.v1.json"
 )
+APPLICATION_PATH = (
+    ROOT
+    / "distribution/sim/lifecycle/red-f23987ba-continuation-application.v1.json"
+)
 TOOL_PATH = ROOT / "distribution/sim/tools/sim_red_lifecycle_readiness.py"
 
 SPEC = importlib.util.spec_from_file_location("sim_red_lifecycle_readiness", TOOL_PATH)
@@ -113,6 +117,56 @@ class SimRedLifecycleReadinessTests(unittest.TestCase):
         self.assertFalse(receipt["failurePolicy"]["sameAuthorizationMayBeRetried"])
         self.assertTrue(receipt["failurePolicy"]["newChiefControlRedSignalRequired"])
         self.assertFalse(receipt["rollback"]["required"])
+
+    def test_continuation_application_validates_without_execution(self) -> None:
+        plan = readiness.validate_plan(load(PLAN_PATH), ROOT)
+        application = readiness.validate_continuation_application(
+            load(APPLICATION_PATH),
+            plan,
+            ROOT,
+        )
+        self.assertEqual(
+            application["attemptAccounting"]["requestedContinuationOrdinal"],
+            2,
+        )
+        self.assertTrue(
+            all(value == 0 for value in application["executedCounts"].values())
+        )
+        self.assertFalse(
+            application["authorization"]["redExecutionAuthorizedByThisApplication"]
+        )
+
+    def test_continuation_cannot_reuse_prior_authorization(self) -> None:
+        plan = readiness.validate_plan(load(PLAN_PATH), ROOT)
+        application = load(APPLICATION_PATH)
+        application["authorization"]["redExecutionAuthorizedByThisApplication"] = True
+        with self.assertRaisesRegex(readiness.SimRedReadinessError, "authorization"):
+            readiness.validate_continuation_application(application, plan, ROOT)
+
+    def test_continuation_ordinal_drift_is_rejected(self) -> None:
+        plan = readiness.validate_plan(load(PLAN_PATH), ROOT)
+        application = load(APPLICATION_PATH)
+        application["attemptAccounting"]["requestedContinuationOrdinal"] = 1
+        with self.assertRaisesRegex(readiness.SimRedReadinessError, "attempt accounting"):
+            readiness.validate_continuation_application(application, plan, ROOT)
+
+    def test_continuation_cross_edition_owned_path_is_rejected(self) -> None:
+        plan = readiness.validate_plan(load(PLAN_PATH), ROOT)
+        application = load(APPLICATION_PATH)
+        application["ownedExecutionSurface"]["installAndDataPaths"].append(
+            "%LOCALAPPDATA%/DroneDream-Field"
+        )
+        with self.assertRaisesRegex(readiness.SimRedReadinessError, "owned surface"):
+            readiness.validate_continuation_application(application, plan, ROOT)
+
+    def test_continuation_oauth_token_exchange_is_rejected(self) -> None:
+        plan = readiness.validate_plan(load(PLAN_PATH), ROOT)
+        application = load(APPLICATION_PATH)
+        application["requestedAcceptanceMatrix"]["oauthBoundary"][
+            "tokenExchangeAllowed"
+        ] = True
+        with self.assertRaisesRegex(readiness.SimRedReadinessError, "OAuth boundary"):
+            readiness.validate_continuation_application(application, plan, ROOT)
 
 
 if __name__ == "__main__":

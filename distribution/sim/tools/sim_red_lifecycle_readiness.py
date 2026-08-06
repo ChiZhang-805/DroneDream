@@ -15,6 +15,7 @@ ARTIFACT_SHA256 = "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffb
 ARTIFACT_BYTES = 11686921
 PLAN_KIND = "dronedream-sim-red-app-only-lifecycle-plan"
 RECEIPT_KIND = "dronedream-sim-red-app-only-readiness"
+APPLICATION_KIND = "dronedream-sim-red-lifecycle-continuation-application"
 
 
 class SimRedReadinessError(ValueError):
@@ -365,10 +366,266 @@ def validate_receipt(
     return receipt
 
 
+def validate_continuation_application(
+    application: dict[str, Any], plan: dict[str, Any], root: Path
+) -> dict[str, Any]:
+    _require(application.get("schemaVersion") == 1, "application schema drifted")
+    _require(application.get("kind") == APPLICATION_KIND, "application kind drifted")
+    _require(application.get("applicationVersion") == "1.0.0", "application version drifted")
+    _require(application.get("editionId") == "sim", "application edition drifted")
+    _require(
+        application.get("state")
+        == "application-only-awaiting-new-exact-red-start-signal",
+        "application state drifted",
+    )
+
+    source = application["sourceSeparation"]
+    _require(source["productSourceCommit"] == PRODUCT_SOURCE, "application source drifted")
+    _require(
+        source["lifecycleToolEvidenceCommit"]
+        == "0768cd36bf55aa3248c83b44393b4ae1613aa83d"
+        and source["abortEvidenceCommit"]
+        == "a65e16bc6da56fe9d9db73632a161fc65999a0cb"
+        and source["postDonorGreenHead"]
+        == "4e77c3828386d4537d6abc0f899fc41cc154e8e9",
+        "application evidence lineage drifted",
+    )
+    _require(source["applicationEvidenceIsProductSource"] is False, "application relabelled")
+
+    artifact = application["artifact"]
+    for key, value in plan["artifact"].items():
+        _require(artifact.get(key) == value, f"application artifact drifted: {key}")
+    _require(
+        artifact["rebuildRequested"] is False and artifact["relabelRequested"] is False,
+        "application requested artifact mutation",
+    )
+
+    expected_inputs = {
+        "plan": (
+            "distribution/sim/lifecycle/red-app-only-lifecycle-plan.v1.json",
+            9577,
+            "2bb63984660943e6941a96477d2ddd1598854a1f9512ea97e6819d6db191fa0c",
+        ),
+        "readiness": (
+            "distribution/sim/lifecycle/red-f23987ba-app-only-readiness.v1.json",
+            6055,
+            "e70498b4d93b092ba6d4c738b86876345ffdd99d59389022a64f19583a2ebed0",
+        ),
+        "abortedAttempt": (
+            "distribution/sim/lifecycle/red-f23987ba-execution-attempt-1-aborted.v1.json",
+            4035,
+            "71ddc8fa94af207a2d2c1f309dde8311535cbf6690933abbf4f15a3fe0a2da47",
+        ),
+    }
+    frozen_inputs = application["frozenInputs"]
+    _require(set(frozen_inputs) == set(expected_inputs), "application input inventory drifted")
+    for key, (path, size, sha256) in expected_inputs.items():
+        row = frozen_inputs[key]
+        _require(
+            row == {"path": path, "bytes": size, "sha256": sha256},
+            f"application input binding drifted: {key}",
+        )
+        input_path = root / path
+        _require(input_path.stat().st_size == size, f"application input bytes drifted: {key}")
+        _require(_sha256(input_path) == sha256, f"application input SHA drifted: {key}")
+
+    aborted = json.loads(
+        (root / expected_inputs["abortedAttempt"][0]).read_text(encoding="utf-8")
+    )
+    _require(
+        aborted["state"] == "aborted-before-owned-root-or-installer-mutation",
+        "prior abort classification drifted",
+    )
+    _require(
+        all(value == 0 for value in aborted["executedExactCounts"].values())
+        and aborted["ownedStateAfterAbort"]["runRootPresent"] is False
+        and aborted["runner"]["automaticRetryExecuted"] is False
+        and aborted["failurePolicy"]["sameAuthorizationMayBeRetried"] is False,
+        "prior abort mutation boundary drifted",
+    )
+    _require(
+        application["attemptAccounting"]
+        == {
+            "priorRedRunnerAttempts": 1,
+            "priorMutatingRedAttempts": 0,
+            "priorAttemptOrdinal": 1,
+            "priorAttemptState": "aborted-before-owned-root-or-installer-mutation",
+            "priorOuterShellExitCode": 124,
+            "priorOwnedRunRootsCreated": 0,
+            "priorInstallerInvocations": 0,
+            "requestedContinuationOrdinal": 2,
+            "maximumNewExecutionAttempts": 1,
+            "automaticRetriesAllowed": 0,
+            "artifactBuildsRequested": 0,
+        },
+        "continuation attempt accounting drifted",
+    )
+
+    owned = application["ownedExecutionSurface"]
+    expected_owned = {
+        "runId": "sim-red-continuation-2-f23987ba",
+        "runRoot": (
+            "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/"
+            "sim-red-continuation-2-f23987ba"
+        ),
+        "tempRoot": (
+            "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/"
+            "sim-red-continuation-2-f23987ba/temp"
+        ),
+        "installAndDataPaths": plan["ownedWriteSurface"]["paths"][:3],
+        "shortcutPaths": plan["ownedWriteSurface"]["paths"][3:],
+        "registryKeys": plan["ownedWriteSurface"]["registryKeys"],
+        "shortcutTarget": plan["identity"]["shortcutTarget"],
+        "temporaryEnvironmentRestrictedToRunRoot": True,
+        "writesOutsideOwnedSurfaceAllowed": False,
+    }
+    _require(owned == expected_owned, "continuation owned surface drifted")
+
+    protected = application["protectedState"]
+    _require(
+        protected["snapshotImmediatelyBeforeExecutionRequired"] is True
+        and protected["parityAfterEveryPhaseRequired"] is True
+        and protected["runtimeMustRemainStopped"] is True
+        and protected["webView2InstallRepairAllowed"] is False
+        and protected["protectedDeletionAllowed"] is False,
+        "continuation protected state drifted",
+    )
+    _require(
+        set(protected["families"])
+        == {
+            "legacy-DroneDream-install-registry-shortcuts",
+            "Universal-install-registry-shortcuts-data",
+            "Lab-install-registry-shortcuts-data",
+            "Field-install-registry-shortcuts-data",
+            "DroneDreamRuntime-state-and-files",
+            "WebView2-version-location-and-executable",
+        },
+        "continuation protected family inventory drifted",
+    )
+
+    matrix = application["requestedAcceptanceMatrix"]
+    _require(
+        matrix["sequence"]
+        == [
+            "fresh-install",
+            "fresh-identity-shortcut-residue-check",
+            "overlay-install",
+            "overlay-identity-shortcut-residue-check",
+            "single-app-launch-live-webview2",
+            "en-zh-path-only-check",
+            "oauth-pkce-boundary-no-credentials",
+            "owned-sim-uninstall",
+            "final-residue-and-protected-parity-check",
+        ],
+        "continuation sequence drifted",
+    )
+    expected_counts = {
+        "freshInstallerInvocations": 1,
+        "overlayInstallerInvocations": 1,
+        "applicationLaunches": 1,
+        "uninstallerProcessStartsTotal": 1,
+        "desktopShortcutChecks": 2,
+        "startMenuShortcutChecks": 2,
+        "englishPathOnlyChecks": 1,
+        "simplifiedChinesePathOnlyChecks": 1,
+        "liveWebView2Checks": 1,
+        "pkceBoundaryChecks": 1,
+        "browserLoginTransactions": 0,
+        "realTokenExchanges": 0,
+        "credentialReads": 0,
+        "runtimeStarts": 0,
+        "px4Starts": 0,
+        "gazeboStarts": 0,
+        "hardwareActions": 0,
+        "artifactBuilds": 0,
+    }
+    _require(matrix["exactMaximumCounts"] == expected_counts, "continuation counts drifted")
+    _require(
+        matrix["locales"]
+        == {
+            "mode": "path-only-no-additional-installer-or-launch",
+            "required": ["en-US", "zh-CN"],
+        },
+        "continuation locale boundary drifted",
+    )
+    _require(
+        matrix["webView2"]
+        == {
+            "liveValidationUsesSingleAuthorizedAppLaunch": True,
+            "installOrRepairInvocations": 0,
+            "systemWebView2MutationAllowed": False,
+        },
+        "continuation WebView2 boundary drifted",
+    )
+    _require(
+        matrix["oauthBoundary"]
+        == {
+            "editionId": "sim",
+            "callback": "http://127.0.0.1:49211/desktop-auth/sim/callback",
+            "pkceBoundaryChecks": 1,
+            "browserTransactionAllowed": False,
+            "accountCredentialInputAllowed": False,
+            "tokenExchangeAllowed": False,
+            "stopBeforeRealAccountOrProviderExchange": True,
+        },
+        "continuation OAuth boundary drifted",
+    )
+
+    rollback = application["rollback"]
+    _require(
+        rollback["uninstallerPath"] == "%LOCALAPPDATA%/DroneDream-Sim/uninstall.exe"
+        and rollback["mustResolveInsideExactSimInstallRoot"] is True
+        and rollback["maximumUninstallerProcessStartsTotal"] == 1
+        and rollback["failureRollbackConsumesSameUninstallerBudget"] is True
+        and rollback["rollbackOnlyAfterOwnedInstallationExists"] is True
+        and rollback["manualOwnedDeletionAllowed"] is False
+        and rollback["manualProtectedDeletionAllowed"] is False
+        and rollback["historicalEvidenceDeletionAllowed"] is False
+        and rollback["stopAfterFailureWithoutRetry"] is True,
+        "continuation rollback boundary drifted",
+    )
+    authorization = application["authorization"]
+    _require(
+        authorization["applicationPreparationAuthorized"] is True
+        and authorization["redExecutionAuthorizedByThisApplication"] is False
+        and authorization["newExactChiefControlStartSignalRequired"] is True,
+        "continuation authorization overclaim",
+    )
+    _require(
+        authorization["requiredSignalBindings"]
+        == [
+            "productSourceCommit",
+            "artifactSha256",
+            "artifactBytes",
+            "applicationSha256",
+            "requestedContinuationOrdinal",
+            "ownedRunRoot",
+            "exactMaximumCounts",
+        ],
+        "continuation signal binding inventory drifted",
+    )
+    _require(
+        application["executedCounts"]
+        == {
+            "ownedRunRootsCreated": 0,
+            "freshInstallerInvocations": 0,
+            "overlayInstallerInvocations": 0,
+            "applicationLaunches": 0,
+            "uninstallerProcessStarts": 0,
+            "pkceBoundaryChecks": 0,
+            "artifactBuilds": 0,
+        },
+        "continuation execution count overclaim",
+    )
+    _assert_false_values(application["nonClaims"], "continuation nonClaims")
+    return application
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("plan", type=Path)
     parser.add_argument("--receipt", type=Path)
+    parser.add_argument("--application", type=Path)
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--require-local-evidence", action="store_true")
     args = parser.parse_args()
@@ -384,6 +641,12 @@ def main() -> int:
             json.loads(args.receipt.read_text(encoding="utf-8")),
             plan,
             plan_path.relative_to(root),
+        )
+    if args.application:
+        validate_continuation_application(
+            json.loads(args.application.read_text(encoding="utf-8")),
+            plan,
+            root,
         )
     print(
         json.dumps(
