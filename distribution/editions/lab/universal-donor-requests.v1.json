@@ -5,9 +5,10 @@
   "requestingEdition": "lab",
   "authority": {
     "branch": "codex/software",
-    "observedHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
-    "observedHeadIsProductSource": false,
-    "observedProductSource": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "observedHead": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+    "observedTree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d",
+    "observedHeadUsedAsWholeDonor": false,
+    "observedProductSource": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
     "canonicalBrandProductSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "labMayCarrySharedFixLongTerm": false,
@@ -26,7 +27,25 @@
           "desktop/src-tauri/nsis/runtime-mode.nsh",
           "desktop/src-tauri/src/installer_handoff.rs"
         ],
-        "integration": "merge-parent-preserved"
+        "integration": "merge-parent-preserved",
+        "verifiedAtUniversalSource": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
+        "pathByteAudit": [
+          {
+            "path": "desktop/scripts/verify-nsis-template.ps1",
+            "blob": "0e1d94e8de358057cfd0d95bcc0ae332f8d71cf1",
+            "sha256": "d23770d685b3ac41679857e37d3c5e127929ad14b5eef5fc80de139f4dc83432"
+          },
+          {
+            "path": "desktop/src-tauri/nsis/runtime-mode.nsh",
+            "blob": "9af1787fa8607e725c4495fa14a5763de781a5a3",
+            "sha256": "daa73c6e7f6ea4e4cc05fda1c8602ef358d5e42e7daabf711d357144c600cbfa"
+          },
+          {
+            "path": "desktop/src-tauri/src/installer_handoff.rs",
+            "blob": "d6ed51beb4730264c835d0b77f10cd14ee448b89",
+            "sha256": "cee0a2cd6bbf889ed07951cfc640e52cb70dee91239237b77c5cec897e2e1663"
+          }
+        ]
       },
       "coexistenceContractDonor": {
         "commit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
@@ -86,7 +105,7 @@
     {
       "requestId": "universal-edition-auth-isolation-v1",
       "ownership": "Universal/Core",
-      "state": "delivered-exact-donor-forward-synced-with-portable-binding-fix",
+      "state": "delivered-exact-donor-forward-synced",
       "exactDonorChain": [
         "6355aad351370178a7171b504a5d2f235fb12ceb",
         "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75",
@@ -94,15 +113,18 @@
         "bed637c726462e1a38b74eba46915543d007869d",
         "4c779b7ca316c0953f94f7ef3f4f850881ef2d58"
       ],
-      "portableUniversalPatch": {
-        "labCommit": "169ae40d7b727aa0f89964dd11e2f217a6ca22db",
+      "canonicalSinglePathDonor": {
+        "commit": "c322cda1c968d15b09e8ac93364f885777b619e8",
+        "verifiedAtUniversalSource": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
         "path": "distribution/desktop/edition-browser-auth.v1.json",
-        "purpose": "bind browser auth to the coexistence contract changed by the Runtime diagnostics donor",
-        "mustReturnToUniversal": true,
-        "mayRemainAsLabFork": false
+        "blob": "2b314e9c13215f7d0c08c7c75a340261be6c7f40",
+        "sha256": "0cde18e10ed10b68f66a9efb6ef229076dc22255b734337a1c98852015d22345",
+        "identityBindingContractSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
+        "wholeCommitSyncForbidden": true,
+        "labBytesExact": true
       },
       "evidence": {
-        "observedUniversalHead": "528ecf39ef7c4f2a85b88af73a76057f87184e35",
+        "observedUniversalHead": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
         "browserAuthPath": "desktop/src-tauri/src/browser_auth.rs",
         "browserAuthGitObjectId": "fcd44440704d0c30e1b07a84dde3bd3b29e8d665",
         "currentCallbackIsEditionBound": true,
@@ -280,7 +302,7 @@
     }
   ],
   "labRecovery": {
-    "nextStep": "return the portable auth identity-binding fix to Universal, obtain the edition-safety fixture donor, and collect separately authorized auth/updater/lifecycle execution evidence before requesting a new gated Lab build",
+    "nextStep": "obtain the edition-safety fixture donor and collect separately authorized auth/updater/lifecycle execution evidence before requesting a new gated Lab build",
     "rebuildAuthorizedByThisRequest": false,
     "installAuthorizedByThisRequest": false,
     "frozenArtifactMayBecomeFinalWithoutRebuild": false

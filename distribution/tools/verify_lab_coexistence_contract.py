@@ -44,6 +44,12 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _git_blob(path: Path) -> str:
+    payload = path.read_bytes()
+    header = f"blob {len(payload)}\0".encode("ascii")
+    return hashlib.sha1(header + payload, usedforsecurity=False).hexdigest()
+
+
 def _mapping(value: object, label: str) -> dict[str, object]:
     if not isinstance(value, dict):
         raise LabCoexistenceContractError(f"{label} must be an object")
@@ -181,7 +187,15 @@ def validate_contract(
         or common_auth.get("credentialVaultProductCommit")
         != "bed637c726462e1a38b74eba46915543d007869d"
         or common_auth.get("nativeAuditProductCommit") != "4c779b7ca316c0953f94f7ef3f4f850881ef2d58"
-        or common_auth.get("portableIdentityBindingFixMustReturnToUniversal") is not True
+        or common_auth.get("canonicalIdentityBindingSourceCommit")
+        != "c322cda1c968d15b09e8ac93364f885777b619e8"
+        or common_auth.get("canonicalVerificationSourceCommit")
+        != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+        or common_auth.get("canonicalVerificationSourceTree")
+        != "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d"
+        or common_auth.get("canonicalIdentityBindingBlob") != _git_blob(COMMON_AUTH_PATH)
+        or common_auth.get("canonicalSinglePathSync") is not True
+        or common_auth.get("wholeSourceCommitSyncForbidden") is not True
         or common_auth_manifest.get("path") != "distribution/desktop/edition-browser-auth.v1.json"
         or common_auth_manifest.get("bytes") != COMMON_AUTH_PATH.stat().st_size
         or common_auth_manifest.get("sha256") != _sha256(COMMON_AUTH_PATH)
@@ -393,9 +407,10 @@ def validate_contract(
     authority = _mapping(donor.get("authority"), "donor authority")
     if (
         authority.get("branch") != "codex/software"
-        or authority.get("observedHead") != "528ecf39ef7c4f2a85b88af73a76057f87184e35"
-        or authority.get("observedHeadIsProductSource") is not False
-        or authority.get("observedProductSource") != "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d"
+        or authority.get("observedHead") != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+        or authority.get("observedTree") != "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d"
+        or authority.get("observedHeadUsedAsWholeDonor") is not False
+        or authority.get("observedProductSource") != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
         or authority.get("canonicalBrandProductSource")
         != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
         or authority.get("labMayCarrySharedFixLongTerm") is not False
@@ -418,7 +433,6 @@ def validate_contract(
         item = _mapping(request, "donor request")
         if item.get("ownership") != "Universal/Core" or item.get("state") not in {
             "delivered-exact-donor-forward-synced",
-            "delivered-exact-donor-forward-synced-with-portable-binding-fix",
             "awaiting-exact-donor",
             "requested-not-delivered",
         }:
@@ -428,6 +442,7 @@ def validate_contract(
             raise LabCoexistenceContractError("shared donor request points into Lab ownership")
         if item.get("requestId") == "universal-nsis-existing-install-quiesce-v1":
             exact_donor = _mapping(item.get("exactDonor"), "NSIS exact donor")
+            path_audit = _sequence(exact_donor.get("pathByteAudit"), "NSIS path byte audit")
             coexistence_donor = _mapping(
                 item.get("coexistenceContractDonor"),
                 "coexistence contract donor",
@@ -440,6 +455,8 @@ def validate_contract(
                 exact_donor.get("commit") != "b099ed00923e9f2b833f812ad79f1614529038de"
                 or exact_donor.get("parent") != "39d19414e4ac6649288726195f74afaf6dc58123"
                 or exact_donor.get("integration") != "merge-parent-preserved"
+                or exact_donor.get("verifiedAtUniversalSource")
+                != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
                 or coexistence_donor.get("commit") != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
                 or identity_donor.get("commit") != "8a8ad6ce0ea619a52ec087b7f55142c24311165a"
                 or identity_donor.get("unknownProductDecision") != "deny"
@@ -447,6 +464,34 @@ def validate_contract(
                 or identity_donor.get("labDisplayName") != "DroneDream · LAB"
             ):
                 raise LabCoexistenceContractError("NSIS donor provenance drifted")
+            expected_runtime_mode_paths = {
+                "desktop/scripts/verify-nsis-template.ps1": (
+                    "0e1d94e8de358057cfd0d95bcc0ae332f8d71cf1",
+                    "d23770d685b3ac41679857e37d3c5e127929ad14b5eef5fc80de139f4dc83432",
+                ),
+                "desktop/src-tauri/nsis/runtime-mode.nsh": (
+                    "9af1787fa8607e725c4495fa14a5763de781a5a3",
+                    "daa73c6e7f6ea4e4cc05fda1c8602ef358d5e42e7daabf711d357144c600cbfa",
+                ),
+                "desktop/src-tauri/src/installer_handoff.rs": (
+                    "d6ed51beb4730264c835d0b77f10cd14ee448b89",
+                    "cee0a2cd6bbf889ed07951cfc640e52cb70dee91239237b77c5cec897e2e1663",
+                ),
+            }
+            if len(path_audit) != len(expected_runtime_mode_paths):
+                raise LabCoexistenceContractError("NSIS runtime-mode path audit is incomplete")
+            for reference in path_audit:
+                path = reference.get("path")
+                if path not in expected_runtime_mode_paths:
+                    raise LabCoexistenceContractError("NSIS runtime-mode path audit drifted")
+                expected_blob, expected_sha = expected_runtime_mode_paths[path]
+                if (
+                    reference.get("blob") != expected_blob
+                    or reference.get("sha256") != expected_sha
+                    or _git_blob(ROOT / path) != expected_blob
+                    or _sha256(ROOT / path) != expected_sha
+                ):
+                    raise LabCoexistenceContractError("NSIS runtime-mode bytes drifted")
         if item.get("requestId") == "universal-large-edition-lockup-brand-v1":
             exact_donor = _mapping(item.get("exactDonor"), "brand exact donor")
             evidence = _mapping(item.get("evidence"), "brand donor evidence")
@@ -465,7 +510,10 @@ def validate_contract(
                 raise LabCoexistenceContractError("brand donor provenance drifted")
         if item.get("requestId") == "universal-edition-auth-isolation-v1":
             chain = _sequence(item.get("exactDonorChain"), "auth exact donor chain")
-            portable = _mapping(item.get("portableUniversalPatch"), "portable auth patch")
+            canonical = _mapping(
+                item.get("canonicalSinglePathDonor"),
+                "canonical auth single-path donor",
+            )
             if (
                 chain
                 != [
@@ -475,8 +523,14 @@ def validate_contract(
                     "bed637c726462e1a38b74eba46915543d007869d",
                     "4c779b7ca316c0953f94f7ef3f4f850881ef2d58",
                 ]
-                or portable.get("mustReturnToUniversal") is not True
-                or portable.get("mayRemainAsLabFork") is not False
+                or canonical.get("commit") != "c322cda1c968d15b09e8ac93364f885777b619e8"
+                or canonical.get("verifiedAtUniversalSource")
+                != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
+                or canonical.get("path") != "distribution/desktop/edition-browser-auth.v1.json"
+                or canonical.get("blob") != _git_blob(COMMON_AUTH_PATH)
+                or canonical.get("sha256") != _sha256(COMMON_AUTH_PATH)
+                or canonical.get("wholeCommitSyncForbidden") is not True
+                or canonical.get("labBytesExact") is not True
             ):
                 raise LabCoexistenceContractError("auth donor provenance drifted")
     recovery = _mapping(donor.get("labRecovery"), "labRecovery")
@@ -493,7 +547,6 @@ def validate_contract(
         "existing-install/quiesce",
         "large LAB suffix",
         "provider, signed-updater",
-        "identity-binding hash fix",
         "edition-safety allow-fixture",
         "predates this contract",
     ):

@@ -108,7 +108,7 @@ class LabCoexistenceContractTests(unittest.TestCase):
         with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "compiled Edition"):
             coexistence.validate_contract(*inputs)
 
-    def test_rejects_auth_donor_or_portable_backflow_claim_drift(self) -> None:
+    def test_rejects_auth_donor_or_canonical_single_path_drift(self) -> None:
         inputs = list(load_inputs())
         contract = copy.deepcopy(inputs[0])
         contract["authentication"]["currentCommonCoreObservation"][
@@ -125,9 +125,22 @@ class LabCoexistenceContractTests(unittest.TestCase):
             for item in donor["requests"]
             if item["requestId"] == "universal-edition-auth-isolation-v1"
         )
-        auth_request["portableUniversalPatch"]["mustReturnToUniversal"] = False
+        auth_request["canonicalSinglePathDonor"]["blob"] = "0" * 40
         inputs[1] = donor
         with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "auth donor"):
+            coexistence.validate_contract(*inputs)
+
+    def test_rejects_runtime_mode_atomic_path_drift(self) -> None:
+        inputs = list(load_inputs())
+        donor = copy.deepcopy(inputs[1])
+        nsis_request = next(
+            item
+            for item in donor["requests"]
+            if item["requestId"] == "universal-nsis-existing-install-quiesce-v1"
+        )
+        nsis_request["exactDonor"]["pathByteAudit"][1]["sha256"] = "0" * 64
+        inputs[1] = donor
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "runtime-mode bytes"):
             coexistence.validate_contract(*inputs)
 
     def test_rejects_silent_cross_edition_auth_or_frontend_identity(self) -> None:
