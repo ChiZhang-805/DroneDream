@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-preview-1.0.0-0017604-yellow-attempt5",
+  "editionId": "lab",
+  "result": "build-succeeded-postbuild-receipt-validation-blocked",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "001760490e42395c3aa0b1dbeb134cd4a9fd25be",
+    "tree": "24dea8387bbad9ea895789f53c4189fee7f0f13b",
+    "statusAtAttemptStart": "clean",
+    "upstreamExactAtAttemptStart": true
+  },
+  "commonCore": {
+    "productSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "lifecycleValidatorDonor": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
+    "lifecycleValidatorIntegrationCommit": "e9f6a4232d350d2dcc70deeffe62cef3dfad37bc"
+  },
+  "attempt": {
+    "historicalLabYellowAttemptNumber": 5,
+    "exactSourceAttemptNumber": 1,
+    "classification": "YELLOW",
+    "startedAt": "2026-08-06T20:20:32.7557333+08:00",
+    "endedAt": "2026-08-06T20:22:35.7668607+08:00",
+    "toolchain": "1.97.0-x86_64-pc-windows-gnullvm",
+    "cargoBuildJobs": 2,
+    "serializedWithOtherEditionBuilds": true,
+    "tauriCargoNsisAttemptCount": 1,
+    "buildExitCode": 0,
+    "automaticRetryAllowed": false
+  },
+  "resourceGate": {
+    "memoryUsedPercent": 56.7,
+    "memoryFreeGiB": 6.81,
+    "heavyProcessCount": 0,
+    "cDriveFreeGiBBeforeAttempt": 94.58,
+    "passed": true
+  },
+  "inputs": {
+    "publicSupabaseActionsVariablesInjected": true,
+    "publicSupabaseValuesRecorded": false,
+    "publicOauthClientInjected": true,
+    "publicOauthClientValueSha256": "9b7aeecd58e71d646b0ec9ddd54cdff4d09203bcbc4fab80614949345cdc2e07",
+    "approvedUpdaterKeyId": "BA3FDCAF71CE2FF5",
+    "privateKeyContentRecorded": false,
+    "productionNamingKeyUsed": false,
+    "providerCalled": false,
+    "modelApiKeyRead": false,
+    "accountPasswordRead": false,
+    "serviceRoleRead": false
+  },
+  "verificationBeforeAttempt": {
+    "pythonTestsPassed": 150,
+    "nsisEditionFixtures": "passed-universal-sim-lab-field-and-unknown-deny",
+    "nsisTemplateGate": "passed-pinned-tauri-2.11.4",
+    "powershellAst": "passed",
+    "ruff": "passed",
+    "releaseSourcePolicy": "passed",
+    "yellowReadinessRequestable": true,
+    "yellowReadinessBlockerCount": 0,
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny"
+  },
+  "buildOutputs": {
+    "attemptRoot": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\0017604-yellow-attempt5",
+    "attemptStart": {
+      "fileName": "attempt-start.json",
+      "bytes": 1109,
+      "sha256": "7a0a977ceb01731d57cb8773e6f15cf7f69cb05618848ba1425545ddafde8103"
+    },
+    "log": {
+      "fileName": "build.log",
+      "bytes": 5662,
+      "sha256": "80c0fd48e1393f10a5eb51455365d35b6261a65f5be689feb3ed365bfd7debdc",
+      "childBuildOutputCaptured": false,
+      "hostInvocationAndBoundaryCaptured": true
+    },
+    "attemptEnd": {
+      "fileName": "attempt-end.json",
+      "bytes": 372,
+      "sha256": "146c4b4ef460d8a360e0092ff41210990c4e1c6193193f1b61c799e2ba30180d"
+    },
+    "generatedReceipt": {
+      "fileName": "lab-preview-receipt.json",
+      "bytes": 9199,
+      "sha256": "75f9398921014f4ba6723dc5acc6222a186f79e1175179d807099f05116bf8f3",
+      "sourceCommitMatches": true,
+      "commonCoreCommitMatches": true,
+      "editionProfileAndSafetyFieldsValidatedBeforePathGate": true,
+      "accepted": false
+    }
+  },
+  "artifact": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\0017604-yellow-attempt5\\artifact\\DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "uniqueAttemptArtifactCount": 1,
+    "bytes": 12083065,
+    "sha256": "4f94594612b16c57e8620bc74bb1c2a355c3aee8447ba4568e719078f515bd89",
+    "fileVersion": "1.0.0",
+    "productVersion": "1.0.0",
+    "productName": "DroneDream · LAB",
+    "peMachine": "0x014C",
+    "peCertificateTableOffset": 0,
+    "peCertificateTableSize": 0,
+    "authenticodeStatus": "NotSigned",
+    "acceptedForInstall": false,
+    "acceptedForWebsiteHandoff": false
+  },
+  "updaterSignature": {
+    "absolutePath": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-build-attempts\\0017604-yellow-attempt5\\artifact\\DroneDream-Lab-1.0.0.exe.sig",
+    "bytes": 428,
+    "sha256": "32cb15ed51b17f1a6dd4a3fa5eb1b87868a2b77d7bb70d54ef5ab73cfa07034a",
+    "state": "issued",
+    "keyId": "BA3FDCAF71CE2FF5"
+  },
+  "internalBundleEvidence": {
+    "checksumBytes": 102,
+    "checksumSha256": "b2d90e22c26118dbbf0c2adff47a717c70314d01c7db76b070860477270f4374",
+    "updaterManifestBytes": 1016,
+    "updaterManifestSha256": "999dbeda021dc6f3575ff4e29ccdd7b4c4f1105f8d75a93a231a7862ba263846",
+    "updaterManifestEditionUrlFamily": "desktop-lab-v1.0.0-build-757",
+    "updaterManifestSourceCommitMatches": true
+  },
+  "postBuildBlocker": {
+    "stage": "offline-artifact-receipt-validation",
+    "verifier": "distribution/tools/verify_lab_preview_artifact.py",
+    "message": "artifact.path is not a safe repository-relative path",
+    "rootCause": "build-lab-preview.ps1 serializes an absolute artifact and signature path when OutputRoot is outside the repository, while the receipt schema and verifier require repository-relative safePath values",
+    "artifactBytesFailed": false,
+    "productNsisIdentityFailed": false,
+    "generatedReceiptFailed": true,
+    "preinstallDecision": "blocked",
+    "mayRelabelOrInstall": false
+  },
+  "sideEffects": {
+    "installerRun": false,
+    "runtimeMigration": false,
+    "px4OrGazeboStarted": false,
+    "hardwareAccess": false,
+    "releaseBranchCreated": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "remainingGates": [
+    "Universal/Core must provide or approve one canonical receipt-path contract that supports an edition-owned external output root without weakening traversal checks.",
+    "This frozen EXE must not be installed or handed to Website while its exact generated receipt fails the artifact verifier.",
+    "Any build from a corrected source requires a new exact-source single-attempt YELLOW authorization; this attempt must not be rerun.",
+    "Fresh, overlay, coexistence, login-entry, uninstall, residue, rollback, and Website four-file handoff remain pending."
+  ],
+  "releaseReady": false
+}
