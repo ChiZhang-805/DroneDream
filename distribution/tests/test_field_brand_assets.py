@@ -13,6 +13,8 @@ FIELD_APP = ROOT / "frontend" / "src" / "field" / "FieldApp.tsx"
 FIELD_VITE = ROOT / "frontend" / "vite.field.config.ts"
 FIELD_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.field.conf.json"
 CANONICAL_MANIFEST = ROOT / "brand" / "generated" / "brand-assets.v1.json"
+CANONICAL_CONTRACT = ROOT / "brand" / "brand-editions.v1.json"
+CANONICAL_VISUAL_RECEIPT = ROOT / "brand" / "generated" / "brand-visual-receipt.v1.json"
 
 
 def sha256(path: Path) -> str:
@@ -42,18 +44,26 @@ class FieldBrandAssetTests(unittest.TestCase):
         self.assertEqual(self.manifest["copyPolicy"], "byte-for-byte-no-transcode")
         self.assertEqual(
             self.manifest["commonCoreCommit"],
-            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
         )
         donor = self.manifest["canonicalDonor"]
         self.assertEqual(donor["commit"], self.manifest["commonCoreCommit"])
+        self.assertEqual(donor["fieldIntegrationCommit"], "c35c2707f42e2612fae2d1202ef2b87b3897ff07")
+        self.assertEqual(donor["contractSha256"], sha256(CANONICAL_CONTRACT))
         self.assertEqual(donor["manifestSha256"], sha256(CANONICAL_MANIFEST))
+        self.assertEqual(donor["visualReceiptSha256"], sha256(CANONICAL_VISUAL_RECEIPT))
         self.assertEqual(
-            self.manifest["source"]["handoffSha256"],
-            "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
+            self.manifest["source"]["receiptSha256"],
+            "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
         )
+        self.assertFalse(self.manifest["source"]["evidenceCommitConsumed"])
+        visual_receipt = json.loads(CANONICAL_VISUAL_RECEIPT.read_text(encoding="utf-8"))
+        self.assertEqual(visual_receipt["editionLabelHeightRatio"], 0.9)
+        self.assertTrue(visual_receipt["naturalEditionLabelWidths"])
+        self.assertTrue(visual_receipt["presentationOnly"])
 
     def test_formal_assets_match_source_hash_size_and_dimensions(self) -> None:
-        expected_ids = {"field-mark", "field-dot-lockup"}
+        expected_ids = {"field-mark", "field-large-label-lockup"}
         self.assertEqual({asset["assetId"] for asset in self.manifest["assets"]}, expected_ids)
 
         for asset in self.manifest["assets"]:
@@ -70,6 +80,18 @@ class FieldBrandAssetTests(unittest.TestCase):
             ]
             self.assertEqual(sha256(donor_path), asset["sourceSha256"])
             self.assertEqual(target.read_bytes(), donor_path.read_bytes())
+
+    def test_all_field_lockup_surfaces_use_the_exact_large_label_bytes(self) -> None:
+        expected = "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+        paths = (
+            BRANDING_ROOT / "dronedream-field-dot-lockup.png",
+            ROOT / "brand" / "generated" / "field" / "lockup-primary.png",
+            ROOT / "brand" / "generated" / "field" / "lockup-compact.png",
+            ROOT / "frontend" / "src" / "assets" / "brand" / "field-lockup-primary.png",
+            ROOT / "frontend" / "src" / "assets" / "brand" / "field-lockup-compact.png",
+        )
+        self.assertEqual({sha256(path) for path in paths}, {expected})
+        self.assertEqual({png_dimensions(path) for path in paths}, {(2581, 218)})
 
     def test_frontend_and_desktop_consume_only_field_owned_assets(self) -> None:
         app_source = FIELD_APP.read_text(encoding="utf-8")

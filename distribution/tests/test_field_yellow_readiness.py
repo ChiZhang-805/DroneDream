@@ -91,7 +91,7 @@ class FieldYellowReadinessTests(unittest.TestCase):
         self.assertIn("../../runtime/licenses/valkey-COPYING", resources)
         self.assertEqual(
             desktop["canonicalDonor"]["commit"],
-            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
         )
         self.assertEqual(
             next(item for item in resources if item.endswith("field/windows/icon.ico")),

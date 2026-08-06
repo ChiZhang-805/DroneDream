@@ -127,7 +127,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertEqual(structure["updaterManifestFilename"], "field-latest.json")
         self.assertEqual(
             structure["canonicalDonor"]["commit"],
-            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
         )
         self.assertEqual(structure["simulatorReferences"], [])
         self.assertEqual(structure["verificationErrors"], [])
@@ -149,8 +149,8 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
             {
                 "field-mark":
                     "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
-                "field-dot-lockup":
-                    "def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192",
+                "field-large-label-lockup":
+                    "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
             },
         )
 

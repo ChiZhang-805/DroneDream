@@ -321,7 +321,7 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         == next(
             asset["sourceSha256"]
             for asset in manifest["assets"]
-            if asset["assetId"] == "field-dot-lockup"
+            if asset["assetId"] == "field-large-label-lockup"
         ),
     }
     overlay_bundle = tauri.get("bundle", {})
