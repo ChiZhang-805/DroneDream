@@ -103,6 +103,18 @@ YELLOW_ATTEMPT_6_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-6-a99f5e8-tauri-cli-missing-failed.v1.json"
 )
+YELLOW_ATTEMPT_7_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-7-e181d02-application.v1.json"
+)
+YELLOW_ATTEMPT_7_PLAN_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-7-e181d02-plan-ready.v1.json"
+)
 DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     DISTRIBUTION
     / "sim"
@@ -115,7 +127,7 @@ DETACHED_NODE_DEPENDENCY_SYNC_PATH = (
     / "readiness"
     / "detached-node-dependency-common-core-sync.v1.json"
 )
-YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_6_APPLICATION_PATH
+YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_7_APPLICATION_PATH
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -435,8 +447,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(protected["publicSupabaseValuesPrintedOrPersisted"])
 
     def test_yellow_attempt_6_binds_new_product_source_and_updater_donor(self) -> None:
-        self.assertEqual(YELLOW_APPLICATION_PATH, YELLOW_ATTEMPT_6_APPLICATION_PATH)
-        application = load_json(YELLOW_APPLICATION_PATH)
+        application = load_json(YELLOW_ATTEMPT_6_APPLICATION_PATH)
         source = application["sourceSeparation"]
         donor = application["commonCoreAndDonor"]
         self.assertEqual(
@@ -807,6 +818,211 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(receipt["nextGate"]["createDependencyBundleAllowed"])
         self.assertFalse(receipt["nextGate"]["createJunctionsAllowed"])
         self.assertFalse(receipt["nextGate"]["buildAllowed"])
+
+    def test_yellow_attempt_7_binds_exact_product_donor_and_dependency_identity(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_7_APPLICATION_PATH)
+        source = application["sourceSeparation"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "e181d029278e50788afe8460ec0cafd9c78a6623",
+        )
+        self.assertEqual(
+            git("show", "-s", "--format=%T", source["productSourceCommit"]),
+            source["productSourceTree"],
+        )
+        donor = application["commonCoreDonor"]
+        self.assertEqual(
+            donor["productCommit"],
+            "b02d593c6c2fc6481bf5b8078b9cf143eb7965d3",
+        )
+        self.assertEqual(donor["pathCount"], 5)
+        for item in donor["paths"]:
+            path = ROOT / item["path"]
+            self.assertEqual(path.stat().st_size, item["bytes"], item["path"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                item["sha256"],
+                item["path"],
+            )
+            self.assertEqual(
+                git("rev-parse", f"{source['productSourceCommit']}:{item['path']}"),
+                item["gitBlob"],
+                item["path"],
+            )
+
+        bundle = application["dependencyBundle"]
+        identity = "\n".join(bundle["identityInputsInOrder"]).encode()
+        expected_id = f"npm-win32-x64-{hashlib.sha256(identity).hexdigest()[:16]}"
+        self.assertEqual(bundle["bundleId"], expected_id)
+        self.assertEqual(
+            bundle["completeTree"]["treeFingerprint"],
+            "7f4dc4d394ca98a8458f84f7cc5dfe40603f9fe662e1610d910651d04fbe6aea",
+        )
+        self.assertEqual(bundle["completeTree"]["entryCount"], 18851)
+        self.assertEqual(bundle["completeTree"]["fileCount"], 17339)
+        self.assertEqual(bundle["completeTree"]["totalFileBytes"], 263384543)
+
+    def test_yellow_attempt_7_binds_source_locks_tools_and_exact_two_mounts(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_7_APPLICATION_PATH)
+        bundle = application["dependencyBundle"]
+        product = application["sourceSeparation"]["productSourceCommit"]
+        for item in bundle["sourceInputs"]:
+            path = ROOT / item["path"]
+            self.assertEqual(path.stat().st_size, item["bytes"], item["path"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                item["sha256"],
+                item["path"],
+            )
+            self.assertEqual(
+                git("rev-parse", f"{product}:{item['path']}"),
+                item["gitBlob"],
+                item["path"],
+            )
+        tools = bundle["toolchain"]
+        self.assertEqual(tools["tauriCliVersion"], "2.11.4")
+        self.assertEqual(tools["viteVersion"], "7.3.6")
+        self.assertEqual(tools["platformPackageName"], "@tauri-apps/cli-win32-x64-msvc")
+        self.assertEqual(tools["platformBinaryBytes"], 15235584)
+        self.assertEqual(len(bundle["mounts"]), 2)
+        self.assertEqual(
+            [mount["linkPath"] for mount in bundle["mounts"]],
+            ["desktop/node_modules", "frontend/node_modules"],
+        )
+        self.assertTrue(all(mount["linkType"] == "junction" for mount in bundle["mounts"]))
+        self.assertFalse(bundle["arbitraryJunctionAllowed"])
+        self.assertFalse(bundle["dependencyPayloadAllowed"])
+
+    def test_yellow_attempt_7_plan_is_hash_bound_non_mutating_and_unauthorized(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_7_APPLICATION_PATH)
+        plan = load_json(YELLOW_ATTEMPT_7_PLAN_PATH)
+        entry = ROOT / application["executionPlan"]["entryScript"]["path"]
+        self.assertEqual(
+            YELLOW_ATTEMPT_7_APPLICATION_PATH.stat().st_size,
+            plan["application"]["bytes"],
+        )
+        self.assertEqual(
+            hashlib.sha256(YELLOW_ATTEMPT_7_APPLICATION_PATH.read_bytes()).hexdigest(),
+            plan["application"]["sha256"],
+        )
+        self.assertEqual(entry.stat().st_size, plan["entryScript"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(entry.read_bytes()).hexdigest(),
+            plan["entryScript"]["sha256"],
+        )
+        attributes = git(
+            "check-attr",
+            "eol",
+            "--",
+            application["executionPlan"]["entryScript"]["path"],
+        )
+        self.assertTrue(attributes.endswith(": eol: lf"), attributes)
+        self.assertFalse(
+            application["authorization"]["dependencyBundlePreparationAuthorizedByThisApplication"]
+        )
+        self.assertFalse(
+            application["authorization"]["yellowBuildExecutionAuthorizedByThisApplication"]
+        )
+        self.assertFalse(
+            plan["authorization"]["dependencyPreparationAuthorizedByThisReceipt"]
+        )
+        self.assertFalse(plan["authorization"]["yellowBuildExecutionAuthorizedByThisReceipt"])
+        self.assertTrue(all(value == 0 for value in application["executedCounts"].values()))
+        self.assertTrue(all(value == 0 for value in plan["executedCounts"].values()))
+
+        roots = application["ownedBuildSurface"]
+        before = {
+            "source": Path(roots["sourceRoot"]).exists(),
+            "run": Path(roots["runRoot"]).exists(),
+            "cargo": Path(roots["cargoTargetDir"]).exists(),
+            "dependency": Path(application["dependencyBundle"]["dependencyRoot"]).exists(),
+        }
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(entry),
+                "-Mode",
+                "Plan",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        output = json.loads(result.stdout)
+        self.assertEqual(output["state"], "green-plan-only-no-mutation")
+        after = {
+            "source": Path(roots["sourceRoot"]).exists(),
+            "run": Path(roots["runRoot"]).exists(),
+            "cargo": Path(roots["cargoTargetDir"]).exists(),
+            "dependency": Path(application["dependencyBundle"]["dependencyRoot"]).exists(),
+        }
+        self.assertEqual(before, after)
+        self.assertTrue(all(not value for value in after.values()))
+
+    def test_yellow_attempt_7_future_commands_are_fail_closed_and_counted(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_7_APPLICATION_PATH)
+        attempt = application["attemptAccounting"]
+        maximums = application["executionPlan"]["maximums"]
+        self.assertEqual(attempt["globalCommandApplicationOrdinal"], 7)
+        self.assertEqual(attempt["sourceApplicationPreflightOrdinal"], 1)
+        self.assertEqual(attempt["dependencyPreparationOrdinal"], 1)
+        self.assertEqual(attempt["dependencyPreparationMaximum"], 1)
+        self.assertEqual(attempt["npmCiInvocationMaximum"], 2)
+        self.assertEqual(attempt["sourceBuildInvocationOrdinal"], 1)
+        self.assertEqual(attempt["sourceBuildInvocationMaximum"], 1)
+        self.assertFalse(attempt["automaticRetryAllowed"])
+        for key in (
+            "preflight",
+            "dependencyPreparation",
+            "buildScript",
+            "frontend",
+            "tauri",
+            "cargo",
+            "nsis",
+            "artifact",
+        ):
+            self.assertEqual(maximums[key], 1, key)
+        self.assertEqual(maximums["npmCi"], 2)
+        self.assertEqual(maximums["junctionCreation"], 2)
+        self.assertEqual(maximums["retry"], 0)
+
+        entry = (ROOT / application["executionPlan"]["entryScript"]["path"]).read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(entry.count("New-Item -ItemType Junction"), 2)
+        self.assertIn("-DetachedNodeDependencyManifest $DependencyManifest", entry)
+        self.assertIn("npm.cmd --prefix", entry)
+        self.assertIn("ci --offline --no-audit --no-fund", entry)
+        self.assertIn("Remove-ExactJunction", entry)
+        self.assertNotIn("Remove-Item -LiteralPath $DependencyRoot -Recurse", entry)
+        self.assertNotIn("git config --global", entry)
+        self.assertNotIn("npm install", entry)
+
+    def test_yellow_attempt_7_preserves_ordinal_six_and_frozen_artifact(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_7_APPLICATION_PATH)
+        protected = application["protectedHistory"]
+        self.assertEqual(
+            protected["ordinalSixFailureReceiptSha256"],
+            "6d223eb0d2d7996b3afba4b0621d95ef9998a499c098ffbe40b1210dcd2a7224",
+        )
+        failure = ROOT / protected["ordinalSixFailureReceiptPath"]
+        self.assertEqual(
+            hashlib.sha256(failure.read_bytes()).hexdigest(),
+            protected["ordinalSixFailureReceiptSha256"],
+        )
+        self.assertTrue(protected["priorRootsReadOnly"])
+        self.assertFalse(protected["reuseAllowed"])
+        self.assertFalse(protected["cleanupAllowed"])
+        self.assertEqual(
+            protected["frozenArtifact"]["sha256"],
+            "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+        )
+        self.assertFalse(protected["frozenArtifact"]["websiteHandoffAllowed"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
