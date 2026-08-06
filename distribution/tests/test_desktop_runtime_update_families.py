@@ -39,6 +39,10 @@ def test_schema_and_contract_are_closed_versioned_inputs() -> None:
 def test_shared_runtime_has_one_global_owner_and_one_global_operation_lease() -> None:
     shared = contract_tool.load_contract(ROOT)["sharedRuntimeBase"]
     assert shared["managerNamespace"] == "io.dronedream.runtime-base-manager"
+    assert shared["legacyCompatibilityLeaseRequired"] is True
+    assert shared["legacyCompatibilityLeaseRelativePath"] == (
+        "io.dronedream.desktop/runtime-operation-v1.lock"
+    )
     assert shared["editionOperationsMayUseIndependentLocks"] is False
     assert shared["editionUninstallMayRemoveRuntime"] is False
 

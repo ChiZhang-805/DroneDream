@@ -19,7 +19,7 @@ RUNTIME_PROFILES = {
     "universal": "unified-sim-lab",
     "sim": "sim-only",
     "lab": "unified-sim-lab",
-    "field": "field-only",
+    "field": "field-lightweight",
 }
 
 
@@ -69,6 +69,10 @@ def validate_contract(document: Any) -> dict[str, Any]:
         "owner": "runtime-base-manager",
         "managerNamespace": "io.dronedream.runtime-base-manager",
         "operationLeaseFileName": "runtime-operation-v1.lock",
+        "legacyCompatibilityLeaseRelativePath": (
+            "io.dronedream.desktop/runtime-operation-v1.lock"
+        ),
+        "legacyCompatibilityLeaseRequired": True,
         "downloadCacheDirectoryName": "DroneDream.download-cache",
         "diagnosticsRootDirectoryName": "diagnostics",
         "editionUninstallMayRemoveRuntime": False,

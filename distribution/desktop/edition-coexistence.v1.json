@@ -113,7 +113,7 @@
       "appUserModelId": "io.dronedream.desktop.field",
       "updaterChannel": "field",
       "updaterMetadataFileName": "latest-field.json",
-      "runtimeProfileId": "field-only",
+      "runtimeProfileId": "field-lightweight",
       "authClientId": "dronedream-desktop-field",
       "loopbackPathPrefix": "/desktop-auth/field/",
       "customProtocol": "dronedream-field",
