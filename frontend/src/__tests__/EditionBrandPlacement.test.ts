@@ -115,7 +115,7 @@ describe("edition brand placement contract", () => {
   });
 
   it.each(["sim", "lab", "field"] as const)(
-    "keeps the %s lockup out of the current compact Product card slot",
+    "accepts the %s lockup in the current desktop Product card slot",
     (edition) => {
       const placement = syntheticLockup("product-card", edition);
       const naturalRatio = placement.asset.naturalWidth / placement.asset.naturalHeight;
@@ -124,8 +124,7 @@ describe("edition brand placement contract", () => {
       placement.renderedWidth = 400;
       placement.renderedHeight = 400 / naturalRatio;
 
-      expect(assessEditionBrandPlacement(placement).violations)
-        .toContain("compact-slot-requires-mark");
+      expect(assessEditionBrandPlacement(placement).accepted).toBe(true);
     },
   );
 

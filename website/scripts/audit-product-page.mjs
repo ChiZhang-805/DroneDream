@@ -235,21 +235,54 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
   for (const heading of expected.headings) {
     if (!headings.includes(heading)) violations.push(`missing product heading: ${heading}`);
   }
-  const editionMarks = cards.map((card) => card.querySelector("img.site-product-edition-icon"));
-  if (editionMarks.some((mark) => !mark)) violations.push("approved edition mark is missing");
-  if (editionMarks.some((mark) => !visible(mark))) violations.push("approved edition mark is not visible");
-  if (editionMarks.some((mark) => mark?.dataset.brandHandoff !== "commander-approved-brand-handoff-v2")) {
-    violations.push("edition mark does not declare the approved brand handoff");
+  const expectedBrandDimensions = {
+    sim: { mark: [1024, 1024], lockup: [2337, 218] },
+    lab: { mark: [1024, 1024], lockup: [2386, 218] },
+    field: { mark: [1024, 1024], lockup: [2581, 218] },
+  };
+  const desktopLockup = window.innerWidth >= 1161;
+  const editionImages = cards.map((card) => ({
+    edition: card.dataset.edition,
+    image: card.querySelector("picture.site-product-edition-picture img.site-product-edition-icon"),
+    picture: card.querySelector("picture.site-product-edition-picture"),
+  }));
+  if (editionImages.some(({ image, picture }) => !image || !picture)) {
+    violations.push("approved responsive edition brand is missing");
   }
-  if (editionMarks.some((mark) => !mark?.complete || mark.naturalWidth !== 1024 || mark.naturalHeight !== 1024)) {
-    violations.push("edition mark source dimensions are not 1024x1024");
-  }
-  if (editionMarks.some((mark) => {
-    if (!mark) return true;
-    const rect = mark.getBoundingClientRect();
-    return Math.abs(rect.width - rect.height) > tolerance || mark.naturalWidth / rect.width < 4;
-  })) {
-    violations.push("edition mark is cropped or undersampled at the rendered size");
+  for (const { edition, image, picture } of editionImages) {
+    if (!edition || !image || !picture) continue;
+    if (picture.dataset.brandHandoff !== "universal-canonical-brand-donor-v1.1.0") {
+      violations.push(`${edition} brand does not declare the approved handoff`);
+    }
+    if (picture.dataset.brandSurface !== "product-card") {
+      violations.push(`${edition} brand is bound to the wrong surface`);
+    }
+    if (image.getAttribute("alt") !== "" || image.getAttribute("aria-hidden") !== "true") {
+      violations.push(`${edition} decorative brand image has an invalid accessible name`);
+    }
+    const variant = desktopLockup ? "lockup" : "mark";
+    const dimensions = expectedBrandDimensions[edition]?.[variant];
+    if (
+      !image.complete ||
+      !dimensions ||
+      image.naturalWidth !== dimensions[0] ||
+      image.naturalHeight !== dimensions[1]
+    ) {
+      violations.push(`${edition} ${variant} source dimensions are invalid`);
+      continue;
+    }
+    if (!image.currentSrc.includes(`${edition}-${variant === "lockup" ? "lockup-primary" : "mark"}`)) {
+      violations.push(`${edition} selected the wrong responsive brand asset`);
+    }
+    const rect = image.getBoundingClientRect();
+    const naturalRatio = image.naturalWidth / image.naturalHeight;
+    const renderedRatio = rect.width / rect.height;
+    if (
+      Math.abs(renderedRatio - naturalRatio) / naturalRatio > 0.02 ||
+      rect.width > picture.getBoundingClientRect().width + tolerance
+    ) {
+      violations.push(`${edition} ${variant} is stretched or cropped`);
+    }
   }
   if (document.querySelector('[data-icon-donor="pending"]')) violations.push("icon donor remains pending");
   if (document.querySelector(".site-product-edition-visual")) {
@@ -309,10 +342,11 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
     nav,
     headings,
     productCardHeights: heights,
-    iconHandoff: editionMarks.map((mark) => ({
-      source: mark?.getAttribute("src") ?? null,
-      width: mark ? Math.round(mark.getBoundingClientRect().width) : 0,
-      naturalWidth: mark?.naturalWidth ?? 0,
+    iconHandoff: editionImages.map(({ image }) => ({
+      source: image?.currentSrc ?? null,
+      width: image ? Math.round(image.getBoundingClientRect().width) : 0,
+      naturalWidth: image?.naturalWidth ?? 0,
+      naturalHeight: image?.naturalHeight ?? 0,
     })),
     uniqueThemeCount: new Set(themeTokens).size,
     universalDisabledPresent: Boolean(universalButton),

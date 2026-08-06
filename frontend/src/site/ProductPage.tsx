@@ -106,17 +106,28 @@ export function ProductPage({
                 key={release.id}
               >
                 <div className="site-product-edition-brand">
-                  <img
-                    alt=""
-                    aria-hidden="true"
-                    className="site-product-edition-icon"
-                    data-brand-asset="mark"
-                    data-brand-handoff="commander-approved-brand-handoff-v2"
+                  <picture
+                    data-brand-handoff="universal-canonical-brand-donor-v1.1.0"
                     data-brand-surface="product-card"
-                    height="1024"
-                    src={brandAssets.mark}
-                    width="1024"
-                  />
+                    className="site-product-edition-picture"
+                  >
+                    <source
+                      data-brand-asset="lockup"
+                      height={brandAssets.lockupHeight}
+                      media="(min-width: 1161px)"
+                      srcSet={brandAssets.lockup}
+                      width={brandAssets.lockupWidth}
+                    />
+                    <img
+                      alt=""
+                      aria-hidden="true"
+                      className="site-product-edition-icon"
+                      data-brand-asset="mark"
+                      height="1024"
+                      src={brandAssets.mark}
+                      width="1024"
+                    />
+                  </picture>
                   <h2 id={titleId}>{editionText.title}</h2>
                 </div>
                 <p className="site-product-edition-audience">{editionText.audience}</p>

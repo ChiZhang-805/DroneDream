@@ -46,15 +46,28 @@ describe("ProductPage", () => {
     expect(screen.getByText("Evidence review for advanced field preparation"))
       .toBeVisible();
     expect(screen.queryByText(/vehicle execution|vehicle lab integration/i)).toBeNull();
+    const editionPictures = container.querySelectorAll(
+      'picture.site-product-edition-picture'
+      + '[data-brand-handoff="universal-canonical-brand-donor-v1.1.0"]'
+      + '[data-brand-surface="product-card"]',
+    );
+    expect(editionPictures).toHaveLength(3);
     const editionMarks = container.querySelectorAll(
-      'img.site-product-edition-icon[data-brand-handoff="commander-approved-brand-handoff-v2"]'
-      + '[data-brand-surface="product-card"][data-brand-asset="mark"]',
+      'picture.site-product-edition-picture img[data-brand-asset="mark"]',
     );
     expect(editionMarks).toHaveLength(3);
     expect([...editionMarks].map((image) => image.getAttribute("src"))).toEqual([
       expect.stringContaining("dronedream-sim-mark.png"),
       expect.stringContaining("dronedream-lab-mark.png"),
       expect.stringContaining("dronedream-field-mark.png"),
+    ]);
+    const editionLockups = container.querySelectorAll(
+      'picture.site-product-edition-picture source[data-brand-asset="lockup"]',
+    );
+    expect([...editionLockups].map((source) => source.getAttribute("srcset"))).toEqual([
+      expect.stringContaining("sim-lockup-primary.png"),
+      expect.stringContaining("lab-lockup-primary.png"),
+      expect.stringContaining("field-lockup-primary.png"),
     ]);
     expect(container.querySelector('[data-icon-donor="pending"]')).toBeNull();
     expect(container.querySelector(".site-product-edition-visual")).toBeNull();

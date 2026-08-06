@@ -48,8 +48,8 @@ export interface EditionBrandPlacementAssessment {
   violations: EditionBrandPlacementViolation[];
 }
 
-export const EDITION_LOCKUP_MIN_RENDERED_WIDTH = 240;
-export const EDITION_LOCKUP_MIN_RENDERED_HEIGHT = 44;
+export const EDITION_LOCKUP_MIN_RENDERED_WIDTH = 320;
+export const EDITION_LOCKUP_MIN_RENDERED_HEIGHT = 30;
 
 export const editionDisplayNames: Record<EditionId, string> = {
   universal: "DroneDream",
