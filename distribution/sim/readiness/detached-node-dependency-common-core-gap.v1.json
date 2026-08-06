@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-detached-node-dependency-common-core-gap",
+  "state": "green-gap-frozen-awaiting-common-core-donor",
+  "editionId": "sim",
+  "appliesToEditions": [
+    "universal",
+    "sim",
+    "lab",
+    "field"
+  ],
+  "ownership": {
+    "commonCoreBranch": "codex/software",
+    "editionBranchMayImplementBuildSemantics": false,
+    "simBranchRole": "freeze-observed-gap-and-donor-request",
+    "noReversePatchToCommonCore": true
+  },
+  "failureBinding": {
+    "productSourceCommit": "a99f5e81893f5001ebd571d09e95b72d8afa070a",
+    "productSourceTree": "dcc4343919d4104059a02a0327d0d4671c2b7088",
+    "evidenceHeadBeforeThisGapReceipt": "5a3463c328044905537d285f6351db2eb63a2d16",
+    "failureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-6-a99f5e8-tauri-cli-missing-failed.v1.json",
+    "failureReceiptBytes": 6534,
+    "failureReceiptSha256": "6d223eb0d2d7996b3afba4b0621d95ef9998a499c098ffbe40b1210dcd2a7224",
+    "detachedSourceRoot": "C:/Users/zju20/dds6",
+    "detachedDesktopNodeModulesPresent": false,
+    "detachedFrontendNodeModulesPresent": false,
+    "buildScriptInvocations": 1,
+    "npmBuildScriptInvocations": 1,
+    "tauriCliProcessInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "retryAllowed": false
+  },
+  "exactSourceDependencyInputs": {
+    "desktopPackageJson": {
+      "path": "desktop/package.json",
+      "gitBlob": "20f705a6afe7a5a67962d6a46bc9f26670235fd1",
+      "bytes": 1056,
+      "sha256": "ba37f6edb95c454ea0f83130b98f708c0f27990133c705c8c23597ac96fd36b6"
+    },
+    "desktopPackageLock": {
+      "path": "desktop/package-lock.json",
+      "gitBlob": "119729ff9289848a3eca91a66bed42080af558ef",
+      "bytes": 7449,
+      "sha256": "1138f300f140dfcaf22a6c47d44f676e9ea9294b77a2caabb7fa08ef8340d058",
+      "lockfileVersion": 3,
+      "packageEntriesIncludingRoot": 13,
+      "rootName": "drone-dream-desktop",
+      "rootVersion": "1.0.0",
+      "tauriCliVersion": "2.11.4",
+      "tauriCliIntegrity": "sha512-R8xGtMpwyetawSqm9kYOuMmEqkhUbvcUy8n0aNXIxollKBLESUu5f4Fx+64hgASYm1H+jSWq6jCW6zqTnH6hqQ=="
+    },
+    "frontendPackageJson": {
+      "path": "frontend/package.json",
+      "gitBlob": "9ea14f15a1a70ad7a7541df9358c33a15ff7c047",
+      "bytes": 2267,
+      "sha256": "cd905e33a1faad2c22b165ba407e16c05d01fbdab1738dd156d616cfee4daf05"
+    },
+    "frontendPackageLock": {
+      "path": "frontend/package-lock.json",
+      "gitBlob": "b82bdbf3d828595d3723eaf349722c1cc716a4ed",
+      "bytes": 182857,
+      "sha256": "27b8f36c53be1a02eecbd99801033639662a4697c42ad1141d276c78adbc664a",
+      "lockfileVersion": 3,
+      "packageEntriesIncludingRoot": 379,
+      "rootName": "drone-dream-frontend",
+      "rootVersion": "1.0.0",
+      "viteVersion": "7.3.6",
+      "viteIntegrity": "sha512-4XP60spRGjSZFf1qYH+dJIkK2znL3zQfl9KkOV9MkkRR/3Dls0dxaBsQPTloEc5BLXWPL9vsOxopxyKoMmDueg=="
+    }
+  },
+  "observedCanonicalDependencyTree": {
+    "role": "read-only-reference-not-approved-release-input",
+    "sourceRoot": "C:/Users/zju20/.codex/worktrees/d47f/DroneDream",
+    "sourceBoundManifestPresent": false,
+    "sharedMutationRiskPresent": true,
+    "desktopNodeModulesPresent": true,
+    "frontendNodeModulesPresent": true,
+    "desktopNodeModulesIsReparsePoint": false,
+    "frontendNodeModulesIsReparsePoint": false,
+    "tauriCliPackageJson": {
+      "path": "desktop/node_modules/@tauri-apps/cli/package.json",
+      "bytes": 2455,
+      "sha256": "2211ba5e468d2ac8c70d9d5f0b2f017a98e9d2b2932ad47fc3588fc14e103a33",
+      "version": "2.11.4"
+    },
+    "tauriCliEntrypoint": {
+      "path": "desktop/node_modules/@tauri-apps/cli/tauri.js",
+      "bytes": 1864,
+      "sha256": "0dd6ec63c7c63a993fde20955e291d833c03f3760e63e0ee21e83482f6c0b43a"
+    },
+    "tauriWin32NativePackageJson": {
+      "path": "desktop/node_modules/@tauri-apps/cli-win32-x64-msvc/package.json",
+      "bytes": 707,
+      "sha256": "9b7ff3368f454c5cc630270556faf181ef9e126a56cef788285470cc98d178f0",
+      "version": "2.11.4"
+    },
+    "tauriWin32NativeBinary": {
+      "path": "desktop/node_modules/@tauri-apps/cli-win32-x64-msvc/cli.win32-x64-msvc.node",
+      "bytes": 15235584,
+      "sha256": "37c4d79256120893f2c12c1385bce5f7510b5063afdeb09b40a9effec28d0208"
+    },
+    "vitePackageJson": {
+      "path": "frontend/node_modules/vite/package.json",
+      "bytes": 5158,
+      "sha256": "e5ed0f85215f871fe22a48987dcd77fcfbe14064a53c0c9f7f48186a6b7e2cf0",
+      "version": "7.3.6"
+    },
+    "directReuseApproved": false
+  },
+  "invariants": {
+    "exactSourceCommitAndTreeRequired": true,
+    "desktopPackageAndLockHashBound": true,
+    "frontendPackageAndLockHashBound": true,
+    "tauriCliVersionAndEntrypointHashBound": true,
+    "platformNativeCliVersionAndBinaryHashBound": true,
+    "dependencyTreeFingerprintRequired": true,
+    "dependencyRootMustBeOutsideEveryGitWorktree": true,
+    "dependencyRootMustBeInsideExactOwnedBase": true,
+    "systemOrGlobalInstallationAllowed": false,
+    "networkDuringBuildAllowed": false,
+    "arbitraryJunctionAllowed": false,
+    "arbitraryPathInjectionAllowed": false,
+    "reparsePointEscapeAllowed": false,
+    "dependencyMutationDuringBuildAllowed": false,
+    "dependencyTreeIsProductSource": false,
+    "dependencyTreeMayEnterFrontendDistOrBundle": false,
+    "postbuildMayWhitelistDependencyFilesAsGeneratedSource": false,
+    "unknownEditionFailsClosed": true
+  },
+  "optionAnalysis": [
+    {
+      "optionId": "reuse-canonical-node-modules-by-direct-junction",
+      "disposition": "rejected-as-default",
+      "advantages": [
+        "no dependency copy",
+        "normal npm and Node resolution"
+      ],
+      "blockers": [
+        "current canonical node_modules has no source-bound manifest",
+        "shared mutable worktree dependencies can drift during an Edition build",
+        "target is inside another Git worktree rather than an Edition-owned dependency root"
+      ]
+    },
+    {
+      "optionId": "explicit-dependency-root-via-path-or-direct-cli-only",
+      "disposition": "insufficient-alone",
+      "advantages": [
+        "no junction",
+        "Tauri CLI entrypoint can be explicit"
+      ],
+      "blockers": [
+        "PATH resolves binaries but does not reliably bind frontend ESM imports to an external node_modules tree",
+        "Tauri beforeBuildCommand runs the source frontend package and needs normal package resolution"
+      ]
+    },
+    {
+      "optionId": "npm-ci-offline-inside-detached-source",
+      "disposition": "not-preferred-for-release-build",
+      "advantages": [
+        "native npm resolution",
+        "lockfile-driven install"
+      ],
+      "blockers": [
+        "dependency lifecycle execution and large writes occur inside the exact-source worktree",
+        "installation becomes part of the same one-shot build attempt",
+        "ignored node_modules can evade ordinary postbuild status reporting without a dedicated manifest"
+      ],
+      "allowedOnlyAsSeparateProvisioningStageAfterYellowAuthorization": true
+    },
+    {
+      "optionId": "attested-external-bundle-with-two-allowlisted-junctions",
+      "disposition": "recommended",
+      "advantages": [
+        "normal desktop and frontend Node resolution is preserved",
+        "dependency bytes live in a repo-external Edition-neutral owned root",
+        "one immutable source/lock-bound bundle can be reused by all four Editions"
+      ],
+      "requiredJunctions": [
+        {
+          "linkRelativeToDetachedSource": "desktop/node_modules",
+          "targetRelativeToDependencyRoot": "desktop/node_modules"
+        },
+        {
+          "linkRelativeToDetachedSource": "frontend/node_modules",
+          "targetRelativeToDependencyRoot": "frontend/node_modules"
+        }
+      ]
+    }
+  ],
+  "recommendedCommonCoreContract": {
+    "bundleIdentityInputs": [
+      "productSourceCommit",
+      "desktopPackageJsonSha256",
+      "desktopPackageLockSha256",
+      "frontendPackageJsonSha256",
+      "frontendPackageLockSha256",
+      "nodeExecutableVersion",
+      "npmVersion",
+      "operatingSystem",
+      "architecture"
+    ],
+    "ownedBaseExample": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm",
+    "bundleRootPattern": "<ownedBase>/<bundleIdentity>",
+    "requiredLayout": [
+      "manifest.json",
+      "desktop/package.json",
+      "desktop/package-lock.json",
+      "desktop/node_modules",
+      "frontend/package.json",
+      "frontend/package-lock.json",
+      "frontend/node_modules"
+    ],
+    "preparation": {
+      "separateAuthorizationClass": "YELLOW",
+      "buildAttemptMayProvisionDependencies": false,
+      "networkAllowed": false,
+      "exactOfflineCacheRootRequired": true,
+      "npmCommandMustUseOfflineMode": true,
+      "npmAuditAndFundingRequestsDisabled": true,
+      "lifecycleScriptsMustBeDeclaredAndAudited": true,
+      "preparationReceiptRequired": true
+    },
+    "manifest": {
+      "canonicalJsonRequired": true,
+      "packageAndLockCopiesMustMatchSourceBytes": true,
+      "sortedRelativeFileInventoryRequired": true,
+      "fileTypeBytesAndSha256Required": true,
+      "packageTreeFingerprintRequired": true,
+      "reparsePointInventoryRequired": true,
+      "allowedReparsePointTargetsMustRemainInsideBundleRoot": true,
+      "tauriCliVersionMustEqualDesktopLock": true,
+      "viteVersionMustEqualFrontendLock": true
+    },
+    "buildMount": {
+      "detachedSourceMustBeExactAndCleanBeforeMount": true,
+      "linkPathsMustNotExistBeforeMount": true,
+      "onlyTwoExactJunctionsAllowed": true,
+      "junctionTargetsMustEqualManifestPaths": true,
+      "resolvedTargetsMustRemainInsideBundleRoot": true,
+      "nestedReparsePointsMustNotEscapeBundleRoot": true,
+      "dependencyRootAndManifestFingerprintMustMatchBeforeBuild": true,
+      "dependencyRootAndManifestFingerprintMustMatchAfterBuild": true,
+      "failurePreservesDetachedSourceLinksAndBundleForEvidence": true
+    },
+    "buildInvocation": {
+      "existingNpmAndTauriSemanticsPreserved": true,
+      "arbitraryPathPrependForbidden": true,
+      "systemTauriResolutionForbidden": true,
+      "sourceLocalUnattestedNodeModulesForbidden": true,
+      "buildScriptFrontendTauriCargoNsisArtifactMaximumEach": 1,
+      "retryMaximum": 0
+    },
+    "postbuild": {
+      "trackedSourceChangesForbidden": true,
+      "onlyEditionFrontendDistGeneratedFilesAllowed": true,
+      "dependencyLinksAndTargetsAreBuildInputsNotProductSource": true,
+      "frontendDistMustContainNoJunctionOrDependencyRootReference": true,
+      "bundleMustContainNoNodeModulesOrDependencyManifestUnlessExplicitPayloadContractAllows": true,
+      "sourceDependencyLinksMustBeReportedSeparatelyFromGitStatus": true
+    }
+  },
+  "requestedCommonCorePaths": [
+    {
+      "path": "distribution/schemas/desktop-node-dependency-bundle.schema.json",
+      "purpose": "machine-validate the immutable dependency manifest"
+    },
+    {
+      "path": "desktop/scripts/verify-detached-node-dependencies.ps1",
+      "purpose": "validate source, locks, manifest, fingerprints, junctions, and path containment"
+    },
+    {
+      "path": "desktop/scripts/build-windows-llvm.ps1",
+      "purpose": "require an exact verified dependency bundle for detached-source builds"
+    },
+    {
+      "path": "desktop/scripts/release-build-driver.psm1",
+      "purpose": "report dependency mounts separately and preserve generated-source fail-closed behavior"
+    },
+    {
+      "path": "distribution/tests/test_shared_windows_build_contract.py",
+      "purpose": "cover all four Editions and negative path, hash, version, and reparse cases"
+    }
+  ],
+  "requiredNegativeTests": [
+    "product-source-commit-mismatch",
+    "desktop-package-json-hash-mismatch",
+    "desktop-package-lock-hash-mismatch",
+    "frontend-package-json-hash-mismatch",
+    "frontend-package-lock-hash-mismatch",
+    "lockfile-version-unsupported",
+    "tauri-cli-version-mismatch",
+    "tauri-cli-entrypoint-hash-mismatch",
+    "platform-native-cli-version-or-binary-hash-mismatch",
+    "vite-version-mismatch",
+    "dependency-tree-fingerprint-mismatch",
+    "dependency-root-inside-any-git-worktree",
+    "dependency-root-outside-exact-owned-base",
+    "dependency-root-overlaps-source-run-cargo-or-output-root",
+    "preexisting-source-node-modules",
+    "missing-desktop-or-frontend-junction",
+    "unexpected-third-junction",
+    "junction-target-not-exact-manifest-path",
+    "junction-target-escapes-bundle-root",
+    "nested-reparse-point-escapes-bundle-root",
+    "dependency-tree-mutates-during-build",
+    "system-or-global-tauri-resolves",
+    "arbitrary-path-entry-injected",
+    "network-fallback-requested",
+    "unknown-edition",
+    "node-modules-or-dependency-manifest-enters-frontend-dist",
+    "node-modules-or-dependency-manifest-enters-installer-bundle",
+    "postbuild-treats-dependency-files-as-product-source",
+    "failed-build-attempt-tries-to-reuse-or-clean-frozen-evidence"
+  ],
+  "currentAtomExecution": {
+    "npmCiInvocations": 0,
+    "npmNetworkInvocations": 0,
+    "dependencyDirectoriesCopied": 0,
+    "junctionsCreated": 0,
+    "buildInvocations": 0,
+    "ordinalSixRetries": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "deployments": 0
+  },
+  "nextGate": {
+    "exactCommonCoreDonorRequired": true,
+    "donorMustBePathLimitedAndSemanticallyReviewed": true,
+    "newExactApplicationRequiredAfterDonorSync": true,
+    "freshYellowAuthorizationRequired": true,
+    "currentProductSourceMayNotBeRebuiltFromThisRequest": true
+  }
+}

@@ -103,6 +103,12 @@ YELLOW_ATTEMPT_6_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-6-a99f5e8-tauri-cli-missing-failed.v1.json"
 )
+DETACHED_NODE_DEPENDENCY_GAP_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "readiness"
+    / "detached-node-dependency-common-core-gap.v1.json"
+)
 YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_6_APPLICATION_PATH
 
 
@@ -665,6 +671,108 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(protected["publicSupabaseValuesPrintedOrPersisted"])
         self.assertFalse(receipt["nonClaims"]["artifactCreated"])
         self.assertFalse(receipt["nonClaims"]["releaseReady"])
+
+    def test_detached_node_dependency_gap_binds_exact_source_inputs(self) -> None:
+        contract = load_json(DETACHED_NODE_DEPENDENCY_GAP_PATH)
+        source = contract["failureBinding"]["productSourceCommit"]
+        self.assertEqual(source, "a99f5e81893f5001ebd571d09e95b72d8afa070a")
+        for item in contract["exactSourceDependencyInputs"].values():
+            path = ROOT / item["path"]
+            self.assertEqual(path.stat().st_size, item["bytes"], item["path"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                item["sha256"],
+                item["path"],
+            )
+            self.assertEqual(
+                git("rev-parse", f"{source}:{item['path']}"),
+                item["gitBlob"],
+                item["path"],
+            )
+        self.assertEqual(
+            contract["exactSourceDependencyInputs"]["desktopPackageLock"][
+                "tauriCliVersion"
+            ],
+            "2.11.4",
+        )
+        self.assertEqual(
+            contract["exactSourceDependencyInputs"]["frontendPackageLock"][
+                "viteVersion"
+            ],
+            "7.3.6",
+        )
+
+    def test_detached_node_dependency_gap_selects_attested_external_bundle(self) -> None:
+        contract = load_json(DETACHED_NODE_DEPENDENCY_GAP_PATH)
+        options = {item["optionId"]: item for item in contract["optionAnalysis"]}
+        self.assertEqual(
+            options["reuse-canonical-node-modules-by-direct-junction"]["disposition"],
+            "rejected-as-default",
+        )
+        self.assertEqual(
+            options["explicit-dependency-root-via-path-or-direct-cli-only"][
+                "disposition"
+            ],
+            "insufficient-alone",
+        )
+        self.assertEqual(
+            options["npm-ci-offline-inside-detached-source"]["disposition"],
+            "not-preferred-for-release-build",
+        )
+        recommended = options["attested-external-bundle-with-two-allowlisted-junctions"]
+        self.assertEqual(recommended["disposition"], "recommended")
+        self.assertEqual(
+            [item["linkRelativeToDetachedSource"] for item in recommended["requiredJunctions"]],
+            ["desktop/node_modules", "frontend/node_modules"],
+        )
+        invariants = contract["invariants"]
+        self.assertTrue(invariants["dependencyRootMustBeOutsideEveryGitWorktree"])
+        self.assertFalse(invariants["systemOrGlobalInstallationAllowed"])
+        self.assertFalse(invariants["networkDuringBuildAllowed"])
+        self.assertFalse(invariants["arbitraryJunctionAllowed"])
+        self.assertFalse(invariants["reparsePointEscapeAllowed"])
+        self.assertFalse(invariants["dependencyTreeIsProductSource"])
+
+    def test_detached_node_dependency_gap_requests_common_core_fail_closed_donor(self) -> None:
+        contract = load_json(DETACHED_NODE_DEPENDENCY_GAP_PATH)
+        requested = {item["path"] for item in contract["requestedCommonCorePaths"]}
+        self.assertEqual(
+            requested,
+            {
+                "distribution/schemas/desktop-node-dependency-bundle.schema.json",
+                "desktop/scripts/verify-detached-node-dependencies.ps1",
+                "desktop/scripts/build-windows-llvm.ps1",
+                "desktop/scripts/release-build-driver.psm1",
+                "distribution/tests/test_shared_windows_build_contract.py",
+            },
+        )
+        negative = set(contract["requiredNegativeTests"])
+        for required in (
+            "product-source-commit-mismatch",
+            "desktop-package-lock-hash-mismatch",
+            "frontend-package-lock-hash-mismatch",
+            "tauri-cli-version-mismatch",
+            "dependency-root-inside-any-git-worktree",
+            "junction-target-escapes-bundle-root",
+            "nested-reparse-point-escapes-bundle-root",
+            "dependency-tree-mutates-during-build",
+            "system-or-global-tauri-resolves",
+            "network-fallback-requested",
+            "unknown-edition",
+            "node-modules-or-dependency-manifest-enters-installer-bundle",
+        ):
+            self.assertIn(required, negative)
+        self.assertFalse(contract["ownership"]["editionBranchMayImplementBuildSemantics"])
+        self.assertEqual(contract["ownership"]["commonCoreBranch"], "codex/software")
+
+    def test_detached_node_dependency_gap_is_green_only_and_cannot_rebuild(self) -> None:
+        contract = load_json(DETACHED_NODE_DEPENDENCY_GAP_PATH)
+        self.assertTrue(all(value == 0 for value in contract["currentAtomExecution"].values()))
+        gate = contract["nextGate"]
+        self.assertTrue(gate["exactCommonCoreDonorRequired"])
+        self.assertTrue(gate["newExactApplicationRequiredAfterDonorSync"])
+        self.assertTrue(gate["freshYellowAuthorizationRequired"])
+        self.assertTrue(gate["currentProductSourceMayNotBeRebuiltFromThisRequest"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
