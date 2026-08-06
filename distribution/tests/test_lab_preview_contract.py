@@ -106,6 +106,11 @@ class LabPreviewContractTests(unittest.TestCase):
             "$receipt | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8",
             script,
         )
+        self.assertIn(
+            "distribution\\schemas\\lab-website-exact-exe-handoff.schema.json",
+            script,
+        )
+        self.assertNotIn("website-exact-exe-handoff.awaiting.v1.json", script)
 
     def test_shared_llvm_build_uses_ordered_cli_config_overlays(self) -> None:
         script = (ROOT / "desktop/scripts/build-windows-llvm.ps1").read_text(

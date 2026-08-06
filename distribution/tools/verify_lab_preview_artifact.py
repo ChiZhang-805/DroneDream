@@ -28,9 +28,8 @@ SCHEMA_PATH = ROOT / "distribution/schemas/lab-preview-artifact-receipt.schema.j
 WEBSITE_HANDOFF_PATH = (
     ROOT
     / "distribution"
-    / "editions"
-    / "lab"
-    / "website-exact-exe-handoff.awaiting.v1.json"
+    / "schemas"
+    / "lab-website-exact-exe-handoff.schema.json"
 )
 
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")

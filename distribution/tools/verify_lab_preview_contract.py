@@ -405,7 +405,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         '$tauriProductName = [string]$tauriOverlay.productName',
         'brand-source-manifest.v1.json',
         'canonicalDonor = New-RepoFileRef "brand\\brand-editions.v1.json"',
-        'websiteHandoffContract = New-RepoFileRef "distribution\\editions\\lab\\website-exact-exe-handoff.awaiting.v1.json"',
+        'websiteHandoffContract = New-RepoFileRef "distribution\\schemas\\lab-website-exact-exe-handoff.schema.json"',
         'grantsHardwareAuthority = $false',
         '[ValidateSet("gnullvm")]',
         '$readiness.toolchain.selectedToolchain',
