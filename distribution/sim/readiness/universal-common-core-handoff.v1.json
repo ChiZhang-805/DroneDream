@@ -29,12 +29,13 @@
     "lifecycleRegistrationVerifierCommit": "57b74f59ed4164ebefde623fa7f5102e5c24363f",
     "releaseBuildDriverCommit": "f2858e3d2e39f493baab28368b77230e45dd199f",
     "frontendDistResolutionCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+    "lifecyclePreferenceResidueCommit": "8215a2206ec5e1192792410aaaf2a438f6b6127f",
     "wholeLineageMerged": false,
     "evidenceCommitUsedAsProductSource": false
   },
   "pathSync": {
     "canonicalBrandPathCount": 94,
-    "exactCommonPathCount": 52,
+    "exactCommonPathCount": 53,
     "simSemanticAdapterPath": "frontend/src/pages/DesktopSetup.tsx",
     "unrelatedBenchmarkPathsAdopted": false,
     "hardwareAuthorityGranted": false
@@ -184,6 +185,35 @@
       "overlayLocationChangesResolution": false,
       "absolutePathsRestrictedToEditionOutputs": true,
       "unknownEditionFailsClosed": true,
+      "buildAuthorized": false
+    },
+    "lifecyclePreferenceResidue": {
+      "sourceCommit": "8215a2206ec5e1192792410aaaf2a438f6b6127f",
+      "parentCommit": "d80f5f99309668d9d1cd50be51371efaa3c5491d",
+      "donorChangedPathCount": 4,
+      "simConsumedPaths": [
+        {
+          "path": "desktop/scripts/edition-installer-lifecycle-contract.ps1",
+          "blob": "b06c557e33a0a3b78a2feab138e805ce795e65cc",
+          "objectSha256": "f2ca2c92a1a6b7f267041002d838599c550438e6ea4490970f94ca2c76d17d4e"
+        },
+        {
+          "path": "desktop/scripts/verify-universal-installer-lifecycle.ps1",
+          "blob": "e90fe02e3c739faedacb9fa3577af7e95463f9fb",
+          "objectSha256": "0931d4d328c51d780fc3fde3e8303fc8f7393cd70f76ef27f4874f6a978eb8a2"
+        },
+        {
+          "path": "distribution/tests/test_desktop_edition_coexistence.py",
+          "blob": "c2ef54fc554d71015aa581760faed2a8144829ff",
+          "objectSha256": "81b3ee200b0897d75a9d31050a0e962b1ce99c3c7819849fd8e263258f71c26f"
+        }
+      ],
+      "universalOnlyTestPath": "distribution/tests/test_universal_installer_contract.py",
+      "universalOnlyTestRestored": false,
+      "simAssertionAdapterPath": "distribution/tests/test_software_sim_branch_contract.py",
+      "classification": "validator-evidence-and-standard-edition-preference-residue-false-negative",
+      "productNsisChanged": false,
+      "frozenArtifactReuseAllowed": false,
       "buildAuthorized": false
     }
   },

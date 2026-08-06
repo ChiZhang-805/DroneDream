@@ -26,7 +26,7 @@ class SimUniversalHandoffTests(unittest.TestCase):
     def test_exact_handoff_and_sim_adapter_validate(self) -> None:
         receipt = validate_handoff(load_receipt(), ROOT)
         self.assertEqual(receipt["pathSync"]["canonicalBrandPathCount"], 94)
-        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 52)
+        self.assertEqual(receipt["pathSync"]["exactCommonPathCount"], 53)
         self.assertFalse(receipt["execution"]["buildAuthorized"])
 
     def test_observed_head_cannot_be_relabelled_whole_product_source(self) -> None:
@@ -87,6 +87,25 @@ class SimUniversalHandoffTests(unittest.TestCase):
             "overlayLocationChangesResolution"
         ] = True
         with self.assertRaisesRegex(SimUniversalHandoffError, "overlay location"):
+            validate_handoff(receipt, ROOT)
+
+    def test_lifecycle_preference_residue_path_drift_is_rejected(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["lifecyclePreferenceResidue"]["simConsumedPaths"][0][
+            "blob"
+        ] = "0" * 40
+        with self.assertRaisesRegex(
+            SimUniversalHandoffError,
+            "lifecycle preference residue blob",
+        ):
+            validate_handoff(receipt, ROOT)
+
+    def test_universal_only_lifecycle_test_cannot_be_reintroduced(self) -> None:
+        receipt = load_receipt()
+        receipt["corrections"]["lifecyclePreferenceResidue"][
+            "universalOnlyTestRestored"
+        ] = True
+        with self.assertRaisesRegex(SimUniversalHandoffError, "Universal-only"):
             validate_handoff(receipt, ROOT)
 
     def test_auth_verifier_migration_order_drift_is_rejected(self) -> None:

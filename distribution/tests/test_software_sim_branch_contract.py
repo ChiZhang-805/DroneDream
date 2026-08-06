@@ -46,6 +46,9 @@ REPLACEMENT_YELLOW2_PATH = (
 COEXISTENCE_SYNC_PATH = (
     DISTRIBUTION / "sim" / "readiness" / "coexistence-common-core-sync.v1.json"
 )
+LIFECYCLE_CONTRACT_PATH = (
+    ROOT / "desktop" / "scripts" / "edition-installer-lifecycle-contract.ps1"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -63,7 +66,105 @@ def git(*args: str) -> str:
     return completed.stdout.strip()
 
 
+def run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
+    command = (
+        f". '{LIFECYCLE_CONTRACT_PATH}'; "
+        "$ErrorActionPreference='Stop'; "
+        f"{expression}"
+    )
+    return subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 class SoftwareSimBranchContractTests(unittest.TestCase):
+    def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
+        result = run_lifecycle_contract(
+            "$e=[ordered]@{DisplayName='DroneDream · SIM';DisplayVersion='1.0.0';"
+            "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim';"
+            "MainBinaryName='drone-dream-desktop.exe'};"
+            "$a=[ordered]@{DisplayName='DroneDream · SIM';DisplayVersion='1.0.0';"
+            "InstallLocation='\"c:\\users\\example\\appdata\\local\\dronedream-sim\\\"';"
+            "MainBinaryName='drone-dream-desktop.exe'};"
+            "$r=Compare-DroneDreamUninstallRegistration -Expected $e -Actual $a;"
+            "if(-not $r.passed -or $r.mismatches.Count -ne 0){exit 9}"
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_shared_lifecycle_contract_captures_fields_before_failure(self) -> None:
+        mismatch = run_lifecycle_contract(
+            "$e=[ordered]@{DisplayName='DroneDream · SIM';DisplayVersion='1.0.0';"
+            "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim';"
+            "MainBinaryName='drone-dream-desktop.exe'};"
+            "$a=[ordered]@{DisplayName='DroneDream-Sim';DisplayVersion='1.0.0';"
+            "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim';"
+            "MainBinaryName='drone-dream-desktop.exe'};"
+            "$r=Compare-DroneDreamUninstallRegistration -Expected $e -Actual $a;"
+            "if($r.passed -or $r.mismatches.Count -ne 1 "
+            "-or $r.mismatches[0] -cne 'DisplayName'){exit 9}"
+        )
+        self.assertEqual(mismatch.returncode, 0, mismatch.stderr)
+
+        unknown = run_lifecycle_contract(
+            "$e=[ordered]@{DisplayName='DroneDream · SIM';DisplayVersion='1.0.0';"
+            "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim';"
+            "MainBinaryName='drone-dream-desktop.exe';Unexpected='value'};"
+            "$a=[ordered]@{DisplayName='DroneDream · SIM';DisplayVersion='1.0.0';"
+            "InstallLocation='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim';"
+            "MainBinaryName='drone-dream-desktop.exe'};"
+            "Compare-DroneDreamUninstallRegistration -Expected $e -Actual $a"
+        )
+        self.assertNotEqual(unknown.returncode, 0)
+        self.assertIn("fields drifted", unknown.stderr)
+
+    def test_shared_lifecycle_contract_rejects_unowned_sim_residue(self) -> None:
+        accepted = run_lifecycle_contract(
+            "$v=[ordered]@{'(default)'='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim';"
+            "'DroneDreamRuntimeInstallMode'='install-app-only';"
+            "'DroneDreamRuntimeDrive'='';'DroneDreamRuntimeOperationProtocol'=2};"
+            "$r=Get-DroneDreamProductRegistrationDisposition -Values $v "
+            "-ExpectedInstallDirectory 'c:\\users\\example\\appdata\\local\\dronedream-sim' "
+            "-PreflightProductKeyAbsent $true;"
+            "if($r.state -cne 'retained-by-standard-uninstaller' "
+            "-or -not $r.testHarnessRemovalAllowed){exit 9}"
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+        cases = (
+            (
+                "$v=[ordered]@{'(default)'='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim';"
+                "'ForeignValue'='do-not-delete'};"
+                "Get-DroneDreamProductRegistrationDisposition -Values $v "
+                "-ExpectedInstallDirectory 'C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim' "
+                "-PreflightProductKeyAbsent $true",
+                "unowned values",
+            ),
+            (
+                "$v=[ordered]@{'(default)'='C:\\Users\\Example\\AppData\\Local\\DroneDream-Lab';"
+                "'DroneDreamRuntimeInstallMode'='install-app-only'};"
+                "Get-DroneDreamProductRegistrationDisposition -Values $v "
+                "-ExpectedInstallDirectory 'C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim' "
+                "-PreflightProductKeyAbsent $true",
+                "different install directory",
+            ),
+            (
+                "$v=[ordered]@{'(default)'='C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim'};"
+                "Get-DroneDreamProductRegistrationDisposition -Values $v "
+                "-ExpectedInstallDirectory 'C:\\Users\\Example\\AppData\\Local\\DroneDream-Sim' "
+                "-PreflightProductKeyAbsent $false",
+                "existed at preflight",
+            ),
+        )
+        for expression, message in cases:
+            with self.subTest(message=message):
+                rejected = run_lifecycle_contract(expression)
+                self.assertNotEqual(rejected.returncode, 0)
+                self.assertIn(message, rejected.stderr)
+
     def test_replacement_yellow2_preserves_product_source_and_failure_genealogy(self) -> None:
         evidence = load_json(REPLACEMENT_YELLOW2_PATH)
 

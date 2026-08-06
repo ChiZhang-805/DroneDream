@@ -17,6 +17,7 @@ RUNTIME_REVIEWED_HEAD = "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
 NSIS_IDENTITY_FIX_COMMIT = "a11fe7d09fceafaecf102a0cbfba49abb066a557"
 RELEASE_BUILD_DRIVER_COMMIT = "f2858e3d2e39f493baab28368b77230e45dd199f"
 FRONTEND_DIST_RESOLUTION_COMMIT = "d80f5f99309668d9d1cd50be51371efaa3c5491d"
+LIFECYCLE_PREFERENCE_RESIDUE_COMMIT = "8215a2206ec5e1192792410aaaf2a438f6b6127f"
 BRAND_PRODUCT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
 
 EXACT_GROUPS = {
@@ -88,6 +89,9 @@ EXACT_GROUPS = {
     ),
     OBSERVED_HEAD: (
         "desktop/scripts/verify-edition-identity-nsis.ps1",
+    ),
+    LIFECYCLE_PREFERENCE_RESIDUE_COMMIT: (
+        "desktop/scripts/edition-installer-lifecycle-contract.ps1",
         "desktop/scripts/verify-universal-installer-lifecycle.ps1",
         "distribution/tests/test_desktop_edition_coexistence.py",
     ),
@@ -185,6 +189,11 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
         source.get("frontendDistResolutionCommit") == FRONTEND_DIST_RESOLUTION_COMMIT,
         "frontendDist resolution source drifted",
     )
+    _require(
+        source.get("lifecyclePreferenceResidueCommit")
+        == LIFECYCLE_PREFERENCE_RESIDUE_COMMIT,
+        "lifecycle preference residue source drifted",
+    )
     _require(source.get("observedHeadIsEvidenceOnly") is False, "product head relabelled")
     _require(
         source.get("observedHeadUsedAsWholeProductSource") is False,
@@ -218,13 +227,13 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     for path in brand_paths:
         _validate_exact_path(root, BRAND_PRODUCT, path)
     common_paths = [path for paths in EXACT_GROUPS.values() for path in paths]
-    _require(len(common_paths) == len(set(common_paths)) == 52, "common path inventory drifted")
+    _require(len(common_paths) == len(set(common_paths)) == 53, "common path inventory drifted")
     for commit, paths in EXACT_GROUPS.items():
         for path in paths:
             _validate_exact_path(root, commit, path)
     path_sync = document.get("pathSync", {})
     _require(path_sync.get("canonicalBrandPathCount") == 94, "brand count receipt drifted")
-    _require(path_sync.get("exactCommonPathCount") == 52, "common count receipt drifted")
+    _require(path_sync.get("exactCommonPathCount") == 53, "common count receipt drifted")
     _require(path_sync.get("unrelatedBenchmarkPathsAdopted") is False, "Benchmark overclaim")
     _require(path_sync.get("hardwareAuthorityGranted") is False, "hardware authority overclaim")
 
@@ -529,6 +538,77 @@ def validate_handoff(document: dict[str, Any], root: Path) -> dict[str, Any]:
     _require(
         frontend_dist.get("buildAuthorized") is False,
         "frontendDist donor authorized a build",
+    )
+
+    lifecycle_preference = corrections.get("lifecyclePreferenceResidue", {})
+    _require(
+        lifecycle_preference.get("sourceCommit")
+        == LIFECYCLE_PREFERENCE_RESIDUE_COMMIT,
+        "lifecycle preference residue source drifted",
+    )
+    _require(
+        lifecycle_preference.get("parentCommit") == FRONTEND_DIST_RESOLUTION_COMMIT,
+        "lifecycle preference residue parent drifted",
+    )
+    expected_lifecycle_preference_rows = {
+        "desktop/scripts/edition-installer-lifecycle-contract.ps1": (
+            "b06c557e33a0a3b78a2feab138e805ce795e65cc",
+            "f2ca2c92a1a6b7f267041002d838599c550438e6ea4490970f94ca2c76d17d4e",
+        ),
+        "desktop/scripts/verify-universal-installer-lifecycle.ps1": (
+            "e90fe02e3c739faedacb9fa3577af7e95463f9fb",
+            "0931d4d328c51d780fc3fde3e8303fc8f7393cd70f76ef27f4874f6a978eb8a2",
+        ),
+        "distribution/tests/test_desktop_edition_coexistence.py": (
+            "c2ef54fc554d71015aa581760faed2a8144829ff",
+            "81b3ee200b0897d75a9d31050a0e962b1ce99c3c7819849fd8e263258f71c26f",
+        ),
+    }
+    lifecycle_preference_rows = lifecycle_preference.get("simConsumedPaths", [])
+    _require(
+        [row.get("path") for row in lifecycle_preference_rows]
+        == list(expected_lifecycle_preference_rows),
+        "lifecycle preference residue path inventory drifted",
+    )
+    for row in lifecycle_preference_rows:
+        path = row["path"]
+        blob, object_sha256 = expected_lifecycle_preference_rows[path]
+        _require(
+            row.get("blob") == blob,
+            f"lifecycle preference residue blob drifted: {path}",
+        )
+        _require(
+            row.get("objectSha256") == object_sha256,
+            f"lifecycle preference residue SHA drifted: {path}",
+        )
+        _require(
+            _git(root, "rev-parse", f"{LIFECYCLE_PREFERENCE_RESIDUE_COMMIT}:{path}")
+            == blob,
+            f"historical lifecycle preference residue blob drifted: {path}",
+        )
+        _require(
+            hashlib.sha256(
+                _git_bytes(
+                    root,
+                    "cat-file",
+                    "blob",
+                    f"{LIFECYCLE_PREFERENCE_RESIDUE_COMMIT}:{path}",
+                )
+            ).hexdigest()
+            == object_sha256,
+            f"historical lifecycle preference residue bytes drifted: {path}",
+        )
+    _require(
+        lifecycle_preference.get("universalOnlyTestPath")
+        == "distribution/tests/test_universal_installer_contract.py"
+        and lifecycle_preference.get("universalOnlyTestRestored") is False,
+        "Universal-only lifecycle test boundary drifted",
+    )
+    _require(
+        lifecycle_preference.get("productNsisChanged") is False
+        and lifecycle_preference.get("frozenArtifactReuseAllowed") is False
+        and lifecycle_preference.get("buildAuthorized") is False,
+        "lifecycle preference residue execution overclaim",
     )
 
     _require(document.get("upstreamBlockers") == [], "resolved blocker was retained")
