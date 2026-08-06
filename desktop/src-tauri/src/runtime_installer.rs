@@ -879,7 +879,10 @@ async fn run_runtime_maintenance(
         let _operation = operation;
         let executor = ProductionWslExecutor;
         let result = (|| {
-            if !executor.is_registered().map_err(|error| error.message)? {
+            if !executor
+                .is_registered()
+                .map_err(runtime_maintenance_error_for_ipc)?
+            {
                 return Err(
                     "DroneDreamRuntime is not installed; no other WSL distribution was changed."
                         .to_string(),
@@ -899,7 +902,7 @@ async fn run_runtime_maintenance(
                         &cancel,
                         TRUSTED_KEYRING,
                     )
-                    .map_err(|error| error.message)?;
+                    .map_err(runtime_maintenance_error_for_ipc)?;
                     installer.update(|snapshot| {
                         snapshot.phase = RuntimeInstallPhase::Completed;
                         snapshot.installed_version = Some(recovered.version);
@@ -913,14 +916,18 @@ async fn run_runtime_maintenance(
             };
             if repair {
                 keepalive.release()?;
-                executor.terminate().map_err(|error| error.message)?;
+                executor
+                    .terminate()
+                    .map_err(runtime_maintenance_error_for_ipc)?;
             }
             keepalive.ensure_running()?;
             let cancel = AtomicBool::new(false);
-            executor.start(&cancel).map_err(|error| error.message)?;
+            executor
+                .start(&cancel)
+                .map_err(runtime_maintenance_error_for_ipc)?;
             executor
                 .wait_healthy(&build_id, &version, &cancel)
-                .map_err(|error| error.message)?;
+                .map_err(runtime_maintenance_error_for_ipc)?;
             let report = crate::runtime::probe_runtime()?;
             if !report.is_ready() {
                 return Err(
@@ -982,6 +989,17 @@ impl InstallFailure {
 
 fn fail(code: &str, message: impl Into<String>, retryable: bool) -> InstallFailure {
     InstallFailure::new(code, message, retryable)
+}
+
+fn runtime_maintenance_error_for_ipc(error: InstallFailure) -> String {
+    let mut error = RuntimeInstallError {
+        code: error.code,
+        message: error.message,
+        retryable: error.retryable,
+        diagnostics_path: error.diagnostics_path,
+    };
+    error.sanitize_for_ipc();
+    format!("{}: {}", error.code, error.message)
 }
 
 fn is_runtime_health_failure(error: &InstallFailure) -> bool {
@@ -4235,6 +4253,23 @@ fn verify_file_sha256(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_maintenance_ipc_error_preserves_bounded_machine_code() {
+        let value = runtime_maintenance_error_for_ipc(InstallFailure {
+            code: "runtime_service_unhealthy\nignored".to_string(),
+            message: "backend did not become ready\r\nsecond line".to_string(),
+            retryable: true,
+            cancelled: false,
+            diagnostics_path: None,
+        });
+
+        assert_eq!(
+            value,
+            "runtime_service_unhealthy ignored: backend did not become ready second line"
+        );
+        assert!(!value.contains(['\r', '\n']));
+    }
     use ed25519_dalek::{Signer, SigningKey};
     use std::sync::atomic::AtomicUsize;
     use std::time::{SystemTime, UNIX_EPOCH};

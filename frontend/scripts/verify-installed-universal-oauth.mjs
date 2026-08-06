@@ -43,15 +43,34 @@ const counts = {
   localLogout: 0,
 };
 const evidence = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   kind: "dronedream-installed-universal-oauth-observation",
   passed: false,
   counts,
+  stage: "initialized",
   runtimeReadyObserved: false,
+  runtimeActionSettled: false,
+  runtimeFailureCode: null,
   callbackSessionObserved: false,
   accountSurfaceObserved: false,
   localLogoutObserved: false,
 };
+
+async function persist(stage) {
+  evidence.stage = stage;
+  evidence.updatedAt = new Date().toISOString();
+  await atomicJson(outputPath, evidence);
+}
+
+function safeFailure(error) {
+  if (error?.name === "TimeoutError") {
+    return { name: "TimeoutError", message: "A bounded observer wait timed out." };
+  }
+  if (error instanceof assert.AssertionError) {
+    return { name: "AssertionError", message: "A bounded observer assertion failed." };
+  }
+  return { name: "Error", message: "The bounded installed-app observer failed." };
+}
 
 function normalizedButtonText(value) {
   return value.replace(/\s+/gu, " ").trim().toLowerCase();
@@ -67,6 +86,7 @@ function isSignIn(text) {
 
 const browser = await chromium.connectOverCDP(cdpEndpoint);
 try {
+  await persist("connected");
   const contexts = browser.contexts();
   assert.equal(contexts.length, 1, "Expected exactly one installed-app browser context");
   const pages = contexts[0].pages();
@@ -85,21 +105,56 @@ try {
   if (isRuntimeStart(primaryText)) {
     counts.runtimeStart += 1;
     assert.equal(counts.runtimeStart, 1, "Runtime start cap exceeded");
+    await persist("runtime-start-attempted");
     await primary.focus();
     await primary.press("Enter");
-    await page.waitForFunction(
+    const runtimeOutcomeHandle = await page.waitForFunction(
       () => {
         const button = document.querySelector(".launcher-primary-action");
         const text = button?.textContent?.replace(/\s+/gu, " ").trim().toLowerCase();
-        return text === "sign in and enter tuning workspace" || text === "登录并进入调优平台";
+        if (
+          text === "sign in and enter tuning workspace" ||
+          text === "登录并进入调优平台"
+        ) return "ready";
+        const runtimeError = [...document.querySelectorAll(".alert-body code")]
+          .map((node) => node.textContent ?? "")
+          .find((value) => value.trim().toLowerCase().startsWith("start_runtime:"));
+        if (!runtimeError) return false;
+        const normalized = runtimeError.toLowerCase();
+        for (const code of [
+          "runtime_service_unhealthy",
+          "runtime_host_connectivity",
+          "runtime_health_unknown",
+        ]) {
+          if (normalized.includes(code)) return code;
+        }
+        if (normalized.includes("another runtime installation or maintenance operation")) {
+          return "runtime_operation_busy";
+        }
+        if (normalized.includes("update quiesce is active")) return "runtime_update_quiesce_active";
+        if (normalized.includes("runtime is not installed")) return "runtime_not_installed";
+        if (normalized.includes("windows cannot reach it")) return "runtime_host_connectivity";
+        if (normalized.includes("runtime-internal backend")) return "runtime_service_unhealthy";
+        if (normalized.includes("did not become healthy")) return "runtime_health_unknown";
+        return "runtime_error_unclassified";
       },
       undefined,
       { timeout: runtimeReadyTimeoutMs },
     );
+    const runtimeOutcome = await runtimeOutcomeHandle.jsonValue();
+    evidence.runtimeActionSettled = true;
+    if (runtimeOutcome !== "ready") {
+      evidence.runtimeFailureCode = runtimeOutcome;
+      await persist("runtime-start-failed");
+      throw new Error("Runtime start failed before browser authentication became available.");
+    }
     evidence.runtimeReadyObserved = true;
+    await persist("runtime-ready");
     primaryText = normalizedButtonText(await primary.innerText());
   } else if (isSignIn(primaryText)) {
     evidence.runtimeReadyObserved = true;
+    evidence.runtimeActionSettled = true;
+    await persist("runtime-already-ready");
   } else {
     throw new Error("Launcher did not expose the bounded Runtime-start or Universal sign-in action");
   }
@@ -107,6 +162,7 @@ try {
   assert(isSignIn(primaryText), "Runtime became ready without exposing the Universal sign-in action");
   counts.loginButton += 1;
   counts.oauthTransaction += 1;
+  await persist("oauth-attempted");
   await primary.focus();
   await primary.press("Enter");
 
@@ -127,6 +183,7 @@ try {
   const signOut = accountDialog.locator(".account-sign-out");
   await signOut.waitFor({ state: "visible" });
   counts.localLogout += 1;
+  await persist("local-logout-attempted");
   await signOut.focus();
   await signOut.press("Enter");
   await signOut.waitFor({ state: "hidden", timeout: 30_000 });
@@ -139,13 +196,16 @@ try {
     localLogout: 1,
   });
   evidence.passed = true;
+  await persist("completed");
 } catch (error) {
-  evidence.failure = {
-    name: error instanceof Error ? error.name : "Error",
-    message: error instanceof Error ? error.message : String(error),
-  };
+  if (counts.runtimeStart === 1 && !evidence.runtimeActionSettled) {
+    evidence.runtimeFailureCode = "runtime_start_pending_timeout";
+  }
+  evidence.failure = safeFailure(error);
   throw error;
 } finally {
+  evidence.terminalState = evidence.passed ? "passed" : "failed";
+  evidence.completedAt = new Date().toISOString();
   await atomicJson(outputPath, evidence);
   // This helper only observes an app-owned WebView2 instance. Never call
   // browser.close(), which would terminate a browser process it does not own.

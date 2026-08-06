@@ -3,6 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 POWERSHELL = ROOT / "desktop/scripts/verify-universal-real-oauth.ps1"
 OBSERVER = ROOT / "frontend/scripts/verify-installed-universal-oauth.mjs"
+RUNTIME_INSTALLER = ROOT / "desktop/src-tauri/src/runtime_installer.rs"
 
 
 def test_oauth_tool_is_source_bound_and_plan_only_by_default() -> None:
@@ -64,6 +65,55 @@ def test_observer_is_bounded_and_never_owns_or_logs_the_external_browser() -> No
     assert "counts.localLogout += 1" in text
     for forbidden in ("access_token", "refresh_token", "password", "cookie", "requestId"):
         assert forbidden not in text
+
+
+def test_attempts_are_durable_before_side_effects_and_runtime_failure_is_bounded() -> None:
+    observer = OBSERVER.read_text(encoding="utf-8")
+    powershell = POWERSHELL.read_text(encoding="utf-8")
+
+    runtime_increment = observer.index("counts.runtimeStart += 1")
+    runtime_checkpoint = observer.index('await persist("runtime-start-attempted")')
+    runtime_click = observer.index('await primary.press("Enter")', runtime_checkpoint)
+    assert runtime_increment < runtime_checkpoint < runtime_click
+
+    oauth_increment = observer.index("counts.oauthTransaction += 1")
+    oauth_checkpoint = observer.index('await persist("oauth-attempted")')
+    oauth_click = observer.index('await primary.press("Enter")', oauth_checkpoint)
+    assert oauth_increment < oauth_checkpoint < oauth_click
+
+    logout_increment = observer.index("counts.localLogout += 1")
+    logout_checkpoint = observer.index('await persist("local-logout-attempted")')
+    logout_click = observer.index('await signOut.press("Enter")')
+    assert logout_increment < logout_checkpoint < logout_click
+
+    assert '.querySelectorAll(".alert-body code")' in observer
+    for code in (
+        "runtime_service_unhealthy",
+        "runtime_host_connectivity",
+        "runtime_health_unknown",
+        "runtime_operation_busy",
+        "runtime_update_quiesce_active",
+        "runtime_start_pending_timeout",
+    ):
+        assert code in observer
+
+    assert "function Import-ObserverCheckpoint" in powershell
+    finally_block = powershell.index("finally {", powershell.index("& node $nodeVerifier"))
+    assert powershell.index("Import-ObserverCheckpoint $observerPath", finally_block) > finally_block
+    assert 'rawRuntimeErrorRecorded = $false' in powershell
+
+    app_close_increment = powershell.index("$counts.appClose++")
+    app_close_checkpoint = powershell.index('Save-ExecutionCheckpoint "app-close-attempted"')
+    app_close_action = powershell.index("$app.CloseMainWindow()", app_close_checkpoint)
+    assert app_close_increment < app_close_checkpoint < app_close_action
+
+
+def test_native_runtime_maintenance_preserves_machine_failure_code() -> None:
+    text = RUNTIME_INSTALLER.read_text(encoding="utf-8")
+    assert "fn runtime_maintenance_error_for_ipc" in text
+    assert '.map_err(runtime_maintenance_error_for_ipc)?' in text
+    assert 'format!("{}: {}", error.code, error.message)' in text
+    assert "runtime_maintenance_ipc_error_preserves_bounded_machine_code" in text
 
 
 def test_receipt_uses_allowlisted_native_audit_hashes_and_local_logout() -> None:

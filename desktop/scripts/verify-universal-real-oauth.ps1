@@ -79,6 +79,44 @@ function Write-AtomicJson([string]$Path, $Value) {
     finally { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
 }
 
+function Import-ObserverCheckpoint([string]$Path, $Counts, $Receipt) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    $observation = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    if ($observation.schemaVersion -ne 2 -or $observation.kind -cne "dronedream-installed-universal-oauth-observation") {
+        throw "Installed-app OAuth observer checkpoint has an unknown contract."
+    }
+    $expectedCountKeys = @("localLogout", "loginButton", "oauthTransaction", "runtimeStart")
+    $actualCountKeys = @($observation.counts.PSObject.Properties.Name | Sort-Object)
+    if (($actualCountKeys -join "|") -cne (($expectedCountKeys | Sort-Object) -join "|")) {
+        throw "Installed-app OAuth observer checkpoint has unknown count fields."
+    }
+    foreach ($key in $expectedCountKeys) {
+        $value = $observation.counts.$key
+        if ($value -isnot [int] -and $value -isnot [long]) {
+            throw "Installed-app OAuth observer count $key is not an integer."
+        }
+        if ([long]$value -lt 0 -or [long]$value -gt 1) {
+            throw "Installed-app OAuth observer count $key exceeds its frozen cap."
+        }
+        $Counts[$key] = [int]$value
+    }
+    $allowedStages = @("initialized", "connected", "runtime-start-attempted", "runtime-ready", "runtime-already-ready", "runtime-start-failed", "oauth-attempted", "local-logout-attempted", "completed")
+    if ($observation.stage -notin $allowedStages) { throw "Installed-app OAuth observer checkpoint has an unknown stage." }
+    $allowedRuntimeFailures = @($null, "runtime_service_unhealthy", "runtime_host_connectivity", "runtime_health_unknown", "runtime_operation_busy", "runtime_update_quiesce_active", "runtime_not_installed", "runtime_error_unclassified", "runtime_start_pending_timeout")
+    if ($observation.runtimeFailureCode -notin $allowedRuntimeFailures) {
+        throw "Installed-app OAuth observer checkpoint has an unknown Runtime failure code."
+    }
+    $Receipt["runtimeDiagnosis"] = [ordered]@{
+        stage = [string]$observation.stage
+        runtimeReadyObserved = [bool]$observation.runtimeReadyObserved
+        runtimeActionSettled = [bool]$observation.runtimeActionSettled
+        runtimeFailureCode = $observation.runtimeFailureCode
+        observerCheckpointSha256 = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+        rawRuntimeErrorRecorded = $false
+    }
+    return $observation
+}
+
 function Get-WslInventory {
     $raw = (& wsl.exe --list --verbose 2>$null | Out-String) -replace "`0", ""
     $rows = @()
@@ -289,9 +327,16 @@ $uninstalled = $false
 $cleaned = $false
 $auditBefore = @(Get-AuditRecords)
 $protectedBefore = Get-ProtectedState
+function Save-ExecutionCheckpoint([string]$Stage) {
+    $receipt["stage"] = $Stage
+    $receipt["updatedAt"] = [DateTime]::UtcNow.ToString("O")
+    $receipt["counts"] = $counts
+    Write-AtomicJson $receiptPath $receipt
+}
 try {
     New-Item -ItemType Directory -Path $executionRoot | Out-Null
     $counts.installerFreshSilentNoShortcut++
+    Save-ExecutionCheckpoint "installer-attempted"
     Invoke-Checked $installerPath @("/S", "/NS", "/L=1033") "Universal isolated install"
     $installed = $true
     Wait-Until { (Test-Path -LiteralPath $applicationPath -PathType Leaf) -and (Test-Path -LiteralPath $uninstallerPath -PathType Leaf) } 30 "Universal application did not install."
@@ -302,6 +347,7 @@ try {
         [Environment]::SetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--remote-debugging-address=127.0.0.1 --remote-debugging-port=$CdpPort", "Process")
         [Environment]::SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", $webViewProfileRoot, "Process")
         $counts.appLaunch++
+        Save-ExecutionCheckpoint "app-launch-attempted"
         $app = Start-Process -FilePath $applicationPath -PassThru
     }
     finally {
@@ -311,11 +357,7 @@ try {
     Wait-Until { (Get-PortRecord $CdpPort).listenerCount -eq 1 } 45 "Installed app did not open loopback CDP."
     & node $nodeVerifier "--cdp-endpoint=http://127.0.0.1:$CdpPort" "--output=$observerPath" "--runtime-ready-timeout-ms=300000" "--oauth-timeout-ms=600000"
     if ($LASTEXITCODE -ne 0) { throw "Installed-app OAuth observer failed or stopped before authorization." }
-    $observation = Get-Content -LiteralPath $observerPath -Raw | ConvertFrom-Json
-    $counts.runtimeStart = [int]$observation.counts.runtimeStart
-    $counts.loginButton = [int]$observation.counts.loginButton
-    $counts.oauthTransaction = [int]$observation.counts.oauthTransaction
-    $counts.localLogout = [int]$observation.counts.localLogout
+    $observation = Import-ObserverCheckpoint $observerPath $counts $receipt
     if (-not $observation.passed -or -not $observation.callbackSessionObserved -or -not $observation.localLogoutObserved) { throw "OAuth observer did not prove callback session and local logout." }
 
     $auditAfter = @(Get-AuditRecords)
@@ -339,15 +381,20 @@ try {
         credentialsRecorded = $false
     }
 
-    if (-not $app.HasExited) { $app.CloseMainWindow() | Out-Null; Wait-Until { $app.HasExited } 15 "App did not close." }
+    if ($app.HasExited) { throw "App exited before the bounded close action." }
     $counts.appClose++
+    Save-ExecutionCheckpoint "app-close-attempted"
+    $app.CloseMainWindow() | Out-Null
+    Wait-Until { $app.HasExited } 15 "App did not close."
     $app.Dispose(); $app = $null
     $counts.isolatedUninstaller++
+    Save-ExecutionCheckpoint "uninstaller-attempted"
     Invoke-Checked $uninstallerPath @("/S", "_?=$installDirectory") "Universal isolated uninstall"
     $uninstalled = $true
     Wait-Until { -not (Test-Path -LiteralPath $installDirectory) } 30 "Universal install root remained after uninstall."
     if ((Test-Path -LiteralPath $productKey) -or (Test-Path -LiteralPath $webViewProfileRoot)) {
         $counts.ownedCleanup++
+        Save-ExecutionCheckpoint "owned-cleanup-attempted"
         if (Test-Path -LiteralPath $productKey) { Remove-Item -LiteralPath $productKey -Recurse -Force }
         if (Test-Path -LiteralPath $webViewProfileRoot) { Remove-Item -LiteralPath $webViewProfileRoot -Recurse -Force }
     }
@@ -377,15 +424,25 @@ catch {
     throw
 }
 finally {
+    try { $null = Import-ObserverCheckpoint $observerPath $counts $receipt }
+    catch { $receipt["observerCheckpointError"] = $_.Exception.Message }
     if ($null -ne $app) {
-        try { if (-not $app.HasExited) { $app.CloseMainWindow() | Out-Null; Wait-Until { $app.HasExited } 15 "App recovery close failed." }; $counts.appClose++ } catch { $receipt.appCloseRecoveryError = $_.Exception.Message }
+        try {
+            if (-not $app.HasExited -and $counts.appClose -eq 0) {
+                $counts.appClose++
+                Save-ExecutionCheckpoint "app-close-recovery-attempted"
+                $app.CloseMainWindow() | Out-Null
+                Wait-Until { $app.HasExited } 15 "App recovery close failed."
+            }
+        }
+        catch { $receipt.appCloseRecoveryError = $_.Exception.Message }
         $app.Dispose()
     }
     if ($installed -and -not $uninstalled -and (Test-Path -LiteralPath $uninstallerPath -PathType Leaf)) {
-        try { $counts.isolatedUninstaller++; Invoke-Checked $uninstallerPath @("/S", "_?=$installDirectory") "Universal failure recovery uninstall"; $uninstalled = $true } catch { $receipt.uninstallRecoveryError = $_.Exception.Message }
+        try { $counts.isolatedUninstaller++; Save-ExecutionCheckpoint "uninstaller-recovery-attempted"; Invoke-Checked $uninstallerPath @("/S", "_?=$installDirectory") "Universal failure recovery uninstall"; $uninstalled = $true } catch { $receipt.uninstallRecoveryError = $_.Exception.Message }
     }
     if (-not $cleaned -and ((Test-Path -LiteralPath $productKey) -or (Test-Path -LiteralPath $webViewProfileRoot))) {
-        try { $counts.ownedCleanup++; if (Test-Path -LiteralPath $productKey) { Remove-Item -LiteralPath $productKey -Recurse -Force }; if (Test-Path -LiteralPath $webViewProfileRoot) { Remove-Item -LiteralPath $webViewProfileRoot -Recurse -Force }; $cleaned = $true } catch { $receipt.ownedCleanupError = $_.Exception.Message }
+        try { $counts.ownedCleanup++; Save-ExecutionCheckpoint "owned-cleanup-recovery-attempted"; if (Test-Path -LiteralPath $productKey) { Remove-Item -LiteralPath $productKey -Recurse -Force }; if (Test-Path -LiteralPath $webViewProfileRoot) { Remove-Item -LiteralPath $webViewProfileRoot -Recurse -Force }; $cleaned = $true } catch { $receipt.ownedCleanupError = $_.Exception.Message }
     }
     $receipt.counts = $counts
     $receipt.protectedStateBefore = $protectedBefore
