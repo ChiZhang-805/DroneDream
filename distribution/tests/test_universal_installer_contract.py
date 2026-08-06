@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -86,6 +87,37 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     }
     assert profile["brand"]["presentationOnly"] is True  # type: ignore[index]
     assert profile["brand"]["grantsHardwareAuthority"] is False  # type: ignore[index]
+    shared_ui = profile["sharedUiContract"]
+    assert shared_ui["contractId"] == "dronedream-shared-edition-ui/v1"  # type: ignore[index]
+    assert shared_ui["donorCommit"] == (  # type: ignore[index]
+        "4933e214a57a048099d8f0bdd11c9748b620ac3e"
+    )
+    assert shared_ui["minimumDesktopViewport"] == {  # type: ignore[index]
+        "width": 390,
+        "height": 700,
+        "scalePercent": 100,
+    }
+    assert shared_ui["settingsDialogVerticalOverflowAllowed"] is False  # type: ignore[index]
+    assert shared_ui["activeSettingsPanelVerticalOverflowAllowed"] is False  # type: ignore[index]
+    assert shared_ui["presentationOnly"] is True  # type: ignore[index]
+    assert shared_ui["grantsHardwareAuthority"] is False  # type: ignore[index]
+    assert shared_ui["fieldLightweightEntryIntegrationStatus"] == (  # type: ignore[index]
+        "downstream-required-not-claimed"
+    )
+    visual = shared_ui["visualEvidence"]  # type: ignore[index]
+    assert visual["caseCount"] == 6
+    assert visual["locales"] == ["en", "zh-CN"]
+    assert visual["viewportWidths"] == [390, 760, 1440]
+    assert visual["coveredSettingsTabs"] == ["general", "memory", "model"]
+    assert visual["runtimePanelHeadedValidationStatus"] == (
+        "pending-exact-desktop-runtime-red-validation"
+    )
+    source_files = shared_ui["sourceFiles"]  # type: ignore[index]
+    assert len(source_files) == 7
+    for source_file in source_files:
+        path = ROOT / source_file["path"]
+        assert path.is_file()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == source_file["sha256"]
     authority = profile["capabilityAuthority"]
     assert authority["frontendCanAuthorize"] is False  # type: ignore[index]
     assert authority["validatedVehiclePackCount"] == 0  # type: ignore[index]
@@ -163,6 +195,14 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'desktop-universal-v1\\.0\\.0-build-',
         'publishedWithWebsiteFiles = $false',
         'payloadContractId = "dronedream-universal-engine-payload/v1"',
+        'dronedream-shared-edition-ui/v1',
+        'Invoke-GitText @("merge-base", "--is-ancestor"',
+        'Universal shared UI source binding drifted:',
+        'Universal shared UI visual evidence hash drifted.',
+        'dialogScrollHeight -gt $measurement.dialogClientHeight',
+        'panelScrollHeight -gt $measurement.panelClientHeight',
+        'runtimePanelHeadedValidationStatus',
+        'fieldLightweightEntryIntegrationStatus',
         'Multiple incompatible Universal Engine Pack manifests were produced.',
         "-AdditionalConfigPath $overlayPath",
         "-CargoTargetDir $cargoTargetFull",

@@ -28,6 +28,60 @@
     "presentationOnly": true,
     "grantsHardwareAuthority": false
   },
+  "sharedUiContract": {
+    "contractId": "dronedream-shared-edition-ui/v1",
+    "donorCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "sourceFiles": [
+      {
+        "path": "frontend/src/AppShell.tsx",
+        "sha256": "ea8201987fc3afd0a8c4afb22042060cc884d03b7a9d18c6442a0316279c4f69"
+      },
+      {
+        "path": "frontend/src/components/EditionSettingsSurface.tsx",
+        "sha256": "23f0c359b3c1e40d390b176a26a3e4ff75e54d62a6176c0debab7745848016e1"
+      },
+      {
+        "path": "frontend/src/components/DroneLaunchScene.tsx",
+        "sha256": "13e00b683d74dae93718cadc4a17573333417cdbfef6db1ee069cf4060c8d8a2"
+      },
+      {
+        "path": "frontend/src/features/distribution/universalMode.ts",
+        "sha256": "ba1ec0144c383f9b280876f35219c34d1a089da5628edcbef91e0e8f84670416"
+      },
+      {
+        "path": "frontend/src/styles.css",
+        "sha256": "5e437cf714bc74fc01a897ee623be86a25f97d6466a8289d4413d98f5e45b2ca"
+      },
+      {
+        "path": "frontend/src/theme/EditionThemeProvider.tsx",
+        "sha256": "d57296710283344d40ed941d38dd74d8bfd97f43adaaba0c3278ae593e86b4fe"
+      },
+      {
+        "path": "frontend/src/theme/editionTheme.ts",
+        "sha256": "581febad1997a4d7f0497d6c7df6cb0a203132da32953d8f6f0980c4fe8d866d"
+      }
+    ],
+    "visualEvidence": {
+      "path": "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json",
+      "sha256": "781fe965d09f8ad2a68d67462e4a113c37aeeb51b20147c3da6e80436a676ac4",
+      "subjectCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+      "caseCount": 6,
+      "locales": ["en", "zh-CN"],
+      "viewportWidths": [390, 760, 1440],
+      "coveredSettingsTabs": ["general", "memory", "model"],
+      "runtimePanelHeadedValidationStatus": "pending-exact-desktop-runtime-red-validation"
+    },
+    "minimumDesktopViewport": {
+      "width": 390,
+      "height": 700,
+      "scalePercent": 100
+    },
+    "settingsDialogVerticalOverflowAllowed": false,
+    "activeSettingsPanelVerticalOverflowAllowed": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "fieldLightweightEntryIntegrationStatus": "downstream-required-not-claimed"
+  },
   "workspaceModes": ["universal", "sim", "lab", "field"],
   "desktopContracts": {
     "coexistence": "distribution/desktop/edition-coexistence.v1.json",

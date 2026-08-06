@@ -75,6 +75,7 @@ $overlay = Get-Content -LiteralPath $overlayPath -Raw -Encoding UTF8 | ConvertFr
 $coexistence = Get-Content -LiteralPath $coexistencePath -Raw -Encoding UTF8 | ConvertFrom-Json
 $browserAuth = Get-Content -LiteralPath $browserAuthPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw -Encoding UTF8 | ConvertFrom-Json
+$sharedUi = $profile.sharedUiContract
 if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $overlay.productName -cne "DroneDream-Universal" -or
     $profile.enginePackProfile -cne "unified-sim-lab" -or
@@ -87,9 +88,60 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $profile.releaseGates.releaseReadyBeforeBothReceipts -ne $false -or
     $profile.brand.presentationOnly -ne $true -or
     $profile.brand.grantsHardwareAuthority -ne $false -or
+    $sharedUi.contractId -cne "dronedream-shared-edition-ui/v1" -or
+    $sharedUi.donorCommit -cnotmatch "^[0-9a-f]{40}$" -or
+    $sharedUi.visualEvidence.subjectCommit -cne $sharedUi.donorCommit -or
+    $sharedUi.visualEvidence.caseCount -ne 6 -or
+    $sharedUi.visualEvidence.runtimePanelHeadedValidationStatus -cne "pending-exact-desktop-runtime-red-validation" -or
+    $sharedUi.minimumDesktopViewport.width -ne 390 -or
+    $sharedUi.minimumDesktopViewport.height -ne 700 -or
+    $sharedUi.minimumDesktopViewport.scalePercent -ne 100 -or
+    $sharedUi.settingsDialogVerticalOverflowAllowed -ne $false -or
+    $sharedUi.activeSettingsPanelVerticalOverflowAllowed -ne $false -or
+    $sharedUi.presentationOnly -ne $true -or
+    $sharedUi.grantsHardwareAuthority -ne $false -or
+    $sharedUi.fieldLightweightEntryIntegrationStatus -cne "downstream-required-not-claimed" -or
     $profile.capabilityAuthority.frontendCanAuthorize -ne $false -or
     $profile.capabilityAuthority.hardwareActionDecision -cne "deny") {
     throw "Universal build identity or safety policy drifted."
+}
+Invoke-GitText @("merge-base", "--is-ancestor", [string]$sharedUi.donorCommit, $sourceCommit) | Out-Null
+$sharedUiSourceRefs = @()
+foreach ($expectedRef in @($sharedUi.sourceFiles)) {
+    if ($expectedRef.path -cnotmatch "^frontend/src/" -or
+        $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$") {
+        throw "Universal shared UI source binding is malformed."
+    }
+    $actualRef = New-RepoFileRef ([string]$expectedRef.path)
+    if ($actualRef.sha256 -cne [string]$expectedRef.sha256) {
+        throw "Universal shared UI source binding drifted: $($expectedRef.path)"
+    }
+    $sharedUiSourceRefs += $actualRef
+}
+if ($sharedUiSourceRefs.Count -ne 7) {
+    throw "Universal shared UI contract must bind exactly seven source files."
+}
+$sharedUiEvidenceRef = New-RepoFileRef ([string]$sharedUi.visualEvidence.path)
+if ($sharedUiEvidenceRef.sha256 -cne [string]$sharedUi.visualEvidence.sha256) {
+    throw "Universal shared UI visual evidence hash drifted."
+}
+$sharedUiEvidence = Get-Content -LiteralPath (Join-Path $repoRoot $sharedUiEvidenceRef.path) `
+    -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($sharedUiEvidence.subject_commit -cne [string]$sharedUi.donorCommit -or
+    $sharedUiEvidence.subject_dirty -ne $false -or
+    $sharedUiEvidence.status -cne "pass" -or
+    @($sharedUiEvidence.cases).Count -ne [int]$sharedUi.visualEvidence.caseCount -or
+    @($sharedUiEvidence.cases | Where-Object { $_.status -cne "pass" }).Count -ne 0) {
+    throw "Universal shared UI visual evidence is not an exact clean passing donor receipt."
+}
+foreach ($case in @($sharedUiEvidence.cases)) {
+    foreach ($measurement in @($case.settings.panelMeasurements)) {
+        if ($measurement.dialogScrollHeight -gt $measurement.dialogClientHeight -or
+            $measurement.panelScrollHeight -gt $measurement.panelClientHeight -or
+            $measurement.grantsHardwareAuthority -cne "false") {
+            throw "Universal shared UI visual evidence violates the no-overflow or authority contract."
+        }
+    }
 }
 $coexistenceMatches = @($coexistence.editions | Where-Object { $_.editionId -ceq "universal" })
 $browserAuthMatches = @($browserAuth.editions | Where-Object { $_.editionId -ceq "universal" })
@@ -155,6 +207,19 @@ if (-not $Build) {
             coexistence = New-RepoFileRef "distribution\desktop\edition-coexistence.v1.json"
             browserAuth = New-RepoFileRef "distribution\desktop\edition-browser-auth.v1.json"
             runtimeAndUpdaterFamilies = New-RepoFileRef "distribution\desktop\edition-runtime-update-families.v1.json"
+        }
+        sharedUi = [ordered]@{
+            contractId = [string]$sharedUi.contractId
+            donorCommit = [string]$sharedUi.donorCommit
+            sourceFiles = $sharedUiSourceRefs
+            visualEvidence = $sharedUiEvidenceRef
+            minimumDesktopViewport = $sharedUi.minimumDesktopViewport
+            settingsDialogVerticalOverflowAllowed = $false
+            activeSettingsPanelVerticalOverflowAllowed = $false
+            runtimePanelHeadedValidationStatus = [string]$sharedUi.visualEvidence.runtimePanelHeadedValidationStatus
+            fieldLightweightEntryIntegrationStatus = [string]$sharedUi.fieldLightweightEntryIntegrationStatus
+            presentationOnly = $true
+            grantsHardwareAuthority = $false
         }
         appAuthClientId = $expectedAppAuthClientId
         providerOAuthClientId = "external-registered-public-config-required"
@@ -339,6 +404,19 @@ $buildReceipt = [ordered]@{
     profile = New-RepoFileRef "distribution\build-profiles\universal-1.0.0.v1.json"
     overlay = New-RepoFileRef "desktop\src-tauri\tauri.universal.conf.json"
     brand = New-RepoFileRef "brand\brand-editions.v1.json"
+    sharedUi = [ordered]@{
+        contractId = [string]$sharedUi.contractId
+        donorCommit = [string]$sharedUi.donorCommit
+        sourceFiles = $sharedUiSourceRefs
+        visualEvidence = $sharedUiEvidenceRef
+        minimumDesktopViewport = $sharedUi.minimumDesktopViewport
+        settingsDialogVerticalOverflowAllowed = $false
+        activeSettingsPanelVerticalOverflowAllowed = $false
+        runtimePanelHeadedValidationStatus = [string]$sharedUi.visualEvidence.runtimePanelHeadedValidationStatus
+        fieldLightweightEntryIntegrationStatus = [string]$sharedUi.fieldLightweightEntryIntegrationStatus
+        presentationOnly = $true
+        grantsHardwareAuthority = $false
+    }
     desktopContracts = [ordered]@{
         coexistence = New-RepoFileRef "distribution\desktop\edition-coexistence.v1.json"
         browserAuth = New-RepoFileRef "distribution\desktop\edition-browser-auth.v1.json"
