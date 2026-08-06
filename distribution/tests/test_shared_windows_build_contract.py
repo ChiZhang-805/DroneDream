@@ -146,10 +146,12 @@ def test_generated_frontend_contract_is_parameterized_and_fail_closed(tmp_path: 
             if edition == "universal"
             else f"../../frontend/{edition}-dist"
         )
-        overlay.write_text(
-            json.dumps({"build": {"frontendDist": frontend_dist}}),
-            encoding="utf-8",
+        overlay_payload = (
+            {"productName": "DroneDream-Universal"}
+            if edition == "universal"
+            else {"build": {"frontendDist": frontend_dist}}
         )
+        overlay.write_text(json.dumps(overlay_payload), encoding="utf-8")
         command = textwrap.dedent(
             f"""
             $ErrorActionPreference = 'Stop'
