@@ -53,7 +53,7 @@ YELLOW_ATTEMPT_3_APPLICATION_PATH = (
     DISTRIBUTION
     / "sim"
     / "desktop"
-    / "yellow-build-attempt-3-b51fcd4-application.v1.json"
+    / "yellow-build-attempt-3-2bffcb0-application.v1.json"
 )
 
 
@@ -93,7 +93,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         source = application["sourceSeparation"]
         self.assertEqual(
             source["productSourceCommit"],
-            "b51fcd41d69b9019dee6cf23c39d4a5f7e6a5b47",
+            "2bffcb0d26d080107144441f1c356f45dc4320ec",
         )
         self.assertEqual(
             git("show", "-s", "--format=%T", source["productSourceCommit"]),
@@ -103,19 +103,19 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(
             application["authorization"]["yellowBuildExecutionAuthorizedByThisApplication"]
         )
-        self.assertFalse(
+        self.assertTrue(
             application["authorization"]["yellowBuildRequestSubmitted"]
         )
         self.assertTrue(application["pendingProductGate"]["exactDonorReceived"])
-        self.assertTrue(application["pendingProductGate"]["thisApplicationSuperseded"])
+        self.assertFalse(application["pendingProductGate"]["thisApplicationSuperseded"])
         self.assertEqual(
             application["state"],
-            "superseded-by-common-ui-theme-product-source",
+            "green-readiness-frozen-yellow-request-submitted",
         )
-        self.assertFalse(
+        self.assertTrue(
             application["pendingProductGate"]["currentSourceMayBeUsedForExeBuild"]
         )
-        self.assertFalse(
+        self.assertTrue(
             application["pendingProductGate"]["yellowRequestSubmissionAllowed"]
         )
         self.assertTrue(
