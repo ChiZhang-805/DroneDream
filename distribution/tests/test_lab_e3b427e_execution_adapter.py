@@ -26,6 +26,11 @@ SECOND_FAILURE_RECEIPT = (
     / "distribution/build-receipts/"
     "lab-e3b427e-red-segment-a2-failure.json"
 )
+SUCCESS_RECEIPT = (
+    ROOT
+    / "distribution/build-receipts/"
+    "lab-e3b427e-red-segment-a3-success.json"
+)
 
 
 def _load(path: Path) -> dict:
@@ -443,5 +448,119 @@ def test_second_red_attempt_is_frozen_at_provider_boundary_and_rolled_back() -> 
         "sameCommandMayBeRunAgain": False,
         "requiresOfflineDiagnosticPatchNewApplicationAndNewExactRedSignal": True,
     }
+    assert receipt["releaseReady"] is False
+    assert receipt["websiteHandoffReady"] is False
+
+
+def test_third_red_attempt_is_frozen_passed_redacted_and_rolled_back() -> None:
+    receipt = _load(SUCCESS_RECEIPT)
+
+    assert receipt["attemptId"] == "lab-e3b427e-segment-a-red3"
+    assert receipt["attemptOrdinal"] == 3
+    assert receipt["result"] == "segment-a-app-only-passed"
+    assert receipt["sourceSeparation"] == {
+        "artifactProductSourceCommit": (
+            "e3b427e9d1d6209495d629c399a1962913f2d00c"
+        ),
+        "executionEvidenceCommit": "aba53aa4470073bf1cc807e9e5b806a061c0d632",
+        "executionEvidenceIsArtifactSource": False,
+        "artifactInvalidatedByThisExecution": False,
+    }
+    assert receipt["artifact"]["bytes"] == 12081900
+    assert receipt["artifact"]["sha256BeforeAndAfter"] == (
+        "e0776b09a46b4e4223ec2bbecad89a48951d7a72edb918193d09e59d7dbe80e4"
+    )
+    assert receipt["artifact"]["authenticodeStatus"] == "NotSigned"
+    assert receipt["artifact"]["rebuiltRelabeledOverwrittenOrDeleted"] is False
+    assert receipt["authorization"] == {
+        "segment": "A",
+        "maximumInvocations": 1,
+        "actualInvocations": 1,
+        "automaticRetryMaximum": 0,
+        "automaticRetryActual": 0,
+        "commandContractSha256": (
+            "0b26fae910a07c22e85c85888d3764cb47d2ab2e7daff80e3e0f6c222a3d011c"
+        ),
+        "applicationSha256": (
+            "544afe7c5b51999d8a473e5643db5d671aacc4c8cd85d163d534c0b15b67c7fb"
+        ),
+        "planSha256": (
+            "e9b1f1a12d5ebb5fe311d9a88c34fc093da09bd72bd73c3c1aee167a9f1233c5"
+        ),
+        "targetReceiptSha256": (
+            "c16327e43f45c5b9e0b0dd89ebc224ccdfe0241bad23d36f9623527060f8339c"
+        ),
+    }
+
+    counts = receipt["exactCounts"]
+    assert counts == _load(APPLICATION)["segments"]["a"]["exactCounts"]
+    assert counts == _load(PLAN)["exactCounts"]
+    assert counts == _load(TARGET)["requiredExactCounts"]
+    for forbidden_count in (
+        "browserLaunches",
+        "oauthBoundaryChecks",
+        "providerTokenExchanges",
+        "accountReads",
+        "artifactBuilds",
+        "runtimeStartsOrMigrations",
+        "px4Starts",
+        "gazeboStarts",
+        "hardwareActions",
+        "uploadsOrDeployments",
+    ):
+        assert counts[forbidden_count] == 0
+
+    for phase in ("freshLiveWebView2", "overlayLiveWebView2"):
+        stage = receipt["stageResults"][phase]
+        assert stage["passed"] is True
+        assert stage["settingsSingleScreenNoVerticalScroll"] is True
+        assert stage["labThemeTokens"] == ["#A7E84A", "#20C77A", "#087E69"]
+        assert stage["labThemeAndThreeDResponsive"] is True
+        assert stage["presentationOnly"] is True
+        assert stage["grantsHardwareAuthority"] is False
+        assert stage["forbiddenAuthRequestCount"] == 0
+        assert stage["forbiddenProviderRequestCount"] == 0
+
+    diagnostics = receipt["requestDiagnostics"]
+    assert diagnostics["redactionContract"][
+        "rawUrlHostPathQueryHeadersCookieTokenApiKeyOrEmailPersisted"
+    ] is False
+    assert diagnostics["redactionContract"]["forbiddenPersistedKeyHits"] == []
+    assert diagnostics["fresh"]["deniedCount"] == 0
+    assert diagnostics["fresh"]["authSensitiveCount"] == 0
+    assert diagnostics["overlay"]["deniedCount"] == 0
+    assert diagnostics["overlay"]["authSensitiveCount"] == 0
+    assert set(diagnostics["fresh"]["hostClasses"]) == {
+        "tauri-app-origin",
+        "tauri-ipc-origin",
+    }
+    assert set(diagnostics["overlay"]["hostClasses"]) == {
+        "tauri-app-origin",
+        "tauri-ipc-origin",
+    }
+
+    assert receipt["protectedState"][
+        "baseUniversalSimFieldRuntimeAndWebView2Parity"
+    ] is True
+    assert receipt["protectedState"]["touched"] is False
+    assert all(
+        receipt["finalState"][key]
+        for key in (
+            "installRootAbsent",
+            "roamingAppDataAbsent",
+            "localAppDataAbsent",
+            "uninstallKeyAbsent",
+            "productKeyAbsent",
+            "desktopShortcutAbsent",
+            "startMenuShortcutAbsent",
+            "protectedStateByteEquivalent",
+        )
+    )
+    assert receipt["finalState"]["droneDreamProcessCount"] == 0
+    assert receipt["finalState"]["oauthPort49212ListenerCount"] == 0
+    assert receipt["oauthSegmentB"]["state"] == "fail-closed-not-executed"
+    assert receipt["oauthSegmentB"]["providerCalled"] is False
+    assert receipt["retry"]["sameCommandMayBeRunAgain"] is False
+    assert receipt["acceptance"]["segmentAReady"] is True
     assert receipt["releaseReady"] is False
     assert receipt["websiteHandoffReady"] is False
