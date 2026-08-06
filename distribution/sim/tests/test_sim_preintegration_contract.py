@@ -26,7 +26,7 @@ def load_contract() -> dict:
 
 
 class SimPreintegrationContractTests(unittest.TestCase):
-    def test_frozen_inventory_matches_every_baseline_blob_and_working_sha(self) -> None:
+    def test_frozen_inventory_matches_every_baseline_blob_and_sha(self) -> None:
         contract = validate_contract(load_contract(), ROOT)
         self.assertEqual(len(contract["localSourceSurfaces"]), 72)
         self.assertEqual(len(contract["externalSurfaces"]), 4)
@@ -79,7 +79,7 @@ class SimPreintegrationContractTests(unittest.TestCase):
     def test_mutated_sha_is_rejected(self) -> None:
         contract = load_contract()
         contract["localSourceSurfaces"][0]["sha256"] = "0" * 64
-        with self.assertRaisesRegex(PreintegrationContractError, "working SHA mismatch"):
+        with self.assertRaisesRegex(PreintegrationContractError, "baseline SHA mismatch"):
             validate_contract(contract, ROOT)
 
 

@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-canonical-large-label-adoption-receipt",
+  "receiptVersion": "1.1.0",
+  "editionId": "sim",
+  "state": "canonical-large-label-adopted-green-static",
+  "source": {
+    "donorBranch": "origin/codex/software",
+    "productDonorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "donorParentCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+    "evidenceCommit": "7482647f1c2fcb92f58aaef009efc99764792297",
+    "evidenceCommitIsProductSource": false,
+    "universalReceiptPath": "brand/receipts/canonical-large-label-donor-v1.json",
+    "universalReceiptSha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+    "brandContractPath": "brand/brand-editions.v1.json",
+    "brandContractSha256": "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33",
+    "brandManifestPath": "brand/generated/brand-assets.v1.json",
+    "brandManifestSha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471",
+    "commonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
+    "commonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8",
+    "commonCoreUpdated": false
+  },
+  "productAudit": {
+    "changedPathCount": 24,
+    "allowedPathPrefixes": [
+      "brand/",
+      "frontend/src/assets/brand/",
+      "scripts/build-brand-assets.py"
+    ],
+    "forbiddenPathPrefixes": [
+      "backend/",
+      "desktop/",
+      "distribution/",
+      "engine-pack/",
+      "runtime/",
+      "website/",
+      "worker/"
+    ],
+    "brandOnly": true,
+    "benchmarkBackendInstallerOrDeployPathsAdopted": false
+  },
+  "assetBinding": {
+    "role": "sim-large-label-lockup-primary",
+    "approvedSourcePath": "brand/source/approved/sim-large-label-lockup.png",
+    "donorMirrorPath": "frontend/src/assets/brand/sim-lockup-primary.png",
+    "editionPath": "frontend/src/editions/sim/assets/dronedream-sim-large-label-lockup.png",
+    "sha256": "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233",
+    "bytes": 122340,
+    "width": 2337,
+    "height": 218,
+    "displayName": "DroneDream \u00b7 SIM",
+    "separatorCodePoint": "U+00B7",
+    "editionLabelHeightRatio": 0.9,
+    "naturalEditionLabelWidth": true,
+    "exactByteIdentity": true,
+    "redrawnOrReencoded": false
+  },
+  "preservedAssets": {
+    "markPath": "frontend/src/editions/sim/assets/dronedream-sim-mark.png",
+    "markSha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
+    "windowsIcoPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+    "windowsIcoSha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+    "supersededSmallLabelPath": "frontend/src/editions/sim/assets/dronedream-sim-dot-lockup.png",
+    "supersededSmallLabelSha256": "8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548",
+    "supersededSmallLabelDeleted": false
+  },
+  "pathLimitedSync": {
+    "wholeCommitCherryPicked": false,
+    "donorPaths": ["frontend/src/assets/brand/sim-lockup-primary.png"],
+    "simAdapterPaths": [
+      "frontend/src/editions/sim/SimEditionExperience.tsx",
+      "frontend/src/__tests__/SimEditionExperience.test.tsx"
+    ],
+    "lockedEdition": "sim",
+    "editionRadioPresent": false,
+    "labOrFieldSwitchPresent": false,
+    "hardwareAuthorityGranted": false
+  },
+  "surfaceMappings": [
+    {"surface":"application-launcher","asset":"sim-large-label-lockup-primary","status":"source-wired"},
+    {"surface":"application-sidebar","asset":"sim-large-label-lockup-primary","status":"source-wired"},
+    {"surface":"sim-overview","asset":"sim-large-label-lockup-primary","status":"source-wired"},
+    {"surface":"installer-ui","asset":"sim-windows-ico","status":"unchanged-canonical-input-only"},
+    {"surface":"desktop-start-menu-taskbar","asset":"sim-windows-ico","status":"unchanged-canonical-input-only"},
+    {"surface":"login","asset":"sim-large-label-lockup-primary","status":"pending-universal-auth-donor"},
+    {"surface":"browser-callback","asset":"sim-large-label-lockup-primary","status":"pending-universal-auth-donor"},
+    {"surface":"website-edition-card","asset":"sim-large-label-lockup-primary","status":"pending-website-consumption"},
+    {"surface":"website-download-metadata","asset":"sim-windows-ico","status":"pending-exact-final-handoff"}
+  ],
+  "execution": {
+    "frontendBuildExecuted": false,
+    "browserStarted": false,
+    "installerBuilt": false,
+    "installerExecuted": false,
+    "runtimeStartedOrMigrated": false,
+    "px4OrGazeboStarted": false,
+    "deploymentExecuted": false,
+    "apiKeyRead": false,
+    "releaseAsset": false
+  },
+  "nonClaims": {
+    "coexistenceIntegrated": false,
+    "authenticationIsolationIntegrated": false,
+    "runtimeNamespaceIntegrated": false,
+    "updaterNamespaceIntegrated": false,
+    "lifecycleValidated": false,
+    "websiteHandoffReady": false,
+    "releaseReady": false
+  }
+}

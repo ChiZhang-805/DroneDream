@@ -9,7 +9,7 @@ import {
 import { Link, useLocation } from "react-router-dom";
 
 import { useI18n } from "../../i18n/I18nProvider";
-import simDotLockup from "./assets/dronedream-sim-dot-lockup.png";
+import simLockup from "./assets/dronedream-sim-large-label-lockup.png";
 import simMark from "./assets/dronedream-sim-mark.png";
 import { SIM_EDITION, simCopy } from "./profile";
 import "./sim.css";
@@ -19,7 +19,7 @@ export function SimBrandLockup({ className = "" }: { className?: string }) {
   return (
     <img
       className={classes}
-      src={simDotLockup}
+      src={simLockup}
       alt=""
       aria-hidden="true"
       data-brand-edition="sim"

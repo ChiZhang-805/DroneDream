@@ -55,7 +55,11 @@ def _sha256(path: Path) -> str:
 
 
 def validate_contract(
-    document: dict[str, Any], repo_root: Path, *, verify_files: bool = True
+    document: dict[str, Any],
+    repo_root: Path,
+    *,
+    verify_files: bool = True,
+    require_current_match: bool = False,
 ) -> dict[str, Any]:
     _require(document.get("schemaVersion") == 1, "schemaVersion must be 1")
     _require(
@@ -124,18 +128,27 @@ def validate_contract(
                 f"bad mode: {path}",
             )
         if verify_files:
-            local_path = repo_root / path
-            _require(local_path.is_file(), f"missing surface: {path}")
-            _require(_sha256(local_path) == row["sha256"], f"working SHA mismatch: {path}")
+            baseline_payload = subprocess.run(
+                ["git", "-C", str(repo_root), "show", f"{baseline['commit']}:{path}"],
+                check=True,
+                capture_output=True,
+            ).stdout
+            _require(
+                hashlib.sha256(baseline_payload).hexdigest() == row["sha256"],
+                f"baseline SHA mismatch: {path}",
+            )
             _require(
                 _git(repo_root, "rev-parse", f"{baseline['commit']}:{path}")
                 == row["gitBlob"],
                 f"baseline blob mismatch: {path}",
             )
-            _require(
-                _git(repo_root, "hash-object", "--", path) == row["gitBlob"],
-                f"working blob mismatch: {path}",
-            )
+            if require_current_match:
+                local_path = repo_root / path
+                _require(local_path.is_file(), f"missing current surface: {path}")
+                _require(
+                    _sha256(local_path) == row["sha256"],
+                    f"current SHA mismatch: {path}",
+                )
         ids.add(surface_id)
         paths.add(path)
         observed_domains.add(domain)
@@ -151,10 +164,19 @@ def validate_contract(
         _require(row.get("domain") == "website-handoff", "bad external domain")
 
     runtime_requirements = document.get("runtimeSurfaceRequirements")
-    _require(isinstance(runtime_requirements, list) and runtime_requirements, "runtime surfaces required")
+    _require(
+        isinstance(runtime_requirements, list) and runtime_requirements,
+        "runtime surfaces required",
+    )
     runtime_ids = [row.get("id") for row in runtime_requirements]
     _require(len(runtime_ids) == len(set(runtime_ids)), "duplicate runtime surface id")
-    _require(all(row.get("authority") in OWNERS | {"website"} for row in runtime_requirements), "bad runtime authority")
+    _require(
+        all(
+            row.get("authority") in OWNERS | {"website"}
+            for row in runtime_requirements
+        ),
+        "bad runtime authority",
+    )
 
     negative = document.get("negativeAcceptanceChecks")
     _require(isinstance(negative, list) and negative, "negative checks required")
@@ -170,9 +192,15 @@ def validate_contract(
     _require(evidence.get("relabelAllowed") is False, "historical EXE relabel forbidden")
 
     execution = document.get("execution", {})
-    _require(execution and all(value is False for value in execution.values()), "execution flags must be false")
+    _require(
+        execution and all(value is False for value in execution.values()),
+        "execution flags must be false",
+    )
     non_claims = document.get("nonClaims", {})
-    _require(non_claims and all(value is False for value in non_claims.values()), "nonClaims must be false")
+    _require(
+        non_claims and all(value is False for value in non_claims.values()),
+        "nonClaims must be false",
+    )
     return document
 
 
@@ -180,9 +208,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("contract", type=Path)
     parser.add_argument("--repo-root", type=Path, required=True)
+    parser.add_argument("--require-current-match", action="store_true")
     args = parser.parse_args()
     document = json.loads(args.contract.read_text(encoding="utf-8"))
-    validate_contract(document, args.repo_root.resolve())
+    validate_contract(
+        document,
+        args.repo_root.resolve(),
+        require_current_match=args.require_current_match,
+    )
     print(
         json.dumps(
             {

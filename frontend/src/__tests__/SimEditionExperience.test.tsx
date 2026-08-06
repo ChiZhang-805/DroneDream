@@ -29,7 +29,7 @@ describe("DroneDream Sim experience", () => {
       .toBeInTheDocument();
     const lockup = container.querySelector(".sim-overview-lockup");
     const mark = container.querySelector(".sim-brand-mark");
-    expect(lockup?.getAttribute("src")).toContain("dronedream-sim-dot-lockup.png");
+    expect(lockup?.getAttribute("src")).toContain("dronedream-sim-large-label-lockup.png");
     expect(lockup).toHaveAttribute("aria-hidden", "true");
     expect(lockup).toHaveAttribute("data-brand-edition", "sim");
     expect(container.querySelector(".sim-overview-page"))
