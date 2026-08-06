@@ -93,7 +93,7 @@ _DESCRIPTORS = (
         "hebo/v1",
         "traditional",
         "contract_only",
-        "hebo-0.3.6-sequential-scalar-contract",
+        "hebo-0.3.6-isolated-stdio-adapter-contract",
         "standard_reference",
     ),
     BenchmarkAdapterDescriptor(

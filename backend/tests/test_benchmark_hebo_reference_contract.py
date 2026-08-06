@@ -250,11 +250,11 @@ def test_schema_or_binding_tamper_fails_closed() -> None:
 def test_inventory_is_now_source_and_license_bound_but_execution_stays_blocked() -> None:
     inventory = BENCHMARK_METHOD_INVENTORY["hebo/v1"]
     assert inventory.execution_readiness == "blocked"
-    assert inventory.implementation_label == "hebo-0.3.6-sequential-scalar-contract"
+    assert inventory.implementation_label == "hebo-0.3.6-isolated-stdio-adapter-contract"
     assert inventory.blocker_codes == (
-        "adapter_not_implemented",
         "compatibility_unverified",
         "isolated_environment_missing",
+        "isolated_runner_not_bound",
     )
     assert "license_unverified" not in inventory.blocker_codes
     assert "source_archive_hash_pending" not in inventory.blocker_codes

@@ -97,12 +97,15 @@ def test_external_references_are_pinned_candidates_but_fail_closed_until_locked(
         require_execution_ready_method(adapter_id)
 
 
-def test_hebo_cannot_execute_until_isolated_compatibility_and_adapter_are_verified() -> None:
+def test_hebo_cannot_execute_until_isolated_runner_and_compatibility_are_verified() -> None:
     entry = BENCHMARK_METHOD_INVENTORY["hebo/v1"]
     assert entry.execution_readiness == "blocked"
-    assert "adapter_not_implemented" in entry.blocker_codes
-    assert "compatibility_unverified" in entry.blocker_codes
-    assert "isolated_environment_missing" in entry.blocker_codes
+    assert entry.blocker_codes == (
+        "compatibility_unverified",
+        "isolated_environment_missing",
+        "isolated_runner_not_bound",
+    )
+    assert "adapter_not_implemented" not in entry.blocker_codes
     assert "license_unverified" not in entry.blocker_codes
     assert "version_unresolved" not in entry.blocker_codes
     assert "source_archive_hash_pending" not in entry.blocker_codes

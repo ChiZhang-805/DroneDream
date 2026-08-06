@@ -186,9 +186,9 @@ class HeboPreparedContractV1(_StrictFrozen):
         "HEBO.observe",
     )
     blocker_codes: tuple[
-        Literal["isolated-environment-missing", "ask-observe-adapter-missing"],
-        Literal["isolated-environment-missing", "ask-observe-adapter-missing"],
-    ] = ("isolated-environment-missing", "ask-observe-adapter-missing")
+        Literal["isolated-environment-missing", "runner-compatibility-unverified"],
+        Literal["isolated-environment-missing", "runner-compatibility-unverified"],
+    ] = ("isolated-environment-missing", "runner-compatibility-unverified")
     binding_sha256: Sha256Hex
 
     @model_validator(mode="after")
@@ -341,7 +341,10 @@ def prepare_hebo_contract(observation: BenchmarkObservationV2) -> HeboPreparedCo
             "HEBO.suggest",
             "HEBO.observe",
         ),
-        "blocker_codes": ("isolated-environment-missing", "ask-observe-adapter-missing"),
+        "blocker_codes": (
+            "isolated-environment-missing",
+            "runner-compatibility-unverified",
+        ),
     }
     return HeboPreparedContractV1.model_validate(
         {**payload, "binding_sha256": canonical_sha256(payload)}

@@ -33,6 +33,7 @@ BlockerCode = Literal[
     "adapter_not_implemented",
     "compatibility_unverified",
     "isolated_environment_missing",
+    "isolated_runner_not_bound",
     "license_unverified",
     "provider_contract_pending",
     "source_archive_hash_pending",
@@ -442,7 +443,7 @@ _ENTRIES = (
     BenchmarkMethodInventoryEntryV1(
         adapter_id="hebo/v1",
         method_classification="standard_reference",
-        implementation_label="hebo-0.3.6-sequential-scalar-contract",
+        implementation_label="hebo-0.3.6-isolated-stdio-adapter-contract",
         execution_readiness="blocked",
         environment_boundary="isolated_benchmark",
         sources=(
@@ -466,15 +467,19 @@ _ENTRIES = (
             ),
         ),
         blocker_codes=(
-            "adapter_not_implemented",
             "compatibility_unverified",
             "isolated_environment_missing",
+            "isolated_runner_not_bound",
         ),
         reproducibility_notes=(
             "The exact PyPI wheel contains HEBO-0.3.6.dist-info/LICENSE under MIT.",
             "HEBO 0.3.6 requires numpy<1.25 and pymoo==0.6.0 in an isolated environment.",
             "Core HEBO has no native constraint model; only real feasible losses may be observed.",
             "Unsafe and failed work stays in accounting and never receives a fabricated loss.",
+            (
+                "The reviewed JSON-stdio adapter remains blocked until an exact "
+                "isolated runner is bound."
+            ),
         ),
     ),
     _ready_project(
