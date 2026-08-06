@@ -14,6 +14,31 @@ function Assert-Contract {
     }
 }
 
+function Test-ExactSequence {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object[]]$Expected,
+
+        [Parameter(Mandatory = $true)]
+        [object[]]$Actual
+    )
+
+    $differences = @(
+        Compare-Object `
+            -ReferenceObject $Expected `
+            -DifferenceObject $Actual `
+            -SyncWindow 0
+    )
+    return $differences.Count -eq 0
+}
+
+Assert-Contract (
+    Test-ExactSequence -Expected @("alpha", "beta") -Actual @("alpha", "beta")
+) "an empty sequence difference must pass under StrictMode"
+Assert-Contract (-not (
+    Test-ExactSequence -Expected @("alpha", "beta") -Actual @("alpha", "gamma")
+)) "a real sequence difference must fail closed"
+
 $helperPath = Join-Path $PSScriptRoot "invoke-tauri-updater-signer.ps1"
 $buildScriptPath = Join-Path $PSScriptRoot "build-windows-llvm.ps1"
 $helperText = Get-Content -LiteralPath $helperPath -Raw
@@ -146,7 +171,9 @@ process.exit(Number(process.env.DRONEDREAM_SIGNER_EXIT_CODE));
         $fakeInstaller
     )
     Assert-Contract (
-        (Compare-Object $expectedEmptyArguments @($emptyPasswordRecord.arguments) -SyncWindow 0).Count -eq 0
+        Test-ExactSequence `
+            -Expected $expectedEmptyArguments `
+            -Actual @($emptyPasswordRecord.arguments)
     ) "empty-password argv must be exact and ordered"
     Assert-Contract (-not $emptyPasswordRecord.password_present) "the empty-password case must not invent an environment secret"
 
@@ -172,7 +199,9 @@ process.exit(Number(process.env.DRONEDREAM_SIGNER_EXIT_CODE));
         $fakeInstaller
     )
     Assert-Contract (
-        (Compare-Object $expectedNonEmptyArguments @($nonEmptyRecord.arguments) -SyncWindow 0).Count -eq 0
+        Test-ExactSequence `
+            -Expected $expectedNonEmptyArguments `
+            -Actual @($nonEmptyRecord.arguments)
     ) "non-empty passwords must stay out of argv"
     Assert-Contract $nonEmptyRecord.password_present "the non-empty password must remain available to the child environment"
     Assert-Contract (
