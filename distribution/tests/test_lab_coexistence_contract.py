@@ -37,11 +37,19 @@ class LabCoexistenceContractTests(unittest.TestCase):
         contract = coexistence._load_json(coexistence.CONTRACT_PATH)
         self.assertEqual(
             contract["brandContinuity"]["dotLockupState"],
-            "superseded-awaiting-exact-large-suffix-donor",
+            "canonical-large-label-donor-consumed",
         )
         self.assertEqual(
             contract["brandContinuity"]["approvedEditionSuffixCapHeightRatio"],
             0.9,
+        )
+        self.assertTrue(
+            contract["brandContinuity"]["preserveNaturalEditionLabelWidth"]
+        )
+        self.assertFalse(
+            contract["brandContinuity"]["canonicalDonor"][
+                "evidenceCommitIsProductSource"
+            ]
         )
 
     def test_rejects_product_and_app_identity_collision(self) -> None:
@@ -139,6 +147,16 @@ class LabCoexistenceContractTests(unittest.TestCase):
         donor["labRecovery"]["rebuildAuthorizedByThisRequest"] = True
         inputs[1] = donor
         with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "authorizes"):
+            coexistence.validate_contract(*inputs)
+
+    def test_rejects_brand_evidence_head_as_product_source(self) -> None:
+        inputs = list(load_inputs())
+        contract = copy.deepcopy(inputs[0])
+        contract["brandContinuity"]["canonicalDonor"]["productCommit"] = (
+            "7482647f1c2fcb92f58aaef009efc99764792297"
+        )
+        inputs[0] = contract
+        with self.assertRaisesRegex(coexistence.LabCoexistenceContractError, "brand donor"):
             coexistence.validate_contract(*inputs)
 
     def test_contract_files_are_utf8_json_with_u00b7_name(self) -> None:

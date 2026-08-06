@@ -8,7 +8,7 @@
     "labBranch": "codex/software-lab",
     "labCommit": "a62111eee2b7dc5d64475b9ac207bb599fe13669",
     "universalBranch": "codex/software",
-    "universalObservedCommit": "b099ed00923e9f2b833f812ad79f1614529038de",
+    "universalObservedCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "simObservedCommit": "c8630332cdad1c1a94155d13d1981c83bdec0d1c",
     "fieldObservedCommit": "452eed9c7b018d97beec3cd3d61ee182b6e67330"
@@ -75,7 +75,7 @@
       "enginePackEditionProfile": "unified-sim-lab",
       "canonicalWindowsIcon": "brand/generated/lab/windows/icon.ico",
       "canonicalMarkSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
-      "canonicalDotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+      "canonicalDotLockupSha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
     },
     {
       "editionId": "field",
@@ -103,11 +103,20 @@
     "separatorCodePoint": "U+00B7",
     "markPath": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
     "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
-    "dotLockupPath": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
-    "dotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
-    "dotLockupState": "superseded-awaiting-exact-large-suffix-donor",
+    "dotLockupPath": "brand/generated/lab/lockup-compact.png",
+    "dotLockupSha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+    "dotLockupState": "canonical-large-label-donor-consumed",
+    "canonicalDonor": {
+      "productCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+      "productParentCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+      "evidenceCommit": "7482647f1c2fcb92f58aaef009efc99764792297",
+      "receiptPath": "brand/receipts/canonical-large-label-donor-v1.json",
+      "receiptSha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+      "evidenceCommitIsProductSource": false
+    },
     "approvedEditionSuffixCapHeightRatio": 0.9,
-    "futureReleaseMustUsePendingDonor": true,
+    "preserveNaturalEditionLabelWidth": true,
+    "futureReleaseMustUsePendingDonor": false,
     "windowsIconPath": "brand/generated/lab/windows/icon.ico",
     "tokens": {
       "gradient": ["#A7E84A", "#20C77A", "#087E69"],
@@ -177,7 +186,7 @@
     "Universal and Sim currently resolve the same latest.json updater manifest; Sim needs an edition-owned endpoint before four-Edition update isolation is accepted.",
     "Universal has not delivered the exact edition-aware authentication donor required by this contract.",
     "The exact Universal existing-install/quiesce donor b099ed0 is forward-synced, but rebuilt Lab bytes and same-version /UPDATE acceptance remain gated.",
-    "The approved large LAB suffix has no exact Universal canonical donor commit, manifest, or hash yet; the current dot lockup is superseded for future release bytes.",
+    "The exact large LAB suffix brand donor b8e0d0c is forward-synced, but the frozen Lab EXE predates it and future release bytes require a new gated build.",
     "Universal edition-safety allow-fixture tests pin the Universal Lab manifest hash and need a canonical parameterized fixture before the branded Lab manifest can pass the test-only allow path.",
     "The frozen Lab EXE predates this contract and remains an exact unsigned non-release artifact."
   ],

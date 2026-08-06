@@ -103,7 +103,7 @@ const tauriOverlay = JSON.parse(await readFile(tauriOverlayPath, "utf8"));
 assert.equal(brandManifest.displayName, "DroneDream · LAB");
 assert.equal(
   brandManifest.sourceAuthority.donorCommit,
-  "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+  "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
 );
 assert.deepEqual(brandManifest.theme.palette, ["#A7E84A", "#20C77A", "#087E69"]);
 assert.equal(brandManifest.theme.grantsHardwareAuthority, false);
@@ -165,7 +165,7 @@ try {
       naturalWidth: image instanceof HTMLImageElement ? image.naturalWidth : 0,
       naturalHeight: image instanceof HTMLImageElement ? image.naturalHeight : 0,
     }));
-    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 1840, naturalHeight: 340 });
+    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 2386, naturalHeight: 218 });
     assert((await page.getByText("DroneDream · LAB", { exact: false }).count()) > 0);
     const palette = await page.locator(".lab-page").evaluate((element) => {
       const style = getComputedStyle(element);

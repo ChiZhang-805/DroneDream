@@ -192,7 +192,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         not isinstance(brand, dict)
         or brand.get("displayName") != "DroneDream · LAB"
         or brand.get("canonicalDonorCommit")
-        != "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235"
+        != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
         or brand.get("canonicalDonorManifest") != "brand/brand-editions.v1.json"
         or brand.get("labSourceManifest")
         != "distribution/editions/lab/brand-source-manifest.v1.json"
@@ -383,7 +383,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "../../distribution/editions/lab/coexistence-and-auth.v1.json",
         "../../distribution/editions/lab/universal-donor-requests.v1.json",
         "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
-        "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+        "../../brand/generated/lab/lockup-compact.png",
         "../../brand/brand-editions.v1.json",
         "../../brand/generated/brand-assets.v1.json",
         "../../brand/generated/brand-visual-receipt.v1.json",

@@ -5,7 +5,8 @@
   "requestingEdition": "lab",
   "authority": {
     "branch": "codex/software",
-    "observedHead": "b099ed00923e9f2b833f812ad79f1614529038de",
+    "observedHead": "7482647f1c2fcb92f58aaef009efc99764792297",
+    "observedProductSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "labMayCarrySharedFixLongTerm": false,
     "integrationRule": "review exact donor ancestry and diff, then forward-sync the canonical change without hand-copying or blindly cherry-picking"
@@ -81,16 +82,57 @@
     {
       "requestId": "universal-large-edition-lockup-brand-v1",
       "ownership": "Universal/Core",
-      "state": "awaiting-exact-donor",
+      "state": "delivered-exact-donor-forward-synced",
+      "exactDonor": {
+        "commit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+        "parent": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+        "integration": "audited-authorized-brand-only-cherry-pick",
+        "changedPaths": [
+          "brand/README.md",
+          "brand/brand-editions.schema.json",
+          "brand/brand-editions.v1.json",
+          "brand/generated/brand-assets.v1.json",
+          "brand/generated/brand-visual-receipt.v1.json",
+          "brand/generated/edition-brand-preview.png",
+          "brand/generated/field/lockup-compact.png",
+          "brand/generated/field/lockup-primary.png",
+          "brand/generated/lab/lockup-compact.png",
+          "brand/generated/lab/lockup-primary.png",
+          "brand/generated/sim/lockup-compact.png",
+          "brand/generated/sim/lockup-primary.png",
+          "brand/source/approved/edition-brand-large-label-approved-preview.png",
+          "brand/source/approved/field-large-label-lockup.png",
+          "brand/source/approved/lab-large-label-lockup.png",
+          "brand/source/approved/sim-large-label-lockup.png",
+          "brand/tests/test_brand_assets.py",
+          "frontend/src/assets/brand/field-lockup-compact.png",
+          "frontend/src/assets/brand/field-lockup-primary.png",
+          "frontend/src/assets/brand/lab-lockup-compact.png",
+          "frontend/src/assets/brand/lab-lockup-primary.png",
+          "frontend/src/assets/brand/sim-lockup-compact.png",
+          "frontend/src/assets/brand/sim-lockup-primary.png",
+          "scripts/build-brand-assets.py"
+        ]
+      },
       "evidence": {
         "approvedDisplayName": "DroneDream · LAB",
         "separatorCodePoint": "U+00B7",
         "approvedEditionSuffixCapHeightRatio": 0.9,
-        "currentDotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
-        "currentDotLockupState": "superseded-for-future-release",
+        "canonicalDotLockupPath": "brand/source/approved/lab-large-label-lockup.png",
+        "canonicalDotLockupBytes": 128948,
+        "canonicalDotLockupDimensions": [2386, 218],
+        "canonicalDotLockupSha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+        "preserveNaturalEditionLabelWidth": true,
+        "supersededDotLockupSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
         "markAndIconRemainCanonical": true,
         "labPaletteRemainsCanonical": true,
-        "universalStylesContractFailure": "edition-brand.generated.css defines the tokens, but stylesContract.test.ts scans styles.css alone"
+        "receipt": {
+          "commit": "7482647f1c2fcb92f58aaef009efc99764792297",
+          "path": "brand/receipts/canonical-large-label-donor-v1.json",
+          "bytes": 3367,
+          "sha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+          "isProductSource": false
+        }
       },
       "candidatePaths": [
         "brand/brand-editions.v1.json",
@@ -98,6 +140,7 @@
         "brand/generated/brand-visual-receipt.v1.json",
         "brand/generated/lab/lockup-primary.png",
         "brand/generated/lab/lockup-compact.png",
+        "brand/source/approved/lab-large-label-lockup.png",
         "frontend/src/brand/edition-brand.generated.css",
         "frontend/src/__tests__/stylesContract.test.ts"
       ],
@@ -134,7 +177,7 @@
     }
   ],
   "labRecovery": {
-    "nextStep": "validate the synced NSIS donor offline, then wait for exact Universal auth and large-suffix brand donors before requesting a new gated Lab build",
+    "nextStep": "keep the exact brand and NSIS donors frozen, then wait for exact Universal auth, runtime, updater, and edition-safety fixture donors before requesting a new gated Lab build",
     "rebuildAuthorizedByThisRequest": false,
     "installAuthorizedByThisRequest": false,
     "frozenArtifactMayBecomeFinalWithoutRebuild": false

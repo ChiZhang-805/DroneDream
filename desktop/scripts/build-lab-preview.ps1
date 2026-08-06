@@ -200,7 +200,7 @@ $receipt = [ordered]@{
         canonicalDonor = New-RepoFileRef "brand\brand-editions.v1.json"
         sourceManifest = New-RepoFileRef "distribution\editions\lab\brand-source-manifest.v1.json"
         mark = New-RepoFileRef "distribution\editions\lab\assets\dronedream-lab-mark-v2.png"
-        dotLockup = New-RepoFileRef "distribution\editions\lab\assets\dronedream-lab-dot-lockup-v2.png"
+        dotLockup = New-RepoFileRef "brand\generated\lab\lockup-compact.png"
         installerIcon = New-RepoFileRef "brand\generated\lab\windows\icon.ico"
         grantsHardwareAuthority = $false
     }

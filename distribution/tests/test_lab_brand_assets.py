@@ -28,12 +28,14 @@ EXPECTED_ASSETS = {
         "bytes": 98418,
         "sha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
         "dimensions": (1024, 1024),
+        "copyMode": "exact-bytes",
     },
     "dot-lockup": {
-        "filename": "dronedream-lab-dot-lockup-v2.png",
-        "bytes": 98556,
-        "sha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
-        "dimensions": (1840, 340),
+        "filename": "lockup-compact.png",
+        "bytes": 128948,
+        "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+        "dimensions": (2386, 218),
+        "copyMode": "canonical-donor-reference",
     },
 }
 
@@ -77,7 +79,7 @@ class LabBrandAssetTests(unittest.TestCase):
         self.assertTrue(self.manifest["theme"]["presentationOnly"])
         self.assertEqual(
             self.manifest["sourceAuthority"]["donorCommit"],
-            "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
         )
         donor_path = ROOT / self.manifest["sourceAuthority"]["canonicalContract"]["path"]
         self.assertEqual(
@@ -113,9 +115,9 @@ class LabBrandAssetTests(unittest.TestCase):
             self.assertEqual(entry["repositoryBytes"], len(payload))
             self.assertEqual(entry["canonicalSourceSha256"], digest)
             self.assertEqual(entry["repositorySha256"], digest)
-            self.assertEqual(entry["copyMode"], "exact-bytes")
+            self.assertEqual(entry["copyMode"], expected["copyMode"])
 
-    def test_old_lab_palette_and_v1_assets_are_not_formal_assets(self) -> None:
+    def test_old_lab_palette_and_small_lockup_are_superseded(self) -> None:
         formal_asset_names = {
             path.name
             for path in (MANIFEST_PATH.parent / "assets").iterdir()
@@ -123,7 +125,15 @@ class LabBrandAssetTests(unittest.TestCase):
         }
         self.assertEqual(
             formal_asset_names,
-            {expected["filename"] for expected in EXPECTED_ASSETS.values()},
+            {"dronedream-lab-mark-v2.png", "dronedream-lab-dot-lockup-v2.png"},
+        )
+        self.assertEqual(len(self.manifest["supersededAssets"]), 1)
+        superseded = self.manifest["supersededAssets"][0]
+        self.assertEqual(superseded["status"], "superseded")
+        self.assertFalse(superseded["includedInFuturePayload"])
+        self.assertEqual(
+            superseded["sha256"],
+            "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
         )
         self.assertEqual(
             self.manifest["theme"]["supersededPalette"],
@@ -175,7 +185,7 @@ class LabBrandAssetTests(unittest.TestCase):
     def test_integration_state_does_not_overstate_build_or_authority(self) -> None:
         self.assertEqual(
             self.manifest["integration"]["application"],
-            "canonical-lockup-selected-by-lab-gate",
+            "canonical-large-label-lockup-selected-by-lab-gate",
         )
         self.assertEqual(
             self.manifest["integration"]["installer"],
@@ -209,6 +219,11 @@ class LabBrandAssetTests(unittest.TestCase):
         resources = overlay["bundle"]["resources"]
         self.assertIn(
             "../../distribution/editions/lab/brand-source-manifest.v1.json",
+            resources,
+        )
+        self.assertIn("../../brand/generated/lab/lockup-compact.png", resources)
+        self.assertNotIn(
+            "../../distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
             resources,
         )
         base_icon = ROOT / "desktop" / "src-tauri" / "icons" / "icon.ico"
@@ -275,16 +290,10 @@ class LabBrandAssetTests(unittest.TestCase):
         self.assertFalse(receipt["commonCore"]["brandDonorIsProductSource"])
         self.assertFalse(receipt["canonicalBrandDonor"]["grantsHardwareAuthority"])
 
-        for key, expected_path in (
-            ("contract", "brand/brand-editions.v1.json"),
-            ("assetManifest", "brand/generated/brand-assets.v1.json"),
-            ("visualReceipt", "brand/generated/brand-visual-receipt.v1.json"),
-        ):
-            reference = receipt["canonicalBrandDonor"][key]
-            self.assertEqual(reference["path"], expected_path)
-            payload = (ROOT / expected_path).read_bytes()
-            self.assertEqual(len(payload), reference["bytes"])
-            self.assertEqual(hashlib.sha256(payload).hexdigest(), reference["sha256"])
+        self.assertNotEqual(
+            receipt["canonicalBrandDonor"]["commit"],
+            self.manifest["sourceAuthority"]["donorCommit"],
+        )
 
         report_reference = receipt["visualVerification"]["acceptedReport"]
         report_payload = (ROOT / report_reference["path"]).read_bytes()

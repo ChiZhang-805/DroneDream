@@ -40,7 +40,7 @@ SUPABASE_DESKTOP_VERIFIER_PATH = ROOT / "desktop/scripts/verify-browser-auth-con
 
 COMMON_CORE_PRODUCT_SOURCE_COMMIT = artifact_verifier.COMMON_CORE_PRODUCT_SOURCE_COMMIT
 EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT = artifact_verifier.EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT
-CANONICAL_BRAND_DONOR_COMMIT = "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235"
+CANONICAL_BRAND_DONOR_COMMIT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
 COMMON_CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
 HARDWARE_ACTIONS = (
     "hardware.parameter.write",
@@ -261,9 +261,29 @@ def _brand_state() -> dict[str, Any]:
     theme = manifest.get("theme")
     source_authority = manifest.get("sourceAuthority")
     merge_head = _git("rev-parse", "--verify", "MERGE_HEAD", check=False)
-    donor_is_integrated = _git_success(
+    donor_is_ancestor = _git_success(
         "merge-base", "--is-ancestor", CANONICAL_BRAND_DONOR_COMMIT, "HEAD"
     ) or merge_head == CANONICAL_BRAND_DONOR_COMMIT
+    donor_paths = tuple(
+        path
+        for path in _git(
+            "diff-tree",
+            "--no-commit-id",
+            "--name-only",
+            "-r",
+            CANONICAL_BRAND_DONOR_COMMIT,
+        ).splitlines()
+        if path
+    )
+    donor_paths_match = bool(donor_paths) and _git_success(
+        "diff",
+        "--quiet",
+        CANONICAL_BRAND_DONOR_COMMIT,
+        "HEAD",
+        "--",
+        *donor_paths,
+    )
+    donor_is_integrated = donor_is_ancestor or donor_paths_match
     ready = (
         manifest.get("displayName") == "DroneDream · LAB"
         and isinstance(source_authority, dict)
@@ -273,6 +293,8 @@ def _brand_state() -> dict[str, Any]:
         and donor.get("editions", {}).get("lab", {}).get("productName")
         == "DroneDream · LAB"
         and donor.get("safety", {}).get("grantsHardwareAuthority") is False
+        and donor.get("approval", {}).get("editionLabelHeightRatio") == 0.9
+        and donor.get("approval", {}).get("preserveNaturalLabelWidth") is True
         and donor_is_integrated
         and isinstance(theme, dict)
         and theme.get("palette") == ["#A7E84A", "#20C77A", "#087E69"]
@@ -281,7 +303,8 @@ def _brand_state() -> dict[str, Any]:
         and overlay.get("productName") == "DroneDream · LAB"
         and overlay.get("bundle", {}).get("icon") == expected_icons
         and isinstance(integration, dict)
-        and integration.get("application") == "canonical-lockup-selected-by-lab-gate"
+        and integration.get("application")
+        == "canonical-large-label-lockup-selected-by-lab-gate"
         and integration.get("installer") == "canonical-lab-icon-bound-in-overlay-not-built"
         and integration.get("shortcut") == "canonical-lab-executable-icon-bound-not-built"
     )
@@ -291,6 +314,11 @@ def _brand_state() -> dict[str, Any]:
             "commit": CANONICAL_BRAND_DONOR_COMMIT,
             "file": _file_ref(BRAND_DONOR_PATH),
             "integrated": donor_is_integrated,
+            "isAncestor": donor_is_ancestor,
+            "exactChangedPathsMatch": donor_paths_match,
+            "integrationMode": (
+                "ancestor" if donor_is_ancestor else "audited-authorized-cherry-pick"
+            ),
         },
         "tauriOverlay": _file_ref(TAURI_OVERLAY_PATH),
         "displayName": manifest.get("displayName"),

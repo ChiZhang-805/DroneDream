@@ -6,24 +6,31 @@
   "displayName": "DroneDream · LAB",
   "sourceAuthority": {
     "kind": "universal-canonical-donor",
-    "donorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
-    "donorParentCommit": "26d69562c9cea6557f30b3b21b3d6d39ac89e294",
+    "donorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "donorParentCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
     "canonicalContract": {
       "path": "brand/brand-editions.v1.json",
-      "bytes": 2964,
-      "sha256": "6f1753e37c7d2c6188e918b51373432619e7fc49e136177cf293f41d01a124fc"
+      "bytes": 4488,
+      "sha256": "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33"
     },
     "canonicalAssetManifest": {
       "path": "brand/generated/brand-assets.v1.json",
-      "bytes": 15574,
-      "sha256": "7d7415edd678ca3499ee994bf895c4e2299f86ee9f4636b260c4333f12524d34"
+      "bytes": 16607,
+      "sha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471"
     },
     "canonicalVisualReceipt": {
       "path": "brand/generated/brand-visual-receipt.v1.json",
-      "bytes": 538,
-      "sha256": "2c980725b436beb887cdccc5bb3767967bf56efd3eb6d98057f9bef1b2d34ab3"
+      "bytes": 892,
+      "sha256": "207ff1a01aaf4fc6ee94d32031b3456b3e1be387216d9ce2d761b4be408bb9ba"
     },
-    "approvalHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657"
+    "approvalHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
+    "receiptEvidence": {
+      "commit": "7482647f1c2fcb92f58aaef009efc99764792297",
+      "path": "brand/receipts/canonical-large-label-donor-v1.json",
+      "bytes": 3367,
+      "sha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+      "isProductSource": false
+    }
   },
   "commonCore": {
     "authority": "Universal/Core",
@@ -51,13 +58,27 @@
     },
     {
       "role": "dot-lockup",
-      "canonicalSourcePath": "brand/source/approved/lab-dot-lockup.png",
-      "canonicalSourceBytes": 98556,
-      "canonicalSourceSha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
-      "repositoryPath": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
-      "repositoryBytes": 98556,
-      "repositorySha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
-      "copyMode": "exact-bytes"
+      "canonicalSourcePath": "brand/source/approved/lab-large-label-lockup.png",
+      "canonicalSourceBytes": 128948,
+      "canonicalSourceSha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+      "repositoryPath": "brand/generated/lab/lockup-compact.png",
+      "repositoryBytes": 128948,
+      "repositorySha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+      "dimensions": {
+        "width": 2386,
+        "height": 218
+      },
+      "copyMode": "canonical-donor-reference"
+    }
+  ],
+  "supersededAssets": [
+    {
+      "role": "dot-lockup",
+      "path": "distribution/editions/lab/assets/dronedream-lab-dot-lockup-v2.png",
+      "bytes": 98556,
+      "sha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+      "status": "superseded",
+      "includedInFuturePayload": false
     }
   ],
   "derivation": {
@@ -66,7 +87,7 @@
     "operation": "universal-canonical-generator-v1",
     "designChanges": false,
     "generatorPath": "scripts/build-brand-assets.py",
-    "generatorSha256": "b0f6401cdcad4d93af7ebe56f5526cac07978e491075ddf7cfe019b7b097be13",
+    "generatorSha256": "5aa0430416d1034ea966d35446fee959ba50c6133c2cc632038fa97ce1e4594d",
     "assets": [
       {
         "role": "desktop-32",
@@ -95,7 +116,7 @@
     ]
   },
   "integration": {
-    "application": "canonical-lockup-selected-by-lab-gate",
+    "application": "canonical-large-label-lockup-selected-by-lab-gate",
     "installer": "canonical-lab-icon-bound-in-overlay-not-built",
     "shortcut": "canonical-lab-executable-icon-bound-not-built"
   }

@@ -139,7 +139,7 @@
     "enginePackEditionProfile": "unified-sim-lab",
     "brand": {
       "displayName": "DroneDream · LAB",
-      "canonicalDonorCommit": "d1f0fef4e04fb5c2fbee0a4ca80b5bc59df94235",
+      "canonicalDonorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
       "canonicalDonorManifest": "brand/brand-editions.v1.json",
       "labSourceManifest": "distribution/editions/lab/brand-source-manifest.v1.json",
       "applicationLockup": "brand/generated/lab/lockup-compact.png",
