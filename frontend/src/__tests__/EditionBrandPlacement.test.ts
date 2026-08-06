@@ -6,6 +6,7 @@ import {
   type EditionBrandPlacement,
   type EditionBrandSurface,
 } from "../site/editionBrandPlacement";
+import { editionBrandAssets } from "../site/editionBrandAssets";
 import type { EditionId } from "../site/editionAvailability";
 
 function syntheticPlacement(
@@ -36,24 +37,42 @@ function syntheticLockup(
   surface: EditionBrandSurface,
   edition: EditionId,
 ): EditionBrandPlacement {
+  const brand = editionBrandAssets[edition];
+  const renderedHeight = 52;
+  const renderedWidth = renderedHeight * brand.lockupWidth / brand.lockupHeight;
   return syntheticPlacement({
     surface,
     expectedEdition: edition,
     asset: {
       edition,
       kind: "lockup",
-      naturalWidth: 1840,
-      naturalHeight: 340,
+      naturalWidth: brand.lockupWidth,
+      naturalHeight: brand.lockupHeight,
     },
-    slotWidth: 400,
+    slotWidth: renderedWidth + 24,
     slotHeight: 90,
-    renderedWidth: 368,
-    renderedHeight: 68,
+    renderedWidth,
+    renderedHeight,
     visibleEditionName: editionDisplayNames[edition],
   });
 }
 
 describe("edition brand placement contract", () => {
+  it.each([
+    ["sim", 2337, 218, "sim-lockup-primary.png"],
+    ["lab", 2386, 218, "lab-lockup-primary.png"],
+    ["field", 2581, 218, "field-lockup-primary.png"],
+  ] as const)(
+    "binds the %s runtime asset to the canonical large-label mirror",
+    (edition, width, height, fileName) => {
+      expect(editionBrandAssets[edition]).toMatchObject({
+        lockupWidth: width,
+        lockupHeight: height,
+      });
+      expect(editionBrandAssets[edition].lockup).toContain(fileName);
+    },
+  );
+
   it.each([
     ["product-card", "sim"],
     ["product-card", "lab"],
@@ -85,14 +104,44 @@ describe("edition brand placement contract", () => {
 
   it("rejects a lockup rendered at compact icon size", () => {
     const placement = syntheticLockup("download-chooser", "universal");
+    const naturalRatio = placement.asset.naturalWidth / placement.asset.naturalHeight;
     placement.slotWidth = 64;
     placement.slotHeight = 24;
     placement.renderedWidth = 64;
-    placement.renderedHeight = 64 / (1840 / 340);
+    placement.renderedHeight = 64 / naturalRatio;
 
     expect(assessEditionBrandPlacement(placement).violations)
       .toContain("compact-slot-requires-mark");
   });
+
+  it.each(["sim", "lab", "field"] as const)(
+    "keeps the %s lockup out of the current compact Product card slot",
+    (edition) => {
+      const placement = syntheticLockup("product-card", edition);
+      const naturalRatio = placement.asset.naturalWidth / placement.asset.naturalHeight;
+      placement.slotWidth = 400;
+      placement.slotHeight = 144;
+      placement.renderedWidth = 400;
+      placement.renderedHeight = 400 / naturalRatio;
+
+      expect(assessEditionBrandPlacement(placement).violations)
+        .toContain("compact-slot-requires-mark");
+    },
+  );
+
+  it.each(["sim", "lab", "field"] as const)(
+    "accepts the exact %s lockup in the 540px account or callback surface",
+    (edition) => {
+      const placement = syntheticLockup("browser-callback", edition);
+      const naturalRatio = placement.asset.naturalWidth / placement.asset.naturalHeight;
+      placement.slotWidth = 540;
+      placement.slotHeight = 68;
+      placement.renderedHeight = 44;
+      placement.renderedWidth = naturalRatio * placement.renderedHeight;
+
+      expect(assessEditionBrandPlacement(placement).accepted).toBe(true);
+    },
+  );
 
   it("rejects cross-edition assets and labels", () => {
     const placement = syntheticLockup("browser-callback", "field");
