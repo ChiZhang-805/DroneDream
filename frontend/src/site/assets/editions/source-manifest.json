@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "handoff": "universal-canonical-brand-donor-v1.1.0",
   "copyPolicy": "byte-for-byte",
   "runtimeSource": "repository-assets-only",
@@ -9,7 +9,11 @@
     "evidencePolicy": "receipt-only-not-product-source",
     "receiptPath": "brand/receipts/canonical-large-label-donor-v1.json",
     "receiptSha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+    "schemaPath": "brand/brand-editions.schema.json",
+    "schemaSha256": "3d46dfd6e464dda2dcc4c7bdd00be9724b5f1d9cd7cdbfc219b5d7d538116260",
+    "contractPath": "brand/brand-editions.v1.json",
     "contractSha256": "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33",
+    "manifestPath": "brand/generated/brand-assets.v1.json",
     "manifestSha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471"
   },
   "editions": {
@@ -28,6 +32,14 @@
         "style": "large-edition-label-v1",
         "canonicalSourcePath": "brand/source/approved/sim-large-label-lockup.png",
         "path": "frontend/src/assets/brand/sim-lockup-primary.png",
+        "width": 2337,
+        "height": 218,
+        "bytes": 122340,
+        "sha256": "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"
+      },
+      "compactLockup": {
+        "style": "large-edition-label-v1",
+        "path": "frontend/src/assets/brand/sim-lockup-compact.png",
         "width": 2337,
         "height": 218,
         "bytes": 122340,
@@ -53,6 +65,14 @@
         "height": 218,
         "bytes": 128948,
         "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
+      },
+      "compactLockup": {
+        "style": "large-edition-label-v1",
+        "path": "frontend/src/assets/brand/lab-lockup-compact.png",
+        "width": 2386,
+        "height": 218,
+        "bytes": 128948,
+        "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
       }
     },
     "field": {
@@ -70,6 +90,14 @@
         "style": "large-edition-label-v1",
         "canonicalSourcePath": "brand/source/approved/field-large-label-lockup.png",
         "path": "frontend/src/assets/brand/field-lockup-primary.png",
+        "width": 2581,
+        "height": 218,
+        "bytes": 116568,
+        "sha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+      },
+      "compactLockup": {
+        "style": "large-edition-label-v1",
+        "path": "frontend/src/assets/brand/field-lockup-compact.png",
         "width": 2581,
         "height": 218,
         "bytes": 116568,
