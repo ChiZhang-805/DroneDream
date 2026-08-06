@@ -197,8 +197,202 @@ function Test-PostBuildSourceStatus {
     }
 }
 
+function Test-PathIsWithinRoot {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Root,
+        [switch]$AllowEqual
+    )
+
+    $pathFull = [IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+    $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    if ($AllowEqual -and $pathFull.Equals(
+        $rootFull,
+        [StringComparison]::OrdinalIgnoreCase
+    )) {
+        return $true
+    }
+    return $pathFull.StartsWith(
+        "$rootFull\",
+        [StringComparison]::OrdinalIgnoreCase
+    )
+}
+
+function Resolve-DetachedNodeDependencyMountContract {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot,
+        [Parameter(Mandatory = $true)]
+        [string]$OwnedBase,
+        [Parameter(Mandatory = $true)]
+        [string]$DependencyRoot,
+        [Parameter(Mandatory = $true)]
+        [object[]]$Mounts,
+        [Parameter(Mandatory = $true)]
+        [string]$FrontendDistPath,
+        [Parameter(Mandatory = $true)]
+        [string]$InstallerBundlePath,
+        [switch]$InspectFileSystem
+    )
+
+    $repoRootFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
+    $ownedBaseFull = [IO.Path]::GetFullPath($OwnedBase).TrimEnd('\', '/')
+    $dependencyRootFull = [IO.Path]::GetFullPath($DependencyRoot).TrimEnd('\', '/')
+    if (-not (Test-PathIsWithinRoot -Path $dependencyRootFull -Root $ownedBaseFull)) {
+        throw "The dependency root must remain inside the exact owned base."
+    }
+    if (Test-PathIsWithinRoot -Path $dependencyRootFull -Root $repoRootFull -AllowEqual) {
+        throw "The dependency root must remain outside the release source worktree."
+    }
+
+    foreach ($outputPath in @($FrontendDistPath, $InstallerBundlePath)) {
+        $outputFull = [IO.Path]::GetFullPath($outputPath).TrimEnd('\', '/')
+        if ((Test-PathIsWithinRoot -Path $outputFull -Root $dependencyRootFull -AllowEqual) -or
+            (Test-PathIsWithinRoot -Path $dependencyRootFull -Root $outputFull -AllowEqual)) {
+            throw "The dependency root must not overlap frontendDist or installer output."
+        }
+    }
+
+    $expected = @(
+        [pscustomobject]@{
+            linkPath = "desktop/node_modules"
+            targetPath = "desktop/node_modules"
+            linkType = "junction"
+        },
+        [pscustomobject]@{
+            linkPath = "frontend/node_modules"
+            targetPath = "frontend/node_modules"
+            linkType = "junction"
+        }
+    )
+    if (@($Mounts).Count -ne $expected.Count) {
+        throw "Exactly two detached dependency junctions are required."
+    }
+
+    $resolved = @()
+    for ($index = 0; $index -lt $expected.Count; $index += 1) {
+        $actual = @($Mounts)[$index]
+        $wanted = $expected[$index]
+        if ([string]$actual.linkPath -cne $wanted.linkPath -or
+            [string]$actual.targetPath -cne $wanted.targetPath -or
+            [string]$actual.linkType -cne $wanted.linkType) {
+            throw "Detached dependency junction $index does not match the allowlist."
+        }
+        $linkFull = [IO.Path]::GetFullPath(
+            (Join-Path $repoRootFull ([string]$actual.linkPath))
+        ).TrimEnd('\', '/')
+        $targetFull = [IO.Path]::GetFullPath(
+            (Join-Path $dependencyRootFull ([string]$actual.targetPath))
+        ).TrimEnd('\', '/')
+        if (-not (Test-PathIsWithinRoot -Path $linkFull -Root $repoRootFull)) {
+            throw "A detached dependency junction escapes the release source."
+        }
+        if (-not (Test-PathIsWithinRoot -Path $targetFull -Root $dependencyRootFull)) {
+            throw "A detached dependency junction target escapes the bundle root."
+        }
+
+        if ($InspectFileSystem) {
+            $linkItem = Get-Item -LiteralPath $linkFull -Force -ErrorAction Stop
+            if (-not ($linkItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+                [string]$linkItem.LinkType -cne "Junction") {
+                throw "The detached dependency mount is not an exact junction: $linkFull"
+            }
+            $observedTargets = @($linkItem.Target)
+            if ($observedTargets.Count -ne 1) {
+                throw "The detached dependency junction has an ambiguous target: $linkFull"
+            }
+            $observedTargetValue = [string]$observedTargets[0]
+            $observedTargetCandidate = if ([IO.Path]::IsPathRooted($observedTargetValue)) {
+                $observedTargetValue
+            } else {
+                Join-Path (Split-Path -Parent $linkFull) $observedTargetValue
+            }
+            $observedTarget = [IO.Path]::GetFullPath(
+                $observedTargetCandidate
+            ).TrimEnd('\', '/')
+            if (-not $observedTarget.Equals(
+                $targetFull,
+                [StringComparison]::OrdinalIgnoreCase
+            )) {
+                throw "The detached dependency junction target differs from the manifest."
+            }
+        }
+
+        $resolved += [pscustomobject]@{
+            linkPath = [string]$actual.linkPath
+            linkAbsolutePath = $linkFull
+            targetPath = [string]$actual.targetPath
+            targetAbsolutePath = $targetFull
+            linkType = "junction"
+        }
+    }
+
+    [pscustomobject]@{
+        mountCount = $resolved.Count
+        mounts = $resolved
+        dependencyRoot = $dependencyRootFull
+        liveMountValidated = [bool]$InspectFileSystem
+    }
+}
+
+function Test-DetachedDependencyPayloadIsolation {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$OutputPaths
+    )
+
+    $violations = @()
+    foreach ($outputPath in @($OutputPaths)) {
+        if (-not (Test-Path -LiteralPath $outputPath)) {
+            continue
+        }
+        $outputFull = [IO.Path]::GetFullPath($outputPath).TrimEnd('\', '/')
+        $pending = New-Object System.Collections.Generic.Stack[string]
+        $pending.Push($outputFull)
+        while ($pending.Count -gt 0) {
+            $current = $pending.Pop()
+            foreach ($item in @(Get-ChildItem -LiteralPath $current -Force)) {
+                $relative = $item.FullName.Substring($outputFull.Length).
+                    TrimStart('\', '/').Replace('\', '/')
+                $segments = @($relative -split '/')
+                $isReparse = [bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)
+                $isDependencyManifest = $item.Name -ceq "desktop-node-dependency-bundle.json"
+                if (-not $isDependencyManifest -and
+                    -not $item.PSIsContainer -and
+                    $item.Name -ceq "manifest.json" -and
+                    $item.Length -le 1048576) {
+                    $manifestPrefix = Get-Content -LiteralPath $item.FullName -Raw -Encoding UTF8
+                    $isDependencyManifest = $manifestPrefix -match (
+                        '"kind"\s*:\s*"dronedream-desktop-node-dependency-bundle"'
+                    )
+                }
+                if ($segments -contains "node_modules" -or
+                    $isDependencyManifest -or
+                    $isReparse) {
+                    $violations += $item.FullName
+                }
+                if ($item.PSIsContainer -and -not $isReparse) {
+                    $pending.Push($item.FullName)
+                }
+            }
+        }
+    }
+    [pscustomobject]@{
+        violationCount = $violations.Count
+        violations = $violations
+    }
+}
+
 Export-ModuleMember -Function @(
     "Invoke-CheckedNativeCommand",
     "Resolve-EditionGeneratedFrontendContract",
-    "Test-PostBuildSourceStatus"
+    "Test-PostBuildSourceStatus",
+    "Test-PathIsWithinRoot",
+    "Resolve-DetachedNodeDependencyMountContract",
+    "Test-DetachedDependencyPayloadIsolation"
 )

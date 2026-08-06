@@ -2,6 +2,7 @@ param(
     [string]$AdditionalConfigPath,
     [string]$CargoTargetDir,
     [string]$LlvmRoot,
+    [string]$DetachedNodeDependencyManifest,
     [string]$ExpectedProductName = "DroneDream",
     [ValidateSet("universal", "sim", "lab", "field")]
     [string]$EditionId = "universal",
@@ -20,6 +21,24 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $releaseSourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $releaseSourceCommit -cnotmatch '^[0-9a-f]{40}$') {
     throw "Unable to freeze the exact release source commit."
+}
+$releaseSourceTree = (& git -C $repoRoot rev-parse 'HEAD^{tree}').Trim()
+if ($LASTEXITCODE -ne 0 -or $releaseSourceTree -cnotmatch '^[0-9a-f]{40}$') {
+    throw "Unable to freeze the exact release source tree."
+}
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $releaseBranch = (& git -C $repoRoot symbolic-ref --short -q HEAD 2>$null | Out-String).Trim()
+    $releaseBranchExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($releaseBranchExitCode -notin @(0, 1)) {
+    throw "Unable to classify the release source branch state."
+}
+if (-not $releaseBranch -and -not $DetachedNodeDependencyManifest) {
+    throw "Detached release sources require an exact attested Node dependency manifest."
 }
 $releaseBuildNumber = (& git -C $repoRoot rev-list --count $releaseSourceCommit).Trim()
 if ($LASTEXITCODE -ne 0 -or $releaseBuildNumber -notmatch '^[1-9][0-9]*$') {
@@ -112,6 +131,8 @@ $cargoTargetRoot = if ($CargoTargetDir) {
 }
 $env:CARGO_TARGET_DIR = $cargoTargetRoot
 $targetOutputRoot = Join-Path $cargoTargetRoot "x86_64-pc-windows-gnullvm\release"
+$installerBundleRoot = Join-Path $targetOutputRoot "bundle\nsis"
+$detachedDependencyContract = $null
 
 # The gnullvm target otherwise links libunwind.dll dynamically. Tauri's NSIS
 # bundler does not discover that toolchain DLL, so the installed application
@@ -178,6 +199,24 @@ $frontendDistContract = Resolve-EditionGeneratedFrontendContract `
     -BaseConfigPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") `
     -AdditionalConfigPath $additionalConfig `
     -EditionId $EditionId
+if ($DetachedNodeDependencyManifest) {
+    $detachedDependencyContract = & (Join-Path $PSScriptRoot "verify-detached-node-dependencies.ps1") `
+        -ManifestPath $DetachedNodeDependencyManifest `
+        -RepoRoot $repoRoot `
+        -EditionId $EditionId `
+        -ExpectedSourceCommit $releaseSourceCommit `
+        -ExpectedSourceTree $releaseSourceTree `
+        -FrontendDistPath $frontendDistContract.absolutePath `
+        -InstallerBundlePath $installerBundleRoot
+    if (-not $detachedDependencyContract.liveMountValidated -or
+        $detachedDependencyContract.mountCount -ne 2) {
+        throw "The detached Node dependency mounts were not live-validated."
+    }
+    $env:npm_config_offline = "true"
+    $env:npm_config_audit = "false"
+    $env:npm_config_fund = "false"
+    $env:npm_config_update_notifier = "false"
+}
 $runtimeUpdateFamilies = Get-Content -LiteralPath (
     Join-Path $repoRoot "distribution\desktop\edition-runtime-update-families.v1.json"
 ) -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -247,6 +286,22 @@ if ($postBuildStatus.allowedGeneratedCount -gt 0) {
         "Accepted $($postBuildStatus.allowedGeneratedCount) generated frontend files " +
         "under $($frontendDistContract.relativePath)."
     )
+}
+if ($detachedDependencyContract) {
+    $postBuildDependencyContract = & (Join-Path $PSScriptRoot "verify-detached-node-dependencies.ps1") `
+        -ManifestPath $DetachedNodeDependencyManifest `
+        -RepoRoot $repoRoot `
+        -EditionId $EditionId `
+        -ExpectedSourceCommit $releaseSourceCommit `
+        -ExpectedSourceTree $releaseSourceTree `
+        -FrontendDistPath $frontendDistContract.absolutePath `
+        -InstallerBundlePath $installerBundleRoot `
+        -InspectOutputPayload
+    if (-not $postBuildDependencyContract.liveMountValidated -or
+        $postBuildDependencyContract.treeFingerprint -cne $detachedDependencyContract.treeFingerprint -or
+        $postBuildDependencyContract.manifestSha256 -cne $detachedDependencyContract.manifestSha256) {
+        throw "The detached Node dependency bundle changed during the release build."
+    }
 }
 
 $application = Join-Path $targetOutputRoot "drone-dream-desktop.exe"
@@ -329,7 +384,11 @@ if ($AllowUnsignedUpdater) {
         -not (Test-Path -LiteralPath $updaterKeyPath -PathType Leaf)) {
         throw "Set TAURI_SIGNING_PRIVATE_KEY_PATH before signing the updater artifact."
     }
-    $tauriCli = Join-Path $PSScriptRoot "..\node_modules\@tauri-apps\cli\tauri.js"
+    $tauriCli = if ($detachedDependencyContract) {
+        [string]$detachedDependencyContract.tauriCliPath
+    } else {
+        Join-Path $PSScriptRoot "..\node_modules\@tauri-apps\cli\tauri.js"
+    }
     if (-not (Test-Path -LiteralPath $tauriCli -PathType Leaf)) {
         throw "The installed Tauri CLI was not found at $tauriCli"
     }
