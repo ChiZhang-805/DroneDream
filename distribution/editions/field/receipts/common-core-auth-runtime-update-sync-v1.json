@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-common-core-auth-runtime-update-sync-receipt",
+  "editionId": "field",
+  "productSource": {
+    "branch": "codex/software-field",
+    "commit": "47f09e5912bdfdcd4b99f27d39077d05ea3774cd",
+    "cleanAtReceiptInput": true
+  },
+  "canonicalProductDonors": [
+    {"commit": "6355aad351370178a7171b504a5d2f235fb12ceb", "integrationCommit": "56565e087a1343c5df2cd44ba58b74e2ed5d8864", "role": "edition-auth-contract"},
+    {"commit": "ba1b44955a96b88dda50b7f7bd8b6db58ac91a75", "integrationCommit": "d84dbeab5445f516d72eae8d8838e4d58cf9da3f", "role": "supabase-pkce-contract-prerequisite"},
+    {"commit": "2f1dbc5fef092ae4cf58366e1178684672ae26c2", "integrationCommit": "03778e90c8ebe809f13ff5a8fa746da83664f181", "role": "native-and-frontend-pkce"},
+    {"commit": "bed637c726462e1a38b74eba46915543d007869d", "integrationCommit": "5e3d6e5292c0375345f834ba4ae7065807dff4d4", "role": "edition-credential-vault"},
+    {"commit": "4c779b7ca316c0953f94f7ef3f4f850881ef2d58", "integrationCommit": "78cadb6e18bf59eb131a74e88edb9a13ba83d1fb", "role": "redacted-auth-audit"},
+    {"commit": "4ea7fd1dfe3a69d90ada1a37a82dd888cba48430", "integrationCommit": "2f859f4c14e6b59a17d76469a9e22f74043d05d0", "role": "runtime-update-family-registry"},
+    {"commit": "8a0828c258782fa77506ee32c7c016e5b18ad292", "integrationCommit": "4a2a24b1a6c6ad9c738160f9afc38dd6d731e60f", "role": "runtime-owner-and-edition-diagnostics"},
+    {"commit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d", "integrationCommit": "fc0c8ceaa44273ffd09cb57db715024012763353", "role": "updater-release-families"}
+  ],
+  "commonProfileDependencySync": {
+    "canonicalCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "integrationCommit": "47f09e5912bdfdcd4b99f27d39077d05ea3774cd",
+    "pathCount": 18,
+    "allPathsExact": true,
+    "benchmarkPathsConsumed": false,
+    "paths": [
+      "backend/app/distribution_safety.py",
+      "distribution/engine-pack-profiles/sim-only.v1.json",
+      "distribution/runtime-contract-registry.sim-only.v1.json",
+      "distribution/schemas/engine-pack-profile.schema.json",
+      "distribution/schemas/vehicle-pack-profile-registry.schema.json",
+      "distribution/tests/test_edition_safety_contract.py",
+      "distribution/tests/test_engine_pack_profile_contract.py",
+      "distribution/tests/test_vehicle_pack_profile_registry.py",
+      "distribution/tests/test_vehicle_pack_registry.py",
+      "distribution/tools/distribution_contract.py",
+      "distribution/tools/edition_build_planner.py",
+      "distribution/tools/engine_pack_profile_contract.py",
+      "distribution/vehicle-packs/registry.sim-only.v1.json",
+      "engine-pack/manifest.schema.json",
+      "engine-pack/tests/test_engine_pack.py",
+      "engine-pack/tools/engine_pack.py",
+      "runtime/scripts/edition-safety-gate.py",
+      "runtime/tests/test_edition_safety_gate.py"
+    ]
+  },
+  "sharedDonorUnionAudit": {
+    "baseCommit": "8a8ad6ce0ea619a52ec087b7f55142c24311165a",
+    "tipCommit": "a918113282b94cf5ebb0b6af3354c5cf2e2ad51d",
+    "pathCount": 38,
+    "allPathsExact": true
+  },
+  "fieldBindings": {
+    "compiledEditionId": "field",
+    "runtimeProfileId": "field-lightweight",
+    "authClientId": "dronedream-desktop-field",
+    "credentialVaultNamespace": "DroneDream/Auth/field/v1",
+    "diagnosticsNamespace": "diagnostics/field",
+    "updaterMetadataFilename": "latest-field.json",
+    "updaterEndpoint": "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-field-channel/latest-field.json",
+    "tauriOverlayPath": "desktop/src-tauri/tauri.field.conf.json",
+    "tauriOverlaySha256": "923d9499870c6c03837efcc5d7cbe85a2d4947a314a880eda0d440417bba5657",
+    "fieldAuthControlPath": "frontend/src/field/FieldAuthControl.tsx",
+    "fieldAuthControlSha256": "5d92a2921696e724f17907b5f6c1167a0d03d269f3b51c9f4746fb1d86269db7"
+  },
+  "canonicalBrand": {
+    "productDonor": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "manifestSha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471",
+    "fieldLargeLockupSha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+    "fieldWindowsIconSha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559"
+  },
+  "universalAuthBindingBlocker": {
+    "proposalPath": "distribution/editions/field/proposals/universal-auth-coexistence-binding-fix-v1.json",
+    "proposalSha256": "f15c132d2516d8a09ce15c575d72c97d6444eae83255709903d1e0d3e352bc05",
+    "coexistenceActualSha256": "47531767aca4d529ceadecd22b25623f0aeb39ec65098c6944f06b0d358b079a",
+    "authBoundCoexistenceSha256": "1af65a86d4f77add7d16d21fe257b7052cb5138de68b6eb3f111f0a32d17bd38",
+    "cleared": false
+  },
+  "excludedEvidenceCommits": [
+    "7482647f1c2fcb92f58aaef009efc99764792297",
+    "528ecf39ef7c4f2a85b88af73a76057f87184e35"
+  ],
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "frontendIsAuthority": false,
+    "buildAllowed": false,
+    "installAllowed": false,
+    "providerUseAllowed": false,
+    "deviceEnumerationAllowed": false,
+    "hardwareActionsAllowed": false,
+    "simulationAllowed": false,
+    "releaseBranchAllowed": false,
+    "websiteHandoffAllowed": false
+  },
+  "frozenArtifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "sha256": "ce3937440e85655d9532097904286eae783f6ed6b25eb0eb94ee113049139317",
+    "sourceCommit": "c7e25b3862fdd491de99f4a0b02cf0f348b94ea3",
+    "status": "superseded-unsigned-preview",
+    "releaseReady": false,
+    "websiteReady": false
+  },
+  "verifiedTests": [
+    {"suite": "field-python", "passed": 85, "subtestsPassed": 9},
+    {"suite": "engine-pack", "passed": 30, "subtestsPassed": 4},
+    {"suite": "common-profile-registry-runtime-safety", "passed": 51, "subtestsPassed": 2},
+    {"suite": "field-frontend-auth", "passed": 19, "subtestsPassed": 0},
+    {"suite": "runtime-update-coexistence", "passed": 28, "subtestsPassed": 0}
+  ],
+  "remainingGates": [
+    "consume Universal auth binding fix donor",
+    "obtain a new exact YELLOW build authorization for the new product source",
+    "produce and sign replacement installer and updater bytes",
+    "execute fresh, upgrade, uninstall, shortcut, EN/ZH and WebView2 lifecycle acceptance",
+    "complete exact Website handoff only after releaseReady becomes true"
+  ]
+}
