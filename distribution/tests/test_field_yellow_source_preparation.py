@@ -119,6 +119,11 @@ def _run(application: Path, mode: str) -> subprocess.CompletedProcess[str]:
 def test_plan_is_zero_write(tmp_path: Path) -> None:
     application, document = _application(tmp_path)
     result = _run(application, "-Plan")
+    if _git("status", "--porcelain=v1", "--untracked-files=all"):
+        assert result.returncode != 0
+        assert "Evidence worktree is not clean." in result.stderr
+        assert not Path(str(document["ownedPaths"]["sourceRoot"])).exists()
+        return
     assert result.returncode == 0, result.stderr
     plan = json.loads(result.stdout)
     assert plan["decision"] == "pass-plan-zero-write"
@@ -129,6 +134,11 @@ def test_plan_is_zero_write(tmp_path: Path) -> None:
 def test_prepare_creates_exact_detached_source_and_junctions(tmp_path: Path) -> None:
     application, document = _application(tmp_path)
     result = _run(application, "-Prepare")
+    if _git("status", "--porcelain=v1", "--untracked-files=all"):
+        assert result.returncode != 0
+        assert "Evidence worktree is not clean." in result.stderr
+        assert not Path(str(document["ownedPaths"]["sourceRoot"])).exists()
+        return
     assert result.returncode == 0, result.stderr
     receipt = json.loads(result.stdout)
     source_root = Path(str(document["ownedPaths"]["sourceRoot"]))

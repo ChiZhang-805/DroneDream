@@ -104,6 +104,13 @@ def _rewrite(application: Path, document: dict[str, object]) -> None:
 def test_exact_6672320_binding_passes_without_creating_paths(tmp_path: Path) -> None:
     application, document = _application(tmp_path)
     result = _run(application)
+    if _git("status", "--porcelain=v1", "--untracked-files=all"):
+        assert result.returncode != 0
+        assert "Evidence worktree is not clean." in result.stderr
+        paths = document["ownedPaths"]
+        assert isinstance(paths, dict)
+        assert all(not Path(str(value)).exists() for value in paths.values())
+        return
     assert result.returncode == 0, result.stderr
     receipt = json.loads(result.stdout)
     assert receipt["decision"] == "pass-plan-only"

@@ -159,6 +159,11 @@ def _run(application: Path, mode: str) -> subprocess.CompletedProcess[str]:
 def test_plan_has_zero_side_effects(tmp_path: Path) -> None:
     application, document = _application(tmp_path)
     result = _run(application, "-Plan")
+    if _git("status", "--porcelain=v1", "--untracked-files=all"):
+        assert result.returncode != 0
+        assert "Evidence worktree is not clean." in result.stderr
+        assert not Path(str(document["ownedPaths"]["runRoot"])).exists()
+        return
     assert result.returncode == 0, result.stderr
     plan = json.loads(result.stdout)
     assert plan["decision"] == "pass-plan-zero-write"
@@ -171,6 +176,11 @@ def test_plan_has_zero_side_effects(tmp_path: Path) -> None:
 def test_generate_exclusively_creates_five_bound_files(tmp_path: Path) -> None:
     application, document = _application(tmp_path)
     result = _run(application, "-Generate")
+    if _git("status", "--porcelain=v1", "--untracked-files=all"):
+        assert result.returncode != 0
+        assert "Evidence worktree is not clean." in result.stderr
+        assert not Path(str(document["ownedPaths"]["runRoot"])).exists()
+        return
     assert result.returncode == 0, result.stderr
     generated = json.loads(result.stdout)
     assert generated["decision"] == "generated-exclusive"

@@ -162,11 +162,22 @@ def test_application_never_requires_evidence_test_inside_product_checkout() -> N
     assert forbidden.endswith("test_field_yellow_560f574_application.py")
 
 
-def test_application_integrity_and_plan_only_runner_pass_without_audit_root() -> None:
+def test_application_integrity_and_frozen_audit_state_are_exact() -> None:
     application = load()
     assert canonical_sha(application) == application["integrity"]["canonicalSha256"]
     audit_root = Path(application["ownedPaths"]["auditRunRoot"])
-    assert not audit_root.exists()
+    if audit_root.exists():
+        receipt_path = audit_root / "audit-receipt.json"
+        assert receipt_path.is_file()
+        assert hashlib.sha256(receipt_path.read_bytes()).hexdigest() == (
+            "2447677521529871e671053159515a898743d6ee82775f09e030fd5674252ceb"
+        )
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        assert receipt["decision"] == "pass-static-audit-lifecycle-still-required"
+        assert receipt["auditCount"] == 1
+        assert receipt["retryCount"] == 0
+        assert receipt["artifact"]["sha256"] == application["artifactIdentity"]["sha256"]
+        return
     result = subprocess.run(
         [
             sys.executable,
