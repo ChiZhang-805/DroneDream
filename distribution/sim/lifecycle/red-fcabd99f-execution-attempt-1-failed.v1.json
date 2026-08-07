@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-final-candidate-lifecycle-failure",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "failed-runner-unicode-decoding-false-negative-rolled-back",
+  "productSourceCommit": "79a718dae55c274cf4803a57129e5789012dca03",
+  "artifact": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal15-79a718d/bundle/DroneDream-Sim-1.0.0.exe",
+    "bytes": 11944855,
+    "sha256": "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e",
+    "rebuilt": false,
+    "relabelled": false
+  },
+  "execution": {
+    "ordinal": 1,
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 1,
+    "pkceBoundaryChecks": 0,
+    "builds": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "automaticRetries": 0
+  },
+  "failure": {
+    "stage": "fresh-en-app-only-uninstall-registration",
+    "classification": "runner-powershell-5.1-no-bom-unicode-decoding-false-negative",
+    "failedField": "DisplayName",
+    "installerExitCode": 0,
+    "productDefectObserved": false,
+    "rootCause": "The runner contained a literal U+00B7 in a UTF-8 file without BOM; Windows PowerShell 5.1 decoded the expected value incorrectly."
+  },
+  "rollback": {
+    "ownedUninstallerInvoked": true,
+    "ownedUninstallerExitCode": 0,
+    "installRootAbsent": true,
+    "uninstallKeyAbsent": true,
+    "desktopShortcutAbsent": true,
+    "startMenuShortcutAbsent": true,
+    "preExistingPreferenceKeyPreserved": true,
+    "protectedStateParity": true,
+    "runtimeState": "Stopped",
+    "processCount": 0,
+    "callback49211ListenerCount": 0
+  },
+  "externalReceipt": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-fcabd99f-ordinal1/evidence/lifecycle-receipt.json",
+    "bytes": 30057,
+    "sha256": "40b86fe9f60c09b21af1736aebe079a3e5149af9bf2a7ec6e6f5c23dcd1503ce"
+  },
+  "nextAttempt": {
+    "requiresNewRunnerHash": true,
+    "requiresNewApplicationHash": true,
+    "requiresNewOwnedRunRoot": true,
+    "artifactMayRemainIdentical": true,
+    "sameExecutionMayBeRetried": false
+  },
+  "nonClaims": {
+    "freshInstallValidated": false,
+    "overlayValidated": false,
+    "applicationLaunched": false,
+    "webView2Validated": false,
+    "uninstallLifecycleValidated": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}

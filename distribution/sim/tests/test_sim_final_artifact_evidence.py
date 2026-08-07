@@ -16,6 +16,20 @@ RECORD = (
 APPLICATION = (
     ROOT / "distribution" / "sim" / "lifecycle" / "red-fcabd99f-final-application.v1.json"
 )
+APPLICATION_2 = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-final-application-2.v1.json"
+)
+ATTEMPT_1_FAILURE = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-execution-attempt-1-failed.v1.json"
+)
 
 
 def sha256(path: Path) -> str:
@@ -137,3 +151,22 @@ def test_final_candidate_lifecycle_application_is_single_attempt_and_fail_closed
         assert counts[key] == 0
     assert application["protectedState"]["simPreferenceKeyValueParity"] is True
     assert application["rollback"]["manualProtectedStateDeletionAllowed"] is False
+
+
+def test_second_lifecycle_application_repairs_only_runner_unicode_and_uses_new_root() -> None:
+    first = json.loads(APPLICATION.read_text(encoding="utf-8"))
+    second = json.loads(APPLICATION_2.read_text(encoding="utf-8"))
+    failure = json.loads(ATTEMPT_1_FAILURE.read_text(encoding="utf-8"))
+    assert second["artifact"] == first["artifact"]
+    assert second["ownedSurface"]["runRoot"] != first["ownedSurface"]["runRoot"]
+    assert second["runner"]["path"].endswith("invoke-red-lifecycle-fcabd99f-2.ps1")
+    runner = ROOT / second["runner"]["path"]
+    assert runner.stat().st_size == second["runner"]["bytes"]
+    assert sha256(runner) == second["runner"]["sha256"]
+    runner_text = runner.read_text(encoding="utf-8-sig")
+    assert "[char]0x00B7" in runner_text
+    assert "\u00b7" not in runner_text
+    assert failure["failure"]["productDefectObserved"] is False
+    assert failure["rollback"]["protectedStateParity"] is True
+    assert second["priorAttempt"]["externalReceiptSha256"] == failure["externalReceipt"]["sha256"]
+    assert second["priorAttempt"]["sameRunRootReuseAllowed"] is False
