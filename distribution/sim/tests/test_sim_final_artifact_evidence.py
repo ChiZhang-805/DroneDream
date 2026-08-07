@@ -72,6 +72,20 @@ ATTEMPT_4_FAILURE = (
     / "lifecycle"
     / "red-fcabd99f-execution-attempt-4-failed.v1.json"
 )
+ATTEMPT_5_ACCEPTANCE = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-execution-attempt-5-passed.v1.json"
+)
+WEBSITE_HANDOFF = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "release"
+    / "website-exact-four-file-handoff-fcabd99f.v1.json"
+)
 
 
 def sha256(path: Path) -> str:
@@ -286,3 +300,66 @@ def test_fifth_lifecycle_application_restores_runner_owned_locale_before_parity(
     assert fifth["priorAttempt"]["externalReceiptSha256"] == failure["externalReceipt"][
         "sha256"
     ]
+
+
+def test_fifth_lifecycle_acceptance_and_website_handoff_are_exact() -> None:
+    acceptance = json.loads(ATTEMPT_5_ACCEPTANCE.read_text(encoding="utf-8"))
+    handoff = json.loads(WEBSITE_HANDOFF.read_text(encoding="utf-8"))
+    assert acceptance["state"] == "passed-release-ready-website-handoff-ready"
+    assert acceptance["sourceSeparation"]["productSourceCommit"] == (
+        "79a718dae55c274cf4803a57129e5789012dca03"
+    )
+    assert acceptance["artifact"]["sha256"] == (
+        "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e"
+    )
+    counts = acceptance["execution"]
+    for key in (
+        "freshInstallerInvocations",
+        "overlayInstallerInvocations",
+        "applicationLaunches",
+        "uninstallerInvocations",
+        "pkceBoundaryChecks",
+        "installerLanguagePreferenceCleanupWrites",
+    ):
+        assert counts[key] == 1
+    for key in (
+        "browserLoginTransactions",
+        "realTokenExchanges",
+        "runtimeStarts",
+        "px4Starts",
+        "gazeboStarts",
+        "hardwareActions",
+        "builds",
+        "automaticRetries",
+    ):
+        assert counts[key] == 0
+    assert acceptance["acceptance"]["protectedStateParity"] == "pass-after-every-phase"
+    assert acceptance["release"]["releaseReady"] is True
+    assert acceptance["release"]["websiteHandoffReady"] is True
+    assert acceptance["release"]["websiteDeployed"] is False
+    assert sha256(ROOT / acceptance["release"]["websiteHandoffRecordPath"]) == (
+        acceptance["release"]["websiteHandoffRecordSha256"]
+    )
+    receipt = Path(acceptance["externalReceipt"]["path"])
+    if receipt.exists():
+        assert receipt.stat().st_size == acceptance["externalReceipt"]["bytes"]
+        assert sha256(receipt) == acceptance["externalReceipt"]["sha256"]
+        execution = json.loads(receipt.read_text(encoding="utf-8"))
+        assert execution["success"] is True
+        assert execution["releaseReady"] is True
+        assert execution["websiteHandoffReady"] is True
+
+    assert handoff["state"] == "ready-for-website-receive-not-deployed"
+    assert handoff["productSourceCommit"] == acceptance["sourceSeparation"][
+        "productSourceCommit"
+    ]
+    assert len(handoff["files"]) == 4
+    assert handoff["website"]["deploymentAuthorized"] is False
+    assert handoff["website"]["deployed"] is False
+    handoff_root = Path(handoff["handoffRoot"])
+    if handoff_root.exists():
+        for file_record in handoff["files"]:
+            path = handoff_root / file_record["fileName"]
+            assert path.is_file()
+            assert path.stat().st_size == file_record["bytes"]
+            assert sha256(path) == file_record["sha256"]

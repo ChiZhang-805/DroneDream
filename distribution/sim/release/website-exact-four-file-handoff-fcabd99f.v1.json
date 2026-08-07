@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-website-exact-four-file-handoff-record",
+  "recordVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "ready-for-website-receive-not-deployed",
+  "productSourceCommit": "79a718dae55c274cf4803a57129e5789012dca03",
+  "productSourceTree": "c6ac1549c352b4331d9d94e78a0b2e8662690023",
+  "handoffRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-handoffs/website/sim-1.0.0-79a718d-fcabd99f",
+  "files": [
+    {
+      "role": "installer",
+      "fileName": "DroneDream-Sim-1.0.0.exe",
+      "bytes": 11944855,
+      "sha256": "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e"
+    },
+    {
+      "role": "updater-signature",
+      "fileName": "DroneDream-Sim-1.0.0.exe.sig",
+      "bytes": 428,
+      "sha256": "d75e653e239fe2800f9839a2edb4a5aa7e3f5284a8ea61c1ec9fe80ba367d8ac"
+    },
+    {
+      "role": "checksum-sidecar",
+      "fileName": "DroneDream-Sim-1.0.0.exe.sha256",
+      "bytes": 92,
+      "sha256": "b3c5c0eda50f63542b0d60e8cf5c3ac83cb08dffb97f95424a60f0d15f482f20"
+    },
+    {
+      "role": "handoff-manifest",
+      "fileName": "DroneDream-Sim-1.0.0.handoff.json",
+      "bytes": 4372,
+      "sha256": "f0ffc5d8020bd390795bf1bb24034ca94fe49e455a0bcf7994d7fb741c0ab04e"
+    }
+  ],
+  "evidence": {
+    "staticAcceptancePath": "distribution/sim/desktop/yellow-build-attempt-15-79a718d-static-accepted.v1.json",
+    "staticAcceptanceSha256": "8c013da5e6116f7a54e53fd1fb5fd8fbe291e1e205035b2984a989b35da3f9c1",
+    "lifecycleAcceptancePath": "distribution/sim/lifecycle/red-fcabd99f-execution-attempt-5-passed.v1.json",
+    "externalLifecycleReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-fcabd99f-ordinal5/evidence/lifecycle-receipt.json",
+    "externalLifecycleReceiptSha256": "ee0d1076b3df930b133417ec7563436dcaae385a163f469ad2a65540eee329f1"
+  },
+  "website": {
+    "recipientBranch": "codex/website",
+    "receiveMode": "read-only-no-rebuild-no-rename",
+    "deploymentAuthorized": false,
+    "deployed": false,
+    "downloadUrl": null,
+    "checksumUrl": null,
+    "signatureUrl": null,
+    "releaseTag": null
+  },
+  "releaseReady": true,
+  "websiteHandoffReady": true
+}
