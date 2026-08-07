@@ -1,20 +1,18 @@
 {
   "schemaVersion": 3,
-  "handoff": "universal-canonical-brand-donor-v1.1.0",
+  "handoff": "universal-brand-dot-centering-v1.1.1",
   "copyPolicy": "byte-for-byte",
   "runtimeSource": "repository-assets-only",
   "donor": {
-    "productSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
-    "evidenceHead": "7482647f1c2fcb92f58aaef009efc99764792297",
-    "evidencePolicy": "receipt-only-not-product-source",
-    "receiptPath": "brand/receipts/canonical-large-label-donor-v1.json",
-    "receiptSha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+    "sourceBranch": "codex/brand-dot-centering",
+    "productSource": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
+    "evidencePolicy": "product-donor-only",
     "schemaPath": "brand/brand-editions.schema.json",
-    "schemaSha256": "3d46dfd6e464dda2dcc4c7bdd00be9724b5f1d9cd7cdbfc219b5d7d538116260",
+    "schemaSha256": "56867ab6d7849ab9d4a5e33bd7de9e7a86405af5da4d09d62dde230d133a82ec",
     "contractPath": "brand/brand-editions.v1.json",
-    "contractSha256": "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33",
+    "contractSha256": "11400eae1df73ce2d2b753443a243ceb555bd6fabe3a5a1a09832470590aebc2",
     "manifestPath": "brand/generated/brand-assets.v1.json",
-    "manifestSha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471"
+    "manifestSha256": "9f574a98d703196c6de2b540fd86f8d52bdb5d76ac036d32e17513c7e678b40e"
   },
   "editions": {
     "sim": {
@@ -29,21 +27,26 @@
         "sha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa"
       },
       "lockup": {
-        "style": "large-edition-label-v1",
-        "canonicalSourcePath": "brand/source/approved/sim-large-label-lockup.png",
+        "style": "large-edition-label-centered-separator-v2",
+        "canonicalSourcePath": "brand/source/approved/sim-large-label-centered-lockup.png",
         "path": "frontend/src/assets/brand/sim-lockup-primary.png",
         "width": 2337,
         "height": 218,
-        "bytes": 122340,
-        "sha256": "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"
+        "bytes": 115631,
+        "sha256": "f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e",
+        "separatorGeometry": {
+          "leftGapPx": 53,
+          "rightGapPx": 53,
+          "tolerancePx": 0
+        }
       },
       "compactLockup": {
-        "style": "large-edition-label-v1",
+        "style": "large-edition-label-centered-separator-v2",
         "path": "frontend/src/assets/brand/sim-lockup-compact.png",
         "width": 2337,
         "height": 218,
-        "bytes": 122340,
-        "sha256": "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"
+        "bytes": 115631,
+        "sha256": "f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e"
       }
     },
     "lab": {
@@ -58,21 +61,26 @@
         "sha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806"
       },
       "lockup": {
-        "style": "large-edition-label-v1",
-        "canonicalSourcePath": "brand/source/approved/lab-large-label-lockup.png",
+        "style": "large-edition-label-centered-separator-v2",
+        "canonicalSourcePath": "brand/source/approved/lab-large-label-centered-lockup.png",
         "path": "frontend/src/assets/brand/lab-lockup-primary.png",
         "width": 2386,
         "height": 218,
-        "bytes": 128948,
-        "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
+        "bytes": 123162,
+        "sha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94",
+        "separatorGeometry": {
+          "leftGapPx": 58,
+          "rightGapPx": 58,
+          "tolerancePx": 0
+        }
       },
       "compactLockup": {
-        "style": "large-edition-label-v1",
+        "style": "large-edition-label-centered-separator-v2",
         "path": "frontend/src/assets/brand/lab-lockup-compact.png",
         "width": 2386,
         "height": 218,
-        "bytes": 128948,
-        "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
+        "bytes": 123162,
+        "sha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94"
       }
     },
     "field": {
@@ -87,21 +95,26 @@
         "sha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5"
       },
       "lockup": {
-        "style": "large-edition-label-v1",
-        "canonicalSourcePath": "brand/source/approved/field-large-label-lockup.png",
+        "style": "large-edition-label-centered-separator-v2",
+        "canonicalSourcePath": "brand/source/approved/field-large-label-centered-lockup.png",
         "path": "frontend/src/assets/brand/field-lockup-primary.png",
         "width": 2581,
         "height": 218,
-        "bytes": 116568,
-        "sha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+        "bytes": 111047,
+        "sha256": "e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa",
+        "separatorGeometry": {
+          "leftGapPx": 58,
+          "rightGapPx": 58,
+          "tolerancePx": 0
+        }
       },
       "compactLockup": {
-        "style": "large-edition-label-v1",
+        "style": "large-edition-label-centered-separator-v2",
         "path": "frontend/src/assets/brand/field-lockup-compact.png",
         "width": 2581,
         "height": 218,
-        "bytes": 116568,
-        "sha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+        "bytes": 111047,
+        "sha256": "e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa"
       }
     }
   }

@@ -9,7 +9,7 @@ const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
 if (
   manifest.schemaVersion !== 3 ||
-  manifest.handoff !== "universal-canonical-brand-donor-v1.1.0"
+  manifest.handoff !== "universal-brand-dot-centering-v1.1.1"
 ) {
   throw new Error(`Unexpected brand handoff: ${manifest.handoff}`);
 }
@@ -18,17 +18,15 @@ if (manifest.copyPolicy !== "byte-for-byte" || manifest.runtimeSource !== "repos
 }
 
 const expectedDonor = {
-  productSource: "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
-  evidenceHead: "7482647f1c2fcb92f58aaef009efc99764792297",
-  evidencePolicy: "receipt-only-not-product-source",
-  receiptPath: "brand/receipts/canonical-large-label-donor-v1.json",
-  receiptSha256: "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
+  sourceBranch: "codex/brand-dot-centering",
+  productSource: "6de4f1343c0239a916949f0486fa63d3f460d6a8",
+  evidencePolicy: "product-donor-only",
   schemaPath: "brand/brand-editions.schema.json",
-  schemaSha256: "3d46dfd6e464dda2dcc4c7bdd00be9724b5f1d9cd7cdbfc219b5d7d538116260",
+  schemaSha256: "56867ab6d7849ab9d4a5e33bd7de9e7a86405af5da4d09d62dde230d133a82ec",
   contractPath: "brand/brand-editions.v1.json",
-  contractSha256: "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33",
+  contractSha256: "11400eae1df73ce2d2b753443a243ceb555bd6fabe3a5a1a09832470590aebc2",
   manifestPath: "brand/generated/brand-assets.v1.json",
-  manifestSha256: "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471",
+  manifestSha256: "9f574a98d703196c6de2b540fd86f8d52bdb5d76ac036d32e17513c7e678b40e",
 };
 for (const [property, expected] of Object.entries(expectedDonor)) {
   if (manifest.donor?.[property] !== expected) {
@@ -78,7 +76,11 @@ if (
 if (
   canonicalManifest.contractSha256 !== manifest.donor.contractSha256 ||
   canonicalManifest.schemaSha256 !== manifest.donor.schemaSha256 ||
-  canonicalManifest.brandVersion !== contract.brandVersion
+  canonicalManifest.brandVersion !== contract.brandVersion ||
+  canonicalManifest.largeLabelApproval?.separatorCentering?.method !== "equal-alpha-edge-gaps" ||
+  canonicalManifest.largeLabelApproval?.separatorCentering?.tolerancePx !== 0 ||
+  contract.approval?.separatorCentering?.method !== "equal-alpha-edge-gaps" ||
+  contract.approval?.separatorCentering?.tolerancePx !== 0
 ) {
   throw new Error("Official brand manifest does not bind the copied schema and contract");
 }
@@ -123,10 +125,10 @@ for (const [editionId, edition] of Object.entries(manifest.editions)) {
     throw new Error(`${editionId} Website identity diverges from the official contract`);
   }
   if (
-    edition.lockup.style !== "large-edition-label-v1" ||
-    edition.compactLockup.style !== "large-edition-label-v1"
+    edition.lockup.style !== "large-edition-label-centered-separator-v2" ||
+    edition.compactLockup.style !== "large-edition-label-centered-separator-v2"
   ) {
-    throw new Error(`${editionId} does not use the canonical large-label style`);
+    throw new Error(`${editionId} does not use the canonical centered-separator large-label style`);
   }
 
   const approved = canonicalManifest.approvedEditionAssets?.[editionId];
@@ -139,6 +141,16 @@ for (const [editionId, edition] of Object.entries(manifest.editions)) {
     approved?.dotLockup?.dimensions?.height !== edition.lockup.height
   ) {
     throw new Error(`${editionId} metadata diverges from the official generated manifest`);
+  }
+  const expectedGap = editionId === "sim" ? 53 : 58;
+  if (
+    edition.lockup.separatorGeometry?.leftGapPx !== expectedGap ||
+    edition.lockup.separatorGeometry?.rightGapPx !== expectedGap ||
+    edition.lockup.separatorGeometry?.tolerancePx !== 0 ||
+    approved.dotLockup?.separatorGeometry?.leftGapPx !== expectedGap ||
+    approved.dotLockup?.separatorGeometry?.rightGapPx !== expectedGap
+  ) {
+    throw new Error(`${editionId} separator is not centered with the approved zero-tolerance gap`);
   }
 
   const markBuffer = await verifyPng(`${editionId}.mark`, edition.mark, edition.mark.path);
