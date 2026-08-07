@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-yellow-command-binding-application",
+  "applicationId": "field-yellow-6672320-lightweight-installer-preflight2-v1",
+  "editionId": "field",
+  "status": "prepared-awaiting-new-exact-yellow-start-signal",
+  "preparedAt": "2026-08-07T01:10:00Z",
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "6672320392f3274a952a7f02a2006aa2bd6e2671",
+    "productTree": "46c877553ad751f78849593ea9ba93a1042ace68",
+    "toolSourceCommit": "e3c075f26904c97ca96d730cd30deee73c606c5d",
+    "evidenceCommitIsProductSource": false,
+    "productSourceChangedByThisGreenAtom": false,
+    "sourceChangeInvalidatesApproval": true
+  },
+  "toolBinding": {
+    "path": "distribution/editions/field/build/resolve-field-yellow-command-binding.ps1",
+    "sourceCommit": "e3c075f26904c97ca96d730cd30deee73c606c5d",
+    "gitBlob": "c13ef408e7d1122801601777c7f1691f33b20e47",
+    "canonicalBlobBytes": 7554,
+    "canonicalBlobSha256": "ef2371ef50c70d609af6c9ac046c977007ca8f5267f470514d552d46c66e4ac8",
+    "workingTreeRepresentationGrantsAuthority": false,
+    "validationMode": "exact-application-plus-source-derived-owned-paths",
+    "unknownSourceDenied": true,
+    "mismatchedLeafDenied": true,
+    "pathEscapeDenied": true,
+    "planOnlyCreatesPaths": false
+  },
+  "predecessor": {
+    "applicationId": "field-yellow-6672320-lightweight-installer-single-nsis-v1",
+    "applicationFileSha256": "4189f680f63d6b050ac21a1562911dc9967737cf17acebc0072c6639ba98dfa4",
+    "runRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer",
+    "preflightScriptSha256": "8b8c77ae9bb8a2ddd7988bb4d04ba1623b0c29c3c2c90eb8a695b32e9673531a",
+    "buildScriptSha256": "126443bb2fe2fbfa175e97964b30f72c057ebe89b1078f02af59346566ec2b80",
+    "runFilesReceiptSha256": "3a9d44167be724db6a02fd66946032d5df7374b15a602a3cbe0536517d5aa6f3",
+    "preflightFailureReceiptBytes": 4363,
+    "preflightFailureReceiptSha256": "489084db5213c503d8049157d5c906e036019c0f0a1131e083b2eb2d06d2fa78",
+    "rootCause": "external preflight command file compared the correct 6672320 cargo path to copied literal 560f574",
+    "applicationConsumed": 1,
+    "preflightConsumed": 1,
+    "buildScriptConsumed": 0,
+    "frontendConsumed": 0,
+    "tauriConsumed": 0,
+    "cargoConsumed": 0,
+    "nsisConsumed": 0,
+    "freshBuildConsumed": 0,
+    "retryAllowed": false,
+    "readOnlyPreserved": true,
+    "reuseAllowed": false
+  },
+  "commandBinding": {
+    "sourceId": "6672320",
+    "pathOrdinalSuffix": "-preflight2",
+    "sourceOwner": "C:\\Users\\zju20",
+    "cargoOwner": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target",
+    "runOwner": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39",
+    "derivation": {
+      "sourceRootLeaf": "ddf${sourceId}${pathOrdinalSuffix}",
+      "cargoTargetLeaf": "${sourceId}${pathOrdinalSuffix}",
+      "runRootLeaf": "field-yellow-build-${sourceId}-lightweight-installer${pathOrdinalSuffix}",
+      "outputRootLeaf": "artifact"
+    },
+    "literalHistoricalSourceLeafAllowed": false,
+    "futureCommandFilesMustConsumeResolvedBinding": true,
+    "futureCommandFileGenerationRequiresNewYellowStartSignal": true
+  },
+  "ownedPaths": {
+    "sourceRoot": "C:\\Users\\zju20\\ddf6672320-preflight2",
+    "cargoTarget": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\6672320-preflight2",
+    "runRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2",
+    "outputRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2\\artifact",
+    "applicationCopy": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2\\yellow-build-application.json",
+    "preflightScript": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2\\preflight-approved-build.ps1",
+    "buildScript": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2\\invoke-approved-build.ps1",
+    "sourceRootExistsAtPreparation": false,
+    "cargoTargetExistsAtPreparation": false,
+    "runRootExistsAtPreparation": false,
+    "outputRootExistsAtPreparation": false,
+    "reuseHistoricalSourceTargetOrOutputAllowed": false
+  },
+  "attemptOrdinal": {
+    "scope": "field-lightweight-installer-product-6672320",
+    "application": 2,
+    "preflight": 2,
+    "buildScript": 1,
+    "frontend": 1,
+    "tauri": 1,
+    "cargo": 1,
+    "nsis": 1,
+    "freshBuild": 1,
+    "retryMaximum": 0,
+    "predecessorBuildWasNotConsumed": true
+  },
+  "exactCommands": {
+    "planOnlyTemplate": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\build\\resolve-field-yellow-command-binding.ps1 -Application C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\build\\yellow-6672320-preflight2-application.v1.json -ExpectedApplicationSha256 <FROZEN_APPLICATION_FILE_SHA256> -ExpectedEvidenceHead <EXACT_EVIDENCE_HEAD_FROM_NEW_YELLOW_START_SIGNAL> -RepoRoot C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream -PlanOnly",
+    "futurePreflight": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2\\preflight-approved-build.ps1",
+    "futureSingleBuild": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2\\invoke-approved-build.ps1",
+    "commandFilesCreatedDuringThisGreenAtom": false,
+    "commandFilesMayBeCreatedOnlyAfterNewYellowStartSignal": true,
+    "preflightFailureConsumesBuild": false,
+    "buildScriptInvocationConsumesAttempt": true
+  },
+  "productContract": {
+    "predecessorTrackedApplication": "distribution/editions/field/build/yellow-6672320-application.v1.json",
+    "predecessorTrackedApplicationSha256": "4189f680f63d6b050ac21a1562911dc9967737cf17acebc0072c6639ba98dfa4",
+    "productSourceRemainsExact": true,
+    "profile": "field-lightweight",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "fieldRuntimeModePageEnabled": false,
+    "fieldSimulatorPayloadAllowed": false,
+    "validatedHardwarePackCount": 0,
+    "hardwareDecision": "deny",
+    "frontendIsAuthority": false
+  },
+  "authorization": {
+    "currentMessageAuthorizesBuild": false,
+    "planOnlyAllowed": true,
+    "newExactYellowStartSignalRequired": true,
+    "sourceCloneCreationAllowed": false,
+    "cargoTargetCreationAllowed": false,
+    "runRootCreationAllowed": false,
+    "outputCreationAllowed": false
+  },
+  "prohibited": [
+    "preflight",
+    "frontend",
+    "tauri",
+    "cargo",
+    "nsis",
+    "installer",
+    "runtime-or-wsl-migration",
+    "px4-gazebo-sitl-hitl",
+    "device-or-hardware",
+    "provider-or-model-key",
+    "deployment-or-upload",
+    "release-branch"
+  ],
+  "remainingGates": [
+    "clean evidence HEAD and exact application SHA freeze",
+    "new exact YELLOW start signal bound to product source, tool source, application SHA, and owned paths",
+    "new command files generated from resolver output without literal source leaves",
+    "single source-bound preflight ordinal 2",
+    "single build/frontend/Tauri/Cargo/NSIS/fresh attempt ordinal 1",
+    "artifact static audit and owned-isolation lifecycle before Website handoff",
+    "real hardware remains prohibited"
+  ],
+  "integrity": {
+    "canonicalization": "UTF-8 JSON sorted keys compact separators excluding integrity",
+    "canonicalSha256": "b2a7a00e32165597d81479f6b32d956a48f8e000e3f7a5445faa62ddc48f830c"
+  }
+}
