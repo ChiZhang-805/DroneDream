@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 
+import {
+  appReducedMotionEnabled,
+  REDUCE_MOTION_CHANGE_EVENT,
+} from "../desktop/uiMotionPreferences";
+
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 function readReducedMotionPreference() {
-  return typeof window !== "undefined" && typeof window.matchMedia === "function"
-    ? window.matchMedia(REDUCED_MOTION_QUERY).matches
-    : false;
+  if (typeof window === "undefined") return false;
+  return appReducedMotionEnabled()
+    || (typeof window.matchMedia === "function"
+      && window.matchMedia(REDUCED_MOTION_QUERY).matches);
 }
 
 /** Keeps animation-heavy views in sync with the operating-system motion setting. */
@@ -15,16 +21,24 @@ export function usePrefersReducedMotion() {
   );
 
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
-    const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches);
-    updatePreference();
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updatePreference);
-      return () => mediaQuery.removeEventListener("change", updatePreference);
+    const mediaQuery = typeof window.matchMedia === "function"
+      ? window.matchMedia(REDUCED_MOTION_QUERY)
+      : null;
+    const updateCombinedPreference = () => setPrefersReducedMotion(readReducedMotionPreference());
+    updateCombinedPreference();
+    window.addEventListener(REDUCE_MOTION_CHANGE_EVENT, updateCombinedPreference);
+    if (typeof mediaQuery?.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateCombinedPreference);
+      return () => {
+        mediaQuery.removeEventListener("change", updateCombinedPreference);
+        window.removeEventListener(REDUCE_MOTION_CHANGE_EVENT, updateCombinedPreference);
+      };
     }
-    mediaQuery.addListener?.(updatePreference);
-    return () => mediaQuery.removeListener?.(updatePreference);
+    mediaQuery?.addListener?.(updateCombinedPreference);
+    return () => {
+      mediaQuery?.removeListener?.(updateCombinedPreference);
+      window.removeEventListener(REDUCE_MOTION_CHANGE_EVENT, updateCombinedPreference);
+    };
   }, []);
 
   return prefersReducedMotion;

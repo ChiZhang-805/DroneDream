@@ -529,6 +529,7 @@ export function DroneLaunchScene({
   const reducedMotion = usePrefersReducedMotion();
   const editionTheme = useEditionTheme();
   const sceneTheme = editionTheme.three;
+  const lightAppearance = editionTheme.appearance === "light";
 
   useEffect(() => {
     activeRef.current = active;
@@ -565,7 +566,7 @@ export function DroneLaunchScene({
     renderer.shadowMap.autoUpdate = false;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.25;
+    renderer.toneMappingExposure = lightAppearance ? 1.05 : 1.25;
     renderer.domElement.className = "drone-launch-canvas";
     renderer.domElement.setAttribute("aria-hidden", "true");
     renderer.domElement.style.cursor = reducedMotion ? "default" : "crosshair";
@@ -597,7 +598,8 @@ export function DroneLaunchScene({
     renderer.domElement.addEventListener("webglcontextrestored", onContextRestored);
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(sceneTheme.fog, 0.042);
+    scene.background = lightAppearance ? new THREE.Color(0xffffff) : null;
+    scene.fog = new THREE.FogExp2(lightAppearance ? 0xffffff : sceneTheme.fog, 0.042);
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
     camera.position.set(5.3, 3.35, 7.5);
     camera.lookAt(0, 0.05, 0);
@@ -694,10 +696,15 @@ export function DroneLaunchScene({
     magentaNebula.position.set(6.4, 1.8, -13.5);
     magentaNebula.scale.set(11.5, 7.8, 1);
     celestialBackdrop.add(magentaNebula);
+    celestialBackdrop.visible = !lightAppearance;
     scene.add(celestialBackdrop);
 
-    scene.add(new THREE.HemisphereLight(0xb9d8ff, 0x15051e, 2.1));
-    const key = new THREE.DirectionalLight(0xf5eaff, 5.2);
+    scene.add(new THREE.HemisphereLight(
+      lightAppearance ? 0xffffff : 0xb9d8ff,
+      lightAppearance ? 0xdcefff : 0x15051e,
+      lightAppearance ? 2.45 : 2.1,
+    ));
+    const key = new THREE.DirectionalLight(0xf5eaff, lightAppearance ? 4.1 : 5.2);
     key.position.set(4.5, 7, 5.5);
     key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024);
@@ -719,11 +726,11 @@ export function DroneLaunchScene({
     const floor = new THREE.Mesh(
       new THREE.PlaneGeometry(36, 36),
       new THREE.MeshStandardMaterial({
-        color: sceneTheme.darkSurface,
+        color: lightAppearance ? 0xffffff : sceneTheme.darkSurface,
         roughness: 0.86,
         metalness: 0.15,
         transparent: true,
-        opacity: 0.44,
+        opacity: lightAppearance ? 0.96 : 0.44,
       }),
     );
     floor.rotation.x = -Math.PI / 2;
@@ -736,7 +743,7 @@ export function DroneLaunchScene({
     const gridMaterials = Array.isArray(grid.material) ? grid.material : [grid.material];
     gridMaterials.forEach((material) => {
       material.transparent = true;
-      material.opacity = 0.28;
+      material.opacity = lightAppearance ? 0.42 : 0.28;
       material.depthWrite = false;
     });
     scene.add(grid);
@@ -749,7 +756,12 @@ export function DroneLaunchScene({
     ] as const) {
       const ring = new THREE.Mesh(
         new THREE.TorusGeometry(radius, 0.012, 8, 120),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }),
+        new THREE.MeshBasicMaterial({
+          color,
+          transparent: true,
+          opacity: lightAppearance ? Math.min(0.62, opacity * 1.7) : opacity,
+          depthWrite: false,
+        }),
       );
       ring.rotation.x = Math.PI / 2;
       telemetryRing.add(ring);
@@ -779,6 +791,7 @@ export function DroneLaunchScene({
         sizeAttenuation: true,
       }),
     );
+    particles.visible = !lightAppearance;
     scene.add(particles);
 
     const pointer = new THREE.Vector2();
@@ -1135,7 +1148,7 @@ export function DroneLaunchScene({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [editionTheme.id, reducedMotion, sceneTheme, starflightControllerRef, visualOffsetX]);
+  }, [editionTheme.id, lightAppearance, reducedMotion, sceneTheme, starflightControllerRef, visualOffsetX]);
 
   return (
     <div
@@ -1145,6 +1158,9 @@ export function DroneLaunchScene({
       data-flight-state={starflightActive ? "starflight" : "hover"}
       data-theme-edition={editionTheme.id}
       data-theme-appearance={editionTheme.appearance}
+      data-scene-stars={lightAppearance ? "false" : "true"}
+      data-scene-particles={lightAppearance ? "false" : "true"}
+      data-reduced-motion={reducedMotion ? "true" : "false"}
       data-theme-primary={`#${sceneTheme.primary.toString(16).padStart(6, "0")}`}
       data-theme-secondary={`#${sceneTheme.secondary.toString(16).padStart(6, "0")}`}
       data-theme-tertiary={`#${sceneTheme.tertiary.toString(16).padStart(6, "0")}`}

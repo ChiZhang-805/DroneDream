@@ -2102,6 +2102,15 @@ class UserExperiencePreferences(Base):
         nullable=True,
     )
     default_altitude_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    default_objective_profile: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )
+    default_optimizer_strategy: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )
+    default_max_total_trials: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=_now,

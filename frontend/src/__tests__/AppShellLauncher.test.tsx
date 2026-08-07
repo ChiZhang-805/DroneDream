@@ -123,6 +123,9 @@ beforeEach(() => {
     default_template_key: null,
     default_track_type: null,
     default_altitude_m: null,
+    default_objective_profile: null,
+    default_optimizer_strategy: null,
+    default_max_total_trials: null,
     retention_days: 90,
     stored_content:
       "allowlisted_preferences_and_verified_structured_job_outcomes_only",
@@ -144,6 +147,39 @@ afterEach(() => {
 });
 
 describe("desktop launcher chrome", () => {
+  it("persists granular notification and motion controls without changing edition authority", async () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    window.localStorage.setItem("dronedream:notification-preferences-v2", JSON.stringify({
+      enabled: true,
+      taskResults: true,
+      attentionRequired: true,
+      qualificationResults: true,
+      environmentIssues: true,
+    }));
+    installDesktopBridge();
+    const { router } = renderLauncher();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
+    const taskResults = within(dialog).getByRole("checkbox", {
+      name: "Task result notifications",
+    });
+    expect(taskResults).toBeChecked();
+    fireEvent.click(taskResults);
+    expect(JSON.parse(window.localStorage.getItem(
+      "dronedream:notification-preferences-v2",
+    ) ?? "{}")).toMatchObject({ enabled: true, taskResults: false });
+
+    const reduceMotion = within(dialog).getByRole("checkbox", { name: "Reduce motion" });
+    fireEvent.click(reduceMotion);
+    expect(window.localStorage.getItem("dronedream:reduce-motion")).toBe("true");
+    await waitFor(() => expect(document.documentElement.dataset.ddReducedMotion).toBe("true"));
+    expect(dialog).toHaveAttribute("data-grants-hardware-authority", "false");
+    expect(within(dialog).queryByText("Fixed edition")).not.toBeInTheDocument();
+
+    router.dispose();
+  });
+
   it("does not expose a header sign-in control on the startup launcher", () => {
     launcherAuthState.current = {
       configured: true,
@@ -179,6 +215,9 @@ describe("desktop launcher chrome", () => {
       default_template_key: "hover-basics@1",
       default_track_type: "hover",
       default_altitude_m: 4,
+      default_objective_profile: "robust",
+      default_optimizer_strategy: "llm_harness",
+      default_max_total_trials: 240,
       retention_days: 90,
       stored_content:
         "allowlisted_preferences_and_verified_structured_job_outcomes_only",
@@ -217,6 +256,9 @@ describe("desktop launcher chrome", () => {
       default_template_key: "hover-basics@1",
       default_track_type: "hover",
       default_altitude_m: 4,
+      default_objective_profile: null,
+      default_optimizer_strategy: null,
+      default_max_total_trials: null,
     }));
     expect(within(dialog).getByText("Personal defaults saved.")).toBeVisible();
 
@@ -248,6 +290,9 @@ describe("desktop launcher chrome", () => {
       default_template_key: null,
       default_track_type: null,
       default_altitude_m: null,
+      default_objective_profile: null,
+      default_optimizer_strategy: null,
+      default_max_total_trials: null,
       retention_days: 90,
       stored_content:
         "allowlisted_preferences_and_verified_structured_job_outcomes_only",
@@ -288,6 +333,11 @@ describe("desktop launcher chrome", () => {
     fireEvent.click(within(dialog).getByRole("tab", { name: "Model" }));
     expect(within(dialog).getByRole("button", { name: /Included allowance/ }))
       .toHaveAttribute("aria-pressed", "true");
+    expect(within(dialog).queryByText("Sign in to read and use your included allowance."))
+      .not.toBeInTheDocument();
+    expect(within(dialog).getAllByText("Available after sign-in").length).toBeGreaterThanOrEqual(6);
+    expect(within(dialog).getByRole("button", { name: "Refresh usage" })).toBeDisabled();
+    expect(within(dialog).getByLabelText("Autonomous tuning boundary")).toBeVisible();
     expect(within(dialog).getByRole("link", { name: "Manage subscription" }))
       .toHaveAttribute("href", "https://getdronedream.com/pricing/");
     fireEvent.click(within(dialog).getByRole("button", { name: /Use my API key/ }));

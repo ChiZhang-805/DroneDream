@@ -151,6 +151,9 @@ class UserExperiencePreferencesUpdate(_Strict):
     default_template_key: StarterExperienceTemplateKey | None = None
     default_track_type: DefaultTrackType | None = None
     default_altitude_m: Annotated[float, Field(ge=1, le=20)] | None = None
+    default_objective_profile: ObjectiveProfile | None = None
+    default_optimizer_strategy: OptimizerStrategy | None = None
+    default_max_total_trials: Annotated[int, Field(ge=1, le=10000)] | None = None
 
     @model_validator(mode="after")
     def require_at_least_one_field(self) -> UserExperiencePreferencesUpdate:
@@ -167,6 +170,9 @@ class UserExperiencePreferences(BaseModel):
     default_template_key: StarterExperienceTemplateKey | None = None
     default_track_type: DefaultTrackType | None = None
     default_altitude_m: float | None = None
+    default_objective_profile: ObjectiveProfile | None = None
+    default_optimizer_strategy: OptimizerStrategy | None = None
+    default_max_total_trials: int | None = None
     retention_days: int
     stored_content: Literal[
         "allowlisted_preferences_and_verified_structured_job_outcomes_only"

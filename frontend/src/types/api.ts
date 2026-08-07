@@ -64,6 +64,9 @@ export interface UserExperiencePreferences {
   default_template_key: StarterExperienceTemplateKey | null;
   default_track_type: UserDefaultTrackType | null;
   default_altitude_m: number | null;
+  default_objective_profile: ObjectiveProfile | null;
+  default_optimizer_strategy: OptimizerStrategy | null;
+  default_max_total_trials: number | null;
   retention_days: number;
   stored_content:
     "allowlisted_preferences_and_verified_structured_job_outcomes_only";
@@ -76,6 +79,9 @@ export interface UserExperiencePreferencesUpdate {
   default_template_key?: StarterExperienceTemplateKey | null;
   default_track_type?: UserDefaultTrackType | null;
   default_altitude_m?: number | null;
+  default_objective_profile?: ObjectiveProfile | null;
+  default_optimizer_strategy?: OptimizerStrategy | null;
+  default_max_total_trials?: number | null;
 }
 
 export interface UserExperiencePreferencesMutation

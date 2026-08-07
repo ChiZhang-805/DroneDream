@@ -1183,6 +1183,9 @@ describe("NewJob experiment wizard", () => {
         default_template_key: "hover-basics@1",
         default_track_type: "hover",
         default_altitude_m: 4,
+        default_objective_profile: "robust",
+        default_optimizer_strategy: "llm_harness",
+        default_max_total_trials: 240,
         retention_days: 90,
         stored_content:
           "allowlisted_preferences_and_verified_structured_job_outcomes_only",
@@ -1196,7 +1199,11 @@ describe("NewJob experiment wizard", () => {
     await waitFor(() => expect(preferencesSpy).toHaveBeenCalledTimes(1));
     expect(screen.getByLabelText(/Track type/i)).toHaveValue("hover");
     expect(screen.getByLabelText(/Altitude/i)).toHaveValue(4);
+    expect(screen.getByLabelText(/Objective profile/i)).toHaveValue("robust");
     expect(screen.getByText(/Saved defaults applied.*No experiment was created/i)).toBeVisible();
+    openStep(/Constraints & budget/i);
+    expect(screen.getByLabelText(/Optimizer Strategy/i)).toHaveValue("llm_harness");
+    expect(screen.getByLabelText(/Maximum total trials/i)).toHaveValue(240);
     expect(createSpy).not.toHaveBeenCalled();
   });
 

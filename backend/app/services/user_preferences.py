@@ -47,6 +47,15 @@ def serialize_user_experience_preferences(
             "default_altitude_m": (
                 preferences.default_altitude_m if preferences else None
             ),
+            "default_objective_profile": (
+                preferences.default_objective_profile if preferences else None
+            ),
+            "default_optimizer_strategy": (
+                preferences.default_optimizer_strategy if preferences else None
+            ),
+            "default_max_total_trials": (
+                preferences.default_max_total_trials if preferences else None
+            ),
             "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
             "updated_at": preferences.updated_at if preferences else None,
         }
@@ -70,6 +79,9 @@ def update_user_experience_preferences(
         "default_template_key",
         "default_track_type",
         "default_altitude_m",
+        "default_objective_profile",
+        "default_optimizer_strategy",
+        "default_max_total_trials",
     ):
         if field_name in fields:
             setattr(preferences, field_name, getattr(request, field_name))

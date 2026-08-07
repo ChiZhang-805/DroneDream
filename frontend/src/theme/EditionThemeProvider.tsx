@@ -5,11 +5,16 @@ import {
   useLayoutEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { applyUniversalMode } from "../features/distribution/universalMode";
+import {
+  appReducedMotionEnabled,
+  REDUCE_MOTION_CHANGE_EVENT,
+} from "../desktop/uiMotionPreferences";
 import {
   editionTheme,
   editionThemeForAppearance,
@@ -46,6 +51,14 @@ export function EditionThemeProvider({
   children: ReactNode;
 }) {
   const [appearance, setAppearanceState] = useState<AppearanceMode>(storedAppearance);
+  const reducedMotion = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener(REDUCE_MOTION_CHANGE_EVENT, onChange);
+      return () => window.removeEventListener(REDUCE_MOTION_CHANGE_EVENT, onChange);
+    },
+    appReducedMotionEnabled,
+    () => false,
+  );
   const setAppearance = useCallback((next: AppearanceMode) => {
     window.localStorage.setItem(APPEARANCE_STORAGE_KEY, next);
     setAppearanceState(next);
@@ -59,8 +72,9 @@ export function EditionThemeProvider({
   useLayoutEffect(() => {
     applyUniversalMode(edition);
     document.documentElement.dataset.ddAppearance = appearance;
+    document.documentElement.dataset.ddReducedMotion = String(reducedMotion);
     document.documentElement.style.colorScheme = appearance;
-  }, [appearance, edition]);
+  }, [appearance, edition, reducedMotion]);
   return (
     <EditionThemeContext.Provider value={theme}>
       {children}

@@ -268,6 +268,8 @@ async function verifySettings(page, testCase) {
       if (!(panel instanceof HTMLElement)) throw new Error("Active Settings panel is missing");
       const dialogBounds = element.getBoundingClientRect();
       const panelBounds = panel.getBoundingClientRect();
+      const notificationList = panel.querySelector(".settings-notification-list");
+      const modelLoop = panel.querySelector(".settings-model-loop");
       return {
         tab: panel.dataset.settingsPanel,
         dialogClientHeight: element.clientHeight,
@@ -279,6 +281,22 @@ async function verifySettings(page, testCase) {
         panelTop: panelBounds.top,
         panelBottom: panelBounds.bottom,
         grantsHardwareAuthority: element.getAttribute("data-grants-hardware-authority"),
+        notificationList: notificationList instanceof HTMLElement ? {
+          borderRadius: getComputedStyle(notificationList).borderRadius,
+          backgroundColor: getComputedStyle(notificationList).backgroundColor,
+          rowCount: notificationList.querySelectorAll(".settings-toggle-row").length,
+        } : null,
+        memoryDefaultCount: panel.querySelectorAll(".settings-memory-defaults > label").length,
+        memoryFactCount: panel.querySelectorAll(".settings-memory-facts").length,
+        modelLoopVisible: modelLoop instanceof HTMLElement
+          && modelLoop.getBoundingClientRect().bottom <= panelBounds.bottom + 1,
+        runtimeRowsWithoutBorders: Array.from(
+          panel.querySelectorAll(".settings-runtime-checks li"),
+        ).every((row) => getComputedStyle(row).borderBottomWidth === "0px"),
+        runtimeLastCheckWithoutBorder: (() => {
+          const footer = panel.querySelector(".settings-runtime-last-check");
+          return footer === null || getComputedStyle(footer).borderTopWidth === "0px";
+        })(),
       };
     });
     const panelImage = await screenshot(page, testCase.id, `settings-${measurement.tab}`);
@@ -294,6 +312,22 @@ async function verifySettings(page, testCase) {
     assert(measurement.panelTop >= measurement.dialogTop - 1);
     assert(measurement.panelBottom <= measurement.dialogBottom + 1);
     assert.equal(measurement.grantsHardwareAuthority, "false");
+    if (measurement.tab === "general") {
+      assert.deepEqual(measurement.notificationList, {
+        borderRadius: "0px",
+        backgroundColor: "rgba(0, 0, 0, 0)",
+        rowCount: 6,
+      });
+    }
+    if (measurement.tab === "memory") {
+      assert.equal(measurement.memoryDefaultCount, 6);
+      assert.equal(measurement.memoryFactCount, 0);
+    }
+    if (measurement.tab === "model") assert.equal(measurement.modelLoopVisible, true);
+    if (measurement.tab === "runtime") {
+      assert.equal(measurement.runtimeRowsWithoutBorders, true);
+      assert.equal(measurement.runtimeLastCheckWithoutBorder, true);
+    }
     panelMeasurements.push(measurement);
     panelImages.push(panelImage);
   }

@@ -7,6 +7,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
+import { PNG } from "pngjs";
 import { createServer } from "vite";
 
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -299,12 +300,61 @@ async function verifyCase(browser, testCase) {
       appearance: document.documentElement.dataset.ddAppearance,
       grantsHardwareAuthority: document.documentElement.dataset.themeGrantsHardwareAuthority,
       calls: window.__SIM_VISUAL_CALLS__,
+      sceneStars: document.querySelector(".drone-launch-scene")?.getAttribute("data-scene-stars"),
+      sceneParticles: document.querySelector(".drone-launch-scene")
+        ?.getAttribute("data-scene-particles"),
     }));
     assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
     assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
     assert.equal(dimensions.appearance, testCase.appearance);
     assert.equal(dimensions.brandEdition, "sim");
     assert.equal(dimensions.grantsHardwareAuthority, "false");
+    assert.equal(dimensions.sceneStars, testCase.appearance === "light" ? "false" : "true");
+    assert.equal(dimensions.sceneParticles, testCase.appearance === "light" ? "false" : "true");
+    const imagePath = path.join(outputRoot, `${testCase.id}.png`);
+    await page.screenshot({ path: imagePath, fullPage: false });
+    const canvasScreenshot = await page.locator(".drone-launch-canvas").screenshot({ type: "png" });
+    const canvasFrame = PNG.sync.read(canvasScreenshot);
+    const points = [
+      [0.03, 0.03], [0.25, 0.08], [0.5, 0.08], [0.75, 0.08], [0.97, 0.03],
+      [0.08, 0.4], [0.33, 0.4], [0.5, 0.5], [0.67, 0.4], [0.92, 0.4],
+      [0.08, 0.72], [0.33, 0.72], [0.5, 0.72], [0.67, 0.72], [0.92, 0.72],
+    ];
+    const samples = points.map(([x, y]) => {
+      const pixelX = Math.min(canvasFrame.width - 1, Math.floor(canvasFrame.width * x));
+      const pixelY = Math.min(canvasFrame.height - 1, Math.floor(canvasFrame.height * y));
+      const offset = (pixelY * canvasFrame.width + pixelX) * 4;
+      return [...canvasFrame.data.subarray(offset, offset + 4)];
+    });
+    const canvasPixels = {
+      width: canvasFrame.width,
+      height: canvasFrame.height,
+      samples,
+      distinctSamples: new Set(samples.map((sample) => sample.join(","))).size,
+      upperBrightRatio: (() => {
+        let bright = 0;
+        let total = 0;
+        const upperLimit = Math.max(1, Math.floor(canvasFrame.height * 0.3));
+        for (let y = 0; y < upperLimit; y += 12) {
+          for (let x = 0; x < canvasFrame.width; x += 12) {
+            const offset = (y * canvasFrame.width + x) * 4;
+            total += 1;
+            if (
+              canvasFrame.data[offset] >= 245
+              && canvasFrame.data[offset + 1] >= 245
+              && canvasFrame.data[offset + 2] >= 245
+            ) bright += 1;
+          }
+        }
+        return total > 0 ? bright / total : 0;
+      })(),
+    };
+    assert(canvasPixels.width > 100 && canvasPixels.height > 100);
+    assert(canvasPixels.distinctSamples >= 6, `${testCase.id}: 3D canvas appears blank`);
+    if (testCase.appearance === "light") {
+      assert(canvasPixels.upperBrightRatio >= 0.6,
+        `${testCase.id}: light scene is not predominantly white: ${canvasPixels.upperBrightRatio}`);
+    }
     if (testCase.scenario === "auto-ready") {
       assert.equal(dimensions.calls.filter((command) => command === "start_runtime").length, 1);
     } else {
@@ -312,13 +362,12 @@ async function verifyCase(browser, testCase) {
     }
     assert.equal(pageErrors.length, 0);
 
-    const imagePath = path.join(outputRoot, `${testCase.id}.png`);
-    await page.screenshot({ path: imagePath, fullPage: false });
     return {
       case: testCase,
       status: "pass",
       expectedPercent: Number(expectedPercent),
       dimensions,
+      canvasPixels,
       image: {
         path: path.relative(repoRoot, imagePath).replaceAll("\\", "/"),
         sha256: await sha256File(imagePath),

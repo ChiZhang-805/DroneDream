@@ -19,6 +19,9 @@ def test_experience_preferences_are_opt_in_bounded_and_deletable(client) -> None
         "default_template_key": None,
         "default_track_type": None,
         "default_altitude_m": None,
+        "default_objective_profile": None,
+        "default_optimizer_strategy": None,
+        "default_max_total_trials": None,
         "retention_days": 90,
         "stored_content": (
             "allowlisted_preferences_and_verified_structured_job_outcomes_only"
@@ -34,6 +37,9 @@ def test_experience_preferences_are_opt_in_bounded_and_deletable(client) -> None
             "default_template_key": "hover-basics@1",
             "default_track_type": "hover",
             "default_altitude_m": 3.0,
+            "default_objective_profile": "robust",
+            "default_optimizer_strategy": "llm_harness",
+            "default_max_total_trials": 240,
         },
     )
     assert saved.status_code == 200
@@ -44,6 +50,9 @@ def test_experience_preferences_are_opt_in_bounded_and_deletable(client) -> None
     assert saved_data["default_template_key"] == "hover-basics@1"
     assert saved_data["default_track_type"] == "hover"
     assert saved_data["default_altitude_m"] == 3.0
+    assert saved_data["default_objective_profile"] == "robust"
+    assert saved_data["default_optimizer_strategy"] == "llm_harness"
+    assert saved_data["default_max_total_trials"] == 240
     assert saved_data["deleted_memory_count"] == 0
     assert "user_id" not in saved_data
 
@@ -138,6 +147,18 @@ def test_experience_preferences_reject_unknown_or_unbounded_values(client) -> No
     assert client.put(
         "/api/v1/preferences/experience",
         json={"default_track_type": "custom"},
+    ).status_code == 422
+    assert client.put(
+        "/api/v1/preferences/experience",
+        json={"default_objective_profile": "unsafe"},
+    ).status_code == 422
+    assert client.put(
+        "/api/v1/preferences/experience",
+        json={"default_optimizer_strategy": "unbounded_agent"},
+    ).status_code == 422
+    assert client.put(
+        "/api/v1/preferences/experience",
+        json={"default_max_total_trials": 10001},
     ).status_code == 422
     assert client.put(
         "/api/v1/preferences/experience",

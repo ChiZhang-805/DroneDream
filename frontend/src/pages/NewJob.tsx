@@ -1668,6 +1668,11 @@ export function NewJob() {
         altitude_m: preferences.default_altitude_m === null
           ? templated.altitude_m
           : String(preferences.default_altitude_m),
+        objective_profile: preferences.default_objective_profile ?? templated.objective_profile,
+        optimizer_strategy: preferences.default_optimizer_strategy ?? templated.optimizer_strategy,
+        max_total_trials: preferences.default_max_total_trials === null
+          ? templated.max_total_trials
+          : String(preferences.default_max_total_trials),
       };
     });
     if (template) {
@@ -1676,7 +1681,15 @@ export function NewJob() {
     }
     setErrors((previous) => {
       const next = { ...previous };
-      for (const key of ["track_type", "start_x", "start_y", "altitude_m"]) {
+      for (const key of [
+        "track_type",
+        "start_x",
+        "start_y",
+        "altitude_m",
+        "objective_profile",
+        "optimizer_strategy",
+        "max_total_trials",
+      ]) {
         delete next[key];
       }
       if (template) {
@@ -1693,7 +1706,10 @@ export function NewJob() {
       const hasDefaults = (
         preferences.default_template_key !== null ||
         preferences.default_track_type !== null ||
-        preferences.default_altitude_m !== null
+        preferences.default_altitude_m !== null ||
+        preferences.default_objective_profile !== null ||
+        preferences.default_optimizer_strategy !== null ||
+        preferences.default_max_total_trials !== null
       );
       if (!preferences.saved || !hasDefaults) {
         setSavedDefaultsState("empty");

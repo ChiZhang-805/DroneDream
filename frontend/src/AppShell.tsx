@@ -9,12 +9,15 @@ import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
+  Activity,
+  BadgeCheck,
   BellRing,
   Box,
   BotMessageSquare,
   Camera,
   CheckCircle2,
   Circle,
+  CircleAlert,
   CircleUserRound,
   Download,
   History,
@@ -31,6 +34,7 @@ import {
   Save,
   Settings,
   ShieldCheck,
+  Sparkles,
   Sun,
   X,
   XCircle,
@@ -68,11 +72,18 @@ import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
 import type { DesktopReadinessCheckId } from "./desktop/readiness";
 import {
   EXPERIMENT_NOTIFICATION_CHANGE_EVENT,
-  experimentNotificationsEnabled,
+  getExperimentNotificationPreferences,
   requestExperimentNotificationPermission,
   sendExperimentCompletionNotification,
-  setExperimentNotificationsEnabled,
+  sendEnvironmentIssueNotification,
+  setExperimentNotificationPreferences,
+  type ExperimentNotificationPreferences,
 } from "./desktop/experimentNotifications";
+import {
+  appReducedMotionEnabled,
+  REDUCE_MOTION_CHANGE_EVENT,
+  setAppReducedMotionEnabled,
+} from "./desktop/uiMotionPreferences";
 import {
   approveDesktopStartupGateWithoutCloudAuth,
   setDesktopStartupGateState,
@@ -111,15 +122,18 @@ import {
   hasExperimentDraft,
   persistExperimentDraftsForExit,
 } from "./features/experiment/draftStorage";
+import { optimizerStrategyLabel } from "./features/experiment/optimizerStrategies";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
 import type {
   Job,
   JobStatus,
+  ObjectiveProfile,
+  OptimizerStrategy,
   StarterExperienceTemplateKey,
   UserDefaultTrackType,
-  UserExperiencePreferences,
 } from "./types/api";
+import { OBJECTIVE_PROFILES, OPTIMIZER_STRATEGIES } from "./types/api";
 import {
   SimBrandLockup,
 } from "./editions/sim/SimEditionExperience";
@@ -227,6 +241,9 @@ interface ExperiencePreferenceDraft {
   default_template_key: StarterExperienceTemplateKey | null;
   default_track_type: UserDefaultTrackType | null;
   default_altitude_m: number | null;
+  default_objective_profile: ObjectiveProfile | null;
+  default_optimizer_strategy: OptimizerStrategy | null;
+  default_max_total_trials: number | null;
 }
 
 const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
@@ -234,6 +251,9 @@ const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
   default_template_key: null,
   default_track_type: null,
   default_altitude_m: null,
+  default_objective_profile: null,
+  default_optimizer_strategy: null,
+  default_max_total_trials: null,
 };
 const EXPERIENCE_PREFERENCE_LOAD_FAILED = "experience-preference-load-failed";
 
@@ -458,8 +478,6 @@ function SettingsDialog({
   const [managedModelsError, setManagedModelsError] = useState<string | null>(null);
   const [subscriptionOpenError, setSubscriptionOpenError] =
     useState<string | null>(null);
-  const [experiencePreferences, setExperiencePreferences] =
-    useState<UserExperiencePreferences | null>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
     useState<ExperiencePreferenceDraft>(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
   const [experiencePreferenceState, setExperiencePreferenceState] =
@@ -470,32 +488,49 @@ function SettingsDialog({
     useState<string | null>(null);
   const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
     useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(
-    experimentNotificationsEnabled,
+  const [notificationPreferences, setNotificationPreferences] = useState(
+    getExperimentNotificationPreferences,
   );
+  const [reduceMotion, setReduceMotion] = useState(appReducedMotionEnabled);
   const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
   const [notificationPermissionBusy, setNotificationPermissionBusy] = useState(false);
   const changeNotifications = async (enabled: boolean) => {
     setNotificationMessage(null);
     if (!enabled) {
-      setExperimentNotificationsEnabled(false);
-      setNotificationsEnabled(false);
+      const next = { ...notificationPreferences, enabled: false };
+      setExperimentNotificationPreferences(next);
+      setNotificationPreferences(next);
       return;
     }
     setNotificationPermissionBusy(true);
     try {
       const granted = await requestExperimentNotificationPermission();
-      setExperimentNotificationsEnabled(granted);
-      setNotificationsEnabled(granted);
+      const next = { ...notificationPreferences, enabled: granted };
+      setExperimentNotificationPreferences(next);
+      setNotificationPreferences(next);
       if (!granted) setNotificationMessage(t("settings.general.notificationDenied"));
     } catch {
-      setExperimentNotificationsEnabled(false);
-      setNotificationsEnabled(false);
+      const next = { ...notificationPreferences, enabled: false };
+      setExperimentNotificationPreferences(next);
+      setNotificationPreferences(next);
       setNotificationMessage(t("settings.general.notificationFailed"));
     } finally {
       setNotificationPermissionBusy(false);
     }
   };
+  const updateNotificationPreference = (
+    key: Exclude<keyof ExperimentNotificationPreferences, "enabled">,
+    enabled: boolean,
+  ) => {
+    const next = { ...notificationPreferences, [key]: enabled };
+    setExperimentNotificationPreferences(next);
+    setNotificationPreferences(next);
+  };
+  useEffect(() => {
+    const sync = () => setReduceMotion(appReducedMotionEnabled());
+    window.addEventListener(REDUCE_MOTION_CHANGE_EVENT, sync);
+    return () => window.removeEventListener(REDUCE_MOTION_CHANGE_EVENT, sync);
+  }, []);
   const openSubscriptionPage = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
   ) => {
@@ -581,12 +616,14 @@ function SettingsDialog({
     void apiClient.getUserExperiencePreferences()
       .then((preferences) => {
         if (!active) return;
-        setExperiencePreferences(preferences);
         setExperiencePreferenceDraft({
           memory_enabled: preferences.memory_enabled,
           default_template_key: preferences.default_template_key,
           default_track_type: preferences.default_track_type,
           default_altitude_m: preferences.default_altitude_m,
+          default_objective_profile: preferences.default_objective_profile,
+          default_optimizer_strategy: preferences.default_optimizer_strategy,
+          default_max_total_trials: preferences.default_max_total_trials,
         });
         setExperiencePreferenceState("ready");
       })
@@ -615,7 +652,6 @@ function SettingsDialog({
         ...experiencePreferenceDraft,
         locale,
       });
-      setExperiencePreferences(saved);
       setExperiencePreferenceState("saved");
       setExperiencePreferenceMessage(
         saved.deleted_memory_count > 0
@@ -642,7 +678,6 @@ function SettingsDialog({
     setExperiencePreferenceMessage(null);
     try {
       const deleted = await apiClient.deleteUserExperiencePreferences();
-      setExperiencePreferences(null);
       setExperiencePreferenceDraft(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
       setConfirmExperiencePreferenceDelete(false);
       setExperiencePreferenceState("ready");
@@ -706,8 +741,6 @@ function SettingsDialog({
       );
     }
     details.push(...runtime.diagnostics);
-  } else if (!access.isChecking) {
-    details.push(t("settings.runtime.noResult"));
   }
   const uniqueDetails = [...new Set(details.filter(Boolean))];
   const statusLabel = access.isChecking
@@ -798,39 +831,87 @@ function SettingsDialog({
             </button>
           </div>
         </div>
-        <div className="settings-toggle-row">
-          <BellRing aria-hidden="true" />
-          <span>
-            <strong>{t("settings.general.notifications")}</strong>
-            <small>{t("settings.general.notificationsDetail")}</small>
-          </span>
-          <label className="settings-switch">
-            <input
-              type="checkbox"
-              checked={notificationsEnabled}
-              disabled={notificationPermissionBusy}
-              aria-label={t("settings.general.notifications")}
-              onChange={(event) => void changeNotifications(event.target.checked)}
-            />
-            <span aria-hidden="true" />
-          </label>
+        <div className="settings-notification-list" aria-label={t("settings.general.notificationSection")}>
+          <div className="settings-toggle-row settings-toggle-row-master">
+            <BellRing aria-hidden="true" />
+            <span>
+              <strong>{t("settings.general.notifications")}</strong>
+              <small>{t("settings.general.notificationsDetail")}</small>
+            </span>
+            <label className="settings-switch">
+              <input
+                type="checkbox"
+                checked={notificationPreferences.enabled}
+                disabled={notificationPermissionBusy}
+                aria-label={t("settings.general.notifications")}
+                onChange={(event) => void changeNotifications(event.target.checked)}
+              />
+              <span aria-hidden="true" />
+            </label>
+          </div>
+          {([
+            ["taskResults", BadgeCheck, "settings.general.taskResults", "settings.general.taskResultsDetail"],
+            ["attentionRequired", CircleAlert, "settings.general.attention", "settings.general.attentionDetail"],
+            ["qualificationResults", ShieldCheck, "settings.general.qualification", "settings.general.qualificationDetail"],
+            ["environmentIssues", Activity, "settings.general.environmentIssues", "settings.general.environmentIssuesDetail"],
+          ] as const).map(([key, Icon, labelKey, detailKey]) => (
+            <div className="settings-toggle-row settings-toggle-row-child" key={key}>
+              <Icon aria-hidden="true" />
+              <span>
+                <strong>{t(labelKey)}</strong>
+                <small>{t(detailKey)}</small>
+              </span>
+              <label className="settings-switch">
+                <input
+                  type="checkbox"
+                  checked={notificationPreferences[key]}
+                  disabled={!notificationPreferences.enabled}
+                  aria-label={t(labelKey)}
+                  onChange={(event) => updateNotificationPreference(key, event.target.checked)}
+                />
+                <span aria-hidden="true" />
+              </label>
+            </div>
+          ))}
+          <div className="settings-toggle-row settings-toggle-row-motion">
+            <Sparkles aria-hidden="true" />
+            <span>
+              <strong>{t("settings.general.reduceMotion")}</strong>
+              <small>{t("settings.general.reduceMotionDetail")}</small>
+            </span>
+            <label className="settings-switch">
+              <input
+                type="checkbox"
+                checked={reduceMotion}
+                aria-label={t("settings.general.reduceMotion")}
+                onChange={(event) => {
+                  setAppReducedMotionEnabled(event.target.checked);
+                  setReduceMotion(event.target.checked);
+                }}
+              />
+              <span aria-hidden="true" />
+            </label>
+          </div>
         </div>
         {notificationMessage ? (
           <p className="settings-inline-message" role="status">{notificationMessage}</p>
         ) : null}
         <div className="settings-general-footer">
-          <div>
-            <span>{t("settings.general.version")}</span>
-            <strong>DroneDream · SIM {SIM_EDITION.displayVersion}</strong>
-          </div>
+          <strong>DroneDream · SIM {SIM_EDITION.displayVersion}</strong>
           <button
             type="button"
             className="btn"
             onClick={() => {
               setLocale("en");
               editionTheme.resetAppearance();
-              setExperimentNotificationsEnabled(false);
-              setNotificationsEnabled(false);
+              const nextNotifications = {
+                ...notificationPreferences,
+                enabled: false,
+              };
+              setExperimentNotificationPreferences(nextNotifications);
+              setNotificationPreferences(nextNotifications);
+              setAppReducedMotionEnabled(false);
+              setReduceMotion(false);
               setNotificationMessage(null);
             }}
           >
@@ -867,7 +948,7 @@ function SettingsDialog({
           />
           <strong>{t("settings.memory.consent")}</strong>
         </label>
-        <div className="settings-memory-grid">
+        <div className="settings-memory-defaults">
           <label htmlFor="settings_default_template">
             <span>{t("settings.memory.defaultTemplate")}</span>
             <select
@@ -925,27 +1006,58 @@ function SettingsDialog({
               }))}
             />
           </label>
-        </div>
-        <div className="settings-memory-facts">
-          <div>
-            <History aria-hidden="true" />
-            <span>{t("settings.memory.retention")}</span>
-            <strong>{experiencePreferences?.retention_days ?? 90} {t("settings.memory.days")}</strong>
-          </div>
-          <div>
-            <Save aria-hidden="true" />
-            <span>{t("settings.memory.lastUpdated")}</span>
-            <strong>{experiencePreferences?.updated_at
-              ? new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
-                  dateStyle: "medium",
-                }).format(new Date(experiencePreferences.updated_at))
-              : t("settings.memory.notSaved")}</strong>
-          </div>
-          <div>
-            <ShieldCheck aria-hidden="true" />
-            <span>{t("settings.memory.scope")}</span>
-            <strong>{t("settings.memory.verifiedOnly")}</strong>
-          </div>
+          <label htmlFor="settings_default_objective">
+            <span>{t("settings.memory.defaultObjective")}</span>
+            <select
+              id="settings_default_objective"
+              value={experiencePreferenceDraft.default_objective_profile ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_objective_profile: (event.target.value || null) as ObjectiveProfile | null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              {OBJECTIVE_PROFILES.map((profile) => (
+                <option key={profile} value={profile}>{t(`wizard.objective.${profile}` as TranslationKey)}</option>
+              ))}
+            </select>
+          </label>
+          <label htmlFor="settings_default_optimizer">
+            <span>{t("settings.memory.defaultOptimizer")}</span>
+            <select
+              id="settings_default_optimizer"
+              value={experiencePreferenceDraft.default_optimizer_strategy ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_optimizer_strategy: (event.target.value || null) as OptimizerStrategy | null,
+              }))}
+            >
+              <option value="">{t("settings.memory.noDefault")}</option>
+              {OPTIMIZER_STRATEGIES.map((strategy) => (
+                <option key={strategy} value={strategy}>{optimizerStrategyLabel(strategy, t)}</option>
+              ))}
+            </select>
+          </label>
+          <label htmlFor="settings_default_trial_budget">
+            <span>{t("settings.memory.defaultTrialBudget")}</span>
+            <input
+              id="settings_default_trial_budget"
+              type="number"
+              min="1"
+              max="10000"
+              step="1"
+              value={experiencePreferenceDraft.default_max_total_trials ?? ""}
+              disabled={experiencePreferenceControlsDisabled}
+              onChange={(event) => setExperiencePreferenceDraft((current) => ({
+                ...current,
+                default_max_total_trials: event.target.value === ""
+                  ? null
+                  : Number(event.target.value),
+              }))}
+            />
+          </label>
         </div>
         <div className="settings-memory-actions">
           <button
@@ -992,14 +1104,12 @@ function SettingsDialog({
             {t("settings.memory.runtimeRequired")}
           </p>
         ) : null}
-        {experiencePreferenceMessage ? (
+        {experiencePreferenceMessage && experiencePreferenceMessage !== EXPERIENCE_PREFERENCE_LOAD_FAILED ? (
           <p
             className="settings-memory-message"
             role={experiencePreferenceState === "error" ? "alert" : "status"}
           >
-            {experiencePreferenceMessage === EXPERIENCE_PREFERENCE_LOAD_FAILED
-              ? t("settings.memory.loadFailed")
-              : experiencePreferenceMessage}
+            {experiencePreferenceMessage}
           </p>
         ) : null}
         </section>
@@ -1056,6 +1166,11 @@ function SettingsDialog({
                     event.target.value as ManagedModelCatalogEntry["provider"],
                   )}
                 >
+                  {managedModels.length === 0 ? (
+                    <option value={modelAccess.managedProvider}>
+                      {t("settings.model.signInPlaceholder")}
+                    </option>
+                  ) : null}
                   {managedModels.map((model) => (
                     <option key={model.provider} value={model.provider}>
                       {model.display_name} · {model.model}
@@ -1087,86 +1202,64 @@ function SettingsDialog({
                 {subscriptionOpenError}
               </p>
             ) : null}
-            {!auth.account && !docsPreview ? (
-              <p className="settings-model-usage-message">
-                {t("settings.model.signInForAllowance")}
-              </p>
-            ) : managedUsage ? (
-              <>
-                <div className="settings-model-quota-heading">
-                  <span>{t("settings.model.periodUsage")}</span>
-                  <strong>
-                    {numberFormatter.format(managedUsage.usage.consumed_ai_credits)}
-                    {" / "}
-                    {numberFormatter.format(managedUsage.plan.included_ai_credits)}
-                    {" "}
-                    {t("settings.model.credits")}
-                  </strong>
-                </div>
-                <div
-                  className="settings-model-quota-track"
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={managedUsage.plan.included_ai_credits}
-                  aria-valuenow={managedUsage.usage.consumed_ai_credits}
-                >
-                  <span style={{ width: `${creditRatio}%` }} />
-                </div>
-                <div className="settings-model-usage-grid">
-                  <div>
-                    <span>{t("settings.model.remaining")}</span>
-                    <strong>{numberFormatter.format(managedUsage.usage.remaining_ai_credits)}</strong>
-                  </div>
-                  <div>
-                    <span>{t("settings.model.requests")}</span>
-                    <strong>{numberFormatter.format(managedUsage.usage.request_count)}</strong>
-                  </div>
-                  <div>
-                    <span>{t("settings.model.inputTokens")}</span>
-                    <strong>{numberFormatter.format(managedUsage.usage.input_tokens)}</strong>
-                  </div>
-                  <div>
-                    <span>{t("settings.model.outputTokens")}</span>
-                    <strong>{numberFormatter.format(managedUsage.usage.output_tokens)}</strong>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="settings-model-usage-message" role="status">
-                {managedUsageState === "loading"
-                  ? t("settings.model.loadingUsage")
-                  : managedUsageError ?? t("settings.model.usageUnavailable")}
-              </p>
-            )}
-            <div className="settings-model-usage-footer">
-              {managedUsage ? (
-                <p className="settings-model-period">
-                  {t("settings.model.resetsAt")}:{" "}
-                  {new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }).format(new Date(managedUsage.period.ends_at))}
-                  {managedUsage.usage.estimated_request_count > 0
-                    ? ` · ${t("settings.model.estimatedUsage", {
-                        count: managedUsage.usage.estimated_request_count,
-                      })}`
-                    : ""}
-                </p>
-              ) : <span aria-hidden="true" />}
-              {auth.account || docsPreview ? (
-                <button
-                  type="button"
-                  className="btn settings-model-refresh"
-                  disabled={managedUsageState === "loading"}
-                  onClick={() => void refreshManagedUsage()}
-                >
-                  {t("settings.model.refreshUsage")}
-                </button>
-              ) : null}
+            <div className="settings-model-quota-heading">
+              <span>{t("settings.model.periodUsage")}</span>
+              <strong>
+                {managedUsage
+                  ? `${numberFormatter.format(managedUsage.usage.consumed_ai_credits)} / ${numberFormatter.format(managedUsage.plan.included_ai_credits)} ${t("settings.model.credits")}`
+                  : t("settings.model.signedOutValue")}
+              </strong>
             </div>
-            <p className="settings-model-security-note">
-              {t("settings.model.platformSecurityNote")}
-            </p>
+            <div
+              className="settings-model-quota-track"
+              role="progressbar"
+              aria-label={t("settings.model.periodUsage")}
+              aria-valuemin={0}
+              aria-valuemax={managedUsage?.plan.included_ai_credits ?? 100}
+              aria-valuenow={managedUsage?.usage.consumed_ai_credits ?? 0}
+              aria-disabled={!managedUsage}
+            >
+              <span style={{ width: `${creditRatio}%` }} />
+            </div>
+            <div className="settings-model-usage-grid" aria-busy={managedUsageState === "loading"}>
+              {([
+                ["settings.model.remaining", managedUsage?.usage.remaining_ai_credits],
+                ["settings.model.requests", managedUsage?.usage.request_count],
+                ["settings.model.inputTokens", managedUsage?.usage.input_tokens],
+                ["settings.model.outputTokens", managedUsage?.usage.output_tokens],
+              ] as const).map(([labelKey, value]) => (
+                <div key={labelKey}>
+                  <span>{t(labelKey)}</span>
+                  <strong>{value === undefined
+                    ? t("settings.model.signedOutValue")
+                    : numberFormatter.format(value)}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="settings-model-usage-footer">
+              <p className="settings-model-period">
+                {t("settings.model.resetsAt")}:{" "}
+                {managedUsage
+                  ? new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(managedUsage.period.ends_at))
+                  : t("settings.model.signedOutValue")}
+              </p>
+              <button
+                type="button"
+                className="btn settings-model-refresh"
+                disabled={!auth.account || managedUsageState === "loading"}
+                onClick={() => void refreshManagedUsage()}
+              >
+                {t("settings.model.refreshUsage")}
+              </button>
+            </div>
+            {managedUsageError || managedModelsError ? (
+              <span className="sr-only" role="status">
+                {managedUsageError ?? managedModelsError}
+              </span>
+            ) : null}
           </div>
         ) : (
           <>
@@ -1251,7 +1344,6 @@ function SettingsDialog({
                 />
               </label>
             </div>
-            <p className="settings-model-security-note">{t("settings.model.securityNote")}</p>
           </>
         )}
         <div className="settings-model-loop" aria-label={t("settings.model.loopTitle")}>
@@ -1315,7 +1407,7 @@ function SettingsDialog({
               );
             })}
           </ol>
-          {!access.isChecking && level !== "healthy" && uniqueDetails.length > 0 ? (
+          {!access.isChecking && snapshot && level !== "healthy" && uniqueDetails.length > 0 ? (
             <p className="settings-runtime-diagnostic">{uniqueDetails[0]}</p>
           ) : null}
           <div className="settings-runtime-last-check">
@@ -2214,11 +2306,12 @@ function AppShellContent() {
   const exitPromptRef = useRef<ExitPromptState | null>(null);
   const exitCheckInFlightRef = useRef(false);
   const exitApprovedRef = useRef(false);
-  const [completionNotificationsEnabled, setCompletionNotificationsEnabled] = useState(
-    experimentNotificationsEnabled,
+  const [appNotificationPreferences, setAppNotificationPreferences] = useState(
+    getExperimentNotificationPreferences,
   );
   const notificationActiveJobsRef = useRef<Set<string>>(new Set());
   const notificationBaselineReadyRef = useRef(false);
+  const previousHealthyRuntimeRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
@@ -2267,14 +2360,30 @@ function AppShellContent() {
         : t("updater.sidebarRetry");
 
   useEffect(() => {
-    const sync = () => setCompletionNotificationsEnabled(experimentNotificationsEnabled());
+    const sync = () => setAppNotificationPreferences(getExperimentNotificationPreferences());
     window.addEventListener(EXPERIMENT_NOTIFICATION_CHANGE_EVENT, sync);
     return () => window.removeEventListener(EXPERIMENT_NOTIFICATION_CHANGE_EVENT, sync);
   }, []);
 
   useEffect(() => {
+    if (runtimeAccess.isChecking) return;
+    const healthy = runtimeAccess.status === "ready"
+      && runtimeAccess.canUseRuntime;
+    if (previousHealthyRuntimeRef.current && !healthy) {
+      void sendEnvironmentIssueNotification(locale, appNotificationPreferences).catch(() => undefined);
+    }
+    previousHealthyRuntimeRef.current = healthy;
+  }, [
+    appNotificationPreferences,
+    locale,
+    runtimeAccess.canUseRuntime,
+    runtimeAccess.isChecking,
+    runtimeAccess.status,
+  ]);
+
+  useEffect(() => {
     if (
-      !completionNotificationsEnabled ||
+      !appNotificationPreferences.enabled ||
       !desktopRuntime ||
       !runtimeAccess.canUseRuntime ||
       !auth.account
@@ -2301,7 +2410,7 @@ function AppShellContent() {
             try {
               const job = await apiClient.getJob(jobId);
               if (!active) return;
-              await sendExperimentCompletionNotification(job, locale);
+              await sendExperimentCompletionNotification(job, locale, appNotificationPreferences);
             } catch {
               // Notification failures never mutate or retry the tuning job.
             }
@@ -2322,7 +2431,7 @@ function AppShellContent() {
       active = false;
       window.clearInterval(interval);
     };
-  }, [auth.account, completionNotificationsEnabled, desktopRuntime, locale, runtimeAccess.canUseRuntime]);
+  }, [auth.account, appNotificationPreferences, desktopRuntime, locale, runtimeAccess.canUseRuntime]);
   const handleSidebarUpdate = useCallback(() => {
     if (updater.status === "available") {
       void updater.installAvailableUpdate();
