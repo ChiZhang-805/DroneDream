@@ -26,7 +26,11 @@ REQUIREMENTS_PATH = REPO / "brand" / "requirements.lock.txt"
 MANIFEST_PATH = REPO / "brand" / "generated" / "brand-assets.v1.json"
 VISUAL_RECEIPT_PATH = REPO / "brand" / "generated" / "brand-visual-receipt.v1.json"
 APPROVED_PREVIEW_PATH = (
-    REPO / "brand" / "source" / "approved" / "edition-brand-large-label-approved-preview.png"
+    REPO
+    / "brand"
+    / "source"
+    / "approved"
+    / "edition-brand-centered-separator-approved-preview.png"
 )
 
 EDITION_IDS = ("universal", "sim", "lab", "field")
@@ -61,7 +65,7 @@ def load_contract() -> dict[str, Any]:
     if (
         contract.get("schemaVersion") != 1
         or contract.get("kind") != "dronedream-edition-brand-system"
-        or contract.get("brandVersion") != "1.1.0"
+        or contract.get("brandVersion") != "1.1.1"
         or tuple(contract.get("editions", {})) != EDITION_IDS
         or contract.get("separator") != "\u00b7"
         or contract.get("safety") != {"presentationOnly": True, "grantsHardwareAuthority": False}
@@ -87,11 +91,13 @@ def load_contract() -> dict[str, Any]:
         or approval.get("largeLabelReviewPreviewPath")
         != APPROVED_PREVIEW_PATH.relative_to(REPO).as_posix()
         or approval.get("largeLabelReviewPreviewSha256")
-        != "8963661c81db8f9115b37114eccf80580b7bbed02d865e4e648c8503f355a01f"
+        != "77d5326be1155528d9585a56de99c80364640ed7f4d488222c7f581ef70da02e"
         or approval.get("largeLabelReviewStudySha256")
         != "9b3e9a274ef51393ffbf8ba3cf5d41224a0cafc9990deddeafcef1a92122353a"
         or approval.get("editionLabelHeightRatio") != 0.9
         or approval.get("preserveNaturalLabelWidth") is not True
+        or approval.get("separatorCentering")
+        != {"method": "equal-alpha-edge-gaps", "tolerancePx": 0}
     ):
         raise BrandBuildError("large-label approval identity drifted")
     return contract
@@ -137,6 +143,49 @@ def load_approved_edition_asset(
             raise BrandBuildError(f"approved {edition_id} asset format drifted: {path_key}")
         image = source.copy()
     return image, payload, path
+
+
+def validate_centered_separator(
+    image: Image.Image,
+    descriptor: dict[str, Any],
+    edition_id: str,
+    tolerance_px: int,
+) -> None:
+    geometry = descriptor.get("separatorGeometry")
+    if not isinstance(geometry, dict):
+        raise BrandBuildError(f"separator geometry is missing: {edition_id}")
+    try:
+        wordmark_end = int(geometry["wordmarkEndX"])
+        separator_start = int(geometry["separatorStartX"])
+        separator_end = int(geometry["separatorEndX"])
+        label_start = int(geometry["editionLabelStartX"])
+        declared_left_gap = int(geometry["leftGapPx"])
+        declared_right_gap = int(geometry["rightGapPx"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise BrandBuildError(f"separator geometry is invalid: {edition_id}") from exc
+
+    if not (0 <= wordmark_end < separator_start <= separator_end < label_start < image.width):
+        raise BrandBuildError(f"separator geometry escaped the lockup: {edition_id}")
+
+    alpha = image.getchannel("A")
+
+    def column_has_alpha(x: int) -> bool:
+        return alpha.crop((x, 0, x + 1, image.height)).getbbox() is not None
+
+    boundary_columns = (wordmark_end, separator_start, separator_end, label_start)
+    if not all(column_has_alpha(x) for x in boundary_columns):
+        raise BrandBuildError(f"separator alpha boundary drifted: {edition_id}")
+    if any(column_has_alpha(x) for x in range(wordmark_end + 1, separator_start)):
+        raise BrandBuildError(f"separator left gap is not transparent: {edition_id}")
+    if any(column_has_alpha(x) for x in range(separator_end + 1, label_start)):
+        raise BrandBuildError(f"separator right gap is not transparent: {edition_id}")
+
+    left_gap = separator_start - wordmark_end - 1
+    right_gap = label_start - separator_end - 1
+    if (left_gap, right_gap) != (declared_left_gap, declared_right_gap):
+        raise BrandBuildError(f"separator declared gap drifted: {edition_id}")
+    if abs(left_gap - right_gap) > tolerance_px:
+        raise BrandBuildError(f"separator is not centered: {edition_id}")
 
 
 def parse_color(value: str) -> tuple[int, int, int]:
@@ -502,6 +551,12 @@ def build_outputs() -> dict[Path, bytes]:
                         ],
                     ),
                 )
+                validate_centered_separator(
+                    primary_lockup,
+                    contract["approvedEditionAssets"][edition_id],
+                    edition_id,
+                    contract["approval"]["separatorCentering"]["tolerancePx"],
+                )
                 compact_lockup = primary_lockup.copy()
                 compact_lockup_payload = primary_lockup_payload
                 favicon = mark.resize((64, 64), Image.Resampling.LANCZOS)
@@ -597,6 +652,7 @@ def build_outputs() -> dict[Path, bytes]:
         "singleLineCenteredDotLockups": True,
         "editionLabelHeightRatio": contract["approval"]["editionLabelHeightRatio"],
         "naturalEditionLabelWidths": contract["approval"]["preserveNaturalLabelWidth"],
+        "separatorCentering": contract["approval"]["separatorCentering"],
         "sharedGeometry": True,
         "approvedExactByteEditions": list(EDITION_IDS[1:]),
         "presentationOnly": True,
@@ -631,6 +687,13 @@ def build_outputs() -> dict[Path, bytes]:
         descriptor = contract["approvedEditionAssets"][edition_id]
         mark_path = REPO / descriptor["markPath"]
         lockup_path = REPO / descriptor["dotLockupPath"]
+        superseded_large = descriptor["supersededLargeLabelLockup"]
+        superseded_large_path = REPO / superseded_large["path"]
+        if (
+            not superseded_large_path.is_file()
+            or sha256_bytes(superseded_large_path.read_bytes()) != superseded_large["sha256"]
+        ):
+            raise BrandBuildError(f"superseded large-label lockup evidence drifted: {edition_id}")
         superseded = descriptor["supersededDotLockup"]
         superseded_path = REPO / superseded["path"]
         if (
@@ -652,8 +715,10 @@ def build_outputs() -> dict[Path, bytes]:
                 "sha256": descriptor["dotLockupSha256"],
                 "dimensions": descriptor["dotLockupDimensions"],
                 "style": descriptor["dotLockupStyle"],
+                "separatorGeometry": descriptor["separatorGeometry"],
                 "canonicalOutputPath": f"brand/generated/{edition_id}/lockup-primary.png",
             },
+            "supersededLargeLabelLockup": superseded_large,
             "supersededDotLockup": superseded,
         }
 
@@ -696,6 +761,7 @@ def build_outputs() -> dict[Path, bytes]:
             "reviewStudySha256": contract["approval"]["largeLabelReviewStudySha256"],
             "editionLabelHeightRatio": contract["approval"]["editionLabelHeightRatio"],
             "preserveNaturalLabelWidth": contract["approval"]["preserveNaturalLabelWidth"],
+            "separatorCentering": contract["approval"]["separatorCentering"],
         },
         "conceptAssetsAreReleaseAssets": False,
         "universalIsCanonical": True,
