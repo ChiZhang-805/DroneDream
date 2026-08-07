@@ -26,6 +26,15 @@ const forbiddenNetwork = [];
 const observedRequests = [];
 let browser;
 
+function sanitizedNetworkLocation(value) {
+  try {
+    const url = new URL(value);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return "invalid-url";
+  }
+}
+
 try {
   browser = await chromium.connectOverCDP(endpoint);
   const page = browser.contexts().flatMap((context) => context.pages())
@@ -150,6 +159,20 @@ try {
         && !/^https?:\/\/(?:127\.0\.0\.1|tauri\.localhost)(?::\d+)?\//i.test(url))
   ));
   if (forbiddenNetwork.length !== 0 || existingExternalResources.length !== 0) {
+    writeFileSync(outputPath, `${JSON.stringify({
+      schemaVersion: 1,
+      kind: "dronedream-field-installed-launcher-inspection",
+      phase,
+      stage: "external-network-classification",
+      viewport: { width: 390, height: 620 },
+      shell,
+      networkDiagnostics: {
+        observedAfterAttach: [...new Set(forbiddenNetwork.map(sanitizedNetworkLocation))],
+        existingResources: [...new Set(existingExternalResources.map(sanitizedNetworkLocation))],
+        queryAndFragmentPersisted: false,
+      },
+      passed: false,
+    }, null, 2)}\n`, "utf8");
     throw new Error("Forbidden browser, OAuth, provider, or external network request observed.");
   }
 

@@ -162,3 +162,11 @@ def test_launcher_inspector_covers_the_installed_3d_auth_boundary() -> None:
         assert fragment in source
     assert "page.goto(" not in source
     assert ".click();\n  const finalLocale" in source
+
+
+def test_launcher_inspector_redacts_network_diagnostics_before_persisting() -> None:
+    source = LAUNCHER_INSPECTOR.read_text(encoding="utf-8")
+    assert "`${url.origin}${url.pathname}`" in source
+    assert 'queryAndFragmentPersisted: false' in source
+    assert "forbiddenNetwork.map(sanitizedNetworkLocation)" in source
+    assert "existingExternalResources.map(sanitizedNetworkLocation)" in source
