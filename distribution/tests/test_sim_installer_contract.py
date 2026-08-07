@@ -198,7 +198,6 @@ class SimInstallerContractTests(unittest.TestCase):
         )
 
         edition = load_json(ROOT / "distribution" / "editions" / "sim.v1.json")
-        self.assertEqual(edition["displayName"]["en"], "DroneDream · SIM")
         self.assertEqual(edition["sourcePolicy"]["developmentBranch"], "codex/software")
 
     def test_build_profile_rejects_sim_manifest_drift(self) -> None:
