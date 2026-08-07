@@ -1039,6 +1039,18 @@ input:focus-visible {
   text-align: right;
 }
 
+@media (max-width: 1100px) {
+  .field-brand-lockup {
+    width: min(360px, calc(100vw - 400px));
+    height: auto;
+    max-height: 30px;
+  }
+
+  .field-preview-badge {
+    display: none;
+  }
+}
+
 @media (max-width: 920px) {
   html {
     scroll-padding-top: 130px;
@@ -1134,7 +1146,9 @@ input:focus-visible {
   }
 
   .field-brand-lockup {
-    height: 25px;
+    width: min(230px, calc(100vw - 148px));
+    height: auto;
+    max-height: 25px;
   }
 
   .field-brand > span {

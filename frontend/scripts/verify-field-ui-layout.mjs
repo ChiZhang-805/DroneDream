@@ -104,6 +104,46 @@ try {
     assert.deepEqual(theme.colors, ["#FFC247", "#FF754B", "#D746A5"]);
     assert.equal(await page.locator(".field-app").getAttribute("data-authority"), "false");
     assert.equal(await page.locator(".field-app").getAttribute("data-validated-pack-count"), "0");
+    const topbarBounds = await page.evaluate(() => {
+      const brand = document.querySelector(".field-brand-lockup")?.getBoundingClientRect();
+      const actions = document.querySelector(".field-topbar-actions")?.getBoundingClientRect();
+      if (!brand || !actions) throw new Error("Field topbar bounds are unavailable");
+      return { brandRight: brand.right, actionsLeft: actions.left };
+    });
+    assert(topbarBounds.brandRight + 8 <= topbarBounds.actionsLeft,
+      `${testCase.id}: Field lockup overlaps the topbar actions`);
+    const pageBounds = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    assert(pageBounds.scrollWidth <= pageBounds.clientWidth + 1,
+      `${testCase.id}: Field workspace overflowed horizontally`);
+    assert.equal(await page.getByRole("button", {
+      name: testCase.locale === "en" ? "Scan serial registry" : "扫描串口注册表",
+    }).isDisabled(), true);
+
+    const workspaceScreenshotPath = path.join(outputRoot, `${testCase.id}-workspace.png`);
+    await page.screenshot({ path: workspaceScreenshotPath, fullPage: false });
+
+    await page.getByRole("link", {
+      name: testCase.locale === "en" ? /Autonomous tuning/ : /自主调参/,
+    }).click();
+    await page.getByRole("button", {
+      name: testCase.locale === "en" ? "Run safe tuning demo" : "运行安全调参演示",
+    }).click();
+    const tuning = page.locator(".field-tuning-workspace");
+    await tuning.locator(".field-tuning-results").waitFor();
+    assert.equal(await tuning.getAttribute("data-authority"), "false");
+    assert.equal(await tuning.getAttribute("data-simulation"), "false");
+    assert.equal(await tuning.locator("tbody tr").count(), 5);
+    const tuningBounds = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    assert(tuningBounds.scrollWidth <= tuningBounds.clientWidth + 1,
+      `${testCase.id}: tuning results overflowed horizontally`);
+    const tuningScreenshotPath = path.join(outputRoot, `${testCase.id}-tuning.png`);
+    await page.screenshot({ path: tuningScreenshotPath, fullPage: false });
 
     await page.getByRole("button", { name: testCase.locale === "en" ? "Settings" : "设置" }).click();
     const dialog = page.locator(".launcher-settings-dialog");
@@ -143,6 +183,14 @@ try {
       ...testCase,
       theme,
       panels,
+      workspaceScreenshot: {
+        path: path.relative(repoRoot, workspaceScreenshotPath).replaceAll("\\", "/"),
+        sha256: await sha256(workspaceScreenshotPath),
+      },
+      tuningScreenshot: {
+        path: path.relative(repoRoot, tuningScreenshotPath).replaceAll("\\", "/"),
+        sha256: await sha256(tuningScreenshotPath),
+      },
       screenshot: {
         path: path.relative(repoRoot, screenshotPath).replaceAll("\\", "/"),
         sha256: await sha256(screenshotPath),
