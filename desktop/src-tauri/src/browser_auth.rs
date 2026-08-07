@@ -188,7 +188,6 @@ pub struct BrowserAuthSession {
 }
 
 #[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct OAuthTokenResponse {
     access_token: String,
     #[serde(default)]
@@ -1302,6 +1301,32 @@ mod tests {
             Some("challenge-123")
         );
         assert!(!url.as_str().contains("code_verifier"));
+    }
+
+    #[test]
+    fn token_response_uses_the_oauth_snake_case_wire_contract() {
+        let response: OAuthTokenResponse = serde_json::from_value(serde_json::json!({
+            "access_token": "access-token",
+            "refresh_token": "refresh-token",
+            "id_token": "identity-token",
+            "token_type": "bearer",
+            "expires_in": 3600
+        }))
+        .unwrap();
+
+        assert_eq!(response.access_token, "access-token");
+        assert_eq!(response.refresh_token.as_deref(), Some("refresh-token"));
+        assert_eq!(response.id_token.as_deref(), Some("identity-token"));
+        assert_eq!(response.token_type, "bearer");
+        assert_eq!(response.expires_in, 3600);
+        assert!(serde_json::from_value::<OAuthTokenResponse>(serde_json::json!({
+            "accessToken": "access-token",
+            "refreshToken": "refresh-token",
+            "idToken": "identity-token",
+            "tokenType": "bearer",
+            "expiresIn": 3600
+        }))
+        .is_err());
     }
 
     #[test]
