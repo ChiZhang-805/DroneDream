@@ -1275,6 +1275,62 @@ input:focus-visible {
   gap: 8px;
 }
 
+.field-preflight-inputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(120px, 0.75fr) minmax(140px, 0.75fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.field-preflight-inputs label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-preflight-inputs label > span {
+  color: var(--field-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.field-preflight-inputs input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+  border-radius: 5px;
+}
+
+.field-preflight-evaluate {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  color: #ffffff;
+  background: var(--dd-brand-middle);
+  border: 0;
+  border-radius: 5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.field-preflight-evaluate svg {
+  width: 16px;
+  height: 16px;
+}
+
+.field-preflight-evaluate:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .field-gate-grid div,
 .field-action-matrix div {
   display: grid;
@@ -1567,6 +1623,7 @@ input:focus-visible {
   .field-recovery-editors,
   .field-recovery-history,
   .field-control-buttons,
+  .field-preflight-inputs,
   .field-observation-toolbar,
   .field-compatibility-draft {
     grid-template-columns: 1fr;

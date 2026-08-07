@@ -12,6 +12,7 @@ LIB_SOURCE = ROOT / "desktop/src-tauri/src/lib.rs"
 DEVICE_SOURCE = ROOT / "desktop/src-tauri/src/field_device.rs"
 TUNING_SOURCE = ROOT / "desktop/src-tauri/src/field_tuning.rs"
 RECOVERY_SOURCE = ROOT / "desktop/src-tauri/src/field_recovery.rs"
+PREFLIGHT_SOURCE = ROOT / "desktop/src-tauri/src/field_preflight.rs"
 
 
 def test_field_tuning_contract_is_real_device_only_and_authority_is_native() -> None:
@@ -77,6 +78,7 @@ def test_field_native_handler_contains_no_runtime_or_simulator_commands() -> Non
         "create_field_parameter_snapshot",
         "compare_field_parameter_snapshot",
         "prepare_field_parameter_rollback",
+        "prepare_field_preflight",
     ):
         assert required in source
 
@@ -169,3 +171,34 @@ def test_field_recovery_persists_only_content_bound_evidence_and_never_writes_ha
         "flight(",
     ):
         assert forbidden not in recovery
+
+
+def test_field_preflight_is_plan_only_and_denies_every_hardware_action() -> None:
+    preflight = PREFLIGHT_SOURCE.read_text(encoding="utf-8")
+
+    for required in (
+        'kind: "dronedream-field-preflight-plan"',
+        'execution_domain: "real-hardware"',
+        '("parameter-write", "deny")',
+        '("rollback-apply", "deny")',
+        '("takeover", "deny")',
+        '("emergency-stop", "deny")',
+        '("arm", "deny")',
+        '("flight", "deny")',
+        '"field.registry.zero-validated-packs"',
+        "can_execute: false",
+        "hardware_authority: false",
+        "device_open_attempts: 0",
+        "hardware_write_attempts: 0",
+    ):
+        assert required in preflight
+    for forbidden in (
+        "serialport::",
+        "UdpSocket",
+        "TcpStream",
+        "WriteFile",
+        "SetCommState",
+        "PARAM_SET",
+        "COMMAND_LONG",
+    ):
+        assert forbidden not in preflight

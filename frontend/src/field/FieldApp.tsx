@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  CheckCircle2,
   ChevronRight,
   CircleOff,
   ClipboardCheck,
@@ -14,7 +13,6 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
-  SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
 
@@ -33,10 +31,10 @@ import {
 import { FieldAuthControl } from "./FieldAuthControl";
 import { FieldSettingsDialog } from "./FieldSettingsDialog";
 import { FieldRecoveryWorkspace } from "./FieldRecoveryWorkspace";
+import { FieldPreflightWorkspace } from "./FieldPreflightWorkspace";
 import { FieldTuningWorkspace } from "./FieldTuningWorkspace";
 import {
   evaluateFieldSafety,
-  FIELD_HARDWARE_ACTIONS,
   FIELD_OBSERVATION_FIXTURES,
   type FieldObservationState,
 } from "./safety";
@@ -272,7 +270,6 @@ export function FieldApp({
       FIRST_FIELD_PACK.controllers[0]?.model ?? "missing",
     ),
   );
-  const [operatorAcknowledged, setOperatorAcknowledged] = useState(false);
   const [deviceReport, setDeviceReport] = useState<FieldDeviceDiscoveryReport | null>(null);
   const [deviceScanBusy, setDeviceScanBusy] = useState(false);
   const [deviceScanError, setDeviceScanError] = useState<string | null>(null);
@@ -602,48 +599,12 @@ export function FieldApp({
             />
           </section>
 
-          <section id="preflight" className="field-section" aria-labelledby="field-preflight-title">
-            <header><div><h2 id="field-preflight-title">{copy.preflightTitle}</h2><p>{copy.preflightBody}</p></div><ClipboardCheck /></header>
-            <div className="field-gate-grid">
-              {[
-                [copy.pack, copy.missing, false],
-                [copy.controller, copy.missing, false],
-                [copy.firmware, copy.missing, false],
-                [copy.zone, copy.missing, false],
-                [copy.confirmation, operatorAcknowledged ? copy.localOnly : copy.missing, operatorAcknowledged],
-                [copy.nativeGate, copy.missing, false],
-                [copy.runtimeGate, copy.missing, false],
-              ].map(([label, status, locallyRecorded]) => (
-                <div key={String(label)} data-local-only={locallyRecorded ? "true" : undefined}>
-                  {locallyRecorded ? <CheckCircle2 /> : <CircleOff />}
-                  <span>{label}</span>
-                  <strong>{status}</strong>
-                </div>
-              ))}
-            </div>
-            <label className="field-operator-acknowledgement">
-              <input
-                type="checkbox"
-                checked={operatorAcknowledged}
-                onChange={(event) => setOperatorAcknowledged(event.target.checked)}
-              />
-              <span><strong>{copy.operatorAcknowledgement}</strong><small>{copy.operatorBoundary}</small></span>
-            </label>
-          </section>
-
-          <section id="control" className="field-section" aria-labelledby="field-control-title">
-            <header><div><h2 id="field-control-title">{copy.controlTitle}</h2><p>{copy.controlBody}</p></div><ShieldAlert /></header>
-            <div className="field-control-buttons">
-              <button type="button" disabled><SlidersHorizontal />{copy.takeover}</button>
-              <button type="button" disabled><ShieldAlert />{copy.emergency}</button>
-            </div>
-            <h3>{copy.actionMatrix}</h3>
-            <div className="field-action-matrix">
-              {FIELD_HARDWARE_ACTIONS.map((action) => (
-                <div key={action}><CircleOff /><span>{copy.action[action]}</span><strong>{copy.denied}</strong></div>
-              ))}
-            </div>
-          </section>
+          <FieldPreflightWorkspace
+            locale={locale}
+            selectedPackId={selectedPackId}
+            selectedControllerId={selectedControllerKey}
+            snapshot={latestSnapshot ?? undefined}
+          />
           <footer>{copy.footer}</footer>
         </main>
       </div>

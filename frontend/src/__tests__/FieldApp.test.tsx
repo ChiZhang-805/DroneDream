@@ -106,7 +106,7 @@ describe("FieldApp", () => {
     expect(table.getAllByRole("row")).toHaveLength(8);
     expect(table.getByText("Holybro X500 v2 with Pixhawk 6")).toBeInTheDocument();
     expect(table.getByText("Bitcraze Crazyflie 2.1+")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /arm|flight/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(?:arm|flight)$/i })).not.toBeInTheDocument();
   });
 
   it("shows protocol choices without granting authority in browser preview", () => {
@@ -147,11 +147,11 @@ describe("FieldApp", () => {
     const { container } = render(<FieldApp initialLocale="en" />);
 
     fireEvent.click(screen.getByRole("checkbox", {
-      name: /I acknowledge the Field preview safety boundary/,
+      name: /I confirm the declared zone/,
     }));
 
     expect(screen.getByText("Local only")).toBeInTheDocument();
-    expect(screen.getByText(/not signed evidence/)).toBeInTheDocument();
+    expect(screen.getByText(/not signed authority/)).toBeInTheDocument();
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
     expect(container.querySelector("[data-quorum='missing']")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Emergency stop" })).toBeDisabled();

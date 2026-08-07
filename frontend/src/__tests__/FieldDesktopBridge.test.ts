@@ -12,6 +12,7 @@ import {
   listFieldParameterSnapshots,
   loadFieldParameterSnapshot,
   probeFieldMavlinkTelemetry,
+  prepareFieldPreflight,
   prepareFieldHardwareTuning,
   prepareFieldParameterRollback,
 } from "../desktop/bridge";
@@ -344,6 +345,74 @@ describe("Field desktop bridge", () => {
     await expect(compareFieldParameterSnapshot(diffRequest)).rejects.toThrow(/delta/i);
     invoke.mockResolvedValueOnce({ ...rollback, canExecute: true });
     await expect(prepareFieldParameterRollback(diffRequest)).rejects.toThrow();
+  });
+
+  it("accepts only a deny-by-default native Field preflight plan", async () => {
+    const request = {
+      vehiclePackId: "holybro-x500-v2-pixhawk6",
+      controllerId: "Holybro::Pixhawk 6C",
+      firmwareVersion: "PX4 1.16.0",
+      deviceObservationId: "operator-imported",
+      observationSha256: "a".repeat(64),
+      snapshotSha256: "b".repeat(64),
+      zoneName: "Indoor cage A",
+      zoneRadiusM: 12,
+      maxAltitudeM: 5,
+      operatorConfirmed: true,
+    };
+    const plan = {
+      schemaVersion: 1,
+      kind: "dronedream-field-preflight-plan",
+      editionId: "field",
+      executionDomain: "real-hardware",
+      sourceCommit: "c".repeat(40),
+      requestSha256: "d".repeat(64),
+      planSha256: "e".repeat(64),
+      validatedPackCount: 0,
+      zone: {
+        name: "Indoor cage A",
+        radiusM: 12,
+        maxAltitudeM: 5,
+        evidenceState: "operator-declared-only",
+      },
+      quorum: {
+        vehiclePack: "missing",
+        nativeBackendRuntime: "missing",
+        policy: "deny",
+      },
+      actionDecisions: {
+        "parameter-write": "deny",
+        "rollback-apply": "deny",
+        takeover: "deny",
+        "emergency-stop": "deny",
+        arm: "deny",
+        flight: "deny",
+      },
+      requiredEvidence: ["a", "b", "c", "d", "e", "f", "g"],
+      blockers: [
+        "field.registry.zero-validated-packs",
+        "field.native-backend-runtime-quorum.missing",
+      ],
+      canExecute: false,
+      hardwareAuthority: false,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+    };
+    const invoke = vi.fn(async () => plan);
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(prepareFieldPreflight(request)).resolves.toEqual(plan);
+    expect(invoke).toHaveBeenCalledWith("prepare_field_preflight", { request });
+    invoke.mockResolvedValueOnce({
+      ...plan,
+      actionDecisions: { ...plan.actionDecisions, flight: "allow" },
+    });
+    await expect(prepareFieldPreflight(request)).rejects.toThrow(/deny|literal/i);
+    invoke.mockResolvedValueOnce({ ...plan, zone: { ...plan.zone, radiusM: 0 } });
+    await expect(prepareFieldPreflight(request)).rejects.toThrow(/safety boundary/i);
+    await expect(prepareFieldPreflight({ ...request, maxAltitudeM: 0 })).rejects.toThrow(/bound/i);
+    await expect(prepareFieldPreflight({ ...request, deviceObservationId: " observation" }))
+      .rejects.toThrow(/bound/i);
   });
 
   it.each([

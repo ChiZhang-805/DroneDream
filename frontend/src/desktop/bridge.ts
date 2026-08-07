@@ -450,6 +450,44 @@ export interface FieldRollbackPlan {
   blockers: string[];
 }
 
+export interface FieldPreflightRequest {
+  vehiclePackId: string;
+  controllerId: string;
+  firmwareVersion: string;
+  deviceObservationId: string | null;
+  observationSha256: string | null;
+  snapshotSha256: string | null;
+  zoneName: string;
+  zoneRadiusM: number;
+  maxAltitudeM: number;
+  operatorConfirmed: boolean;
+}
+
+export interface FieldPreflightPlan {
+  schemaVersion: 1;
+  kind: "dronedream-field-preflight-plan";
+  editionId: "field";
+  executionDomain: "real-hardware";
+  sourceCommit: string;
+  requestSha256: string;
+  planSha256: string;
+  validatedPackCount: number;
+  zone: {
+    name: string;
+    radiusM: number;
+    maxAltitudeM: number;
+    evidenceState: "operator-declared-only";
+  };
+  quorum: Record<string, string>;
+  actionDecisions: Record<string, "deny">;
+  requiredEvidence: string[];
+  blockers: string[];
+  canExecute: false;
+  hardwareAuthority: false;
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+}
+
 export interface DesktopApiRequest {
   method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
@@ -927,6 +965,37 @@ export function prepareFieldParameterRollback(
   return invokeDesktop("prepare_field_parameter_rollback", parseFieldRollbackPlan, {
     request,
   });
+}
+
+export function prepareFieldPreflight(
+  request: FieldPreflightRequest,
+): Promise<FieldPreflightPlan> {
+  for (const value of [
+    request.vehiclePackId,
+    request.controllerId,
+    request.firmwareVersion,
+    request.zoneName,
+  ]) {
+    if (!/^[A-Za-z0-9][-A-Za-z0-9 .:_/+]{0,159}$/.test(value) || value.trim() !== value) {
+      return Promise.reject(new Error("Field preflight identity is invalid."));
+    }
+  }
+  if (
+    !Number.isSafeInteger(request.zoneRadiusM)
+    || request.zoneRadiusM < 1
+    || request.zoneRadiusM > 10_000
+    || !Number.isSafeInteger(request.maxAltitudeM)
+    || request.maxAltitudeM < 1
+    || request.maxAltitudeM > 1_000
+    || (request.deviceObservationId !== null
+      && (!/^[A-Za-z0-9][-A-Za-z0-9 .:_/+]{0,159}$/.test(request.deviceObservationId)
+        || request.deviceObservationId.trim() !== request.deviceObservationId))
+    || request.observationSha256 !== null && !/^[a-f0-9]{64}$/.test(request.observationSha256)
+    || request.snapshotSha256 !== null && !/^[a-f0-9]{64}$/.test(request.snapshotSha256)
+  ) {
+    return Promise.reject(new Error("Field preflight request is outside its bound."));
+  }
+  return invokeDesktop("prepare_field_preflight", parseFieldPreflightPlan, { request });
 }
 
 export function runFieldTuningDemo(
@@ -2833,6 +2902,97 @@ function parseFieldRollbackPlan(value: unknown): FieldRollbackPlan {
     || !plan.blockers.includes("field.snapshot.rollback-write-disabled")
   ) {
     throw new Error("Field rollback plan weakened its native safety boundary");
+  }
+  return plan;
+}
+
+function parseFieldPreflightPlan(value: unknown): FieldPreflightPlan {
+  const path = "fieldPreflightPlan";
+  const record = expectExactRecord(value, path, [
+    "schemaVersion", "kind", "editionId", "executionDomain", "sourceCommit",
+    "requestSha256", "planSha256", "validatedPackCount", "zone", "quorum",
+    "actionDecisions", "requiredEvidence", "blockers", "canExecute",
+    "hardwareAuthority", "deviceOpenAttempts", "hardwareWriteAttempts",
+  ]);
+  const zone = expectExactRecord(record.zone, `${path}.zone`, [
+    "name", "radiusM", "maxAltitudeM", "evidenceState",
+  ]);
+  const quorumRecord = expectRecord(record.quorum, `${path}.quorum`);
+  const quorum = Object.fromEntries(Object.entries(quorumRecord).map(([key, raw]) => [
+    key,
+    expectSafeNonEmptyString(raw, `${path}.quorum.${key}`),
+  ]));
+  const decisionsRecord = expectExactRecord(record.actionDecisions, `${path}.actionDecisions`, [
+    "parameter-write", "rollback-apply", "takeover", "emergency-stop", "arm", "flight",
+  ]);
+  const actionDecisions = Object.fromEntries(Object.entries(decisionsRecord).map(([key, raw]) => [
+    key,
+    expectLiteral(raw, "deny", `${path}.actionDecisions.${key}`),
+  ])) as Record<string, "deny">;
+  const plan: FieldPreflightPlan = {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
+    kind: expectLiteral(record.kind, "dronedream-field-preflight-plan", `${path}.kind`),
+    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    executionDomain: expectLiteral(
+      record.executionDomain,
+      "real-hardware",
+      `${path}.executionDomain`,
+    ),
+    sourceCommit: expectLowercaseHex(record.sourceCommit, `${path}.sourceCommit`, 40),
+    requestSha256: expectLowercaseHex(record.requestSha256, `${path}.requestSha256`, 64),
+    planSha256: expectLowercaseHex(record.planSha256, `${path}.planSha256`, 64),
+    validatedPackCount: expectBoundedNonNegativeInteger(
+      record.validatedPackCount,
+      `${path}.validatedPackCount`,
+      8,
+    ),
+    zone: {
+      name: parseFieldRecoveryIdentity(zone.name, `${path}.zone.name`),
+      radiusM: expectBoundedNonNegativeInteger(zone.radiusM, `${path}.zone.radiusM`, 10_000),
+      maxAltitudeM: expectBoundedNonNegativeInteger(
+        zone.maxAltitudeM,
+        `${path}.zone.maxAltitudeM`,
+        1_000,
+      ),
+      evidenceState: expectLiteral(
+        zone.evidenceState,
+        "operator-declared-only",
+        `${path}.zone.evidenceState`,
+      ),
+    },
+    quorum,
+    actionDecisions,
+    requiredEvidence: parseSafeNonEmptyStringArray(
+      record.requiredEvidence,
+      `${path}.requiredEvidence`,
+    ),
+    blockers: parseSafeNonEmptyStringArray(record.blockers, `${path}.blockers`),
+    canExecute: expectLiteral(record.canExecute, false, `${path}.canExecute`),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      `${path}.hardwareAuthority`,
+    ),
+    deviceOpenAttempts: expectLiteral(
+      record.deviceOpenAttempts,
+      0,
+      `${path}.deviceOpenAttempts`,
+    ),
+    hardwareWriteAttempts: expectLiteral(
+      record.hardwareWriteAttempts,
+      0,
+      `${path}.hardwareWriteAttempts`,
+    ),
+  };
+  if (
+    plan.validatedPackCount !== 0
+    || plan.zone.radiusM === 0
+    || plan.zone.maxAltitudeM === 0
+    || !plan.blockers.includes("field.registry.zero-validated-packs")
+    || plan.requiredEvidence.length < 7
+    || Object.values(plan.actionDecisions).some((decision) => decision !== "deny")
+  ) {
+    throw new Error("Field preflight plan weakened its native safety boundary");
   }
   return plan;
 }
