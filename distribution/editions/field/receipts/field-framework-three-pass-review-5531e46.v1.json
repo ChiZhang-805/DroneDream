@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-framework-three-pass-review-receipt",
+  "editionId": "field",
+  "productSource": {
+    "commit": "5531e46456dcdadfd4d00c5d24c7efd01480d60d",
+    "tree": "4db8f73a54677a0f65775ae182cacdac3f54782b",
+    "branch": "codex/software-field",
+    "upstreamExactAtFreeze": true,
+    "cleanAtFreeze": true
+  },
+  "positioning": {
+    "executionDomain": "real-hardware",
+    "simulationStageAllowed": false,
+    "independentFieldTuning": true,
+    "modelRole": "proposal-only",
+    "harnessRole": "bounded-execution-evidence-qualification-and-rollback",
+    "presentationGrantsAuthority": false
+  },
+  "passes": [
+    {
+      "ordinal": 1,
+      "scope": "native architecture, catalog binding, command exposure, and hardware authority",
+      "result": "pass",
+      "fixCommit": "5531e46456dcdadfd4d00c5d24c7efd01480d60d",
+      "checks": [
+        "validated Vehicle Pack count is derived from the hash-verified embedded catalog",
+        "hardware preparation validates edition, pack tier, signature, controller, and firmware",
+        "unknown packs fail closed",
+        "transport and quorum blockers keep canExecute and hardwareAuthority false",
+        "Field command registry exposes no runtime, simulator, parameter-write, arm, or flight handler"
+      ],
+      "tests": {
+        "fieldNative": {"passed": 55, "failed": 0},
+        "threeLayerAndEnginePack": {"passed": 43, "subtestsPassed": 4, "failed": 0},
+        "fieldContractAndRegistry": {"passed": 39, "subtestsPassed": 2, "failed": 0},
+        "fieldFrontendFocused": {"passed": 27, "failed": 0}
+      }
+    },
+    {
+      "ordinal": 2,
+      "scope": "product copy, EN/ZH, responsive layout, accessibility, theme, and authority presentation",
+      "result": "pass",
+      "visualReceipt": {
+        "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\07\\field-three-pass-review-2\\field-ui-layout-receipt.json",
+        "sha256": "45d61b1d1174912acfaefbd9513b2df0f5e0164ea860b91bb75aa16ede9d9893",
+        "cases": 6,
+        "screenshots": 18,
+        "viewports": ["1440x900", "760x900", "390x620"],
+        "locales": ["en", "zh-CN"]
+      },
+      "assertions": {
+        "settingsVerticalScroll": false,
+        "horizontalOverflow": false,
+        "fieldTheme": ["#FFC247", "#FF754B", "#D746A5"],
+        "presentationOnly": true,
+        "grantsHardwareAuthority": false,
+        "validatedPackCount": 0
+      },
+      "frontendSuite": {
+        "passed": 517,
+        "failed": 1,
+        "knownUnrelatedFailure": "PublicSite billing availability mock does not answer the download metadata request"
+      },
+      "typecheck": "pass",
+      "lint": {"errors": 0, "existingWarnings": 1}
+    },
+    {
+      "ordinal": 3,
+      "scope": "release source, NSIS identity, coexistence, payload, brand, license, NOTICE, and build contracts",
+      "result": "pass",
+      "checks": {
+        "releaseSource": "pass-2071-tracked-390-npm-532-rust",
+        "nsisTemplate": "pass-tauri-2.11.4",
+        "fourEditionMakensisFixtures": 4,
+        "unknownEditionRejected": true,
+        "fieldRuntimeModePageEnabled": false,
+        "fieldSimulatorPayloadAllowed": false,
+        "focusedDistributionTests": {"passed": 61, "failed": 0}
+      },
+      "fullDistributionSuite": {
+        "passed": 410,
+        "subtestsPassed": 24,
+        "failed": 13,
+        "currentProductFailures": 0,
+        "historicalEvidenceFailures": 13,
+        "classification": [
+          "frozen common-core donor receipts assert historical blobs against current HEAD",
+          "frozen postbuild application requires its already-consumed audit root to be absent",
+          "frozen 6672320 source-preparation fixtures reference an already-created historical output root",
+          "Universal-only finalizer is absent from the Field branch"
+        ]
+      }
+    }
+  ],
+  "safetyDecision": {
+    "validatedHardwarePackCount": 0,
+    "hardwareParameterWrite": "deny",
+    "unlock": "deny",
+    "arm": "deny",
+    "flight": "deny",
+    "deviceDiscovery": "read-only-observation",
+    "fixtureEvidenceQualifiesHardware": false
+  },
+  "buildReadiness": {
+    "decision": "allow-one-new-owned-offline-build",
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "installAuthorizedByThisReceipt": false,
+    "deploymentAuthorizedByThisReceipt": false,
+    "retryMaximum": 0
+  }
+}
