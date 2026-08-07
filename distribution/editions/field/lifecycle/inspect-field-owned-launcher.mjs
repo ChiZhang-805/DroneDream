@@ -46,7 +46,7 @@ try {
     observedRequests.push(url);
     if (forbiddenPattern.test(url)
         || (/^https?:/i.test(url)
-          && !/^https?:\/\/(?:127\.0\.0\.1|tauri\.localhost)(?::\d+)?\//i.test(url))) {
+          && !/^https?:\/\/(?:127\.0\.0\.1|tauri\.localhost|ipc\.localhost)(?::\d+)?\//i.test(url))) {
       forbiddenNetwork.push(url);
     }
   });
@@ -156,7 +156,7 @@ try {
     performance.getEntriesByType("resource")
       .map((entry) => entry.name)
       .filter((url) => /^https?:/i.test(url)
-        && !/^https?:\/\/(?:127\.0\.0\.1|tauri\.localhost)(?::\d+)?\//i.test(url))
+        && !/^https?:\/\/(?:127\.0\.0\.1|tauri\.localhost|ipc\.localhost)(?::\d+)?\//i.test(url))
   ));
   if (forbiddenNetwork.length !== 0 || existingExternalResources.length !== 0) {
     writeFileSync(outputPath, `${JSON.stringify({
