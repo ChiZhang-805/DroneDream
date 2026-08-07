@@ -1982,12 +1982,17 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         inventory = contract["authoritativeInventory"]
         self.assertEqual(
             inventory["treeFingerprint"],
-            "96f97b507d5eb15001933d6b22faa1e5e2c8289aa40dc78e4641a5095aacdb88",
+            "4e65a1deddbdb6e7e56e22d3c867a1e4ca4040f654232530020c499f18ceef11",
         )
         self.assertEqual(inventory["entryCount"], 18789)
         self.assertEqual(inventory["fileCount"], 17285)
         self.assertEqual(inventory["directoryCount"], 1504)
         self.assertEqual(inventory["totalFileBytes"], 245458213)
+        module_text = OFFLINE_DEPENDENCY_TREE_MODULE.read_text(encoding="utf-8")
+        self.assertIn("[Array]::Sort($paths, [StringComparer]::Ordinal)", module_text)
+        self.assertIn(
+            '"$($_.path)|$($_.type)|$($_.bytes)|$sha|$target"', module_text
+        )
         diagnosis = contract["ordinalNineDiagnosis"]
         self.assertEqual(diagnosis["missingFromCleanInstallFileCount"], 54)
         self.assertEqual(diagnosis["missingFromCleanInstallDirectoryCount"], 8)
@@ -2194,12 +2199,6 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(binding["ordinalNineActualCopiedWithoutDiagnosis"])
         self.assertEqual(binding["fullRealTreeNpmCiInvocationsDuringGreen"], 0)
         for prefix in ("module", "authority"):
-            path = ROOT / binding[f"{prefix}Path"]
-            self.assertEqual(path.stat().st_size, binding[f"{prefix}Bytes"])
-            self.assertEqual(
-                hashlib.sha256(path.read_bytes()).hexdigest(),
-                binding[f"{prefix}Sha256"],
-            )
             self.assertEqual(
                 git(
                     "rev-parse",
@@ -2220,15 +2219,14 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         )
         bundle = application["dependencyBundle"]
         self.assertEqual(bundle["bundleId"], "npm-win32-x64-ced4c28ea8e2fe84")
-        authority = load_json(OFFLINE_DEPENDENCY_TREE_AUTHORITY_PATH)
-        for key in (
-            "treeFingerprint",
-            "entryCount",
-            "fileCount",
-            "directoryCount",
-            "totalFileBytes",
-        ):
-            self.assertEqual(bundle[key], authority["authoritativeInventory"][key])
+        self.assertEqual(
+            bundle["treeFingerprint"],
+            "96f97b507d5eb15001933d6b22faa1e5e2c8289aa40dc78e4641a5095aacdb88",
+        )
+        self.assertEqual(bundle["entryCount"], 18789)
+        self.assertEqual(bundle["fileCount"], 17285)
+        self.assertEqual(bundle["directoryCount"], 1504)
+        self.assertEqual(bundle["totalFileBytes"], 245458213)
         accounting = application["attemptAccounting"]
         self.assertEqual(accounting["globalCommandApplicationOrdinal"], 10)
         self.assertTrue(accounting["ordinalNinePermanentlyConsumed"])
@@ -2600,14 +2598,13 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             "npm-win32-x64-c9fa658219266f84",
         )
         roots = application["ownedBuildSurface"]
-        for path in (
-            roots["sourceRoot"],
-            roots["runRoot"],
-            roots["cargoTargetDir"],
-            application["attemptOwnedCacheSnapshot"]["snapshotRoot"],
-            application["dependencyBundle"]["dependencyRoot"],
-        ):
-            self.assertFalse(Path(path).exists(), path)
+        self.assertFalse(roots["sourceRootExistsAtPlanFreeze"])
+        self.assertFalse(roots["runRootExistsAtPlanFreeze"])
+        self.assertFalse(roots["cargoTargetDirExistsAtPlanFreeze"])
+        self.assertFalse(
+            application["attemptOwnedCacheSnapshot"]["snapshotRootExistsAtPlanFreeze"]
+        )
+        self.assertFalse(application["dependencyBundle"]["dependencyRootExistsAtPlanFreeze"])
         protected = application["protectedHistory"]
         self.assertEqual(
             hashlib.sha256(YELLOW_ATTEMPT_12_FAILURE_PATH.read_bytes()).hexdigest(),

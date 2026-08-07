@@ -36,7 +36,7 @@ function Get-OfflineDependencyInventory {
     }
 
     $entries = [Collections.Generic.List[object]]::new()
-    foreach ($item in @(Get-ChildItem -LiteralPath $rootFull -Recurse -Force | Sort-Object FullName)) {
+    foreach ($item in @(Get-ChildItem -LiteralPath $rootFull -Recurse -Force)) {
         $relative = $item.FullName.Substring($rootFull.Length + 1).Replace("\", "/")
         if ($relative -ceq "manifest.json") { continue }
         $isReparse = [bool]($item.Attributes -band [IO.FileAttributes]::ReparsePoint)
@@ -50,10 +50,22 @@ function Get-OfflineDependencyInventory {
         })
     }
 
+    $entriesByPath = @{}
+    [string[]]$paths = @($entries.ToArray() | ForEach-Object {
+        $entriesByPath[[string]$_.path] = $_
+        [string]$_.path
+    })
+    [Array]::Sort($paths, [StringComparer]::Ordinal)
+    $orderedEntries = [Collections.Generic.List[object]]::new()
+    foreach ($path in $paths) {
+        $orderedEntries.Add($entriesByPath[$path])
+    }
+    $entries = $orderedEntries
+
     $lines = @($entries | ForEach-Object {
         $sha = if ($null -eq $_.sha256) { "" } else { [string]$_.sha256 }
         $target = if ($null -eq $_.target) { "" } else { [string]$_.target }
-        "$($_.path)`t$($_.type)`t$($_.bytes)`t$sha`t$target"
+        "$($_.path)|$($_.type)|$($_.bytes)|$sha|$target"
     })
     $files = @($entries | Where-Object { $_.type -ceq "file" })
     $directories = @($entries | Where-Object { $_.type -ceq "directory" })

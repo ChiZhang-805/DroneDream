@@ -23,7 +23,7 @@
   },
   "authoritativeInventory": {
     "algorithm": "sha256-lines-v1",
-    "treeFingerprint": "96f97b507d5eb15001933d6b22faa1e5e2c8289aa40dc78e4641a5095aacdb88",
+    "treeFingerprint": "4e65a1deddbdb6e7e56e22d3c867a1e4ca4040f654232530020c499f18ceef11",
     "entryCount": 18789,
     "fileCount": 17285,
     "directoryCount": 1504,
