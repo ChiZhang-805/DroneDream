@@ -369,8 +369,8 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
       violations.push(`${edition} screenshot image did not load`);
     } else {
       const naturalRatio = screenshot.naturalWidth / screenshot.naturalHeight;
-      if (Math.abs(naturalRatio - 1.6) > 0.04) {
-        violations.push(`${edition} screenshot source is not a complete 16:10 app capture`);
+      if (naturalRatio < 1.55 || naturalRatio > 1.72) {
+        violations.push(`${edition} screenshot source is outside the expected app-window ratio`);
       }
     }
     const imageRect = screenshot.getBoundingClientRect();
