@@ -9,6 +9,8 @@ mod edition_safety;
 #[cfg(not(dronedream_field))]
 mod engine_pack;
 #[cfg(dronedream_field)]
+mod field_adapters;
+#[cfg(dronedream_field)]
 mod field_device;
 #[cfg(dronedream_field)]
 mod field_installer_handoff;
@@ -108,6 +110,9 @@ pub fn run() {
         browser_auth::clear_browser_auth_vault,
         browser_auth::restore_browser_auth_vault,
         preferences::get_installer_locale,
+        field_adapters::get_field_adapter_catalog,
+        field_adapters::inspect_field_adapter_frame,
+        field_adapters::install_field_adapter,
         field_device::discover_field_devices,
         field_tuning::get_field_tuning_status,
         field_tuning::run_field_tuning_demo,

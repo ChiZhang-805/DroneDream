@@ -100,6 +100,102 @@ export interface FieldTuningStatus {
   blockers: string[];
 }
 
+export type FieldAdapterCapability =
+  | "unavailable"
+  | "read-only"
+  | "quorum-required"
+  | "vendor-controlled";
+
+export interface FieldAdapterCapabilities {
+  deviceDiscovery: FieldAdapterCapability;
+  telemetryRead: FieldAdapterCapability;
+  parameterRead: FieldAdapterCapability;
+  parameterWrite: FieldAdapterCapability;
+  arm: FieldAdapterCapability;
+  flight: FieldAdapterCapability;
+  autonomousTuning: FieldAdapterCapability;
+}
+
+export interface FieldAdapterCatalogEntry {
+  adapterId: string;
+  version: string;
+  displayName: { en: string; "zh-CN": string };
+  vendor: string;
+  protocolFamily: string;
+  implementationStatus:
+    | "available"
+    | "vendor-access-required"
+    | "platform-bridge-required"
+    | "planned";
+  deliveryMode: "embedded-managed" | "vendor-managed" | "unavailable";
+  installable: boolean;
+  installed: boolean;
+  installedPackageSha256: string | null;
+  supportedTransports: string[];
+  supportedPlatforms: string[];
+  packageSha256: string | null;
+  capabilities: FieldAdapterCapabilities;
+  safety: {
+    installationGrantsAuthority: false;
+    discoveryGrantsAuthority: false;
+    requiresValidatedVehiclePackForWrites: true;
+    requiresNativeBackendRuntimeOperatorQuorum: true;
+  };
+}
+
+export interface FieldAdapterCatalogReport {
+  schemaVersion: 1;
+  kind: "dronedream-field-adapter-catalog-report";
+  catalogVersion: string;
+  editionId: "field";
+  source: "source-bound-embedded-catalog";
+  catalogSha256: string;
+  hardwareAuthority: false;
+  executableExtensionLoading: false;
+  entries: FieldAdapterCatalogEntry[];
+}
+
+export interface FieldAdapterInstallRequest {
+  adapterId: string;
+  expectedPackageSha256: string;
+}
+
+export interface FieldAdapterInstallReceipt {
+  schemaVersion: 1;
+  kind: "dronedream-field-adapter-install-receipt";
+  editionId: "field";
+  adapterId: string;
+  packageSha256: string;
+  state: "installed" | "already-installed";
+  executableCodeInstalled: false;
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+  hardwareAuthority: false;
+}
+
+export interface FieldAdapterFrameInspectionRequest {
+  adapterId: string;
+  frameBase64: string;
+}
+
+export interface FieldAdapterFrameInspection {
+  schemaVersion: 1;
+  kind: "dronedream-field-adapter-frame-inspection";
+  editionId: "field";
+  adapterId: string;
+  protocolVersion: 1 | 2;
+  systemId: number;
+  componentId: number;
+  sequence: number;
+  messageId: number;
+  messageName: string;
+  frameSha256: string;
+  frameBytes: number;
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+  hardwareAuthority: false;
+}
+
 export interface FieldDiscoveredDevice {
   observationId: string;
   portName: string;
@@ -551,6 +647,38 @@ export function getInstallerLocale(): Promise<InstallerLocale> {
 
 export function getFieldTuningStatus(): Promise<FieldTuningStatus> {
   return invokeDesktop("get_field_tuning_status", parseFieldTuningStatus);
+}
+
+export function getFieldAdapterCatalog(): Promise<FieldAdapterCatalogReport> {
+  return invokeDesktop("get_field_adapter_catalog", parseFieldAdapterCatalog);
+}
+
+export function installFieldAdapter(
+  request: FieldAdapterInstallRequest,
+): Promise<FieldAdapterInstallReceipt> {
+  if (
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.adapterId)
+    || !/^[a-f0-9]{64}$/.test(request.expectedPackageSha256)
+  ) {
+    return Promise.reject(new Error("Field adapter install request is invalid."));
+  }
+  return invokeDesktop("install_field_adapter", parseFieldAdapterInstallReceipt, { request });
+}
+
+export function inspectFieldAdapterFrame(
+  request: FieldAdapterFrameInspectionRequest,
+): Promise<FieldAdapterFrameInspection> {
+  if (
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.adapterId)
+    || request.frameBase64.length === 0
+    || request.frameBase64.length > 512
+    || !/^[A-Za-z0-9+/]*={0,2}$/.test(request.frameBase64)
+  ) {
+    return Promise.reject(new Error("Field adapter frame inspection request is invalid."));
+  }
+  return invokeDesktop("inspect_field_adapter_frame", parseFieldAdapterFrameInspection, {
+    request,
+  });
 }
 
 export function discoverFieldDevices(): Promise<FieldDeviceDiscoveryReport> {
@@ -1328,6 +1456,363 @@ function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
     throw new Error("Field tuning status weakened its source-bound safety denial");
   }
   return status;
+}
+
+function parseFieldAdapterCapability(value: unknown, path: string): FieldAdapterCapability {
+  if (
+    value !== "unavailable"
+    && value !== "read-only"
+    && value !== "quorum-required"
+    && value !== "vendor-controlled"
+  ) {
+    throw new Error(`${path} is unsupported`);
+  }
+  return value;
+}
+
+function parseFieldAdapterCapabilities(value: unknown, path: string): FieldAdapterCapabilities {
+  const record = expectExactRecord(value, path, [
+    "deviceDiscovery",
+    "telemetryRead",
+    "parameterRead",
+    "parameterWrite",
+    "arm",
+    "flight",
+    "autonomousTuning",
+  ]);
+  return {
+    deviceDiscovery: parseFieldAdapterCapability(record.deviceDiscovery, `${path}.deviceDiscovery`),
+    telemetryRead: parseFieldAdapterCapability(record.telemetryRead, `${path}.telemetryRead`),
+    parameterRead: parseFieldAdapterCapability(record.parameterRead, `${path}.parameterRead`),
+    parameterWrite: parseFieldAdapterCapability(record.parameterWrite, `${path}.parameterWrite`),
+    arm: parseFieldAdapterCapability(record.arm, `${path}.arm`),
+    flight: parseFieldAdapterCapability(record.flight, `${path}.flight`),
+    autonomousTuning: parseFieldAdapterCapability(
+      record.autonomousTuning,
+      `${path}.autonomousTuning`,
+    ),
+  };
+}
+
+function parseFieldAdapterEntry(value: unknown, index: number): FieldAdapterCatalogEntry {
+  const path = `fieldAdapterCatalog.entries[${index}]`;
+  const record = expectExactRecord(value, path, [
+    "adapterId",
+    "version",
+    "displayName",
+    "vendor",
+    "protocolFamily",
+    "implementationStatus",
+    "deliveryMode",
+    "installable",
+    "installed",
+    "installedPackageSha256",
+    "supportedTransports",
+    "supportedPlatforms",
+    "packageSha256",
+    "capabilities",
+    "safety",
+  ]);
+  const displayName = expectExactRecord(record.displayName, `${path}.displayName`, ["en", "zh-CN"]);
+  const safety = expectExactRecord(record.safety, `${path}.safety`, [
+    "installationGrantsAuthority",
+    "discoveryGrantsAuthority",
+    "requiresValidatedVehiclePackForWrites",
+    "requiresNativeBackendRuntimeOperatorQuorum",
+  ]);
+  const implementationStatus = expectString(
+    record.implementationStatus,
+    `${path}.implementationStatus`,
+  );
+  if (![
+    "available",
+    "vendor-access-required",
+    "platform-bridge-required",
+    "planned",
+  ].includes(implementationStatus)) {
+    throw new Error(`${path}.implementationStatus is unsupported`);
+  }
+  const deliveryMode = expectString(record.deliveryMode, `${path}.deliveryMode`);
+  if (!["embedded-managed", "vendor-managed", "unavailable"].includes(deliveryMode)) {
+    throw new Error(`${path}.deliveryMode is unsupported`);
+  }
+  const packageSha256 = record.packageSha256 == null
+    ? null
+    : expectLowercaseHex(record.packageSha256, `${path}.packageSha256`, 64);
+  const installedPackageSha256 = record.installedPackageSha256 == null
+    ? null
+    : expectLowercaseHex(
+      record.installedPackageSha256,
+      `${path}.installedPackageSha256`,
+      64,
+    );
+  const entry: FieldAdapterCatalogEntry = {
+    adapterId: expectIdentifier(record.adapterId, `${path}.adapterId`),
+    version: expectSafeNonEmptyString(record.version, `${path}.version`),
+    displayName: {
+      en: expectSafeNonEmptyString(displayName.en, `${path}.displayName.en`),
+      "zh-CN": expectSafeNonEmptyString(displayName["zh-CN"], `${path}.displayName.zh-CN`),
+    },
+    vendor: expectSafeNonEmptyString(record.vendor, `${path}.vendor`),
+    protocolFamily: expectSafeNonEmptyString(record.protocolFamily, `${path}.protocolFamily`),
+    implementationStatus: implementationStatus as FieldAdapterCatalogEntry["implementationStatus"],
+    deliveryMode: deliveryMode as FieldAdapterCatalogEntry["deliveryMode"],
+    installable: expectBoolean(record.installable, `${path}.installable`),
+    installed: expectBoolean(record.installed, `${path}.installed`),
+    installedPackageSha256,
+    supportedTransports: parseSafeNonEmptyStringArray(
+      record.supportedTransports,
+      `${path}.supportedTransports`,
+    ),
+    supportedPlatforms: parseSafeNonEmptyStringArray(
+      record.supportedPlatforms,
+      `${path}.supportedPlatforms`,
+    ),
+    packageSha256,
+    capabilities: parseFieldAdapterCapabilities(record.capabilities, `${path}.capabilities`),
+    safety: {
+      installationGrantsAuthority: expectLiteral(
+        safety.installationGrantsAuthority,
+        false,
+        `${path}.safety.installationGrantsAuthority`,
+      ),
+      discoveryGrantsAuthority: expectLiteral(
+        safety.discoveryGrantsAuthority,
+        false,
+        `${path}.safety.discoveryGrantsAuthority`,
+      ),
+      requiresValidatedVehiclePackForWrites: expectLiteral(
+        safety.requiresValidatedVehiclePackForWrites,
+        true,
+        `${path}.safety.requiresValidatedVehiclePackForWrites`,
+      ),
+      requiresNativeBackendRuntimeOperatorQuorum: expectLiteral(
+        safety.requiresNativeBackendRuntimeOperatorQuorum,
+        true,
+        `${path}.safety.requiresNativeBackendRuntimeOperatorQuorum`,
+      ),
+    },
+  };
+  if (
+    entry.installed !== (
+      entry.packageSha256 !== null
+      && entry.installedPackageSha256 === entry.packageSha256
+    )
+    || entry.installable !== (
+      entry.deliveryMode === "embedded-managed"
+      && entry.implementationStatus === "available"
+      && entry.packageSha256 !== null
+    )
+  ) {
+    throw new Error(`${path} has inconsistent install state`);
+  }
+  return entry;
+}
+
+function parseFieldAdapterCatalog(value: unknown): FieldAdapterCatalogReport {
+  const record = expectExactRecord(value, "fieldAdapterCatalog", [
+    "schemaVersion",
+    "kind",
+    "catalogVersion",
+    "editionId",
+    "source",
+    "catalogSha256",
+    "hardwareAuthority",
+    "executableExtensionLoading",
+    "entries",
+  ]);
+  const entries = expectArray(record.entries, "fieldAdapterCatalog.entries")
+    .map(parseFieldAdapterEntry);
+  if (entries.length === 0 || new Set(entries.map((entry) => entry.adapterId)).size !== entries.length) {
+    throw new Error("Field adapter catalog must contain unique entries");
+  }
+  return {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldAdapterCatalog.schemaVersion"),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-adapter-catalog-report",
+      "fieldAdapterCatalog.kind",
+    ),
+    catalogVersion: expectSafeNonEmptyString(
+      record.catalogVersion,
+      "fieldAdapterCatalog.catalogVersion",
+    ),
+    editionId: expectLiteral(record.editionId, "field", "fieldAdapterCatalog.editionId"),
+    source: expectLiteral(
+      record.source,
+      "source-bound-embedded-catalog",
+      "fieldAdapterCatalog.source",
+    ),
+    catalogSha256: expectLowercaseHex(
+      record.catalogSha256,
+      "fieldAdapterCatalog.catalogSha256",
+      64,
+    ),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldAdapterCatalog.hardwareAuthority",
+    ),
+    executableExtensionLoading: expectLiteral(
+      record.executableExtensionLoading,
+      false,
+      "fieldAdapterCatalog.executableExtensionLoading",
+    ),
+    entries,
+  };
+}
+
+function parseFieldAdapterInstallReceipt(value: unknown): FieldAdapterInstallReceipt {
+  const record = expectExactRecord(value, "fieldAdapterInstallReceipt", [
+    "schemaVersion",
+    "kind",
+    "editionId",
+    "adapterId",
+    "packageSha256",
+    "state",
+    "executableCodeInstalled",
+    "deviceOpenAttempts",
+    "hardwareWriteAttempts",
+    "hardwareAuthority",
+  ]);
+  const state = expectString(record.state, "fieldAdapterInstallReceipt.state");
+  if (state !== "installed" && state !== "already-installed") {
+    throw new Error("fieldAdapterInstallReceipt.state is unsupported");
+  }
+  return {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldAdapterInstallReceipt.schemaVersion"),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-adapter-install-receipt",
+      "fieldAdapterInstallReceipt.kind",
+    ),
+    editionId: expectLiteral(record.editionId, "field", "fieldAdapterInstallReceipt.editionId"),
+    adapterId: expectIdentifier(record.adapterId, "fieldAdapterInstallReceipt.adapterId"),
+    packageSha256: expectLowercaseHex(
+      record.packageSha256,
+      "fieldAdapterInstallReceipt.packageSha256",
+      64,
+    ),
+    state,
+    executableCodeInstalled: expectLiteral(
+      record.executableCodeInstalled,
+      false,
+      "fieldAdapterInstallReceipt.executableCodeInstalled",
+    ),
+    deviceOpenAttempts: expectLiteral(
+      record.deviceOpenAttempts,
+      0,
+      "fieldAdapterInstallReceipt.deviceOpenAttempts",
+    ),
+    hardwareWriteAttempts: expectLiteral(
+      record.hardwareWriteAttempts,
+      0,
+      "fieldAdapterInstallReceipt.hardwareWriteAttempts",
+    ),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldAdapterInstallReceipt.hardwareAuthority",
+    ),
+  };
+}
+
+function parseFieldAdapterFrameInspection(value: unknown): FieldAdapterFrameInspection {
+  const record = expectExactRecord(value, "fieldAdapterFrameInspection", [
+    "schemaVersion",
+    "kind",
+    "editionId",
+    "adapterId",
+    "protocolVersion",
+    "systemId",
+    "componentId",
+    "sequence",
+    "messageId",
+    "messageName",
+    "frameSha256",
+    "frameBytes",
+    "deviceOpenAttempts",
+    "hardwareWriteAttempts",
+    "hardwareAuthority",
+  ]);
+  const protocolVersion = expectBoundedNonNegativeInteger(
+    record.protocolVersion,
+    "fieldAdapterFrameInspection.protocolVersion",
+    2,
+  );
+  if (protocolVersion !== 1 && protocolVersion !== 2) {
+    throw new Error("fieldAdapterFrameInspection.protocolVersion is unsupported");
+  }
+  const frameBytes = expectBoundedNonNegativeInteger(
+    record.frameBytes,
+    "fieldAdapterFrameInspection.frameBytes",
+    280,
+  );
+  if (frameBytes === 0) throw new Error("fieldAdapterFrameInspection.frameBytes is out of range");
+  const messageName = expectSafeNonEmptyString(
+    record.messageName,
+    "fieldAdapterFrameInspection.messageName",
+  );
+  if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(messageName)) {
+    throw new Error("fieldAdapterFrameInspection.messageName is malformed");
+  }
+  return {
+    schemaVersion: expectLiteral(
+      record.schemaVersion,
+      1,
+      "fieldAdapterFrameInspection.schemaVersion",
+    ),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-adapter-frame-inspection",
+      "fieldAdapterFrameInspection.kind",
+    ),
+    editionId: expectLiteral(record.editionId, "field", "fieldAdapterFrameInspection.editionId"),
+    adapterId: expectIdentifier(record.adapterId, "fieldAdapterFrameInspection.adapterId"),
+    protocolVersion,
+    systemId: expectBoundedNonNegativeInteger(
+      record.systemId,
+      "fieldAdapterFrameInspection.systemId",
+      255,
+    ),
+    componentId: expectBoundedNonNegativeInteger(
+      record.componentId,
+      "fieldAdapterFrameInspection.componentId",
+      255,
+    ),
+    sequence: expectBoundedNonNegativeInteger(
+      record.sequence,
+      "fieldAdapterFrameInspection.sequence",
+      255,
+    ),
+    messageId: expectBoundedNonNegativeInteger(
+      record.messageId,
+      "fieldAdapterFrameInspection.messageId",
+      16_777_215,
+    ),
+    messageName,
+    frameSha256: expectLowercaseHex(
+      record.frameSha256,
+      "fieldAdapterFrameInspection.frameSha256",
+      64,
+    ),
+    frameBytes,
+    deviceOpenAttempts: expectLiteral(
+      record.deviceOpenAttempts,
+      0,
+      "fieldAdapterFrameInspection.deviceOpenAttempts",
+    ),
+    hardwareWriteAttempts: expectLiteral(
+      record.hardwareWriteAttempts,
+      0,
+      "fieldAdapterFrameInspection.hardwareWriteAttempts",
+    ),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldAdapterFrameInspection.hardwareAuthority",
+    ),
+  };
 }
 
 function parseFieldDeviceDiscoveryReport(value: unknown): FieldDeviceDiscoveryReport {
@@ -2254,6 +2739,16 @@ function expectNonNegativeInteger(value: unknown, path: string): number {
   const number = expectNonNegativeNumber(value, path);
   if (!Number.isInteger(number)) throw new Error(`${path} must be an integer`);
   return number;
+}
+
+function expectBoundedNonNegativeInteger(
+  value: unknown,
+  path: string,
+  maximum: number,
+): number {
+  const result = expectNonNegativeInteger(value, path);
+  if (result > maximum) throw new Error(`${path} is out of range`);
+  return result;
 }
 
 function parseStringArray(value: unknown, path: string): string[] {

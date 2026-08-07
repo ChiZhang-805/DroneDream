@@ -88,6 +88,8 @@ class FieldDesktopProfileTests(unittest.TestCase):
                 "branding/canonical-brand-visual-receipt.v1.json",
             "../../brand/generated/field/windows/icon.ico":
                 "icons/DroneDream.ico",
+            "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md":
+                "licenses/Field-Adapter-THIRD-PARTY-NOTICES.md",
         })
         self.assertNotIn("windows", self.config["bundle"])
 

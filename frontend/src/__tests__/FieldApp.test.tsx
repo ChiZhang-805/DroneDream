@@ -90,11 +90,26 @@ describe("FieldApp", () => {
   it("renders all seven Field-compatible packs and no authority action", () => {
     render(<FieldApp initialLocale="en" />);
 
-    expect(screen.getAllByRole("row")).toHaveLength(8);
-    const table = within(screen.getByRole("table"));
+    const table = within(screen.getByRole("table", { name: "Vehicle Pack registry" }));
+    expect(table.getAllByRole("row")).toHaveLength(8);
     expect(table.getByText("Holybro X500 v2 with Pixhawk 6")).toBeInTheDocument();
     expect(table.getByText("Bitcraze Crazyflie 2.1+")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /arm|flight/i })).not.toBeInTheDocument();
+  });
+
+  it("shows protocol choices without granting authority in browser preview", () => {
+    const { container } = render(<FieldApp initialLocale="en" />);
+    const table = within(screen.getByRole("table", { name: "Protocol adapters" }));
+
+    expect(table.getAllByRole("row")).toHaveLength(9);
+    expect(table.getByText("MAVLink Common")).toBeInTheDocument();
+    expect(table.getByText("DJI Enterprise SDK")).toBeInTheDocument();
+    expect(screen.getByText(/inspect captured frames only/i)).toBeInTheDocument();
+    expect(screen.getByText(/live serial, radio, TCP, and UDP links are not enabled yet/i))
+      .toBeInTheDocument();
+    expect(container.querySelector("#adapters[data-authority='false']")).toBeTruthy();
+    expect(table.getAllByRole("button", { name: "Install" })
+      .every((button) => (button as HTMLButtonElement).disabled)).toBe(true);
   });
 
   it("keeps compatibility selections local and fail-closed", () => {

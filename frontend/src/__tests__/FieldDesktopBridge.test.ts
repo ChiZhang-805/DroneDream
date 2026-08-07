@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   discoverFieldDevices,
+  getFieldAdapterCatalog,
   getFieldTuningStatus,
+  inspectFieldAdapterFrame,
+  installFieldAdapter,
   prepareFieldHardwareTuning,
 } from "../desktop/bridge";
 
@@ -40,6 +43,155 @@ describe("Field desktop bridge", () => {
 
     await expect(discoverFieldDevices()).resolves.toEqual(deviceReport);
     expect(invoke).toHaveBeenCalledWith("discover_field_devices", undefined);
+  });
+
+  it("accepts a source-bound adapter catalog and data-only install receipt", async () => {
+    const catalog = {
+      schemaVersion: 1,
+      kind: "dronedream-field-adapter-catalog-report",
+      catalogVersion: "1.0.0",
+      editionId: "field",
+      source: "source-bound-embedded-catalog",
+      catalogSha256: "a".repeat(64),
+      hardwareAuthority: false,
+      executableExtensionLoading: false,
+      entries: [{
+        adapterId: "mavlink-common-v2",
+        version: "1.0.0",
+        displayName: { en: "MAVLink Common", "zh-CN": "MAVLink 通用协议" },
+        vendor: "MAVLink",
+        protocolFamily: "MAVLink 1/2 Common",
+        implementationStatus: "available",
+        deliveryMode: "embedded-managed",
+        installable: true,
+        installed: false,
+        installedPackageSha256: null,
+        supportedTransports: ["serial"],
+        supportedPlatforms: ["windows"],
+        packageSha256: "b".repeat(64),
+        capabilities: {
+          deviceDiscovery: "read-only",
+          telemetryRead: "read-only",
+          parameterRead: "quorum-required",
+          parameterWrite: "quorum-required",
+          arm: "quorum-required",
+          flight: "quorum-required",
+          autonomousTuning: "quorum-required",
+        },
+        safety: {
+          installationGrantsAuthority: false,
+          discoveryGrantsAuthority: false,
+          requiresValidatedVehiclePackForWrites: true,
+          requiresNativeBackendRuntimeOperatorQuorum: true,
+        },
+      }],
+    };
+    const receipt = {
+      schemaVersion: 1,
+      kind: "dronedream-field-adapter-install-receipt",
+      editionId: "field",
+      adapterId: "mavlink-common-v2",
+      packageSha256: "b".repeat(64),
+      state: "installed",
+      executableCodeInstalled: false,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      hardwareAuthority: false,
+    };
+    const invoke = vi.fn(async (command: string) => (
+      command === "get_field_adapter_catalog" ? catalog : receipt
+    ));
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(getFieldAdapterCatalog()).resolves.toEqual(catalog);
+    await expect(installFieldAdapter({
+      adapterId: "mavlink-common-v2",
+      expectedPackageSha256: "b".repeat(64),
+    })).resolves.toEqual(receipt);
+  });
+
+  it("accepts a passive MAVLink frame inspection and rejects authority drift", async () => {
+    const inspection = {
+      schemaVersion: 1,
+      kind: "dronedream-field-adapter-frame-inspection",
+      editionId: "field",
+      adapterId: "mavlink-common-v2",
+      protocolVersion: 2,
+      systemId: 42,
+      componentId: 1,
+      sequence: 7,
+      messageId: 0,
+      messageName: "HEARTBEAT",
+      frameSha256: "c".repeat(64),
+      frameBytes: 21,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      hardwareAuthority: false,
+    };
+    const invoke = vi.fn(async () => inspection);
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(inspectFieldAdapterFrame({
+      adapterId: "mavlink-common-v2",
+      frameBase64: "AQ==",
+    })).resolves.toEqual(inspection);
+
+    invoke.mockResolvedValueOnce({ ...inspection, hardwareWriteAttempts: 1 });
+    await expect(inspectFieldAdapterFrame({
+      adapterId: "mavlink-common-v2",
+      frameBase64: "AQ==",
+    })).rejects.toThrow();
+  });
+
+  it.each([
+    { hardwareAuthority: true },
+    { executableExtensionLoading: true },
+    { entries: [] },
+  ])("rejects an adapter catalog that weakens its boundary: %o", async (drift) => {
+    const invoke = vi.fn(async () => ({
+      schemaVersion: 1,
+      kind: "dronedream-field-adapter-catalog-report",
+      catalogVersion: "1.0.0",
+      editionId: "field",
+      source: "source-bound-embedded-catalog",
+      catalogSha256: "a".repeat(64),
+      hardwareAuthority: false,
+      executableExtensionLoading: false,
+      entries: [{
+        adapterId: "mavlink-common-v2",
+        version: "1.0.0",
+        displayName: { en: "MAVLink Common", "zh-CN": "MAVLink 通用协议" },
+        vendor: "MAVLink",
+        protocolFamily: "MAVLink 1/2 Common",
+        implementationStatus: "available",
+        deliveryMode: "embedded-managed",
+        installable: true,
+        installed: false,
+        installedPackageSha256: null,
+        supportedTransports: ["serial"],
+        supportedPlatforms: ["windows"],
+        packageSha256: "b".repeat(64),
+        capabilities: {
+          deviceDiscovery: "read-only",
+          telemetryRead: "read-only",
+          parameterRead: "quorum-required",
+          parameterWrite: "quorum-required",
+          arm: "quorum-required",
+          flight: "quorum-required",
+          autonomousTuning: "quorum-required",
+        },
+        safety: {
+          installationGrantsAuthority: false,
+          discoveryGrantsAuthority: false,
+          requiresValidatedVehiclePackForWrites: true,
+          requiresNativeBackendRuntimeOperatorQuorum: true,
+        },
+      }],
+      ...drift,
+    }));
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(getFieldAdapterCatalog()).rejects.toThrow();
   });
 
   it.each([

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dronedream.local/schemas/field-adapter-catalog.schema.json",
+  "title": "DroneDream Field adapter catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "catalogVersion",
+    "editionId",
+    "hardwareAuthority",
+    "entries"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "dronedream-field-adapter-catalog" },
+    "catalogVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "editionId": { "const": "field" },
+    "hardwareAuthority": { "const": false },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "localized": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en", "zh-CN"],
+      "properties": {
+        "en": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "zh-CN": { "type": "string", "minLength": 1, "maxLength": 120 }
+      }
+    },
+    "capability": {
+      "enum": ["unavailable", "read-only", "quorum-required", "vendor-controlled"]
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapterId",
+        "version",
+        "displayName",
+        "vendor",
+        "protocolFamily",
+        "implementationStatus",
+        "deliveryMode",
+        "installable",
+        "supportedTransports",
+        "supportedPlatforms",
+        "packageSha256",
+        "capabilities",
+        "safety"
+      ],
+      "properties": {
+        "adapterId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "displayName": { "$ref": "#/$defs/localized" },
+        "vendor": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "protocolFamily": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "implementationStatus": {
+          "enum": ["available", "vendor-access-required", "platform-bridge-required", "planned"]
+        },
+        "deliveryMode": { "enum": ["embedded-managed", "vendor-managed", "unavailable"] },
+        "installable": { "type": "boolean" },
+        "supportedTransports": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["serial", "usb-network", "udp", "tcp", "remote-controller", "cloud", "radio"] }
+        },
+        "supportedPlatforms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["windows", "android-bridge", "linux-bridge", "vendor-cloud"] }
+        },
+        "packageSha256": {
+          "anyOf": [
+            { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            { "type": "null" }
+          ]
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "deviceDiscovery",
+            "telemetryRead",
+            "parameterRead",
+            "parameterWrite",
+            "arm",
+            "flight",
+            "autonomousTuning"
+          ],
+          "properties": {
+            "deviceDiscovery": { "$ref": "#/$defs/capability" },
+            "telemetryRead": { "$ref": "#/$defs/capability" },
+            "parameterRead": { "$ref": "#/$defs/capability" },
+            "parameterWrite": { "$ref": "#/$defs/capability" },
+            "arm": { "$ref": "#/$defs/capability" },
+            "flight": { "$ref": "#/$defs/capability" },
+            "autonomousTuning": { "$ref": "#/$defs/capability" }
+          }
+        },
+        "safety": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "installationGrantsAuthority",
+            "discoveryGrantsAuthority",
+            "requiresValidatedVehiclePackForWrites",
+            "requiresNativeBackendRuntimeOperatorQuorum"
+          ],
+          "properties": {
+            "installationGrantsAuthority": { "const": false },
+            "discoveryGrantsAuthority": { "const": false },
+            "requiresValidatedVehiclePackForWrites": { "const": true },
+            "requiresNativeBackendRuntimeOperatorQuorum": { "const": true }
+          }
+        }
+      }
+    }
+  }
+}

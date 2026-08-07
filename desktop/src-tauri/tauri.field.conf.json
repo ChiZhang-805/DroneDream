@@ -41,7 +41,8 @@
       "../../distribution/editions/field/branding/source-manifest.v1.json": "branding/source-manifest.v1.json",
       "../../brand/generated/brand-assets.v1.json": "branding/canonical-brand-assets.v1.json",
       "../../brand/generated/brand-visual-receipt.v1.json": "branding/canonical-brand-visual-receipt.v1.json",
-      "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico"
+      "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico",
+      "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md": "licenses/Field-Adapter-THIRD-PARTY-NOTICES.md"
     },
     "publisher": "DroneDream",
     "shortDescription": "Real-device operations and autonomous field tuning",

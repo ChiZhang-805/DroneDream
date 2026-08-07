@@ -591,6 +591,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "crc-any"
+version = "2.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46db9f663dfb869b80fcf59e32d7a80fc6c464a4f6328f3f06a00f5e36d05f8c"
+
+[[package]]
 name = "crc32fast"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -895,6 +901,7 @@ dependencies = [
  "chrono",
  "ed25519-dalek",
  "hex",
+ "mavlink",
  "reqwest 0.12.28",
  "semver",
  "serde",
@@ -2154,6 +2161,43 @@ dependencies = [
 ]
 
 [[package]]
+name = "mavlink"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0df4c9e6c5f14b13459638df2dd35efdc4743b327621d5bfe7801bb850326f44"
+dependencies = [
+ "bitflags 2.13.0",
+ "mavlink-bindgen",
+ "mavlink-core",
+ "num-derive",
+ "num-traits",
+]
+
+[[package]]
+name = "mavlink-bindgen"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2052217619766a23bd0181e7ddee6c4661fac7e5179f75c8f802fec551278304"
+dependencies = [
+ "crc-any",
+ "proc-macro2",
+ "quick-xml 0.39.4",
+ "quote",
+ "regex",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "mavlink-core"
+version = "0.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9e8f00fd8c85980548571d28ead126f320733bbe27684aa02f1787060d3264d"
+dependencies = [
+ "byteorder",
+ "crc-any",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2257,6 +2301,17 @@ name = "num-conv"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "521739c6d2bac4aa25192232afe6841231376b2b26d4d9fae5ecf8ca5772e441"
+
+[[package]]
+name = "num-derive"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ed3955f1a9c7c0c15e092f9c887db08b1fc683305fdf6eb6684f22555355e202"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.118",
+]
 
 [[package]]
 name = "num-traits"
@@ -2704,7 +2759,7 @@ checksum = "7da1d65da6dd5d1e44199ac0f58712d241c0f439f80adea8924d832384087f85"
 dependencies = [
  "base64 0.22.1",
  "indexmap 2.14.0",
- "quick-xml",
+ "quick-xml 0.41.0",
  "serde",
  "time",
 ]
@@ -2830,6 +2885,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.39.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cdcc8dd4e2f670d309a5f0e83fe36dfdc05af317008fea29144da1a2ac858e5e"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]

@@ -1,0 +1,257 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-adapter-catalog",
+  "catalogVersion": "1.0.0",
+  "editionId": "field",
+  "hardwareAuthority": false,
+  "entries": [
+    {
+      "adapterId": "mavlink-common-v2",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "MAVLink Common",
+        "zh-CN": "MAVLink 通用协议"
+      },
+      "vendor": "MAVLink",
+      "protocolFamily": "MAVLink 1/2 Common",
+      "implementationStatus": "available",
+      "deliveryMode": "embedded-managed",
+      "installable": true,
+      "supportedTransports": ["serial", "udp", "tcp", "radio"],
+      "supportedPlatforms": ["windows"],
+      "packageSha256": "df845a8866851510cfef8263c0ae4e75c35899a0a55df16c9ae5553ef8a4a463",
+      "capabilities": {
+        "deviceDiscovery": "read-only",
+        "telemetryRead": "read-only",
+        "parameterRead": "quorum-required",
+        "parameterWrite": "quorum-required",
+        "arm": "quorum-required",
+        "flight": "quorum-required",
+        "autonomousTuning": "quorum-required"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "mavlink-px4-v2",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "PX4 MAVLink",
+        "zh-CN": "PX4 MAVLink 适配器"
+      },
+      "vendor": "PX4",
+      "protocolFamily": "MAVLink 2 / PX4",
+      "implementationStatus": "available",
+      "deliveryMode": "embedded-managed",
+      "installable": true,
+      "supportedTransports": ["serial", "udp", "tcp", "radio"],
+      "supportedPlatforms": ["windows"],
+      "packageSha256": "c819d9429f4e92ea3c709fe72414e94d5a06aea80d0aa66c3b9410ce876d4d13",
+      "capabilities": {
+        "deviceDiscovery": "read-only",
+        "telemetryRead": "read-only",
+        "parameterRead": "quorum-required",
+        "parameterWrite": "quorum-required",
+        "arm": "quorum-required",
+        "flight": "quorum-required",
+        "autonomousTuning": "quorum-required"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "mavlink-ardupilotmega-v2",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "ArduPilot MAVLink",
+        "zh-CN": "ArduPilot MAVLink 适配器"
+      },
+      "vendor": "ArduPilot",
+      "protocolFamily": "MAVLink 2 / ArduPilotMega",
+      "implementationStatus": "available",
+      "deliveryMode": "embedded-managed",
+      "installable": true,
+      "supportedTransports": ["serial", "udp", "tcp", "radio"],
+      "supportedPlatforms": ["windows"],
+      "packageSha256": "2683304bf8b3c1e42b0ee442dad681f91fa365e0244aa05fd0f73ddcffa30bcf",
+      "capabilities": {
+        "deviceDiscovery": "read-only",
+        "telemetryRead": "read-only",
+        "parameterRead": "quorum-required",
+        "parameterWrite": "quorum-required",
+        "arm": "quorum-required",
+        "flight": "quorum-required",
+        "autonomousTuning": "quorum-required"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "dji-enterprise-sdk",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "DJI Enterprise SDK",
+        "zh-CN": "大疆行业SDK"
+      },
+      "vendor": "DJI",
+      "protocolFamily": "DJI Mobile / Onboard / Cloud SDK",
+      "implementationStatus": "vendor-access-required",
+      "deliveryMode": "vendor-managed",
+      "installable": false,
+      "supportedTransports": ["remote-controller", "cloud"],
+      "supportedPlatforms": ["android-bridge", "linux-bridge", "vendor-cloud"],
+      "packageSha256": null,
+      "capabilities": {
+        "deviceDiscovery": "vendor-controlled",
+        "telemetryRead": "vendor-controlled",
+        "parameterRead": "vendor-controlled",
+        "parameterWrite": "unavailable",
+        "arm": "vendor-controlled",
+        "flight": "vendor-controlled",
+        "autonomousTuning": "unavailable"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "autel-enterprise-sdk",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "Autel Enterprise SDK",
+        "zh-CN": "道通行业SDK"
+      },
+      "vendor": "Autel Robotics",
+      "protocolFamily": "Autel Mobile / Payload / Cloud SDK",
+      "implementationStatus": "vendor-access-required",
+      "deliveryMode": "vendor-managed",
+      "installable": false,
+      "supportedTransports": ["remote-controller", "cloud"],
+      "supportedPlatforms": ["android-bridge", "vendor-cloud"],
+      "packageSha256": null,
+      "capabilities": {
+        "deviceDiscovery": "vendor-controlled",
+        "telemetryRead": "vendor-controlled",
+        "parameterRead": "vendor-controlled",
+        "parameterWrite": "unavailable",
+        "arm": "vendor-controlled",
+        "flight": "vendor-controlled",
+        "autonomousTuning": "unavailable"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "parrot-anafi-sdk",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "Parrot ANAFI SDK",
+        "zh-CN": "Parrot ANAFI SDK"
+      },
+      "vendor": "Parrot",
+      "protocolFamily": "Ground SDK / Olympe / Drone Web API",
+      "implementationStatus": "platform-bridge-required",
+      "deliveryMode": "vendor-managed",
+      "installable": false,
+      "supportedTransports": ["usb-network", "remote-controller"],
+      "supportedPlatforms": ["android-bridge", "linux-bridge"],
+      "packageSha256": null,
+      "capabilities": {
+        "deviceDiscovery": "vendor-controlled",
+        "telemetryRead": "vendor-controlled",
+        "parameterRead": "vendor-controlled",
+        "parameterWrite": "unavailable",
+        "arm": "vendor-controlled",
+        "flight": "vendor-controlled",
+        "autonomousTuning": "unavailable"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "skydio-x10d-rasa",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "Skydio X10D RAS-A",
+        "zh-CN": "Skydio X10D RAS-A"
+      },
+      "vendor": "Skydio",
+      "protocolFamily": "MAVLink / RAS-A",
+      "implementationStatus": "vendor-access-required",
+      "deliveryMode": "vendor-managed",
+      "installable": false,
+      "supportedTransports": ["radio", "usb-network"],
+      "supportedPlatforms": ["windows", "vendor-cloud"],
+      "packageSha256": null,
+      "capabilities": {
+        "deviceDiscovery": "vendor-controlled",
+        "telemetryRead": "vendor-controlled",
+        "parameterRead": "vendor-controlled",
+        "parameterWrite": "vendor-controlled",
+        "arm": "vendor-controlled",
+        "flight": "vendor-controlled",
+        "autonomousTuning": "unavailable"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "crazyflie-crtp",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "Crazyflie CRTP",
+        "zh-CN": "Crazyflie CRTP"
+      },
+      "vendor": "Bitcraze",
+      "protocolFamily": "Crazy RealTime Protocol",
+      "implementationStatus": "planned",
+      "deliveryMode": "unavailable",
+      "installable": false,
+      "supportedTransports": ["radio", "usb-network"],
+      "supportedPlatforms": ["windows"],
+      "packageSha256": null,
+      "capabilities": {
+        "deviceDiscovery": "unavailable",
+        "telemetryRead": "unavailable",
+        "parameterRead": "unavailable",
+        "parameterWrite": "unavailable",
+        "arm": "unavailable",
+        "flight": "unavailable",
+        "autonomousTuning": "unavailable"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    }
+  ]
+}

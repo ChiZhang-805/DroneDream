@@ -9,6 +9,7 @@ import {
   FileClock,
   Gauge,
   HardDrive,
+  PackageOpen,
   PackageCheck,
   RadioTower,
   RefreshCw,
@@ -27,6 +28,7 @@ import {
   type FieldDeviceDiscoveryReport,
 } from "../desktop/bridge";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
+import { FieldAdapterCenter } from "./FieldAdapterCenter";
 import { FieldAuthControl } from "./FieldAuthControl";
 import { FieldSettingsDialog } from "./FieldSettingsDialog";
 import { FieldTuningWorkspace } from "./FieldTuningWorkspace";
@@ -48,6 +50,7 @@ const COPY = {
     overview: "Overview",
     devices: "Device",
     compatibility: "Compatibility",
+    adapters: "Protocol adapters",
     tuning: "Autonomous tuning",
     recovery: "Snapshot & rollback",
     preflight: "Preflight",
@@ -144,6 +147,7 @@ const COPY = {
     overview: "概览",
     devices: "设备",
     compatibility: "兼容性",
+    adapters: "协议适配器",
     tuning: "自主调参",
     recovery: "快照与回滚",
     preflight: "飞前检查",
@@ -236,6 +240,7 @@ const NAVIGATION = [
   ["overview", "overview", Gauge],
   ["device", "devices", RadioTower],
   ["compatibility", "compatibility", PackageCheck],
+  ["adapters", "adapters", PackageOpen],
   ["tuning", "tuning", Sparkles],
   ["recovery", "recovery", FileClock],
   ["preflight", "preflight", ClipboardCheck],
@@ -559,7 +564,7 @@ export function FieldApp({
               </div>
             </div>
             <div className="field-table-scroll">
-              <table>
+              <table aria-label={copy.registryTitle}>
                 <thead><tr><th>{copy.packName}</th><th>{copy.controllers}</th><th>{copy.tier}</th><th>{copy.adapter}</th></tr></thead>
                 <tbody>
                   {FIELD_CATALOG.vehiclePacks.map((pack) => (
@@ -574,6 +579,8 @@ export function FieldApp({
               </table>
             </div>
           </section>
+
+          <FieldAdapterCenter locale={locale} />
 
           <section id="tuning" className="field-section field-tuning-section" aria-labelledby="field-tuning-title">
             <FieldTuningWorkspace
