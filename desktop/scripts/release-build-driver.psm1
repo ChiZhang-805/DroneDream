@@ -388,11 +388,48 @@ function Test-DetachedDependencyPayloadIsolation {
     }
 }
 
+function Remove-ExactEmptyDetachedBuildScratch {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DependencyRoot
+    )
+
+    $dependencyRootFull = (
+        Resolve-Path -LiteralPath $DependencyRoot -ErrorAction Stop
+    ).Path.TrimEnd('\', '/')
+    $scratchPath = Join-Path $dependencyRootFull "frontend\node_modules\.vite-temp"
+    if (-not (Test-Path -LiteralPath $scratchPath)) {
+        return [pscustomobject]@{
+            removed = $false
+            relativePath = "frontend/node_modules/.vite-temp"
+        }
+    }
+
+    $scratch = Get-Item -LiteralPath $scratchPath -Force
+    if (-not $scratch.PSIsContainer) {
+        throw "The exact Vite build scratch path is not a directory."
+    }
+    if ([bool]($scratch.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "The exact Vite build scratch directory must not be a reparse point."
+    }
+    if (@(Get-ChildItem -LiteralPath $scratch.FullName -Force).Count -ne 0) {
+        throw "The exact Vite build scratch directory is not empty."
+    }
+
+    [IO.Directory]::Delete($scratch.FullName, $false)
+    [pscustomobject]@{
+        removed = $true
+        relativePath = "frontend/node_modules/.vite-temp"
+    }
+}
+
 Export-ModuleMember -Function @(
     "Invoke-CheckedNativeCommand",
     "Resolve-EditionGeneratedFrontendContract",
     "Test-PostBuildSourceStatus",
     "Test-PathIsWithinRoot",
     "Resolve-DetachedNodeDependencyMountContract",
-    "Test-DetachedDependencyPayloadIsolation"
+    "Test-DetachedDependencyPayloadIsolation",
+    "Remove-ExactEmptyDetachedBuildScratch"
 )

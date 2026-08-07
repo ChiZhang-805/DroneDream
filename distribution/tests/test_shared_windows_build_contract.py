@@ -84,6 +84,7 @@ def test_shared_llvm_build_keeps_signing_and_source_guards_fail_closed() -> None
         "Invoke-CheckedNativeCommand",
         "Resolve-EditionGeneratedFrontendContract",
         "Test-PostBuildSourceStatus",
+        "Remove-ExactEmptyDetachedBuildScratch",
     ):
         assert fragment in script
 
@@ -680,3 +681,87 @@ def test_detached_dependency_scripts_never_provision_or_hide_dependencies() -> N
     assert "desktoplockfileversion -ne 3" in combined
     assert "nested dependency bundle reparse point escapes" in combined
     assert "detached node dependency bundle changed during the release build" in combined
+
+
+def test_detached_build_removes_only_the_exact_empty_vite_scratch(tmp_path: Path) -> None:
+    dependency_root = tmp_path / "dependencies"
+    scratch = dependency_root / "frontend" / "node_modules" / ".vite-temp"
+    scratch.mkdir(parents=True)
+    module = str(DRIVER).replace("'", "''")
+    result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            Import-Module '{module}' -Force
+            Remove-ExactEmptyDetachedBuildScratch `
+              -DependencyRoot '{str(dependency_root).replace("'", "''")}' |
+              ConvertTo-Json -Compress
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "removed": True,
+        "relativePath": "frontend/node_modules/.vite-temp",
+    }
+    assert not scratch.exists()
+
+
+def test_detached_build_rejects_nonempty_or_non_directory_vite_scratch(
+    tmp_path: Path,
+) -> None:
+    module = str(DRIVER).replace("'", "''")
+    for name, make_fixture, expected in (
+        (
+            "nonempty",
+            lambda path: (path.mkdir(parents=True), (path / "config.mjs").write_text("x")),
+            "is not empty",
+        ),
+        (
+            "file",
+            lambda path: (path.parent.mkdir(parents=True), path.write_text("x")),
+            "is not a directory",
+        ),
+    ):
+        dependency_root = tmp_path / name
+        scratch = dependency_root / "frontend" / "node_modules" / ".vite-temp"
+        make_fixture(scratch)
+        result = _run_powershell(
+            textwrap.dedent(
+                f"""
+                $ErrorActionPreference = 'Stop'
+                Import-Module '{module}' -Force
+                Remove-ExactEmptyDetachedBuildScratch `
+                  -DependencyRoot '{str(dependency_root).replace("'", "''")}'
+                """
+            ),
+            cwd=tmp_path,
+        )
+        assert result.returncode != 0
+        assert expected in result.stderr
+
+
+def test_detached_build_rejects_reparse_vite_scratch(tmp_path: Path) -> None:
+    dependency_root = tmp_path / "reparse"
+    scratch_parent = dependency_root / "frontend" / "node_modules"
+    scratch_parent.mkdir(parents=True)
+    target = tmp_path / "unexpected-target"
+    target.mkdir()
+    module = str(DRIVER).replace("'", "''")
+    result = _run_powershell(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            $scratch = Join-Path '{str(scratch_parent).replace("'", "''")}' '.vite-temp'
+            New-Item -ItemType Junction -Path $scratch `
+              -Target '{str(target).replace("'", "''")}' | Out-Null
+            Import-Module '{module}' -Force
+            Remove-ExactEmptyDetachedBuildScratch `
+              -DependencyRoot '{str(dependency_root).replace("'", "''")}'
+            """
+        ),
+        cwd=tmp_path,
+    )
+    assert result.returncode != 0
+    assert "must not be a reparse point" in result.stderr

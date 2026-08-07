@@ -268,6 +268,14 @@ if ($additionalConfig) {
         )
 }
 
+if ($detachedDependencyContract) {
+    $scratchCleanup = Remove-ExactEmptyDetachedBuildScratch `
+        -DependencyRoot $detachedDependencyContract.dependencyRoot
+    if ($scratchCleanup.removed) {
+        Write-Host "Removed the exact empty Vite build scratch directory."
+    }
+}
+
 $postBuildCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
 $postBuildStatusLines = @(
     & git -C $repoRoot status --porcelain=v1 --untracked-files=all
