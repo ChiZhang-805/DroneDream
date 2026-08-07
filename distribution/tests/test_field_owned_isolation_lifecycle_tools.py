@@ -8,6 +8,7 @@ LIFECYCLE = ROOT / "distribution" / "editions" / "field" / "lifecycle"
 RUNNER = LIFECYCLE / "run-field-owned-isolation-lifecycle.ps1"
 INSTALLER_INSPECTOR = LIFECYCLE / "inspect-field-owned-installer-language.ps1"
 WEBVIEW_INSPECTOR = LIFECYCLE / "inspect-field-owned-webview2.mjs"
+LAUNCHER_INSPECTOR = LIFECYCLE / "inspect-field-owned-launcher.mjs"
 
 
 def _parse_powershell(path: Path) -> None:
@@ -40,15 +41,16 @@ def test_lifecycle_powershell_tools_parse() -> None:
 
 
 def test_webview_inspector_is_valid_javascript() -> None:
-    result = subprocess.run(
-        ["node.exe", "--check", str(WEBVIEW_INSPECTOR)],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    assert result.returncode == 0, result.stderr
+    for inspector in (WEBVIEW_INSPECTOR, LAUNCHER_INSPECTOR):
+        result = subprocess.run(
+            ["node.exe", "--check", str(inspector)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        assert result.returncode == 0, result.stderr
 
 
 def test_plan_only_branch_precedes_all_host_lifecycle_reads_and_writes() -> None:
@@ -138,3 +140,24 @@ def test_webview_inspector_covers_field_ui_without_browser_or_provider_navigatio
         assert fragment in source
     assert "page.goto(" not in source
     assert "launchPersistentContext" not in source
+
+
+def test_launcher_inspector_covers_the_installed_3d_auth_boundary() -> None:
+    source = LAUNCHER_INSPECTOR.read_text(encoding="utf-8")
+    for fragment in (
+        "width: 390, height: 620",
+        '.field-launcher[data-authority="false"]',
+        'aria-valuenow="100"',
+        'canvas.drone-launch-canvas',
+        'data-flight-state") === "starflight"',
+        '"--dd-brand-start": "#ffc247"',
+        '"--dd-brand-middle": "#ff754b"',
+        '"--dd-brand-end": "#d746a5"',
+        'authButtonClicked: false',
+        'fieldAppEntered: false',
+        'forbiddenNetwork.length !== 0',
+        'live3dInteractionObserved: true',
+    ):
+        assert fragment in source
+    assert "page.goto(" not in source
+    assert ".click();\n  const finalLocale" in source
