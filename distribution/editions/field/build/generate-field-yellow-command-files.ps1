@@ -144,14 +144,15 @@ function Render-Template([string]$Template, [hashtable]$Tokens, [string]$Label) 
         "$Label contains unresolved tokens."
     Assert-Contract (-not ($rendered -match '560f574')) `
         "$Label contains the historical cargo leaf."
-    $errors = $null
-    $tokens = $null
+    $parseErrors = $null
+    $parseTokens = $null
     [Management.Automation.Language.Parser]::ParseInput(
         $rendered,
-        [ref]$tokens,
-        [ref]$errors
+        [ref]$parseTokens,
+        [ref]$parseErrors
     ) | Out-Null
-    Assert-Contract ($errors.Count -eq 0) "$Label does not parse as PowerShell 5.1."
+    Assert-Contract ($parseErrors.Count -eq 0) `
+        "$Label does not parse as PowerShell 5.1."
     return $rendered
 }
 
