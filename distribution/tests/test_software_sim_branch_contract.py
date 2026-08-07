@@ -177,6 +177,12 @@ YELLOW_ATTEMPT_10_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-10-392b6fb-owned-base-prepare-failed.v1.json"
 )
+YELLOW_ATTEMPT_11_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-11-413a83b-application.v1.json"
+)
 ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH = (
     DISTRIBUTION
     / "sim"
@@ -2373,6 +2379,83 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(receipt["nonClaims"]["artifactCreated"])
         self.assertTrue(receipt["nextGate"]["requiresGreenIdempotentOwnedBaseFix"])
         self.assertFalse(receipt["nextGate"]["executeMayProceed"])
+
+    def test_yellow_attempt_11_binds_owned_root_product_contract(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_11_APPLICATION_PATH)
+        source = application["sourceSeparation"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "413a83bfa097fd81523674f79c418df75e0c19c2",
+        )
+        self.assertEqual(
+            git("show", "-s", "--format=%T", source["productSourceCommit"]),
+            source["productSourceTree"],
+        )
+        contract = application["ownedBuildRootContract"]
+        path = ROOT / contract["modulePath"]
+        self.assertEqual(path.stat().st_size, contract["moduleBytes"])
+        self.assertEqual(
+            hashlib.sha256(path.read_bytes()).hexdigest(), contract["moduleSha256"]
+        )
+        self.assertEqual(
+            git(
+                "rev-parse",
+                f"{source['productSourceCommit']}:{contract['modulePath']}",
+            ),
+            contract["moduleProductSourceGitBlob"],
+        )
+        self.assertTrue(contract["sharedParentsMustExist"])
+        self.assertTrue(contract["sharedParentsReadOnly"])
+        self.assertFalse(contract["sharedParentsMayBeReparsePoints"])
+        self.assertTrue(contract["attemptDirectoriesUseExclusiveCreate"])
+        self.assertFalse(contract["forceAllowed"])
+        self.assertFalse(contract["pathEscapeAllowed"])
+        self.assertEqual(contract["greenRealRootMutationCount"], 0)
+
+    def test_yellow_attempt_11_freezes_entry_roots_and_zero_execution(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_11_APPLICATION_PATH)
+        entry_binding = application["executionPlan"]["entryScript"]
+        entry = ROOT / entry_binding["path"]
+        self.assertEqual(entry.stat().st_size, entry_binding["bytes"])
+        self.assertEqual(
+            hashlib.sha256(entry.read_bytes()).hexdigest(), entry_binding["sha256"]
+        )
+        entry_text = entry.read_text(encoding="utf-8")
+        self.assertNotIn(
+            "New-Item -ItemType Directory -Path $RunRoot, $ReceiptRoot", entry_text
+        )
+        self.assertIn("Import-AndAssert-OwnedBases $EvidenceRoot", entry_text)
+        self.assertIn("New-ExclusiveAttemptDirectory -Path $RunRoot", entry_text)
+        self.assertIn("New-ExclusiveAttemptDirectory -Path $DependencyRoot", entry_text)
+        self.assertNotRegex(entry_text, r"New-Item[^\r\n]+-Force")
+        accounting = application["attemptAccounting"]
+        self.assertEqual(accounting["globalCommandApplicationOrdinal"], 11)
+        self.assertTrue(accounting["ordinalTenPermanentlyConsumed"])
+        self.assertEqual(accounting["retryMaximum"], 0)
+        roots = application["ownedBuildSurface"]
+        for path in (
+            roots["sourceRoot"],
+            roots["runRoot"],
+            roots["cargoTargetDir"],
+            application["attemptOwnedCacheSnapshot"]["snapshotRoot"],
+            application["dependencyBundle"]["dependencyRoot"],
+        ):
+            self.assertFalse(Path(path).exists(), path)
+        self.assertEqual(
+            application["dependencyBundle"]["bundleId"],
+            "npm-win32-x64-c9fa658219266f84",
+        )
+        protected = application["protectedHistory"]
+        self.assertEqual(
+            protected["ordinalTenFailureReceiptSha256"],
+            "83961627f737d65067c8d58adede994fd6295d9064ede740b0b5effbb8ed1ebf",
+        )
+        self.assertTrue(protected["dds5ThroughDds10AndAllPriorRootsReadOnly"])
+        self.assertTrue(all(value == 0 for value in application["executedCounts"].values()))
+        authorization = application["authorization"]
+        self.assertFalse(authorization["preflightAuthorizedByThisApplication"])
+        self.assertFalse(authorization["prepareAuthorizedByThisApplication"])
+        self.assertFalse(authorization["executeAuthorizedByThisApplication"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
