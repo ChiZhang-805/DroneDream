@@ -20,6 +20,7 @@ export interface LabCalibrationInput {
   jobId: string;
   cycleOrdinal: number;
   commonCoreCommit: string;
+  editionManifestSha256: string;
   vehiclePackId: string;
   controllerIdentity: string;
   firmwareIdentity: string;
@@ -80,6 +81,18 @@ function objectValue(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function assertExactKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+  label: string,
+): void {
+  const actual = Object.keys(value).sort();
+  const required = [...expected].sort();
+  if (actual.length !== required.length || actual.some((key, index) => key !== required[index])) {
+    throw new LabCalibrationInputError(`${label} fields do not match the supported schema.`);
+  }
+}
+
 function assertNoSensitiveFields(value: unknown, path = "receipt"): void {
   if (Array.isArray(value)) {
     value.forEach((item, index) => assertNoSensitiveFields(item, `${path}[${index}]`));
@@ -129,6 +142,11 @@ function metricValue(value: unknown, label: string, integer = false): number {
 
 function parseMetrics(value: unknown, label: string): CalibrationMetrics {
   const metrics = objectValue(value, label);
+  assertExactKeys(
+    metrics,
+    ["trackingRmseM", "maxErrorM", "energyWh", "overshootCount"],
+    label,
+  );
   return {
     trackingRmseM: metricValue(metrics.trackingRmseM, `${label} tracking RMSE`),
     maxErrorM: metricValue(metrics.maxErrorM, `${label} max error`),
@@ -159,6 +177,23 @@ export function parseLabCalibrationInput(
   }
   assertNoSensitiveFields(decoded);
   const receipt = objectValue(decoded, "Calibration input");
+  assertExactKeys(
+    receipt,
+    [
+      "schemaVersion",
+      "kind",
+      "editionId",
+      "jobId",
+      "cycleOrdinal",
+      "source",
+      "vehicle",
+      "evidence",
+      "simulation",
+      "realObservation",
+      "authority",
+    ],
+    "Calibration input",
+  );
   if (
     receipt.schemaVersion !== 1
     || receipt.kind !== "dronedream-lab-calibration-input"
@@ -171,6 +206,29 @@ export function parseLabCalibrationInput(
   const vehicle = objectValue(receipt.vehicle, "Vehicle binding");
   const evidence = objectValue(receipt.evidence, "Evidence binding");
   const authority = objectValue(receipt.authority, "Authority binding");
+  assertExactKeys(
+    sourceBinding,
+    ["kind", "commonCoreCommit", "editionManifestSha256"],
+    "Source binding",
+  );
+  assertExactKeys(
+    vehicle,
+    ["vehiclePackId", "controllerIdentity", "firmwareIdentity"],
+    "Vehicle binding",
+  );
+  assertExactKeys(
+    evidence,
+    [
+      "simulationReceiptHash",
+      "realObservationReceiptHash",
+      "parameterCandidateHash",
+      "objectiveContractHash",
+      "constraintContractHash",
+      "holdoutContractHash",
+    ],
+    "Evidence binding",
+  );
+  assertExactKeys(authority, ["decision", "grantsHardwareAuthority"], "Authority binding");
   if (authority.decision !== "deny" || authority.grantsHardwareAuthority !== false) {
     throw new LabCalibrationInputError("Imported calibration evidence must not grant authority.");
   }
@@ -195,6 +253,10 @@ export function parseLabCalibrationInput(
     jobId: identifierValue(receipt.jobId, "Job ID"),
     cycleOrdinal,
     commonCoreCommit,
+    editionManifestSha256: shaValue(
+      sourceBinding.editionManifestSha256,
+      "Edition manifest hash",
+    ),
     vehiclePackId: identifierValue(vehicle.vehiclePackId, "Vehicle Pack ID"),
     controllerIdentity: identifierValue(vehicle.controllerIdentity, "Controller identity"),
     firmwareIdentity: identifierValue(vehicle.firmwareIdentity, "Firmware identity"),
@@ -332,6 +394,7 @@ export function buildLabCalibrationDraftReceipt(
     cycleOrdinal: input.cycleOrdinal,
     source: {
       commonCoreCommit: input.commonCoreCommit,
+      editionManifestSha256: input.editionManifestSha256,
       sourceKind: input.sourceKind,
     },
     vehicle: {

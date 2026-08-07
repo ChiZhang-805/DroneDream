@@ -6,7 +6,8 @@
   "cycleOrdinal": 2,
   "source": {
     "kind": "test-fixture",
-    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9"
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "editionManifestSha256": "303856056bb9a6dcd36227d704eef5ff29a577da20343a6b564baf6f61f5ee1a"
   },
   "vehicle": {
     "vehiclePackId": "px4-gazebo-x500-reference",
