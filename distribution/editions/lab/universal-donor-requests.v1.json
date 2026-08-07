@@ -9,7 +9,7 @@
     "observedTree": "d5d6acb39fec0af65bac4fbd4f964b6aeab73b3d",
     "observedHeadUsedAsWholeDonor": false,
     "observedProductSource": "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
-    "canonicalBrandProductSource": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+    "canonicalBrandProductSource": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
     "commonCoreProductSourceCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "labMayCarrySharedFixLongTerm": false,
     "integrationRule": "review exact donor ancestry and diff, then forward-sync the canonical change without hand-copying or blindly cherry-picking"
@@ -275,6 +275,86 @@
         "Use the exact canonical lockup bytes across sidebar, launcher, login, browser callback, installer-facing resources, taskbar, shortcuts, Website cards, and download metadata.",
         "Make the public stylesheet contract validate imported generated Edition tokens without duplicating token definitions into Lab-owned CSS.",
         "Do not source from visualizations or concept directories, redraw geometry, replace U+00B7, or let visual mode grant hardware authority."
+      ]
+    },
+    {
+      "requestId": "universal-centered-edition-separator-brand-v2",
+      "ownership": "Universal/Core",
+      "state": "delivered-exact-donor-forward-synced",
+      "exactDonor": {
+        "commit": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
+        "parent": "a0d15b18d164e84fc764396b34d15da0e9840283",
+        "integration": "audited-path-limited-exact-byte-sync",
+        "changedPaths": [
+          "brand/README.md",
+          "brand/brand-editions.schema.json",
+          "brand/brand-editions.v1.json",
+          "brand/generated/brand-assets.v1.json",
+          "brand/generated/brand-visual-receipt.v1.json",
+          "brand/generated/edition-brand-preview.png",
+          "brand/generated/field/lockup-compact.png",
+          "brand/generated/field/lockup-primary.png",
+          "brand/generated/lab/lockup-compact.png",
+          "brand/generated/lab/lockup-primary.png",
+          "brand/generated/sim/lockup-compact.png",
+          "brand/generated/sim/lockup-primary.png",
+          "brand/source/approved/edition-brand-centered-separator-approved-preview.png",
+          "brand/source/approved/field-large-label-centered-lockup.png",
+          "brand/source/approved/lab-large-label-centered-lockup.png",
+          "brand/source/approved/sim-large-label-centered-lockup.png",
+          "brand/tests/test_brand_assets.py",
+          "frontend/src/assets/brand/field-lockup-compact.png",
+          "frontend/src/assets/brand/field-lockup-primary.png",
+          "frontend/src/assets/brand/lab-lockup-compact.png",
+          "frontend/src/assets/brand/lab-lockup-primary.png",
+          "frontend/src/assets/brand/sim-lockup-compact.png",
+          "frontend/src/assets/brand/sim-lockup-primary.png",
+          "scripts/build-brand-assets.py"
+        ]
+      },
+      "evidence": {
+        "approvedDisplayName": "DroneDream · LAB",
+        "separatorCodePoint": "U+00B7",
+        "canonicalDotLockupPath": "brand/source/approved/lab-large-label-centered-lockup.png",
+        "canonicalDotLockupBytes": 123162,
+        "canonicalDotLockupDimensions": [2386, 218],
+        "canonicalDotLockupSha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94",
+        "separatorGeometry": {
+          "wordmarkEndX": 1748,
+          "separatorStartX": 1807,
+          "separatorEndX": 1858,
+          "editionLabelStartX": 1917,
+          "leftGapPx": 58,
+          "rightGapPx": 58,
+          "tolerancePx": 0
+        },
+        "supersededLargeLabelLockup": {
+          "path": "brand/source/approved/lab-large-label-lockup.png",
+          "bytes": 128948,
+          "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+          "retainedAsHistoricalEvidence": true
+        },
+        "markAndIconRemainCanonical": true,
+        "labPaletteRemainsCanonical": true,
+        "presentationOnly": true,
+        "grantsHardwareAuthority": false
+      },
+      "candidatePaths": [
+        "brand/brand-editions.v1.json",
+        "brand/generated/brand-assets.v1.json",
+        "brand/generated/brand-visual-receipt.v1.json",
+        "brand/generated/lab/lockup-primary.png",
+        "brand/generated/lab/lockup-compact.png",
+        "brand/source/approved/lab-large-label-centered-lockup.png",
+        "frontend/src/assets/brand/lab-lockup-primary.png",
+        "frontend/src/assets/brand/lab-lockup-compact.png"
+      ],
+      "acceptance": [
+        "Keep the LAB mark, Windows icon, label size, natural width, and green palette byte-unchanged.",
+        "Center U+00B7 with exact 58 pixel alpha-edge gaps and zero tolerance.",
+        "Use the exact centered lockup bytes at every current Lab application and native callback entrypoint.",
+        "Retain superseded large-label and small-label sources only as historical evidence.",
+        "Keep presentation-only branding outside native, backend, and runtime hardware authority."
       ]
     },
     {

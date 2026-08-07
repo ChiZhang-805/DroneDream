@@ -250,7 +250,7 @@ def validate_contract(
     if (
         brand.get("displayName") != "DroneDream · LAB"
         or brand.get("separatorCodePoint") != "U+00B7"
-        or brand.get("dotLockupState") != "canonical-large-label-donor-consumed"
+        or brand.get("dotLockupState") != "canonical-centered-separator-donor-consumed"
         or brand.get("approvedEditionSuffixCapHeightRatio") != 0.9
         or brand.get("preserveNaturalEditionLabelWidth") is not True
         or brand.get("futureReleaseMustUsePendingDonor") is not False
@@ -261,7 +261,7 @@ def validate_contract(
         raise LabCoexistenceContractError("Lab canonical brand policy drifted")
     expected_brand_files = {
         "markPath": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
-        "dotLockupPath": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+        "dotLockupPath": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94",
     }
     for path_key, expected_hash in expected_brand_files.items():
         relative = brand.get(path_key)
@@ -269,14 +269,36 @@ def validate_contract(
             raise LabCoexistenceContractError(f"canonical Lab brand bytes drifted: {path_key}")
     canonical_donor = _mapping(brand.get("canonicalDonor"), "brandContinuity.canonicalDonor")
     if (
-        canonical_donor.get("productCommit") != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
-        or canonical_donor.get("productParentCommit") != "2d19b045c11f5e78ae1a0b6554aee0d0ad382335"
-        or canonical_donor.get("evidenceCommit") != "7482647f1c2fcb92f58aaef009efc99764792297"
-        or canonical_donor.get("receiptSha256")
-        != "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94"
-        or canonical_donor.get("evidenceCommitIsProductSource") is not False
+        canonical_donor.get("productCommit") != "6de4f1343c0239a916949f0486fa63d3f460d6a8"
+        or canonical_donor.get("productParentCommit") != "a0d15b18d164e84fc764396b34d15da0e9840283"
+        or canonical_donor.get("integration") != "audited-path-limited-exact-byte-sync"
     ):
         raise LabCoexistenceContractError("Lab canonical brand donor provenance drifted")
+    old_evidence = _mapping(
+        canonical_donor.get("supersededLargeLabelEvidence"),
+        "brandContinuity.canonicalDonor.supersededLargeLabelEvidence",
+    )
+    if (
+        old_evidence.get("productCommit") != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
+        or old_evidence.get("evidenceCommit") != "7482647f1c2fcb92f58aaef009efc99764792297"
+        or old_evidence.get("receiptSha256")
+        != "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94"
+        or old_evidence.get("isCurrentProductSource") is not False
+    ):
+        raise LabCoexistenceContractError("superseded Lab brand evidence drifted")
+    separator_geometry = _mapping(
+        brand.get("separatorGeometry"), "brandContinuity.separatorGeometry"
+    )
+    if separator_geometry != {
+        "wordmarkEndX": 1748,
+        "separatorStartX": 1807,
+        "separatorEndX": 1858,
+        "editionLabelStartX": 1917,
+        "leftGapPx": 58,
+        "rightGapPx": 58,
+        "tolerancePx": 0,
+    }:
+        raise LabCoexistenceContractError("Lab separator geometry drifted")
     tokens = _mapping(brand.get("tokens"), "brandContinuity.tokens")
     if (
         tokens.get("gradient") != ["#A7E84A", "#20C77A", "#087E69"]
@@ -412,7 +434,7 @@ def validate_contract(
         or authority.get("observedHeadUsedAsWholeDonor") is not False
         or authority.get("observedProductSource") != "6f25bb5051794842a8dfc6d02d199c5f93afce7c"
         or authority.get("canonicalBrandProductSource")
-        != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
+        != "6de4f1343c0239a916949f0486fa63d3f460d6a8"
         or authority.get("labMayCarrySharedFixLongTerm") is not False
         or "without hand-copying or blindly cherry-picking"
         not in str(authority.get("integrationRule"))
@@ -424,6 +446,7 @@ def validate_contract(
         "universal-nsis-existing-install-quiesce-v1",
         "universal-edition-auth-isolation-v1",
         "universal-large-edition-lockup-brand-v1",
+        "universal-centered-edition-separator-brand-v2",
         "universal-runtime-diagnostics-isolation-v1",
         "universal-updater-release-family-isolation-v1",
         "universal-nsis-duplicate-label-v1",
@@ -515,6 +538,24 @@ def validate_contract(
                 or receipt.get("isProductSource") is not False
             ):
                 raise LabCoexistenceContractError("brand donor provenance drifted")
+        if item.get("requestId") == "universal-centered-edition-separator-brand-v2":
+            exact_donor = _mapping(item.get("exactDonor"), "centered brand exact donor")
+            evidence = _mapping(item.get("evidence"), "centered brand donor evidence")
+            geometry = _mapping(evidence.get("separatorGeometry"), "centered separator geometry")
+            if (
+                item.get("state") != "delivered-exact-donor-forward-synced"
+                or exact_donor.get("commit") != "6de4f1343c0239a916949f0486fa63d3f460d6a8"
+                or exact_donor.get("parent") != "a0d15b18d164e84fc764396b34d15da0e9840283"
+                or evidence.get("canonicalDotLockupSha256")
+                != "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94"
+                or evidence.get("canonicalDotLockupDimensions") != [2386, 218]
+                or geometry.get("leftGapPx") != 58
+                or geometry.get("rightGapPx") != 58
+                or geometry.get("tolerancePx") != 0
+                or evidence.get("presentationOnly") is not True
+                or evidence.get("grantsHardwareAuthority") is not False
+            ):
+                raise LabCoexistenceContractError("centered brand donor provenance drifted")
         if item.get("requestId") == "universal-edition-auth-isolation-v1":
             chain = _sequence(item.get("exactDonorChain"), "auth exact donor chain")
             canonical = _mapping(

@@ -158,7 +158,7 @@
     "updaterMetadataFileName": "latest-lab.json",
     "brand": {
       "displayName": "DroneDream · LAB",
-      "canonicalDonorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+      "canonicalDonorCommit": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
       "canonicalDonorManifest": "brand/brand-editions.v1.json",
       "labSourceManifest": "distribution/editions/lab/brand-source-manifest.v1.json",
       "applicationLockup": "brand/generated/lab/lockup-compact.png",

@@ -146,7 +146,7 @@
       "enginePackEditionProfile": "unified-sim-lab",
       "canonicalWindowsIcon": "brand/generated/lab/windows/icon.ico",
       "canonicalMarkSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
-      "canonicalDotLockupSha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
+      "canonicalDotLockupSha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94"
     },
     {
       "editionId": "field",
@@ -178,15 +178,28 @@
     "markPath": "distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
     "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
     "dotLockupPath": "brand/generated/lab/lockup-compact.png",
-    "dotLockupSha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
-    "dotLockupState": "canonical-large-label-donor-consumed",
+    "dotLockupSha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94",
+    "dotLockupState": "canonical-centered-separator-donor-consumed",
     "canonicalDonor": {
-      "productCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
-      "productParentCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+      "productCommit": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
+      "productParentCommit": "a0d15b18d164e84fc764396b34d15da0e9840283",
+      "integration": "audited-path-limited-exact-byte-sync",
+      "supersededLargeLabelEvidence": {
+        "productCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
       "evidenceCommit": "7482647f1c2fcb92f58aaef009efc99764792297",
       "receiptPath": "brand/receipts/canonical-large-label-donor-v1.json",
       "receiptSha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
-      "evidenceCommitIsProductSource": false
+        "isCurrentProductSource": false
+      }
+    },
+    "separatorGeometry": {
+      "wordmarkEndX": 1748,
+      "separatorStartX": 1807,
+      "separatorEndX": 1858,
+      "editionLabelStartX": 1917,
+      "leftGapPx": 58,
+      "rightGapPx": 58,
+      "tolerancePx": 0
     },
     "approvedEditionSuffixCapHeightRatio": 0.9,
     "preserveNaturalEditionLabelWidth": true,

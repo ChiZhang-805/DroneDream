@@ -38,8 +38,8 @@ EXPECTED_ASSETS = {
     },
     "dot-lockup": {
         "filename": "lockup-compact.png",
-        "bytes": 128948,
-        "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+        "bytes": 123162,
+        "sha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94",
         "dimensions": (2386, 218),
         "copyMode": "canonical-donor-reference",
     },
@@ -85,7 +85,7 @@ class LabBrandAssetTests(unittest.TestCase):
         self.assertTrue(self.manifest["theme"]["presentationOnly"])
         self.assertEqual(
             self.manifest["sourceAuthority"]["donorCommit"],
-            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+            "6de4f1343c0239a916949f0486fa63d3f460d6a8",
         )
         donor_path = ROOT / self.manifest["sourceAuthority"]["canonicalContract"]["path"]
         self.assertEqual(
@@ -123,6 +123,12 @@ class LabBrandAssetTests(unittest.TestCase):
             self.assertEqual(entry["repositorySha256"], digest)
             self.assertEqual(entry["copyMode"], expected["copyMode"])
 
+        lockup = assets["dot-lockup"]
+        self.assertEqual(lockup["style"], "large-edition-label-centered-separator-v2")
+        self.assertEqual(lockup["separatorGeometry"]["leftGapPx"], 58)
+        self.assertEqual(lockup["separatorGeometry"]["rightGapPx"], 58)
+        self.assertEqual(lockup["separatorGeometry"]["tolerancePx"], 0)
+
     def test_old_lab_palette_and_small_lockup_are_superseded(self) -> None:
         formal_asset_names = {
             path.name
@@ -133,14 +139,25 @@ class LabBrandAssetTests(unittest.TestCase):
             formal_asset_names,
             {"dronedream-lab-mark-v2.png", "dronedream-lab-dot-lockup-v2.png"},
         )
-        self.assertEqual(len(self.manifest["supersededAssets"]), 1)
-        superseded = self.manifest["supersededAssets"][0]
-        self.assertEqual(superseded["status"], "superseded")
-        self.assertFalse(superseded["includedInFuturePayload"])
+        self.assertEqual(len(self.manifest["supersededAssets"]), 2)
+        superseded = {
+            entry["sha256"]: entry for entry in self.manifest["supersededAssets"]
+        }
+        small_lockup = superseded[
+            "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"
+        ]
+        self.assertEqual(small_lockup["status"], "superseded")
+        self.assertFalse(small_lockup["includedInFuturePayload"])
+        large_lockup = superseded[
+            "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
+        ]
         self.assertEqual(
-            superseded["sha256"],
-            "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
+            large_lockup["status"], "superseded-by-centered-separator-v2"
         )
+        self.assertFalse(large_lockup["includedInFuturePayload"])
+        old_large_payload = (ROOT / large_lockup["path"]).read_bytes()
+        self.assertEqual(len(old_large_payload), 128948)
+        self.assertEqual(hashlib.sha256(old_large_payload).hexdigest(), large_lockup["sha256"])
         self.assertEqual(
             self.manifest["theme"]["supersededPalette"],
             ["#16D6A3", "#19BBD3", "#5268F2"],

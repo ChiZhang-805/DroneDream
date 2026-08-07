@@ -42,11 +42,11 @@ class LabCoexistenceContractTests(unittest.TestCase):
             result["labIdentity"]["installerProductName"],
             "DroneDream-Lab",
         )
-        self.assertEqual(result["universalDonorRequestCount"], 7)
+        self.assertEqual(result["universalDonorRequestCount"], 8)
         contract = coexistence._load_json(coexistence.CONTRACT_PATH)
         self.assertEqual(
             contract["brandContinuity"]["dotLockupState"],
-            "canonical-large-label-donor-consumed",
+            "canonical-centered-separator-donor-consumed",
         )
         self.assertEqual(
             contract["brandContinuity"]["approvedEditionSuffixCapHeightRatio"],
@@ -54,7 +54,9 @@ class LabCoexistenceContractTests(unittest.TestCase):
         )
         self.assertTrue(contract["brandContinuity"]["preserveNaturalEditionLabelWidth"])
         self.assertFalse(
-            contract["brandContinuity"]["canonicalDonor"]["evidenceCommitIsProductSource"]
+            contract["brandContinuity"]["canonicalDonor"][
+                "supersededLargeLabelEvidence"
+            ]["isCurrentProductSource"]
         )
 
     def test_rejects_product_and_app_identity_collision(self) -> None:

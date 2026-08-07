@@ -41,7 +41,7 @@ SUPABASE_DESKTOP_VERIFIER_PATH = ROOT / "desktop/scripts/verify-browser-auth-con
 
 COMMON_CORE_PRODUCT_SOURCE_COMMIT = artifact_verifier.COMMON_CORE_PRODUCT_SOURCE_COMMIT
 EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT = artifact_verifier.EXCLUDED_SIM_PREVIEW_EVIDENCE_COMMIT
-CANONICAL_BRAND_DONOR_COMMIT = "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
+CANONICAL_BRAND_DONOR_COMMIT = "6de4f1343c0239a916949f0486fa63d3f460d6a8"
 COMMON_CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
 HARDWARE_ACTIONS = (
     "hardware.parameter.write",
@@ -276,13 +276,11 @@ def _brand_state() -> dict[str, Any]:
         ).splitlines()
         if path
     )
-    donor_paths_match = bool(donor_paths) and _git_success(
-        "diff",
-        "--quiet",
-        CANONICAL_BRAND_DONOR_COMMIT,
-        "HEAD",
-        "--",
-        *donor_paths,
+    donor_paths_match = bool(donor_paths) and all(
+        (ROOT / path).is_file()
+        and _git("hash-object", "--", path)
+        == _git("rev-parse", f"{CANONICAL_BRAND_DONOR_COMMIT}:{path}")
+        for path in donor_paths
     )
     donor_is_integrated = donor_is_ancestor or donor_paths_match
     ready = (
@@ -320,7 +318,7 @@ def _brand_state() -> dict[str, Any]:
             "isAncestor": donor_is_ancestor,
             "exactChangedPathsMatch": donor_paths_match,
             "integrationMode": (
-                "ancestor" if donor_is_ancestor else "audited-authorized-cherry-pick"
+                "ancestor" if donor_is_ancestor else "audited-path-limited-exact-byte-sync"
             ),
         },
         "tauriOverlay": _file_ref(TAURI_OVERLAY_PATH),

@@ -6,30 +6,31 @@
   "displayName": "DroneDream · LAB",
   "sourceAuthority": {
     "kind": "universal-canonical-donor",
-    "donorCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
-    "donorParentCommit": "2d19b045c11f5e78ae1a0b6554aee0d0ad382335",
+    "donorCommit": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
+    "donorParentCommit": "a0d15b18d164e84fc764396b34d15da0e9840283",
     "canonicalContract": {
       "path": "brand/brand-editions.v1.json",
-      "bytes": 4488,
-      "sha256": "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33"
+      "bytes": 6105,
+      "sha256": "11400eae1df73ce2d2b753443a243ceb555bd6fabe3a5a1a09832470590aebc2"
     },
     "canonicalAssetManifest": {
       "path": "brand/generated/brand-assets.v1.json",
-      "bytes": 16607,
-      "sha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471"
+      "bytes": 17837,
+      "sha256": "9f574a98d703196c6de2b540fd86f8d52bdb5d76ac036d32e17513c7e678b40e"
     },
     "canonicalVisualReceipt": {
       "path": "brand/generated/brand-visual-receipt.v1.json",
-      "bytes": 892,
-      "sha256": "207ff1a01aaf4fc6ee94d32031b3456b3e1be387216d9ce2d761b4be408bb9ba"
+      "bytes": 971,
+      "sha256": "a8cbbdadcdf678faf442415ff15ffc913db86f09542230c09c62c0c582d3c384"
     },
     "approvalHandoffSha256": "9fc52dea2edab1b65aa8c814fbf05ff1ad4fea0de4980403bec84dab8a1d9657",
-    "receiptEvidence": {
+    "supersededLargeLabelReceiptEvidence": {
       "commit": "7482647f1c2fcb92f58aaef009efc99764792297",
       "path": "brand/receipts/canonical-large-label-donor-v1.json",
       "bytes": 3367,
       "sha256": "9f2e054cc9ce7ff612919e60b51894ab0bea54b58cb7140aa002bf058f174c94",
-      "isProductSource": false
+      "supportsProductSourceCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+      "isCurrentProductSource": false
     }
   },
   "commonCore": {
@@ -58,16 +59,26 @@
     },
     {
       "role": "dot-lockup",
-      "canonicalSourcePath": "brand/source/approved/lab-large-label-lockup.png",
-      "canonicalSourceBytes": 128948,
-      "canonicalSourceSha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+      "canonicalSourcePath": "brand/source/approved/lab-large-label-centered-lockup.png",
+      "canonicalSourceBytes": 123162,
+      "canonicalSourceSha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94",
       "repositoryPath": "brand/generated/lab/lockup-compact.png",
-      "repositoryBytes": 128948,
-      "repositorySha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+      "repositoryBytes": 123162,
+      "repositorySha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94",
       "dimensions": {
         "width": 2386,
         "height": 218
       },
+      "separatorGeometry": {
+        "wordmarkEndX": 1748,
+        "separatorStartX": 1807,
+        "separatorEndX": 1858,
+        "editionLabelStartX": 1917,
+        "leftGapPx": 58,
+        "rightGapPx": 58,
+        "tolerancePx": 0
+      },
+      "style": "large-edition-label-centered-separator-v2",
       "copyMode": "canonical-donor-reference"
     }
   ],
@@ -79,6 +90,14 @@
       "sha256": "b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91",
       "status": "superseded",
       "includedInFuturePayload": false
+    },
+    {
+      "role": "large-label-lockup",
+      "path": "brand/source/approved/lab-large-label-lockup.png",
+      "bytes": 128948,
+      "sha256": "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea",
+      "status": "superseded-by-centered-separator-v2",
+      "includedInFuturePayload": false
     }
   ],
   "derivation": {
@@ -87,7 +106,7 @@
     "operation": "universal-canonical-generator-v1",
     "designChanges": false,
     "generatorPath": "scripts/build-brand-assets.py",
-    "generatorSha256": "5aa0430416d1034ea966d35446fee959ba50c6133c2cc632038fa97ce1e4594d",
+    "generatorSha256": "c215aba39c60ec32f3d6dfa8e21441b1b890d80aad49ee29b528792cd9b97bb1",
     "assets": [
       {
         "role": "desktop-32",

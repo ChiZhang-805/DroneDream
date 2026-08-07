@@ -202,7 +202,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         not isinstance(brand, dict)
         or brand.get("displayName") != "DroneDream · LAB"
         or brand.get("canonicalDonorCommit")
-        != "b8e0d0c7093abe9f54fe36f01022deb95852fa39"
+        != "6de4f1343c0239a916949f0486fa63d3f460d6a8"
         or brand.get("canonicalDonorManifest") != "brand/brand-editions.v1.json"
         or brand.get("labSourceManifest")
         != "distribution/editions/lab/brand-source-manifest.v1.json"

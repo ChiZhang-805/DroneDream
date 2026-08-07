@@ -106,7 +106,7 @@ const tauriOverlay = JSON.parse(await readFile(tauriOverlayPath, "utf8"));
 assert.equal(brandManifest.displayName, "DroneDream · LAB");
 assert.equal(
   brandManifest.sourceAuthority.donorCommit,
-  "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+  "6de4f1343c0239a916949f0486fa63d3f460d6a8",
 );
 assert.deepEqual(brandManifest.theme.palette, ["#A7E84A", "#20C77A", "#087E69"]);
 assert.equal(brandManifest.theme.grantsHardwareAuthority, false);
