@@ -323,8 +323,8 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertEqual(manifest["displayName"]["zh-CN"], "DroneDream · LAB")
         self.assertEqual(
             manifest["description"]["zh-CN"],
-            "统一提供仿真、HITL 与真机实验，"
-            "但所有真机能力都必须通过 native、Runtime 与后端三层安全门。",
+            "贯通 Sim-to-Real 与 Real-to-Sim 的双向自主调优、校准、资格判定和证据签发；"
+            "所有真机能力仍必须通过 native、后端与 Runtime 三层安全门。",
         )
         self.assertNotEqual(manifest["description"]["zh-CN"], manifest["description"]["en"])
 

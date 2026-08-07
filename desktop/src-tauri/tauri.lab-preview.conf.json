@@ -19,7 +19,7 @@
   "bundle": {
     "publisher": "DroneDream",
     "shortDescription": "DroneDream · LAB internal unsigned preview",
-    "longDescription": "DroneDream · LAB is an internal unsigned preview of the shared DroneDream core with simulation workflows and hardware workflow configuration behind native, backend, and runtime safety gates.",
+    "longDescription": "DroneDream · LAB is the bidirectional Sim-to-Real and Real-to-Sim calibration workspace. Model proposals and Harness experiments remain bounded by native, backend, runtime, Vehicle Pack, and operator safety gates.",
     "icon": [
       "../../brand/generated/lab/windows/32x32.png",
       "../../brand/generated/lab/windows/128x128.png",
@@ -36,6 +36,7 @@
       "../../distribution/editions/lab/coexistence-and-auth.v1.json": "distribution/editions/lab/coexistence-and-auth.v1.json",
       "../../distribution/editions/lab/universal-donor-requests.v1.json": "distribution/editions/lab/universal-donor-requests.v1.json",
       "../../distribution/editions/lab/safety-oauth-source-readiness.v1.json": "distribution/editions/lab/safety-oauth-source-readiness.v1.json",
+      "../../distribution/editions/lab/model-harness-closed-loop.v1.json": "distribution/editions/lab/model-harness-closed-loop.v1.json",
       "../../distribution/desktop/edition-coexistence.v1.json": "distribution/desktop/edition-coexistence.v1.json",
       "../../distribution/schemas/desktop-edition-coexistence.schema.json": "distribution/schemas/desktop-edition-coexistence.schema.json",
       "../../distribution/desktop/edition-browser-auth.v1.json": "distribution/desktop/edition-browser-auth.v1.json",

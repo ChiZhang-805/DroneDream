@@ -24,7 +24,7 @@
     "fixtureEditionManifestSha256": "7ff9deb6f06ae8a0dbfb4610dca03515bbaf523d5846c62408fd6d7a12b8e356",
     "activeLabManifest": {
       "path": "distribution/editions/lab.v1.json",
-      "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+      "sha256": "3c82fe24ea071ba92635b280f85afd8ac02221f258217991d52289b0414bf9b0"
     },
     "rawBaseManifestMatchesActiveLabManifest": false,
     "parameterizationDonor": {
