@@ -10,6 +10,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   Apple,
   BotMessageSquare,
+  Box,
   Camera,
   CircleUserRound,
   Download,
@@ -98,7 +99,6 @@ import {
   persistExperimentDraftsForExit,
 } from "./features/experiment/draftStorage";
 import {
-  applyUniversalMode,
   loadUniversalMode,
   persistUniversalMode,
 } from "./features/distribution/universalMode";
@@ -142,6 +142,11 @@ const NAV_ITEMS: {
     to: "/scenarios",
     labelKey: "app.fixedScenarios",
     icon: MapPinned,
+  },
+  {
+    to: "/vehicle-studio",
+    labelKey: "app.vehicleStudio",
+    icon: Box,
   },
   {
     to: ECE498BH_COURSE_URL,
@@ -2068,6 +2073,9 @@ function AppShellContent() {
   const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
+  const activeThemeEdition: BrandEditionId = location.pathname === "/vehicle-studio"
+    ? "universal"
+    : universalMode;
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
   const launcherRuntimeChecking =
@@ -2105,7 +2113,6 @@ function AppShellContent() {
   ].includes(updater.status);
 
   useEffect(() => {
-    applyUniversalMode(universalMode);
     persistUniversalMode(universalMode);
   }, [universalMode]);
   const sidebarUpdateLabel = updater.status === "available"
@@ -2535,7 +2542,7 @@ function AppShellContent() {
 
   if (launcherMode) {
     return (
-      <EditionThemeProvider edition={universalMode}>
+      <EditionThemeProvider edition={activeThemeEdition}>
         <div className="app-shell app-shell-launcher">
         <a
           className="skip-link"
@@ -2585,7 +2592,7 @@ function AppShellContent() {
             <SettingsDialog
               access={runtimeAccess}
               closeRef={launcherSettingsCloseRef}
-              edition={universalMode}
+              edition={activeThemeEdition}
               onClose={closeSettings}
             />
           </div>
@@ -2600,7 +2607,7 @@ function AppShellContent() {
   }
 
   return (
-    <EditionThemeProvider edition={universalMode}>
+    <EditionThemeProvider edition={activeThemeEdition}>
       <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}>
       <a
         className="skip-link"
@@ -2615,11 +2622,11 @@ function AppShellContent() {
       <aside className="app-sidebar">
         {desktopRuntime ? (
           <Link to="/assistant" className="app-title" aria-label="DroneDream">
-            <BrandLockup variant="compact" edition={universalMode} />
+            <BrandLockup variant="compact" edition={activeThemeEdition} />
           </Link>
         ) : (
           <a href="/" className="app-title" aria-label="DroneDream">
-            <BrandLockup variant="compact" edition={universalMode} />
+            <BrandLockup variant="compact" edition={activeThemeEdition} />
           </a>
         )}
         {mobileNavigationEnabled ? (
@@ -2839,7 +2846,7 @@ function AppShellContent() {
             <SettingsDialog
               access={runtimeAccess}
               closeRef={launcherSettingsCloseRef}
-              edition={universalMode}
+              edition={activeThemeEdition}
               onClose={closeSettings}
             />
           </div>

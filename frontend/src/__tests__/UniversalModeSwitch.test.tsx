@@ -19,9 +19,9 @@ describe("UniversalModeSwitch", () => {
     delete document.documentElement.dataset.themeGrantsHardwareAuthority;
   });
 
-  it("fails unknown persisted values back to the Universal mother brand", () => {
-    expect(parseUniversalMode("unknown")).toBe("universal");
-    expect(loadUniversalMode()).toBe("universal");
+  it("fails unknown persisted values back to the SIM workspace", () => {
+    expect(parseUniversalMode("unknown")).toBe("sim");
+    expect(loadUniversalMode()).toBe("sim");
   });
 
   it("persists and applies a presentation-only mode without changing install selection", () => {
@@ -38,16 +38,17 @@ describe("UniversalModeSwitch", () => {
     expect(document.documentElement.dataset.themeGrantsHardwareAuthority).toBe("false");
   });
 
-  it("offers all four modes and never represents the switch as authority", () => {
+  it("offers the three integrated workspaces and never represents the switch as authority", () => {
     const onChange = vi.fn();
     const { container } = render(
-      <UniversalModeSwitch mode="universal" locale="en" onChange={onChange} />,
+      <UniversalModeSwitch mode="sim" locale="en" onChange={onChange} />,
     );
 
     const region = container.querySelector(".universal-mode-switch");
     expect(region).toHaveAttribute("data-presentation-only", "true");
     expect(region).toHaveAttribute("data-grants-hardware-authority", "false");
-    expect(screen.getAllByRole("option")).toHaveLength(4);
+    expect(screen.getAllByRole("option")).toHaveLength(3);
+    expect(screen.queryByRole("option", { name: "DroneDream" })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("combobox", { name: "Workspace mode" }), {
       target: { value: "lab" },
@@ -57,6 +58,7 @@ describe("UniversalModeSwitch", () => {
 
   it("authors the Chinese safety boundary independently", () => {
     render(<UniversalModeSwitch mode="sim" locale="zh-CN" onChange={() => undefined} />);
-    expect(screen.getByText(/这里只切换界面和工作流程/)).toBeInTheDocument();
+    expect(screen.getByText(/这里只切换工作区/)).toBeInTheDocument();
+    expect(screen.getByText(/不会启动 Model \+ Harness/)).toBeInTheDocument();
   });
 });

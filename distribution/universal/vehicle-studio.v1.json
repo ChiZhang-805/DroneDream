@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-vehicle-studio-contract",
+  "contractVersion": "1.0.0",
+  "ownerEdition": "universal",
+  "purpose": "Create versioned custom drone models and exchange integrity-bound Vehicle Pack drafts with SIM, LAB, and FIELD.",
+  "transport": {
+    "mediaType": "application/vnd.dronedream.vehicle-pack-draft+json",
+    "fileSuffix": ".ddvp.json",
+    "schemaPath": "distribution/schemas/vehicle-pack-draft-envelope.schema.json",
+    "canonicalization": "dronedream-sorted-json-v1",
+    "integrityAlgorithm": "SHA-256"
+  },
+  "receivers": ["sim", "lab", "field"],
+  "requiredReceiverSequence": [
+    "parse-closed-schema",
+    "verify-envelope-and-artifact-hashes",
+    "verify-target-edition",
+    "run-edition-compatibility-gate",
+    "promote-through-signed-vehicle-pack-pipeline"
+  ],
+  "authority": {
+    "draftOnly": true,
+    "frontendIsAuthority": false,
+    "importInstallsModules": false,
+    "importStartsModelHarness": false,
+    "grantsSimulationExecution": false,
+    "grantsHardwareAuthority": false,
+    "hardwareUseRequiresSignedValidationEvidence": true
+  },
+  "currentBoundary": {
+    "localRevisionLibrary": true,
+    "fileExportImport": true,
+    "generatedGazeboGeometrySdf": true,
+    "generatedGeometryIsExecutionReady": false,
+    "cloudPackRegistryPublish": false,
+    "automaticEditionInstallation": false,
+    "validatedVehiclePacks": 0
+  }
+}

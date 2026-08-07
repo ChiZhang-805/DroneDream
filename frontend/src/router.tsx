@@ -84,6 +84,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
           },
         },
         {
+          path: "vehicle-studio",
+          lazy: async () => {
+            const { VehicleStudio } = await import("./pages/VehicleStudio");
+            return { Component: VehicleStudio };
+          },
+        },
+        {
           path: "admin",
           lazy: async () => {
             const { AdminPage } = await import("./pages/AdminPage");

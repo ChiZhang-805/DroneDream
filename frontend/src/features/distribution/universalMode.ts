@@ -1,32 +1,38 @@
 import {
-  BRAND_EDITION_IDS,
   type BrandEditionId,
 } from "../../brand/edition-brand.generated";
 
-export const UNIVERSAL_MODE_STORAGE_KEY = "dronedream:universal-mode:v1";
+export const UNIVERSAL_WORKSPACE_IDS = ["sim", "lab", "field"] as const;
+export type UniversalWorkspaceId = (typeof UNIVERSAL_WORKSPACE_IDS)[number];
 
-const MODE_SET = new Set<string>(BRAND_EDITION_IDS);
+export const UNIVERSAL_MODE_STORAGE_KEY = "dronedream:universal-workspace:v2";
+export const UNIVERSAL_WORKSPACE_CHANGED_EVENT = "dronedream:universal-workspace-changed";
 
-export function parseUniversalMode(value: unknown): BrandEditionId {
+const MODE_SET = new Set<string>(UNIVERSAL_WORKSPACE_IDS);
+
+export function parseUniversalMode(value: unknown): UniversalWorkspaceId {
   return typeof value === "string" && MODE_SET.has(value)
-    ? value as BrandEditionId
-    : "universal";
+    ? value as UniversalWorkspaceId
+    : "sim";
 }
 
 export function loadUniversalMode(storage: Pick<Storage, "getItem"> = window.localStorage) {
   try {
     return parseUniversalMode(storage.getItem(UNIVERSAL_MODE_STORAGE_KEY));
   } catch {
-    return "universal" as const;
+    return "sim" as const;
   }
 }
 
 export function persistUniversalMode(
-  mode: BrandEditionId,
+  mode: UniversalWorkspaceId,
   storage: Pick<Storage, "setItem"> = window.localStorage,
 ) {
   try {
     storage.setItem(UNIVERSAL_MODE_STORAGE_KEY, mode);
+    window.dispatchEvent(new CustomEvent(UNIVERSAL_WORKSPACE_CHANGED_EVENT, {
+      detail: { mode },
+    }));
   } catch {
     // Mode persistence is presentation-only. Storage failure must not affect
     // capability policy, installation selection, or application availability.
