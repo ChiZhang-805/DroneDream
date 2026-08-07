@@ -44,11 +44,14 @@ class FieldBrandAssetTests(unittest.TestCase):
         self.assertEqual(self.manifest["copyPolicy"], "byte-for-byte-no-transcode")
         self.assertEqual(
             self.manifest["commonCoreCommit"],
-            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+            "6de4f1343c0239a916949f0486fa63d3f460d6a8",
         )
         donor = self.manifest["canonicalDonor"]
         self.assertEqual(donor["commit"], self.manifest["commonCoreCommit"])
-        self.assertEqual(donor["fieldIntegrationCommit"], "c35c2707f42e2612fae2d1202ef2b87b3897ff07")
+        self.assertEqual(
+            donor["baseLargeLabelCommit"],
+            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+        )
         self.assertEqual(donor["contractSha256"], sha256(CANONICAL_CONTRACT))
         self.assertEqual(donor["manifestSha256"], sha256(CANONICAL_MANIFEST))
         self.assertEqual(donor["visualReceiptSha256"], sha256(CANONICAL_VISUAL_RECEIPT))
@@ -61,6 +64,14 @@ class FieldBrandAssetTests(unittest.TestCase):
         self.assertEqual(visual_receipt["editionLabelHeightRatio"], 0.9)
         self.assertTrue(visual_receipt["naturalEditionLabelWidths"])
         self.assertTrue(visual_receipt["presentationOnly"])
+        self.assertEqual(
+            donor["separatorGeometry"],
+            {"leftGapPx": 58, "rightGapPx": 58, "tolerancePx": 0},
+        )
+        self.assertEqual(
+            donor["supersededDotLockupSha256"],
+            "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+        )
 
     def test_formal_assets_match_source_hash_size_and_dimensions(self) -> None:
         expected_ids = {"field-mark", "field-large-label-lockup"}
@@ -82,7 +93,7 @@ class FieldBrandAssetTests(unittest.TestCase):
             self.assertEqual(target.read_bytes(), donor_path.read_bytes())
 
     def test_all_field_lockup_surfaces_use_the_exact_large_label_bytes(self) -> None:
-        expected = "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+        expected = "e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa"
         paths = (
             BRANDING_ROOT / "dronedream-field-dot-lockup.png",
             ROOT / "brand" / "generated" / "field" / "lockup-primary.png",

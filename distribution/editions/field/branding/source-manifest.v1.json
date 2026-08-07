@@ -4,18 +4,25 @@
   "editionId": "field",
   "displayName": "DroneDream · FIELD",
   "copyPolicy": "byte-for-byte-no-transcode",
-  "commonCoreCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+  "commonCoreCommit": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
   "canonicalDonor": {
-    "commit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
-    "fieldIntegrationCommit": "c35c2707f42e2612fae2d1202ef2b87b3897ff07",
+    "commit": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
+    "baseLargeLabelCommit": "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
     "contractPath": "brand/brand-editions.v1.json",
-    "contractSha256": "79e281a808e273d35e01287c178f269bbd1a7476fae94f76365d2c83016fef33",
+    "contractSha256": "11400eae1df73ce2d2b753443a243ceb555bd6fabe3a5a1a09832470590aebc2",
     "manifestPath": "brand/generated/brand-assets.v1.json",
-    "manifestSha256": "cd56361d20c90c1447085da908bb8617924310b31f4b7a8883ae29ef0bf12471",
+    "manifestSha256": "9f574a98d703196c6de2b540fd86f8d52bdb5d76ac036d32e17513c7e678b40e",
     "visualReceiptPath": "brand/generated/brand-visual-receipt.v1.json",
-    "visualReceiptSha256": "207ff1a01aaf4fc6ee94d32031b3456b3e1be387216d9ce2d761b4be408bb9ba",
+    "visualReceiptSha256": "a8cbbdadcdf678faf442415ff15ffc913db86f09542230c09c62c0c582d3c384",
     "markPath": "brand/source/approved/field-mark-1024.png",
-    "dotLockupPath": "brand/source/approved/field-large-label-lockup.png"
+    "dotLockupPath": "brand/source/approved/field-large-label-centered-lockup.png",
+    "separatorGeometry": {
+      "leftGapPx": 58,
+      "rightGapPx": 58,
+      "tolerancePx": 0
+    },
+    "supersededDotLockupPath": "brand/source/approved/field-large-label-lockup.png",
+    "supersededDotLockupSha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
   },
   "source": {
     "evidenceCommit": "7482647f1c2fcb92f58aaef009efc99764792297",
@@ -48,15 +55,15 @@
     {
       "assetId": "field-large-label-lockup",
       "role": "application-large-edition-label-lockup",
-      "sourceFilename": "field-large-label-lockup.png",
+      "sourceFilename": "field-large-label-centered-lockup.png",
       "targetFilename": "dronedream-field-dot-lockup.png",
       "targetPath": "distribution/editions/field/branding/dronedream-field-dot-lockup.png",
       "mediaType": "image/png",
       "width": 2581,
       "height": 218,
-      "sizeBytes": 116568,
-      "sourceSha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
-      "targetSha256": "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+      "sizeBytes": 111047,
+      "sourceSha256": "e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa",
+      "targetSha256": "e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa",
       "transformations": []
     }
   ]
