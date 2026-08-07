@@ -30,11 +30,11 @@
   },
   "sharedUiContract": {
     "contractId": "dronedream-shared-edition-ui/v1",
-    "donorCommit": "4933e214a57a048099d8f0bdd11c9748b620ac3e",
+    "donorCommit": "ad125aa71dde48c9a02b0144be4885595073c1d9",
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "ea8201987fc3afd0a8c4afb22042060cc884d03b7a9d18c6442a0316279c4f69"
+        "sha256": "5219f7a3f7e204a28b373ad1303e9b7adff4d1966e74c938f52720b14247aa9b"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
@@ -46,11 +46,11 @@
       },
       {
         "path": "frontend/src/features/distribution/universalMode.ts",
-        "sha256": "ba1ec0144c383f9b280876f35219c34d1a089da5628edcbef91e0e8f84670416"
+        "sha256": "65352f7ee53e95c128e2269ab78f3c14edf9dd0f758a8a7c426a49fa65178410"
       },
       {
         "path": "frontend/src/styles.css",
-        "sha256": "5e437cf714bc74fc01a897ee623be86a25f97d6466a8289d4413d98f5e45b2ca"
+        "sha256": "19a7807a277646f9fc85f0047fc20df1c87605d7a8b810ed2b81ab45b2d443cd"
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
@@ -82,7 +82,32 @@
     "grantsHardwareAuthority": false,
     "fieldLightweightEntryIntegrationStatus": "downstream-required-not-claimed"
   },
-  "workspaceModes": ["universal", "sim", "lab", "field"],
+  "workspaceModes": ["sim", "lab", "field"],
+  "universalExclusiveCapabilities": {
+    "vehicleStudio": {
+      "ownerEdition": "universal",
+      "route": "/vehicle-studio",
+      "productSourceCommit": "ad125aa71dde48c9a02b0144be4885595073c1d9",
+      "contract": "distribution/universal/vehicle-studio.v1.json",
+      "schema": "distribution/schemas/vehicle-pack-draft-envelope.schema.json",
+      "shareTargets": ["sim", "lab", "field"],
+      "transport": "file-based-draft-envelope",
+      "automaticReceiverInstallation": false,
+      "modelHarnessStartsOnExchange": false,
+      "grantsSimulationExecution": false,
+      "grantsHardwareAuthority": false,
+      "sourceFiles": [
+        {"path": "frontend/src/pages/VehicleStudio.tsx", "sha256": "cc9e4d6f7abde0748b84c3a1d270cabf7614fa2dd7272f343cf5debf29494837"},
+        {"path": "frontend/src/features/vehicleStudio/model.ts", "sha256": "8bd19421f9dec258fed7d0e1cb705e210af6f0e491b4e1263ff0e83c2cdc977d"},
+        {"path": "frontend/src/features/vehicleStudio/pack.ts", "sha256": "82454a93ec0b8c4382971b6d51d033dca8521e569837aab9c39ba9252770684a"},
+        {"path": "frontend/src/features/vehicleStudio/storage.ts", "sha256": "65fbffacae77e3508b5aca477ccfb2227ac4847a4fa1dda54d1b524c05456559"},
+        {"path": "frontend/src/router.tsx", "sha256": "cca6a3dbb3463cdb36ab6bce96119f2a5abfe5600873818095dea4c4369d5b84"},
+        {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "61e9d37e35c5bf59b049a1094e9ed020006159ca7c80bdc992d2a70d72371b6c"},
+        {"path": "distribution/schemas/vehicle-pack-draft-envelope.schema.json", "sha256": "6f4025c7a62eadbc4467d771c610697840f6cd04f276f6a259a5be8fac82f7d9"},
+        {"path": "distribution/universal/vehicle-studio.v1.json", "sha256": "515f8f9a95a6388793d0a1e0a5f8dd82dbec7e5534c2717fd52c800eb33e6e6b"}
+      ]
+    }
+  },
   "desktopContracts": {
     "coexistence": "distribution/desktop/edition-coexistence.v1.json",
     "browserAuth": "distribution/desktop/edition-browser-auth.v1.json",
