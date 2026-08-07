@@ -80,6 +80,21 @@ def test_shared_llvm_build_keeps_signing_and_source_guards_fail_closed() -> None
         assert fragment in script
 
 
+def test_field_build_skips_the_runtime_planner_smoke_only_for_field() -> None:
+    script = _script()
+    field_guard = 'if ($EditionId -ceq "field")'
+    skip_message = 'Skipped Runtime installer planner smoke for field-lightweight.'
+    planner_call = '& (Join-Path $PSScriptRoot "verify-installer-planner.ps1")'
+
+    guard_index = script.index(field_guard)
+    skip_index = script.index(skip_message, guard_index)
+    else_index = script.index("} else {", skip_index)
+    planner_index = script.index(planner_call, else_index)
+
+    assert guard_index < skip_index < else_index < planner_index
+    assert script.count(planner_call) == 1
+
+
 def test_release_policies_anchor_the_wrapped_native_build_boundary() -> None:
     expected_anchor = "Invoke-CheckedNativeCommand `"
     assert expected_anchor in RELEASE_POLICY.read_text(encoding="utf-8-sig")

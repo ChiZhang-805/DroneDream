@@ -296,9 +296,13 @@ if (-not (Test-Path -LiteralPath $generatedNsi -PathType Leaf)) {
 & (Join-Path $PSScriptRoot "verify-webview2-installer.ps1") -GeneratedNsi $generatedNsi
 & (Join-Path $PSScriptRoot "verify-installer-path-guard.ps1")
 & (Join-Path $PSScriptRoot "verify-installer-locales.ps1") -GeneratedNsi $generatedNsi
-& (Join-Path $PSScriptRoot "verify-installer-planner.ps1") `
-    -Application $application `
-    -WebViewLoader $webViewLoaderStaged
+if ($EditionId -ceq "field") {
+    Write-Host "Skipped Runtime installer planner smoke for field-lightweight."
+} else {
+    & (Join-Path $PSScriptRoot "verify-installer-planner.ps1") `
+        -Application $application `
+        -WebViewLoader $webViewLoaderStaged
+}
 
 $tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
     ConvertFrom-Json
