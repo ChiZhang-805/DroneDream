@@ -214,6 +214,9 @@ OFFLINE_DEPENDENCY_TREE_AUTHORITY_PATH = (
     / "desktop"
     / "offline-dependency-tree-authority.v1.json"
 )
+OWNED_BUILD_ROOT_MODULE = (
+    DISTRIBUTION / "sim" / "desktop" / "owned-build-root-contract.psm1"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -313,6 +316,22 @@ def run_offline_dependency_contract(
     expression: str,
 ) -> subprocess.CompletedProcess[str]:
     module = str(OFFLINE_DEPENDENCY_TREE_MODULE).replace("'", "''")
+    command = (
+        f"Import-Module '{module}' -Force; "
+        "$ErrorActionPreference='Stop'; "
+        f"{expression}"
+    )
+    return subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def run_owned_build_root_contract(expression: str) -> subprocess.CompletedProcess[str]:
+    module = str(OWNED_BUILD_ROOT_MODULE).replace("'", "''")
     command = (
         f"Import-Module '{module}' -Force; "
         "$ErrorActionPreference='Stop'; "
@@ -2019,6 +2038,94 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             )
             self.assertNotEqual(negative.returncode, 0)
             self.assertIn("generated transient path", negative.stderr)
+
+    def test_owned_build_root_contract_accepts_existing_parent_and_exclusive_child(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            allowed = Path(temp) / "owned"
+            parent = allowed / "shared"
+            parent.mkdir(parents=True)
+            child = parent / "attempt-11"
+            allowed_literal = str(allowed).replace("'", "''")
+            parent_literal = str(parent).replace("'", "''")
+            child_literal = str(child).replace("'", "''")
+            positive = run_owned_build_root_contract(
+                f"Assert-CanonicalOwnedDirectory -Path '{parent_literal}' "
+                f"-ExpectedPath '{parent_literal}' -AllowedRoot '{allowed_literal}' "
+                "| Out-Null; "
+                f"New-ExclusiveAttemptDirectory -Path '{child_literal}' "
+                f"-CanonicalParent '{parent_literal}' -AllowedRoot '{allowed_literal}' "
+                "| ConvertTo-Json -Compress"
+            )
+            self.assertEqual(positive.returncode, 0, positive.stderr)
+            result = json.loads(positive.stdout)
+            self.assertTrue(result["created"])
+            self.assertTrue(result["exclusive"])
+            self.assertFalse(result["forceUsed"])
+            self.assertTrue(child.is_dir())
+
+            duplicate = run_owned_build_root_contract(
+                f"New-ExclusiveAttemptDirectory -Path '{child_literal}' "
+                f"-CanonicalParent '{parent_literal}' -AllowedRoot '{allowed_literal}'"
+            )
+            self.assertNotEqual(duplicate.returncode, 0)
+            self.assertIn("already exists", duplicate.stderr)
+
+    def test_owned_build_root_contract_rejects_missing_file_and_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            allowed = Path(temp) / "owned"
+            allowed.mkdir()
+            missing = allowed / "missing"
+            file_parent = allowed / "file-parent"
+            file_parent.write_text("not-a-directory", encoding="utf-8")
+            valid_parent = allowed / "valid"
+            valid_parent.mkdir()
+            escaped = allowed.parent / "escaped-attempt"
+            allowed_literal = str(allowed).replace("'", "''")
+
+            for candidate, expected_message in (
+                (missing, "missing or is not a directory"),
+                (file_parent, "missing or is not a directory"),
+            ):
+                candidate_literal = str(candidate).replace("'", "''")
+                result = run_owned_build_root_contract(
+                    f"Assert-CanonicalOwnedDirectory -Path '{candidate_literal}' "
+                    f"-ExpectedPath '{candidate_literal}' "
+                    f"-AllowedRoot '{allowed_literal}'"
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_message, result.stderr)
+
+            parent_literal = str(valid_parent).replace("'", "''")
+            escaped_literal = str(escaped).replace("'", "''")
+            escape = run_owned_build_root_contract(
+                f"Assert-ExclusiveAttemptPathAbsent -Path '{escaped_literal}' "
+                f"-CanonicalParent '{parent_literal}' -AllowedRoot '{allowed_literal}'"
+            )
+            self.assertNotEqual(escape.returncode, 0)
+            self.assertIn("direct child", escape.stderr)
+
+    def test_owned_build_root_contract_rejects_reparse_parent(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            allowed = Path(temp) / "owned"
+            target = allowed / "target"
+            link = allowed / "linked-parent"
+            target.mkdir(parents=True)
+            allowed_literal = str(allowed).replace("'", "''")
+            target_literal = str(target).replace("'", "''")
+            link_literal = str(link).replace("'", "''")
+            result = run_owned_build_root_contract(
+                f"New-Item -ItemType Junction -Path '{link_literal}' "
+                f"-Target '{target_literal}' | Out-Null; "
+                f"Assert-CanonicalOwnedDirectory -Path '{link_literal}' "
+                f"-ExpectedPath '{link_literal}' -AllowedRoot '{allowed_literal}'"
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("must not be a reparse point", result.stderr)
+
+        module_text = OWNED_BUILD_ROOT_MODULE.read_text(encoding="utf-8")
+        self.assertNotRegex(module_text, r"New-Item[^\r\n]+-Force")
 
     def test_yellow_attempt_10_binds_new_product_and_clean_dependency_contract(
         self,
