@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify exact canonical large-label adoption without executing build work."""
+"""Verify the exact historical v1.1.0 large-label adoption evidence."""
 
 from __future__ import annotations
 
@@ -154,14 +154,9 @@ def validate_adoption(document: dict[str, Any], repo_root: Path) -> dict[str, An
     _require(sync.get("lockedEdition") == "sim", "edition lock drifted")
     for key in ("editionRadioPresent", "labOrFieldSwitchPresent", "hardwareAuthorityGranted"):
         _require(sync.get(key) is False, f"{key} must remain false")
-    component = (
-        repo_root / "frontend/src/editions/sim/SimEditionExperience.tsx"
-    ).read_text(encoding="utf-8")
-    _require(
-        './assets/dronedream-sim-large-label-lockup.png' in component,
-        "SIM component not wired",
-    )
-    _require('data-brand-edition="sim"' in component, "SIM brand marker missing")
+    # The edition mirror remains immutable historical evidence after a later
+    # canonical asset supersedes it; current product wiring is verified by the
+    # superseding adoption receipt and tests.
 
     mappings = document.get("surfaceMappings", [])
     observed_mappings = {row.get("surface"): row.get("status") for row in mappings}

@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-centered-separator-adoption-receipt",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "centered-separator-adopted-green-source",
+  "source": {
+    "donorBranch": "codex/brand-dot-centering",
+    "productDonorCommit": "6de4f1343c0239a916949f0486fa63d3f460d6a8",
+    "donorParentCommit": "a0d15b18d164e84fc764396b34d15da0e9840283",
+    "donorPathCount": 24,
+    "donorIsBrandOnly": true,
+    "donorCommitAdoptedAsIs": true,
+    "commonCoreCommitUpdated": false,
+    "brandContractPath": "brand/brand-editions.v1.json",
+    "brandContractSha256": "11400eae1df73ce2d2b753443a243ceb555bd6fabe3a5a1a09832470590aebc2",
+    "brandManifestPath": "brand/generated/brand-assets.v1.json",
+    "brandManifestSha256": "9f574a98d703196c6de2b540fd86f8d52bdb5d76ac036d32e17513c7e678b40e"
+  },
+  "assetBinding": {
+    "approvedSourcePath": "brand/source/approved/sim-large-label-centered-lockup.png",
+    "generatedPrimaryPath": "brand/generated/sim/lockup-primary.png",
+    "generatedCompactPath": "brand/generated/sim/lockup-compact.png",
+    "sharedFrontendPrimaryPath": "frontend/src/assets/brand/sim-lockup-primary.png",
+    "sharedFrontendCompactPath": "frontend/src/assets/brand/sim-lockup-compact.png",
+    "simEditionPath": "frontend/src/editions/sim/assets/dronedream-sim-centered-separator-lockup.png",
+    "sha256": "f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e",
+    "bytes": 115631,
+    "width": 2337,
+    "height": 218,
+    "displayName": "DroneDream · SIM",
+    "separatorCodePoint": "U+00B7",
+    "separatorGeometry": {
+      "wordmarkEndX": 1748,
+      "separatorStartX": 1802,
+      "separatorEndX": 1851,
+      "editionLabelStartX": 1905,
+      "leftGapPx": 53,
+      "rightGapPx": 53,
+      "tolerancePx": 0
+    },
+    "exactDonorBytes": true,
+    "redrawnOrReencoded": false
+  },
+  "historicalPreservation": {
+    "supersededLargeLabelPath": "brand/source/approved/sim-large-label-lockup.png",
+    "supersededLargeLabelSha256": "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233",
+    "priorAdoptionReceiptPath": "distribution/sim/brand/canonical-large-label-adoption-receipt.v1.json",
+    "priorEditionMirrorPath": "frontend/src/editions/sim/assets/dronedream-sim-large-label-lockup.png",
+    "historicalBytesDeletedOrOverwritten": false,
+    "oldAssetMayRemainCurrentProductInput": false
+  },
+  "actualSurfaceAudit": [
+    {
+      "surface": "desktop-launcher",
+      "source": "SimBrandLockup",
+      "assetPath": "frontend/src/editions/sim/assets/dronedream-sim-centered-separator-lockup.png",
+      "status": "replaced"
+    },
+    {
+      "surface": "desktop-sidebar",
+      "source": "SimBrandLockup",
+      "assetPath": "frontend/src/editions/sim/assets/dronedream-sim-centered-separator-lockup.png",
+      "status": "replaced"
+    },
+    {
+      "surface": "sim-overview",
+      "source": "SimBrandLockup",
+      "assetPath": "frontend/src/editions/sim/assets/dronedream-sim-centered-separator-lockup.png",
+      "status": "replaced"
+    },
+    {
+      "surface": "settings",
+      "source": "BrandLockup edition=sim compact",
+      "assetPath": "frontend/src/assets/brand/sim-lockup-compact.png",
+      "status": "replaced"
+    },
+    {
+      "surface": "shared-primary-lockup",
+      "source": "BrandLockup edition=sim primary",
+      "assetPath": "frontend/src/assets/brand/sim-lockup-primary.png",
+      "status": "replaced"
+    },
+    {
+      "surface": "installer-shortcut-taskbar",
+      "source": "canonical SIM ICO",
+      "assetPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+      "status": "unchanged-no-horizontal-lockup"
+    },
+    {
+      "surface": "website",
+      "source": "website-owned",
+      "assetPath": null,
+      "status": "not-modified-by-sim-branch"
+    }
+  ],
+  "priorArtifactSupersession": {
+    "artifactSha256": "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e",
+    "historicalHandoffPath": "distribution/sim/release/website-exact-four-file-handoff-fcabd99f.v1.json",
+    "artifactBytesModified": false,
+    "artifactContainsCenteredSeparatorV2": false,
+    "currentWebsiteDeploymentAllowed": false,
+    "newExactSourceBuildRequired": true
+  },
+  "authority": {
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "simOnlyCapabilityBoundaryChanged": false
+  },
+  "execution": {
+    "brandSourceSynchronized": true,
+    "frontendBuildExecuted": false,
+    "browserStarted": false,
+    "installerBuilt": false,
+    "installerExecuted": false,
+    "runtimeStarted": false,
+    "px4OrGazeboStarted": false,
+    "websiteDeployed": false
+  }
+}

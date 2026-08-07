@@ -14,7 +14,7 @@ import {
 import { Link, useLocation } from "react-router-dom";
 
 import { useI18n } from "../../i18n/I18nProvider";
-import simLockup from "./assets/dronedream-sim-large-label-lockup.png";
+import simLockup from "./assets/dronedream-sim-centered-separator-lockup.png";
 import simMark from "./assets/dronedream-sim-mark.png";
 import { SIM_EDITION, simCopy } from "./profile";
 import "./sim.css";
