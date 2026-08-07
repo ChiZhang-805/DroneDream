@@ -4,7 +4,6 @@ import re
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = ROOT / "distribution/editions/field/adapters/catalog.v1.json"
 PACKAGE_ROOT = ROOT / "distribution/editions/field/adapters/packages"
@@ -21,10 +20,15 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         self.assertEqual(self.catalog["editionId"], "field")
         self.assertFalse(self.catalog["hardwareAuthority"])
         entries = self.catalog["entries"]
-        self.assertEqual(len(entries), 10)
+        self.assertEqual(len(entries), 11)
         identifiers = [entry["adapterId"] for entry in entries]
         self.assertEqual(len(identifiers), len(set(identifiers)))
-        self.assertTrue(all(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", item) for item in identifiers))
+        self.assertTrue(
+            all(
+                re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", item)
+                for item in identifiers
+            )
+        )
         for entry in entries:
             safety = entry["safety"]
             self.assertFalse(safety["installationGrantsAuthority"])
@@ -67,6 +71,7 @@ class FieldAdapterCatalogTest(unittest.TestCase):
                 "crazyflie-crtp",
                 "betaflight-msp-v1",
                 "dronecan-v1",
+                "tello-state-v2",
             },
         )
         for entry in installable:
@@ -79,7 +84,21 @@ class FieldAdapterCatalogTest(unittest.TestCase):
             self.assertFalse(package["safety"]["executableCode"])
             self.assertEqual(package["safety"]["zeroValidatedPackDecision"], "deny")
             for action in ("parameterWrite", "arm", "flight", "autonomousTuning"):
-                self.assertEqual(package["capabilities"][action], "quorum-required")
+                self.assertIn(
+                    package["capabilities"][action],
+                    {"quorum-required", "unavailable"},
+                )
+        tello = json.loads(
+            (PACKAGE_ROOT / "tello-state-v2.adapter.json").read_text(encoding="utf-8")
+        )
+        for action in (
+            "parameterRead",
+            "parameterWrite",
+            "arm",
+            "flight",
+            "autonomousTuning",
+        ):
+            self.assertEqual(tello["capabilities"][action], "unavailable")
 
     def test_vendor_restricted_entries_cannot_be_installed_or_impersonated(self) -> None:
         restricted = [entry for entry in self.catalog["entries"] if not entry["installable"]]
@@ -92,7 +111,9 @@ class FieldAdapterCatalogTest(unittest.TestCase):
     def test_native_parser_has_only_bounded_read_only_serial_transport(self) -> None:
         manifest = (ROOT / "desktop/src-tauri/Cargo.toml").read_text(encoding="utf-8")
         mavlink_line = next(line for line in manifest.splitlines() if line.startswith("mavlink ="))
-        serial_line = next(line for line in manifest.splitlines() if line.startswith("serialport ="))
+        serial_line = next(
+            line for line in manifest.splitlines() if line.startswith("serialport =")
+        )
         msp_line = next(
             line for line in manifest.splitlines()
             if line.startswith("multiwii_serial_protocol =")
@@ -118,6 +139,7 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         self.assertIn("inspect_field_protocol_frame", source)
         self.assertIn("multiwii_serial_protocol::MspParser", source)
         self.assertIn("dronecan::Id::new", source)
+        self.assertIn("inspect_tello_state", source)
         self.assertIn("device_open_attempts: 0", source)
         self.assertIn("device_open_attempts: 1", source)
         self.assertIn("hardware_write_attempts: 0", source)
@@ -143,6 +165,7 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         self.assertIn("MultiWii Serial Protocol parser 0.1.1", notice)
         self.assertIn("DroneCAN parser 0.1.0", notice)
         self.assertIn("Bitcraze Crazy RealTime Protocol", notice)
+        self.assertIn("Ryze Tello SDK 2.0 State", notice)
         self.assertIn("MIT License", notice)
         self.assertIn("Apache License 2.0", notice)
         self.assertIn("Mozilla Public License 2.0", notice)

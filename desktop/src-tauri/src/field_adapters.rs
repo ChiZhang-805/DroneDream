@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
@@ -36,6 +37,9 @@ const BETAFLIGHT_MSP_RAW: &str = include_str!(
 );
 const DRONECAN_RAW: &str =
     include_str!("../../../distribution/editions/field/adapters/packages/dronecan-v1.adapter.json");
+const TELLO_STATE_RAW: &str = include_str!(
+    "../../../distribution/editions/field/adapters/packages/tello-state-v2.adapter.json"
+);
 const FIELD_ADAPTER_TRANSPORTS: [&str; 8] = [
     "serial",
     "can",
@@ -305,6 +309,7 @@ fn embedded_package(adapter_id: &str) -> Option<&'static str> {
         "crazyflie-crtp" => Some(CRAZYFLIE_CRTP_RAW),
         "betaflight-msp-v1" => Some(BETAFLIGHT_MSP_RAW),
         "dronecan-v1" => Some(DRONECAN_RAW),
+        "tello-state-v2" => Some(TELLO_STATE_RAW),
         _ => None,
     }
 }
@@ -410,9 +415,12 @@ fn validate_package(entry: &AdapterCatalogEntry, raw: &str) -> Result<(), String
             entry.adapter_id
         ));
     }
-    if package.capabilities.parameter_write != "quorum-required"
-        || package.capabilities.arm != "quorum-required"
-        || package.capabilities.flight != "quorum-required"
+    let hardware_action_is_fail_closed =
+        |value: &str| matches!(value, "quorum-required" | "unavailable");
+    if !hardware_action_is_fail_closed(&package.capabilities.parameter_write)
+        || !hardware_action_is_fail_closed(&package.capabilities.arm)
+        || !hardware_action_is_fail_closed(&package.capabilities.flight)
+        || !hardware_action_is_fail_closed(&package.capabilities.autonomous_tuning)
     {
         return Err(format!(
             "Field adapter {} package weakened hardware actions",
@@ -968,6 +976,118 @@ fn inspect_dronecan_frame(
     ))
 }
 
+fn tello_integer(key: &str, raw: &str, minimum: i64, maximum: i64) -> Result<Value, String> {
+    if raw.is_empty()
+        || raw.starts_with('+')
+        || (raw.starts_with('0') && raw.len() > 1)
+        || raw == "-0"
+        || (raw.starts_with("-0") && raw.len() > 2)
+    {
+        return Err(format!(
+            "Field Tello state {key} is not a canonical integer"
+        ));
+    }
+    let value = raw
+        .parse::<i64>()
+        .map_err(|_| format!("Field Tello state {key} is not an integer"))?;
+    if !(minimum..=maximum).contains(&value) {
+        return Err(format!("Field Tello state {key} is outside its bound"));
+    }
+    Ok(serde_json::json!(value))
+}
+
+fn tello_float(key: &str, raw: &str, minimum: f64, maximum: f64) -> Result<Value, String> {
+    let unsigned = raw.strip_prefix('-').unwrap_or(raw);
+    if raw.is_empty()
+        || raw.starts_with('+')
+        || raw.contains('e')
+        || raw.contains('E')
+        || raw == "-0"
+        || (unsigned.starts_with('0') && unsigned.len() > 1 && !unsigned.starts_with("0."))
+    {
+        return Err(format!(
+            "Field Tello state {key} is not a canonical decimal"
+        ));
+    }
+    let value = raw
+        .parse::<f64>()
+        .map_err(|_| format!("Field Tello state {key} is not a decimal"))?;
+    if !value.is_finite() || !(minimum..=maximum).contains(&value) {
+        return Err(format!("Field Tello state {key} is outside its bound"));
+    }
+    Ok(serde_json::json!(value))
+}
+
+fn inspect_tello_state(
+    adapter_id: &str,
+    bytes: &[u8],
+) -> Result<FieldProtocolFrameInspection, String> {
+    if !(80..=384).contains(&bytes.len()) || !bytes.ends_with(b";\r\n") {
+        return Err(
+            "Field Tello input must contain one complete SDK 2.0 state datagram".to_string(),
+        );
+    }
+    let state = std::str::from_utf8(&bytes[..bytes.len() - 2])
+        .map_err(|_| "Field Tello state must be UTF-8".to_string())?;
+    let mut fields = BTreeMap::new();
+    for segment in state
+        .strip_suffix(';')
+        .ok_or_else(|| "Field Tello state is missing its terminator".to_string())?
+        .split(';')
+    {
+        let (key, raw) = segment
+            .split_once(':')
+            .ok_or_else(|| "Field Tello state contains a malformed field".to_string())?;
+        if key.is_empty()
+            || !key.bytes().all(|byte| byte.is_ascii_lowercase())
+            || fields.contains_key(key)
+        {
+            return Err("Field Tello state contains an invalid or duplicate key".to_string());
+        }
+        let value = match key {
+            "pitch" | "roll" | "yaw" => tello_integer(key, raw, -360, 360)?,
+            "vgx" | "vgy" | "vgz" => tello_integer(key, raw, -1_000, 1_000)?,
+            "templ" | "temph" => tello_integer(key, raw, -50, 150)?,
+            "tof" | "h" => tello_integer(key, raw, 0, 10_000)?,
+            "bat" => tello_integer(key, raw, 0, 100)?,
+            "time" => tello_integer(key, raw, 0, 10_000_000)?,
+            "mid" => tello_integer(key, raw, -1, 8)?,
+            "x" | "y" | "z" => tello_integer(key, raw, -10_000, 10_000)?,
+            "baro" => tello_float(key, raw, -10_000.0, 10_000.0)?,
+            "agx" | "agy" | "agz" => tello_float(key, raw, -100.0, 100.0)?,
+            "mpry" => {
+                let values = raw
+                    .split(',')
+                    .map(|item| tello_integer(key, item, -360, 360))
+                    .collect::<Result<Vec<_>, _>>()?;
+                if values.len() != 3 {
+                    return Err("Field Tello state mpry must contain three angles".to_string());
+                }
+                Value::Array(values)
+            }
+            _ => return Err(format!("Field Tello state contains unknown key {key}")),
+        };
+        fields.insert(key.to_string(), value);
+    }
+    for required in [
+        "pitch", "roll", "yaw", "vgx", "vgy", "vgz", "templ", "temph", "tof", "h", "bat", "baro",
+        "time", "agx", "agy", "agz",
+    ] {
+        if !fields.contains_key(required) {
+            return Err(format!(
+                "Field Tello state is missing required key {required}"
+            ));
+        }
+    }
+    Ok(protocol_inspection(
+        adapter_id,
+        "Tello SDK 2.0 State",
+        "state-telemetry",
+        fields,
+        bytes,
+    ))
+}
+
 fn inspect_protocol_frame(
     root: &Path,
     request: &FieldProtocolFrameInspectionRequest,
@@ -1068,6 +1188,7 @@ fn inspect_protocol_frame(
         "crazyflie-crtp" => inspect_crtp_frame(&request.adapter_id, &bytes),
         "betaflight-msp-v1" => inspect_msp_v1_frame(&request.adapter_id, &bytes),
         "dronecan-v1" => inspect_dronecan_frame(&request.adapter_id, &bytes),
+        "tello-state-v2" => inspect_tello_state(&request.adapter_id, &bytes),
         _ => Err("Field adapter has no native offline frame parser".to_string()),
     }
 }
@@ -1316,14 +1437,14 @@ mod tests {
     #[test]
     fn catalog_is_unique_data_only_and_fail_closed() {
         let catalog = load_catalog().expect("catalog should validate");
-        assert_eq!(catalog.entries.len(), 10);
+        assert_eq!(catalog.entries.len(), 11);
         assert_eq!(
             catalog
                 .entries
                 .iter()
                 .filter(|entry| entry.installable)
                 .count(),
-            6
+            7
         );
         assert!(catalog.entries.iter().all(|entry| {
             !entry.safety.installation_grants_authority
@@ -1519,7 +1640,12 @@ mod tests {
 
         let root = sandbox("open-protocol-frames");
         fs::create_dir(&root).unwrap();
-        for adapter_id in ["crazyflie-crtp", "betaflight-msp-v1", "dronecan-v1"] {
+        for adapter_id in [
+            "crazyflie-crtp",
+            "betaflight-msp-v1",
+            "dronecan-v1",
+            "tello-state-v2",
+        ] {
             let package_sha = load_catalog()
                 .unwrap()
                 .entries
@@ -1591,10 +1717,82 @@ mod tests {
         assert_eq!(dronecan.classification, "message");
         assert_eq!(dronecan.fields["typeId"], serde_json::json!(1010));
 
-        for receipt in [crtp, msp, dronecan] {
+        let tello = inspect_protocol_frame(
+            &root,
+            &FieldProtocolFrameInspectionRequest {
+                adapter_id: "tello-state-v2".to_string(),
+                frame_base64: base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    b"pitch:0;roll:-2;yaw:3;vgx:1;vgy:2;vgz:-1;templ:42;temph:45;tof:80;h:75;bat:87;baro:12.34;time:120;agx:0.01;agy:-0.02;agz:0.98;\r\n",
+                ),
+            },
+        )
+        .unwrap();
+        assert_eq!(tello.protocol_family, "Tello SDK 2.0 State");
+        assert_eq!(tello.classification, "state-telemetry");
+        assert_eq!(tello.fields["bat"], serde_json::json!(87));
+        assert_eq!(tello.fields["yaw"], serde_json::json!(3));
+
+        for receipt in [crtp, msp, dronecan, tello] {
             assert_eq!(receipt.device_open_attempts, 0);
             assert_eq!(receipt.hardware_write_attempts, 0);
             assert!(!receipt.hardware_authority);
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn tello_state_parser_rejects_noncanonical_or_command_input() {
+        let root = sandbox("tello-state-negative");
+        fs::create_dir(&root).unwrap();
+        let package_sha = load_catalog()
+            .unwrap()
+            .entries
+            .into_iter()
+            .find(|entry| entry.adapter_id == "tello-state-v2")
+            .unwrap()
+            .package_sha256
+            .unwrap();
+        install_to_root(
+            &root,
+            &FieldAdapterInstallRequest {
+                adapter_id: "tello-state-v2".to_string(),
+                expected_package_sha256: package_sha,
+            },
+        )
+        .unwrap();
+
+        let valid = "pitch:0;roll:-2;yaw:3;vgx:1;vgy:2;vgz:-1;templ:42;temph:45;tof:80;h:75;bat:87;baro:12.34;time:120;agx:0.01;agy:-0.02;agz:0.98;";
+        for (raw, expected_error) in [
+            (
+                format!("{}\r\n", valid.replace(";bat:87", "")),
+                "missing required key bat",
+            ),
+            (format!("{}bat:88;\r\n", valid), "invalid or duplicate key"),
+            (
+                format!("{}\r\n", valid.replace("bat:87", "bat:101")),
+                "outside its bound",
+            ),
+            (format!("{}foo:1;\r\n", valid), "unknown key foo"),
+            (valid.to_string(), "complete SDK 2.0 state datagram"),
+            (
+                format!("{}\r\n", valid.replace("baro:12.34", "baro:1e1")),
+                "canonical decimal",
+            ),
+            ("command\r\n".to_string(), "complete SDK 2.0 state datagram"),
+        ] {
+            let error = inspect_protocol_frame(
+                &root,
+                &FieldProtocolFrameInspectionRequest {
+                    adapter_id: "tello-state-v2".to_string(),
+                    frame_base64: base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        raw.as_bytes(),
+                    ),
+                },
+            )
+            .expect_err("invalid Tello state must fail closed");
+            assert!(error.contains(expected_error), "{error}");
         }
         fs::remove_dir_all(root).unwrap();
     }

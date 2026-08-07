@@ -27,17 +27,17 @@ import {
 } from "../desktop/bridge";
 import type { FieldLocale } from "./catalog";
 
-const CATALOG_SHA256 = "244e424bdc5516ccb4f1668a9862881caca5760422ee2453f84c825ce5779266";
+const CATALOG_SHA256 = "5b1a7b9f5bd64624b6d4af7b0745e1ba4b1babca63fab0ba765ca97e58ac9419";
 
 const COPY = {
   en: {
     title: "Protocol adapters",
-    body: "Enable source-bound frame inspection and bounded read-only serial telemetry without adding proprietary SDKs to the base app.",
+    body: "Enable source-bound open-protocol frame inspection and bounded read-only serial telemetry without adding proprietary SDKs to the base app.",
     refresh: "Refresh adapter state",
     offline: "Native adapter installation is available in the installed Field app.",
     loadError: "The native adapter catalog could not be verified.",
     installError: "Adapter installation was rejected.",
-    boundary: "Managed MAVLink packages support offline inspection and one bounded, operator-confirmed read-only serial probe. Continuous sessions, radio, TCP, UDP, parameter access, and control remain disabled. Every hardware action still requires Vehicle Pack validation and the full native safety quorum.",
+    boundary: "Managed open-protocol packages support offline inspection; MAVLink also supports one bounded, operator-confirmed read-only serial probe. Continuous sessions, radio, TCP, UDP, parameter access, and control remain disabled. Every hardware action still requires Vehicle Pack validation and the full native safety quorum.",
     protocol: "Protocol",
     transports: "Protocol transports",
     telemetry: "Telemetry",
@@ -77,12 +77,12 @@ const COPY = {
   },
   "zh-CN": {
     title: "协议适配器",
-    body: "在不把专有 SDK 塞入基础应用的前提下，启用源绑定帧检查和有时间上限的只读串口遥测。",
+    body: "在不把专有 SDK 塞入基础应用的前提下，启用源绑定开放协议帧检查和有时间上限的只读串口遥测。",
     refresh: "刷新适配器状态",
     offline: "原生适配器安装仅在已安装的 Field 应用中可用。",
     loadError: "无法验证原生适配器目录。",
     installError: "适配器安装被拒绝。",
-    boundary: "受管 MAVLink 适配包支持离线检查，以及一次有时间上限、经操作员确认的只读串口探测。连续会话、无线电、TCP、UDP、参数访问和控制仍处于禁用状态；任何真机动作仍必须通过机型包验证和完整原生安全仲裁。",
+    boundary: "受管开放协议适配包支持离线检查；MAVLink 还支持一次有时间上限、经操作员确认的只读串口探测。连续会话、无线电、TCP、UDP、参数访问和控制仍处于禁用状态；任何真机动作仍必须通过机型包验证和完整原生安全仲裁。",
     protocol: "协议",
     transports: "协议可用传输方式",
     telemetry: "遥测",

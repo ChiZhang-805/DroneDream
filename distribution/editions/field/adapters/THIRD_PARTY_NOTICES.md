@@ -76,6 +76,20 @@ link implementation.
 
 - [Bitcraze CRTP specification](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/crtp/)
 
+## Ryze Tello SDK 2.0 State
+
+The managed Tello package contains only DroneDream protocol metadata and a
+strict parser for an offline-captured SDK 2.0 state datagram. It follows the
+state-field format published by Ryze Technology. DroneDream does not
+redistribute a Tello SDK binary, open a live UDP session, enter SDK command
+mode, or send takeoff, landing, movement, or other control commands.
+
+- [Official Tello SDK 2.0 User Guide](https://dl-cdn.ryzerobotics.com/downloads/Tello/Tello%20SDK%202.0%20User%20Guide.pdf)
+
+The guide and Tello product names remain the property of their respective
+owners. This compatibility metadata does not imply endorsement or validation
+of any Tello aircraft.
+
 Installing or using any of these data-only packages does not validate a
 Vehicle Pack and does not grant parameter, arm, flight, or autonomous tuning
 authority.

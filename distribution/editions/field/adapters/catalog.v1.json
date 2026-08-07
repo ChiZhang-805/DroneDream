@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "dronedream-field-adapter-catalog",
-  "catalogVersion": "1.0.0",
+  "catalogVersion": "1.1.0",
   "editionId": "field",
   "hardwareAuthority": false,
   "entries": [
@@ -152,6 +152,37 @@
         "arm": "quorum-required",
         "flight": "quorum-required",
         "autonomousTuning": "quorum-required"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "tello-state-v2",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "Tello SDK State",
+        "zh-CN": "Tello SDK 状态协议"
+      },
+      "vendor": "Ryze Technology",
+      "protocolFamily": "Tello SDK 2.0 State",
+      "implementationStatus": "available",
+      "deliveryMode": "embedded-managed",
+      "installable": true,
+      "supportedTransports": ["udp"],
+      "supportedPlatforms": ["windows"],
+      "packageSha256": "e368df1ae2fee719e8f88c918aae5acdfba3f625327ae6288dd7e73a260fc357",
+      "capabilities": {
+        "deviceDiscovery": "unavailable",
+        "telemetryRead": "read-only",
+        "parameterRead": "unavailable",
+        "parameterWrite": "unavailable",
+        "arm": "unavailable",
+        "flight": "unavailable",
+        "autonomousTuning": "unavailable"
       },
       "safety": {
         "installationGrantsAuthority": false,
