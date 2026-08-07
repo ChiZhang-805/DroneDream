@@ -84,6 +84,12 @@ const fixture = await readFile(
 const calibrationFixture = await readFile(
   path.join(frontendRoot, "src", "lab", "__fixtures__", "calibration-input.fake.json"),
 );
+const simBridgeFixture = await readFile(
+  path.join(frontendRoot, "src", "lab", "__fixtures__", "sim-qualification-bridge.fake.json"),
+);
+const fieldBridgeFixture = await readFile(
+  path.join(frontendRoot, "src", "lab", "__fixtures__", "field-harness-receipt.fake.json"),
+);
 const profile = JSON.parse(await readFile(
   path.join(repoRoot, "distribution", "build-profiles", "lab-preview.v1.json"),
   "utf8",
@@ -128,13 +134,42 @@ try {
     const calibration = page.locator('.lab-calibration[data-brand-edition="lab"]');
     assert.equal(await calibration.getAttribute("data-presentation-only"), "true");
     assert.equal(await calibration.getAttribute("data-grants-hardware-authority"), "false");
-    await page.locator('#lab-panel-calibration input[type="file"]').setInputFiles({
+    const bridge = page.locator('.lab-evidence-bridge[data-grants-hardware-authority="false"]');
+    assert.equal(await bridge.getAttribute("data-presentation-only"), "true");
+    const bridgeInputs = bridge.locator('input[type="file"]');
+    assert.equal(await bridgeInputs.count(), 2);
+    await bridgeInputs.nth(0).setInputFiles({
+      name: "sim-qualification-bridge.fake.json",
+      mimeType: "application/json",
+      buffer: simBridgeFixture,
+    });
+    await bridgeInputs.nth(1).setInputFiles({
+      name: "field-harness-receipt.fake.json",
+      mimeType: "application/json",
+      buffer: fieldBridgeFixture,
+    });
+    await page.getByText(
+      testCase.locale === "en"
+        ? "Candidate lineage matched · calibration blocked"
+        : "候选链路已匹配 · 校准仍阻断",
+      { exact: true },
+    ).waitFor();
+    assert.equal(await bridge.getAttribute("data-bridge-state"), "awaiting-sim-donor-and-metrics");
+    assert.equal(
+      await page.getByText(
+        testCase.locale === "en" ? "Remaining gates · 6" : "剩余门禁 · 6",
+        { exact: true },
+      ).count(),
+      1,
+    );
+    await page.locator('.lab-calibration-controls input[type="file"]').setInputFiles({
       name: "calibration-input.fake.json",
       mimeType: "application/json",
       buffer: calibrationFixture,
     });
     await page.getByText("lab_job_fixture_001", { exact: true }).waitFor();
     assert(await page.getByRole("button", { name: testCase.locale === "en" ? "DENY" : "拒绝" }).isDisabled());
+    await bridge.scrollIntoViewIfNeeded();
     await assertViewportFits(page, testCase, "calibration");
     evidence.push(await screenshot(page, testCase, "calibration"));
 
