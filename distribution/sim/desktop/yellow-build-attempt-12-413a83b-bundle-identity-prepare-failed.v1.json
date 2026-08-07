@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-failure-receipt",
+  "editionId": "sim",
+  "state": "failed-frozen-no-retry",
+  "productSourceCommit": "413a83bfa097fd81523674f79c418df75e0c19c2",
+  "productSourceTree": "d19eb977ce5e049399f7688bd6c318110784a7a3",
+  "evidenceHeadAtExecution": "4bf41efd7d8bc2d46ba41ce7fdb003560b54844f",
+  "globalApplicationOrdinal": 12,
+  "failedPhase": "Prepare",
+  "failureClass": "deterministic-dependency-bundle-identity-mismatch",
+  "failureMessage": "The dependency bundle identity is not derived from the exact source, locks, and platform.",
+  "rootCause": {
+    "declaredBundleId": "npm-win32-x64-f1c9a2b8d34e6710",
+    "expectedBundleId": "npm-win32-x64-c9fa658219266f84",
+    "identityInputs": [
+      "413a83bfa097fd81523674f79c418df75e0c19c2",
+      "ba37f6edb95c454ea0f83130b98f708c0f27990133c705c8c23597ac96fd36b6",
+      "1138f300f140dfcaf22a6c47d44f676e9ea9294b77a2caabb7fa08ef8340d058",
+      "cd905e33a1faad2c22b165ba407e16c05d01fbdab1738dd156d616cfee4daf05",
+      "27b8f36c53be1a02eecbd99801033639662a4697c42ad1141d276c78adbc664a",
+      "v24.14.1",
+      "11.11.0",
+      "windows",
+      "x64"
+    ],
+    "dependencyTreeFingerprint": "96f97b507d5eb15001933d6b22faa1e5e2c8289aa40dc78e4641a5095aacdb88",
+    "dependencyTreeMatchedAuthority": true
+  },
+  "frozenEvidence": {
+    "sourceRoot": "C:/Users/zju20/dds12",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal12-413a83b",
+    "snapshotRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm-snapshots/npm-snapshot-ordinal12-413a83b",
+    "dependencyRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-f1c9a2b8d34e6710",
+    "manifestBytes": 9350621,
+    "manifestSha256": "69803760e8e673ad89ad98115cde1066487a8fa96a460bc69f679924ac46bdb1",
+    "snapshotReceiptBytes": 2301,
+    "snapshotReceiptSha256": "115cf7d55738a9bac4a13e545b054510ec48e0d6765cf057a0962b3a228301b4",
+    "preparationCoreBytes": 446,
+    "preparationCoreSha256": "b361a9df413a49db44c951f1dbb7cca4431785faa970017277706a6d2f74ea3c"
+  },
+  "executedCounts": {
+    "publicConfigLauncherInvocations": 1,
+    "publicRepositoryVariableFetches": 2,
+    "controlledChildInvocations": 2,
+    "preflights": 1,
+    "prepareInvocations": 1,
+    "sourceCheckouts": 1,
+    "snapshotsCreated": 1,
+    "realCacheFilesCopied": 646,
+    "npmCiInvocations": 2,
+    "networkInvocationsOutsideApprovedPublicVariableFetch": 0,
+    "dependencyTreeAttestations": 1,
+    "junctionsCreated": 0,
+    "buildScriptInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "retry": 0
+  },
+  "nextGate": {
+    "ordinalTwelvePermanentlyConsumed": true,
+    "reuseOrRetryAllowed": false,
+    "requiredFix": "Use the deterministic dependency bundle identity derived by the shared verifier.",
+    "newSourceRunSnapshotAndCargoRootsRequired": true,
+    "derivedDependencyRootMustBeAbsent": true
+  }
+}

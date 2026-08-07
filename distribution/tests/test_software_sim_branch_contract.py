@@ -207,6 +207,24 @@ YELLOW_ATTEMPT_12_PLAN_PATH = (
     / "desktop"
     / "yellow-build-attempt-12-413a83b-plan-ready.v1.json"
 )
+YELLOW_ATTEMPT_12_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-12-413a83b-bundle-identity-prepare-failed.v1.json"
+)
+YELLOW_ATTEMPT_13_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-13-413a83b-application.v1.json"
+)
+YELLOW_ATTEMPT_13_PLAN_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-13-413a83b-plan-ready.v1.json"
+)
 ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH = (
     DISTRIBUTION
     / "sim"
@@ -228,7 +246,7 @@ DETACHED_NODE_DEPENDENCY_SYNC_PATH = (
 STABLE_OFFLINE_CACHE_CONTRACT_PATH = (
     DISTRIBUTION / "sim" / "readiness" / "stable-offline-cache-contract.v1.json"
 )
-YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_12_APPLICATION_PATH
+YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_13_APPLICATION_PATH
 LOCKFILE_OFFLINE_CACHE_TOOL = (
     DISTRIBUTION / "sim" / "desktop" / "lockfile-offline-cache.mjs"
 )
@@ -2542,12 +2560,45 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertIn("git -C $RepoRoot diff --quiet --no-ext-diff", text)
         self.assertIn("git -C $RepoRoot diff --cached --quiet --no-ext-diff", text)
 
-    def test_yellow_attempt_12_freezes_new_roots_and_exact_sequence(self) -> None:
-        application = load_json(YELLOW_ATTEMPT_12_APPLICATION_PATH)
+    def test_yellow_attempt_12_freezes_bundle_identity_failure(self) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_12_FAILURE_PATH)
+        self.assertEqual(receipt["state"], "failed-frozen-no-retry")
+        self.assertEqual(receipt["failedPhase"], "Prepare")
+        self.assertEqual(
+            receipt["failureClass"],
+            "deterministic-dependency-bundle-identity-mismatch",
+        )
+        self.assertEqual(
+            receipt["rootCause"]["expectedBundleId"],
+            "npm-win32-x64-c9fa658219266f84",
+        )
+        self.assertTrue(receipt["rootCause"]["dependencyTreeMatchedAuthority"])
+        counts = receipt["executedCounts"]
+        self.assertEqual(counts["snapshotsCreated"], 1)
+        self.assertEqual(counts["realCacheFilesCopied"], 646)
+        self.assertEqual(counts["npmCiInvocations"], 2)
+        for key in (
+            "buildScriptInvocations",
+            "frontendBuilds",
+            "tauriBuilds",
+            "cargoBuilds",
+            "nsisBuilds",
+            "artifactBuilds",
+        ):
+            self.assertEqual(counts[key], 0, key)
+        self.assertTrue(receipt["nextGate"]["ordinalTwelvePermanentlyConsumed"])
+        self.assertFalse(receipt["nextGate"]["reuseOrRetryAllowed"])
+
+    def test_yellow_attempt_13_freezes_derived_bundle_and_new_roots(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_13_APPLICATION_PATH)
         accounting = application["attemptAccounting"]
-        self.assertEqual(accounting["globalCommandApplicationOrdinal"], 12)
-        self.assertTrue(accounting["ordinalElevenPermanentlyConsumed"])
+        self.assertEqual(accounting["globalCommandApplicationOrdinal"], 13)
+        self.assertTrue(accounting["ordinalTwelvePermanentlyConsumed"])
         self.assertEqual(accounting["retryMaximum"], 0)
+        self.assertEqual(
+            application["dependencyBundle"]["bundleId"],
+            "npm-win32-x64-c9fa658219266f84",
+        )
         roots = application["ownedBuildSurface"]
         for path in (
             roots["sourceRoot"],
@@ -2559,24 +2610,24 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             self.assertFalse(Path(path).exists(), path)
         protected = application["protectedHistory"]
         self.assertEqual(
-            hashlib.sha256(YELLOW_ATTEMPT_11_FAILURE_PATH.read_bytes()).hexdigest(),
-            protected["ordinalElevenFailureReceiptSha256"],
+            hashlib.sha256(YELLOW_ATTEMPT_12_FAILURE_PATH.read_bytes()).hexdigest(),
+            protected["ordinalTwelveFailureReceiptSha256"],
         )
-        plan = load_json(YELLOW_ATTEMPT_12_PLAN_PATH)
+        plan = load_json(YELLOW_ATTEMPT_13_PLAN_PATH)
         sequence = plan["exactFutureCommand"]["executeAuthorizedSequence"]
         self.assertEqual(
             plan["application"]["path"],
-            YELLOW_ATTEMPT_12_APPLICATION_PATH.relative_to(ROOT).as_posix(),
+            YELLOW_ATTEMPT_13_APPLICATION_PATH.relative_to(ROOT).as_posix(),
         )
         self.assertEqual(
-            YELLOW_ATTEMPT_12_APPLICATION_PATH.stat().st_size,
+            YELLOW_ATTEMPT_13_APPLICATION_PATH.stat().st_size,
             plan["application"]["bytes"],
         )
         self.assertEqual(
-            hashlib.sha256(YELLOW_ATTEMPT_12_APPLICATION_PATH.read_bytes()).hexdigest(),
+            hashlib.sha256(YELLOW_ATTEMPT_13_APPLICATION_PATH.read_bytes()).hexdigest(),
             plan["application"]["sha256"],
         )
-        self.assertIn("invoke-yellow-build-attempt-12-413a83b.ps1", sequence)
+        self.assertIn("invoke-yellow-build-attempt-13-413a83b.ps1", sequence)
         self.assertIn(plan["entryScript"]["sha256"], sequence)
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
