@@ -183,6 +183,12 @@ YELLOW_ATTEMPT_11_APPLICATION_PATH = (
     / "desktop"
     / "yellow-build-attempt-11-413a83b-application.v1.json"
 )
+YELLOW_ATTEMPT_11_PLAN_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-11-413a83b-plan-ready.v1.json"
+)
 ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH = (
     DISTRIBUTION
     / "sim"
@@ -204,7 +210,7 @@ DETACHED_NODE_DEPENDENCY_SYNC_PATH = (
 STABLE_OFFLINE_CACHE_CONTRACT_PATH = (
     DISTRIBUTION / "sim" / "readiness" / "stable-offline-cache-contract.v1.json"
 )
-YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_10_APPLICATION_PATH
+YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_11_APPLICATION_PATH
 LOCKFILE_OFFLINE_CACHE_TOOL = (
     DISTRIBUTION / "sim" / "desktop" / "lockfile-offline-cache.mjs"
 )
@@ -2456,6 +2462,50 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(authorization["preflightAuthorizedByThisApplication"])
         self.assertFalse(authorization["prepareAuthorizedByThisApplication"])
         self.assertFalse(authorization["executeAuthorizedByThisApplication"])
+
+    def test_yellow_attempt_11_plan_freezes_exact_unapproved_sequence(self) -> None:
+        plan = load_json(YELLOW_ATTEMPT_11_PLAN_PATH)
+        source = plan["sourceSeparation"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "413a83bfa097fd81523674f79c418df75e0c19c2",
+        )
+        self.assertEqual(
+            source["planEvidenceBaseHead"],
+            "ec7a1968bac72e264d5ae7b717f90c64b29cdfae",
+        )
+        application = plan["application"]
+        self.assertEqual(
+            application["path"],
+            YELLOW_ATTEMPT_11_APPLICATION_PATH.relative_to(ROOT).as_posix(),
+        )
+        self.assertEqual(YELLOW_ATTEMPT_11_APPLICATION_PATH.stat().st_size, application["bytes"])
+        self.assertEqual(
+            hashlib.sha256(YELLOW_ATTEMPT_11_APPLICATION_PATH.read_bytes()).hexdigest(),
+            application["sha256"],
+        )
+        exact = plan["exactFutureCommand"]["executeAuthorizedSequence"]
+        self.assertIn("-Mode ExecuteSequence", exact)
+        self.assertIn("invoke-yellow-build-attempt-11-413a83b.ps1", exact)
+        self.assertIn(plan["entryScript"]["sha256"], exact)
+        self.assertFalse(plan["exactFutureCommand"]["executionAuthorizedByThisReceipt"])
+        root_contract = plan["ownedBuildRootContract"]
+        self.assertEqual(root_contract["sharedParentPositiveChecks"], 5)
+        self.assertEqual(root_contract["missingFileReparseEscapeNegativeClasses"], 4)
+        self.assertTrue(root_contract["freshAttemptExclusiveCreatePositive"])
+        self.assertFalse(root_contract["forceAllowed"])
+        verification = plan["planVerification"]
+        self.assertTrue(verification["entryPlanCommandExecuted"])
+        self.assertTrue(verification["launcherPlanCommandExecuted"])
+        self.assertEqual(verification["newRootCount"], 0)
+        self.assertEqual(verification["providerInvocations"], 0)
+        self.assertFalse(verification["valuesRead"])
+        for key, value in plan["ownedRoots"].items():
+            if key.endswith("AbsentAfterPlan"):
+                self.assertTrue(value, key)
+        self.assertTrue(all(value == 0 for value in plan["executedCounts"].values()))
+        self.assertTrue(plan["protectedHistory"]["ordinalTenPermanentlyConsumed"])
+        self.assertFalse(plan["authorization"]["futureSequenceAuthorizedByThisReceipt"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
