@@ -10,6 +10,10 @@ palettes, surfaces, export dimensions, font source, and the presentation-only
 safety boundary. `source/approved/` contains the exact user-approved SIM, LAB,
 and FIELD mark and large-edition-label lockup bytes. Edition labels use the
 approved roughly 90% wordmark-height treatment and preserve natural text width.
+The separator is optically and geometrically centered by requiring equal
+transparent alpha-edge gaps between the end of `DroneDream`, the separator,
+and the first edition-label letter. The previous off-center large-label
+lockups remain as superseded review evidence.
 They are copied into canonical 1024 px/primary outputs without re-rendering;
 smaller PNG, favicon, and ICO outputs remain deterministic derivatives of the
 unchanged marks. The earlier small-label lockups remain in the repository as
