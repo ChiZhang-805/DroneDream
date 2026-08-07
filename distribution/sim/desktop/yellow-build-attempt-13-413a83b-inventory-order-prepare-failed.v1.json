@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-failure-receipt",
+  "editionId": "sim",
+  "state": "failed-frozen-no-retry",
+  "productSourceCommit": "413a83bfa097fd81523674f79c418df75e0c19c2",
+  "productSourceTree": "d19eb977ce5e049399f7688bd6c318110784a7a3",
+  "evidenceHeadAtExecution": "5f85d7aa7eb343350f440b1b65902f8ab72b4782",
+  "globalApplicationOrdinal": 13,
+  "failedPhase": "Prepare",
+  "failureClass": "dependency-inventory-algorithm-mismatch",
+  "failureMessage": "The dependency tree inventory differs from the attested manifest at desktop/node_modules/@tauri-apps/cli/append-headers.js.",
+  "rootCause": {
+    "generatorSort": "PowerShell Sort-Object FullName culture ordering",
+    "verifierSort": "StringComparer.Ordinal path ordering",
+    "generatorLineSeparator": "tab",
+    "verifierLineSeparator": "pipe",
+    "firstObservedOrderingBoundary": [
+      "desktop/node_modules/@tauri-apps/cli/CHANGELOG.md",
+      "desktop/node_modules/@tauri-apps/cli/append-headers.js"
+    ],
+    "oldGeneratorFingerprint": "96f97b507d5eb15001933d6b22faa1e5e2c8289aa40dc78e4641a5095aacdb88",
+    "sharedVerifierFingerprint": "4e65a1deddbdb6e7e56e22d3c867a1e4ca4040f654232530020c499f18ceef11",
+    "entryBytesAndHashesMatched": true,
+    "dependencyPayloadDriftObserved": false
+  },
+  "frozenEvidence": {
+    "sourceRoot": "C:/Users/zju20/dds13",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal13-413a83b",
+    "snapshotRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm-snapshots/npm-snapshot-ordinal13-413a83b",
+    "dependencyRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-c9fa658219266f84",
+    "manifestBytes": 9350621,
+    "manifestSha256": "be8a2034f28bf808b1da9f115c7a17075c19f13fc907ca34e908a244c95b0f0b",
+    "snapshotReceiptBytes": 2301,
+    "snapshotReceiptSha256": "08a0c0701386b69d407835ce74be2adc66a45f613c27304e6120f656cfba13ce",
+    "preparationCoreBytes": 446,
+    "preparationCoreSha256": "b361a9df413a49db44c951f1dbb7cca4431785faa970017277706a6d2f74ea3c"
+  },
+  "executedCounts": {
+    "publicConfigLauncherInvocations": 1,
+    "publicRepositoryVariableFetches": 2,
+    "controlledChildInvocations": 2,
+    "preflights": 1,
+    "prepareInvocations": 1,
+    "sourceCheckouts": 1,
+    "snapshotsCreated": 1,
+    "realCacheFilesCopied": 646,
+    "npmCiInvocations": 2,
+    "dependencyTreeAttestations": 1,
+    "junctionsCreated": 0,
+    "buildScriptInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "retry": 0
+  },
+  "nextGate": {
+    "ordinalThirteenPermanentlyConsumed": true,
+    "reuseOrRetryAllowed": false,
+    "requiredFix": "Make the Sim inventory generator use the shared verifier ordinal ordering and line encoding, then freeze a new product source.",
+    "oldProductSourceMayBeRebuilt": false
+  }
+}
