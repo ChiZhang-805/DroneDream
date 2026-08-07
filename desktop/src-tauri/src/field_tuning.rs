@@ -7,10 +7,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use tauri::AppHandle;
 
 use crate::distribution_plan::{
     native_hardware_validated_pack_count, native_safety_catalog_snapshot,
 };
+use crate::field_recovery::{resolve_field_snapshot_binding, FieldSnapshotBinding};
 
 const CONTRACT_RAW: &str =
     include_str!("../../../distribution/editions/field/field-tuning-contract.v1.json");
@@ -85,11 +87,15 @@ pub(crate) struct FieldTuningDemoReceipt {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct FieldHardwareTuningRequest {
-    device_id: String,
+    device_observation_id: Option<String>,
     vehicle_pack_id: String,
     controller_id: String,
     firmware_version: String,
+    adapter_id: Option<String>,
+    observation_sha256: Option<String>,
+    snapshot_sha256: Option<String>,
     objective: String,
+    max_iterations: u8,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -97,13 +103,21 @@ pub(crate) struct FieldHardwareTuningRequest {
 pub(crate) struct FieldHardwareTuningPlan {
     schema_version: u8,
     kind: &'static str,
+    job_id: String,
     edition_id: &'static str,
     execution_domain: &'static str,
+    source_commit: &'static str,
     request_sha256: String,
+    snapshot_sha256: Option<String>,
+    observation_sha256: Option<String>,
+    budget: Value,
+    phases: Vec<&'static str>,
     can_execute: bool,
     hardware_authority: bool,
+    hardware_write_attempts: u8,
     required_evidence: Vec<&'static str>,
     blockers: Vec<String>,
+    plan_sha256: String,
 }
 
 fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
@@ -277,13 +291,12 @@ pub(crate) fn run_field_tuning_demo(
     run_demo(request)
 }
 
-#[tauri::command]
-pub(crate) fn prepare_field_hardware_tuning(
+fn prepare_hardware_plan(
     request: FieldHardwareTuningRequest,
+    snapshot_binding: Option<&FieldSnapshotBinding>,
 ) -> Result<FieldHardwareTuningPlan, String> {
     require_field_contract()?;
     for (label, value) in [
-        ("deviceId", request.device_id.as_str()),
         ("vehiclePackId", request.vehicle_pack_id.as_str()),
         ("controllerId", request.controller_id.as_str()),
         ("firmwareVersion", request.firmware_version.as_str()),
@@ -293,13 +306,38 @@ pub(crate) fn prepare_field_hardware_tuning(
             return Err(format!("Field hardware tuning {label} is invalid"));
         }
     }
-    let snapshot = native_safety_catalog_snapshot("field", &request.vehicle_pack_id)?;
+    for (label, value) in [
+        (
+            "deviceObservationId",
+            request.device_observation_id.as_deref(),
+        ),
+        ("adapterId", request.adapter_id.as_deref()),
+    ] {
+        if value.is_some_and(|item| item.trim().is_empty() || item.len() > 160) {
+            return Err(format!("Field hardware tuning {label} is invalid"));
+        }
+    }
+    if request
+        .observation_sha256
+        .as_deref()
+        .is_some_and(|value| !valid_lowercase_hash(value, 64))
+        || request
+            .snapshot_sha256
+            .as_deref()
+            .is_some_and(|value| !valid_lowercase_hash(value, 64))
+    {
+        return Err("Field hardware tuning evidence hash is invalid".to_string());
+    }
+    if !(1..=32).contains(&request.max_iterations) {
+        return Err("Field hardware tuning iteration budget must be between 1 and 32".to_string());
+    }
+    let safety_catalog = native_safety_catalog_snapshot("field", &request.vehicle_pack_id)?;
     let validated_pack_count = native_hardware_validated_pack_count()?;
     let mut blockers = Vec::new();
     if validated_pack_count == 0 {
         blockers.push("field.registry.zero-validated-packs".to_string());
     }
-    let field_supported = snapshot
+    let field_supported = safety_catalog
         .vehicle_pack
         .pointer("/supportedEditions")
         .and_then(Value::as_array)
@@ -311,12 +349,12 @@ pub(crate) fn prepare_field_hardware_tuning(
     if !field_supported {
         blockers.push("field.pack.edition-incompatible".to_string());
     }
-    if snapshot
+    if safety_catalog
         .vehicle_pack
         .pointer("/validationStatus")
         .and_then(Value::as_str)
         != Some("validated")
-        || snapshot
+        || safety_catalog
             .vehicle_pack
             .pointer("/validationTier")
             .and_then(Value::as_str)
@@ -324,7 +362,7 @@ pub(crate) fn prepare_field_hardware_tuning(
     {
         blockers.push("field.pack.not-hardware-validated".to_string());
     }
-    if snapshot
+    if safety_catalog
         .vehicle_pack
         .pointer("/integrity/signature/state")
         .and_then(Value::as_str)
@@ -340,7 +378,7 @@ pub(crate) fn prepare_field_hardware_tuning(
             .collect::<String>()
     };
     let requested_controller = normalize(&request.controller_id);
-    let controller_validated = snapshot
+    let controller_validated = safety_catalog
         .vehicle_pack
         .pointer("/controllers")
         .and_then(Value::as_array)
@@ -358,7 +396,7 @@ pub(crate) fn prepare_field_hardware_tuning(
     if !controller_validated {
         blockers.push("field.controller.unvalidated-or-incompatible".to_string());
     }
-    let firmware_matches = snapshot
+    let firmware_matches = safety_catalog
         .vehicle_pack
         .pointer("/autopilot/supportedFirmwareVersions")
         .and_then(Value::as_array)
@@ -370,22 +408,67 @@ pub(crate) fn prepare_field_hardware_tuning(
     if !firmware_matches {
         blockers.push("field.firmware.drift".to_string());
     }
+    match (request.snapshot_sha256.as_deref(), snapshot_binding) {
+        (None, _) => blockers.push("field.snapshot.missing".to_string()),
+        (Some(_), None) => blockers.push("field.snapshot.unavailable".to_string()),
+        (Some(expected), Some(binding)) => {
+            if binding.snapshot_sha256 != expected
+                || binding.vehicle_pack_id != request.vehicle_pack_id
+                || binding.controller_id != request.controller_id
+                || binding.firmware_version != request.firmware_version
+                || request.device_observation_id.as_deref()
+                    != Some(binding.device_observation_id.as_str())
+                || request.adapter_id.as_deref() != Some(binding.adapter_id.as_str())
+                || request.observation_sha256.as_deref()
+                    != Some(binding.observation_sha256.as_str())
+            {
+                blockers.push("field.snapshot.identity-mismatch".to_string());
+            }
+        }
+    }
+    if request.device_observation_id.is_none() || request.observation_sha256.is_none() {
+        blockers.push("field.protocol-observation.missing".to_string());
+    }
     blockers.push("field.device.transport-unavailable".to_string());
     blockers.push("field.quorum.missing".to_string());
+    blockers.push("field.operator-confirmation.missing".to_string());
 
     let request_value = serde_json::to_value(&request)
         .map_err(|error| format!("Field hardware request cannot be serialized: {error}"))?;
-    Ok(FieldHardwareTuningPlan {
+    let request_sha256 = canonical_sha256(&request_value)?;
+    let mut plan = FieldHardwareTuningPlan {
         schema_version: 1,
         kind: "dronedream-field-hardware-tuning-plan",
+        job_id: format!("field-hardware-plan-{}", &request_sha256[..16]),
         edition_id: "field",
         execution_domain: "real-hardware",
-        request_sha256: canonical_sha256(&request_value)?,
+        source_commit: SOURCE_COMMIT,
+        request_sha256,
+        snapshot_sha256: request.snapshot_sha256,
+        observation_sha256: request.observation_sha256,
+        budget: json!({
+            "maxIterations": request.max_iterations,
+            "hardwareTrialBudget": 0,
+            "parameterWriteBudget": 0,
+            "providerRequests": 0,
+        }),
+        phases: vec![
+            "snapshot-binding",
+            "candidate-validation",
+            "operator-confirmation",
+            "controlled-trial",
+            "telemetry-capture",
+            "scoring-and-failure-classification",
+            "independent-holdout",
+            "publish-or-rollback",
+        ],
         can_execute: false,
         hardware_authority: false,
+        hardware_write_attempts: 0,
         required_evidence: vec![
             "validated-vehicle-pack",
             "controller-and-firmware-match",
+            "protocol-observation-receipt",
             "parameter-snapshot",
             "transaction-rollback",
             "operator-confirmation",
@@ -396,12 +479,52 @@ pub(crate) fn prepare_field_hardware_tuning(
             "native-backend-runtime-quorum",
         ],
         blockers,
-    })
+        plan_sha256: String::new(),
+    };
+    let mut value = serde_json::to_value(&plan)
+        .map_err(|error| format!("Field hardware plan cannot be serialized: {error}"))?;
+    value["planSha256"] = Value::String(String::new());
+    plan.plan_sha256 = canonical_sha256(&value)?;
+    Ok(plan)
+}
+
+fn valid_lowercase_hash(value: &str, length: usize) -> bool {
+    value.len() == length
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+#[tauri::command]
+pub(crate) fn prepare_field_hardware_tuning(
+    app: AppHandle,
+    request: FieldHardwareTuningRequest,
+) -> Result<FieldHardwareTuningPlan, String> {
+    let binding = request
+        .snapshot_sha256
+        .as_deref()
+        .map(|hash| resolve_field_snapshot_binding(&app, hash))
+        .transpose()?;
+    prepare_hardware_plan(request, binding.as_ref())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn hardware_request() -> FieldHardwareTuningRequest {
+        FieldHardwareTuningRequest {
+            device_observation_id: None,
+            vehicle_pack_id: "holybro-x500-v2-pixhawk6".to_string(),
+            controller_id: "Holybro:Pixhawk-6C".to_string(),
+            firmware_version: "v1.16".to_string(),
+            adapter_id: None,
+            observation_sha256: None,
+            snapshot_sha256: None,
+            objective: "Bench tuning".to_string(),
+            max_iterations: 5,
+        }
+    }
 
     #[test]
     fn status_is_field_only_and_fail_closed() {
@@ -430,16 +553,12 @@ mod tests {
 
     #[test]
     fn hardware_plan_is_always_denied_with_zero_validated_packs() {
-        let plan = prepare_field_hardware_tuning(FieldHardwareTuningRequest {
-            device_id: "device-fixture".to_string(),
-            vehicle_pack_id: "holybro-x500-v2-pixhawk6".to_string(),
-            controller_id: "Holybro:Pixhawk-6C".to_string(),
-            firmware_version: "v1.16".to_string(),
-            objective: "Bench tuning".to_string(),
-        })
-        .expect("plan should return a typed denial");
+        let plan = prepare_hardware_plan(hardware_request(), None)
+            .expect("plan should return a typed denial");
         assert!(!plan.can_execute);
         assert!(!plan.hardware_authority);
+        assert_eq!(plan.hardware_write_attempts, 0);
+        assert_eq!(plan.budget["parameterWriteBudget"], 0);
         assert!(plan
             .blockers
             .contains(&"field.registry.zero-validated-packs".to_string()));
@@ -453,19 +572,51 @@ mod tests {
             .blockers
             .contains(&"field.controller.unvalidated-or-incompatible".to_string()));
         assert!(plan.blockers.contains(&"field.firmware.drift".to_string()));
+        assert!(plan
+            .blockers
+            .contains(&"field.snapshot.missing".to_string()));
+        assert!(plan
+            .blockers
+            .contains(&"field.protocol-observation.missing".to_string()));
     }
 
     #[test]
     fn hardware_plan_rejects_unknown_vehicle_pack() {
-        let error = prepare_field_hardware_tuning(FieldHardwareTuningRequest {
-            device_id: "device-fixture".to_string(),
-            vehicle_pack_id: "unknown-pack".to_string(),
-            controller_id: "Unknown".to_string(),
-            firmware_version: "unknown".to_string(),
-            objective: "Bench tuning".to_string(),
-        })
-        .expect_err("unknown packs must fail closed");
+        let mut request = hardware_request();
+        request.vehicle_pack_id = "unknown-pack".to_string();
+        request.controller_id = "Unknown".to_string();
+        request.firmware_version = "unknown".to_string();
+        let error =
+            prepare_hardware_plan(request, None).expect_err("unknown packs must fail closed");
         assert!(error.contains("unknown Vehicle Pack"));
+    }
+
+    #[test]
+    fn content_bound_snapshot_never_unlocks_a_hardware_job() {
+        let mut request = hardware_request();
+        request.device_observation_id = Some("offline-frame:fixture".to_string());
+        request.adapter_id = Some("mavlink-common-v2".to_string());
+        request.observation_sha256 = Some("a".repeat(64));
+        request.snapshot_sha256 = Some("b".repeat(64));
+        let binding = FieldSnapshotBinding {
+            snapshot_sha256: "b".repeat(64),
+            device_observation_id: "offline-frame:fixture".to_string(),
+            vehicle_pack_id: request.vehicle_pack_id.clone(),
+            controller_id: request.controller_id.clone(),
+            firmware_version: request.firmware_version.clone(),
+            adapter_id: "mavlink-common-v2".to_string(),
+            observation_sha256: "a".repeat(64),
+        };
+        let plan = prepare_hardware_plan(request, Some(&binding)).expect("plan should be typed");
+        assert!(!plan
+            .blockers
+            .contains(&"field.snapshot.identity-mismatch".to_string()));
+        assert!(plan
+            .blockers
+            .contains(&"field.registry.zero-validated-packs".to_string()));
+        assert!(!plan.can_execute);
+        assert_eq!(plan.hardware_write_attempts, 0);
+        assert_eq!(plan.plan_sha256.len(), 64);
     }
 
     #[test]

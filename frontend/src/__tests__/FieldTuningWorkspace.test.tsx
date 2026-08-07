@@ -33,6 +33,27 @@ describe("FieldTuningWorkspace", () => {
         locale="en"
         selectedPackId="holybro-x500-v2-pixhawk6"
         selectedControllerId="Holybro::Pixhawk 6C"
+        snapshot={{
+          schemaVersion: 1,
+          kind: "dronedream-field-parameter-snapshot",
+          editionId: "field",
+          executionDomain: "real-hardware",
+          evidenceSource: "operator-imported-read-only",
+          sourceCommit: "a".repeat(40),
+          deviceObservationId: "offline-frame:fixture",
+          vehiclePackId: "holybro-x500-v2-pixhawk6",
+          controllerId: "Holybro::Pixhawk 6C",
+          firmwareVersion: "PX4 1.16.0",
+          adapterId: "mavlink-common-v2",
+          observationSha256: "b".repeat(64),
+          parameterCount: 1,
+          parameters: { MC_ROLL_P: 6.5 },
+          parameterSetSha256: "c".repeat(64),
+          snapshotSha256: "d".repeat(64),
+          deviceOpenAttempts: 0,
+          hardwareWriteAttempts: 0,
+          hardwareAuthority: false,
+        }}
       />,
     );
 
@@ -43,7 +64,9 @@ describe("FieldTuningWorkspace", () => {
       .toBeInTheDocument();
     expect(within(status).getByText("parameter-snapshot")).toBeInTheDocument();
     expect(within(status).getByText("transaction-rollback")).toBeInTheDocument();
+    expect(within(status).getByText("0")).toBeInTheDocument();
     expect(within(status).getByText(/canExecute=false/)).toBeInTheDocument();
+    expect(screen.getByText("Snapshot bound")).toBeInTheDocument();
   });
 
   it("authors the Chinese tuning workflow independently", () => {

@@ -100,6 +100,17 @@ pub(crate) struct FieldRollbackPlan {
     blockers: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct FieldSnapshotBinding {
+    pub(crate) snapshot_sha256: String,
+    pub(crate) device_observation_id: String,
+    pub(crate) vehicle_pack_id: String,
+    pub(crate) controller_id: String,
+    pub(crate) firmware_version: String,
+    pub(crate) adapter_id: String,
+    pub(crate) observation_sha256: String,
+}
+
 fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
     hex::encode(Sha256::digest(bytes.as_ref()))
 }
@@ -344,6 +355,22 @@ fn load_snapshot(root: &Path, snapshot_sha256: &str) -> Result<FieldParameterSna
     }
     validate_parameters(&snapshot.parameters)?;
     Ok(snapshot)
+}
+
+pub(crate) fn resolve_field_snapshot_binding(
+    app: &AppHandle,
+    snapshot_sha256: &str,
+) -> Result<FieldSnapshotBinding, String> {
+    let snapshot = load_snapshot(&snapshot_root(app)?, snapshot_sha256)?;
+    Ok(FieldSnapshotBinding {
+        snapshot_sha256: snapshot.snapshot_sha256,
+        device_observation_id: snapshot.device_observation_id,
+        vehicle_pack_id: snapshot.vehicle_pack_id,
+        controller_id: snapshot.controller_id,
+        firmware_version: snapshot.firmware_version,
+        adapter_id: snapshot.adapter_id,
+        observation_sha256: snapshot.observation_sha256,
+    })
 }
 
 fn parameter_changes(

@@ -323,23 +323,40 @@ export interface FieldTuningDemoReceipt {
 }
 
 export interface FieldHardwareTuningRequest {
-  deviceId: string;
+  deviceObservationId: string | null;
   vehiclePackId: string;
   controllerId: string;
   firmwareVersion: string;
+  adapterId: string | null;
+  observationSha256: string | null;
+  snapshotSha256: string | null;
   objective: string;
+  maxIterations: number;
 }
 
 export interface FieldHardwareTuningPlan {
   schemaVersion: 1;
   kind: "dronedream-field-hardware-tuning-plan";
+  jobId: string;
   editionId: "field";
   executionDomain: "real-hardware";
+  sourceCommit: string;
   requestSha256: string;
+  snapshotSha256: string | null;
+  observationSha256: string | null;
+  budget: {
+    maxIterations: number;
+    hardwareTrialBudget: 0;
+    parameterWriteBudget: 0;
+    providerRequests: 0;
+  };
+  phases: string[];
   canExecute: false;
   hardwareAuthority: false;
+  hardwareWriteAttempts: 0;
   requiredEvidence: string[];
   blockers: string[];
+  planSha256: string;
 }
 
 export interface FieldParameterSnapshotRequest {
@@ -899,10 +916,28 @@ export function runFieldTuningDemo(
 export function prepareFieldHardwareTuning(
   request: FieldHardwareTuningRequest,
 ): Promise<FieldHardwareTuningPlan> {
-  for (const value of Object.values(request)) {
+  for (const value of [
+    request.vehiclePackId,
+    request.controllerId,
+    request.firmwareVersion,
+    request.objective,
+  ]) {
     if (value.trim() === "" || value.length > 160) {
       return Promise.reject(new Error("Field hardware tuning request is invalid."));
     }
+  }
+  for (const value of [request.deviceObservationId, request.adapterId]) {
+    if (value !== null && (value.trim() === "" || value.length > 160)) {
+      return Promise.reject(new Error("Field hardware tuning evidence identity is invalid."));
+    }
+  }
+  for (const value of [request.observationSha256, request.snapshotSha256]) {
+    if (value !== null && !/^[a-f0-9]{64}$/.test(value)) {
+      return Promise.reject(new Error("Field hardware tuning evidence hash is invalid."));
+    }
+  }
+  if (!Number.isInteger(request.maxIterations) || request.maxIterations < 1 || request.maxIterations > 32) {
+    return Promise.reject(new Error("Field hardware tuning iteration budget is invalid."));
   }
   return invokeDesktop("prepare_field_hardware_tuning", parseFieldHardwareTuningPlan, {
     request,
@@ -2680,7 +2715,15 @@ function parseFieldRollbackPlan(value: unknown): FieldRollbackPlan {
 }
 
 function parseFieldHardwareTuningPlan(value: unknown): FieldHardwareTuningPlan {
-  const record = expectRecord(value, "fieldHardwarePlan");
+  const record = expectExactRecord(value, "fieldHardwarePlan", [
+    "schemaVersion", "kind", "jobId", "editionId", "executionDomain", "sourceCommit",
+    "requestSha256", "snapshotSha256", "observationSha256", "budget", "phases",
+    "canExecute", "hardwareAuthority", "hardwareWriteAttempts", "requiredEvidence",
+    "blockers", "planSha256",
+  ]);
+  const budget = expectExactRecord(record.budget, "fieldHardwarePlan.budget", [
+    "maxIterations", "hardwareTrialBudget", "parameterWriteBudget", "providerRequests",
+  ]);
   const plan: FieldHardwareTuningPlan = {
     schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldHardwarePlan.schemaVersion"),
     kind: expectLiteral(
@@ -2688,26 +2731,68 @@ function parseFieldHardwareTuningPlan(value: unknown): FieldHardwareTuningPlan {
       "dronedream-field-hardware-tuning-plan",
       "fieldHardwarePlan.kind",
     ),
+    jobId: expectSafeNonEmptyString(record.jobId, "fieldHardwarePlan.jobId"),
     editionId: expectLiteral(record.editionId, "field", "fieldHardwarePlan.editionId"),
     executionDomain: expectLiteral(
       record.executionDomain,
       "real-hardware",
       "fieldHardwarePlan.executionDomain",
     ),
+    sourceCommit: expectLowercaseHex(record.sourceCommit, "fieldHardwarePlan.sourceCommit", 40),
     requestSha256: expectLowercaseHex(record.requestSha256, "fieldHardwarePlan.requestSha256", 64),
+    snapshotSha256: record.snapshotSha256 === null
+      ? null
+      : expectLowercaseHex(record.snapshotSha256, "fieldHardwarePlan.snapshotSha256", 64),
+    observationSha256: record.observationSha256 === null
+      ? null
+      : expectLowercaseHex(record.observationSha256, "fieldHardwarePlan.observationSha256", 64),
+    budget: {
+      maxIterations: expectBoundedNonNegativeInteger(
+        budget.maxIterations,
+        "fieldHardwarePlan.budget.maxIterations",
+        32,
+      ),
+      hardwareTrialBudget: expectLiteral(
+        budget.hardwareTrialBudget,
+        0,
+        "fieldHardwarePlan.budget.hardwareTrialBudget",
+      ),
+      parameterWriteBudget: expectLiteral(
+        budget.parameterWriteBudget,
+        0,
+        "fieldHardwarePlan.budget.parameterWriteBudget",
+      ),
+      providerRequests: expectLiteral(
+        budget.providerRequests,
+        0,
+        "fieldHardwarePlan.budget.providerRequests",
+      ),
+    },
+    phases: parseSafeNonEmptyStringArray(record.phases, "fieldHardwarePlan.phases"),
     canExecute: expectLiteral(record.canExecute, false, "fieldHardwarePlan.canExecute"),
     hardwareAuthority: expectLiteral(
       record.hardwareAuthority,
       false,
       "fieldHardwarePlan.hardwareAuthority",
     ),
+    hardwareWriteAttempts: expectLiteral(
+      record.hardwareWriteAttempts,
+      0,
+      "fieldHardwarePlan.hardwareWriteAttempts",
+    ),
     requiredEvidence: parseSafeNonEmptyStringArray(
       record.requiredEvidence,
       "fieldHardwarePlan.requiredEvidence",
     ),
     blockers: parseSafeNonEmptyStringArray(record.blockers, "fieldHardwarePlan.blockers"),
+    planSha256: expectLowercaseHex(record.planSha256, "fieldHardwarePlan.planSha256", 64),
   };
-  if (plan.blockers.length === 0 || plan.requiredEvidence.length < 8) {
+  if (
+    plan.blockers.length === 0
+    || plan.requiredEvidence.length < 10
+    || plan.phases.length < 8
+    || plan.budget.maxIterations === 0
+  ) {
     throw new Error("Field hardware plan removed mandatory safety evidence");
   }
   return plan;

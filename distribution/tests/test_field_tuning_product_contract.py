@@ -27,6 +27,13 @@ def test_field_tuning_contract_is_real_device_only_and_authority_is_native() -> 
     assert contract["harness"]["failClosed"] is True
     assert contract["harness"]["candidateWritesAreTransactional"] is True
     assert contract["harness"]["independentHoldoutRequired"] is True
+    assert contract["harness"]["preQuorumBudgets"] == {
+        "hardwareTrials": 0,
+        "parameterWrites": 0,
+        "providerRequests": 0,
+    }
+    assert "protocol-observation-receipt" in contract["harness"]["jobBinding"]
+    assert "parameter-snapshot" in contract["harness"]["jobBinding"]
     assert contract["harness"]["phases"] == [
         "snapshot",
         "candidate-validation",
@@ -113,6 +120,11 @@ def test_tuning_commands_are_fixture_or_plan_only_and_config_has_no_sim_payload(
     assert "hardware_actions_performed: Vec::new()" in tuning
     assert "can_execute: false" in tuning
     assert "hardware_authority: false" in tuning
+    assert '"parameterWriteBudget": 0' in tuning
+    assert '"providerRequests": 0' in tuning
+    assert '"protocol-observation-receipt"' in tuning
+    assert "resolve_field_snapshot_binding" in tuning
+    assert "hardware_write_attempts: 0" in tuning
     assert "native_hardware_validated_pack_count" in tuning
     assert "native_safety_catalog_snapshot" in tuning
     assert "validated_pack_count: 0" not in tuning

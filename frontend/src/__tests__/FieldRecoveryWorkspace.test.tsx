@@ -77,6 +77,7 @@ describe("FieldRecoveryWorkspace", () => {
   });
 
   it("captures, compares, and prepares only a denied rollback plan", async () => {
+    const onSnapshotCreated = vi.fn();
     const { container } = render(
       <FieldRecoveryWorkspace
         locale="en"
@@ -87,6 +88,7 @@ describe("FieldRecoveryWorkspace", () => {
           observationSha256: "b".repeat(64),
           deviceObservationId: "offline-frame:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         }}
+        onSnapshotCreated={onSnapshotCreated}
       />,
     );
     expect(screen.getByRole("textbox", { name: "Observation receipt SHA-256" }))
@@ -96,6 +98,7 @@ describe("FieldRecoveryWorkspace", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save snapshot" }));
     expect(await screen.findByText("dddddddddd...dddddddd")).toBeInTheDocument();
+    expect(onSnapshotCreated).toHaveBeenCalledWith(snapshot);
 
     const current = screen.getByRole("textbox", { name: "Current parameters (JSON)" });
     fireEvent.change(current, { target: { value: JSON.stringify({ ...snapshot.parameters, MC_ROLL_P: 6.8 }) } });

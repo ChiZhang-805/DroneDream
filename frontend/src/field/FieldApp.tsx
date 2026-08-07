@@ -23,6 +23,7 @@ import {
   discoverFieldDevices,
   isDesktopRuntime,
   type FieldDeviceDiscoveryReport,
+  type FieldParameterSnapshot,
 } from "../desktop/bridge";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
 import {
@@ -277,6 +278,7 @@ export function FieldApp({
   const [deviceScanError, setDeviceScanError] = useState<string | null>(null);
   const [readOnlyEvidence, setReadOnlyEvidence] =
     useState<FieldReadOnlyProtocolEvidence | null>(null);
+  const [latestSnapshot, setLatestSnapshot] = useState<FieldParameterSnapshot | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -585,6 +587,7 @@ export function FieldApp({
               locale={locale}
               selectedPackId={selectedPackId}
               selectedControllerId={selectedControllerKey}
+              snapshot={latestSnapshot ?? undefined}
             />
           </section>
 
@@ -595,6 +598,7 @@ export function FieldApp({
               selectedControllerId={selectedControllerKey}
               device={deviceReport?.devices[0]}
               evidence={readOnlyEvidence ?? undefined}
+              onSnapshotCreated={setLatestSnapshot}
             />
           </section>
 

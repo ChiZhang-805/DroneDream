@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "dronedream-field-tuning-contract",
-  "contractVersion": "1.0.0",
+  "contractVersion": "1.1.0",
   "editionId": "field",
   "executionDomain": "real-hardware",
   "simulationAllowed": false,
@@ -33,7 +33,20 @@
     ],
     "failClosed": true,
     "candidateWritesAreTransactional": true,
-    "independentHoldoutRequired": true
+    "independentHoldoutRequired": true,
+    "jobBinding": [
+      "source-commit",
+      "vehicle-pack",
+      "controller-and-firmware",
+      "protocol-observation-receipt",
+      "parameter-snapshot",
+      "objective-and-iteration-budget"
+    ],
+    "preQuorumBudgets": {
+      "hardwareTrials": 0,
+      "parameterWrites": 0,
+      "providerRequests": 0
+    }
   },
   "authority": {
     "frontendGrantsAuthority": false,
@@ -45,6 +58,7 @@
   "requiredSafetyEvidence": [
     "validated-vehicle-pack",
     "controller-and-firmware-match",
+    "protocol-observation-receipt",
     "parameter-snapshot",
     "transaction-rollback",
     "operator-confirmation",

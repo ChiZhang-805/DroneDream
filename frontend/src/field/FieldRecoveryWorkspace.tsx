@@ -108,12 +108,14 @@ export function FieldRecoveryWorkspace({
   selectedControllerId,
   device,
   evidence,
+  onSnapshotCreated,
 }: {
   locale: FieldLocale;
   selectedPackId: string;
   selectedControllerId: string;
   device?: FieldDiscoveredDevice;
   evidence?: FieldReadOnlyProtocolEvidence;
+  onSnapshotCreated?: (snapshot: FieldParameterSnapshot) => void;
 }) {
   const copy = COPY[locale];
   const desktop = isDesktopRuntime();
@@ -169,6 +171,7 @@ export function FieldRecoveryWorkspace({
         parameters,
       });
       setSnapshot(next);
+      onSnapshotCreated?.(next);
       setCurrentText(JSON.stringify(parameters, null, 2));
     } catch (reason) {
       setError(reason instanceof SyntaxError || (reason instanceof Error && /shape|count|parameter/.test(reason.message))

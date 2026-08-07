@@ -428,18 +428,109 @@ describe("Field desktop bridge", () => {
     await expect(getFieldTuningStatus()).resolves.toEqual(response);
   });
 
+  it("accepts a content-bound zero-write hardware plan and rejects budget drift", async () => {
+    const response = {
+      schemaVersion: 1,
+      kind: "dronedream-field-hardware-tuning-plan",
+      jobId: "field-hardware-plan-fixture",
+      editionId: "field",
+      executionDomain: "real-hardware",
+      sourceCommit: "a".repeat(40),
+      requestSha256: "b".repeat(64),
+      snapshotSha256: "c".repeat(64),
+      observationSha256: "d".repeat(64),
+      budget: {
+        maxIterations: 5,
+        hardwareTrialBudget: 0,
+        parameterWriteBudget: 0,
+        providerRequests: 0,
+      },
+      phases: [
+        "snapshot-binding",
+        "candidate-validation",
+        "operator-confirmation",
+        "controlled-trial",
+        "telemetry-capture",
+        "scoring-and-failure-classification",
+        "independent-holdout",
+        "publish-or-rollback",
+      ],
+      canExecute: false,
+      hardwareAuthority: false,
+      hardwareWriteAttempts: 0,
+      requiredEvidence: [
+        "validated-vehicle-pack",
+        "controller-and-firmware-match",
+        "protocol-observation-receipt",
+        "parameter-snapshot",
+        "transaction-rollback",
+        "operator-confirmation",
+        "preflight",
+        "safety-zone",
+        "control-takeover",
+        "emergency-stop",
+        "native-backend-runtime-quorum",
+      ],
+      blockers: ["field.registry.zero-validated-packs", "field.quorum.missing"],
+      planSha256: "e".repeat(64),
+    };
+    const invoke = vi.fn(async () => response);
+    window.__TAURI__ = { core: { invoke } };
+    const request = {
+      deviceObservationId: "offline-frame:fixture",
+      vehiclePackId: "holybro-x500-v2-pixhawk6",
+      controllerId: "Holybro::Pixhawk 6C",
+      firmwareVersion: "PX4 1.16.0",
+      adapterId: "mavlink-common-v2",
+      observationSha256: "d".repeat(64),
+      snapshotSha256: "c".repeat(64),
+      objective: "Bounded bench tuning",
+      maxIterations: 5,
+    };
+
+    await expect(prepareFieldHardwareTuning(request)).resolves.toEqual(response);
+    expect(invoke).toHaveBeenCalledWith("prepare_field_hardware_tuning", { request });
+    invoke.mockResolvedValueOnce({
+      ...response,
+      budget: { ...response.budget, parameterWriteBudget: 1 },
+    });
+    await expect(prepareFieldHardwareTuning(request)).rejects.toThrow();
+  });
+
   it("rejects a native hardware plan that claims execution authority", async () => {
     const invoke = vi.fn(async () => ({
       schemaVersion: 1,
       kind: "dronedream-field-hardware-tuning-plan",
+      jobId: "field-hardware-plan-fixture",
       editionId: "field",
       executionDomain: "real-hardware",
+      sourceCommit: "a".repeat(40),
       requestSha256: "e".repeat(64),
+      snapshotSha256: null,
+      observationSha256: null,
+      budget: {
+        maxIterations: 5,
+        hardwareTrialBudget: 0,
+        parameterWriteBudget: 0,
+        providerRequests: 0,
+      },
+      phases: [
+        "snapshot-binding",
+        "candidate-validation",
+        "operator-confirmation",
+        "controlled-trial",
+        "telemetry-capture",
+        "scoring-and-failure-classification",
+        "independent-holdout",
+        "publish-or-rollback",
+      ],
       canExecute: true,
       hardwareAuthority: true,
+      hardwareWriteAttempts: 0,
       requiredEvidence: [
         "validated-vehicle-pack",
         "controller-and-firmware-match",
+        "protocol-observation-receipt",
         "parameter-snapshot",
         "transaction-rollback",
         "operator-confirmation",
@@ -449,15 +540,20 @@ describe("Field desktop bridge", () => {
         "emergency-stop",
       ],
       blockers: [],
+      planSha256: "f".repeat(64),
     }));
     window.__TAURI__ = { core: { invoke } };
 
     await expect(prepareFieldHardwareTuning({
-      deviceId: "device-fixture",
+      deviceObservationId: null,
       vehiclePackId: "pack-fixture",
       controllerId: "controller-fixture",
       firmwareVersion: "1.0.0",
+      adapterId: null,
+      observationSha256: null,
+      snapshotSha256: null,
       objective: "Bounded bench tuning",
+      maxIterations: 5,
     })).rejects.toThrow();
   });
 });

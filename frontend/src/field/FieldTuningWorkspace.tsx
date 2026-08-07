@@ -17,6 +17,7 @@ import {
   prepareFieldHardwareTuning,
   runFieldTuningDemo,
   type FieldHardwareTuningPlan,
+  type FieldParameterSnapshot,
   type FieldTuningDemoReceipt,
   type FieldTuningStatus,
 } from "../desktop/bridge";
@@ -68,6 +69,10 @@ const COPY = {
     blockers: "Current blockers",
     required: "Required evidence",
     unavailable: "Native Field contract unavailable",
+    snapshotBound: "Snapshot bound",
+    snapshotMissing: "No parameter snapshot bound",
+    job: "Harness job",
+    writeBudget: "Parameter write budget",
   },
   "zh-CN": {
     title: "真机自主调参",
@@ -109,6 +114,10 @@ const COPY = {
     blockers: "当前阻断",
     required: "必需证据",
     unavailable: "原生 Field 合同不可用",
+    snapshotBound: "已绑定参数快照",
+    snapshotMissing: "尚未绑定参数快照",
+    job: "Harness 作业",
+    writeBudget: "参数写入预算",
   },
 } as const;
 
@@ -121,10 +130,12 @@ export function FieldTuningWorkspace({
   locale,
   selectedPackId,
   selectedControllerId,
+  snapshot,
 }: {
   locale: FieldLocale;
   selectedPackId: string;
   selectedControllerId: string;
+  snapshot?: FieldParameterSnapshot;
 }) {
   const copy = COPY[locale];
   const [objective, setObjective] = useState<string>(copy.objectiveValue);
@@ -181,11 +192,15 @@ export function FieldTuningWorkspace({
       setHardwarePlan(
         isDesktopRuntime()
           ? await prepareFieldHardwareTuning({
-            deviceId: "unbound-device",
+            deviceObservationId: snapshot?.deviceObservationId ?? null,
             vehiclePackId: selectedPackId,
             controllerId: selectedControllerId,
-            firmwareVersion: "unverified",
+            firmwareVersion: snapshot?.firmwareVersion ?? "unverified",
+            adapterId: snapshot?.adapterId ?? null,
+            observationSha256: snapshot?.observationSha256 ?? null,
+            snapshotSha256: snapshot?.snapshotSha256 ?? null,
             objective,
+            maxIterations: iterations,
           })
           : fieldBrowserHardwareDenial(),
       );
@@ -249,6 +264,8 @@ export function FieldTuningWorkspace({
         <span>{statusSource === "native" ? copy.native : copy.browser}</span>
         <code>{compactHash(status.contractSha256)}</code>
         <span>{status.validatedPackCount} validated packs</span>
+        <span>{snapshot ? copy.snapshotBound : copy.snapshotMissing}</span>
+        <code>{snapshot ? compactHash(snapshot.snapshotSha256) : "-"}</code>
       </div>
 
       {error ? <div className="field-tuning-error" role="alert"><Ban aria-hidden="true" />{copy.unavailable}: {error}</div> : null}
@@ -294,6 +311,8 @@ export function FieldTuningWorkspace({
         <button type="button" onClick={() => void evaluateHardwareGate()}><ShieldCheck aria-hidden="true" />{copy.evaluate}</button>
         {hardwarePlan ? (
           <div className="field-gate-evidence" role="status">
+            <div><h4>{copy.job}</h4><code>{hardwarePlan.jobId}</code></div>
+            <div><h4>{copy.writeBudget}</h4><code>{hardwarePlan.budget.parameterWriteBudget}</code></div>
             <div><h4>{copy.blockers}</h4><ul>{hardwarePlan.blockers.map((item) => <li key={item}>{item}</li>)}</ul></div>
             <div><h4>{copy.required}</h4><ul>{hardwarePlan.requiredEvidence.map((item) => <li key={item}>{item}</li>)}</ul></div>
             <p><RotateCcw aria-hidden="true" />canExecute=false · hardwareAuthority=false</p>
