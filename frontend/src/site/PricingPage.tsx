@@ -28,6 +28,7 @@ import {
   getBillingAvailability,
   getManagedModelUsage,
   type BillingAvailability,
+  type ManagedModelBillingScope,
   type ManagedModelPlanId,
   type PaymentMethod,
 } from "../features/settings/cloudModelAccess";
@@ -62,6 +63,13 @@ interface Plan {
   featured?: boolean;
 }
 
+type SubscriptionKey = `${Audience}-${ManagedModelPlanId}`;
+
+interface DisplayPlan extends Plan {
+  billingScope: Audience;
+  subscriptionKey: SubscriptionKey;
+}
+
 const PLANS: readonly Plan[] = [
   { id: "free", name: "Free", price: 0, includedCredits: 300_000 },
   { id: "plus", name: "Plus", price: 39, includedCredits: 3_000_000, featured: true },
@@ -71,6 +79,13 @@ const BUSINESS_SEAT_PRICES: Record<PaidPlanId, number> = {
   plus: 19,
   pro: 69,
 };
+
+function subscriptionKey(
+  scope: ManagedModelBillingScope,
+  planId: ManagedModelPlanId,
+): SubscriptionKey {
+  return `${scope}-${planId}`;
+}
 
 const FEATURE_KEYS: readonly FeatureKey[] = [
   "workflow",
@@ -211,10 +226,11 @@ export function PricingPage({
 }: PricingPageProps) {
   const copy = pricingContent[locale];
   const [audience, setAudience] = useState<Audience>("individual");
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<DisplayPlan | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("wechat");
   const [availability, setAvailability] = useState<BillingAvailability | null>(null);
-  const [currentPlanId, setCurrentPlanId] = useState<ManagedModelPlanId>("free");
+  const [currentSubscriptionKey, setCurrentSubscriptionKey] =
+    useState<SubscriptionKey>("individual-free");
   const [paymentState, setPaymentState] =
     useState<"idle" | "checking" | "creating" | "qr" | "error">("idle");
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
@@ -257,6 +273,8 @@ export function PricingPage({
                 price: authoritative.monthly_price_cny_fen / 100,
                 includedCredits: authoritative.included_ai_credits,
                 featured: authoritative.id === "plus",
+                billingScope: current.billingScope,
+                subscriptionKey: subscriptionKey(current.billingScope, authoritative.id),
               }
             : current;
         });
@@ -285,17 +303,20 @@ export function PricingPage({
 
   useEffect(() => {
     if (!authenticated || !sensitiveCloudActionsEnabled) {
-      setCurrentPlanId("free");
+      setCurrentSubscriptionKey("individual-free");
       return undefined;
     }
     let active = true;
     void getManagedModelUsage()
       .then((snapshot) => {
         if (!active) return;
-        setCurrentPlanId(snapshot.plan.id);
+        setCurrentSubscriptionKey(subscriptionKey(
+          snapshot.account?.billing_scope ?? "individual",
+          snapshot.plan.id,
+        ));
       })
       .catch(() => {
-        if (active) setCurrentPlanId("free");
+        if (active) setCurrentSubscriptionKey("individual-free");
       });
     return () => {
       active = false;
@@ -311,14 +332,16 @@ export function PricingPage({
         featured: plan.id === "plus",
       }))
     : PLANS;
-  const displayedPlans = plans.map((plan) => ({
+  const displayedPlans: DisplayPlan[] = plans.map((plan) => ({
     ...plan,
     price: audience === "business" && plan.id !== "free"
       ? BUSINESS_SEAT_PRICES[plan.id]
       : plan.price,
+    billingScope: audience,
+    subscriptionKey: subscriptionKey(audience, plan.id),
   }));
 
-  const choosePlan = (plan: Plan) => {
+  const choosePlan = (plan: DisplayPlan) => {
     if (!sensitiveCloudActionsEnabled) return;
     if (!authenticated) {
       onRequireAccount();
@@ -336,7 +359,11 @@ export function PricingPage({
     setPaymentMessage(null);
     setWechatQr(null);
     try {
-      const order = await createBillingCheckout(selectedPlan.id, paymentMethod);
+      const order = await createBillingCheckout(
+        selectedPlan.id,
+        paymentMethod,
+        selectedPlan.billingScope,
+      );
       if (order.checkout.kind === "redirect") {
         window.location.assign(order.checkout.url);
         return;
@@ -470,10 +497,15 @@ export function PricingPage({
           <article
             key={plan.id}
             data-plan={plan.id}
-            className={`pricing-card${plan.id === currentPlanId ? " is-current" : ""}`}
-            aria-current={plan.id === currentPlanId ? "true" : undefined}
+            data-subscription={plan.subscriptionKey}
+            className={`pricing-card${
+              plan.subscriptionKey === currentSubscriptionKey ? " is-current" : ""
+            }`}
+            aria-current={
+              plan.subscriptionKey === currentSubscriptionKey ? "true" : undefined
+            }
           >
-            {plan.id === currentPlanId ? (
+            {plan.subscriptionKey === currentSubscriptionKey ? (
               <span className="pricing-badge">{copy.currentPlan}</span>
             ) : null}
             <header>
@@ -548,7 +580,10 @@ export function PricingPage({
             </header>
             <div className="payment-plan-summary">
               <strong>{selectedPlan.name}</strong>
-              <span>¥{selectedPlan.price} {copy.month}</span>
+              <span>
+                ¥{selectedPlan.price}{" "}
+                {selectedPlan.billingScope === "business" ? copy.perUserMonth : copy.month}
+              </span>
             </div>
             <div className={`payment-methods${cardMethodAvailable ? " has-card" : ""}`}>
               <button

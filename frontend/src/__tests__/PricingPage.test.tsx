@@ -98,7 +98,11 @@ describe("PricingPage payment channels", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Continue to payment" }));
     await waitFor(() => {
-      expect(billingMock.createBillingCheckout).toHaveBeenCalledWith("plus", "card");
+      expect(billingMock.createBillingCheckout).toHaveBeenCalledWith(
+        "plus",
+        "card",
+        "individual",
+      );
     });
   });
 
@@ -190,6 +194,12 @@ describe("PricingPage payment channels", () => {
         included_ai_credits: 15_000_000,
         capability_set: "core-v1",
       },
+      account: {
+        billing_scope: "individual",
+        organization_id: null,
+        organization_name: null,
+        organization_role: null,
+      },
       period: {
         starts_at: "2026-08-01T00:00:00.000Z",
         ends_at: "2026-09-01T00:00:00.000Z",
@@ -219,6 +229,66 @@ describe("PricingPage payment channels", () => {
     expect(screen.queryByText("Recommended")).toBeNull();
     expect(document.querySelector('.pricing-card[data-plan="plus"]'))
       .not.toHaveClass("is-current");
+  });
+
+  it("marks the current business subscription without marking the individual tab", async () => {
+    billingMock.getManagedModelUsage.mockResolvedValueOnce({
+      plan: {
+        id: "plus",
+        name: "Plus",
+        monthly_price_cny_fen: 1_900,
+        included_ai_credits: 3_000_000,
+        capability_set: "core-v1",
+      },
+      account: {
+        billing_scope: "business",
+        organization_id: "org-1",
+        organization_name: "Drone Lab LLC",
+        organization_role: "member",
+      },
+      period: {
+        starts_at: "2026-08-01T00:00:00.000Z",
+        ends_at: "2026-09-01T00:00:00.000Z",
+      },
+      usage: {
+        reserved_ai_credits: 0,
+        consumed_ai_credits: 0,
+        remaining_ai_credits: 3_000_000,
+        request_count: 0,
+      },
+      recent_requests: [],
+    });
+
+    render(
+      <PricingPage
+        locale="en"
+        authenticated
+        onRequireAccount={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Current plan")).toBeNull();
+    });
+    expect(document.querySelector('[data-subscription="individual-plus"]'))
+      .not.toHaveClass("is-current");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Business" }));
+
+    await waitFor(() => {
+      expect(document.querySelector('[data-subscription="business-plus"]'))
+        .toHaveClass("is-current");
+    });
+    expect(screen.getByText("Current plan")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Choose Plus" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to payment" }));
+    await waitFor(() => {
+      expect(billingMock.createBillingCheckout).toHaveBeenCalledWith(
+        "plus",
+        "card",
+        "business",
+      );
+    });
   });
 
   it("locks the Chinese mobile heading to a natural six-plus-nine character rhythm", () => {

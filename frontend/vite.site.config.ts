@@ -32,6 +32,7 @@ export default defineConfig(({ mode }) => {
           pricing: `${projectRoot}pricing/index.html`,
           community: `${projectRoot}community/index.html`,
           account: `${projectRoot}account/index.html`,
+          businessUpgrade: `${projectRoot}business/upgrade/index.html`,
           oauthConsent: `${projectRoot}oauth/consent/index.html`,
         },
         output: {

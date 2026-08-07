@@ -413,6 +413,7 @@ title: "DroneDream 1.0.0 用户说明书"
   it.each([
     ["/product/", undefined],
     ["/pricing/", undefined],
+    ["/business/upgrade/", undefined],
     ["/community/", "recent"],
     ["/community/?view=all", "all"],
   ])("keeps the homepage footer off the standalone route %s", (route, communityView) => {
@@ -424,6 +425,21 @@ title: "DroneDream 1.0.0 用户说明书"
     if (communityView) {
       expect(site).toHaveAttribute("data-community-view", communityView);
     }
+  });
+
+  it("renders the business upgrade route as a bounded company request form", () => {
+    window.history.replaceState(null, "", "/business/upgrade/");
+    renderSite();
+
+    expect(screen.getByRole("heading", { name: "Upgrade a company account" }))
+      .toBeVisible();
+    expect(screen.getByLabelText("Company owner email")).toBeVisible();
+    expect(screen.getByLabelText("Registration or tax number")).toBeVisible();
+    expect(screen.getByLabelText("Company proof attachment")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Sign in before applying" }))
+      .toBeVisible();
+    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
   });
 
   it("renders three directly comparable plans with the same ordered feature rows", async () => {

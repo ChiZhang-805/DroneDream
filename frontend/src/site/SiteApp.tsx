@@ -19,6 +19,7 @@ import {
 import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { sensitiveCloudActionsAllowed } from "../security/sensitiveOrigin";
+import { BusinessUpgradePage } from "./BusinessUpgradePage";
 import { CommunityPage } from "./CommunityPage";
 import { ManualPage } from "./ManualPage";
 import { OAuthConsentPage } from "./OAuthConsentPage";
@@ -106,6 +107,7 @@ const content = {
     signOut: "Sign out",
     closeAuth: "Close account dialog",
     authEyebrow: "DRONEDREAM ACCOUNT",
+    upgradeBusiness: "Upgrade to business account",
     backHome: "Back to homepage",
     eyebrow: "AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION",
     heroLead: "Tune with evidence.",
@@ -298,6 +300,7 @@ const content = {
     signOut: "退出登录",
     closeAuth: "关闭账号窗口",
     authEyebrow: "DRONEDREAM 账号",
+    upgradeBusiness: "升级为企业账号",
     backHome: "返回首页",
     eyebrow: "智能体驱动的 PX4 / GAZEBO 控制参数优化",
     heroLead: "让调优有章法",
@@ -838,9 +841,11 @@ export function SiteApp({
       : path === "/community"
         ? "community"
         : path === "/oauth/consent"
-          ? "oauth-consent"
+        ? "oauth-consent"
         : path === "/account"
           ? "account"
+          : path === "/business/upgrade"
+            ? "business-upgrade"
           : "home";
   const communityView = sitePage === "community"
     && currentSiteUrl.searchParams.get("view") === "all"
@@ -1168,6 +1173,16 @@ export function SiteApp({
               )}
               <strong>{auth.account.displayName}</strong>
               <span>{auth.account.email}</span>
+              <a
+                className="site-auth-business-link"
+                href="/business/upgrade/"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateWithinSite("/business/upgrade/");
+                }}
+              >
+                {copy.upgradeBusiness}
+              </a>
               <button
                 type="button"
                 className="site-auth-text-button"
@@ -1311,6 +1326,16 @@ export function SiteApp({
                   ? copy.registerNow
                   : copy.backToSignIn}
               </button>
+              <a
+                className="site-auth-business-link"
+                href="/business/upgrade/"
+                onClick={(event) => {
+                  event.preventDefault();
+                  navigateWithinSite("/business/upgrade/");
+                }}
+              >
+                {copy.upgradeBusiness}
+              </a>
             </>
           )}
           {authError ? (
@@ -1435,6 +1460,14 @@ export function SiteApp({
             cloudActionsEnabled={sensitiveCloudActionsEnabled}
             authorizationId={currentOAuthAuthorizationId}
             onRequireSignIn={requireOAuthSignIn}
+          />
+        ) : sitePage === "business-upgrade" && accountCommunityActionsEnabled ? (
+          <BusinessUpgradePage
+            locale={locale}
+            authenticated={Boolean(auth.account)}
+            accountEmail={auth.account?.email ?? ""}
+            onRequireAccount={() => openAccount("sign-in", "/business/upgrade/")}
+            sensitiveCloudActionsEnabled={sensitiveCloudActionsEnabled}
           />
         ) : sitePage === "account" && accountCommunityActionsEnabled ? (
           authPage

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { ProductPage } from "../site/ProductPage";
@@ -27,7 +27,7 @@ function publishedSimAvailability(): EditionAvailabilityDocument {
 }
 
 describe("ProductPage", () => {
-  it("presents exactly three focused products without inventing planned downloads", () => {
+  it("presents dense edition cards without inventing unavailable downloads", () => {
     const { container } = render(
       <ProductPage
         availability={fallbackEditionAvailability}
@@ -41,51 +41,57 @@ describe("ProductPage", () => {
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
-    expect(screen.getByText("Pure simulation")).toBeVisible();
-    expect(screen.getByText("Autonomous tuning")).toBeVisible();
-    expect(screen.getByText("No real vehicle")).toBeVisible();
-    expect(screen.getByText("Sim-to-Real")).toBeVisible();
-    expect(screen.getByText("Real-to-Sim")).toBeVisible();
-    expect(screen.getByText("Qualification evidence")).toBeVisible();
-    expect(screen.getByText("Real vehicle")).toBeVisible();
-    expect(screen.getByText("Field tuning")).toBeVisible();
-    expect(screen.getByText("Telemetry feedback")).toBeVisible();
-    expect(container.querySelectorAll(".site-product-edition li")).toHaveLength(15);
-    expect(container.querySelector(".site-product-edition-audience")).toBeNull();
+    expect(screen.getByText("Simulation-only tests")).toBeVisible();
+    expect(screen.getByText("No real vehicle control")).toBeVisible();
+    expect(screen.getByText("Sim-to-Real checks")).toBeVisible();
+    expect(screen.getByText("Qualification review")).toBeVisible();
+    expect(screen.getByText("Real vehicle setup")).toBeVisible();
+    expect(screen.getByText("No simulation stage")).toBeVisible();
+    expect(container.querySelectorAll(".site-product-edition li")).toHaveLength(27);
+
     const editionPictures = container.querySelectorAll(
       'picture.site-product-edition-picture'
       + '[data-brand-handoff="universal-canonical-brand-donor-v1.1.0"]'
       + '[data-brand-surface="product-card"]',
     );
     expect(editionPictures).toHaveLength(3);
-    const editionMarks = container.querySelectorAll(
+    expect(container.querySelectorAll(
       'picture.site-product-edition-picture img[data-brand-asset="mark"]',
-    );
-    expect(editionMarks).toHaveLength(3);
-    expect([...editionMarks].map((image) => image.getAttribute("src"))).toEqual([
-      expect.stringContaining("dronedream-sim-mark.png"),
-      expect.stringContaining("dronedream-lab-mark.png"),
-      expect.stringContaining("dronedream-field-mark.png"),
-    ]);
-    const editionLockups = container.querySelectorAll(
+    )).toHaveLength(3);
+    expect(container.querySelectorAll(
       'picture.site-product-edition-picture source[data-brand-asset="lockup"]',
-    );
-    expect([...editionLockups].map((source) => source.getAttribute("srcset"))).toEqual([
-      expect.stringContaining("sim-lockup-primary.png"),
-      expect.stringContaining("lab-lockup-primary.png"),
-      expect.stringContaining("field-lockup-primary.png"),
-    ]);
+    )).toHaveLength(3);
     expect(container.querySelector('[data-icon-donor="pending"]')).toBeNull();
-    expect(container.querySelector(".site-product-edition-visual")).toBeNull();
-    expect(container.querySelector(".site-product-current")).toBeNull();
+
+    const downloadButtons = screen.getAllByRole("button", { name: /Download unavailable/i });
+    expect(downloadButtons).toHaveLength(3);
+    expect(downloadButtons.every((button) => button.hasAttribute("disabled"))).toBe(true);
+    expect(container.querySelector('a[href*=".exe"]')).toBeNull();
     expect(screen.queryByText("In preparation")).toBeNull();
     expect(screen.queryByText("Coming soon")).toBeNull();
-    expect(container.querySelector('a[href*="DroneDream-Sim-1.0.0.exe"]')).toBeNull();
-    expect(container.querySelector('a[href*="DroneDream-Lab-1.0.0.exe"]')).toBeNull();
-    expect(container.querySelector('a[href*="DroneDream-Field-1.0.0.exe"]')).toBeNull();
-    expect(container.querySelector('a[href*="DroneDream-Universal-1.0.0.exe"]')).toBeNull();
-    expect(container.querySelector('a[href*="DroneDream_1.0.0_x64-setup.exe"]')).toBeNull();
-    expect(screen.queryByRole("dialog")).toBeNull();
+
+    expect(container.querySelectorAll(".site-product-screenshots")).toHaveLength(3);
+    expect(screen.getByRole("img", { name: "SIM flight setup page" }))
+      .toHaveAttribute("src", "/docs/en/flight-setup.png");
+  });
+
+  it("switches screenshots from the card controls", () => {
+    render(
+      <ProductPage
+        availability={fallbackEditionAvailability}
+        locale="en"
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "SIM flight setup page" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", {
+      name: "Next screenshot DroneDream · SIM",
+    }));
+    expect(screen.getByRole("img", { name: "SIM tuning chat page" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", {
+      name: "Previous screenshot DroneDream · SIM",
+    }));
+    expect(screen.getByRole("img", { name: "SIM flight setup page" })).toBeVisible();
   });
 
   it.each([
@@ -109,7 +115,9 @@ describe("ProductPage", () => {
       expect(container.querySelectorAll(
         '[data-release-registry="exact-edition-exe-v1"][data-download-ready="false"]',
       )).toHaveLength(3);
-      expect(container.querySelectorAll(".site-product-edition-action")).toHaveLength(0);
+      expect(screen.getAllByRole("button", { name: new RegExp(
+        locale === "zh-CN" ? "暂不可下载" : "Download unavailable",
+      ) })).toHaveLength(3);
     },
   );
 
@@ -121,8 +129,10 @@ describe("ProductPage", () => {
       />,
     );
 
-    expect(screen.queryByRole("link", { name: "DroneDream-Sim-1.0.0.exe" }))
+    expect(screen.queryByRole("link", { name: "DroneDream · SIM Download" }))
       .toBeNull();
+    expect(screen.getByRole("button", { name: /DroneDream · SIM Download unavailable/i }))
+      .toBeDisabled();
   });
 
   it("enables only a product whose complete published artifact binding is present when downloads are opened", () => {
@@ -134,11 +144,12 @@ describe("ProductPage", () => {
       />,
     );
 
-    expect(screen.getByRole("link", { name: "DroneDream-Sim-1.0.0.exe" }))
+    expect(screen.getByRole("link", { name: "DroneDream · SIM Download" }))
       .toHaveAttribute("href", "/downloads/DroneDream-Sim-1.0.0.exe");
-    expect(screen.getByRole("link", { name: "DroneDream-Sim-1.0.0.exe" }))
+    expect(screen.getByRole("link", { name: "DroneDream · SIM Download" }))
       .toHaveAttribute("download", "DroneDream-Sim-1.0.0.exe");
-    expect(screen.queryByRole("button", { name: "Coming soon" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /Download unavailable/i }))
+      .toHaveLength(2);
   });
 
   it("authors the Simplified Chinese product page independently", () => {
@@ -153,14 +164,14 @@ describe("ProductPage", () => {
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
-    expect(screen.getByText("纯仿真")).toBeVisible();
-    expect(screen.getByText("不触真机")).toBeVisible();
-    expect(screen.getByText("仿真到真机")).toBeVisible();
-    expect(screen.getByText("真机到仿真")).toBeVisible();
-    expect(screen.getByText("资格证据")).toBeVisible();
-    expect(screen.getByText("真实设备")).toBeVisible();
-    expect(screen.getByText("现场调参")).toBeVisible();
-    expect(screen.getByText("遥测反馈")).toBeVisible();
+    expect(screen.getByText("纯仿真测试")).toBeVisible();
+    expect(screen.getByText("不控制真机")).toBeVisible();
+    expect(screen.getByText("仿真到真机校验")).toBeVisible();
+    expect(screen.getByText("真机到仿真更新")).toBeVisible();
+    expect(screen.getByText("资格证据复核")).toBeVisible();
+    expect(screen.getByText("真机接入设置")).toBeVisible();
+    expect(screen.getByText("现场调参运行")).toBeVisible();
+    expect(screen.getByText("实时遥测复核")).toBeVisible();
     expect(screen.queryByText("正在准备")).toBeNull();
     expect(screen.queryByText("当前内测预览版")).toBeNull();
   });

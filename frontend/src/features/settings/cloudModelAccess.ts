@@ -8,6 +8,7 @@ import {
 import type { ManagedModelProvider } from "./ModelAccessContext";
 
 export type ManagedModelPlanId = "free" | "plus" | "pro";
+export type ManagedModelBillingScope = "individual" | "business";
 export type ManagedModelGrantScope = "assistant" | "job";
 export type PaymentMethod = "alipay" | "wechat" | "card";
 
@@ -49,6 +50,12 @@ export interface ManagedModelUsageRequest {
 
 export interface ManagedModelUsageSnapshot {
   plan: ManagedModelPlan;
+  account?: {
+    billing_scope: ManagedModelBillingScope;
+    organization_id: string | null;
+    organization_name: string | null;
+    organization_role: "owner" | "admin" | "member" | null;
+  };
   period: {
     starts_at: string;
     ends_at: string;
@@ -98,11 +105,35 @@ export type CheckoutTarget =
 export interface BillingCheckout {
   order_id: string;
   plan_id: Exclude<ManagedModelPlanId, "free">;
+  billing_scope: ManagedModelBillingScope;
   payment_method: PaymentMethod;
   amount_cny_fen: number;
   currency: "CNY";
   expires_at: string;
   checkout: CheckoutTarget;
+}
+
+export interface BusinessUpgradeApplicationRequest {
+  target_owner_email: string;
+  company_legal_name: string;
+  company_domain: string;
+  company_website: string;
+  country_region: string;
+  applicant_role: string;
+  employee_count_range: "1-10" | "11-50" | "51-200" | "201-1000" | "1000+";
+  registration_number: string;
+  requested_plan_id: Exclude<ManagedModelPlanId, "free">;
+  proof_file_names: string[];
+  note: string;
+}
+
+export interface BusinessUpgradeApplication {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  target_owner_email: string;
+  company_legal_name: string;
+  requested_plan_id: Exclude<ManagedModelPlanId, "free">;
+  created_at: string;
 }
 
 export class CloudModelAccessError extends Error {
@@ -275,13 +306,28 @@ export function getBillingAvailability(): Promise<BillingAvailability> {
 export function createBillingCheckout(
   planId: Exclude<ManagedModelPlanId, "free">,
   paymentMethod: PaymentMethod,
+  billingScope: ManagedModelBillingScope = "individual",
 ): Promise<BillingCheckout> {
   return cloudRequest<BillingCheckout>(billingCheckoutUrl, "/create", {
     method: "POST",
     body: JSON.stringify({
       plan_id: planId,
+      billing_scope: billingScope,
       payment_method: paymentMethod,
       idempotency_key: crypto.randomUUID(),
     }),
   });
+}
+
+export function submitBusinessUpgradeApplication(
+  application: BusinessUpgradeApplicationRequest,
+): Promise<BusinessUpgradeApplication> {
+  return cloudRequest<BusinessUpgradeApplication>(
+    billingCheckoutUrl,
+    "/business-upgrade/applications",
+    {
+      method: "POST",
+      body: JSON.stringify(application),
+    },
+  );
 }
