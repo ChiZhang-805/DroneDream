@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-adapter-package",
+  "adapterId": "dronecan-v1",
+  "version": "1.0.0",
+  "editionId": "field",
+  "protocol": {
+    "family": "DroneCAN",
+    "dialect": "DroneCAN v1 CAN 2.0B capture record",
+    "versions": [1],
+    "engine": "dronecan-0.1.0",
+    "transportPolicy": "offline-captured-frame-only"
+  },
+  "capabilities": {
+    "deviceDiscovery": "unavailable",
+    "telemetryRead": "read-only",
+    "parameterRead": "quorum-required",
+    "parameterWrite": "quorum-required",
+    "arm": "quorum-required",
+    "flight": "quorum-required",
+    "autonomousTuning": "quorum-required"
+  },
+  "safety": {
+    "executableCode": false,
+    "installationGrantsAuthority": false,
+    "discoveryGrantsAuthority": false,
+    "zeroValidatedPackDecision": "deny"
+  },
+  "license": {
+    "protocolSpecification": "DroneCAN",
+    "parser": "MPL-2.0",
+    "packageContent": "DroneDream-1.0"
+  }
+}

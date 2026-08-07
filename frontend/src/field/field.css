@@ -1842,6 +1842,7 @@ input:focus-visible {
   border-top: 1px solid var(--field-line);
 }
 
+.field-protocol-inspector,
 .field-telemetry-probe {
   display: grid;
   gap: 14px;
@@ -1852,23 +1853,60 @@ input:focus-visible {
   border-radius: 6px;
 }
 
+.field-protocol-inspector > header,
 .field-telemetry-probe > header {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
+.field-protocol-inspector > header h3,
 .field-telemetry-probe > header h3 {
   margin: 0;
   color: var(--field-ink);
   font-size: 15px;
 }
 
+.field-protocol-inspector > header svg,
 .field-telemetry-probe > header svg,
 .field-telemetry-result svg {
   width: 18px;
   height: 18px;
   color: var(--dd-brand-middle);
+}
+
+.field-inspector-controls {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.75fr) minmax(300px, 1.75fr);
+  gap: 12px;
+}
+
+.field-inspector-controls label {
+  display: grid;
+  gap: 6px;
+}
+
+.field-inspector-controls label > span {
+  color: var(--field-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.field-inspector-controls select,
+.field-inspector-controls textarea {
+  width: 100%;
+  padding: 8px 10px;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+  border-radius: 5px;
+}
+
+.field-inspector-controls textarea {
+  min-height: 74px;
+  resize: vertical;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
 }
 
 .field-telemetry-controls {
@@ -1915,9 +1953,52 @@ input:focus-visible {
   accent-color: var(--dd-brand-middle);
 }
 
+.field-protocol-inspector > .field-primary-command,
 .field-telemetry-probe > .field-primary-command {
   width: max-content;
   margin: 0;
+}
+
+.field-inspector-result {
+  display: grid;
+  gap: 10px;
+  color: var(--field-ink);
+  font-size: 12px;
+}
+
+.field-inspector-result > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--dd-brand-middle);
+}
+
+.field-inspector-result dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.field-inspector-result dl > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px;
+  background: var(--field-panel);
+  border: 1px solid var(--field-line);
+  border-radius: 4px;
+}
+
+.field-inspector-result dt {
+  color: var(--field-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.field-inspector-result dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .field-telemetry-result {
@@ -1958,6 +2039,7 @@ input:focus-visible {
 }
 
 @media (max-width: 760px) {
+  .field-inspector-controls,
   .field-telemetry-controls {
     grid-template-columns: 1fr;
   }

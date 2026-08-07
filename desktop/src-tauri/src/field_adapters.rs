@@ -4,7 +4,7 @@
 //! protocol/capability contract; it never loads executable code, opens a
 //! device, or grants hardware authority.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs::{self, OpenOptions};
 use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
@@ -28,6 +28,32 @@ const MAVLINK_PX4_RAW: &str = include_str!(
 const MAVLINK_ARDUPILOT_RAW: &str = include_str!(
     "../../../distribution/editions/field/adapters/packages/mavlink-ardupilotmega-v2.adapter.json"
 );
+const CRAZYFLIE_CRTP_RAW: &str = include_str!(
+    "../../../distribution/editions/field/adapters/packages/crazyflie-crtp.adapter.json"
+);
+const BETAFLIGHT_MSP_RAW: &str = include_str!(
+    "../../../distribution/editions/field/adapters/packages/betaflight-msp-v1.adapter.json"
+);
+const DRONECAN_RAW: &str =
+    include_str!("../../../distribution/editions/field/adapters/packages/dronecan-v1.adapter.json");
+const FIELD_ADAPTER_TRANSPORTS: [&str; 8] = [
+    "serial",
+    "can",
+    "usb-network",
+    "udp",
+    "tcp",
+    "remote-controller",
+    "cloud",
+    "radio",
+];
+
+fn valid_transport_contract(transports: &[String]) -> bool {
+    !transports.is_empty()
+        && transports.iter().collect::<HashSet<_>>().len() == transports.len()
+        && transports
+            .iter()
+            .all(|transport| FIELD_ADAPTER_TRANSPORTS.contains(&transport.as_str()))
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -195,6 +221,30 @@ pub(crate) struct FieldAdapterFrameInspection {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct FieldProtocolFrameInspectionRequest {
+    adapter_id: String,
+    frame_base64: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FieldProtocolFrameInspection {
+    schema_version: u8,
+    kind: &'static str,
+    edition_id: &'static str,
+    adapter_id: String,
+    protocol_family: &'static str,
+    classification: String,
+    fields: BTreeMap<String, serde_json::Value>,
+    frame_sha256: String,
+    frame_bytes: usize,
+    device_open_attempts: u8,
+    hardware_write_attempts: u8,
+    hardware_authority: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct FieldMavlinkTelemetryProbeRequest {
     adapter_id: String,
     expected_package_sha256: String,
@@ -252,6 +302,9 @@ fn embedded_package(adapter_id: &str) -> Option<&'static str> {
         "mavlink-common-v2" => Some(MAVLINK_COMMON_RAW),
         "mavlink-px4-v2" => Some(MAVLINK_PX4_RAW),
         "mavlink-ardupilotmega-v2" => Some(MAVLINK_ARDUPILOT_RAW),
+        "crazyflie-crtp" => Some(CRAZYFLIE_CRTP_RAW),
+        "betaflight-msp-v1" => Some(BETAFLIGHT_MSP_RAW),
+        "dronecan-v1" => Some(DRONECAN_RAW),
         _ => None,
     }
 }
@@ -281,6 +334,12 @@ fn load_catalog() -> Result<AdapterCatalog, String> {
         {
             return Err(format!(
                 "Field adapter {} weakened the safety boundary",
+                entry.adapter_id
+            ));
+        }
+        if !valid_transport_contract(&entry.supported_transports) {
+            return Err(format!(
+                "Field adapter {} has an invalid transport contract",
                 entry.adapter_id
             ));
         }
@@ -691,6 +750,328 @@ fn inspect_frame(
     }
 }
 
+fn protocol_inspection(
+    adapter_id: &str,
+    protocol_family: &'static str,
+    classification: impl Into<String>,
+    fields: BTreeMap<String, serde_json::Value>,
+    bytes: &[u8],
+) -> FieldProtocolFrameInspection {
+    FieldProtocolFrameInspection {
+        schema_version: 1,
+        kind: "dronedream-field-protocol-frame-inspection",
+        edition_id: "field",
+        adapter_id: adapter_id.to_string(),
+        protocol_family,
+        classification: classification.into(),
+        fields,
+        frame_sha256: sha256_hex(bytes),
+        frame_bytes: bytes.len(),
+        device_open_attempts: 0,
+        hardware_write_attempts: 0,
+        hardware_authority: false,
+    }
+}
+
+fn inspect_crtp_frame(
+    adapter_id: &str,
+    bytes: &[u8],
+) -> Result<FieldProtocolFrameInspection, String> {
+    if !(1..=31).contains(&bytes.len()) {
+        return Err("Field CRTP input must contain one 1-to-31-byte packet".to_string());
+    }
+    let header = bytes[0];
+    if header & 0x0c != 0x0c {
+        return Err("Field CRTP packet is missing the required legacy header bits".to_string());
+    }
+    let port = header >> 4;
+    let channel = header & 0x03;
+    let subsystem = match port {
+        0 => "console",
+        2 => "parameters",
+        3 => "commander",
+        4 => "memory",
+        5 => "logging",
+        6 => "localization",
+        7 => "generic-setpoint",
+        8 => "high-level-setpoint",
+        9 => "supervisor",
+        13 => "platform",
+        15 if channel == 3 => "null-packet",
+        15 => "link-control",
+        _ => "unassigned",
+    };
+    let mut fields = BTreeMap::new();
+    fields.insert("port".to_string(), serde_json::json!(port));
+    fields.insert("channel".to_string(), serde_json::json!(channel));
+    fields.insert(
+        "payloadBytes".to_string(),
+        serde_json::json!(bytes.len() - 1),
+    );
+    fields.insert("subsystem".to_string(), serde_json::json!(subsystem));
+    Ok(protocol_inspection(
+        adapter_id, "CRTP", subsystem, fields, bytes,
+    ))
+}
+
+fn inspect_msp_v1_frame(
+    adapter_id: &str,
+    bytes: &[u8],
+) -> Result<FieldProtocolFrameInspection, String> {
+    if !(6..=261).contains(&bytes.len()) || bytes.get(0..2) != Some(b"$M") {
+        return Err("Field MSP input must contain one complete MSP v1 frame".to_string());
+    }
+    let expected = 6usize + usize::from(bytes[3]);
+    if bytes.len() != expected {
+        return Err("Field MSP input length does not match its payload length".to_string());
+    }
+    let mut parser = multiwii_serial_protocol::MspParser::new();
+    let mut parsed = None;
+    for (index, byte) in bytes.iter().copied().enumerate() {
+        match parser.parse(byte) {
+            Ok(Some(packet)) if index + 1 == bytes.len() && parsed.is_none() => {
+                parsed = Some(packet)
+            }
+            Ok(Some(_)) => {
+                return Err("Field MSP input contains more than one packet".to_string());
+            }
+            Ok(None) => {}
+            Err(error) => return Err(format!("Field MSP frame was rejected: {error:?}")),
+        }
+    }
+    let packet = parsed.ok_or_else(|| "Field MSP frame is incomplete".to_string())?;
+    if !parser.state_is_between_packets() {
+        return Err("Field MSP parser did not finish at a packet boundary".to_string());
+    }
+    let direction = match packet.direction {
+        multiwii_serial_protocol::MspPacketDirection::ToFlightController => "to-flight-controller",
+        multiwii_serial_protocol::MspPacketDirection::FromFlightController => {
+            "from-flight-controller"
+        }
+        multiwii_serial_protocol::MspPacketDirection::Unsupported => "unsupported-response",
+    };
+    let command = match packet.cmd {
+        1 => "api-version",
+        2 => "flight-controller-variant",
+        3 => "flight-controller-version",
+        4 => "board-info",
+        5 => "build-info",
+        10 => "name",
+        101 => "status",
+        102 => "raw-imu",
+        106 => "raw-gps",
+        108 => "attitude",
+        110 => "analog",
+        _ => "other-command",
+    };
+    let mut fields = BTreeMap::new();
+    fields.insert("command".to_string(), serde_json::json!(packet.cmd));
+    fields.insert("commandName".to_string(), serde_json::json!(command));
+    fields.insert("direction".to_string(), serde_json::json!(direction));
+    fields.insert(
+        "payloadBytes".to_string(),
+        serde_json::json!(packet.data.len()),
+    );
+    Ok(protocol_inspection(
+        adapter_id,
+        "MSP v1",
+        format!("{direction}:{command}"),
+        fields,
+        bytes,
+    ))
+}
+
+fn inspect_dronecan_frame(
+    adapter_id: &str,
+    bytes: &[u8],
+) -> Result<FieldProtocolFrameInspection, String> {
+    if !(5..=12).contains(&bytes.len()) {
+        return Err(
+            "Field DroneCAN capture must contain a 4-byte little-endian ID and 1-to-8 data bytes"
+                .to_string(),
+        );
+    }
+    let raw_id = u32::from_le_bytes(
+        bytes[0..4]
+            .try_into()
+            .map_err(|_| "Field DroneCAN identifier is truncated".to_string())?,
+    );
+    if raw_id > 0x1fff_ffff {
+        return Err("Field DroneCAN identifier exceeds the 29-bit CAN range".to_string());
+    }
+    let identifier = dronecan::Id::new(raw_id);
+    let mut fields = BTreeMap::new();
+    fields.insert("canId".to_string(), serde_json::json!(raw_id));
+    fields.insert(
+        "priority".to_string(),
+        serde_json::json!(identifier.priority()),
+    );
+    let classification = match identifier {
+        dronecan::Id::Message {
+            type_id,
+            source_node,
+            ..
+        } => {
+            fields.insert("typeId".to_string(), serde_json::json!(type_id));
+            fields.insert("sourceNode".to_string(), serde_json::json!(source_node));
+            "message"
+        }
+        dronecan::Id::Anonymous {
+            discriminator,
+            type_id,
+            ..
+        } => {
+            fields.insert(
+                "discriminator".to_string(),
+                serde_json::json!(discriminator),
+            );
+            fields.insert("typeId".to_string(), serde_json::json!(type_id));
+            "anonymous-message"
+        }
+        dronecan::Id::Service {
+            service_type,
+            request,
+            destination_node,
+            source_node,
+            ..
+        } => {
+            fields.insert("serviceType".to_string(), serde_json::json!(service_type));
+            fields.insert("request".to_string(), serde_json::json!(request));
+            fields.insert(
+                "destinationNode".to_string(),
+                serde_json::json!(destination_node),
+            );
+            fields.insert("sourceNode".to_string(), serde_json::json!(source_node));
+            if request {
+                "service-request"
+            } else {
+                "service-response"
+            }
+        }
+    };
+    let mut transfer = dronecan::Transfer::new(Vec::<u8>::new());
+    let complete = transfer
+        .add_frame(&bytes[4..])
+        .map_err(|error| format!("Field DroneCAN frame was rejected: {error}"))?
+        .is_some();
+    fields.insert("transferComplete".to_string(), serde_json::json!(complete));
+    fields.insert(
+        "canPayloadBytes".to_string(),
+        serde_json::json!(bytes.len() - 4),
+    );
+    Ok(protocol_inspection(
+        adapter_id,
+        "DroneCAN v1",
+        classification,
+        fields,
+        bytes,
+    ))
+}
+
+fn inspect_protocol_frame(
+    root: &Path,
+    request: &FieldProtocolFrameInspectionRequest,
+) -> Result<FieldProtocolFrameInspection, String> {
+    if !valid_adapter_id(&request.adapter_id) || request.frame_base64.len() > 512 {
+        return Err("Field protocol frame inspection request is invalid".to_string());
+    }
+    let catalog = load_catalog()?;
+    let entry = catalog
+        .entries
+        .iter()
+        .find(|entry| entry.adapter_id == request.adapter_id)
+        .ok_or_else(|| "Unknown Field adapter".to_string())?;
+    let expected = entry
+        .package_sha256
+        .as_deref()
+        .ok_or_else(|| "Field adapter is not available as a managed package".to_string())?;
+    if installed_package_hash(root, &request.adapter_id)?.as_deref() != Some(expected) {
+        return Err("Field adapter must be installed and integrity-verified".to_string());
+    }
+    let bytes = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        &request.frame_base64,
+    )
+    .map_err(|_| "Field protocol frame must be canonical base64".to_string())?;
+    if base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &bytes)
+        != request.frame_base64
+    {
+        return Err("Field protocol frame must be canonical base64".to_string());
+    }
+    match request.adapter_id.as_str() {
+        "mavlink-common-v2" | "mavlink-px4-v2" => {
+            let parsed = inspect_mavlink_message::<mavlink::common::MavMessage>(
+                &request.adapter_id,
+                &bytes,
+            )?;
+            let classification = parsed.message_name.clone();
+            let mut fields = BTreeMap::new();
+            fields.insert(
+                "protocolVersion".to_string(),
+                serde_json::json!(parsed.protocol_version),
+            );
+            fields.insert("systemId".to_string(), serde_json::json!(parsed.system_id));
+            fields.insert(
+                "componentId".to_string(),
+                serde_json::json!(parsed.component_id),
+            );
+            fields.insert("sequence".to_string(), serde_json::json!(parsed.sequence));
+            fields.insert(
+                "messageId".to_string(),
+                serde_json::json!(parsed.message_id),
+            );
+            fields.insert(
+                "messageName".to_string(),
+                serde_json::json!(classification.clone()),
+            );
+            Ok(protocol_inspection(
+                &request.adapter_id,
+                "MAVLink",
+                classification,
+                fields,
+                &bytes,
+            ))
+        }
+        "mavlink-ardupilotmega-v2" => {
+            let parsed = inspect_mavlink_message::<mavlink::ardupilotmega::MavMessage>(
+                &request.adapter_id,
+                &bytes,
+            )?;
+            let classification = parsed.message_name.clone();
+            let mut fields = BTreeMap::new();
+            fields.insert(
+                "protocolVersion".to_string(),
+                serde_json::json!(parsed.protocol_version),
+            );
+            fields.insert("systemId".to_string(), serde_json::json!(parsed.system_id));
+            fields.insert(
+                "componentId".to_string(),
+                serde_json::json!(parsed.component_id),
+            );
+            fields.insert("sequence".to_string(), serde_json::json!(parsed.sequence));
+            fields.insert(
+                "messageId".to_string(),
+                serde_json::json!(parsed.message_id),
+            );
+            fields.insert(
+                "messageName".to_string(),
+                serde_json::json!(classification.clone()),
+            );
+            Ok(protocol_inspection(
+                &request.adapter_id,
+                "MAVLink",
+                classification,
+                fields,
+                &bytes,
+            ))
+        }
+        "crazyflie-crtp" => inspect_crtp_frame(&request.adapter_id, &bytes),
+        "betaflight-msp-v1" => inspect_msp_v1_frame(&request.adapter_id, &bytes),
+        "dronecan-v1" => inspect_dronecan_frame(&request.adapter_id, &bytes),
+        _ => Err("Field adapter has no native offline frame parser".to_string()),
+    }
+}
+
 const FIELD_MAVLINK_BAUD_RATES: [u32; 5] = [57_600, 115_200, 230_400, 460_800, 921_600];
 
 fn validate_probe_contract(
@@ -889,6 +1270,18 @@ pub(crate) fn inspect_field_adapter_frame(
 }
 
 #[tauri::command]
+pub(crate) fn inspect_field_protocol_frame(
+    app: AppHandle,
+    request: FieldProtocolFrameInspectionRequest,
+) -> Result<FieldProtocolFrameInspection, String> {
+    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field" {
+        return Err("Field protocol inspection is unavailable in this edition".to_string());
+    }
+    let root = adapter_root(&app)?;
+    inspect_protocol_frame(&root, &request)
+}
+
+#[tauri::command]
 pub(crate) fn probe_field_mavlink_telemetry(
     app: AppHandle,
     request: FieldMavlinkTelemetryProbeRequest,
@@ -923,14 +1316,14 @@ mod tests {
     #[test]
     fn catalog_is_unique_data_only_and_fail_closed() {
         let catalog = load_catalog().expect("catalog should validate");
-        assert_eq!(catalog.entries.len(), 8);
+        assert_eq!(catalog.entries.len(), 10);
         assert_eq!(
             catalog
                 .entries
                 .iter()
                 .filter(|entry| entry.installable)
                 .count(),
-            3
+            6
         );
         assert!(catalog.entries.iter().all(|entry| {
             !entry.safety.installation_grants_authority
@@ -938,6 +1331,16 @@ mod tests {
                 && entry.safety.requires_validated_vehicle_pack_for_writes
                 && entry.safety.requires_native_backend_runtime_operator_quorum
         }));
+        assert!(catalog
+            .entries
+            .iter()
+            .all(|entry| valid_transport_contract(&entry.supported_transports)));
+        assert!(!valid_transport_contract(&[]));
+        assert!(!valid_transport_contract(&[
+            "serial".to_string(),
+            "serial".to_string(),
+        ]));
+        assert!(!valid_transport_contract(&["unknown".to_string()]));
     }
 
     #[test]
@@ -1107,6 +1510,147 @@ mod tests {
         )
         .expect_err("trailing bytes must not be accepted as one frame");
         assert!(trailing.contains("exactly one complete"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn open_protocol_packages_parse_offline_frames_without_device_access() {
+        use std::borrow::Cow;
+
+        let root = sandbox("open-protocol-frames");
+        fs::create_dir(&root).unwrap();
+        for adapter_id in ["crazyflie-crtp", "betaflight-msp-v1", "dronecan-v1"] {
+            let package_sha = load_catalog()
+                .unwrap()
+                .entries
+                .into_iter()
+                .find(|entry| entry.adapter_id == adapter_id)
+                .unwrap()
+                .package_sha256
+                .unwrap();
+            install_to_root(
+                &root,
+                &FieldAdapterInstallRequest {
+                    adapter_id: adapter_id.to_string(),
+                    expected_package_sha256: package_sha,
+                },
+            )
+            .unwrap();
+        }
+
+        let crtp = inspect_protocol_frame(
+            &root,
+            &FieldProtocolFrameInspectionRequest {
+                adapter_id: "crazyflie-crtp".to_string(),
+                frame_base64: base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    [0x5c, 0x01, 0x02],
+                ),
+            },
+        )
+        .unwrap();
+        assert_eq!(crtp.protocol_family, "CRTP");
+        assert_eq!(crtp.classification, "logging");
+        assert_eq!(crtp.fields["port"], serde_json::json!(5));
+
+        let packet = multiwii_serial_protocol::MspPacket {
+            cmd: 108,
+            direction: multiwii_serial_protocol::MspPacketDirection::FromFlightController,
+            data: Cow::Owned(vec![1, 2, 3, 4, 5, 6]),
+        };
+        let mut msp_bytes = vec![0; packet.packet_size_bytes()];
+        packet.serialize(&mut msp_bytes).unwrap();
+        let msp = inspect_protocol_frame(
+            &root,
+            &FieldProtocolFrameInspectionRequest {
+                adapter_id: "betaflight-msp-v1".to_string(),
+                frame_base64: base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    &msp_bytes,
+                ),
+            },
+        )
+        .unwrap();
+        assert_eq!(msp.protocol_family, "MSP v1");
+        assert_eq!(msp.classification, "from-flight-controller:attitude");
+
+        let mut dronecan_bytes = 0x0803_f20au32.to_le_bytes().to_vec();
+        dronecan_bytes.extend_from_slice(&[0x01, 0x02, 0xc0]);
+        let dronecan = inspect_protocol_frame(
+            &root,
+            &FieldProtocolFrameInspectionRequest {
+                adapter_id: "dronecan-v1".to_string(),
+                frame_base64: base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    &dronecan_bytes,
+                ),
+            },
+        )
+        .unwrap();
+        assert_eq!(dronecan.protocol_family, "DroneCAN v1");
+        assert_eq!(dronecan.classification, "message");
+        assert_eq!(dronecan.fields["typeId"], serde_json::json!(1010));
+
+        for receipt in [crtp, msp, dronecan] {
+            assert_eq!(receipt.device_open_attempts, 0);
+            assert_eq!(receipt.hardware_write_attempts, 0);
+            assert!(!receipt.hardware_authority);
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn open_protocol_frame_parsers_reject_malformed_or_uninstalled_input() {
+        let root = sandbox("open-protocol-negative");
+        fs::create_dir(&root).unwrap();
+        let uninstalled = inspect_protocol_frame(
+            &root,
+            &FieldProtocolFrameInspectionRequest {
+                adapter_id: "crazyflie-crtp".to_string(),
+                frame_base64: "XA==".to_string(),
+            },
+        )
+        .expect_err("uninstalled package must fail closed");
+        assert!(uninstalled.contains("installed"));
+
+        for (adapter_id, raw, expected_error) in [
+            ("crazyflie-crtp", vec![0x50], "legacy header bits"),
+            ("betaflight-msp-v1", b"$M>\x00\x01\x00".to_vec(), "rejected"),
+            (
+                "dronecan-v1",
+                [0xff, 0xff, 0xff, 0xff, 0xc0].to_vec(),
+                "29-bit",
+            ),
+        ] {
+            let package_sha = load_catalog()
+                .unwrap()
+                .entries
+                .into_iter()
+                .find(|entry| entry.adapter_id == adapter_id)
+                .unwrap()
+                .package_sha256
+                .unwrap();
+            install_to_root(
+                &root,
+                &FieldAdapterInstallRequest {
+                    adapter_id: adapter_id.to_string(),
+                    expected_package_sha256: package_sha,
+                },
+            )
+            .unwrap();
+            let error = inspect_protocol_frame(
+                &root,
+                &FieldProtocolFrameInspectionRequest {
+                    adapter_id: adapter_id.to_string(),
+                    frame_base64: base64::Engine::encode(
+                        &base64::engine::general_purpose::STANDARD,
+                        raw,
+                    ),
+                },
+            )
+            .expect_err("malformed frame must fail closed");
+            assert!(error.contains(expected_error), "{error}");
+        }
         fs::remove_dir_all(root).unwrap();
     }
 

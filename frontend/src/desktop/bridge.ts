@@ -196,6 +196,26 @@ export interface FieldAdapterFrameInspection {
   hardwareAuthority: false;
 }
 
+export interface FieldProtocolFrameInspectionRequest {
+  adapterId: string;
+  frameBase64: string;
+}
+
+export interface FieldProtocolFrameInspection {
+  schemaVersion: 1;
+  kind: "dronedream-field-protocol-frame-inspection";
+  editionId: "field";
+  adapterId: string;
+  protocolFamily: string;
+  classification: string;
+  fields: Readonly<Record<string, string | number | boolean>>;
+  frameSha256: string;
+  frameBytes: number;
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+  hardwareAuthority: false;
+}
+
 export interface FieldMavlinkTelemetryProbeRequest {
   adapterId: string;
   expectedPackageSha256: string;
@@ -712,6 +732,22 @@ export function inspectFieldAdapterFrame(
     return Promise.reject(new Error("Field adapter frame inspection request is invalid."));
   }
   return invokeDesktop("inspect_field_adapter_frame", parseFieldAdapterFrameInspection, {
+    request,
+  });
+}
+
+export function inspectFieldProtocolFrame(
+  request: FieldProtocolFrameInspectionRequest,
+): Promise<FieldProtocolFrameInspection> {
+  if (
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.adapterId)
+    || request.frameBase64.length === 0
+    || request.frameBase64.length > 512
+    || !/^[A-Za-z0-9+/]*={0,2}$/.test(request.frameBase64)
+  ) {
+    return Promise.reject(new Error("Field protocol frame inspection request is invalid."));
+  }
+  return invokeDesktop("inspect_field_protocol_frame", parseFieldProtocolFrameInspection, {
     request,
   });
 }
@@ -1869,6 +1905,122 @@ function parseFieldAdapterFrameInspection(value: unknown): FieldAdapterFrameInsp
       record.hardwareAuthority,
       false,
       "fieldAdapterFrameInspection.hardwareAuthority",
+    ),
+  };
+}
+
+function parseFieldProtocolFrameInspection(
+  value: unknown,
+): FieldProtocolFrameInspection {
+  const record = expectExactRecord(value, "fieldProtocolFrameInspection", [
+    "schemaVersion",
+    "kind",
+    "editionId",
+    "adapterId",
+    "protocolFamily",
+    "classification",
+    "fields",
+    "frameSha256",
+    "frameBytes",
+    "deviceOpenAttempts",
+    "hardwareWriteAttempts",
+    "hardwareAuthority",
+  ]);
+  const rawFields = expectRecord(
+    record.fields,
+    "fieldProtocolFrameInspection.fields",
+  );
+  const fieldEntries = Object.entries(rawFields);
+  if (fieldEntries.length === 0 || fieldEntries.length > 16) {
+    throw new Error("fieldProtocolFrameInspection.fields is outside its bounded shape");
+  }
+  const fields: Record<string, string | number | boolean> = {};
+  for (const [key, raw] of fieldEntries) {
+    if (!/^[a-z][A-Za-z0-9]{0,31}$/.test(key)) {
+      throw new Error("fieldProtocolFrameInspection.fields contains an invalid key");
+    }
+    if (typeof raw === "string") {
+      const parsed = expectSafeNonEmptyString(
+        raw,
+        `fieldProtocolFrameInspection.fields.${key}`,
+      );
+      if (parsed.length > 160) {
+        throw new Error(`fieldProtocolFrameInspection.fields.${key} is too long`);
+      }
+      fields[key] = parsed;
+    } else if (typeof raw === "number") {
+      if (!Number.isSafeInteger(raw) || raw < 0 || raw > 0xffff_ffff) {
+        throw new Error(`fieldProtocolFrameInspection.fields.${key} is out of range`);
+      }
+      fields[key] = raw;
+    } else if (typeof raw === "boolean") {
+      fields[key] = raw;
+    } else {
+      throw new Error(`fieldProtocolFrameInspection.fields.${key} is not scalar`);
+    }
+  }
+  const protocolFamily = expectSafeNonEmptyString(
+    record.protocolFamily,
+    "fieldProtocolFrameInspection.protocolFamily",
+  );
+  const classification = expectSafeNonEmptyString(
+    record.classification,
+    "fieldProtocolFrameInspection.classification",
+  );
+  if (protocolFamily.length > 80 || classification.length > 160) {
+    throw new Error("fieldProtocolFrameInspection classification is too long");
+  }
+  const frameBytes = expectBoundedNonNegativeInteger(
+    record.frameBytes,
+    "fieldProtocolFrameInspection.frameBytes",
+    280,
+  );
+  if (frameBytes === 0) {
+    throw new Error("fieldProtocolFrameInspection.frameBytes is out of range");
+  }
+  return {
+    schemaVersion: expectLiteral(
+      record.schemaVersion,
+      1,
+      "fieldProtocolFrameInspection.schemaVersion",
+    ),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-protocol-frame-inspection",
+      "fieldProtocolFrameInspection.kind",
+    ),
+    editionId: expectLiteral(
+      record.editionId,
+      "field",
+      "fieldProtocolFrameInspection.editionId",
+    ),
+    adapterId: expectIdentifier(
+      record.adapterId,
+      "fieldProtocolFrameInspection.adapterId",
+    ),
+    protocolFamily,
+    classification,
+    fields,
+    frameSha256: expectLowercaseHex(
+      record.frameSha256,
+      "fieldProtocolFrameInspection.frameSha256",
+      64,
+    ),
+    frameBytes,
+    deviceOpenAttempts: expectLiteral(
+      record.deviceOpenAttempts,
+      0,
+      "fieldProtocolFrameInspection.deviceOpenAttempts",
+    ),
+    hardwareWriteAttempts: expectLiteral(
+      record.hardwareWriteAttempts,
+      0,
+      "fieldProtocolFrameInspection.hardwareWriteAttempts",
+    ),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldProtocolFrameInspection.hardwareAuthority",
     ),
   };
 }

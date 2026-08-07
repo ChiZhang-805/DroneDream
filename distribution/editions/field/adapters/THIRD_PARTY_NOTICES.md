@@ -46,3 +46,36 @@ The corresponding license text is available in the pinned upstream source:
 
 Including the library does not validate a serial device or grant parameter,
 arm, flight, or autonomous tuning authority.
+
+## MultiWii Serial Protocol parser 0.1.1
+
+The managed Betaflight / INAV package uses the pinned
+`multiwii_serial_protocol 0.1.1` crate only to inspect complete captured MSP v1
+frames. The crate is licensed under MIT OR Apache-2.0. DroneDream does not send
+MSP requests or commands through this package.
+
+- [Crate source and license metadata](https://crates.io/crates/multiwii_serial_protocol/0.1.1)
+- [Betaflight MSP protocol reference](https://betaflight.com/docs/development/MSP-Protocol-Reference-Dev)
+
+## DroneCAN parser 0.1.0
+
+The managed DroneCAN package uses the pinned `dronecan 0.1.0` crate to decode
+captured 29-bit identifiers and transfer framing. The crate is licensed under
+Mozilla Public License 2.0. The DroneCAN specification and its reference
+implementations are openly published by the DroneCAN project.
+
+- [Crate source and license metadata](https://crates.io/crates/dronecan/0.1.0)
+- [DroneCAN specification](https://dronecan.github.io/Specification/1._Introduction/)
+
+## Bitcraze Crazy RealTime Protocol
+
+The managed Crazyflie package contains only DroneDream protocol metadata. Its
+offline frame inspector follows Bitcraze's published CRTP packet header and
+30-byte payload limit; it does not bundle cflib, Crazyradio drivers, or a live
+link implementation.
+
+- [Bitcraze CRTP specification](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/crtp/)
+
+Installing or using any of these data-only packages does not validate a
+Vehicle Pack and does not grant parameter, arm, flight, or autonomous tuning
+authority.

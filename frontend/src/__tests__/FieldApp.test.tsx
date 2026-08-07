@@ -112,8 +112,10 @@ describe("FieldApp", () => {
     const { container } = render(<FieldApp initialLocale="en" />);
     const table = within(screen.getByRole("table", { name: "Protocol adapters" }));
 
-    expect(table.getAllByRole("row")).toHaveLength(9);
+    expect(table.getAllByRole("row")).toHaveLength(11);
     expect(table.getByText("MAVLink Common")).toBeInTheDocument();
+    expect(table.getByText("Betaflight / INAV MSP")).toBeInTheDocument();
+    expect(table.getByText("DroneCAN v1")).toBeInTheDocument();
     expect(table.getByText("DJI Enterprise SDK")).toBeInTheDocument();
     expect(screen.getByText(/support offline inspection/i)).toBeInTheDocument();
     expect(screen.getByText(/one bounded, operator-confirmed read-only serial probe/i))

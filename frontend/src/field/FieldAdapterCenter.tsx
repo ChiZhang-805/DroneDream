@@ -3,6 +3,7 @@ import {
   Check,
   CircleOff,
   Download,
+  FileSearch,
   LockKeyhole,
   PackageOpen,
   RadioReceiver,
@@ -14,6 +15,7 @@ import {
 import sourceCatalog from "../../../distribution/editions/field/adapters/catalog.v1.json";
 import {
   getFieldAdapterCatalog,
+  inspectFieldProtocolFrame,
   installFieldAdapter,
   isDesktopRuntime,
   probeFieldMavlinkTelemetry,
@@ -21,10 +23,11 @@ import {
   type FieldAdapterCatalogReport,
   type FieldDiscoveredDevice,
   type FieldMavlinkTelemetryProbeReceipt,
+  type FieldProtocolFrameInspection,
 } from "../desktop/bridge";
 import type { FieldLocale } from "./catalog";
 
-const CATALOG_SHA256 = "f1bfbaf7586b712018d84fd8b03571b00bd181ec26559bf4cb9efbd54df5a0e5";
+const CATALOG_SHA256 = "244e424bdc5516ccb4f1668a9862881caca5760422ee2453f84c825ce5779266";
 
 const COPY = {
   en: {
@@ -62,6 +65,15 @@ const COPY = {
     telemetryUnavailable: "Scan the serial registry and install a MAVLink adapter first.",
     telemetryError: "The read-only telemetry probe was rejected.",
     telemetryResult: "Received",
+    inspectorTitle: "Offline protocol frame inspector",
+    inspectorAdapter: "Installed adapter",
+    inspectorFrame: "Captured frame (canonical base64)",
+    inspectorPlaceholder: "Paste one captured protocol frame",
+    inspectorAction: "Inspect frame",
+    inspectorBusy: "Inspecting...",
+    inspectorUnavailable: "Install an open protocol package to inspect captured frames.",
+    inspectorError: "The offline frame was rejected.",
+    inspectorResult: "Classified",
   },
   "zh-CN": {
     title: "协议适配器",
@@ -98,6 +110,15 @@ const COPY = {
     telemetryUnavailable: "请先扫描串口注册表并安装一个 MAVLink 适配器。",
     telemetryError: "只读遥测探测被拒绝。",
     telemetryResult: "已接收",
+    inspectorTitle: "离线协议帧检查器",
+    inspectorAdapter: "已安装适配器",
+    inspectorFrame: "已捕获帧（规范 base64）",
+    inspectorPlaceholder: "粘贴一个已捕获的协议帧",
+    inspectorAction: "检查帧",
+    inspectorBusy: "正在检查...",
+    inspectorUnavailable: "请先安装一个开放协议适配包。",
+    inspectorError: "离线帧被拒绝。",
+    inspectorResult: "已分类",
   },
 } as const;
 
@@ -142,6 +163,12 @@ export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterP
   const [telemetryError, setTelemetryError] = useState<string | null>(null);
   const [telemetryResult, setTelemetryResult] =
     useState<FieldMavlinkTelemetryProbeReceipt | null>(null);
+  const [selectedInspectorAdapterId, setSelectedInspectorAdapterId] = useState("");
+  const [frameBase64, setFrameBase64] = useState("");
+  const [inspectorBusy, setInspectorBusy] = useState(false);
+  const [inspectorError, setInspectorError] = useState<string | null>(null);
+  const [inspectorResult, setInspectorResult] =
+    useState<FieldProtocolFrameInspection | null>(null);
   const desktop = isDesktopRuntime();
 
   const loadCatalog = useCallback(async () => {
@@ -190,12 +217,42 @@ export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterP
     )),
     [catalog.entries],
   );
+  const installedInspectableAdapters = useMemo(
+    () => catalog.entries.filter((entry) => (
+      entry.installed
+      && entry.packageSha256 !== null
+      && entry.deliveryMode === "embedded-managed"
+    )),
+    [catalog.entries],
+  );
   const selectedDevice = devices.find(
     (device) => device.observationId === selectedObservationId,
   ) ?? devices[0] ?? null;
   const selectedTelemetryAdapter = installedMavlinkAdapters.find(
     (entry) => entry.adapterId === selectedTelemetryAdapterId,
   ) ?? installedMavlinkAdapters[0] ?? null;
+  const selectedInspectorAdapter = installedInspectableAdapters.find(
+    (entry) => entry.adapterId === selectedInspectorAdapterId,
+  ) ?? installedInspectableAdapters[0] ?? null;
+
+  const inspectOfflineFrame = useCallback(async () => {
+    if (!desktop || !selectedInspectorAdapter || frameBase64.trim() === "") return;
+    setInspectorBusy(true);
+    setInspectorError(null);
+    setInspectorResult(null);
+    try {
+      setInspectorResult(await inspectFieldProtocolFrame({
+        adapterId: selectedInspectorAdapter.adapterId,
+        frameBase64: frameBase64.trim(),
+      }));
+    } catch (reason) {
+      setInspectorError(
+        `${copy.inspectorError} ${reason instanceof Error ? reason.message : String(reason)}`,
+      );
+    } finally {
+      setInspectorBusy(false);
+    }
+  }, [copy.inspectorError, desktop, frameBase64, selectedInspectorAdapter]);
 
   const probeTelemetry = useCallback(async () => {
     if (
@@ -336,6 +393,84 @@ export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterP
             })}
           </tbody>
         </table>
+      </div>
+
+      <div
+        className="field-protocol-inspector"
+        data-authority="false"
+        data-device-open-attempts="0"
+        data-hardware-write-attempts="0"
+      >
+        <header>
+          <FileSearch aria-hidden="true" />
+          <h3>{copy.inspectorTitle}</h3>
+        </header>
+        <div className="field-inspector-controls">
+          <label>
+            <span>{copy.inspectorAdapter}</span>
+            <select
+              value={selectedInspectorAdapter?.adapterId ?? ""}
+              disabled={!desktop || installedInspectableAdapters.length === 0 || inspectorBusy}
+              onChange={(event) => setSelectedInspectorAdapterId(event.target.value)}
+            >
+              {installedInspectableAdapters.length === 0
+                ? <option value="">{copy.unavailable}</option>
+                : null}
+              {installedInspectableAdapters.map((entry) => (
+                <option key={entry.adapterId} value={entry.adapterId}>
+                  {entry.displayName[locale]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{copy.inspectorFrame}</span>
+            <textarea
+              value={frameBase64}
+              maxLength={512}
+              rows={3}
+              placeholder={copy.inspectorPlaceholder}
+              disabled={!desktop || !selectedInspectorAdapter || inspectorBusy}
+              onChange={(event) => setFrameBase64(event.target.value)}
+            />
+          </label>
+        </div>
+        <button
+          type="button"
+          className="field-primary-command"
+          disabled={
+            !desktop
+            || !selectedInspectorAdapter
+            || frameBase64.trim() === ""
+            || inspectorBusy
+          }
+          onClick={() => void inspectOfflineFrame()}
+        >
+          <FileSearch aria-hidden="true" />
+          {inspectorBusy ? copy.inspectorBusy : copy.inspectorAction}
+        </button>
+        {!selectedInspectorAdapter ? (
+          <p className="field-adapter-offline">
+            <WifiOff aria-hidden="true" />{copy.inspectorUnavailable}
+          </p>
+        ) : null}
+        {inspectorError ? (
+          <p className="field-adapter-error" role="alert">{inspectorError}</p>
+        ) : null}
+        {inspectorResult ? (
+          <output className="field-inspector-result" aria-live="polite">
+            <Check aria-hidden="true" />
+            <strong>
+              {copy.inspectorResult} {inspectorResult.protocolFamily}
+              {" · "}{inspectorResult.classification}
+            </strong>
+            <dl>
+              {Object.entries(inspectorResult.fields).map(([key, value]) => (
+                <div key={key}><dt>{key}</dt><dd>{String(value)}</dd></div>
+              ))}
+            </dl>
+          </output>
+        ) : null}
       </div>
 
       <div className="field-telemetry-probe" data-authority="false">

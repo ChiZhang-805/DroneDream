@@ -99,6 +99,68 @@
       }
     },
     {
+      "adapterId": "betaflight-msp-v1",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "Betaflight / INAV MSP",
+        "zh-CN": "Betaflight / INAV MSP"
+      },
+      "vendor": "Betaflight / INAV",
+      "protocolFamily": "MultiWii Serial Protocol v1",
+      "implementationStatus": "available",
+      "deliveryMode": "embedded-managed",
+      "installable": true,
+      "supportedTransports": ["serial"],
+      "supportedPlatforms": ["windows"],
+      "packageSha256": "1aa80978eb8bccf61279655485969bf0daadf48e7555289cc5fe836d47e1f160",
+      "capabilities": {
+        "deviceDiscovery": "unavailable",
+        "telemetryRead": "read-only",
+        "parameterRead": "quorum-required",
+        "parameterWrite": "quorum-required",
+        "arm": "quorum-required",
+        "flight": "quorum-required",
+        "autonomousTuning": "quorum-required"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
+      "adapterId": "dronecan-v1",
+      "version": "1.0.0",
+      "displayName": {
+        "en": "DroneCAN v1",
+        "zh-CN": "DroneCAN v1"
+      },
+      "vendor": "DroneCAN",
+      "protocolFamily": "DroneCAN v1 / UAVCAN v0",
+      "implementationStatus": "available",
+      "deliveryMode": "embedded-managed",
+      "installable": true,
+      "supportedTransports": ["can", "udp"],
+      "supportedPlatforms": ["windows"],
+      "packageSha256": "3f54a9291514b883c44d3997b23a0080d99521ec2aaff47d37f87ea28db5d552",
+      "capabilities": {
+        "deviceDiscovery": "unavailable",
+        "telemetryRead": "read-only",
+        "parameterRead": "quorum-required",
+        "parameterWrite": "quorum-required",
+        "arm": "quorum-required",
+        "flight": "quorum-required",
+        "autonomousTuning": "quorum-required"
+      },
+      "safety": {
+        "installationGrantsAuthority": false,
+        "discoveryGrantsAuthority": false,
+        "requiresValidatedVehiclePackForWrites": true,
+        "requiresNativeBackendRuntimeOperatorQuorum": true
+      }
+    },
+    {
       "adapterId": "dji-enterprise-sdk",
       "version": "1.0.0",
       "displayName": {
@@ -231,20 +293,20 @@
       },
       "vendor": "Bitcraze",
       "protocolFamily": "Crazy RealTime Protocol",
-      "implementationStatus": "planned",
-      "deliveryMode": "unavailable",
-      "installable": false,
+      "implementationStatus": "available",
+      "deliveryMode": "embedded-managed",
+      "installable": true,
       "supportedTransports": ["radio", "usb-network"],
       "supportedPlatforms": ["windows"],
-      "packageSha256": null,
+      "packageSha256": "4d86e82ae35d95e7d1b77c5e266f05f7dc5b0543f64603ed4c7d97e23c05fec3",
       "capabilities": {
         "deviceDiscovery": "unavailable",
-        "telemetryRead": "unavailable",
-        "parameterRead": "unavailable",
-        "parameterWrite": "unavailable",
-        "arm": "unavailable",
-        "flight": "unavailable",
-        "autonomousTuning": "unavailable"
+        "telemetryRead": "read-only",
+        "parameterRead": "quorum-required",
+        "parameterWrite": "quorum-required",
+        "arm": "quorum-required",
+        "flight": "quorum-required",
+        "autonomousTuning": "quorum-required"
       },
       "safety": {
         "installationGrantsAuthority": false,

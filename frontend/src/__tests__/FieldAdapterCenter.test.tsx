@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   getFieldAdapterCatalog,
+  inspectFieldProtocolFrame,
   installFieldAdapter,
   probeFieldMavlinkTelemetry,
 } from "../desktop/bridge";
@@ -15,6 +16,7 @@ vi.mock("../desktop/bridge", async (importOriginal) => {
     isDesktopRuntime: () => true,
     getFieldAdapterCatalog: vi.fn(),
     installFieldAdapter: vi.fn(),
+    inspectFieldProtocolFrame: vi.fn(),
     probeFieldMavlinkTelemetry: vi.fn(),
   };
 });
@@ -131,6 +133,20 @@ describe("FieldAdapterCenter", () => {
       flightAttempts: 0,
       hardwareAuthority: false,
     });
+    vi.mocked(inspectFieldProtocolFrame).mockReset().mockResolvedValue({
+      schemaVersion: 1,
+      kind: "dronedream-field-protocol-frame-inspection",
+      editionId: "field",
+      adapterId: "mavlink-common-v2",
+      protocolFamily: "MAVLink",
+      classification: "HEARTBEAT",
+      fields: { messageId: 0, messageName: "HEARTBEAT" },
+      frameSha256: "e".repeat(64),
+      frameBytes: 21,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      hardwareAuthority: false,
+    });
   });
 
   it("installs only a catalog-bound managed adapter", async () => {
@@ -188,5 +204,30 @@ describe("FieldAdapterCenter", () => {
       operatorConfirmedReadOnly: true,
     }));
     expect(await screen.findByText(/Received HEARTBEAT/)).toBeInTheDocument();
+  });
+
+  it("inspects one offline frame without invoking a device transport", async () => {
+    vi.mocked(getFieldAdapterCatalog).mockResolvedValue({
+      ...report,
+      entries: [{
+        ...report.entries[0]!,
+        installed: true,
+        installedPackageSha256: "b".repeat(64),
+      }, report.entries[1]!],
+    });
+    render(<FieldAdapterCenter locale="en" />);
+
+    const frame = await screen.findByRole("textbox", {
+      name: "Captured frame (canonical base64)",
+    });
+    fireEvent.change(frame, { target: { value: "AQ==" } });
+    fireEvent.click(screen.getByRole("button", { name: "Inspect frame" }));
+
+    await waitFor(() => expect(inspectFieldProtocolFrame).toHaveBeenCalledWith({
+      adapterId: "mavlink-common-v2",
+      frameBase64: "AQ==",
+    }));
+    expect(probeFieldMavlinkTelemetry).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Classified MAVLink/)).toBeInTheDocument();
   });
 });

@@ -21,7 +21,7 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         self.assertEqual(self.catalog["editionId"], "field")
         self.assertFalse(self.catalog["hardwareAuthority"])
         entries = self.catalog["entries"]
-        self.assertEqual(len(entries), 8)
+        self.assertEqual(len(entries), 10)
         identifiers = [entry["adapterId"] for entry in entries]
         self.assertEqual(len(identifiers), len(set(identifiers)))
         self.assertTrue(all(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", item) for item in identifiers))
@@ -31,12 +31,43 @@ class FieldAdapterCatalogTest(unittest.TestCase):
             self.assertFalse(safety["discoveryGrantsAuthority"])
             self.assertTrue(safety["requiresValidatedVehiclePackForWrites"])
             self.assertTrue(safety["requiresNativeBackendRuntimeOperatorQuorum"])
+        by_id = {entry["adapterId"]: entry for entry in entries}
+        self.assertEqual(by_id["dronecan-v1"]["supportedTransports"], ["can", "udp"])
+        self.assertNotIn("usb-network", by_id["dronecan-v1"]["supportedTransports"])
+        schema = json.loads(
+            (ROOT / "distribution/schemas/field-adapter-catalog.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        transport_enum = schema["$defs"]["entry"]["properties"]["supportedTransports"][
+            "items"
+        ]["enum"]
+        self.assertEqual(
+            transport_enum,
+            [
+                "serial",
+                "can",
+                "usb-network",
+                "udp",
+                "tcp",
+                "remote-controller",
+                "cloud",
+                "radio",
+            ],
+        )
 
     def test_managed_packages_are_exact_data_only_and_fail_closed(self) -> None:
         installable = [entry for entry in self.catalog["entries"] if entry["installable"]]
         self.assertEqual(
             {entry["adapterId"] for entry in installable},
-            {"mavlink-common-v2", "mavlink-px4-v2", "mavlink-ardupilotmega-v2"},
+            {
+                "mavlink-common-v2",
+                "mavlink-px4-v2",
+                "mavlink-ardupilotmega-v2",
+                "crazyflie-crtp",
+                "betaflight-msp-v1",
+                "dronecan-v1",
+            },
         )
         for entry in installable:
             path = PACKAGE_ROOT / f"{entry['adapterId']}.adapter.json"
@@ -52,7 +83,7 @@ class FieldAdapterCatalogTest(unittest.TestCase):
 
     def test_vendor_restricted_entries_cannot_be_installed_or_impersonated(self) -> None:
         restricted = [entry for entry in self.catalog["entries"] if not entry["installable"]]
-        self.assertEqual(len(restricted), 5)
+        self.assertEqual(len(restricted), 4)
         for entry in restricted:
             self.assertIsNone(entry["packageSha256"])
             self.assertNotEqual(entry["deliveryMode"], "embedded-managed")
@@ -62,17 +93,31 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         manifest = (ROOT / "desktop/src-tauri/Cargo.toml").read_text(encoding="utf-8")
         mavlink_line = next(line for line in manifest.splitlines() if line.startswith("mavlink ="))
         serial_line = next(line for line in manifest.splitlines() if line.startswith("serialport ="))
+        msp_line = next(
+            line for line in manifest.splitlines()
+            if line.startswith("multiwii_serial_protocol =")
+        )
+        dronecan_line = next(
+            line for line in manifest.splitlines() if line.startswith("dronecan =")
+        )
         self.assertIn('version = "=0.17.1"', mavlink_line)
         self.assertIn('"common"', mavlink_line)
         self.assertIn('"ardupilotmega"', mavlink_line)
         self.assertNotRegex(mavlink_line, r"direct-serial|transport-|\btcp\b|\budp\b")
         self.assertIn('version = "=4.9.0"', serial_line)
         self.assertIn("default-features = false", serial_line)
+        self.assertIn('version = "=0.1.1"', msp_line)
+        self.assertIn("default-features = false", msp_line)
+        self.assertIn('version = "=0.1.0"', dronecan_line)
+        self.assertIn("default-features = false", dronecan_line)
 
         source = (ROOT / "desktop/src-tauri/src/field_adapters.rs").read_text(encoding="utf-8")
         self.assertIn("read_any_msg", source)
         self.assertIn("probe_field_mavlink_telemetry", source)
         self.assertIn("serialport::new", source)
+        self.assertIn("inspect_field_protocol_frame", source)
+        self.assertIn("multiwii_serial_protocol::MspParser", source)
+        self.assertIn("dronecan::Id::new", source)
         self.assertIn("device_open_attempts: 0", source)
         self.assertIn("device_open_attempts: 1", source)
         self.assertIn("hardware_write_attempts: 0", source)
@@ -95,6 +140,9 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         )
         self.assertIn("mavlink 0.17.1", notice)
         self.assertIn("serialport 4.9.0", notice)
+        self.assertIn("MultiWii Serial Protocol parser 0.1.1", notice)
+        self.assertIn("DroneCAN parser 0.1.0", notice)
+        self.assertIn("Bitcraze Crazy RealTime Protocol", notice)
         self.assertIn("MIT License", notice)
         self.assertIn("Apache License 2.0", notice)
         self.assertIn("Mozilla Public License 2.0", notice)

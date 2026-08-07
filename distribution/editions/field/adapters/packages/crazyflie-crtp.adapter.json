@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-adapter-package",
+  "adapterId": "crazyflie-crtp",
+  "version": "1.0.0",
+  "editionId": "field",
+  "protocol": {
+    "family": "Crazy RealTime Protocol",
+    "dialect": "Crazyflie 2.x",
+    "versions": [5, 6],
+    "engine": "native-read-only-crtp-frame-inspector",
+    "transportPolicy": "offline-captured-frame-only"
+  },
+  "capabilities": {
+    "deviceDiscovery": "unavailable",
+    "telemetryRead": "read-only",
+    "parameterRead": "quorum-required",
+    "parameterWrite": "quorum-required",
+    "arm": "quorum-required",
+    "flight": "quorum-required",
+    "autonomousTuning": "quorum-required"
+  },
+  "safety": {
+    "executableCode": false,
+    "installationGrantsAuthority": false,
+    "discoveryGrantsAuthority": false,
+    "zeroValidatedPackDecision": "deny"
+  },
+  "license": {
+    "protocolSpecification": "Bitcraze CRTP",
+    "packageContent": "DroneDream-1.0"
+  }
+}

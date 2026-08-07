@@ -69,7 +69,7 @@
         "supportedTransports": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "enum": ["serial", "usb-network", "udp", "tcp", "remote-controller", "cloud", "radio"] }
+          "items": { "enum": ["serial", "can", "usb-network", "udp", "tcp", "remote-controller", "cloud", "radio"] }
         },
         "supportedPlatforms": {
           "type": "array",

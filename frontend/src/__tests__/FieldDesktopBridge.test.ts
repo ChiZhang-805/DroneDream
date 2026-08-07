@@ -5,6 +5,7 @@ import {
   getFieldAdapterCatalog,
   getFieldTuningStatus,
   inspectFieldAdapterFrame,
+  inspectFieldProtocolFrame,
   installFieldAdapter,
   probeFieldMavlinkTelemetry,
   prepareFieldHardwareTuning,
@@ -141,6 +142,42 @@ describe("Field desktop bridge", () => {
     await expect(inspectFieldAdapterFrame({
       adapterId: "mavlink-common-v2",
       frameBase64: "AQ==",
+    })).rejects.toThrow();
+  });
+
+  it("accepts only bounded scalar offline protocol inspection fields", async () => {
+    const inspection = {
+      schemaVersion: 1,
+      kind: "dronedream-field-protocol-frame-inspection",
+      editionId: "field",
+      adapterId: "crazyflie-crtp",
+      protocolFamily: "CRTP",
+      classification: "logging",
+      fields: { port: 5, channel: 0, subsystem: "logging" },
+      frameSha256: "d".repeat(64),
+      frameBytes: 3,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      hardwareAuthority: false,
+    };
+    const invoke = vi.fn(async () => inspection);
+    window.__TAURI__ = { core: { invoke } };
+
+    await expect(inspectFieldProtocolFrame({
+      adapterId: "crazyflie-crtp",
+      frameBase64: "XAE=",
+    })).resolves.toEqual(inspection);
+    expect(invoke).toHaveBeenCalledWith("inspect_field_protocol_frame", {
+      request: { adapterId: "crazyflie-crtp", frameBase64: "XAE=" },
+    });
+
+    invoke.mockResolvedValueOnce({
+      ...inspection,
+      fields: { nested: {} },
+    } as unknown as typeof inspection);
+    await expect(inspectFieldProtocolFrame({
+      adapterId: "crazyflie-crtp",
+      frameBase64: "XAE=",
     })).rejects.toThrow();
   });
 
