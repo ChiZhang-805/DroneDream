@@ -4,7 +4,6 @@ import json
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = ROOT / "distribution" / "schemas" / "vehicle-pack-draft-envelope.schema.json"
 CONTRACT_PATH = ROOT / "distribution" / "universal" / "vehicle-studio.v1.json"
