@@ -15,7 +15,7 @@ GENERATOR = ROOT / (
 )
 PRODUCT = "6672320392f3274a952a7f02a2006aa2bd6e2671"
 PRODUCT_TREE = "46c877553ad751f78849593ea9ba93a1042ace68"
-TOOL_COMMIT = "f1f8dd49ade82e231f686985a8c8557faf763356"
+TOOL_COMMIT = "f15110b1670452d4fed4f49a9f88003a739a96aa"
 POWERSHELL = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / (
     "System32/WindowsPowerShell/v1.0/powershell.exe"
 )
@@ -23,9 +23,9 @@ POWERSHELL = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / (
 GENERATOR_BINDING = {
     "path": "distribution/editions/field/build/generate-field-yellow-command-files.ps1",
     "sourceCommit": TOOL_COMMIT,
-    "gitBlob": "c16ffc91267ad43b09b2d7924b40be096b304a9e",
+    "gitBlob": "980f3eee9381adee7da4663e1f2ba57d75685b9d",
     "canonicalBlobSha256": (
-        "66067727dc971c8a7c4b0db91d97782da8521a25e3443bd0ff54f14d307987c6"
+        "cd44a88a400e79c72a0f83c232435dd3cb0aea56ae895c6427e5d1ff82e34c9f"
     ),
 }
 TEMPLATE_BINDINGS = [
