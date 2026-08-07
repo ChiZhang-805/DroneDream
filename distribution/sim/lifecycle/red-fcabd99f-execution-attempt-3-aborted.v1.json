@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-final-candidate-lifecycle-abort",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "aborted-by-command-transport-before-owned-root-or-mutation",
+  "productSourceCommit": "79a718dae55c274cf4803a57129e5789012dca03",
+  "artifact": {
+    "bytes": 11944855,
+    "sha256": "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e",
+    "rebuilt": false,
+    "relabelled": false
+  },
+  "execution": {
+    "ordinal": 3,
+    "commandTransportExitCode": 124,
+    "freshInstallerInvocations": 0,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "pkceBoundaryChecks": 0,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "verifiedAfterAbort": {
+    "ownedRunRootAbsent": true,
+    "installRootAbsent": true,
+    "uninstallKeyAbsent": true,
+    "desktopShortcutAbsent": true,
+    "startMenuShortcutAbsent": true,
+    "runnerProcessAbsent": true,
+    "artifactProductDefectObserved": false
+  },
+  "failure": {
+    "stage": "command-transport",
+    "classification": "outer-tool-timeout-before-owned-root-or-lifecycle-mutation",
+    "productDefectObserved": false,
+    "rootCause": "The command transport timeout terminated the runner before it created the attempt-owned run root or invoked any lifecycle stage."
+  },
+  "nextAttempt": {
+    "requiresNewRunnerHash": true,
+    "requiresNewApplicationHash": true,
+    "requiresNewOwnedRunRoot": true,
+    "artifactMayRemainIdentical": true,
+    "sameExecutionMayBeRetried": false
+  },
+  "nonClaims": {
+    "installerExecuted": false,
+    "applicationLaunched": false,
+    "webView2Validated": false,
+    "uninstallLifecycleValidated": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}

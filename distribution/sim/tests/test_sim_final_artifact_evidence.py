@@ -44,6 +44,20 @@ ATTEMPT_2_FAILURE = (
     / "lifecycle"
     / "red-fcabd99f-execution-attempt-2-failed.v1.json"
 )
+APPLICATION_4 = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-final-application-4.v1.json"
+)
+ATTEMPT_3_ABORT = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-execution-attempt-3-aborted.v1.json"
+)
 
 
 def sha256(path: Path) -> str:
@@ -205,3 +219,22 @@ def test_third_lifecycle_application_selects_locales_through_owned_preference() 
     assert failure["failure"]["observedLanguage"] == 2052
     assert failure["rollback"]["protectedStateParity"] is True
     assert third["priorAttempt"]["externalReceiptSha256"] == failure["externalReceipt"]["sha256"]
+
+
+def test_fourth_lifecycle_application_replaces_zero_mutation_transport_abort() -> None:
+    third = json.loads(APPLICATION_3.read_text(encoding="utf-8"))
+    fourth = json.loads(APPLICATION_4.read_text(encoding="utf-8"))
+    aborted = json.loads(ATTEMPT_3_ABORT.read_text(encoding="utf-8"))
+    assert fourth["artifact"] == third["artifact"]
+    assert fourth["ownedSurface"]["runRoot"] != third["ownedSurface"]["runRoot"]
+    runner = ROOT / fourth["runner"]["path"]
+    assert runner.stat().st_size == fourth["runner"]["bytes"]
+    assert sha256(runner) == fourth["runner"]["sha256"]
+    assert "sim-red-final-fcabd99f-ordinal4" in runner.read_text(encoding="utf-8-sig")
+    assert aborted["execution"]["commandTransportExitCode"] == 124
+    assert aborted["execution"]["freshInstallerInvocations"] == 0
+    assert aborted["verifiedAfterAbort"]["ownedRunRootAbsent"] is True
+    assert aborted["verifiedAfterAbort"]["installRootAbsent"] is True
+    assert aborted["verifiedAfterAbort"]["uninstallKeyAbsent"] is True
+    assert fourth["priorAttempt"]["lifecycleMutationCount"] == 0
+    assert fourth["priorAttempt"]["sameRunRootReuseAllowed"] is False
