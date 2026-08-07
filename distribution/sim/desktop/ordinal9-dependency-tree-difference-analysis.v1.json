@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-ordinal9-dependency-tree-difference-analysis",
+  "editionId": "sim",
+  "state": "green-analysis-frozen",
+  "productSourceCommit": "392b6fbb5d301ebba1cea6971fa798627709bf46",
+  "ordinalNineFailureReceiptSha256": "c175ec58b94852f5db8b1dc8f797ba117dda88629477b7dee667b1df5388d772",
+  "differenceOutput": {
+    "absolutePathsIncluded": false,
+    "fieldsInOrder": ["relativePath", "category", "bytes", "sha256"],
+    "recordOrdering": "relativePath-ordinal-ascending",
+    "recordEncoding": "utf8-tsv-crlf",
+    "recordCount": 54,
+    "recordSetSha256": "4755efc9fbcdcaf3262016fb8ea5f6a83b05cd0e6daa8157693b1c957a13b91b"
+  },
+  "categories": [
+    {
+      "category": "generated-layout-evidence-cache",
+      "relativeRoot": "frontend/node_modules/.cache/software-ui-layout",
+      "fileCount": 13,
+      "bytes": 1958481
+    },
+    {
+      "category": "vite-prebundle-cache",
+      "relativeRoot": "frontend/node_modules/.vite/deps",
+      "fileCount": 40,
+      "bytes": 15961230
+    },
+    {
+      "category": "vitest-result-cache",
+      "relativeRoot": "frontend/node_modules/.vite/vitest",
+      "fileCount": 1,
+      "bytes": 6619
+    }
+  ],
+  "generatedDirectoryDifferences": [
+    "frontend/node_modules/.cache",
+    "frontend/node_modules/.cache/software-ui-layout",
+    "frontend/node_modules/.cache/software-ui-layout/ef83548-sim-theme",
+    "frontend/node_modules/.vite",
+    "frontend/node_modules/.vite/deps",
+    "frontend/node_modules/.vite/vitest",
+    "frontend/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709",
+    "frontend/node_modules/.vite-temp"
+  ],
+  "totals": {
+    "missingGeneratedFiles": 54,
+    "missingGeneratedDirectories": 8,
+    "missingGeneratedBytes": 17926330,
+    "actualOnlyFiles": 0,
+    "intersectionFiles": 17285,
+    "intersectionByteOrShaMismatches": 0
+  },
+  "classification": {
+    "npmVersionDifference": false,
+    "platformDifference": false,
+    "optionalDependencyDifference": false,
+    "binLinkDifference": false,
+    "npmInstallMetadataDifference": false,
+    "lockInstalledPackageDifference": false,
+    "oldInventoryContainedGeneratedCaches": true,
+    "authoritativeTreeMustBeCleanOfflineNpmCiOutput": true,
+    "actualFingerprintCopiedWithoutDiagnosis": false
+  },
+  "requiredRuntimeBuildFiles": {
+    "allPresent": true,
+    "tauriCliVersion": "2.11.4",
+    "viteVersion": "7.3.6",
+    "tauriPlatformBinarySha256": "37c4d79256120893f2c12c1385bce5f7510b5063afdeb09b40a9effec28d0208",
+    "esbuildWindowsBinarySha256": "ec02ee9b14ab332416fedd10614dfb80eed5304d94f67745067c011934a8c3c3"
+  },
+  "greenExecution": {
+    "ordinalNineRootsMutated": false,
+    "realDependencyNpmCiInvocations": 0,
+    "networkInvocations": 0,
+    "providerInvocations": 0,
+    "buildInvocations": 0,
+    "independentMicroFixtureRoots": 2,
+    "transientPathNegativeTests": 1
+  },
+  "nonClaims": {
+    "ordinalTenAuthorized": false,
+    "dependencyBundleCreated": false,
+    "artifactCreated": false,
+    "releaseReady": false
+  }
+}

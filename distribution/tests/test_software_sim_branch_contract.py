@@ -165,6 +165,18 @@ YELLOW_ATTEMPT_10_APPLICATION_PATH = (
     / "desktop"
     / "yellow-build-attempt-10-392b6fb-application.v1.json"
 )
+YELLOW_ATTEMPT_10_PLAN_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-10-392b6fb-plan-ready.v1.json"
+)
+ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "ordinal9-dependency-tree-difference-analysis.v1.json"
+)
 DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     DISTRIBUTION
     / "sim"
@@ -180,7 +192,7 @@ DETACHED_NODE_DEPENDENCY_SYNC_PATH = (
 STABLE_OFFLINE_CACHE_CONTRACT_PATH = (
     DISTRIBUTION / "sim" / "readiness" / "stable-offline-cache-contract.v1.json"
 )
-YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_9_APPLICATION_PATH
+YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_10_APPLICATION_PATH
 LOCKFILE_OFFLINE_CACHE_TOOL = (
     DISTRIBUTION / "sim" / "desktop" / "lockfile-offline-cache.mjs"
 )
@@ -2082,6 +2094,91 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(authorization["preflightAuthorizedByThisApplication"])
         self.assertFalse(authorization["prepareAuthorizedByThisApplication"])
         self.assertFalse(authorization["executeAuthorizedByThisApplication"])
+
+    def test_yellow_attempt_10_plan_binds_exact_commands_without_execution(self) -> None:
+        plan = load_json(YELLOW_ATTEMPT_10_PLAN_PATH)
+        self.assertEqual(
+            plan["sourceSeparation"]["productSourceCommit"],
+            "392b6fbb5d301ebba1cea6971fa798627709bf46",
+        )
+        self.assertEqual(
+            plan["sourceSeparation"]["planEvidenceBaseHead"],
+            "b59491f6e96da3334aa41d0ccc588ba798ebf255",
+        )
+        application_binding = plan["application"]
+        self.assertEqual(
+            application_binding["path"],
+            YELLOW_ATTEMPT_10_APPLICATION_PATH.relative_to(ROOT).as_posix(),
+        )
+        self.assertEqual(
+            YELLOW_ATTEMPT_10_APPLICATION_PATH.stat().st_size,
+            application_binding["bytes"],
+        )
+        self.assertEqual(
+            hashlib.sha256(YELLOW_ATTEMPT_10_APPLICATION_PATH.read_bytes()).hexdigest(),
+            application_binding["sha256"],
+        )
+        exact = plan["exactFutureCommand"]["executeAuthorizedSequence"]
+        self.assertIn("-Mode ExecuteSequence", exact)
+        self.assertIn("invoke-yellow-build-attempt-10-392b6fb.ps1", exact)
+        self.assertIn(plan["entryScript"]["sha256"], exact)
+        self.assertFalse(plan["exactFutureCommand"]["executionAuthorizedByThisReceipt"])
+        verification = plan["planVerification"]
+        self.assertTrue(verification["entryPlanCommandExecuted"])
+        self.assertTrue(verification["launcherPlanCommandExecuted"])
+        self.assertEqual(verification["entryPlanCommandExitCode"], 0)
+        self.assertEqual(verification["launcherPlanCommandExitCode"], 0)
+        self.assertEqual(verification["newRootCount"], 0)
+        self.assertEqual(verification["providerInvocations"], 0)
+        self.assertFalse(verification["valuesRead"])
+        for key, value in plan["ownedRoots"].items():
+            if key.endswith("AbsentAfterPlan"):
+                self.assertTrue(value, key)
+        self.assertTrue(all(value == 0 for value in plan["executedCounts"].values()))
+        self.assertTrue(plan["protectedHistory"]["ordinalNinePermanentlyConsumed"])
+        self.assertFalse(plan["authorization"]["futureSequenceAuthorizedByThisReceipt"])
+
+    def test_ordinal_9_dependency_difference_evidence_is_relative_and_complete(
+        self,
+    ) -> None:
+        evidence = load_json(ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH)
+        output = evidence["differenceOutput"]
+        self.assertFalse(output["absolutePathsIncluded"])
+        self.assertEqual(
+            output["fieldsInOrder"],
+            ["relativePath", "category", "bytes", "sha256"],
+        )
+        self.assertEqual(output["recordCount"], 54)
+        self.assertEqual(
+            output["recordSetSha256"],
+            "4755efc9fbcdcaf3262016fb8ea5f6a83b05cd0e6daa8157693b1c957a13b91b",
+        )
+        self.assertEqual(sum(item["fileCount"] for item in evidence["categories"]), 54)
+        self.assertEqual(sum(item["bytes"] for item in evidence["categories"]), 17926330)
+        self.assertEqual(len(evidence["generatedDirectoryDifferences"]), 8)
+        self.assertTrue(
+            all(
+                path.startswith("frontend/node_modules/")
+                for path in evidence["generatedDirectoryDifferences"]
+            )
+        )
+        self.assertEqual(evidence["totals"]["intersectionByteOrShaMismatches"], 0)
+        self.assertTrue(evidence["classification"]["oldInventoryContainedGeneratedCaches"])
+        self.assertFalse(evidence["classification"]["actualFingerprintCopiedWithoutDiagnosis"])
+        self.assertTrue(evidence["requiredRuntimeBuildFiles"]["allPresent"])
+        self.assertEqual(evidence["greenExecution"]["realDependencyNpmCiInvocations"], 0)
+        self.assertFalse(evidence["nonClaims"]["ordinalTenAuthorized"])
+
+        plan = load_json(YELLOW_ATTEMPT_10_PLAN_PATH)
+        binding = plan["ordinalNineDifferenceAnalysis"]
+        self.assertEqual(
+            binding["path"], ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH.relative_to(ROOT).as_posix()
+        )
+        self.assertEqual(ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH.stat().st_size, binding["bytes"])
+        self.assertEqual(
+            hashlib.sha256(ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH.read_bytes()).hexdigest(),
+            binding["sha256"],
+        )
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
