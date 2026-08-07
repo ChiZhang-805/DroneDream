@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 
+import { VehicleModelPreview3D } from "../components/VehicleModelPreview3D";
 import { useAuth } from "../features/auth/AuthContext";
 import {
   buildVehiclePackDraft,
@@ -170,42 +171,6 @@ function downloadEnvelope(envelope: VehiclePackDraftEnvelope) {
   anchor.download = `${envelope.payload.packId}-${envelope.payload.packVersion}.ddvp.json`;
   anchor.click();
   URL.revokeObjectURL(url);
-}
-
-function ModelPreview({ draft }: { draft: VehicleModelDraft }) {
-  const rotorAngles = Array.from(
-    { length: draft.propulsion.motorCount },
-    (_, index) => (Math.PI * 2 * index) / draft.propulsion.motorCount,
-  );
-  const ratio = draft.propulsion.motorCount * draft.propulsion.maximumThrustPerMotorN
-    / Math.max(0.001, draft.body.massKg * 9.80665);
-  return (
-    <div className="vehicle-model-preview" data-testid="vehicle-model-preview">
-      <svg viewBox="0 0 320 240" role="img" aria-label={draft.name}>
-        <defs>
-          <linearGradient id="vehicleStudioGradient" x1="0" x2="1">
-            <stop offset="0" stopColor="var(--dd-brand-start)" />
-            <stop offset="0.52" stopColor="var(--dd-brand-middle)" />
-            <stop offset="1" stopColor="var(--dd-brand-end)" />
-          </linearGradient>
-        </defs>
-        {rotorAngles.map((angle, index) => {
-          const x = 160 + Math.cos(angle) * 82;
-          const y = 112 + Math.sin(angle) * 72;
-          return (
-            <g key={index}>
-              <line x1="160" y1="112" x2={x} y2={y} className="vehicle-preview-arm" />
-              <ellipse cx={x} cy={y} rx="27" ry="8" className="vehicle-preview-rotor" />
-              <circle cx={x} cy={y} r="7" className="vehicle-preview-motor" />
-            </g>
-          );
-        })}
-        <rect x="122" y="84" width="76" height="56" rx="18" fill="url(#vehicleStudioGradient)" />
-        <path d="M137 111h46M160 92v39" className="vehicle-preview-path" />
-      </svg>
-      <div><span>{draft.propulsion.motorCount} motors</span><strong>{ratio.toFixed(2)}×</strong></div>
-    </div>
-  );
 }
 
 export function VehicleStudio() {
@@ -392,7 +357,19 @@ export function VehicleStudio() {
               </> : null}
             </section>
             <aside className="vehicle-studio-inspector">
-              <h2>{copy.preview}</h2><ModelPreview draft={draft} />
+              <h2>{copy.preview}</h2><VehicleModelPreview3D draft={draft} copy={locale === "en" ? {
+                ariaLabel: "Interactive three-dimensional vehicle geometry preview",
+                unavailable: "3D unavailable · showing plan view",
+                interaction: "Drag to orbit · Scroll or +/- to zoom",
+                motors: "motors",
+                ratio: copy.ratio,
+              } : {
+                ariaLabel: "可交互的三维无人机几何预览",
+                unavailable: "无法加载三维视图 · 已显示平面视图",
+                interaction: "拖拽旋转 · 滚轮或 +/- 缩放",
+                motors: "电机",
+                ratio: copy.ratio,
+              }} />
               {issues.length > 0 ? <div className="vehicle-studio-issues" role="alert"><strong>{copy.issues}</strong><ul>{issues.map((issue) => <li key={`${issue.field}:${issue.code}`}><code>{issue.field}</code> {issue.message}</li>)}</ul></div> : <p className="vehicle-studio-ready"><ShieldCheck />{copy.ready}</p>}
               {message ? <p className="vehicle-studio-message" role="status">{message}</p> : null}
               {currentRecord && currentRecord.revisions.length > 1 ? <div className="vehicle-studio-history"><h3><History />{copy.history}</h3>{currentRecord.revisions.map((revision) => <button type="button" key={revision.revision} onClick={() => {

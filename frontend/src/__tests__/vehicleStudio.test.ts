@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { buildVehiclePreviewGeometry } from "../features/vehicleStudio/preview";
 import {
   buildVehiclePackDraft,
   canonicalJson,
@@ -29,6 +30,20 @@ function memoryStorage() {
 }
 
 describe("Universal Vehicle Studio contract", () => {
+  it("builds normalized three-dimensional geometry for every supported rotor layout", () => {
+    for (const motorCount of [4, 6, 8] as const) {
+      const draft = createVehicleModelDraft();
+      draft.propulsion.motorCount = motorCount;
+      const geometry = buildVehiclePreviewGeometry(draft);
+      expect(geometry.rotors).toHaveLength(motorCount);
+      expect(Math.max(...geometry.rotors.map((rotor) => Math.hypot(rotor.x, rotor.z))))
+        .toBeLessThan(2.35);
+      expect(geometry.body.x).toBeGreaterThan(0);
+      expect(geometry.body.y).toBeGreaterThan(0);
+      expect(geometry.body.z).toBeGreaterThan(0);
+    }
+  });
+
   it("creates a valid custom vehicle and deterministic generated simulation geometry", () => {
     vi.spyOn(crypto, "randomUUID")
       .mockReturnValueOnce("00000000-0000-4000-8000-000000000001")

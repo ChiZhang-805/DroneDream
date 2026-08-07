@@ -1310,10 +1310,35 @@ code {
   background-size: 24px 24px;
 }
 
-.vehicle-model-preview svg {
+.vehicle-model-preview-canvas {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  background: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in srgb, var(--dd-brand-middle) 13%, transparent),
+    transparent 58%
+  );
+}
+
+.vehicle-model-preview-canvas:active {
+  cursor: grabbing;
+}
+
+.vehicle-model-preview-canvas:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--dd-brand-start) 58%, white);
+  outline-offset: -4px;
+}
+
+.vehicle-model-preview-canvas canvas,
+.vehicle-model-preview-canvas svg {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  height: 100%;
+  min-height: 280px;
 }
 
 .vehicle-preview-arm,
@@ -1336,13 +1361,23 @@ code {
   fill: var(--dd-brand-start);
 }
 
-.vehicle-model-preview > div {
-  display: flex;
-  justify-content: space-between;
+.vehicle-model-preview-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
   padding: 0.6rem 0.7rem;
   border-top: 1px solid var(--border);
   color: var(--text-muted);
   font-size: 0.78rem;
+}
+
+.vehicle-model-preview-hint {
+  overflow: hidden;
+  font-size: 0.7rem;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vehicle-model-preview strong {
