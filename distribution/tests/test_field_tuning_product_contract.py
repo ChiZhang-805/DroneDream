@@ -109,6 +109,19 @@ def test_tuning_commands_are_fixture_or_plan_only_and_config_has_no_sim_payload(
     assert "hardware_actions_performed: Vec::new()" in tuning
     assert "can_execute: false" in tuning
     assert "hardware_authority: false" in tuning
+    assert "native_hardware_validated_pack_count" in tuning
+    assert "native_safety_catalog_snapshot" in tuning
+    assert "validated_pack_count: 0" not in tuning
+    for blocker in (
+        "field.pack.edition-incompatible",
+        "field.pack.not-hardware-validated",
+        "field.pack.signature-unverified",
+        "field.controller.unvalidated-or-incompatible",
+        "field.firmware.drift",
+        "field.device.transport-unavailable",
+        "field.quorum.missing",
+    ):
+        assert blocker in tuning
     resources = "\n".join(config["bundle"]["resources"]).lower()
     for forbidden in ("px4", "gazebo", "sitl", "hitl", "simulator", "runtime/"):
         assert forbidden not in resources

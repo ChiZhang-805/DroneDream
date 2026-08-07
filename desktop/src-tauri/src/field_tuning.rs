@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
+use crate::distribution_plan::{
+    native_hardware_validated_pack_count, native_safety_catalog_snapshot,
+};
+
 const CONTRACT_RAW: &str =
     include_str!("../../../distribution/editions/field/field-tuning-contract.v1.json");
 const SOURCE_COMMIT: &str = env!("DRONEDREAM_SOURCE_COMMIT");
@@ -29,8 +33,8 @@ pub(crate) struct FieldTuningStatus {
     harness_role: &'static str,
     demo_available: bool,
     hardware_authority: bool,
-    validated_pack_count: u8,
-    blockers: Vec<&'static str>,
+    validated_pack_count: usize,
+    blockers: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -99,7 +103,7 @@ pub(crate) struct FieldHardwareTuningPlan {
     can_execute: bool,
     hardware_authority: bool,
     required_evidence: Vec<&'static str>,
-    blockers: Vec<&'static str>,
+    blockers: Vec<String>,
 }
 
 fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
@@ -139,6 +143,15 @@ fn require_field_contract() -> Result<Value, String> {
 #[tauri::command]
 pub(crate) fn get_field_tuning_status() -> Result<FieldTuningStatus, String> {
     let contract = require_field_contract()?;
+    let validated_pack_count = native_hardware_validated_pack_count()?;
+    let mut blockers = vec![
+        "field.device.not-bound".to_string(),
+        "field.device.transport-unavailable".to_string(),
+        "field.quorum.missing".to_string(),
+    ];
+    if validated_pack_count == 0 {
+        blockers.insert(0, "field.registry.zero-validated-packs".to_string());
+    }
     Ok(FieldTuningStatus {
         schema_version: 1,
         kind: "dronedream-field-tuning-status",
@@ -153,12 +166,8 @@ pub(crate) fn get_field_tuning_status() -> Result<FieldTuningStatus, String> {
         harness_role: "bounded-execution-evidence-and-rollback",
         demo_available: true,
         hardware_authority: false,
-        validated_pack_count: 0,
-        blockers: vec![
-            "field.registry.zero-validated-packs",
-            "field.device.not-bound",
-            "field.quorum.missing",
-        ],
+        validated_pack_count,
+        blockers,
     })
 }
 
@@ -284,6 +293,86 @@ pub(crate) fn prepare_field_hardware_tuning(
             return Err(format!("Field hardware tuning {label} is invalid"));
         }
     }
+    let snapshot = native_safety_catalog_snapshot("field", &request.vehicle_pack_id)?;
+    let validated_pack_count = native_hardware_validated_pack_count()?;
+    let mut blockers = Vec::new();
+    if validated_pack_count == 0 {
+        blockers.push("field.registry.zero-validated-packs".to_string());
+    }
+    let field_supported = snapshot
+        .vehicle_pack
+        .pointer("/supportedEditions")
+        .and_then(Value::as_array)
+        .is_some_and(|editions| {
+            editions
+                .iter()
+                .any(|edition| edition.as_str() == Some("field"))
+        });
+    if !field_supported {
+        blockers.push("field.pack.edition-incompatible".to_string());
+    }
+    if snapshot
+        .vehicle_pack
+        .pointer("/validationStatus")
+        .and_then(Value::as_str)
+        != Some("validated")
+        || snapshot
+            .vehicle_pack
+            .pointer("/validationTier")
+            .and_then(Value::as_str)
+            != Some("hardware-validated")
+    {
+        blockers.push("field.pack.not-hardware-validated".to_string());
+    }
+    if snapshot
+        .vehicle_pack
+        .pointer("/integrity/signature/state")
+        .and_then(Value::as_str)
+        != Some("verified")
+    {
+        blockers.push("field.pack.signature-unverified".to_string());
+    }
+    let normalize = |value: &str| {
+        value
+            .chars()
+            .filter(|character| character.is_ascii_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect::<String>()
+    };
+    let requested_controller = normalize(&request.controller_id);
+    let controller_validated = snapshot
+        .vehicle_pack
+        .pointer("/controllers")
+        .and_then(Value::as_array)
+        .is_some_and(|controllers| {
+            controllers.iter().any(|controller| {
+                let vendor = controller.pointer("/vendor").and_then(Value::as_str);
+                let model = controller.pointer("/model").and_then(Value::as_str);
+                let status = controller.pointer("/status").and_then(Value::as_str);
+                vendor.zip(model).is_some_and(|(vendor, model)| {
+                    normalize(&format!("{vendor}:{model}")) == requested_controller
+                        && status == Some("validated")
+                })
+            })
+        });
+    if !controller_validated {
+        blockers.push("field.controller.unvalidated-or-incompatible".to_string());
+    }
+    let firmware_matches = snapshot
+        .vehicle_pack
+        .pointer("/autopilot/supportedFirmwareVersions")
+        .and_then(Value::as_array)
+        .is_some_and(|versions| {
+            versions
+                .iter()
+                .any(|version| version.as_str() == Some(request.firmware_version.as_str()))
+        });
+    if !firmware_matches {
+        blockers.push("field.firmware.drift".to_string());
+    }
+    blockers.push("field.device.transport-unavailable".to_string());
+    blockers.push("field.quorum.missing".to_string());
+
     let request_value = serde_json::to_value(&request)
         .map_err(|error| format!("Field hardware request cannot be serialized: {error}"))?;
     Ok(FieldHardwareTuningPlan {
@@ -306,11 +395,7 @@ pub(crate) fn prepare_field_hardware_tuning(
             "emergency-stop",
             "native-backend-runtime-quorum",
         ],
-        blockers: vec![
-            "field.registry.zero-validated-packs",
-            "field.device.transport-unavailable",
-            "field.quorum.missing",
-        ],
+        blockers,
     })
 }
 
@@ -357,7 +442,30 @@ mod tests {
         assert!(!plan.hardware_authority);
         assert!(plan
             .blockers
-            .contains(&"field.registry.zero-validated-packs"));
+            .contains(&"field.registry.zero-validated-packs".to_string()));
+        assert!(plan
+            .blockers
+            .contains(&"field.pack.not-hardware-validated".to_string()));
+        assert!(plan
+            .blockers
+            .contains(&"field.pack.signature-unverified".to_string()));
+        assert!(plan
+            .blockers
+            .contains(&"field.controller.unvalidated-or-incompatible".to_string()));
+        assert!(plan.blockers.contains(&"field.firmware.drift".to_string()));
+    }
+
+    #[test]
+    fn hardware_plan_rejects_unknown_vehicle_pack() {
+        let error = prepare_field_hardware_tuning(FieldHardwareTuningRequest {
+            device_id: "device-fixture".to_string(),
+            vehicle_pack_id: "unknown-pack".to_string(),
+            controller_id: "Unknown".to_string(),
+            firmware_version: "unknown".to_string(),
+            objective: "Bench tuning".to_string(),
+        })
+        .expect_err("unknown packs must fail closed");
+        assert!(error.contains("unknown Vehicle Pack"));
     }
 
     #[test]

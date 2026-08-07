@@ -1318,8 +1318,14 @@ function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
     ),
     blockers: parseSafeNonEmptyStringArray(record.blockers, "fieldTuningStatus.blockers"),
   };
-  if (status.validatedPackCount !== 0 || status.blockers.length === 0) {
-    throw new Error("Field tuning status must preserve the zero-pack denial");
+  const zeroPackBlocked = status.blockers.includes("field.registry.zero-validated-packs");
+  if (
+    status.blockers.length === 0
+    || status.blockers.includes("field.device.transport-unavailable") === false
+    || status.blockers.includes("field.quorum.missing") === false
+    || zeroPackBlocked !== (status.validatedPackCount === 0)
+  ) {
+    throw new Error("Field tuning status weakened its source-bound safety denial");
   }
   return status;
 }

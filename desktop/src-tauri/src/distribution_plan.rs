@@ -758,6 +758,39 @@ pub(crate) fn native_safety_catalog_snapshot(
     })
 }
 
+pub(crate) fn native_hardware_validated_pack_count() -> Result<usize, String> {
+    let catalog = verify_embedded_catalog()?;
+    Ok(catalog
+        .vehicle_packs
+        .values()
+        .filter(|pack| {
+            pack.value
+                .pointer("/supportedEditions")
+                .and_then(Value::as_array)
+                .is_some_and(|editions| {
+                    editions
+                        .iter()
+                        .any(|edition| edition.as_str() == Some("field"))
+                })
+                && pack
+                    .value
+                    .pointer("/validationStatus")
+                    .and_then(Value::as_str)
+                    == Some("validated")
+                && pack
+                    .value
+                    .pointer("/validationTier")
+                    .and_then(Value::as_str)
+                    == Some("hardware-validated")
+                && pack
+                    .value
+                    .pointer("/integrity/signature/state")
+                    .and_then(Value::as_str)
+                    == Some("verified")
+        })
+        .count())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -782,6 +815,10 @@ mod tests {
         assert_eq!(catalog.editions.len(), 3);
         assert_eq!(catalog.vehicle_packs.len(), 8);
         assert_eq!(catalog.policy.raw_sha256.len(), 64);
+        assert_eq!(
+            native_hardware_validated_pack_count().expect("validated count"),
+            0
+        );
     }
 
     #[test]
