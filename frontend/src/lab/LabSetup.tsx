@@ -9,6 +9,7 @@ import {
   MonitorUp,
   Play,
   RadioTower,
+  RefreshCw,
   RotateCcw,
   ShieldAlert,
   Upload,
@@ -21,11 +22,12 @@ import {
   parseLabEvidencePreview,
   type LabEvidencePreview,
 } from "./evidencePreview";
+import { LabCalibrationWorkspace } from "./LabCalibrationWorkspace";
 import vehiclePackAdapterJson from "./vehicle-pack-adapter.v1.json";
 import "./lab.css";
 
 type Workspace = "simulation" | "hardware";
-type View = "setup" | "evidence" | "safety";
+type View = "calibration" | "setup" | "evidence" | "safety";
 
 interface VehicleController {
   vendor: string;
@@ -53,7 +55,7 @@ const vehiclePackAdapter = vehiclePackAdapterJson as {
   packs: VehiclePackOption[];
 };
 
-const VIEWS: View[] = ["setup", "evidence", "safety"];
+const VIEWS: View[] = ["calibration", "setup", "evidence", "safety"];
 const HARDWARE_ACTIONS = [
   "hardware.parameter.write",
   "hardware.arm",
@@ -64,9 +66,9 @@ const HARDWARE_ACTIONS = [
 const COPY = {
   en: {
     eyebrow: "LAB 1.0.0 PREVIEW",
-    title: "Simulation and hardware laboratory",
+    title: "Sim-to-Real calibration laboratory",
     subtitle:
-      "One shared core, two distinct workflows. Hardware execution remains unavailable until a validated Vehicle Pack and native, backend, and runtime quorum exist.",
+      "Model + Harness connects simulation search, controlled real observations, model calibration, independent holdout, and evidence issuance in one bounded job.",
     edition: "Edition",
     editionValue: "Lab preview",
     packs: "Validated packs",
@@ -81,6 +83,7 @@ const COPY = {
     hardwareDetail: "Configuration preview only",
     switchNotice:
       "Workspace selection changes the interface and workflow only. It is never counted as native, backend, runtime, or operator authority.",
+    calibration: "Calibration loop",
     setup: "Setup",
     evidence: "Qualification evidence",
     safety: "Safety review",
@@ -141,9 +144,9 @@ const COPY = {
   },
   "zh-CN": {
     eyebrow: "LAB 1.0.0 内测预览",
-    title: "仿真与真机实验室",
+    title: "Sim-to-Real 校准实验室",
     subtitle:
-      "同一公共核心承载两套清晰分离的工作流。在具备已验证 Vehicle Pack 以及 native、后端与 Runtime 三层一致授权前，真机执行始终不可用。",
+      "Model + Harness 在同一份受预算约束的作业中贯通仿真搜索、受控真实观测、模型校准、独立 holdout 与证据签发。",
     edition: "版本",
     editionValue: "Lab 内测预览",
     packs: "已验证机型包",
@@ -158,6 +161,7 @@ const COPY = {
     hardwareDetail: "仅提供配置预览",
     switchNotice:
       "切换工作区只改变界面与流程，不会被计入 native、后端、Runtime 或操作员授权。",
+    calibration: "校准闭环",
     setup: "配置",
     evidence: "资格证据",
     safety: "安全复核",
@@ -226,7 +230,7 @@ export function LabSetup() {
   const { locale } = useI18n();
   const copy = COPY[locale];
   const [workspace, setWorkspace] = useState<Workspace>("simulation");
-  const [view, setView] = useState<View>("setup");
+  const [view, setView] = useState<View>("calibration");
   const [packId, setPackId] = useState(vehiclePackAdapter.packs[0]?.packId ?? "");
   const [controllerIndex, setControllerIndex] = useState(0);
   const [firmwareIndex, setFirmwareIndex] = useState(0);
@@ -256,6 +260,7 @@ export function LabSetup() {
         : pack.supportedEditions.includes("lab") && pack.controllers.length > 0
     ));
     setWorkspace(next);
+    setView("setup");
     setPackId(nextPacks[0]?.packId ?? "");
     setControllerIndex(0);
     setFirmwareIndex(0);
@@ -336,7 +341,13 @@ export function LabSetup() {
       <div className="lab-view-tabs" role="tablist" aria-label={copy.title}>
         {VIEWS.map((item) => {
           const label = copy[item];
-          const Icon = item === "setup" ? FlaskConical : item === "evidence" ? FileCheck2 : ShieldAlert;
+          const Icon = item === "calibration"
+            ? RefreshCw
+            : item === "setup"
+              ? FlaskConical
+              : item === "evidence"
+                ? FileCheck2
+                : ShieldAlert;
           return (
             <button
               key={item}
@@ -354,6 +365,17 @@ export function LabSetup() {
           );
         })}
       </div>
+
+      {view === "calibration" ? (
+        <section
+          id="lab-panel-calibration"
+          className="lab-tool"
+          role="tabpanel"
+          aria-labelledby="lab-view-calibration"
+        >
+          <LabCalibrationWorkspace />
+        </section>
+      ) : null}
 
       {view === "setup" ? (
         <section id="lab-panel-setup" className="lab-tool" role="tabpanel" aria-labelledby="lab-view-setup">
