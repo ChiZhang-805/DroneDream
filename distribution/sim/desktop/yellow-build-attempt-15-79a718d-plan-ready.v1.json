@@ -2,7 +2,7 @@
     "schemaVersion":  1,
     "kind":  "dronedream-sim-public-config-stable-cache-yellow-plan-readiness",
     "editionId":  "sim",
-    "state":  "green-plan-frozen-user-authorized-pending-plan-verification",
+    "state":  "green-plan-passed-user-authorized-single-execution",
     "sourceSeparation":  {
                              "productSourceCommit":  "79a718dae55c274cf4803a57129e5789012dca03",
                              "productSourceTree":  "c6ac1549c352b4331d9d94e78a0b2e8662690023",
@@ -171,10 +171,10 @@
                              "dds14AndOrdinal14RootsReadOnly":  true
                          },
     "planVerification":  {
-                             "entryPlanCommandExecuted":  false,
-                             "entryPlanCommandExitCode":  null,
-                             "launcherPlanCommandExecuted":  false,
-                             "launcherPlanCommandExitCode":  null,
+                             "entryPlanCommandExecuted":  true,
+                             "entryPlanCommandExitCode":  0,
+                             "launcherPlanCommandExecuted":  true,
+                             "launcherPlanCommandExitCode":  0,
                              "newRootCount":  0,
                              "providerInvocations":  0,
                              "valuesRead":  false,
