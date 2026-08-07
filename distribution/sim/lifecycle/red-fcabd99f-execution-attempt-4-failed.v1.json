@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-final-candidate-lifecycle-failure",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "failed-runner-language-cleanup-order-after-owned-uninstall",
+  "productSourceCommit": "79a718dae55c274cf4803a57129e5789012dca03",
+  "artifact": {
+    "bytes": 11944855,
+    "sha256": "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e",
+    "rebuilt": false,
+    "relabelled": false
+  },
+  "execution": {
+    "ordinal": 4,
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 1,
+    "uninstallerInvocations": 1,
+    "pkceBoundaryChecks": 1,
+    "installerLanguagePreferenceWrites": 2,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "verifiedBeforeFailure": {
+    "freshEnglishPath": "pass",
+    "overlaySimplifiedChinesePath": "pass",
+    "uninstallRegistration": "pass",
+    "installedPayload": "pass",
+    "desktopShortcutTargetAndIcon": "pass",
+    "startMenuShortcutTargetAndIcon": "pass",
+    "liveWebView2": "pass",
+    "webViewUserDataNamespace": "io.dronedream.sim",
+    "applicationWindowTitle": "DroneDream · SIM",
+    "pkce49211NoCredentialBoundary": "pass",
+    "ownedUninstallerExitCode": 0,
+    "artifactProductDefectObserved": false
+  },
+  "failure": {
+    "stage": "post-uninstall-preference-parity",
+    "classification": "runner-owned-language-cleanup-ordered-after-full-preference-comparison",
+    "productDefectObserved": false,
+    "rootCause": "The runner compared the full preference registration before removing its own Installer Language value. The finally block then removed that exact value after verifying the protected core."
+  },
+  "postFailureState": {
+    "installRootAbsent": true,
+    "uninstallKeyAbsent": true,
+    "shortcutsAbsent": true,
+    "runnerOwnedLanguageValueRemoved": true,
+    "preExistingPreferenceCorePreserved": true,
+    "runtimeState": "Stopped"
+  },
+  "externalReceipt": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-fcabd99f-ordinal4/evidence/lifecycle-receipt.json",
+    "bytes": 47369,
+    "sha256": "16f332a1c4124304f72832f537b07b7b7454ccb86d06f26679ef7059d3938d9f"
+  },
+  "nextAttempt": {
+    "cleanupBeforeFullPreferenceParity": true,
+    "requiresNewRunnerHash": true,
+    "requiresNewApplicationHash": true,
+    "requiresNewOwnedRunRoot": true,
+    "artifactMayRemainIdentical": true,
+    "sameExecutionMayBeRetried": false
+  },
+  "nonClaims": {
+    "uninstallLifecycleValidated": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}

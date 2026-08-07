@@ -58,6 +58,20 @@ ATTEMPT_3_ABORT = (
     / "lifecycle"
     / "red-fcabd99f-execution-attempt-3-aborted.v1.json"
 )
+APPLICATION_5 = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-final-application-5.v1.json"
+)
+ATTEMPT_4_FAILURE = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-execution-attempt-4-failed.v1.json"
+)
 
 
 def sha256(path: Path) -> str:
@@ -240,3 +254,29 @@ def test_fourth_lifecycle_application_replaces_zero_mutation_transport_abort() -
     assert aborted["verifiedAfterAbort"]["uninstallKeyAbsent"] is True
     assert fourth["priorAttempt"]["lifecycleMutationCount"] == 0
     assert fourth["priorAttempt"]["sameRunRootReuseAllowed"] is False
+
+
+def test_fifth_lifecycle_application_restores_runner_owned_locale_before_parity() -> None:
+    fourth = json.loads(APPLICATION_4.read_text(encoding="utf-8"))
+    fifth = json.loads(APPLICATION_5.read_text(encoding="utf-8"))
+    failure = json.loads(ATTEMPT_4_FAILURE.read_text(encoding="utf-8"))
+    assert fifth["artifact"] == fourth["artifact"]
+    assert fifth["ownedSurface"]["runRoot"] != fourth["ownedSurface"]["runRoot"]
+    runner = ROOT / fifth["runner"]["path"]
+    assert runner.stat().st_size == fifth["runner"]["bytes"]
+    assert sha256(runner) == fifth["runner"]["sha256"]
+    runner_text = runner.read_text(encoding="utf-8-sig")
+    cleanup = runner_text.index(
+        'Remove-OwnedInstallerLanguage -Stage "final-zh-language-preference-cleanup"'
+    )
+    parity = runner_text.index('Assert-SimRemoved -Stage "final-zh-uninstall"')
+    assert cleanup < parity
+    assert "executionOrdinal = 5" in runner_text
+    assert fifth["acceptanceMatrix"]["exactMaximumCounts"][
+        "installerLanguagePreferenceCleanupWrites"
+    ] == 1
+    assert failure["verifiedBeforeFailure"]["liveWebView2"] == "pass"
+    assert failure["postFailureState"]["preExistingPreferenceCorePreserved"] is True
+    assert fifth["priorAttempt"]["externalReceiptSha256"] == failure["externalReceipt"][
+        "sha256"
+    ]
