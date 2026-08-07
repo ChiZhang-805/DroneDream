@@ -144,6 +144,21 @@ afterEach(() => {
 });
 
 describe("desktop launcher chrome", () => {
+  it("always presents the Universal mother-brand theme before workspace entry", () => {
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "field");
+    installDesktopBridge();
+    const { router } = renderLauncher();
+
+    expect(document.documentElement).toHaveAttribute("data-brand-edition", "universal");
+    expect(document.documentElement).toHaveAttribute("data-product-mode", "universal");
+    expect(document.documentElement).toHaveAttribute(
+      "data-theme-grants-hardware-authority",
+      "false",
+    );
+
+    router.dispose();
+  });
+
   it("does not expose a header sign-in control on the startup launcher", () => {
     launcherAuthState.current = {
       configured: true,

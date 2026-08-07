@@ -2073,7 +2073,7 @@ function AppShellContent() {
   const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
-  const activeThemeEdition: BrandEditionId = location.pathname === "/vehicle-studio"
+  const activeThemeEdition: BrandEditionId = launcherMode || location.pathname === "/vehicle-studio"
     ? "universal"
     : universalMode;
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
