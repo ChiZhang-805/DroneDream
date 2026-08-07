@@ -141,7 +141,7 @@ const profiles = {
 const copy = (locale) => ({
   title: locale === "zh-CN" ? "选择你的 DroneDream 版本" : "Choose Your DroneDream Edition",
   productNav: locale === "zh-CN" ? "产品" : "Product",
-  priceNav: locale === "zh-CN" ? "价格" : "Price",
+  priceNav: locale === "zh-CN" ? "价格" : "Pricing",
   universalDisabled: locale === "zh-CN"
     ? "DroneDream Universal 下载"
     : "DroneDream Universal Download",
@@ -217,7 +217,7 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
     const productNav = nav.find((item) => item.text === expected.productNav);
     const priceNav = nav.find((item) => item.text === expected.priceNav);
     if (productNav?.href !== "/product/") violations.push("Product nav does not target /product/");
-    if (priceNav?.href !== "/pricing/") violations.push("Price nav does not target /pricing/");
+    if (priceNav?.href !== "/pricing/") violations.push("Pricing nav does not target /pricing/");
     if (!productNav?.active) violations.push("Product nav is not active on /product/");
   }
 
@@ -403,7 +403,7 @@ const checkNavigation = async (page, viewportWidth) => {
   }
   for (const [selector, label] of [
     ['.site-nav a[href="/product/"]', "Product nav link"],
-    ['.site-nav a[href="/pricing/"]', "Price nav link"],
+    ['.site-nav a[href="/pricing/"]', "Pricing nav link"],
   ]) {
     const target = page.locator(selector).first();
     if (await target.count() === 0) {
@@ -430,7 +430,18 @@ const checkNavigation = async (page, viewportWidth) => {
   }
   const universal = page.locator("button.site-header-download").first();
   if (await universal.count() === 0) issues.push("disabled Universal button is missing");
-  else if (await universal.isEnabled()) issues.push("Universal button is keyboard-enabled while planned");
+  else {
+    if (await universal.isEnabled()) issues.push("Universal button is keyboard-enabled while planned");
+    const iconKind = await universal.evaluate((node) => ({
+      hasDownloadIcon: Boolean(node.querySelector("svg")),
+      hasBrandImage: Boolean(node.querySelector("img")),
+    }));
+    if (!iconKind.hasDownloadIcon) issues.push("Universal button is missing the download icon");
+    if (iconKind.hasBrandImage) issues.push("Universal button uses a brand mark instead of the download icon");
+  }
+  const disabledConsole = page.locator(".site-nav button", { hasText: /^(Console|控制台)$/u }).first();
+  if (await disabledConsole.count() === 0) issues.push("disabled Console nav item is missing");
+  else if (await disabledConsole.isEnabled()) issues.push("Console nav item is enabled");
   return issues;
 };
 

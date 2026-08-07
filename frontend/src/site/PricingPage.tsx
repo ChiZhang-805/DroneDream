@@ -26,7 +26,9 @@ import {
   CloudModelAccessError,
   createBillingCheckout,
   getBillingAvailability,
+  getManagedModelUsage,
   type BillingAvailability,
+  type ManagedModelPlanId,
   type PaymentMethod,
 } from "../features/settings/cloudModelAccess";
 import { useModalFocus } from "./useModalFocus";
@@ -65,6 +67,10 @@ const PLANS: readonly Plan[] = [
   { id: "plus", name: "Plus", price: 39, includedCredits: 3_000_000, featured: true },
   { id: "pro", name: "Pro", price: 129, includedCredits: 15_000_000 },
 ];
+const BUSINESS_SEAT_PRICES: Record<PaidPlanId, number> = {
+  plus: 19,
+  pro: 69,
+};
 
 const FEATURE_KEYS: readonly FeatureKey[] = [
   "workflow",
@@ -98,7 +104,9 @@ const pricingContent = {
     individual: "Individual",
     business: "Business",
     month: "/ month",
+    perUserMonth: "/ user / month",
     current: "Free plan",
+    currentPlan: "Current plan",
     start: "Start free",
     upgrade: "Choose",
     recommended: "Recommended",
@@ -114,7 +122,18 @@ const pricingContent = {
       premiumRouting: "Premium managed-model routing",
       advancedHarness: "Advanced AURORA strategy previews",
     },
+    businessFeatures: {
+      workflow: "Shared DroneDream tuning workspace",
+      harness: "Team AURORA optimization Harness",
+      byok: "Team BYOK fallback after the included allowance",
+      reports: "Shared experiment and comparison report export",
+      comparisonWorkspace: "Team multi-experiment comparison workspace",
+      watermarkFree: "Team watermark-free PDF report export",
+      premiumRouting: "Business managed-model routing",
+      advancedHarness: "Shared AURORA strategy previews",
+    },
     allowanceFeature: (credits: string) => `${credits} managed AI credits each month`,
+    businessAllowanceFeature: (credits: string) => `${credits} managed AI credits per user each month`,
     close: "Close payment dialog",
     paymentTitle: "Payment",
     wechat: "WeChat Pay",
@@ -135,7 +154,9 @@ const pricingContent = {
     individual: "个人",
     business: "商业",
     month: "/ 月",
+    perUserMonth: "/ 人 / 月",
     current: "免费套餐",
+    currentPlan: "当前套餐",
     start: "免费开始",
     upgrade: "选择",
     recommended: "推荐",
@@ -151,7 +172,18 @@ const pricingContent = {
       premiumRouting: "高性能托管模型智能路由",
       advancedHarness: "优先体验 AURORA 高级策略",
     },
+    businessFeatures: {
+      workflow: "共享 DroneDream 调优工作区",
+      harness: "团队 AURORA 优化 Harness",
+      byok: "团队额度用尽后切换到自有 API Key",
+      reports: "共享实验与对比报告导出",
+      comparisonWorkspace: "团队多实验对比工作区",
+      watermarkFree: "团队无水印 PDF 报告导出",
+      premiumRouting: "商业托管模型路由",
+      advancedHarness: "共享 AURORA 高级策略预览",
+    },
     allowanceFeature: (credits: string) => `每月 ${credits} 托管模型 AI 额度`,
+    businessAllowanceFeature: (credits: string) => `每人每月 ${credits} 托管模型 AI 额度`,
     close: "关闭支付弹窗",
     paymentTitle: "支付",
     wechat: "微信支付",
@@ -182,6 +214,7 @@ export function PricingPage({
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("wechat");
   const [availability, setAvailability] = useState<BillingAvailability | null>(null);
+  const [currentPlanId, setCurrentPlanId] = useState<ManagedModelPlanId>("free");
   const [paymentState, setPaymentState] =
     useState<"idle" | "checking" | "creating" | "qr" | "error">("idle");
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
@@ -250,6 +283,25 @@ export function PricingPage({
     sensitiveCloudActionsEnabled,
   ]);
 
+  useEffect(() => {
+    if (!authenticated || !sensitiveCloudActionsEnabled) {
+      setCurrentPlanId("free");
+      return undefined;
+    }
+    let active = true;
+    void getManagedModelUsage()
+      .then((snapshot) => {
+        if (!active) return;
+        setCurrentPlanId(snapshot.plan.id);
+      })
+      .catch(() => {
+        if (active) setCurrentPlanId("free");
+      });
+    return () => {
+      active = false;
+    };
+  }, [authenticated, sensitiveCloudActionsEnabled]);
+
   const plans: readonly Plan[] = availability?.plans.length === 3
     ? availability.plans.map((plan) => ({
         id: plan.id,
@@ -259,6 +311,12 @@ export function PricingPage({
         featured: plan.id === "plus",
       }))
     : PLANS;
+  const displayedPlans = plans.map((plan) => ({
+    ...plan,
+    price: audience === "business" && plan.id !== "free"
+      ? BUSINESS_SEAT_PRICES[plan.id]
+      : plan.price,
+  }));
 
   const choosePlan = (plan: Plan) => {
     if (!sensitiveCloudActionsEnabled) return;
@@ -308,7 +366,13 @@ export function PricingPage({
 
   const featureLabel = (feature: FeatureKey, plan: Plan): string => {
     if (feature === "allowance") {
-      return copy.allowanceFeature(formatCredits(locale, plan.includedCredits));
+      const credits = formatCredits(locale, plan.includedCredits);
+      return audience === "business"
+        ? copy.businessAllowanceFeature(credits)
+        : copy.allowanceFeature(credits);
+    }
+    if (audience === "business" && feature in copy.businessFeatures) {
+      return copy.businessFeatures[feature as keyof typeof copy.businessFeatures];
     }
     return copy.features[feature];
   };
@@ -402,18 +466,21 @@ export function PricingPage({
         role="tabpanel"
         aria-labelledby={`pricing-audience-${audience}`}
       >
-        {plans.map((plan) => (
+        {displayedPlans.map((plan) => (
           <article
             key={plan.id}
             data-plan={plan.id}
-            className={`pricing-card${plan.featured ? " is-featured" : ""}`}
+            className={`pricing-card${plan.id === currentPlanId ? " is-current" : ""}`}
+            aria-current={plan.id === currentPlanId ? "true" : undefined}
           >
-            {plan.featured ? <span className="pricing-badge">{copy.recommended}</span> : null}
+            {plan.id === currentPlanId ? (
+              <span className="pricing-badge">{copy.currentPlan}</span>
+            ) : null}
             <header>
               <h2>{plan.name}</h2>
               <p>
                 <strong><span>¥</span>{plan.price}</strong>
-                <span>{copy.month}</span>
+                <span>{audience === "business" ? copy.perUserMonth : copy.month}</span>
               </p>
             </header>
             <button

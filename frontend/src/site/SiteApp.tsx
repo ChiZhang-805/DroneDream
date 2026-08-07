@@ -29,7 +29,6 @@ import {
   isEditionAvailabilityDocument,
   type EditionAvailabilityDocument,
 } from "./editionAvailability";
-import { editionBrandAssets } from "./editionBrandAssets";
 import {
   buildEditionReleaseRegistry,
   getEditionRelease,
@@ -69,7 +68,7 @@ const content = {
     navLabel: "Primary navigation",
     nav: [
       ["Product", "/product/"],
-      ["Price", "/pricing/"],
+      ["Pricing", "/pricing/"],
       ["Manual", "/manual/"],
       ["Community", "/community/"],
     ],
@@ -1144,21 +1143,29 @@ export function SiteApp({
       data-auth-source="website"
     >
       <div className="site-auth-page-shell">
-        <div className="site-auth-page-intro">
-          <p className="site-eyebrow">{copy.authEyebrow}</p>
+        <div className={`site-auth-page-intro${auth.account ? " is-account-home" : ""}`}>
           <h1 id="site-auth-title">
             {auth.account
-              ? copy.account
+              ? copy.authEyebrow
               : authMode === "register"
                 ? copy.registerTitle
                 : copy.authTitle}
           </h1>
-          <p>{copy.authSessionNote}</p>
         </div>
         <div className="site-auth-page-panel">
           {auth.account ? (
             <div className="site-auth-account">
-              <AccountIcon />
+              {auth.account.avatarUrl ? (
+                <img
+                  className="site-auth-avatar"
+                  src={auth.account.avatarUrl}
+                  alt={`${auth.account.displayName} profile photo`}
+                />
+              ) : (
+                <span className="site-auth-avatar-fallback" aria-hidden="true">
+                  <AccountIcon />
+                </span>
+              )}
               <strong>{auth.account.displayName}</strong>
               <span>{auth.account.email}</span>
               <button
@@ -1356,6 +1363,9 @@ export function SiteApp({
               </a>
             );
           })}
+          <button type="button" disabled aria-disabled="true">
+            {copy.console}
+          </button>
         </nav>
         <div className="site-header-actions">
           <button
@@ -1379,39 +1389,25 @@ export function SiteApp({
           {softwareDownloadsEnabled && universalRelease.downloadReady && universalRelease.downloadUrl ? (
             <a
               className="site-header-download"
-              data-brand-handoff="existing-universal-mother-brand"
               data-edition="universal"
               data-release-registry="exact-edition-exe-v1"
               href={universalRelease.downloadUrl}
               download={universalRelease.artifact.fileName}
               aria-label={`DroneDream Universal — ${copy.downloadShort}`}
             >
-              <img
-                alt=""
-                aria-hidden="true"
-                data-brand-asset="mark"
-                data-brand-surface="download-chooser"
-                src={editionBrandAssets.universal.mark}
-              />
+              <DownloadIcon />
               {copy.downloadShort}
             </a>
           ) : (
             <button
               type="button"
               className="site-header-download"
-              data-brand-handoff="existing-universal-mother-brand"
               data-edition="universal"
               data-release-registry="exact-edition-exe-v1"
               disabled
               aria-label={universalDownloadLabel}
             >
-              <img
-                alt=""
-                aria-hidden="true"
-                data-brand-asset="mark"
-                data-brand-surface="download-chooser"
-                src={editionBrandAssets.universal.mark}
-              />
+              <DownloadIcon />
               {copy.downloadShort}
             </button>
           )}

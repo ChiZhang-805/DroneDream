@@ -1945,7 +1945,7 @@ html[lang="zh-CN"] .site-hero h1 {
   box-shadow: 0 20px 55px rgba(38, 45, 77, 0.08);
 }
 
-.pricing-card.is-featured {
+.pricing-card.is-current {
   border-color: #b24bca;
   box-shadow: 0 24px 65px rgba(153, 62, 190, 0.15);
 }
@@ -2912,29 +2912,22 @@ html[lang="zh-CN"] .site-hero h1 {
 .site-auth-page-intro {
   display: grid;
   justify-items: center;
-  gap: 0.55rem;
   text-align: center;
-}
-
-.site-auth-page-intro .site-eyebrow {
-  margin: 0;
-  color: #8244e8;
 }
 
 .site-auth-page-intro h1 {
   margin: 0;
   color: #111222;
   font-size: clamp(2.1rem, 5vw, 3.25rem);
-  letter-spacing: -0.055em;
+  letter-spacing: 0;
   line-height: 1;
 }
 
-.site-auth-page-intro p:not(.site-eyebrow) {
-  max-width: 50ch;
-  margin: 0;
-  color: #666a7d;
-  font-size: 0.92rem;
-  line-height: 1.55;
+.site-auth-page-intro.is-account-home h1 {
+  width: min(100%, 540px);
+  color: #8244e8;
+  font-size: clamp(2rem, 4.8vw, 3.55rem);
+  font-weight: 800;
 }
 
 .site-auth-page-panel {
@@ -3075,12 +3068,28 @@ html[lang="zh-CN"] .site-hero h1 {
   text-align: center;
 }
 
-.site-auth-account > svg {
+.site-auth-avatar,
+.site-auth-avatar-fallback {
   width: 56px;
   height: 56px;
-  padding: 0.75rem;
   border: 1px solid rgba(123, 76, 225, 0.24);
   border-radius: 50%;
+}
+
+.site-auth-avatar {
+  display: block;
+  object-fit: cover;
+}
+
+.site-auth-avatar-fallback {
+  display: inline-grid;
+  place-items: center;
+  padding: 0.75rem;
+}
+
+.site-auth-avatar-fallback > svg {
+  width: 100%;
+  height: 100%;
   fill: none;
   stroke: #7b4ce1;
   stroke-linecap: round;

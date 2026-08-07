@@ -95,11 +95,11 @@ describe("website account navigation", () => {
     expect(window.location.pathname).toBe("/account/");
     expect(new URLSearchParams(window.location.search).get("source")).toBe("website");
     expect(new URLSearchParams(window.location.search).get("returnTo")).toBe("/");
-    expect(screen.getByText(
+    expect(screen.queryByText(
       /Universal, SIM, LAB, and FIELD each require an explicit Sign in click/i,
-    )).toBeVisible();
-    expect(screen.getByText(/another app's session never signs an app in automatically/i))
-      .toBeVisible();
+    )).toBeNull();
+    expect(screen.queryByText(/another app's session never signs an app in automatically/i))
+      .toBeNull();
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
     expect(screen.queryByRole("dialog")).toBeNull();
 
@@ -132,8 +132,33 @@ describe("website account navigation", () => {
     renderSite();
 
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
-    expect(screen.getByText(/each require an explicit Sign in click/i)).toBeVisible();
+    expect(screen.queryByText(/each require an explicit Sign in click/i)).toBeNull();
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeVisible();
     expect(desktopInvoke).not.toHaveBeenCalled();
+  });
+
+  it("renders the signed-in account page with the stored profile photo", () => {
+    window.history.replaceState(null, "", "/account/?source=website&returnTo=%2F");
+    authState.current = {
+      configured: true,
+      loading: false,
+      account: {
+        id: "user-1",
+        email: "pilot@example.test",
+        displayName: "Pilot",
+        avatarUrl: "https://images.example.test/pilot.png",
+      },
+    };
+
+    renderSite();
+
+    expect(screen.getByRole("heading", { name: "DRONEDREAM ACCOUNT" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Account" })).toBeNull();
+    expect(screen.queryByText(/each require an explicit Sign in click/i)).toBeNull();
+    expect(screen.getByRole("img", { name: "Pilot profile photo" }))
+      .toHaveAttribute("src", "https://images.example.test/pilot.png");
+    expect(screen.getByText("Pilot")).toBeVisible();
+    expect(screen.getByText("pilot@example.test")).toBeVisible();
   });
 
   it("preserves an OAuth authorization identifier through website sign-in", async () => {
@@ -185,8 +210,8 @@ describe("website account navigation", () => {
     renderSite();
 
     expect(screen.getByRole("heading", { name: "创建账号" })).toBeVisible();
-    expect(screen.getByText(/都需要在各自应用内点击登录/)).toBeVisible();
-    expect(screen.getByText(/都不会让任何桌面应用自动登录/)).toBeVisible();
+    expect(screen.queryByText(/都需要在各自应用内点击登录/)).toBeNull();
+    expect(screen.queryByText(/都不会让任何桌面应用自动登录/)).toBeNull();
     expect(document.querySelector('[data-auth-source="website"]')).toBeVisible();
   });
 });

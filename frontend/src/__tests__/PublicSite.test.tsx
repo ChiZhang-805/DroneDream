@@ -59,14 +59,8 @@ describe("DroneDream public website", () => {
     });
     expect(universalDownload).toHaveAttribute("data-edition", "universal");
     expect(universalDownload).toHaveAttribute("data-release-registry", "exact-edition-exe-v1");
-    expect(universalDownload.querySelector("img")).toHaveAttribute(
-      "src",
-      expect.stringContaining("drone-dream-mark.png"),
-    );
-    expect(universalDownload.querySelector("img"))
-      .toHaveAttribute("data-brand-surface", "download-chooser");
-    expect(universalDownload.querySelector("img"))
-      .toHaveAttribute("data-brand-asset", "mark");
+    expect(universalDownload.querySelector("svg")).not.toBeNull();
+    expect(universalDownload.querySelector("img")).toBeNull();
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
     expect(starflightButton).not.toHaveTextContent("+");
@@ -103,10 +97,11 @@ describe("DroneDream public website", () => {
       /Agentic PX4\/Gazebo parameter optimization · Windows 1\.0\.0\./i,
     )).toBeVisible();
     expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/product/");
-    expect(screen.getByRole("link", { name: "Price" })).toHaveAttribute("href", "/pricing/");
+    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute("href", "/pricing/");
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
     expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/community/");
-    expect(screen.queryByRole("button", { name: "Console" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(document.querySelector('.site-nav a[href="/console/"]')).toBeNull();
     expectContentLinksToUseIcons(container);
 
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -165,7 +160,8 @@ describe("DroneDream public website", () => {
       </I18nProvider>,
     );
 
-    expect(screen.queryByRole("button", { name: "Console" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(document.querySelector('.site-nav a[href="/console/"]')).toBeNull();
     expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Login" })).not.toHaveAttribute("title");
     expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
@@ -192,7 +188,8 @@ describe("DroneDream public website", () => {
     expect(document.querySelector('[data-auth-source="website"]')).toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
     expect(document.body).not.toHaveTextContent("HTTP mirror");
-    expect(screen.queryByRole("button", { name: "Console" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(document.querySelector('.site-nav a[href="/console/"]')).toBeNull();
     expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
     expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
     expect(screen.getByRole("button", { name: "Download Windows preview" }))
@@ -210,7 +207,8 @@ describe("DroneDream public website", () => {
     );
 
     expect(screen.getByRole("button", { name: "Login" })).toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Console" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(document.querySelector('.site-nav a[href="/console/"]')).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Login" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeVisible();
     expect(document.querySelector('[data-auth-source="website"]')).not.toBeNull();
@@ -466,8 +464,13 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(screen.getByText(/3,000,000 managed AI credits/i)).toBeVisible();
     expect(screen.getByText(/15,000,000 managed AI credits/i)).toBeVisible();
     expect(screen.getAllByText(
-      "Core AURORA optimization Harness",
+      "Team AURORA optimization Harness",
     )).toHaveLength(3);
+    expect(document.querySelector('.pricing-card[data-plan="plus"]')?.textContent)
+      .toContain("¥19");
+    expect(document.querySelector('.pricing-card[data-plan="pro"]')?.textContent)
+      .toContain("¥69");
+    expect(screen.queryByText("Recommended")).toBeNull();
     const expectedFeatureOrder = [
       "workflow",
       "harness",
