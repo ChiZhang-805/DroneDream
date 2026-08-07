@@ -1116,7 +1116,6 @@ html[lang="zh-CN"] .site-hero h1 {
   }
 
   .site-product-edition li { min-height: 2.35rem; font-size: 0.83rem; }
-  .site-product-edition-action { grid-column: 2; grid-row: 2; }
 }
 
 @media (max-width: 520px) {
@@ -1174,8 +1173,10 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .site-product-edition-topline {
-  display: flex;
+  display: grid;
   min-width: 0;
+  min-height: 58px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
@@ -1191,6 +1192,7 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .site-product-edition-topline .site-product-edition-picture {
+  align-self: center;
   width: min(56%, 252px);
   height: auto;
   min-height: 54px;
@@ -1203,7 +1205,8 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .site-product-edition-action {
-  min-height: 40px;
+  align-self: center;
+  min-height: 42px;
   margin: 0;
   padding: 0.55rem 0.86rem;
   border: 0;
@@ -1307,6 +1310,10 @@ html[lang="zh-CN"] .site-hero h1 {
     grid-template-rows: auto auto auto;
   }
 
+  .site-product-edition-topline {
+    min-height: 58px;
+  }
+
   .site-product-edition-topline .site-product-edition-picture {
     width: 58px;
     height: 58px;
@@ -1325,7 +1332,7 @@ html[lang="zh-CN"] .site-hero h1 {
   }
 
   .site-product-edition-topline {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: 1;
   }
 
@@ -1336,7 +1343,7 @@ html[lang="zh-CN"] .site-hero h1 {
 
   .site-product-screenshots {
     grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-row: 2;
   }
 }
 
