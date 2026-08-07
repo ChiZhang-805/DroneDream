@@ -1,5 +1,6 @@
 import hashlib
 import json
+import subprocess
 from pathlib import Path, PureWindowsPath
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,8 +24,20 @@ def _load_attempt_receipt() -> dict:
     return json.loads(ATTEMPT_RECEIPT.read_text(encoding="utf-8"))
 
 
-def _sha256(path: str) -> str:
-    return hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+def _git_checkout_file_bytes(commit: str, path: str) -> bytes:
+    result = subprocess.run(
+        [
+            "git",
+            "cat-file",
+            "--filters",
+            f"--path={path}",
+            f"{commit}:{path}",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    )
+    return result.stdout
 
 
 def test_application_binds_exact_product_source_and_single_attempt() -> None:
@@ -45,11 +58,14 @@ def test_application_binds_exact_product_source_and_single_attempt() -> None:
     assert attempt["automaticRetryAllowed"] is False
 
 
-def test_application_binds_current_lab_profile_payload_and_zero_pack_deny() -> None:
+def test_application_binds_source_lab_profile_payload_and_zero_pack_deny() -> None:
     application = _load()
+    source_commit = application["sourceSeparation"]["productSourceCommit"]
 
     for file_ref in application["buildInputs"].values():
-        assert _sha256(file_ref["path"]) == file_ref["sha256"]
+        source_bytes = _git_checkout_file_bytes(source_commit, file_ref["path"])
+        assert len(source_bytes) == file_ref["bytes"]
+        assert hashlib.sha256(source_bytes).hexdigest() == file_ref["sha256"]
 
     identity = application["buildIdentity"]
     assert identity["fileName"] == "DroneDream-Lab-1.0.0.exe"

@@ -11,7 +11,7 @@
       },
       "lab": {
         "path": "distribution/editions/lab.v1.json",
-        "sha256": "071360a33aa37eccc15c29582be265bb600d3d60cf1f298df8d4ebeb9cf3cc67"
+        "sha256": "303856056bb9a6dcd36227d704eef5ff29a577da20343a6b564baf6f61f5ee1a"
       },
       "field": {
         "path": "distribution/editions/field.v1.json",
