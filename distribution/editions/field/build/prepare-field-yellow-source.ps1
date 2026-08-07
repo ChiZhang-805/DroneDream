@@ -217,6 +217,7 @@ if ($Prepare) {
     Assert-NoReparsePoint $sourceRoot "sourceRoot"
     Invoke-Git $sourceRoot @("remote", "set-url", "origin", [string]$document.source.originUrl) |
         Out-Null
+    Invoke-Git $sourceRoot @("config", "core.longpaths", "true") | Out-Null
     Invoke-Git $sourceRoot @(
         "update-ref",
         "refs/remotes/origin/codex/software-field",
@@ -240,6 +241,7 @@ if ($Prepare) {
     $preparedRemote = Invoke-Git $sourceRoot @(
         "rev-parse", "refs/remotes/origin/codex/software-field"
     )
+    $longPaths = Invoke-Git $sourceRoot @("config", "--bool", "core.longpaths")
     Assert-Contract ($preparedHead -ceq $productCommit) `
         "Prepared source HEAD changed."
     Assert-Contract ($preparedTree -ceq [string]$document.source.productTree) `
@@ -247,6 +249,8 @@ if ($Prepare) {
     Assert-Contract (-not $preparedStatus) "Prepared source is not clean."
     Assert-Contract ($preparedRemote -ceq $BoundBuildEvidenceHead) `
         "Prepared evidence ref changed."
+    Assert-Contract ($longPaths -ceq "true") `
+        "Prepared source does not enable Windows long paths."
     foreach ($entry in @(
         @($desktopLink, $expectedDesktopTarget, "desktop"),
         @($frontendLink, $expectedFrontendTarget, "frontend")

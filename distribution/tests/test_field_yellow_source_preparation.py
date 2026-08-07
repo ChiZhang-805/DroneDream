@@ -135,6 +135,7 @@ def test_prepare_creates_exact_detached_source_and_junctions(tmp_path: Path) -> 
     assert receipt["decision"] == "prepared-once"
     assert _git_at(source_root, "rev-parse", "HEAD") == PRODUCT
     assert _git_at(source_root, "rev-parse", "HEAD^{tree}") == TREE
+    assert _git_at(source_root, "config", "--bool", "core.longpaths") == "true"
     assert (
         _git_at(source_root, "rev-parse", "refs/remotes/origin/codex/software-field")
         == EVIDENCE
