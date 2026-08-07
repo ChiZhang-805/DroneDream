@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FieldRecoveryWorkspace } from "../field/FieldRecoveryWorkspace";
@@ -113,8 +113,13 @@ describe("FieldRecoveryWorkspace", () => {
     const history = await screen.findByRole("combobox", {
       name: "Saved snapshots for this aircraft",
     });
+    const adapter = screen.getByRole("combobox", { name: "Protocol adapter" });
+    expect(within(adapter).getByRole("option", { name: "PX4 MAVLink" })).toBeInTheDocument();
+    expect(within(adapter).queryByRole("option", { name: /Tello|DJI/i })).not.toBeInTheDocument();
     expect(history).toHaveValue(snapshot.snapshotSha256);
-    fireEvent.click(screen.getByRole("button", { name: "Load snapshot" }));
+    const loadSnapshot = screen.getByRole("button", { name: "Load snapshot" });
+    await waitFor(() => expect(loadSnapshot).toBeEnabled());
+    fireEvent.click(loadSnapshot);
 
     await waitFor(() => expect(bridge.load).toHaveBeenCalledWith(snapshot.snapshotSha256));
     expect(await screen.findByText("dddddddddd...dddddddd")).toBeInTheDocument();

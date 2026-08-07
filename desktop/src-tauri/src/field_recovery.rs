@@ -13,6 +13,7 @@ use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 
 use crate::distribution_plan::native_hardware_validated_pack_count;
+use crate::field_adapters::validate_parameter_snapshot_adapter;
 
 const SOURCE_COMMIT: &str = env!("DRONEDREAM_SOURCE_COMMIT");
 
@@ -209,6 +210,7 @@ fn validate_request(request: &FieldParameterSnapshotRequest) -> Result<(), Strin
     {
         return Err("Field parameter snapshot adapter ID is invalid".to_string());
     }
+    validate_parameter_snapshot_adapter(&request.adapter_id)?;
     if !valid_hash(&request.observation_sha256) {
         return Err("Field parameter snapshot observation hash is invalid".to_string());
     }
@@ -381,6 +383,7 @@ fn load_snapshot(root: &Path, snapshot_sha256: &str) -> Result<FieldParameterSna
         return Err("Field parameter snapshot failed its content-bound contract".to_string());
     }
     validate_parameters(&snapshot.parameters)?;
+    validate_parameter_snapshot_adapter(&snapshot.adapter_id)?;
     Ok(snapshot)
 }
 
@@ -719,6 +722,12 @@ mod tests {
         let mut invalid = request();
         invalid.parameters = BTreeMap::from([("1INVALID".to_string(), 1.0)]);
         assert!(snapshot_with_hash(invalid).is_err());
+        let mut unknown_adapter = request();
+        unknown_adapter.adapter_id = "unknown-adapter".to_string();
+        assert!(snapshot_with_hash(unknown_adapter).is_err());
+        let mut unsupported_adapter = request();
+        unsupported_adapter.adapter_id = "tello-state-v2".to_string();
+        assert!(snapshot_with_hash(unsupported_adapter).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 }

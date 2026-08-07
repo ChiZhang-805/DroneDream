@@ -25,6 +25,7 @@ import {
   type FieldParameterSnapshotSummary,
   type FieldRollbackPlan,
 } from "../desktop/bridge";
+import sourceCatalog from "../../../distribution/editions/field/adapters/catalog.v1.json";
 import type { FieldLocale } from "./catalog";
 import type { FieldReadOnlyProtocolEvidence } from "./FieldAdapterCenter";
 
@@ -94,6 +95,12 @@ const DEFAULT_PARAMETERS = JSON.stringify({
   MC_PITCH_P: 6.5,
   MPC_XY_VEL_P_ACC: 1.8,
 }, null, 2);
+
+const SNAPSHOT_ADAPTERS = sourceCatalog.entries.filter((entry) => (
+  entry.installable
+  && entry.deliveryMode === "embedded-managed"
+  && entry.capabilities.parameterRead !== "unavailable"
+));
 
 function parseParameters(raw: string): Record<string, number> {
   const parsed: unknown = JSON.parse(raw);
@@ -373,7 +380,7 @@ export function FieldRecoveryWorkspace({
       <div className="field-recovery-identity">
         <label><span>{copy.observation}</span><input value={observationSha256} maxLength={64} spellCheck={false} onChange={(event) => setObservationSha256(event.target.value.trim().toLowerCase())} /></label>
         <label><span>{copy.firmware}</span><input value={firmwareVersion} maxLength={160} onChange={(event) => setFirmwareVersion(event.target.value)} /></label>
-        <label><span>{copy.adapter}</span><select value={adapterId} onChange={(event) => setAdapterId(event.target.value)}><option value="mavlink-common-v2">MAVLink Common v2</option><option value="mavlink-ardupilotmega-v2">MAVLink ArduPilotMega v2</option><option value="betaflight-msp-v1">Betaflight / INAV MSP v1</option><option value="crazyflie-crtp">Crazyflie CRTP</option><option value="dronecan-v1">DroneCAN v1</option></select></label>
+        <label><span>{copy.adapter}</span><select value={adapterId} onChange={(event) => setAdapterId(event.target.value)}>{SNAPSHOT_ADAPTERS.map((entry) => <option key={entry.adapterId} value={entry.adapterId}>{entry.displayName[locale]}</option>)}</select></label>
       </div>
 
       <div className="field-recovery-editors">

@@ -390,6 +390,28 @@ fn load_catalog() -> Result<AdapterCatalog, String> {
     Ok(catalog)
 }
 
+pub(crate) fn validate_parameter_snapshot_adapter(adapter_id: &str) -> Result<(), String> {
+    let catalog = load_catalog()?;
+    let entry = catalog
+        .entries
+        .iter()
+        .find(|entry| entry.adapter_id == adapter_id)
+        .ok_or_else(|| "Field parameter snapshot references an unknown adapter".to_string())?;
+    if !entry.installable
+        || entry.delivery_mode != "embedded-managed"
+        || !matches!(
+            entry.capabilities.parameter_read.as_str(),
+            "read-only" | "quorum-required"
+        )
+    {
+        return Err(
+            "Field parameter snapshot adapter does not support managed parameter evidence"
+                .to_string(),
+        );
+    }
+    Ok(())
+}
+
 fn validate_package(entry: &AdapterCatalogEntry, raw: &str) -> Result<(), String> {
     let package: AdapterPackage = serde_json::from_str(raw)
         .map_err(|error| format!("Field adapter package is invalid: {error}"))?;
@@ -1462,6 +1484,23 @@ mod tests {
             "serial".to_string(),
         ]));
         assert!(!valid_transport_contract(&["unknown".to_string()]));
+    }
+
+    #[test]
+    fn parameter_snapshot_adapters_are_catalog_bound_and_capable() {
+        for adapter_id in [
+            "mavlink-common-v2",
+            "mavlink-px4-v2",
+            "mavlink-ardupilotmega-v2",
+            "betaflight-msp-v1",
+            "dronecan-v1",
+            "crazyflie-crtp",
+        ] {
+            validate_parameter_snapshot_adapter(adapter_id).unwrap();
+        }
+        for adapter_id in ["tello-state-v2", "dji-enterprise-sdk", "unknown-adapter"] {
+            assert!(validate_parameter_snapshot_adapter(adapter_id).is_err());
+        }
     }
 
     #[test]
