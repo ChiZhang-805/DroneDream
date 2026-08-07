@@ -773,6 +773,8 @@ try {
     $installedStateCreated = $false
     $receipt.lifecycle.uninstall = "pass"
     $receipt.lifecycle.protectedParity = "pass-after-every-phase"
+    $receipt.releaseReady = $true
+    $receipt.websiteHandoffReady = $true
     $success = $true
     }
 }
