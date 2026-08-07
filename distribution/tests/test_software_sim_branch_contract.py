@@ -181,6 +181,15 @@ LOCKFILE_OFFLINE_CACHE_TOOL = (
 PUBLIC_BUILD_CONFIG_LAUNCHER = (
     DISTRIBUTION / "sim" / "desktop" / "invoke-github-public-build-config.ps1"
 )
+OFFLINE_DEPENDENCY_TREE_MODULE = (
+    DISTRIBUTION / "sim" / "desktop" / "offline-dependency-tree-contract.psm1"
+)
+OFFLINE_DEPENDENCY_TREE_AUTHORITY_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "offline-dependency-tree-authority.v1.json"
+)
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -264,6 +273,24 @@ def write_offline_cache_fixture(root: Path) -> tuple[Path, Path, str, Path, Path
 def run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
     command = (
         f". '{LIFECYCLE_CONTRACT_PATH}'; "
+        "$ErrorActionPreference='Stop'; "
+        f"{expression}"
+    )
+    return subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def run_offline_dependency_contract(
+    expression: str,
+) -> subprocess.CompletedProcess[str]:
+    module = str(OFFLINE_DEPENDENCY_TREE_MODULE).replace("'", "''")
+    command = (
+        f"Import-Module '{module}' -Force; "
         "$ErrorActionPreference='Stop'; "
         f"{expression}"
     )
@@ -1850,6 +1877,124 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertFalse(receipt["nonClaims"]["releaseReady"])
         self.assertFalse(receipt["nextGate"]["executeMayProceed"])
         self.assertTrue(receipt["nextGate"]["newExactYellowApplicationRequired"])
+
+    def test_clean_offline_dependency_authority_excludes_only_generated_caches(
+        self,
+    ) -> None:
+        contract = load_json(OFFLINE_DEPENDENCY_TREE_AUTHORITY_PATH)
+        self.assertEqual(contract["state"], "green-contract-frozen")
+        authority = contract["authority"]
+        self.assertEqual(authority["kind"], "clean-offline-npm-ci-output")
+        self.assertFalse(authority["preExistingWorktreeNodeModulesAuthoritative"])
+        self.assertFalse(authority["actualHashCopiedWithoutDiagnosis"])
+        self.assertFalse(authority["generatedCachesAllowed"])
+        inventory = contract["authoritativeInventory"]
+        self.assertEqual(
+            inventory["treeFingerprint"],
+            "96f97b507d5eb15001933d6b22faa1e5e2c8289aa40dc78e4641a5095aacdb88",
+        )
+        self.assertEqual(inventory["entryCount"], 18789)
+        self.assertEqual(inventory["fileCount"], 17285)
+        self.assertEqual(inventory["directoryCount"], 1504)
+        self.assertEqual(inventory["totalFileBytes"], 245458213)
+        diagnosis = contract["ordinalNineDiagnosis"]
+        self.assertEqual(diagnosis["missingFromCleanInstallFileCount"], 54)
+        self.assertEqual(diagnosis["missingFromCleanInstallDirectoryCount"], 8)
+        self.assertEqual(diagnosis["missingFromCleanInstallBytes"], 17926330)
+        self.assertEqual(diagnosis["intersectionFileCount"], 17285)
+        self.assertEqual(diagnosis["intersectionByteOrShaMismatchCount"], 0)
+        self.assertFalse(diagnosis["npmVersionDifference"])
+        self.assertFalse(diagnosis["platformOptionalDependencyDifference"])
+        self.assertFalse(diagnosis["binLinkDifference"])
+        self.assertFalse(diagnosis["lockfilePackageDifference"])
+        self.assertEqual(
+            sum(item["fileCount"] for item in diagnosis["categories"]), 54
+        )
+        self.assertEqual(
+            sum(item["bytes"] for item in diagnosis["categories"]), 17926330
+        )
+        self.assertTrue(
+            all(
+                item["path"].startswith(("desktop/", "frontend/"))
+                for item in contract["requiredFiles"]
+            )
+        )
+        self.assertFalse(contract["security"]["buildAuthorized"])
+        self.assertFalse(contract["security"]["hardwareAuthorityChanged"])
+
+    def test_clean_offline_dependency_inventory_is_order_independent_and_fail_closed(
+        self,
+    ) -> None:
+        fixture_files = [
+            ("desktop/package.json", b'{"name":"desktop"}\n'),
+            ("desktop/package-lock.json", b'{"lockfileVersion":3}\n'),
+            ("desktop/node_modules/tool/package.json", b'{"version":"1.0.0"}\n'),
+            ("desktop/node_modules/.bin/tool.cmd", b"@echo off\r\n"),
+            ("frontend/package.json", b'{"name":"frontend"}\n'),
+            ("frontend/package-lock.json", b'{"lockfileVersion":3}\n'),
+            ("frontend/node_modules/vite/package.json", b'{"version":"7.3.6"}\n'),
+            ("frontend/node_modules/platform/binary.node", b"fixture-binary"),
+        ]
+        with tempfile.TemporaryDirectory() as temp:
+            roots = [Path(temp) / "first", Path(temp) / "second"]
+            for root, entries in zip(
+                roots, (fixture_files, reversed(fixture_files)), strict=True
+            ):
+                for relative, content in entries:
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(content)
+
+            inventories = []
+            for root in roots:
+                root_literal = str(root).replace("'", "''")
+                result = run_offline_dependency_contract(
+                    f"Get-OfflineDependencyInventory -Root '{root_literal}' "
+                    "| ConvertTo-Json -Depth 20 -Compress"
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                inventories.append(json.loads(result.stdout))
+
+            first, second = inventories
+            self.assertEqual(first["treeFingerprint"], second["treeFingerprint"])
+            self.assertEqual(first["entryCount"], second["entryCount"])
+            self.assertEqual(first["fileCount"], second["fileCount"])
+            self.assertEqual(first["directoryCount"], second["directoryCount"])
+            self.assertEqual(first["totalFileBytes"], second["totalFileBytes"])
+            self.assertTrue(
+                all(
+                    not item["path"].startswith((str(roots[0]), str(roots[1])))
+                    for item in first["entries"]
+                )
+            )
+
+            root_literal = str(roots[0]).replace("'", "''")
+            positive = run_offline_dependency_contract(
+                f"$i=Get-OfflineDependencyInventory -Root '{root_literal}'; "
+                "Assert-CleanOfflineDependencyTree -Inventory $i "
+                f"-ExpectedTreeFingerprint '{first['treeFingerprint']}' "
+                f"-ExpectedEntryCount {first['entryCount']} "
+                f"-ExpectedFileCount {first['fileCount']} "
+                f"-ExpectedDirectoryCount {first['directoryCount']} "
+                f"-ExpectedTotalFileBytes {first['totalFileBytes']} | Out-Null"
+            )
+            self.assertEqual(positive.returncode, 0, positive.stderr)
+
+            transient = roots[1] / "frontend/node_modules/.vite/deps/generated.js"
+            transient.parent.mkdir(parents=True, exist_ok=True)
+            transient.write_text("generated", encoding="utf-8")
+            second_literal = str(roots[1]).replace("'", "''")
+            negative = run_offline_dependency_contract(
+                f"$i=Get-OfflineDependencyInventory -Root '{second_literal}'; "
+                "Assert-CleanOfflineDependencyTree -Inventory $i "
+                f"-ExpectedTreeFingerprint '{first['treeFingerprint']}' "
+                f"-ExpectedEntryCount {first['entryCount']} "
+                f"-ExpectedFileCount {first['fileCount']} "
+                f"-ExpectedDirectoryCount {first['directoryCount']} "
+                f"-ExpectedTotalFileBytes {first['totalFileBytes']} | Out-Null"
+            )
+            self.assertNotEqual(negative.returncode, 0)
+            self.assertIn("generated transient path", negative.stderr)
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(

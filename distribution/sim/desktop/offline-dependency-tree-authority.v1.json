@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-clean-offline-dependency-tree-authority",
+  "editionId": "sim",
+  "state": "green-contract-frozen",
+  "authority": {
+    "kind": "clean-offline-npm-ci-output",
+    "preExistingWorktreeNodeModulesAuthoritative": false,
+    "actualHashCopiedWithoutDiagnosis": false,
+    "generatedCachesAllowed": false,
+    "networkAllowed": false,
+    "manifestExcludedFromInventory": true
+  },
+  "sourceInputs": {
+    "desktopPackageSha256": "ba37f6edb95c454ea0f83130b98f708c0f27990133c705c8c23597ac96fd36b6",
+    "desktopLockSha256": "1138f300f140dfcaf22a6c47d44f676e9ea9294b77a2caabb7fa08ef8340d058",
+    "frontendPackageSha256": "cd905e33a1faad2c22b165ba407e16c05d01fbdab1738dd156d616cfee4daf05",
+    "frontendLockSha256": "27b8f36c53be1a02eecbd99801033639662a4697c42ad1141d276c78adbc664a",
+    "nodeVersion": "v24.14.1",
+    "npmVersion": "11.11.0",
+    "platform": "windows",
+    "architecture": "x64"
+  },
+  "authoritativeInventory": {
+    "algorithm": "sha256-lines-v1",
+    "treeFingerprint": "96f97b507d5eb15001933d6b22faa1e5e2c8289aa40dc78e4641a5095aacdb88",
+    "entryCount": 18789,
+    "fileCount": 17285,
+    "directoryCount": 1504,
+    "reparsePointCount": 0,
+    "totalFileBytes": 245458213
+  },
+  "ordinalNineDiagnosis": {
+    "oldInventoryFingerprint": "7f4dc4d394ca98a8458f84f7cc5dfe40603f9fe662e1610d910651d04fbe6aea",
+    "oldFileCount": 17339,
+    "oldDirectoryCount": 1512,
+    "oldTotalFileBytes": 263384543,
+    "missingFromCleanInstallFileCount": 54,
+    "missingFromCleanInstallDirectoryCount": 8,
+    "missingFromCleanInstallBytes": 17926330,
+    "actualFileNotInOldTreeCount": 0,
+    "intersectionFileCount": 17285,
+    "intersectionByteOrShaMismatchCount": 0,
+    "npmVersionDifference": false,
+    "platformOptionalDependencyDifference": false,
+    "binLinkDifference": false,
+    "lockfilePackageDifference": false,
+    "classification": "old-worktree-inventory-contained-generated-vite-vitest-and-layout-evidence-caches",
+    "categories": [
+      {
+        "category": "generated-layout-evidence-cache",
+        "relativeRoot": "frontend/node_modules/.cache/software-ui-layout",
+        "fileCount": 13,
+        "bytes": 1958481
+      },
+      {
+        "category": "vite-prebundle-cache",
+        "relativeRoot": "frontend/node_modules/.vite/deps",
+        "fileCount": 40,
+        "bytes": 15961230
+      },
+      {
+        "category": "vitest-result-cache",
+        "relativeRoot": "frontend/node_modules/.vite/vitest",
+        "fileCount": 1,
+        "bytes": 6619
+      }
+    ]
+  },
+  "forbiddenTransientRoots": [
+    "desktop/node_modules/.cache",
+    "desktop/node_modules/.vite",
+    "desktop/node_modules/.vite-temp",
+    "frontend/node_modules/.cache",
+    "frontend/node_modules/.vite",
+    "frontend/node_modules/.vite-temp"
+  ],
+  "requiredFiles": [
+    {
+      "path": "desktop/node_modules/@tauri-apps/cli/package.json",
+      "bytes": 2455,
+      "sha256": "2211ba5e468d2ac8c70d9d5f0b2f017a98e9d2b2932ad47fc3588fc14e103a33"
+    },
+    {
+      "path": "desktop/node_modules/@tauri-apps/cli/tauri.js",
+      "bytes": 1864,
+      "sha256": "0dd6ec63c7c63a993fde20955e291d833c03f3760e63e0ee21e83482f6c0b43a"
+    },
+    {
+      "path": "desktop/node_modules/@tauri-apps/cli-win32-x64-msvc/package.json",
+      "bytes": 707,
+      "sha256": "9b7ff3368f454c5cc630270556faf181ef9e126a56cef788285470cc98d178f0"
+    },
+    {
+      "path": "desktop/node_modules/@tauri-apps/cli-win32-x64-msvc/cli.win32-x64-msvc.node",
+      "bytes": 15235584,
+      "sha256": "37c4d79256120893f2c12c1385bce5f7510b5063afdeb09b40a9effec28d0208"
+    },
+    {
+      "path": "frontend/node_modules/vite/package.json",
+      "bytes": 5158,
+      "sha256": "e5ed0f85215f871fe22a48987dcd77fcfbe14064a53c0c9f7f48186a6b7e2cf0"
+    },
+    {
+      "path": "frontend/node_modules/@esbuild/win32-x64/esbuild.exe",
+      "bytes": 11670528,
+      "sha256": "ec02ee9b14ab332416fedd10614dfb80eed5304d94f67745067c011934a8c3c3"
+    }
+  ],
+  "greenVerification": {
+    "ordinalNineRootsReadOnly": true,
+    "realDependencyNpmCiInvocations": 0,
+    "networkInvocations": 0,
+    "independentMicroFixtureRoots": 2,
+    "fixtureCreationOrderDiffers": true,
+    "fixtureFingerprintsMustMatch": true,
+    "transientPathNegativeFixtureMustFail": true,
+    "secondFullCleanInstallRequiredDuringFutureAuthorizedPrepare": false,
+    "reason": "The clean tree is byte-identical to every lock-installed file in the old tree; only generated cache paths differ."
+  },
+  "security": {
+    "hardwareAuthorityChanged": false,
+    "simOnlyProfileChanged": false,
+    "secretReadAllowed": false,
+    "providerUseAllowed": false,
+    "buildAuthorized": false
+  }
+}
