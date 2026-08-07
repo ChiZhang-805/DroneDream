@@ -17,28 +17,64 @@ EDITION_IDS = ("universal", "sim", "lab", "field")
 APPROVED_HASHES = {
     "sim": {
         "markPath": "brand/source/approved/sim-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/sim-large-label-lockup.png",
+        "dotLockupPath": "brand/source/approved/sim-large-label-centered-lockup.png",
         "markSha256": "5b35f8eeccb2742d53888d222e9b6c12b449e03af927a1b7631175e8ac510dfa",
-        "dotLockupSha256": ("d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"),
+        "dotLockupSha256": ("f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e"),
         "dotLockupDimensions": {"width": 2337, "height": 218},
+        "separatorGeometry": {
+            "wordmarkEndX": 1748,
+            "separatorStartX": 1802,
+            "separatorEndX": 1851,
+            "editionLabelStartX": 1905,
+            "leftGapPx": 53,
+            "rightGapPx": 53,
+        },
+        "supersededLargeLabelPath": "brand/source/approved/sim-large-label-lockup.png",
+        "supersededLargeLabelSha256": (
+            "d11e727f4024f356a3850271aa3349d7286e2da85f647d145388c5d1eec20233"
+        ),
         "supersededPath": "brand/source/approved/sim-dot-lockup.png",
         "supersededSha256": ("8cd55f8008bf1c634c9c1b72a59c4ca21a625413bc71a6c421899e347b650548"),
     },
     "lab": {
         "markPath": "brand/source/approved/lab-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/lab-large-label-lockup.png",
+        "dotLockupPath": "brand/source/approved/lab-large-label-centered-lockup.png",
         "markSha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806",
-        "dotLockupSha256": ("5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"),
+        "dotLockupSha256": ("c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94"),
         "dotLockupDimensions": {"width": 2386, "height": 218},
+        "separatorGeometry": {
+            "wordmarkEndX": 1748,
+            "separatorStartX": 1807,
+            "separatorEndX": 1858,
+            "editionLabelStartX": 1917,
+            "leftGapPx": 58,
+            "rightGapPx": 58,
+        },
+        "supersededLargeLabelPath": "brand/source/approved/lab-large-label-lockup.png",
+        "supersededLargeLabelSha256": (
+            "5abee1b88d50d0443fe47da0e4866257487856a2ee5269a213a1320585b6adea"
+        ),
         "supersededPath": "brand/source/approved/lab-dot-lockup.png",
         "supersededSha256": ("b01b87ce92199b7781453aade99c5428fe2bd4b8c141f0aacdd05346e683bc91"),
     },
     "field": {
         "markPath": "brand/source/approved/field-mark-1024.png",
-        "dotLockupPath": "brand/source/approved/field-large-label-lockup.png",
+        "dotLockupPath": "brand/source/approved/field-large-label-centered-lockup.png",
         "markSha256": "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
-        "dotLockupSha256": ("588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"),
+        "dotLockupSha256": ("e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa"),
         "dotLockupDimensions": {"width": 2581, "height": 218},
+        "separatorGeometry": {
+            "wordmarkEndX": 1748,
+            "separatorStartX": 1807,
+            "separatorEndX": 1858,
+            "editionLabelStartX": 1917,
+            "leftGapPx": 58,
+            "rightGapPx": 58,
+        },
+        "supersededLargeLabelPath": "brand/source/approved/field-large-label-lockup.png",
+        "supersededLargeLabelSha256": (
+            "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27"
+        ),
         "supersededPath": "brand/source/approved/field-dot-lockup.png",
         "supersededSha256": ("def3920c2fd355e9ef5a6d4f95d4334e03d02dc2c94eb764e41af154eb03f192"),
     },
@@ -66,7 +102,7 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
     contract = load_json(CONTRACT_PATH)
     schema = load_json(SCHEMA_PATH)
 
-    assert contract["brandVersion"] == "1.1.0"
+    assert contract["brandVersion"] == "1.1.1"
     assert contract["separator"] == "\u00b7"
     assert schema["properties"]["separator"]["const"] == "\u00b7"
     assert contract["safety"] == {
@@ -78,10 +114,10 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
         "conceptAssetsAreReleaseAssets": False,
         "largeLabelLockupsAreCanonicalSources": True,
         "largeLabelReviewPreviewPath": (
-            "brand/source/approved/edition-brand-large-label-approved-preview.png"
+            "brand/source/approved/edition-brand-centered-separator-approved-preview.png"
         ),
         "largeLabelReviewPreviewSha256": (
-            "8963661c81db8f9115b37114eccf80580b7bbed02d865e4e648c8503f355a01f"
+            "77d5326be1155528d9585a56de99c80364640ed7f4d488222c7f581ef70da02e"
         ),
         "largeLabelReviewPreviewDimensions": {"width": 5200, "height": 1680},
         "largeLabelReviewStudySha256": (
@@ -89,6 +125,10 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
         ),
         "editionLabelHeightRatio": 0.9,
         "preserveNaturalLabelWidth": True,
+        "separatorCentering": {
+            "method": "equal-alpha-edge-gaps",
+            "tolerancePx": 0,
+        },
     }
     approved_preview = ROOT / contract["approval"]["largeLabelReviewPreviewPath"]
     assert sha256(approved_preview) == contract["approval"]["largeLabelReviewPreviewSha256"]
@@ -102,7 +142,13 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
         assert descriptor["markSha256"] == expected_hashes["markSha256"]
         assert descriptor["dotLockupSha256"] == expected_hashes["dotLockupSha256"]
         assert descriptor["dotLockupDimensions"] == expected_hashes["dotLockupDimensions"]
-        assert descriptor["dotLockupStyle"] == "large-edition-label-v1"
+        assert descriptor["dotLockupStyle"] == "large-edition-label-centered-separator-v2"
+        assert descriptor["separatorGeometry"] == expected_hashes["separatorGeometry"]
+        assert descriptor["supersededLargeLabelLockup"] == {
+            "path": expected_hashes["supersededLargeLabelPath"],
+            "sha256": expected_hashes["supersededLargeLabelSha256"],
+            "status": "superseded-by-centered-separator-v2",
+        }
         assert descriptor["supersededDotLockup"] == {
             "path": expected_hashes["supersededPath"],
             "sha256": expected_hashes["supersededSha256"],
@@ -110,6 +156,9 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
         }
         assert sha256(ROOT / descriptor["markPath"]) == expected_hashes["markSha256"]
         assert sha256(ROOT / descriptor["dotLockupPath"]) == expected_hashes["dotLockupSha256"]
+        assert sha256(ROOT / expected_hashes["supersededLargeLabelPath"]) == expected_hashes[
+            "supersededLargeLabelSha256"
+        ]
         assert sha256(ROOT / expected_hashes["supersededPath"]) == expected_hashes[
             "supersededSha256"
         ]
@@ -119,6 +168,28 @@ def test_brand_contract_freezes_approved_names_palettes_and_safety_boundary() ->
                 expected_hashes["dotLockupDimensions"]["height"],
             )
             assert lockup.mode == "RGBA"
+            alpha = lockup.getchannel("A")
+            geometry = expected_hashes["separatorGeometry"]
+            left_gap = geometry["separatorStartX"] - geometry["wordmarkEndX"] - 1
+            right_gap = geometry["editionLabelStartX"] - geometry["separatorEndX"] - 1
+            assert left_gap == right_gap
+            assert left_gap == geometry["leftGapPx"] == geometry["rightGapPx"]
+            assert alpha.crop(
+                (
+                    geometry["wordmarkEndX"] + 1,
+                    0,
+                    geometry["separatorStartX"],
+                    lockup.height,
+                )
+            ).getbbox() is None
+            assert alpha.crop(
+                (
+                    geometry["separatorEndX"] + 1,
+                    0,
+                    geometry["editionLabelStartX"],
+                    lockup.height,
+                )
+            ).getbbox() is None
     assert {
         edition_id: {
             "productName": contract["editions"][edition_id]["productName"],
@@ -158,20 +229,24 @@ def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
     assert manifest["presentationOnly"] is True
     assert manifest["grantsHardwareAuthority"] is False
     assert manifest["conceptAssetsAreReleaseAssets"] is False
-    assert manifest["brandVersion"] == "1.1.0"
+    assert manifest["brandVersion"] == "1.1.1"
     assert manifest["largeLabelApproval"] == {
         "canonicalSources": True,
         "reviewPreviewPath": (
-            "brand/source/approved/edition-brand-large-label-approved-preview.png"
+            "brand/source/approved/edition-brand-centered-separator-approved-preview.png"
         ),
         "reviewPreviewSha256": (
-            "8963661c81db8f9115b37114eccf80580b7bbed02d865e4e648c8503f355a01f"
+            "77d5326be1155528d9585a56de99c80364640ed7f4d488222c7f581ef70da02e"
         ),
         "reviewStudySha256": (
             "9b3e9a274ef51393ffbf8ba3cf5d41224a0cafc9990deddeafcef1a92122353a"
         ),
         "editionLabelHeightRatio": 0.9,
         "preserveNaturalLabelWidth": True,
+        "separatorCentering": {
+            "method": "equal-alpha-edge-gaps",
+            "tolerancePx": 0,
+        },
     }
     assert manifest["contractSha256"] == sha256(CONTRACT_PATH)
     assert manifest["schemaSha256"] == sha256(SCHEMA_PATH)
@@ -189,6 +264,15 @@ def test_manifest_binds_every_generated_byte_dimension_and_ico_frame() -> None:
             manifest["approvedEditionAssets"][edition_id]["dotLockup"]["dimensions"]
             == expected_hashes["dotLockupDimensions"]
         )
+        assert (
+            manifest["approvedEditionAssets"][edition_id]["dotLockup"]["separatorGeometry"]
+            == expected_hashes["separatorGeometry"]
+        )
+        assert manifest["approvedEditionAssets"][edition_id]["supersededLargeLabelLockup"] == {
+            "path": expected_hashes["supersededLargeLabelPath"],
+            "sha256": expected_hashes["supersededLargeLabelSha256"],
+            "status": "superseded-by-centered-separator-v2",
+        }
         assert (
             manifest["approvedEditionAssets"][edition_id]["supersededDotLockup"]
             == {
