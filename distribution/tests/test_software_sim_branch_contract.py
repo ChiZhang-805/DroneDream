@@ -171,6 +171,12 @@ YELLOW_ATTEMPT_10_PLAN_PATH = (
     / "desktop"
     / "yellow-build-attempt-10-392b6fb-plan-ready.v1.json"
 )
+YELLOW_ATTEMPT_10_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-10-392b6fb-owned-base-prepare-failed.v1.json"
+)
 ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH = (
     DISTRIBUTION
     / "sim"
@@ -2073,16 +2079,19 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertTrue(accounting["ordinalNinePermanentlyConsumed"])
         self.assertEqual(accounting["retryMaximum"], 0)
         roots = application["ownedBuildSurface"]
-        snapshot = application["attemptOwnedCacheSnapshot"]["snapshotRoot"]
-        dependency = application["dependencyBundle"]["dependencyRoot"]
-        for path in (
-            roots["sourceRoot"],
-            roots["runRoot"],
-            roots["cargoTargetDir"],
-            snapshot,
-            dependency,
-        ):
-            self.assertFalse(Path(path).exists(), path)
+        self.assertFalse(roots["sourceRootExistsAtPlanFreeze"])
+        self.assertFalse(roots["runRootExistsAtPlanFreeze"])
+        self.assertFalse(roots["cargoTargetDirExistsAtPlanFreeze"])
+        self.assertFalse(
+            application["attemptOwnedCacheSnapshot"]["snapshotRootExistsAtPlanFreeze"]
+        )
+        self.assertFalse(application["dependencyBundle"]["dependencyRootExistsAtPlanFreeze"])
+        failure_owned = load_json(YELLOW_ATTEMPT_10_FAILURE_PATH)["ownedEvidence"]
+        self.assertFalse(failure_owned["sourceRootExists"])
+        self.assertTrue(failure_owned["runRootExists"])
+        self.assertFalse(failure_owned["snapshotRootExists"])
+        self.assertFalse(failure_owned["dependencyRootExists"])
+        self.assertFalse(failure_owned["cargoTargetDirExists"])
         protected = application["protectedHistory"]
         self.assertEqual(
             protected["ordinalNineFailureReceiptSha256"],
@@ -2179,6 +2188,84 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             hashlib.sha256(ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH.read_bytes()).hexdigest(),
             binding["sha256"],
         )
+
+    def test_yellow_attempt_10_failure_freezes_at_owned_base_initialization(
+        self,
+    ) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_10_FAILURE_PATH)
+        self.assertEqual(receipt["state"], "failed-frozen-no-retry")
+        binding = receipt["authorizationBinding"]
+        self.assertEqual(binding["globalCommandApplicationOrdinal"], 10)
+        self.assertFalse(binding["sameAuthorizationReusable"])
+        self.assertFalse(binding["retryAllowed"])
+        failure = receipt["failure"]
+        self.assertEqual(failure["phase"], "prepare-owned-base-initialization")
+        self.assertTrue(failure["preflightPassed"])
+        self.assertTrue(failure["prepareStarted"])
+        self.assertTrue(failure["snapshotOwnedBaseAlreadyExisted"])
+        self.assertTrue(failure["dependencyOwnedBaseAlreadyExisted"])
+        self.assertFalse(failure["attemptLockCreated"])
+        self.assertFalse(failure["detachedSourceCreationStarted"])
+        self.assertFalse(failure["snapshotCreationStarted"])
+        self.assertFalse(failure["dependencyPreparationStarted"])
+        self.assertFalse(failure["executeStarted"])
+        boundary = receipt["deterministicBoundaryEvidence"]
+        self.assertEqual(boundary["runChildrenRelative"], ["receipt", "receipt/npm-logs"])
+        self.assertTrue(boundary["fixtureNewDirectoryCreatedBeforeFailure"])
+        self.assertTrue(boundary["fixtureExistingDirectoryPreserved"])
+        self.assertTrue(boundary["fixtureExceptionCaptured"])
+        self.assertTrue(boundary["fixtureRemovedAfterExactOwnershipCheck"])
+
+    def test_yellow_attempt_10_failure_counts_and_public_values_are_fail_closed(
+        self,
+    ) -> None:
+        receipt = load_json(YELLOW_ATTEMPT_10_FAILURE_PATH)
+        counts = receipt["executionCounts"]
+        self.assertEqual(counts["launcherInvocations"], 1)
+        self.assertEqual(counts["publicRepositoryVariableFetches"], 2)
+        self.assertEqual(counts["controlledChildInvocations"], 2)
+        self.assertEqual(counts["preflightInvocations"], 1)
+        self.assertEqual(counts["prepareInvocations"], 1)
+        self.assertEqual(counts["attemptSpecificDirectoriesCreated"], 3)
+        for key in (
+            "executeInvocations",
+            "attemptLockFilesCreated",
+            "detachedSourceCreations",
+            "snapshotsCreated",
+            "selectedCacheFilesCopied",
+            "npmCiInvocations",
+            "dependencyNetworkInvocations",
+            "junctionsCreated",
+            "buildScriptInvocations",
+            "frontendBuilds",
+            "tauriBuilds",
+            "cargoBuilds",
+            "nsisBuilds",
+            "artifactBuilds",
+            "installations",
+            "runtimeStarts",
+            "px4GazeboStarts",
+            "hardwareActions",
+            "deployments",
+            "automaticRetries",
+        ):
+            self.assertEqual(counts[key], 0, key)
+        public = receipt["publicConfigurationCapture"]
+        self.assertFalse(public["valuesPrinted"])
+        self.assertFalse(public["valuesPersisted"])
+        self.assertFalse(public["valuesPlacedOnCommandLine"])
+        self.assertFalse(public["launchingProcessValuesPresentAfterFinally"])
+        self.assertFalse(public["secretServiceRoleAccountTokenOrModelKeyRead"])
+        owned = receipt["ownedEvidence"]
+        self.assertFalse(owned["sourceRootExists"])
+        self.assertTrue(owned["runRootExists"])
+        self.assertFalse(owned["snapshotRootExists"])
+        self.assertFalse(owned["dependencyRootExists"])
+        self.assertFalse(owned["cargoTargetDirExists"])
+        self.assertTrue(owned["createdDirectoriesFrozenReadOnly"])
+        self.assertFalse(receipt["nonClaims"]["artifactCreated"])
+        self.assertTrue(receipt["nextGate"]["requiresGreenIdempotentOwnedBaseFix"])
+        self.assertFalse(receipt["nextGate"]["executeMayProceed"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
