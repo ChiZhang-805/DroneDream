@@ -30,7 +30,6 @@ EDITION_BUILD_BACKFLOW_PATHS = {
 }
 ENGINE_PROFILE_BACKFLOW_PATHS = {
     "desktop/scripts/verify-updater-build-contract.ps1",
-    "desktop/src-tauri/build.rs",
     "engine-pack/manifest.schema.json",
     "engine-pack/tests/test_engine_pack.py",
     "engine-pack/tests/test_engine_pack_manager.py",
@@ -52,16 +51,14 @@ FIELD_CONTRACT_PREFIXES = (
 )
 FIELD_EDITION_PATHS = {
     "desktop/package.json",
+    "desktop/src-tauri/build.rs",
     "distribution/editions/field.v1.json",
     "distribution/runtime-contract-registry.v1.json",
     "frontend/package.json",
 }
 PROTECTED_EVIDENCE_PREFIXES = ("artifacts/test-runs/",)
 FIELD_EVIDENCE_PREFIXES = (
-    "artifacts/test-runs/field-preview-",
-    "artifacts/test-runs/field-install-acceptance-",
-    "artifacts/test-runs/field-host-contained-",
-    "artifacts/test-runs/field-host-phase-",
+    "artifacts/test-runs/field-",
 )
 FIELD_BRANDING_MANIFEST = Path("distribution/editions/field/branding/source-manifest.v1.json")
 FIELD_TAURI_CONFIG = Path("desktop/src-tauri/tauri.field.conf.json")

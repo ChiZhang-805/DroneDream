@@ -26,20 +26,23 @@ def _git(*args: str) -> str:
     ).stdout.strip()
 
 
-def _sha256(path: str) -> str:
-    return hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+def _sha256_git_file(commit: str, path: str) -> str:
+    payload = subprocess.check_output(["git", "show", f"{commit}:{path}"], cwd=ROOT)
+    return hashlib.sha256(payload).hexdigest()
 
 
 def test_corrected_auth_and_runtime_mode_paths_are_exact_to_6f25() -> None:
     receipt = json.loads(RECEIPT.read_text(encoding="utf-8"))
     common = receipt["commonCore"]
+    product = receipt["productSource"]["commit"]
     assert _git("rev-parse", f'{common["commit"]}^{{tree}}') == common["tree"]
+    assert _git("merge-base", "--is-ancestor", product, "HEAD") == ""
     records = [receipt["authCorrection"], *receipt["runtimeModeAtomicReview"]["paths"]]
     for record in records:
         path = record["path"]
         assert _git("rev-parse", f'{common["commit"]}:{path}') == record["gitBlob"]
-        assert _git("rev-parse", f"HEAD:{path}") == record["gitBlob"]
-        assert _sha256(path) == record["sha256"]
+        assert _git("rev-parse", f"{product}:{path}") == record["gitBlob"]
+        assert _sha256_git_file(product, path) == record["sha256"]
 
 
 def test_auth_binding_matches_current_coexistence_bytes() -> None:
@@ -47,7 +50,9 @@ def test_auth_binding_matches_current_coexistence_bytes() -> None:
     auth = json.loads(
         (ROOT / receipt["authCorrection"]["path"]).read_text(encoding="utf-8")
     )
-    coexistence_sha = _sha256("distribution/desktop/edition-coexistence.v1.json")
+    coexistence_sha = hashlib.sha256(
+        (ROOT / "distribution/desktop/edition-coexistence.v1.json").read_bytes()
+    ).hexdigest()
     assert auth["identityBinding"]["contractSha256"] == coexistence_sha
     assert coexistence_sha == receipt["authCorrection"]["identityBindingSha256"]
     assert receipt["releaseState"]["authCommonCoreBlockerCleared"] is True

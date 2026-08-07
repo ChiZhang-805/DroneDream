@@ -133,7 +133,7 @@ class FieldCommonCoreSyncAcceptanceTests(unittest.TestCase):
             set(acceptance.BACKFLOW_GROUPS),
         )
 
-    def test_current_universal_product_source_is_accepted(self) -> None:
+    def test_superseded_6f25_product_source_is_rejected_after_forward_sync(self) -> None:
         request = acceptance.build_repository_acceptance_request(
             universal_commit="6f25bb5051794842a8dfc6d02d199c5f93afce7c",
             universal_common_core_hash=(
@@ -145,13 +145,13 @@ class FieldCommonCoreSyncAcceptanceTests(unittest.TestCase):
         )
         receipt = acceptance.evaluate_sync_acceptance(request, repo_root=ROOT)
 
-        self.assertEqual(receipt["acceptanceDecision"], "accept")
-        self.assertFalse(receipt["commonCoreBackflowPending"])
+        self.assertEqual(receipt["acceptanceDecision"], "deny")
+        self.assertTrue(receipt["commonCoreBackflowPending"])
         self.assertEqual(
             receipt["source"]["universalCommit"],
             "6f25bb5051794842a8dfc6d02d199c5f93afce7c",
         )
-        self.assertNotIn("field.common-core-backflow.pending", receipt["blockers"])
+        self.assertIn("field.common-core-backflow.pending", receipt["blockers"])
         self.assertFalse(receipt["buildAllowed"])
         self.assertEqual(receipt["validatedHardwarePackCount"], 0)
 

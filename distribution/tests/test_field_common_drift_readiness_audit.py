@@ -57,11 +57,14 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         by_path = {item["path"]: item for item in audit["changedPaths"]}
         self.assertNotIn("distribution/tools/edition_build_planner.py", by_path)
         for integrated_path in (
-            "desktop/src-tauri/build.rs",
             "engine-pack/tests/test_engine_pack.py",
             "engine-pack/tools/engine_pack.py",
         ):
             self.assertNotIn(integrated_path, by_path)
+        self.assertEqual(
+            by_path["desktop/src-tauri/build.rs"]["classification"],
+            "field-specific-contract",
+        )
         self.assertEqual(
             by_path["distribution/tools/field_prerelease_audit.py"]["classification"],
             "field-specific-contract",
@@ -71,7 +74,10 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
             "field-specific-contract",
         )
         self.assertEqual(audit["summary"]["universalCommonCorePathCount"], 0)
-        self.assertEqual(audit["summary"]["protectedEvidenceDriftCount"], 0)
+        self.assertEqual(
+            audit["summary"]["protectedEvidenceDriftCount"],
+            len(audit["protectedEvidencePlan"]["paths"]),
+        )
         field_evidence = [
             item
             for item in audit["changedPaths"]
@@ -105,11 +111,16 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertIn("universal-core-engine-pack-edition-profile", plan_ids)
         self.assertIn("universal-core-field-contract-retention-hook", plan_ids)
 
-    def test_protected_evidence_no_longer_differs_from_universal(self) -> None:
+    def test_protected_evidence_is_preserved_without_backflow(self) -> None:
         audit = audit_tool.validate_common_core_drift_audit(self.audit)
         protected = audit["protectedEvidencePlan"]
         self.assertEqual(protected["backflowAction"], "none")
-        self.assertEqual(protected["paths"], [])
+        self.assertTrue(
+            all(
+                item["action"] == "do-not-backflow-delete-coordinate-evidence-owner"
+                for item in protected["paths"]
+            )
+        )
 
     def test_preview_build_readiness_is_fail_closed_and_non_executing(self) -> None:
         receipt = audit_tool.validate_field_preview_readiness_receipt(self.receipt)
@@ -139,7 +150,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
         self.assertEqual(structure["updaterManifestFilename"], "latest-field.json")
         self.assertEqual(
             structure["canonicalDonor"]["commit"],
-            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+            "6de4f1343c0239a916949f0486fa63d3f460d6a8",
         )
         self.assertEqual(structure["simulatorReferences"], [])
         self.assertEqual(structure["verificationErrors"], [])
@@ -163,7 +174,7 @@ class FieldCommonDriftReadinessAuditTests(unittest.TestCase):
                 "field-mark":
                     "751372c87bc9630afc2482f5510fa51f8f52d0702a72f58307fc5ed23f9ba7f5",
                 "field-large-label-lockup":
-                    "588c5aca42b09fa3396efc63a7423bbf1e182379e1a41427f716a1b9f73fbd27",
+                    "e3e88cf4c14b9afdb31f1d9152fd7795f0eaec8ef63e8fd4ae52171eae09b0fa",
             },
         )
 

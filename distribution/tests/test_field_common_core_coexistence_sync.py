@@ -18,10 +18,6 @@ RECEIPT_PATH = (
 )
 
 
-def sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
 def sha256_git_file(commit: str, path: str) -> str:
     completed = subprocess.run(
         ["git", "-C", str(ROOT), "show", f"{commit}:{path}"],
@@ -48,12 +44,12 @@ def validate_receipt(receipt: dict[str, object]) -> None:
     if donor["pathCount"] != 8 or donor["allGitBlobsExact"] is not True:
         raise ValueError("donor path gate drifted")
     for record in donor["paths"]:
-        path = ROOT / record["path"]
         if git("rev-parse", f'{donor["donorCommit"]}:{record["path"]}') != record["gitBlob"]:
             raise ValueError("donor blob drifted")
-        if git("rev-parse", f'HEAD:{record["path"]}') != record["gitBlob"]:
+        source_commit = receipt["source"]["fieldProductCommit"]
+        if git("rev-parse", f'{source_commit}:{record["path"]}') != record["gitBlob"]:
             raise ValueError("integrated blob drifted")
-        if path.stat().st_size != record["bytes"] or sha256_file(path) != record["sha256"]:
+        if sha256_git_file(source_commit, record["path"]) != record["sha256"]:
             raise ValueError("integrated file identity drifted")
     if receipt["safety"] != {
         "validatedHardwarePackCount": 0,

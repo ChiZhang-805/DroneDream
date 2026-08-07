@@ -26,8 +26,9 @@ def _git(*args: str) -> str:
     ).stdout.strip()
 
 
-def _sha256(path: str) -> str:
-    return hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+def _sha256_git_file(commit: str, path: str) -> str:
+    payload = subprocess.check_output(["git", "show", f"{commit}:{path}"], cwd=ROOT)
+    return hashlib.sha256(payload).hexdigest()
 
 
 def test_receipt_binds_exact_product_donors_and_common_profile_dependencies() -> None:
@@ -58,26 +59,27 @@ def test_receipt_binds_exact_product_donors_and_common_profile_dependencies() ->
 def test_receipt_binds_field_namespaces_brand_and_unresolved_auth_blocker() -> None:
     receipt = json.loads(RECEIPT.read_text(encoding="utf-8"))
     field = receipt["fieldBindings"]
+    product_source = receipt["productSource"]["commit"]
     assert field["runtimeProfileId"] == "field-lightweight"
     assert field["compiledEditionId"] == "field"
     assert field["authClientId"] == "dronedream-desktop-field"
     assert field["updaterMetadataFilename"] == "latest-field.json"
-    assert _sha256(field["tauriOverlayPath"]) == field["tauriOverlaySha256"]
-    assert _sha256(field["fieldAuthControlPath"]) == field["fieldAuthControlSha256"]
+    assert _sha256_git_file(product_source, field["tauriOverlayPath"]) == field["tauriOverlaySha256"]
+    assert _sha256_git_file(product_source, field["fieldAuthControlPath"]) == field["fieldAuthControlSha256"]
 
     brand = receipt["canonicalBrand"]
-    assert _sha256("brand/generated/brand-assets.v1.json") == brand["manifestSha256"]
-    assert _sha256("brand/source/approved/field-large-label-lockup.png") == brand[
+    assert _sha256_git_file(product_source, "brand/generated/brand-assets.v1.json") == brand["manifestSha256"]
+    assert _sha256_git_file(product_source, "brand/source/approved/field-large-label-lockup.png") == brand[
         "fieldLargeLockupSha256"
     ]
-    assert _sha256("brand/generated/field/windows/icon.ico") == brand[
+    assert _sha256_git_file(product_source, "brand/generated/field/windows/icon.ico") == brand[
         "fieldWindowsIconSha256"
     ]
 
     blocker = receipt["universalAuthBindingBlocker"]
     assert blocker["cleared"] is False
     assert blocker["coexistenceActualSha256"] != blocker["authBoundCoexistenceSha256"]
-    assert _sha256(blocker["proposalPath"]) == blocker["proposalSha256"]
+    assert _sha256_git_file(product_source, blocker["proposalPath"]) == blocker["proposalSha256"]
 
 
 def test_receipt_keeps_zero_pack_hardware_and_release_gates_closed() -> None:

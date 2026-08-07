@@ -28,8 +28,9 @@ def _git(*args: str) -> str:
     ).stdout.strip()
 
 
-def _sha256(path: str) -> str:
-    return hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
+def _sha256_git_file(commit: str, path: str) -> str:
+    payload = subprocess.check_output(["git", "show", f"{commit}:{path}"], cwd=ROOT)
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _load_module(relative: str, name: str):
@@ -52,7 +53,7 @@ def test_synced_paths_and_dependencies_are_exact_to_current_common_core() -> Non
         path = record["path"]
         assert _git("rev-parse", f'{source["commit"]}:{path}') == record["gitBlob"]
         assert _git("rev-parse", f'{common["commit"]}:{path}') == record["gitBlob"]
-        assert _sha256(path) == record["sha256"]
+        assert _sha256_git_file(source["commit"], path) == record["sha256"]
 
 
 def test_all_historical_backflow_groups_now_match_universal() -> None:
