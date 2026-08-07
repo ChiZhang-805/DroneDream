@@ -2088,6 +2088,24 @@ input:focus-visible {
   border: 1px solid var(--field-line);
 }
 
+.field-adapter-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.field-adapter-actions button {
+  min-height: 38px;
+  padding: 0 14px;
+  color: #ffffff;
+  background: var(--field-ink);
+  border: 1px solid var(--field-ink);
+}
+
+.field-adapter-actions button svg {
+  width: 15px;
+  height: 15px;
+}
+
 .field-adapter-offline,
 .field-adapter-boundary {
   color: var(--field-muted);

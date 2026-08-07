@@ -44,7 +44,9 @@ const COPY = {
     parameters: "Parameters",
     delivery: "Availability",
     install: "Install",
+    installAll: "Install all open adapters",
     installing: "Installing",
+    installingAll: "Installing open adapters",
     installed: "Installed",
     available: "Offline parser available",
     vendorAccess: "Vendor access required",
@@ -89,7 +91,9 @@ const COPY = {
     parameters: "参数",
     delivery: "可用状态",
     install: "安装",
+    installAll: "安装全部开放协议适配器",
     installing: "正在安装",
+    installingAll: "正在安装开放协议适配器",
     installed: "已安装",
     available: "可启用离线解析器",
     vendorAccess: "需要厂商授权",
@@ -220,6 +224,41 @@ export function FieldAdapterCenter({
     () => catalog.entries.filter((entry) => entry.installed).length,
     [catalog.entries],
   );
+  const pendingManagedAdapters = useMemo(
+    () => catalog.entries.filter((entry) => (
+      entry.installable
+      && !entry.installed
+      && entry.deliveryMode === "embedded-managed"
+      && entry.packageSha256 !== null
+    )),
+    [catalog.entries],
+  );
+  const installAll = useCallback(async () => {
+    if (!desktop || busyAdapterId !== null || pendingManagedAdapters.length === 0) return;
+    setBusyAdapterId("all");
+    setError(null);
+    try {
+      for (const entry of pendingManagedAdapters) {
+        if (!entry.packageSha256) {
+          throw new Error("Managed adapter package hash is missing.");
+        }
+        await installFieldAdapter({
+          adapterId: entry.adapterId,
+          expectedPackageSha256: entry.packageSha256,
+        });
+      }
+      setCatalog(await getFieldAdapterCatalog());
+    } catch (reason) {
+      setError(`${copy.installError} ${reason instanceof Error ? reason.message : String(reason)}`);
+      try {
+        setCatalog(await getFieldAdapterCatalog());
+      } catch {
+        // Preserve the installation failure as the primary diagnostic.
+      }
+    } finally {
+      setBusyAdapterId(null);
+    }
+  }, [busyAdapterId, copy.installError, desktop, pendingManagedAdapters]);
   const installedMavlinkAdapters = useMemo(
     () => catalog.entries.filter((entry) => (
       entry.installed
@@ -361,6 +400,16 @@ export function FieldAdapterCenter({
           <RefreshCw className={loading ? "field-auth-spinner" : undefined} aria-hidden="true" />
         </button>
       </div>
+      <div className="field-adapter-actions">
+        <button
+          type="button"
+          disabled={!desktop || busyAdapterId !== null || pendingManagedAdapters.length === 0}
+          onClick={() => void installAll()}
+        >
+          <Download aria-hidden="true" />
+          {busyAdapterId === "all" ? copy.installingAll : copy.installAll}
+        </button>
+      </div>
 
       {!desktop ? (
         <p className="field-adapter-offline"><WifiOff aria-hidden="true" />{copy.offline}</p>
@@ -381,7 +430,7 @@ export function FieldAdapterCenter({
           </thead>
           <tbody>
             {catalog.entries.map((entry) => {
-              const busy = busyAdapterId === entry.adapterId;
+              const busy = busyAdapterId === entry.adapterId || busyAdapterId === "all";
               return (
                 <tr key={entry.adapterId}>
                   <td>
@@ -401,7 +450,12 @@ export function FieldAdapterCenter({
                     <button
                       type="button"
                       className="field-adapter-install"
-                      disabled={!desktop || busy || entry.installed || !entry.installable}
+                      disabled={
+                        !desktop
+                        || busyAdapterId !== null
+                        || entry.installed
+                        || !entry.installable
+                      }
                       onClick={() => void install(entry)}
                     >
                       {entry.installed

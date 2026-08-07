@@ -168,6 +168,56 @@ describe("FieldAdapterCenter", () => {
     expect(screen.getByText("Vendor access required")).toBeInTheDocument();
   });
 
+  it("installs every available managed adapter serially without enabling vendor SDKs", async () => {
+    const secondManaged = {
+      ...report.entries[0]!,
+      adapterId: "betaflight-msp-v1",
+      displayName: { en: "Betaflight / INAV MSP", "zh-CN": "Betaflight / INAV MSP" },
+      vendor: "Betaflight / INAV",
+      protocolFamily: "MultiWii Serial Protocol v1",
+      packageSha256: "c".repeat(64),
+    };
+    vi.mocked(getFieldAdapterCatalog).mockResolvedValue({
+      ...report,
+      entries: [report.entries[0]!, secondManaged, report.entries[1]!],
+    });
+    let activeInstalls = 0;
+    let maximumConcurrentInstalls = 0;
+    const installOrder: string[] = [];
+    vi.mocked(installFieldAdapter).mockImplementation(async (request) => {
+      activeInstalls += 1;
+      maximumConcurrentInstalls = Math.max(maximumConcurrentInstalls, activeInstalls);
+      installOrder.push(request.adapterId);
+      await new Promise((resolve) => window.setTimeout(resolve, 5));
+      activeInstalls -= 1;
+      return {
+        schemaVersion: 1,
+        kind: "dronedream-field-adapter-install-receipt",
+        editionId: "field",
+        adapterId: request.adapterId,
+        packageSha256: request.expectedPackageSha256,
+        state: "installed",
+        executableCodeInstalled: false,
+        deviceOpenAttempts: 0,
+        hardwareWriteAttempts: 0,
+        hardwareAuthority: false,
+      };
+    });
+    render(<FieldAdapterCenter locale="en" />);
+    const installAll = await screen.findByRole("button", {
+      name: "Install all open adapters",
+    });
+
+    fireEvent.click(installAll);
+
+    await waitFor(() => expect(installFieldAdapter).toHaveBeenCalledTimes(2));
+    expect(installOrder).toEqual(["mavlink-common-v2", "betaflight-msp-v1"]);
+    expect(maximumConcurrentInstalls).toBe(1);
+    expect(installFieldAdapter).not.toHaveBeenCalledWith(
+      expect.objectContaining({ adapterId: "dji-enterprise-sdk" }),
+    );
+  });
+
   it("requires an installed adapter, observed port, and explicit read-only confirmation", async () => {
     vi.mocked(getFieldAdapterCatalog).mockResolvedValue({
       ...report,
