@@ -370,6 +370,8 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "../../brand/generated/brand-visual-receipt.v1.json":
             "branding/canonical-brand-visual-receipt.v1.json",
         "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico",
+        "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md":
+            "licenses/Field-Adapter-THIRD-PARTY-NOTICES.md",
     }
     effective_resource_records = []
     config_root = (repo_root / FIELD_TAURI_CONFIG).parent
@@ -414,6 +416,8 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
             "../../brand/generated/brand-visual-receipt.v1.json":
                 "branding/canonical-brand-visual-receipt.v1.json",
             "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico",
+            "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md":
+                "licenses/Field-Adapter-THIRD-PARTY-NOTICES.md",
         },
         "effectiveResourceSet": resources == expected_effective_resources,
         "universalIconSourceRemoved": "icons/icon.ico" not in resources,
@@ -423,6 +427,7 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
                 "../../LICENSE",
                 "../../runtime/THIRD_PARTY_NOTICES.md",
                 "../../runtime/licenses/valkey-COPYING",
+                "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md",
             )
         ),
         "resourceUpperBound": effective_resource_bytes <= FIELD_RESOURCE_UPPER_BOUND_BYTES,

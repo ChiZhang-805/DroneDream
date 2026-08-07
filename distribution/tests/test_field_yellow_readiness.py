@@ -90,8 +90,12 @@ class FieldYellowReadinessTests(unittest.TestCase):
         self.assertIn("../../runtime/THIRD_PARTY_NOTICES.md", resources)
         self.assertIn("../../runtime/licenses/valkey-COPYING", resources)
         self.assertEqual(
+            resources["../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md"],
+            "licenses/Field-Adapter-THIRD-PARTY-NOTICES.md",
+        )
+        self.assertEqual(
             desktop["canonicalDonor"]["commit"],
-            "b8e0d0c7093abe9f54fe36f01022deb95852fa39",
+            "6de4f1343c0239a916949f0486fa63d3f460d6a8",
         )
         self.assertEqual(
             next(item for item in resources if item.endswith("field/windows/icon.ico")),
