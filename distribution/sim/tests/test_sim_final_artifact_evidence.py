@@ -13,6 +13,9 @@ RECORD = (
     / "desktop"
     / "yellow-build-attempt-15-79a718d-static-accepted.v1.json"
 )
+APPLICATION = (
+    ROOT / "distribution" / "sim" / "lifecycle" / "red-fcabd99f-final-application.v1.json"
+)
 
 
 def sha256(path: Path) -> str:
@@ -98,3 +101,39 @@ def test_mounted_final_candidate_rehashes_when_present() -> None:
         if path.exists():
             assert path.is_file()
             assert sha256(path) == record["evidence"][sha_key]
+
+
+def test_final_candidate_lifecycle_application_is_single_attempt_and_fail_closed() -> None:
+    application = json.loads(APPLICATION.read_text(encoding="utf-8"))
+    artifact = application["artifact"]
+    runner = application["runner"]
+    runner_path = ROOT / runner["path"]
+    static_path = ROOT / artifact["staticAcceptancePath"]
+    assert artifact["sha256"] == "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e"
+    assert static_path.stat().st_size == artifact["staticAcceptanceBytes"]
+    assert sha256(static_path) == artifact["staticAcceptanceSha256"]
+    assert runner_path.stat().st_size == runner["bytes"]
+    assert sha256(runner_path) == runner["sha256"]
+    assert runner["maximumExecuteInvocations"] == 1
+    assert runner["automaticRetryAllowed"] is False
+
+    counts = application["acceptanceMatrix"]["exactMaximumCounts"]
+    assert counts["freshInstallerInvocations"] == 1
+    assert counts["overlayInstallerInvocations"] == 1
+    assert counts["applicationLaunches"] == 1
+    assert counts["uninstallerInvocations"] == 1
+    assert counts["pkceBoundaryChecks"] == 1
+    for key in (
+        "browserLoginTransactions",
+        "realTokenExchanges",
+        "credentialReads",
+        "runtimeStarts",
+        "px4Starts",
+        "gazeboStarts",
+        "hardwareActions",
+        "artifactBuilds",
+        "automaticRetries",
+    ):
+        assert counts[key] == 0
+    assert application["protectedState"]["simPreferenceKeyValueParity"] is True
+    assert application["rollback"]["manualProtectedStateDeletionAllowed"] is False

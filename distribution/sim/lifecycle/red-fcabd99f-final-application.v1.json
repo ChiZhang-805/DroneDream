@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-final-candidate-lifecycle-application",
+  "applicationVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "ready-for-single-local-execution",
+  "sourceSeparation": {
+    "productSourceCommit": "79a718dae55c274cf4803a57129e5789012dca03",
+    "productSourceTree": "c6ac1549c352b4331d9d94e78a0b2e8662690023",
+    "toolHeadPolicy": "commit-containing-application-runner-and-tests",
+    "toolEvidenceIsProductSource": false
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal15-79a718d/bundle/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 11944855,
+    "sha256": "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e",
+    "staticAcceptancePath": "distribution/sim/desktop/yellow-build-attempt-15-79a718d-static-accepted.v1.json",
+    "staticAcceptanceBytes": 6968,
+    "staticAcceptanceSha256": "8c013da5e6116f7a54e53fd1fb5fd8fbe291e1e205035b2984a989b35da3f9c1",
+    "rebuildAllowed": false,
+    "relabelAllowed": false
+  },
+  "runner": {
+    "path": "distribution/sim/tools/invoke-red-lifecycle-fcabd99f.ps1",
+    "bytes": 32819,
+    "sha256": "2a515d23e71486d84459b3d669f530b14432c7f07aa10334a0ea8a5ba9ee1470",
+    "modeOrder": ["Plan", "Execute"],
+    "maximumExecuteInvocations": 1,
+    "automaticRetryAllowed": false
+  },
+  "ownedSurface": {
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-fcabd99f-ordinal1",
+    "tempRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-fcabd99f-ordinal1/temp",
+    "evidenceRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-fcabd99f-ordinal1/evidence",
+    "installRoot": "%LOCALAPPDATA%/DroneDream-Sim",
+    "uninstallKey": "HKCU/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+    "preExistingPreferenceKey": "HKCU/Software/DroneDream/DroneDream-Sim",
+    "desktopShortcut": "%USERPROFILE%/Desktop/DroneDream · SIM.lnk",
+    "startMenuShortcut": "%APPDATA%/Microsoft/Windows/Start Menu/Programs/DroneDream · SIM.lnk",
+    "appDataRoots": [
+      "%APPDATA%/io.dronedream.sim",
+      "%LOCALAPPDATA%/io.dronedream.sim"
+    ]
+  },
+  "protectedState": {
+    "legacyUniversalLabFieldInstallRegistryShortcutAndData": true,
+    "simPreferenceKeyValueParity": true,
+    "runtimeStateAndRoots": true,
+    "webView2VersionLocationAndExecutable": true,
+    "snapshotBeforeExecution": true,
+    "parityAfterEveryPhase": true,
+    "manualDeletionAllowed": false
+  },
+  "acceptanceMatrix": {
+    "sequence": [
+      "fresh-en-install",
+      "identity-payload-shortcut-check",
+      "overlay-zh-install",
+      "identity-payload-shortcut-check",
+      "single-app-launch-live-webview2",
+      "pkce-49211-bind-boundary",
+      "owned-uninstall",
+      "residue-and-protected-parity-check"
+    ],
+    "exactMaximumCounts": {
+      "freshInstallerInvocations": 1,
+      "overlayInstallerInvocations": 1,
+      "applicationLaunches": 1,
+      "uninstallerInvocations": 1,
+      "pkceBoundaryChecks": 1,
+      "browserLoginTransactions": 0,
+      "realTokenExchanges": 0,
+      "credentialReads": 0,
+      "runtimeStarts": 0,
+      "px4Starts": 0,
+      "gazeboStarts": 0,
+      "hardwareActions": 0,
+      "artifactBuilds": 0,
+      "automaticRetries": 0
+    }
+  },
+  "rollback": {
+    "mechanism": "single-owned-sim-uninstaller",
+    "ownershipRequiresExactInstallLocationAndUninstallString": true,
+    "sameUninstallerBudgetUsedForFailureRecovery": true,
+    "manualProtectedStateDeletionAllowed": false,
+    "stopAfterFailure": true
+  },
+  "oauthBoundary": {
+    "callback": "http://127.0.0.1:49211/desktop-auth/sim/callback",
+    "listenerBindCheckOnly": true,
+    "browserOpenAllowed": false,
+    "credentialReadAllowed": false,
+    "realTokenExchangeAllowed": false
+  },
+  "nonClaims": {
+    "runRootCreated": false,
+    "installerExecuted": false,
+    "applicationLaunched": false,
+    "runtimeStarted": false,
+    "px4OrGazeboStarted": false,
+    "hardwareUsed": false,
+    "artifactRebuilt": false,
+    "releaseReady": false,
+    "websiteDeployed": false
+  }
+}
