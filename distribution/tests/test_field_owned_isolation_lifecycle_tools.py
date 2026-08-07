@@ -40,6 +40,14 @@ def test_lifecycle_powershell_tools_parse() -> None:
     _parse_powershell(INSTALLER_INSPECTOR)
 
 
+def test_lifecycle_runner_groups_cleanup_state_predicates() -> None:
+    source = RUNNER.read_text(encoding="utf-8-sig")
+    assert (
+        "if ((Test-Path -LiteralPath $productKey) -or -not "
+        "(Test-Path -LiteralPath $sharedProductParent))"
+    ) in source
+
+
 def test_webview_inspector_is_valid_javascript() -> None:
     for inspector in (WEBVIEW_INSPECTOR, LAUNCHER_INSPECTOR):
         result = subprocess.run(

@@ -314,7 +314,7 @@ function Assert-AndRemoveOwnedPreferenceKey {
         throw "Field preference key does not contain the four exact allowed values."
     }
     Remove-Item -LiteralPath $productKey -Recurse -Force
-    if (Test-Path -LiteralPath $productKey -or -not (Test-Path -LiteralPath $sharedProductParent)) {
+    if ((Test-Path -LiteralPath $productKey) -or -not (Test-Path -LiteralPath $sharedProductParent)) {
         throw "Exact Field preference cleanup failed or touched the shared parent."
     }
     $script:counters.ownedPreferenceCleanupInvocations++
