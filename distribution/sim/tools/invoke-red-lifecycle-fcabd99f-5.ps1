@@ -763,9 +763,7 @@ try {
         $desktopShortcut,
         $startMenuShortcut,
         $internalDesktopShortcut,
-        $internalStartMenuShortcut,
-        $roamingAppData,
-        $localAppData
+        $internalStartMenuShortcut
     )) {
         if (Test-Path -LiteralPath $path) {
             throw "Fresh Sim precondition failed: $path"
@@ -790,6 +788,10 @@ try {
         throw "The exact lifecycle baseline must not contain a pre-existing Installer Language value."
     }
     $protectedBefore = Get-ProtectedState
+    $simAppDataBefore = @(
+        Get-DirectoryRecord -Path $roamingAppData -FingerprintFiles
+        Get-DirectoryRecord -Path $localAppData -FingerprintFiles
+    )
     $receipt.preflight = [ordered]@{
         head = $head
         upstream = $upstream
@@ -801,6 +803,8 @@ try {
         callbackPort49211Free = $true
         runtimeState = "Stopped"
         protectedStateCaptured = $true
+        simAppDataPolicy = "existing-user-state-is-not-a-fresh-install-blocker-and-must-not-be-manually-deleted"
+        simAppDataBefore = $simAppDataBefore
     }
     if ($Mode -ceq "Plan") {
         $receipt.lifecycle.freshEn = "plan-only"

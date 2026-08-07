@@ -272,6 +272,12 @@ def test_fifth_lifecycle_application_restores_runner_owned_locale_before_parity(
     parity = runner_text.index('Assert-SimRemoved -Stage "final-zh-uninstall"')
     assert cleanup < parity
     assert "executionOrdinal = 5" in runner_text
+    assert "existing-user-state-is-not-a-fresh-install-blocker" in runner_text
+    precondition_end = runner_text.index('throw "Fresh Sim precondition failed: $path"')
+    precondition_start = runner_text.rindex("foreach ($path in @(", 0, precondition_end)
+    fresh_precondition = runner_text[precondition_start:precondition_end]
+    assert "$roamingAppData" not in fresh_precondition
+    assert "$localAppData" not in fresh_precondition
     assert fifth["acceptanceMatrix"]["exactMaximumCounts"][
         "installerLanguagePreferenceCleanupWrites"
     ] == 1
