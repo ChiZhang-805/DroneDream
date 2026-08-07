@@ -203,6 +203,7 @@ try {
 } finally {
     $ErrorActionPreference = $previousErrorActionPreference
 }
+$global:LASTEXITCODE = 0
 if ($dependencyGitExitCode -eq 0 -and $dependencyGitRoot) {
     throw "The dependency root must remain outside every Git worktree."
 }

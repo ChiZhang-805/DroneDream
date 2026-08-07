@@ -565,6 +565,48 @@ def test_detached_dependency_contract_accepts_all_editions_without_live_junction
         assert payload["systemTauriAllowed"] is False
 
 
+def test_detached_dependency_verifier_clears_expected_non_git_probe_exit_code(
+    tmp_path: Path,
+) -> None:
+    manifest_path, manifest = _detached_fixture(tmp_path)
+    product_source = manifest["productSource"]
+    assert isinstance(product_source, dict)
+    wrapper = tmp_path / "invoke-verifier.ps1"
+    wrapper.write_text(
+        textwrap.dedent(
+            f"""
+            $ErrorActionPreference = 'Stop'
+            & '{str(DETACHED_VERIFIER).replace("'", "''")}' `
+              -ManifestPath '{str(manifest_path).replace("'", "''")}' `
+              -RepoRoot '{str(ROOT).replace("'", "''")}' `
+              -EditionId 'sim' `
+              -ExpectedSourceCommit '{product_source["commit"]}' `
+              -ExpectedSourceTree '{product_source["tree"]}' `
+              -FrontendDistPath '{str(ROOT / "frontend" / "dist").replace("'", "''")}' `
+              -InstallerBundlePath '{str(tmp_path / "installer").replace("'", "''")}' `
+              -ContractOnly | Out-Null
+            exit $LASTEXITCODE
+            """
+        ),
+        encoding="utf-8-sig",
+    )
+    result = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(wrapper),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_detached_dependency_contract_rejects_source_hash_tool_tree_mount_and_policy_drift(
     tmp_path: Path,
 ) -> None:
