@@ -140,6 +140,9 @@ const profiles = {
 
 const copy = (locale) => ({
   title: locale === "zh-CN" ? "选择你的 DroneDream 版本" : "Choose Your DroneDream Edition",
+  subtitle: locale === "zh-CN"
+    ? "三个版本分别覆盖仿真搜索、实验验证和受控真机现场调参。"
+    : "Three focused editions cover simulation search, lab validation, and controlled field tuning.",
   productNav: locale === "zh-CN" ? "产品" : "Product",
   priceNav: locale === "zh-CN" ? "价格" : "Pricing",
   universalDisabled: locale === "zh-CN"
@@ -193,8 +196,15 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
     titleRange.selectNodeContents(title);
     if (titleRange.getClientRects().length !== 1) violations.push("Product page title wraps to multiple lines");
   }
-  if (document.querySelector(".site-product-page-header p")) {
-    violations.push("Product page explanatory copy remains under the title");
+  const subtitle = document.querySelector(".site-product-page-header p");
+  if (!subtitle || nameOf(subtitle) !== expected.subtitle) {
+    violations.push("Product page subtitle is missing or incorrect");
+  } else if (viewportWidth > 900) {
+    const subtitleRange = document.createRange();
+    subtitleRange.selectNodeContents(subtitle);
+    if (subtitleRange.getClientRects().length !== 1) {
+      violations.push("Product page subtitle wraps on desktop");
+    }
   }
   if (visible(header) && visible(shell) && viewportWidth > 900) {
     const shellRect = shell.getBoundingClientRect();
@@ -309,6 +319,84 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
   const inventedDownloads = [...document.querySelectorAll(".site-product-edition a[href]")]
     .filter((node) => /DroneDream-(Sim|Lab|Field|Universal)-1\.0\.0\.exe/u.test(node.getAttribute("href") ?? ""));
   if (inventedDownloads.length > 0) violations.push("planned product package has a live download link");
+
+  for (const card of cards) {
+    const edition = card.dataset.edition ?? "edition";
+    const items = [...card.querySelectorAll("li")].filter(visible);
+    if (items.length !== 6) violations.push(`${edition} feature list should contain 6 items, found ${items.length}`);
+    const topline = card.querySelector(".site-product-edition-topline");
+    const action = card.querySelector(".site-product-edition-action");
+    const picture = card.querySelector(".site-product-edition-picture");
+    if (topline && action && picture) {
+      const actionRect = action.getBoundingClientRect();
+      const pictureRect = picture.getBoundingClientRect();
+      const actionCenter = actionRect.top + actionRect.height / 2;
+      const pictureCenter = pictureRect.top + pictureRect.height / 2;
+      if (Math.abs(actionCenter - pictureCenter) > 8) {
+        violations.push(`${edition} brand and download action are vertically misaligned`);
+      }
+    }
+
+    const list = card.querySelector("ul");
+    const screenshotFrame = card.querySelector(".site-product-screenshots");
+    const screenshot = screenshotFrame?.querySelector("img");
+    const buttons = screenshotFrame ? [...screenshotFrame.querySelectorAll("button")] : [];
+    if (!list || !screenshotFrame || !screenshot || buttons.length !== 2) {
+      violations.push(`${edition} screenshot carousel is incomplete`);
+      continue;
+    }
+    const listRect = list.getBoundingClientRect();
+    const frameRect = screenshotFrame.getBoundingClientRect();
+    const screenshotBelowList = frameRect.top >= listRect.bottom - tolerance;
+    if (
+      screenshotBelowList &&
+      (
+        Math.abs(listRect.left - frameRect.left) > tolerance ||
+        Math.abs(listRect.right - frameRect.right) > tolerance
+      )
+    ) {
+      violations.push(`${edition} screenshot frame is not aligned with the feature rules`);
+    }
+    const frameRatio = frameRect.width / frameRect.height;
+    if (Math.abs(frameRatio - 1.6) > 0.08) {
+      violations.push(`${edition} screenshot frame is not sized like the app viewport`);
+    }
+    const screenshotStyle = getComputedStyle(screenshot);
+    if (screenshotStyle.objectFit !== "contain") {
+      violations.push(`${edition} screenshot image is not configured for full-frame display`);
+    }
+    if (!screenshot.complete || screenshot.naturalWidth <= 0 || screenshot.naturalHeight <= 0) {
+      violations.push(`${edition} screenshot image did not load`);
+    } else {
+      const naturalRatio = screenshot.naturalWidth / screenshot.naturalHeight;
+      if (Math.abs(naturalRatio - 1.6) > 0.04) {
+        violations.push(`${edition} screenshot source is not a complete 16:10 app capture`);
+      }
+    }
+    const imageRect = screenshot.getBoundingClientRect();
+    for (const [buttonIndex, button] of buttons.entries()) {
+      const buttonRect = button.getBoundingClientRect();
+      const buttonStyle = getComputedStyle(button);
+      if (buttonStyle.position !== "absolute") {
+        violations.push(`${edition} screenshot button ${buttonIndex + 1} is not overlayed`);
+      }
+      if (Number.parseInt(buttonStyle.zIndex || "0", 10) < 1) {
+        violations.push(`${edition} screenshot button ${buttonIndex + 1} is below the image layer`);
+      }
+      const opacity = Number.parseFloat(buttonStyle.opacity || "1");
+      if (opacity < 0.45 || opacity > 0.75) {
+        violations.push(`${edition} screenshot button ${buttonIndex + 1} resting opacity is outside the expected range`);
+      }
+      if (
+        buttonRect.left < imageRect.left - tolerance ||
+        buttonRect.right > imageRect.right + tolerance ||
+        buttonRect.top < imageRect.top - tolerance ||
+        buttonRect.bottom > imageRect.bottom + tolerance
+      ) {
+        violations.push(`${edition} screenshot button ${buttonIndex + 1} is not placed on the image`);
+      }
+    }
+  }
 
   if (document.querySelector(".site-product-current")) {
     violations.push("current preview panel remains on Product page");

@@ -37,17 +37,20 @@ describe("ProductPage", () => {
 
     expect(screen.getByRole("heading", { name: "Choose Your DroneDream Edition" }))
       .toBeVisible();
+    expect(screen.getByText(
+      "Three focused editions cover simulation search, lab validation, and controlled field tuning.",
+    )).toBeVisible();
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
-    expect(screen.getByText("Simulation-only tests")).toBeVisible();
+    expect(screen.getByText("Simulation-only test loops")).toBeVisible();
     expect(screen.getByText("No real vehicle control")).toBeVisible();
-    expect(screen.getByText("Sim-to-Real checks")).toBeVisible();
-    expect(screen.getByText("Qualification review")).toBeVisible();
-    expect(screen.getByText("Real vehicle setup")).toBeVisible();
+    expect(screen.getByText("Sim-to-Real calibration")).toBeVisible();
+    expect(screen.getByText("Qualification evidence review")).toBeVisible();
+    expect(screen.getByText("Real vehicle setup flow")).toBeVisible();
     expect(screen.getByText("No simulation stage")).toBeVisible();
-    expect(container.querySelectorAll(".site-product-edition li")).toHaveLength(27);
+    expect(container.querySelectorAll(".site-product-edition li")).toHaveLength(18);
 
     const editionPictures = container.querySelectorAll(
       'picture.site-product-edition-picture'
@@ -161,14 +164,15 @@ describe("ProductPage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "选择你的 DroneDream 版本" })).toBeVisible();
+    expect(screen.getByText("三个版本分别覆盖仿真搜索、实验验证和受控真机现场调参。")).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
-    expect(screen.getByText("纯仿真测试")).toBeVisible();
-    expect(screen.getByText("不控制真机")).toBeVisible();
-    expect(screen.getByText("仿真到真机校验")).toBeVisible();
+    expect(screen.getByText("纯仿真测试闭环")).toBeVisible();
+    expect(screen.getByText("不连接控制真机")).toBeVisible();
+    expect(screen.getByText("仿真到真机校准")).toBeVisible();
     expect(screen.getByText("真机到仿真更新")).toBeVisible();
-    expect(screen.getByText("资格证据复核")).toBeVisible();
+    expect(screen.getByText("资格证据审核")).toBeVisible();
     expect(screen.getByText("真机接入设置")).toBeVisible();
     expect(screen.getByText("现场调参运行")).toBeVisible();
     expect(screen.getByText("实时遥测复核")).toBeVisible();

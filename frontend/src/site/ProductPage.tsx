@@ -19,6 +19,7 @@ type Locale = "en" | "zh-CN";
 
 type ProductCopy = {
   title: string;
+  subtitle: string;
   download: string;
   downloadUnavailable: string;
   previousShot: string;
@@ -36,6 +37,7 @@ type ProductCopy = {
 const copy: Record<Locale, ProductCopy> = {
   en: {
     title: "Choose Your DroneDream Edition",
+    subtitle: "Three focused editions cover simulation search, lab validation, and controlled field tuning.",
     download: "Download",
     downloadUnavailable: "Download unavailable",
     previousShot: "Previous screenshot",
@@ -44,14 +46,11 @@ const copy: Record<Locale, ProductCopy> = {
       sim: {
         title: "DroneDream · SIM",
         features: [
-          "Simulation-only tests",
-          "Autonomous search",
-          "Parameter candidates",
-          "Scenario replay",
-          "Budgeted runs",
-          "Telemetry metrics",
-          "Failure diagnosis",
-          "Holdout evidence",
+          "Simulation-only test loops",
+          "Autonomous parameter search",
+          "Scenario replay scoring",
+          "Telemetry failure metrics",
+          "Holdout evidence review",
           "No real vehicle control",
         ],
         screenshots: [
@@ -63,15 +62,12 @@ const copy: Record<Locale, ProductCopy> = {
       lab: {
         title: "DroneDream · LAB",
         features: [
-          "Sim-to-Real checks",
-          "Real-to-Sim updates",
-          "Calibration workflow",
-          "Mismatch diagnosis",
-          "Qualification review",
-          "Controlled trials",
-          "Evidence handoff",
-          "Receipt comparison",
-          "Lab safety gates",
+          "Sim-to-Real calibration",
+          "Real-to-Sim model updates",
+          "Mismatch diagnosis workflow",
+          "Qualification evidence review",
+          "Controlled trial receipts",
+          "Lab safety gate checks",
         ],
         screenshots: [
           { src: "/docs/en/dashboard.png", alt: "LAB evidence dashboard" },
@@ -82,14 +78,11 @@ const copy: Record<Locale, ProductCopy> = {
       field: {
         title: "DroneDream · FIELD",
         features: [
-          "Real vehicle setup",
-          "Field tuning runs",
-          "Operator safety bounds",
+          "Real vehicle setup flow",
+          "Field tuning run control",
+          "Operator safety boundaries",
           "Live telemetry review",
           "Trial snapshot rollback",
-          "On-site diagnostics",
-          "Parameter application",
-          "Evidence upload",
           "No simulation stage",
         ],
         screenshots: [
@@ -102,6 +95,7 @@ const copy: Record<Locale, ProductCopy> = {
   },
   "zh-CN": {
     title: "选择你的 DroneDream 版本",
+    subtitle: "三个版本分别覆盖仿真搜索、实验验证和受控真机现场调参。",
     download: "下载",
     downloadUnavailable: "暂不可下载",
     previousShot: "上一张截图",
@@ -110,15 +104,12 @@ const copy: Record<Locale, ProductCopy> = {
       sim: {
         title: "DroneDream · SIM",
         features: [
-          "纯仿真测试",
-          "自主参数搜索",
-          "候选参数对比",
-          "场景复现实验",
-          "预算约束运行",
-          "遥测指标复核",
+          "纯仿真测试闭环",
+          "自主参数搜索对比",
+          "场景复现实验记录",
+          "遥测指标评分",
           "失败原因诊断",
-          "留出验证证据",
-          "不控制真机",
+          "不连接控制真机",
         ],
         screenshots: [
           { src: "/docs/zh-CN/flight-setup.png", alt: "SIM 飞行设置页面" },
@@ -129,15 +120,12 @@ const copy: Record<Locale, ProductCopy> = {
       lab: {
         title: "DroneDream · LAB",
         features: [
-          "仿真到真机校验",
+          "仿真到真机校准",
           "真机到仿真更新",
-          "校准工作流程",
           "模型差距诊断",
-          "资格证据复核",
+          "资格证据审核",
           "受控试验验证",
-          "参数交接证据",
-          "试验回执对比",
-          "实验室安全门",
+          "实验安全门控",
         ],
         screenshots: [
           { src: "/docs/zh-CN/dashboard.png", alt: "LAB 证据看板" },
@@ -153,9 +141,6 @@ const copy: Record<Locale, ProductCopy> = {
           "操作员安全边界",
           "实时遥测复核",
           "试验快照回滚",
-          "现场诊断记录",
-          "参数应用流程",
-          "证据上传归档",
           "没有仿真阶段",
         ],
         screenshots: [
@@ -234,6 +219,7 @@ export function ProductPage({
       <div className="site-product-page-shell">
         <header className="site-product-page-header">
           <h1 id="site-product-title">{text.title}</h1>
+          <p>{text.subtitle}</p>
         </header>
 
         <div className="site-product-page-grid">
