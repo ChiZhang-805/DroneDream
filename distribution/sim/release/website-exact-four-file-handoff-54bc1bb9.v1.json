@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-website-exact-four-file-handoff-record",
+  "recordVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "ready-for-website-receive-not-deployed",
+  "productSourceCommit": "4c0021b28161a9fa2210e6deab0edab2e4f8372d",
+  "productSourceTree": "20c1004aeed51a71d2b427ad2ae1ea9b220517ff",
+  "handoffRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-handoffs/website/sim-1.0.0-4c0021b-54bc1bb9",
+  "files": [
+    {
+      "role": "installer",
+      "fileName": "DroneDream-Sim-1.0.0.exe",
+      "bytes": 11920986,
+      "sha256": "54bc1bb939786bbc26f7f9c05a1c831b13b9434338ed62c5a88a59a4f72faf80"
+    },
+    {
+      "role": "updater-signature",
+      "fileName": "DroneDream-Sim-1.0.0.exe.sig",
+      "bytes": 428,
+      "sha256": "8e5ba03eaff41a3fd881779f9bc3fb1fc84fa81b2ac7fe68a61efdf546e36e04"
+    },
+    {
+      "role": "checksum-sidecar",
+      "fileName": "DroneDream-Sim-1.0.0.exe.sha256",
+      "bytes": 92,
+      "sha256": "b097e132c4bfa4c5901b3995fc2750fa545bac6ca5e6111666b57669f438e5ba"
+    },
+    {
+      "role": "handoff-manifest",
+      "fileName": "DroneDream-Sim-1.0.0.handoff.json",
+      "bytes": 4618,
+      "sha256": "c911dd5763ec1e0213b086d794d11aa43d0fa8a07c915dca8eab4b8c5582d2ac"
+    }
+  ],
+  "evidence": {
+    "staticAcceptancePath": "distribution/sim/desktop/yellow-build-attempt-17-4c0021b-static-accepted.v1.json",
+    "staticAcceptanceSha256": "a934f0de2f03961f5a76145db7efe57cf2e37462ba6c063f57c8015b0130260e",
+    "lifecycleAcceptancePath": "distribution/sim/lifecycle/red-54bc1bb9-execution-attempt-1-passed.v1.json",
+    "externalLifecycleReceiptPath": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-54bc1bb9-ordinal1/evidence/lifecycle-receipt.json",
+    "externalLifecycleReceiptBytes": 50311,
+    "externalLifecycleReceiptSha256": "02e37a896e2ee3556b7e62e07779d8cb9bdc67c2212f3441bcccf2014f9960d8"
+  },
+  "brand": {
+    "displayName": "DroneDream · SIM",
+    "centeredSeparatorAssetSha256": "f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e",
+    "separatorGapLeftPx": 53,
+    "separatorGapRightPx": 53,
+    "separatorTolerancePx": 0
+  },
+  "website": {
+    "recipientBranch": "codex/website",
+    "receiveMode": "read-only-no-rebuild-no-rename",
+    "deploymentAuthorized": false,
+    "deployed": false,
+    "downloadUrl": null,
+    "checksumUrl": null,
+    "signatureUrl": null,
+    "releaseTag": null
+  },
+  "releaseReady": true,
+  "websiteHandoffReady": true
+}

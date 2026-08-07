@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-final-candidate-lifecycle-acceptance",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "passed-release-ready-website-handoff-ready",
+  "sourceSeparation": {
+    "productSourceCommit": "4c0021b28161a9fa2210e6deab0edab2e4f8372d",
+    "productSourceTree": "20c1004aeed51a71d2b427ad2ae1ea9b220517ff",
+    "lifecycleToolEvidenceHead": "09cd45887da2c7eed7db84a7f1784b7905380b13",
+    "evidenceIsProductSource": false
+  },
+  "artifact": {
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "version": "1.0.0",
+    "bytes": 11920986,
+    "sha256": "54bc1bb939786bbc26f7f9c05a1c831b13b9434338ed62c5a88a59a4f72faf80",
+    "authenticodeState": "NotSigned",
+    "updaterSignatureSha256": "8e5ba03eaff41a3fd881779f9bc3fb1fc84fa81b2ac7fe68a61efdf546e36e04",
+    "rebuiltDuringLifecycle": false,
+    "relabelled": false
+  },
+  "execution": {
+    "ordinal": 1,
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 1,
+    "uninstallerInvocations": 1,
+    "pkceBoundaryChecks": 1,
+    "installerLanguagePreferenceWrites": 2,
+    "installerLanguagePreferenceCleanupWrites": 1,
+    "browserLoginTransactions": 0,
+    "realTokenExchanges": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "acceptance": {
+    "freshEnglishInstall": "pass",
+    "simplifiedChineseOverlay": "pass",
+    "uninstallRegistrationAndPayload": "pass",
+    "desktopAndStartMenuShortcutTargetAndIcon": "pass",
+    "singleLiveApplicationLaunch": "pass-DroneDream · SIM",
+    "liveWebView2": "pass-io.dronedream.sim",
+    "pkceBoundary": "pass-127.0.0.1-49211-no-browser-no-token",
+    "ownedUninstall": "pass",
+    "protectedStateParity": "pass-after-every-phase",
+    "postInstallRootAbsent": true,
+    "postUninstallKeyAbsent": true,
+    "postShortcutsAbsent": true,
+    "preExistingPreferenceCorePreserved": true,
+    "runnerOwnedInstallerLanguageRemoved": true,
+    "retainedAppDataPolicy": "diagnostics-and-user-state-preserved"
+  },
+  "externalReceipt": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-54bc1bb9-ordinal1/evidence/lifecycle-receipt.json",
+    "bytes": 50311,
+    "sha256": "02e37a896e2ee3556b7e62e07779d8cb9bdc67c2212f3441bcccf2014f9960d8"
+  },
+  "release": {
+    "payloadProfile": "sim-only",
+    "validatedVehiclePackCount": 0,
+    "runtimeBaseEmbedded": false,
+    "hardwareAuthorityGranted": false,
+    "centeredSeparatorAssetSha256": "f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e",
+    "websiteHandoffRecordPath": "distribution/sim/release/website-exact-four-file-handoff-54bc1bb9.v1.json",
+    "websiteHandoffRecordSha256": "5e7e745d264c16bca46f1f0f33a5cdf0b7ce2da769c90efda1237e1407427423",
+    "releaseReady": true,
+    "websiteHandoffReady": true,
+    "websiteDeployed": false
+  },
+  "nonClaims": {
+    "realModelProviderAcceptancePerformed": false,
+    "px4OrGazeboStabilityAcceptancePerformed": false,
+    "hardwareOrHitlUsed": false,
+    "authenticodeSigned": false,
+    "websiteDeploymentPerformed": false
+  }
+}
