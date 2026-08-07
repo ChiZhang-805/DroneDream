@@ -11,7 +11,7 @@ APPLICATION = (
     / "distribution"
     / "sim"
     / "desktop"
-    / "yellow-build-attempt-16-4c0021b-application.v1.json"
+    / "yellow-build-attempt-17-4c0021b-application.v1.json"
 )
 ASSET = (
     ROOT
@@ -69,12 +69,13 @@ def test_rebuild_binds_exact_product_source_and_entry() -> None:
 def test_rebuild_is_single_attempt_and_uses_new_owned_roots() -> None:
     application = load_application()
     accounting = application["attemptAccounting"]
-    assert accounting["globalCommandApplicationOrdinal"] == 16
+    assert accounting["globalCommandApplicationOrdinal"] == 17
     assert accounting["sourceBuildInvocationOrdinal"] == 1
     assert accounting["sourceBuildInvocationMaximum"] == 1
     assert accounting["maximumBuildInvocations"] == 1
     assert accounting["retryMaximum"] == 0
     assert accounting["ordinalFifteenPermanentlyConsumed"] is True
+    assert accounting["ordinalSixteenPermanentlyConsumed"] is True
 
     maximums = application["executionPlan"]["maximums"]
     for key in ("buildScript", "frontend", "tauri", "cargo", "nsis", "artifact"):
@@ -91,9 +92,9 @@ def test_rebuild_is_single_attempt_and_uses_new_owned_roots() -> None:
     )
     assert len(set(roots)) == len(roots)
     assert all(
-        "ordinal16" in value
-        or value.endswith("dds16")
-        or value.endswith("4c0021b28161a9fa")
+        "ordinal17" in value
+        or value.endswith("dds17")
+        or value.endswith("db0abf5102de96a9")
         for value in roots
     )
     assert all(not Path(value).exists() for value in roots)
@@ -119,6 +120,27 @@ def test_rebuild_preserves_sim_authority_and_supersedes_old_artifact() -> None:
     assert application["executionPlan"]["failurePolicy"][
         "ordinalFifteenReuseAllowed"
     ] is False
+    assert application["executionPlan"]["failurePolicy"][
+        "ordinalSixteenReuseAllowed"
+    ] is False
+    assert application["dependencyBundle"]["bundleId"] == (
+        "npm-win32-x64-db0abf5102de96a9"
+    )
+    source_hashes = [
+        item["sha256"] for item in application["stableCacheContract"]["sourceInputs"]
+    ]
+    identity = "\n".join(
+        [
+            application["sourceSeparation"]["productSourceCommit"],
+            *source_hashes,
+            "v24.14.1",
+            "11.11.0",
+            "windows",
+            "x64",
+        ]
+    )
+    derived = hashlib.sha256(identity.encode()).hexdigest()[:16]
+    assert application["dependencyBundle"]["bundleId"] == f"npm-win32-x64-{derived}"
     assert application["nonClaims"]["artifactCreated"] is False
     assert application["nonClaims"]["releaseReady"] is False
 

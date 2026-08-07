@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-failure-receipt",
+  "editionId": "sim",
+  "state": "prepare-failed-frozen-no-retry",
+  "productSourceCommit": "4c0021b28161a9fa2210e6deab0edab2e4f8372d",
+  "productSourceTree": "20c1004aeed51a71d2b427ad2ae1ea9b220517ff",
+  "applicationEvidenceCommit": "7594c2711e79f4c6a03070d4127d1e719299260b",
+  "application": {
+    "path": "distribution/sim/desktop/yellow-build-attempt-16-4c0021b-application.v1.json",
+    "bytes": 17369,
+    "sha256": "4e22dc4c0420d8ba802a6b286b054f4f2a50dd528a64b63be926985c325fd2d4"
+  },
+  "entryScript": {
+    "path": "distribution/sim/desktop/invoke-yellow-build-attempt-16-4c0021b.ps1",
+    "bytes": 27837,
+    "sha256": "80c5f716837d3b066a4031a1a013f0f6c75e135a0fe55f983582e34fb4f6a3ae"
+  },
+  "failure": {
+    "phase": "Prepare",
+    "message": "The dependency bundle identity is not derived from the exact source, locks, and platform.",
+    "classification": "build-application-bundle-id-binding-defect",
+    "productDefectObserved": false,
+    "expectedDerivedBundleId": "npm-win32-x64-db0abf5102de96a9",
+    "configuredBundleId": "npm-win32-x64-4c0021b28161a9fa",
+    "automaticRetryPerformed": false
+  },
+  "executedCounts": {
+    "publicConfigLauncherInvocations": 1,
+    "publicRepositoryVariableFetches": 2,
+    "controlledChildInvocations": 2,
+    "preflights": 1,
+    "prepares": 1,
+    "snapshotsCreated": 1,
+    "selectedCacheFileCopiesMaximum": 646,
+    "npmCiInvocations": 2,
+    "networkInvocationsOutsidePublicConfig": 0,
+    "executes": 0,
+    "junctionsCreated": 0,
+    "buildScriptInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0,
+    "retries": 0
+  },
+  "frozenEvidence": {
+    "sourceRoot": "C:/Users/zju20/dds16",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal16-4c0021b",
+    "snapshotRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm-snapshots/npm-snapshot-ordinal16-4c0021b",
+    "dependencyRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-4c0021b28161a9fa",
+    "cargoTargetRootCreated": false,
+    "artifactCreated": false,
+    "attemptLockSha256": "aa1cfbbbe173d5af0f455e71543bb89cad038c0aa6c61f105b0d53d93fcc1216",
+    "snapshotReceiptSha256": "244f482c9fb5cd3364386bc1ad362e53df05b7aadcccb26995d79aab4ae911a3",
+    "preparationCoreReceiptSha256": "6e219761f3ae95fe67389850223d98f22b5de411b6862fec730973aa886b338b",
+    "generatedInvalidManifestSha256": "6472befc90775462278ba4d0c27fd6247c4ed053612ad0c93d0ce1ab903339d7",
+    "dependencyTreeFingerprint": "4e65a1deddbdb6e7e56e22d3c867a1e4ca4040f654232530020c499f18ceef11",
+    "snapshotFingerprint": "79e5fc0a869acf44a470e63c84bd66e5575f369534ba7445eeeeaeeff18a8622",
+    "rootsReadOnlyAfterFailure": true,
+    "reuseAllowed": false
+  },
+  "nonClaims": {
+    "buildStarted": false,
+    "artifactCreated": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false,
+    "websiteDeployed": false
+  }
+}

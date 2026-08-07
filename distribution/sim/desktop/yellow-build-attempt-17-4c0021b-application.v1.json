@@ -1,0 +1,369 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-public-config-stable-cache-yellow-build-application",
+  "applicationVersion": "1.0.0",
+  "editionId": "sim",
+  "executionClass": "YELLOW",
+  "state": "green-plan-frozen-user-authorized-single-execution",
+  "sourceSeparation": {
+    "productSourceCommit": "4c0021b28161a9fa2210e6deab0edab2e4f8372d",
+    "productSourceTree": "20c1004aeed51a71d2b427ad2ae1ea9b220517ff",
+    "applicationEvidenceIsProductSource": false,
+    "detachedSourceMustBeExactAndClean": true
+  },
+  "stableCacheContract": {
+    "tool": {
+      "path": "distribution/sim/desktop/lockfile-offline-cache.mjs",
+      "gitBlob": "6a6db59963b7c0c6ccf8c7bd63f9607b38a4e1dc",
+      "bytes": 12625,
+      "sha256": "ca0c2cf140713a30fb04210e8446c5750178f984606d1e9fe50ba5b640d397fb"
+    },
+    "contract": {
+      "path": "distribution/sim/readiness/stable-offline-cache-contract.v1.json",
+      "gitBlob": "cba250b9e82c41cab9766e299a759161a824b96c",
+      "bytes": 5506,
+      "sha256": "128b5d497c138fa85877f291afe9761ac2593016633bf18ba79de44c404abdda"
+    },
+    "operatingSystem": "win32",
+    "architecture": "x64",
+    "compatibleLockRows": 330,
+    "uniqueResolvedTarballs": 323,
+    "contentObjectCount": 323,
+    "contentBytes": 55560694,
+    "indexKeyCount": 323,
+    "semanticFingerprint": "fa7523cb1a93b4b3626a3b9132139fea8ed7e2c165097a03545b2e58eaf68a91",
+    "globalWholeCacheFingerprintRequired": false,
+    "ignoredMutableSurfaces": [
+      "_logs",
+      "_npx",
+      "_update-notifier-last-checked",
+      "unreferenced-cacache-objects"
+    ],
+    "sourceInputs": [
+      {
+        "path": "desktop/package.json",
+        "bytes": 1056,
+        "sha256": "ba37f6edb95c454ea0f83130b98f708c0f27990133c705c8c23597ac96fd36b6"
+      },
+      {
+        "path": "desktop/package-lock.json",
+        "bytes": 7449,
+        "sha256": "1138f300f140dfcaf22a6c47d44f676e9ea9294b77a2caabb7fa08ef8340d058"
+      },
+      {
+        "path": "frontend/package.json",
+        "bytes": 2267,
+        "sha256": "cd905e33a1faad2c22b165ba407e16c05d01fbdab1738dd156d616cfee4daf05"
+      },
+      {
+        "path": "frontend/package-lock.json",
+        "bytes": 182857,
+        "sha256": "27b8f36c53be1a02eecbd99801033639662a4697c42ad1141d276c78adbc664a"
+      }
+    ]
+  },
+  "attemptAccounting": {
+    "globalCommandApplicationOrdinal": 17,
+    "sourceApplicationPreflightOrdinal": 1,
+    "snapshotPreparationOrdinal": 1,
+    "snapshotPreparationMaximum": 1,
+    "npmCiInvocationMaximum": 2,
+    "sourceBuildInvocationOrdinal": 1,
+    "sourceBuildInvocationMaximum": 1,
+    "maximumBuildInvocations": 1,
+    "retryMaximum": 0,
+    "ordinalSevenPermanentlyConsumed": true,
+    "ordinalEightPermanentlyConsumed": true,
+    "ordinalNinePermanentlyConsumed": true,
+    "ordinalTenPermanentlyConsumed": true,
+    "ordinalElevenPermanentlyConsumed": true,
+    "ordinalTwelvePermanentlyConsumed": true,
+    "ordinalThirteenPermanentlyConsumed": true,
+    "publicConfigLauncherInvocationMaximum": 1,
+    "publicRepositoryVariableFetchMaximum": 2,
+    "controlledChildInvocationMaximum": 3,
+    "ordinalFifteenPermanentlyConsumed": true,
+    "ordinalSixteenPermanentlyConsumed": true
+  },
+  "buildIdentity": {
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "version": "1.0.0",
+    "displayName": "DroneDream · SIM",
+    "editionId": "sim",
+    "runtimeProfileId": "sim-only",
+    "validatedVehiclePackCount": 0,
+    "hardwareHitlLabFieldPayloadAllowed": false
+  },
+  "attemptOwnedCacheSnapshot": {
+    "globalCacheRoot": "C:/Users/zju20/AppData/Local/npm-cache",
+    "globalCacheReadOnly": true,
+    "ownedBase": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm-snapshots",
+    "snapshotRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm-snapshots/npm-snapshot-ordinal17-4c0021b",
+    "snapshotRootExistsAtPlanFreeze": false,
+    "copyMaximumFiles": 646,
+    "copyMaximumContentFiles": 323,
+    "copyMaximumIndexFiles": 323,
+    "copyMaximumSelectedContentBytes": 55560694,
+    "copyUsesExclusiveCreate": true,
+    "copyEntireGlobalCacheAllowed": false,
+    "snapshotWholeTreeFingerprintKnownAfterPrepare": true,
+    "snapshotWholeTreeFingerprintMustBeFrozenInPreparationReceipt": true,
+    "snapshotWholeTreeFingerprintMustMatchBeforeAndAfterNpmCi": true,
+    "snapshotWholeTreeFingerprintMustMatchBeforeAndAfterBuild": true,
+    "npmLogsRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b/receipt/npm-logs",
+    "npmLogsInsideSnapshotAllowed": false,
+    "snapshotMutationAllowed": false
+  },
+  "dependencyBundle": {
+    "bundleId": "npm-win32-x64-db0abf5102de96a9",
+    "ownedBase": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm",
+    "dependencyRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-db0abf5102de96a9",
+    "dependencyRootExistsAtPlanFreeze": false,
+    "treeFingerprint": "4e65a1deddbdb6e7e56e22d3c867a1e4ca4040f654232530020c499f18ceef11",
+    "entryCount": 18789,
+    "fileCount": 17285,
+    "directoryCount": 1504,
+    "totalFileBytes": 245458213,
+    "tauriCliVersion": "2.11.4",
+    "viteVersion": "7.3.6",
+    "platformBinarySha256": "37c4d79256120893f2c12c1385bce5f7510b5063afdeb09b40a9effec28d0208",
+    "mounts": [
+      {
+        "linkPath": "desktop/node_modules",
+        "targetPath": "desktop/node_modules",
+        "linkType": "junction"
+      },
+      {
+        "linkPath": "frontend/node_modules",
+        "targetPath": "frontend/node_modules",
+        "linkType": "junction"
+      }
+    ],
+    "exactMountCount": 2,
+    "dependencyPayloadAllowed": false
+  },
+  "cleanDependencyTreeContract": {
+    "modulePath": "distribution/sim/desktop/offline-dependency-tree-contract.psm1",
+    "moduleProductSourceGitBlob": "214e949b43619e61defc28f3cd358d9d8914491e",
+    "moduleBytes": 5306,
+    "moduleSha256": "d64724b7a6fffd80e034403cbe799c1a9c64ab2d09b084e47bf8ed110bdaf0c7",
+    "authorityPath": "distribution/sim/desktop/offline-dependency-tree-authority.v1.json",
+    "authorityProductSourceGitBlob": "09194a29b50149bcf73c14e69f658f8159dee501",
+    "authorityBytes": 4680,
+    "authoritySha256": "60f009847367bc5d87026070719b5ac9ca2b59facd9ed4a9f6a1252ddfe26ea0",
+    "authorityKind": "clean-offline-npm-ci-output",
+    "generatedTransientRootsFailClosed": true,
+    "ordinalNineActualCopiedWithoutDiagnosis": false,
+    "fullRealTreeNpmCiInvocationsDuringGreen": 0
+  },
+  "ownedBuildRootContract": {
+    "modulePath": "distribution/sim/desktop/owned-build-root-contract.psm1",
+    "moduleProductSourceGitBlob": "44866698486c1a5ae905619ce8323cbe6fe4049c",
+    "moduleBytes": 4249,
+    "moduleSha256": "9745f04f4024be6a0f69b6fcd4c903e33181c80004aac61acd60e550044d3343",
+    "sharedParentsMustExist": true,
+    "sharedParentsReadOnly": true,
+    "sharedParentsMustBeDirectories": true,
+    "sharedParentsMayBeReparsePoints": false,
+    "attemptRootsMustBeAbsent": true,
+    "attemptDirectoriesUseExclusiveCreate": true,
+    "forceAllowed": false,
+    "pathEscapeAllowed": false,
+    "greenRealRootMutationCount": 0
+  },
+  "detachedSourceBinding": {
+    "strategy": "exact-commit-tree-and-git-blob-with-clean-index",
+    "checkoutEolMayFollowGitAttributes": true,
+    "filesystemByteIdentityAcrossWorktreesRequired": false,
+    "trackedDiffAllowed": false,
+    "stagedDiffAllowed": false,
+    "dependencyContractGitBlob": "214e949b43619e61defc28f3cd358d9d8914491e",
+    "dependencyAuthorityGitBlob": "09194a29b50149bcf73c14e69f658f8159dee501",
+    "ownedRootContractGitBlob": "44866698486c1a5ae905619ce8323cbe6fe4049c"
+  },
+  "ownedBuildSurface": {
+    "sourceRoot": "C:/Users/zju20/dds17",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b",
+    "receiptRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b/receipt",
+    "outputRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b/bundle",
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-4c0021b-ordinal17",
+    "fixedArtifactPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b/bundle/DroneDream-Sim-1.0.0.exe",
+    "fixedSignaturePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b/bundle/DroneDream-Sim-1.0.0.exe.sig",
+    "fixedChecksumPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b/bundle/DroneDream-Sim-1.0.0.exe.sha256",
+    "sourceRootExistsAtPlanFreeze": false,
+    "runRootExistsAtPlanFreeze": false,
+    "outputRootExistsAtPlanFreeze": false,
+    "cargoTargetDirExistsAtPlanFreeze": false
+  },
+  "environmentContract": {
+    "DRONEDREAM_DESKTOP_EDITION_ID": "sim",
+    "DRONEDREAM_EDITION_PROFILE": "sim-only",
+    "VITE_DRONEDREAM_EDITION": "sim",
+    "CARGO_BUILD_JOBS": "2",
+    "DRONEDREAM_OAUTH_CLIENT_ID": "0c2ad943-a0cb-4a2f-9eda-eba44b7f58df",
+    "oauthRedirectUri": "http://127.0.0.1:49211/desktop-auth/sim/callback",
+    "oauthClientIsPublicNoSecret": true,
+    "updaterPrivateKeyPath": "C:/Users/zju20/.tauri/dronedream-updater.key",
+    "updaterExpectedKeyId": "BA3FDCAF71CE2FF5",
+    "updaterPasswordMode": "empty-process-environment-not-recorded",
+    "publicSupabaseVariableNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "publicSupabaseValuesPrintedOrPersisted": false,
+    "buildAndDependencyNetworkAllowed": false,
+    "publicRepositoryVariableCaptureNetworkAllowedOnlyByFutureYellow": true,
+    "modelApiKeyReadAllowed": false,
+    "serviceRoleAllowed": false
+  },
+  "publicConfigurationLauncher": {
+    "path": "distribution/sim/desktop/invoke-github-public-build-config.ps1",
+    "productSourceGitBlob": "e2018c38f50b6e82eaf1a193d5330b8553ea48bf",
+    "bytes": 5947,
+    "sha256": "28b67dd1611a47dd30f9f6b4a4be426951e03f095660991fa0af38d36cd249ec",
+    "repository": "ChiZhang-805/DroneDream",
+    "captureEndpoints": [
+      "repos/ChiZhang-805/DroneDream/actions/variables/VITE_SUPABASE_URL",
+      "repos/ChiZhang-805/DroneDream/actions/variables/VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "responseNameMustExactlyMatchRequest": true,
+    "allowedVariableNamesAreExactAndClosed": true,
+    "valuesEnterOnlyControlledChildEnvironment": true,
+    "valuesOnCommandLineAllowed": false,
+    "valuesInStdoutStderrReceiptOrPlanAllowed": false,
+    "finallyClearsChildEnvironmentAndMemoryReferences": true,
+    "historicalUniversalPatternAuditedReadOnly": true,
+    "historicalSimDotEnvPatternRejected": true,
+    "greenProviderInvocations": 0,
+    "futureProviderInvocationMaximum": 2
+  },
+  "resourceThresholds": {
+    "memoryUsedPercentExclusiveMaximum": 80,
+    "memoryFreeBytesMinimum": 3221225472,
+    "cFreeBytesMinimum": 21474836480,
+    "zFreeBytesMinimum": 16106127360,
+    "heavyProcessMaximum": 0,
+    "cargoBuildJobs": 2
+  },
+  "executionPlan": {
+    "entryScript": {
+      "path": "distribution/sim/desktop/invoke-yellow-build-attempt-17-4c0021b.ps1",
+      "bytes": 27837,
+      "sha256": "4db46fe7dfd9f8720e367cb76f32257e86dccf019f62f19fa5e01e4e57bd8fec",
+      "checkoutEol": "git-attributes-platform-managed",
+      "defaultMode": "Plan"
+    },
+    "exactCommands": {
+      "entryPlan": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-17-4c0021b.ps1 -Mode Plan",
+      "launcherPlan": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-github-public-build-config.ps1 -Mode Plan",
+      "futureAuthorizedSequence": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-github-public-build-config.ps1 -Mode ExecuteSequence -EntryScript C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-attempt-17-4c0021b.ps1 -EntryScriptSha256 4db46fe7dfd9f8720e367cb76f32257e86dccf019f62f19fa5e01e4e57bd8fec"
+    },
+    "controlledChildPhasesInOrder": [
+      "Preflight",
+      "Prepare",
+      "Execute"
+    ],
+    "sourceCheckoutCommand": "git -c core.longpaths=true -C C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream worktree add --detach C:\\Users\\zju20\\dds17 4c0021b28161a9fa2210e6deab0edab2e4f8372d",
+    "maximums": {
+      "preflight": 1,
+      "snapshotPreparation": 1,
+      "selectedCacheFileCopies": 646,
+      "npmCi": 2,
+      "junctionCreation": 2,
+      "buildScript": 1,
+      "frontend": 1,
+      "tauri": 1,
+      "cargo": 1,
+      "nsis": 1,
+      "artifact": 1,
+      "publicConfigLauncher": 1,
+      "publicRepositoryVariableFetch": 2,
+      "controlledChild": 3,
+      "retry": 0
+    },
+    "failurePolicy": {
+      "laterStageRunsAfterFailure": false,
+      "failedOwnedRootsAndReceiptsFrozen": true,
+      "onlyExactOwnedJunctionsMayBeRemoved": true,
+      "recursiveSnapshotDependencyCargoOrHistoryDeletionAllowed": false,
+      "ordinalSevenReuseAllowed": false,
+      "ordinalEightReuseAllowed": false,
+      "ordinalNineReuseAllowed": false,
+      "ordinalTenReuseAllowed": false,
+      "ordinalElevenReuseAllowed": false,
+      "ordinalTwelveReuseAllowed": false,
+      "ordinalThirteenReuseAllowed": false,
+      "ordinalFourteenReuseAllowed": false,
+      "ordinalFifteenReuseAllowed": false,
+      "ordinalSixteenReuseAllowed": false
+    }
+  },
+  "protectedHistory": {
+    "ordinalSevenFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-7-e181d02-cache-drift-preflight-failed.v1.json",
+    "ordinalSevenFailureReceiptSha256": "1c8a47be33a394e3282d33c2871a8284969d60ea977d1fe18a24f0cccfb2cd90",
+    "ordinalEightFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-8-f4a0562-public-config-preflight-failed.v1.json",
+    "ordinalEightFailureReceiptSha256": "fa9ae08e491d2ef4c3a3c98ef36a4c34b1a76c374c950d2e93c8003ce2f29b01",
+    "ordinalNineFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-9-77f4718-dependency-attestation-prepare-failed.v1.json",
+    "ordinalNineFailureReceiptSha256": "c175ec58b94852f5db8b1dc8f797ba117dda88629477b7dee667b1df5388d772",
+    "ordinalTenFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-10-392b6fb-owned-base-prepare-failed.v1.json",
+    "ordinalTenFailureReceiptSha256": "83961627f737d65067c8d58adede994fd6295d9064ede740b0b5effbb8ed1ebf",
+    "ordinalElevenFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-11-413a83b-checkout-eol-prepare-failed.v1.json",
+    "ordinalElevenFailureReceiptSha256": "e8b2ca5de7349c3e0292ff56ecc2242fa82d94844cc2b468a3d11836dd193cc2",
+    "ordinalTwelveFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-12-413a83b-bundle-identity-prepare-failed.v1.json",
+    "ordinalTwelveFailureReceiptSha256": "e652c56f09558baef8c8d42a1bf6591394e63b8f95a438ec31a36649434a7d78",
+    "ordinalThirteenFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-13-413a83b-inventory-order-prepare-failed.v1.json",
+    "ordinalThirteenFailureReceiptSha256": "29c25bc33647078d87ebab98665ea485d2f4d25d9127849e0cc0aaac9b802507",
+    "dds5ThroughDds13AndAllPriorRootsReadOnly": true,
+    "frozenArtifactSha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "reuseRelabelOrWebsiteHandoffAllowed": false,
+    "ordinalFourteenFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-14-6dd792c-postbuild-dependency-tree-failed.v1.json",
+    "ordinalFourteenFailureReceiptSha256": "09b1fa52e8864417c55fc8565abcee99f9fcdfd36b3695cb36c3550bd45b638b",
+    "dds14AndOrdinal14RootsReadOnly": true,
+    "ordinalFifteenArtifactPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal15-79a718d/bundle/DroneDream-Sim-1.0.0.exe",
+    "ordinalFifteenArtifactSha256": "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e",
+    "ordinalFifteenBrandState": "superseded-by-centered-separator-source-change",
+    "ordinalFifteenReuseRelabelOrWebsiteHandoffAllowed": false,
+    "ordinalSixteenFailureReceiptPath": "distribution/sim/desktop/yellow-build-attempt-16-4c0021b-dependency-bundle-identity-prepare-failed.v1.json",
+    "ordinalSixteenFailureClassification": "build-application-bundle-id-binding-defect",
+    "ordinalSixteenConfiguredBundleId": "npm-win32-x64-4c0021b28161a9fa",
+    "ordinalSixteenExpectedDerivedBundleId": "npm-win32-x64-db0abf5102de96a9",
+    "ordinalSixteenArtifactCreated": false,
+    "ordinalSixteenReuseAllowed": false
+  },
+  "authorization": {
+    "greenPlanAuthorized": true,
+    "preflightAuthorizedByThisApplication": true,
+    "prepareAuthorizedByThisApplication": true,
+    "executeAuthorizedByThisApplication": true,
+    "newExactChiefControlSignalRequired": false
+  },
+  "executedCounts": {
+    "preflights": 0,
+    "publicConfigLauncherInvocations": 0,
+    "publicRepositoryVariableFetches": 0,
+    "controlledChildInvocations": 0,
+    "snapshotsCreated": 0,
+    "realCacheFilesCopied": 0,
+    "npmCiInvocations": 0,
+    "networkInvocations": 0,
+    "junctionsCreated": 0,
+    "buildScriptInvocations": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0
+  },
+  "nonClaims": {
+    "snapshotCreated": false,
+    "dependencyBundleCreated": false,
+    "buildStarted": false,
+    "artifactCreated": false,
+    "releaseReady": false
+  }
+}
