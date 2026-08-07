@@ -1,6 +1,7 @@
 import copy
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -41,6 +42,25 @@ def _lf_bytes(path: Path) -> bytes:
 
 def _lf_sha256(path: Path) -> str:
     return hashlib.sha256(_lf_bytes(path)).hexdigest()
+
+
+def _committed_bytes(commit: str, path: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{path}"],
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+
+
+def _committed_blob(commit: str, path: str) -> str:
+    return subprocess.run(
+        ["git", "rev-parse", f"{commit}:{path}"],
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+    ).stdout.strip()
 
 
 def test_application_binds_exact_product_artifact_a3_and_public_registration() -> None:
@@ -110,10 +130,11 @@ def test_runtime_prerequisite_is_explicitly_split_from_oauth_transaction() -> No
     assert plan["b1OAuthTransaction"]["exactCounts"]["oauthTransactions"] == 1
 
 
-def test_source_audit_matches_current_software_bytes_and_auth_contract() -> None:
+def test_source_audit_matches_its_frozen_product_source_and_auth_contract() -> None:
     audit = _load(SOURCE_AUDIT)
     contract = _load(AUTH_CONTRACT)
     lab = next(item for item in contract["editions"] if item["editionId"] == "lab")
+    product_source = audit["productSource"]["commit"]
 
     assert lab["loopbackPort"] == 49212
     assert lab["redirectUri"] == CALLBACK
@@ -123,9 +144,10 @@ def test_source_audit_matches_current_software_bytes_and_auth_contract() -> None
     assert contract["authorizationProtocol"]["replayedCallbackDenied"] is True
     assert contract["authorizationProtocol"]["crossEditionCallbackDenied"] is True
     for source in audit["softwareSources"]:
-        path = ROOT / source["path"]
-        assert source["bytes"] == path.stat().st_size
-        assert source["sha256"] == _sha256(path)
+        committed = _committed_bytes(product_source, source["path"])
+        assert source["bytes"] == len(committed)
+        assert source["sha256"] == hashlib.sha256(committed).hexdigest()
+        assert source["gitBlob"] == _committed_blob(product_source, source["path"])
     assert audit["websiteCommittedSource"]["worktreeWasDirty"] is True
     assert audit["websiteCommittedSource"]["dirtyPathsWereOAuthRelated"] is False
     assert audit["websiteCommittedSource"]["liveEndpointOrProviderVerifiedByThisAudit"] is False
