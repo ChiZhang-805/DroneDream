@@ -159,6 +159,12 @@ YELLOW_ATTEMPT_9_FAILURE_PATH = (
     / "desktop"
     / "yellow-build-attempt-9-77f4718-dependency-attestation-prepare-failed.v1.json"
 )
+YELLOW_ATTEMPT_10_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-10-392b6fb-application.v1.json"
+)
 DETACHED_NODE_DEPENDENCY_GAP_PATH = (
     DISTRIBUTION
     / "sim"
@@ -1995,6 +2001,87 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             )
             self.assertNotEqual(negative.returncode, 0)
             self.assertIn("generated transient path", negative.stderr)
+
+    def test_yellow_attempt_10_binds_new_product_and_clean_dependency_contract(
+        self,
+    ) -> None:
+        application = load_json(YELLOW_ATTEMPT_10_APPLICATION_PATH)
+        source = application["sourceSeparation"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "392b6fbb5d301ebba1cea6971fa798627709bf46",
+        )
+        self.assertEqual(
+            git("show", "-s", "--format=%T", source["productSourceCommit"]),
+            source["productSourceTree"],
+        )
+        binding = application["cleanDependencyTreeContract"]
+        self.assertEqual(binding["authorityKind"], "clean-offline-npm-ci-output")
+        self.assertTrue(binding["generatedTransientRootsFailClosed"])
+        self.assertFalse(binding["ordinalNineActualCopiedWithoutDiagnosis"])
+        self.assertEqual(binding["fullRealTreeNpmCiInvocationsDuringGreen"], 0)
+        for prefix in ("module", "authority"):
+            path = ROOT / binding[f"{prefix}Path"]
+            self.assertEqual(path.stat().st_size, binding[f"{prefix}Bytes"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+                binding[f"{prefix}Sha256"],
+            )
+            self.assertEqual(
+                git(
+                    "rev-parse",
+                    f"{source['productSourceCommit']}:{binding[f'{prefix}Path']}",
+                ),
+                binding[f"{prefix}ProductSourceGitBlob"],
+            )
+
+    def test_yellow_attempt_10_freezes_entry_roots_counts_and_no_authorization(
+        self,
+    ) -> None:
+        application = load_json(YELLOW_ATTEMPT_10_APPLICATION_PATH)
+        entry_binding = application["executionPlan"]["entryScript"]
+        entry = ROOT / entry_binding["path"]
+        self.assertEqual(entry.stat().st_size, entry_binding["bytes"])
+        self.assertEqual(
+            hashlib.sha256(entry.read_bytes()).hexdigest(), entry_binding["sha256"]
+        )
+        bundle = application["dependencyBundle"]
+        self.assertEqual(bundle["bundleId"], "npm-win32-x64-ced4c28ea8e2fe84")
+        authority = load_json(OFFLINE_DEPENDENCY_TREE_AUTHORITY_PATH)
+        for key in (
+            "treeFingerprint",
+            "entryCount",
+            "fileCount",
+            "directoryCount",
+            "totalFileBytes",
+        ):
+            self.assertEqual(bundle[key], authority["authoritativeInventory"][key])
+        accounting = application["attemptAccounting"]
+        self.assertEqual(accounting["globalCommandApplicationOrdinal"], 10)
+        self.assertTrue(accounting["ordinalNinePermanentlyConsumed"])
+        self.assertEqual(accounting["retryMaximum"], 0)
+        roots = application["ownedBuildSurface"]
+        snapshot = application["attemptOwnedCacheSnapshot"]["snapshotRoot"]
+        dependency = application["dependencyBundle"]["dependencyRoot"]
+        for path in (
+            roots["sourceRoot"],
+            roots["runRoot"],
+            roots["cargoTargetDir"],
+            snapshot,
+            dependency,
+        ):
+            self.assertFalse(Path(path).exists(), path)
+        protected = application["protectedHistory"]
+        self.assertEqual(
+            protected["ordinalNineFailureReceiptSha256"],
+            "c175ec58b94852f5db8b1dc8f797ba117dda88629477b7dee667b1df5388d772",
+        )
+        self.assertTrue(protected["dds5Dds6Dds7Dds8Dds9AndAllPriorRootsReadOnly"])
+        self.assertTrue(all(value == 0 for value in application["executedCounts"].values()))
+        authorization = application["authorization"]
+        self.assertFalse(authorization["preflightAuthorizedByThisApplication"])
+        self.assertFalse(authorization["prepareAuthorizedByThisApplication"])
+        self.assertFalse(authorization["executeAuthorizedByThisApplication"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(
