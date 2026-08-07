@@ -1,0 +1,218 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-lightweight-installer-yellow-build-application",
+  "applicationId": "field-yellow-6672320-lightweight-installer-single-nsis-v1",
+  "editionId": "field",
+  "status": "prepared-awaiting-new-exact-start-signal",
+  "preparedAt": "2026-08-07T00:01:36.8558370Z",
+  "source": {
+    "branch": "codex/software-field",
+    "productCommit": "6672320392f3274a952a7f02a2006aa2bd6e2671",
+    "productTree": "46c877553ad751f78849593ea9ba93a1042ace68",
+    "upstreamCommitAtPreparation": "6672320392f3274a952a7f02a2006aa2bd6e2671",
+    "ahead": 0,
+    "behind": 0,
+    "clean": true,
+    "sourceChangeInvalidatesApproval": true,
+    "evidenceCommitIsProductSource": false
+  },
+  "productFix": {
+    "runtimeModePolicyPath": "desktop/src-tauri/nsis/edition-identity.nsh",
+    "runtimeModePolicyGitBlob": "4bd3fca353949b41a144641bf673a95ca758335e",
+    "runtimeModePolicySha256": "e0a1a9819a5735b41ce992b5d42b7162de387839037e5c1ecada9d23804f0459",
+    "runtimeModeImplementationPath": "desktop/src-tauri/nsis/runtime-mode.nsh",
+    "runtimeModeImplementationGitBlob": "ea1b2541f8205d1e053b4dd4eed93e3598414776",
+    "runtimeModeImplementationSha256": "f11050236145516bde8b88f7aea2ef06a55b397749ab37bbfa91fc722cd0e96c",
+    "installerLanguagePath": "desktop/src-tauri/nsis/installer-languages.nsh",
+    "installerLanguageGitBlob": "257d523e92c5d76a2fe285440cc2dab445585419",
+    "installerLanguageSha256": "dbc2be047c1105b97b401f61de5c5703ada9a9476fc1373f346dc9d1918dade3",
+    "observerPath": "distribution/editions/field/lifecycle/inspect-field-owned-installer-language.ps1",
+    "observerGitBlob": "a85e48c0c94ba76a19374e08ccbb9ef3861e6c55",
+    "observerSha256": "5e05a98f82d8f90e01ba7ec22e619655f96bd873a0d248acedaf3a22eba2f9e9",
+    "fieldRuntimeModePageEnabled": false,
+    "fieldRuntimeChoiceStringsCompiled": false,
+    "fieldSimulatorPayloadAllowed": false,
+    "observerNextInvocationsBeforeDirectoryAssertion": 1,
+    "unknownInstallerPageDecision": "deny"
+  },
+  "historicalNoGo": {
+    "productCommit": "560f574a95c8b51bbf34711bfd092d77fd3e166e",
+    "artifactFilename": "DroneDream-Field-1.0.0.exe",
+    "artifactBytes": 11534069,
+    "artifactSha256": "8e2e2260704901c52b1c0b149eb4929b0e353b7ccf3d76a0fbba7031aa17ca1f",
+    "decision": "permanent-no-go-no-relabel-no-website-handoff",
+    "reuseAllowed": false,
+    "lifecycleReceipts": [
+      {"attempt": 1, "sha256": "3f3c5072016e73e16262da70f1558c29ca37eaf6bac6ec45a6521edec754a2e1"},
+      {"attempt": 2, "sha256": "4eda662da0ad1430f463794f38ba4725a058b4f32d9d62fde50e236fa90a9456"},
+      {"attempt": 3, "sha256": "7cc23b0ceca2bdd655b12306673500dea5cfba6b81aac61ffa48307d951e175f"},
+      {"attempt": 4, "sha256": "d5a74565b216f73adf9bc5a536969f61e830e099c89563b75035d71e4fe10598"},
+      {"attempt": 5, "sha256": "e0fba209e6f59c31a4938c7382dbf84c12bfa7ce0dd91fd05d6ae4b6098950ed"},
+      {"attempt": 6, "sha256": "1f5be585fee0e60f7096fbb85f18260483b3c5dcb99bec121fa0d9e8beb0a0d4"},
+      {"attempt": 7, "sha256": "482876e03bfb667a23924968d118d7458d6fc42cc0f3335edc2d3d912ef6d5a0"}
+    ],
+    "attempt7ObserverBytes": 48460,
+    "attempt7ObserverSha256": "ebdca5077c65c64f8c35415db916243880890b18523df99dc690cdb055cc9b77",
+    "readOnlyPreserved": true
+  },
+  "attemptOrdinal": {
+    "scope": "field-lightweight-installer-product-6672320",
+    "application": 1,
+    "preflight": 1,
+    "buildScript": 1,
+    "frontend": 1,
+    "tauri": 1,
+    "cargo": 1,
+    "nsis": 1,
+    "freshBuild": 1,
+    "retryMaximum": 0
+  },
+  "sourceBoundPreflight": {
+    "verifier": "distribution/editions/field/build/verify-source-bound-driver.ps1",
+    "verifierGitBlob": "b887a91385c571c565735dbb888bbd3d8ac812af",
+    "verifierCanonicalSha256": "ad1187d0e4fd296d6a1cf1fa1b4ff1dd51aa2b82b734dbd1170134da598ba981",
+    "target": "desktop/scripts/release-build-driver.psm1",
+    "targetGitBlob": "5195887fae97016693466d7f75e466ca4a5e77e2",
+    "targetCanonicalSha256": "9c8dfc3c1a9ea584ea27cab53c23c4ca0b05911e6409b87b01d05297a309fc14",
+    "validationBasis": "exact-source-git-blob-and-canonical-lf-bytes",
+    "workingTreeFileShaIsAuthorization": false,
+    "exactHeadRequired": true,
+    "cleanWorktreeRequired": true,
+    "unknownSourceDenied": true,
+    "contentDriftDenied": true,
+    "pathEscapeDenied": true,
+    "verifierCommand": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\ddf6672320\\distribution\\editions\\field\\build\\verify-source-bound-driver.ps1 -RepoRoot C:\\Users\\zju20\\ddf6672320 -SourceCommit 6672320392f3274a952a7f02a2006aa2bd6e2671 -RelativePath desktop/scripts/release-build-driver.psm1 -ExpectedGitBlob 5195887fae97016693466d7f75e466ca4a5e77e2 -ExpectedCanonicalSha256 9c8dfc3c1a9ea584ea27cab53c23c4ca0b05911e6409b87b01d05297a309fc14"
+  },
+  "artifact": {
+    "filename": "DroneDream-Field-1.0.0.exe",
+    "version": "1.0.0",
+    "packaging": "tauri-nsis",
+    "authenticodeStateRequested": "unsigned",
+    "updaterSignatureRequested": true,
+    "frontendBuildInvocationMaximum": 1,
+    "tauriInvocationMaximum": 1,
+    "cargoBuildCountMaximum": 1,
+    "nsisInvocationMaximum": 1,
+    "freshBuildAttemptMaximum": 1,
+    "installDuringBuildAllowed": false,
+    "uploadAllowed": false,
+    "websiteHandoffAllowedBeforeLifecycleAcceptance": false
+  },
+  "ownedPaths": {
+    "sourceRoot": "C:\\Users\\zju20\\ddf6672320",
+    "cargoTarget": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\6672320",
+    "runRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer",
+    "outputRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer\\artifact",
+    "applicationCopy": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer\\yellow-build-application.json",
+    "authorizationOverlay": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer\\tauri-yellow-authorized.json",
+    "preflightScript": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer\\preflight-approved-build.ps1",
+    "buildScript": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer\\invoke-approved-build.ps1",
+    "sourceRootExistsAtPreparation": false,
+    "cargoTargetExistsAtPreparation": false,
+    "runRootExistsAtPreparation": false,
+    "reuseHistoricalSourceTargetOrOutputAllowed": false
+  },
+  "exactCommands": {
+    "preflight": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer\\preflight-approved-build.ps1",
+    "singleBuild": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer\\invoke-approved-build.ps1",
+    "commandFilesCreatedOnlyAfterStartSignal": true,
+    "preflightFailureConsumesBuild": false,
+    "buildScriptInvocationConsumesAttempt": true
+  },
+  "tauriOverlayContract": {
+    "trackedSource": "desktop/src-tauri/tauri.field.conf.json",
+    "trackedSourceGitBlob": "73ddcf9fe9d5349a93c88887bef5c09e322ec204",
+    "trackedSourceSha256": "923d9499870c6c03837efcc5d7cbe85a2d4947a314a880eda0d440417bba5657",
+    "allowedMutation": {
+      "path": "build.beforeBuildCommand",
+      "from": "npm run frontend:field-build-gated",
+      "to": "npm run frontend:field-build"
+    },
+    "allOtherFieldsMustRemainSemanticallyExact": true,
+    "frontendDist": "../../frontend/field-dist",
+    "expectedResolvedFrontendDist": "C:\\Users\\zju20\\ddf6672320\\frontend\\field-dist",
+    "productName": "DroneDream-Field",
+    "bundleIdentifier": "io.dronedream.desktop.field",
+    "runtimeProfile": "field-lightweight"
+  },
+  "buildDriver": {
+    "script": "desktop/scripts/build-windows-llvm.ps1",
+    "scriptGitBlob": "f4287f19e96d734dd257ac1421b13677e53e208e",
+    "scriptSha256": "4ac9b141b08aae39275d8538d06e11c711b0ce71c3f74ab7baccf11839d2f6dc",
+    "cargoBuildJobs": 2,
+    "networkMode": "offline-with-loopback-deny-proxies",
+    "candidateInstaller": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\6672320\\x86_64-pc-windows-gnullvm\\release\\bundle\\nsis\\DroneDream-Field_1.0.0_x64-setup.exe",
+    "frozenInstaller": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer\\artifact\\DroneDream-Field-1.0.0.exe"
+  },
+  "publicConfiguration": {
+    "oauthClientIdEnvironmentVariable": "DRONEDREAM_OAUTH_CLIENT_ID",
+    "oauthClientId": "3140bbe2-5f0e-4699-8a9b-295d4030f853",
+    "oauthCallback": "http://127.0.0.1:49213/desktop-auth/field/callback",
+    "oauthClientType": "public",
+    "oauthTokenAuthMethod": "none",
+    "oauthClientSecretPresent": false,
+    "oauthInjectionScope": "single-build-process-only",
+    "trackedPublicSupabaseEnvironment": "frontend/.env.production",
+    "trackedPublicSupabaseEnvironmentGitBlob": "dd857bcec9b5fad8e811599f4ec8d13c71798d3c",
+    "trackedPublicSupabaseEnvironmentCanonicalSha256": "a61664c014d0a5185eb7899adeac44c22efefd9a62297b2c1ccab266336ee28c",
+    "supabasePrivateOrServiceRoleAllowed": false,
+    "updaterPrivateKeyPathReference": "C:\\Users\\zju20\\.tauri\\dronedream-updater.key",
+    "updaterPrivateKeyReadDuringGreen": false,
+    "updaterPrivateKeyPasswordMode": "empty",
+    "updaterMatchingPublicKeyId": "BA3FDCAF71CE2FF5",
+    "productionNamingKeyAllowed": false
+  },
+  "greenVerification": {
+    "fieldAndSharedTests": {"passed": 51, "failed": 0},
+    "realMakensisFixtures": {
+      "universalRuntimeModePage": true,
+      "simRuntimeModePage": true,
+      "labRuntimeModePage": true,
+      "fieldRuntimeModePage": false,
+      "unknownProductRejected": true
+    },
+    "releaseSourcePolicy": "pass: 2047 tracked files, 390 npm packages, 532 external Rust packages",
+    "vendoredNsisTemplatePassed": true,
+    "ruffPassed": true,
+    "powerShellAstPassed": true,
+    "diffCheckPassed": true,
+    "tauriCargoNsisInvoked": false
+  },
+  "safety": {
+    "validatedHardwarePackCount": 0,
+    "requiredDecisionLayers": ["native", "backend", "runtime"],
+    "hardwareDecision": "deny",
+    "frontendIsAuthority": false,
+    "installationAllowed": false,
+    "runtimeMigrationAllowed": false,
+    "deviceOrHardwareAllowed": false,
+    "px4GazeboSitlHitlExecutionAllowed": false,
+    "providerOrModelKeyAllowed": false,
+    "accountPasswordOrTokenAllowed": false,
+    "deploymentAllowed": false,
+    "releaseBranchCreationAllowed": false
+  },
+  "authorization": {
+    "currentMessageAuthorizesBuild": false,
+    "newExactYellowStartSignalRequired": true
+  },
+  "failurePolicy": {
+    "preTauriGateFailureConsumesBuild": false,
+    "afterTauriInvocationRetryAllowed": false,
+    "generatedBytesMustBeFrozenOnFailure": true,
+    "postHocSigningAfterFailureAllowed": false,
+    "sourceApplicationOrCommandChangeInvalidatesApproval": true
+  },
+  "remainingGates": [
+    "new exact total-control YELLOW start signal bound to this product source and application hash",
+    "start-time resource and all-owned-path absence gate",
+    "single source-bound preflight invocation",
+    "single frontend Tauri Cargo NSIS attempt with updater signature and frozen receipts",
+    "new lifecycle validation before Website handoff",
+    "real hardware remains prohibited"
+  ],
+  "integrity": {
+    "canonicalization": "UTF-8 JSON sorted keys compact separators excluding integrity",
+    "canonicalSha256": "ef36720cedceaa040df9c5f3704590f31a14be17dfef579d1602b605a2117b99"
+  }
+}
