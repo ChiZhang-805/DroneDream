@@ -27,7 +27,7 @@ describe("Lab setup", () => {
     const user = userEvent.setup();
     renderLab();
 
-    expect(screen.getByRole("heading", { name: "Simulation and hardware laboratory" }))
+    expect(screen.getByRole("heading", { name: "Sim-to-Real calibration laboratory" }))
       .toBeInTheDocument();
     expect(screen.getByText("0 of 8")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Simulation workspace/i }))
@@ -97,9 +97,9 @@ describe("Lab setup", () => {
     const user = userEvent.setup();
     renderLab("zh-CN");
 
-    expect(screen.getByRole("heading", { name: "仿真与真机实验室" }))
+    expect(screen.getByRole("heading", { name: "Sim-to-Real 校准实验室" }))
       .toBeInTheDocument();
-    expect(screen.getByText(/同一公共核心承载两套清晰分离的工作流/)).toBeInTheDocument();
+    expect(screen.getByText(/同一份受预算约束的作业/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /真机实验室/ }));
     expect(screen.getByRole("button", { name: "写入参数" })).toBeDisabled();
     expect(screen.getByText("真机执行已拒绝")).toBeInTheDocument();

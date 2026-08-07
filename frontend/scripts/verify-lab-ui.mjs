@@ -81,6 +81,9 @@ await mkdir(outputRoot, { recursive: true });
 const fixture = await readFile(
   path.join(frontendRoot, "src", "lab", "__fixtures__", "sim-qualification-receipt.fake.json"),
 );
+const calibrationFixture = await readFile(
+  path.join(frontendRoot, "src", "lab", "__fixtures__", "calibration-input.fake.json"),
+);
 const profile = JSON.parse(await readFile(
   path.join(repoRoot, "distribution", "build-profiles", "lab-preview.v1.json"),
   "utf8",
@@ -155,8 +158,8 @@ try {
     await page.goto(`${origin}/lab/setup`, { waitUntil: "networkidle" });
 
     const title = testCase.locale === "en"
-      ? "Simulation and hardware laboratory"
-      : "仿真与真机实验室";
+      ? "Sim-to-Real calibration laboratory"
+      : "Sim-to-Real 校准实验室";
     await page.getByRole("heading", { name: title }).waitFor();
     const brandImage = page.locator('img[data-brand-edition="lab"]').first();
     await brandImage.waitFor({ state: "attached" });
@@ -176,8 +179,18 @@ try {
     assert.equal(await page.locator("html").getAttribute("lang"), testCase.locale);
     assert.equal(await page.getByText(testCase.locale === "en" ? "0 of 8" : "0 / 8").count(), 1);
     assert.equal(await page.getByText(testCase.locale === "en" ? "DENY" : "拒绝").first().count(), 1);
-    await assertViewportFits(page, testCase, "simulation");
-    evidence.push(await screenshot(page, testCase, "simulation"));
+    const calibration = page.locator('.lab-calibration[data-brand-edition="lab"]');
+    assert.equal(await calibration.getAttribute("data-presentation-only"), "true");
+    assert.equal(await calibration.getAttribute("data-grants-hardware-authority"), "false");
+    await page.locator('#lab-panel-calibration input[type="file"]').setInputFiles({
+      name: "calibration-input.fake.json",
+      mimeType: "application/json",
+      buffer: calibrationFixture,
+    });
+    await page.getByText("lab_job_fixture_001", { exact: true }).waitFor();
+    assert(await page.getByRole("button", { name: testCase.locale === "en" ? "DENY" : "拒绝" }).isDisabled());
+    await assertViewportFits(page, testCase, "calibration");
+    evidence.push(await screenshot(page, testCase, "calibration"));
 
     const hardwareLabel = testCase.locale === "en" ? "Hardware laboratory" : "真机实验室";
     await page.getByRole("button", { name: new RegExp(hardwareLabel) }).click();
@@ -266,7 +279,7 @@ const report = {
   },
   cases: cases.map((testCase) => ({
     ...testCase,
-    surfaces: ["simulation", "hardware", "evidence", "safety"],
+    surfaces: ["calibration", "hardware", "evidence", "safety"],
   })),
   screenshots: evidence,
   sideEffects: {
