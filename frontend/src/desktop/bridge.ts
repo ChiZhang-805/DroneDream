@@ -196,6 +196,41 @@ export interface FieldAdapterFrameInspection {
   hardwareAuthority: false;
 }
 
+export interface FieldMavlinkTelemetryProbeRequest {
+  adapterId: string;
+  expectedPackageSha256: string;
+  observationId: string;
+  portName: string;
+  baudRate: 57600 | 115200 | 230400 | 460800 | 921600;
+  readDeadlineMs: number;
+  operatorConfirmedReadOnly: true;
+}
+
+export interface FieldMavlinkTelemetryProbeReceipt {
+  schemaVersion: 1;
+  kind: "dronedream-field-mavlink-telemetry-probe-receipt";
+  editionId: "field";
+  adapterId: string;
+  observationId: string;
+  portName: string;
+  baudRate: number;
+  protocolVersion: 1 | 2;
+  systemId: number;
+  componentId: number;
+  sequence: number;
+  messageId: number;
+  messageName: string;
+  frameSha256: string;
+  frameBytes: number;
+  deviceOpenAttempts: 1;
+  telemetryReadAttempts: 1;
+  parameterReadAttempts: 0;
+  hardwareWriteAttempts: 0;
+  armAttempts: 0;
+  flightAttempts: 0;
+  hardwareAuthority: false;
+}
+
 export interface FieldDiscoveredDevice {
   observationId: string;
   portName: string;
@@ -679,6 +714,29 @@ export function inspectFieldAdapterFrame(
   return invokeDesktop("inspect_field_adapter_frame", parseFieldAdapterFrameInspection, {
     request,
   });
+}
+
+export function probeFieldMavlinkTelemetry(
+  request: FieldMavlinkTelemetryProbeRequest,
+): Promise<FieldMavlinkTelemetryProbeReceipt> {
+  if (
+    !/^(?:mavlink-common-v2|mavlink-px4-v2|mavlink-ardupilotmega-v2)$/.test(request.adapterId)
+    || !/^[a-f0-9]{64}$/.test(request.expectedPackageSha256)
+    || !/^[a-f0-9]{64}$/.test(request.observationId)
+    || !/^COM(?:[1-9][0-9]{0,2})$/.test(request.portName)
+    || ![57_600, 115_200, 230_400, 460_800, 921_600].includes(request.baudRate)
+    || !Number.isSafeInteger(request.readDeadlineMs)
+    || request.readDeadlineMs < 250
+    || request.readDeadlineMs > 5_000
+    || request.operatorConfirmedReadOnly !== true
+  ) {
+    return Promise.reject(new Error("Field MAVLink telemetry probe request is invalid."));
+  }
+  return invokeDesktop(
+    "probe_field_mavlink_telemetry",
+    parseFieldMavlinkTelemetryProbeReceipt,
+    { request },
+  );
 }
 
 export function discoverFieldDevices(): Promise<FieldDeviceDiscoveryReport> {
@@ -1811,6 +1869,164 @@ function parseFieldAdapterFrameInspection(value: unknown): FieldAdapterFrameInsp
       record.hardwareAuthority,
       false,
       "fieldAdapterFrameInspection.hardwareAuthority",
+    ),
+  };
+}
+
+function parseFieldMavlinkTelemetryProbeReceipt(
+  value: unknown,
+): FieldMavlinkTelemetryProbeReceipt {
+  const record = expectExactRecord(value, "fieldMavlinkTelemetryProbeReceipt", [
+    "schemaVersion",
+    "kind",
+    "editionId",
+    "adapterId",
+    "observationId",
+    "portName",
+    "baudRate",
+    "protocolVersion",
+    "systemId",
+    "componentId",
+    "sequence",
+    "messageId",
+    "messageName",
+    "frameSha256",
+    "frameBytes",
+    "deviceOpenAttempts",
+    "telemetryReadAttempts",
+    "parameterReadAttempts",
+    "hardwareWriteAttempts",
+    "armAttempts",
+    "flightAttempts",
+    "hardwareAuthority",
+  ]);
+  const protocolVersion = expectBoundedNonNegativeInteger(
+    record.protocolVersion,
+    "fieldMavlinkTelemetryProbeReceipt.protocolVersion",
+    2,
+  );
+  if (protocolVersion !== 1 && protocolVersion !== 2) {
+    throw new Error("fieldMavlinkTelemetryProbeReceipt.protocolVersion is unsupported");
+  }
+  const portName = expectSafeNonEmptyString(
+    record.portName,
+    "fieldMavlinkTelemetryProbeReceipt.portName",
+  );
+  if (!/^COM(?:[1-9][0-9]{0,2})$/.test(portName)) {
+    throw new Error("fieldMavlinkTelemetryProbeReceipt.portName is malformed");
+  }
+  const baudRate = expectBoundedNonNegativeInteger(
+    record.baudRate,
+    "fieldMavlinkTelemetryProbeReceipt.baudRate",
+    921_600,
+  );
+  if (![57_600, 115_200, 230_400, 460_800, 921_600].includes(baudRate)) {
+    throw new Error("fieldMavlinkTelemetryProbeReceipt.baudRate is unsupported");
+  }
+  const frameBytes = expectBoundedNonNegativeInteger(
+    record.frameBytes,
+    "fieldMavlinkTelemetryProbeReceipt.frameBytes",
+    280,
+  );
+  if (frameBytes === 0) {
+    throw new Error("fieldMavlinkTelemetryProbeReceipt.frameBytes is out of range");
+  }
+  const messageName = expectSafeNonEmptyString(
+    record.messageName,
+    "fieldMavlinkTelemetryProbeReceipt.messageName",
+  );
+  if (!/^[A-Z][A-Z0-9_]{0,127}$/.test(messageName)) {
+    throw new Error("fieldMavlinkTelemetryProbeReceipt.messageName is malformed");
+  }
+  return {
+    schemaVersion: expectLiteral(
+      record.schemaVersion,
+      1,
+      "fieldMavlinkTelemetryProbeReceipt.schemaVersion",
+    ),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-mavlink-telemetry-probe-receipt",
+      "fieldMavlinkTelemetryProbeReceipt.kind",
+    ),
+    editionId: expectLiteral(
+      record.editionId,
+      "field",
+      "fieldMavlinkTelemetryProbeReceipt.editionId",
+    ),
+    adapterId: expectIdentifier(
+      record.adapterId,
+      "fieldMavlinkTelemetryProbeReceipt.adapterId",
+    ),
+    observationId: expectLowercaseHex(
+      record.observationId,
+      "fieldMavlinkTelemetryProbeReceipt.observationId",
+      64,
+    ),
+    portName,
+    baudRate,
+    protocolVersion,
+    systemId: expectBoundedNonNegativeInteger(
+      record.systemId,
+      "fieldMavlinkTelemetryProbeReceipt.systemId",
+      255,
+    ),
+    componentId: expectBoundedNonNegativeInteger(
+      record.componentId,
+      "fieldMavlinkTelemetryProbeReceipt.componentId",
+      255,
+    ),
+    sequence: expectBoundedNonNegativeInteger(
+      record.sequence,
+      "fieldMavlinkTelemetryProbeReceipt.sequence",
+      255,
+    ),
+    messageId: expectBoundedNonNegativeInteger(
+      record.messageId,
+      "fieldMavlinkTelemetryProbeReceipt.messageId",
+      16_777_215,
+    ),
+    messageName,
+    frameSha256: expectLowercaseHex(
+      record.frameSha256,
+      "fieldMavlinkTelemetryProbeReceipt.frameSha256",
+      64,
+    ),
+    frameBytes,
+    deviceOpenAttempts: expectLiteral(
+      record.deviceOpenAttempts,
+      1,
+      "fieldMavlinkTelemetryProbeReceipt.deviceOpenAttempts",
+    ),
+    telemetryReadAttempts: expectLiteral(
+      record.telemetryReadAttempts,
+      1,
+      "fieldMavlinkTelemetryProbeReceipt.telemetryReadAttempts",
+    ),
+    parameterReadAttempts: expectLiteral(
+      record.parameterReadAttempts,
+      0,
+      "fieldMavlinkTelemetryProbeReceipt.parameterReadAttempts",
+    ),
+    hardwareWriteAttempts: expectLiteral(
+      record.hardwareWriteAttempts,
+      0,
+      "fieldMavlinkTelemetryProbeReceipt.hardwareWriteAttempts",
+    ),
+    armAttempts: expectLiteral(
+      record.armAttempts,
+      0,
+      "fieldMavlinkTelemetryProbeReceipt.armAttempts",
+    ),
+    flightAttempts: expectLiteral(
+      record.flightAttempts,
+      0,
+      "fieldMavlinkTelemetryProbeReceipt.flightAttempts",
+    ),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldMavlinkTelemetryProbeReceipt.hardwareAuthority",
     ),
   };
 }

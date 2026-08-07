@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getFieldAdapterCatalog,
   installFieldAdapter,
+  probeFieldMavlinkTelemetry,
 } from "../desktop/bridge";
 import { FieldAdapterCenter } from "../field/FieldAdapterCenter";
 
@@ -14,6 +15,7 @@ vi.mock("../desktop/bridge", async (importOriginal) => {
     isDesktopRuntime: () => true,
     getFieldAdapterCatalog: vi.fn(),
     installFieldAdapter: vi.fn(),
+    probeFieldMavlinkTelemetry: vi.fn(),
   };
 });
 
@@ -105,6 +107,30 @@ describe("FieldAdapterCenter", () => {
       hardwareWriteAttempts: 0,
       hardwareAuthority: false,
     });
+    vi.mocked(probeFieldMavlinkTelemetry).mockReset().mockResolvedValue({
+      schemaVersion: 1,
+      kind: "dronedream-field-mavlink-telemetry-probe-receipt",
+      editionId: "field",
+      adapterId: "mavlink-common-v2",
+      observationId: "c".repeat(64),
+      portName: "COM7",
+      baudRate: 115_200,
+      protocolVersion: 2,
+      systemId: 42,
+      componentId: 1,
+      sequence: 7,
+      messageId: 0,
+      messageName: "HEARTBEAT",
+      frameSha256: "d".repeat(64),
+      frameBytes: 21,
+      deviceOpenAttempts: 1,
+      telemetryReadAttempts: 1,
+      parameterReadAttempts: 0,
+      hardwareWriteAttempts: 0,
+      armAttempts: 0,
+      flightAttempts: 0,
+      hardwareAuthority: false,
+    });
   });
 
   it("installs only a catalog-bound managed adapter", async () => {
@@ -124,5 +150,43 @@ describe("FieldAdapterCenter", () => {
     }));
     expect(screen.getByText(/Vehicle Pack validation/)).toBeInTheDocument();
     expect(screen.getByText("Vendor access required")).toBeInTheDocument();
+  });
+
+  it("requires an installed adapter, observed port, and explicit read-only confirmation", async () => {
+    vi.mocked(getFieldAdapterCatalog).mockResolvedValue({
+      ...report,
+      entries: [{
+        ...report.entries[0]!,
+        installed: true,
+        installedPackageSha256: "b".repeat(64),
+      }, report.entries[1]!],
+    });
+    render(<FieldAdapterCenter locale="en" devices={[{
+      observationId: "c".repeat(64),
+      portName: "COM7",
+      registryValueNameSha256: "d".repeat(64),
+      transport: "windows-serial-registry-readonly",
+      portOpened: false,
+      validationStatus: "unknown-unvalidated",
+      hardwareAuthority: false,
+    }]} />);
+    const probe = await screen.findByRole("button", { name: "Read one frame" });
+    expect(probe).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", {
+      name: /one read-only frame/i,
+    }));
+    expect(probe).toBeEnabled();
+    fireEvent.click(probe);
+
+    await waitFor(() => expect(probeFieldMavlinkTelemetry).toHaveBeenCalledWith({
+      adapterId: "mavlink-common-v2",
+      expectedPackageSha256: "b".repeat(64),
+      observationId: "c".repeat(64),
+      portName: "COM7",
+      baudRate: 115_200,
+      readDeadlineMs: 3_000,
+      operatorConfirmedReadOnly: true,
+    }));
+    expect(await screen.findByText(/Received HEARTBEAT/)).toBeInTheDocument();
   });
 });

@@ -47,8 +47,18 @@ vi.mock("../field/FieldAuthControl", () => ({
 }));
 
 vi.mock("../field/FieldApp", () => ({
-  FieldApp: ({ initialLocale }: { initialLocale: string }) => (
-    <div data-testid="field-workspace" data-locale={initialLocale} />
+  FieldApp: ({
+    initialLocale,
+    focusOnMount,
+  }: {
+    initialLocale: string;
+    focusOnMount: boolean;
+  }) => (
+    <div
+      data-testid="field-workspace"
+      data-locale={initialLocale}
+      data-focus-on-mount={String(focusOnMount)}
+    />
   ),
 }));
 
@@ -107,5 +117,7 @@ describe("FieldRoot", () => {
 
     expect(screen.getByTestId("field-workspace"))
       .toHaveAttribute("data-locale", "zh-CN");
+    expect(screen.getByTestId("field-workspace"))
+      .toHaveAttribute("data-focus-on-mount", "true");
   });
 });

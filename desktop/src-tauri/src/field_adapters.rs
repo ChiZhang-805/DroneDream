@@ -6,8 +6,9 @@
 
 use std::collections::HashSet;
 use std::fs::{self, OpenOptions};
-use std::io::{Cursor, Write};
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -189,6 +190,45 @@ pub(crate) struct FieldAdapterFrameInspection {
     frame_bytes: usize,
     device_open_attempts: u8,
     hardware_write_attempts: u8,
+    hardware_authority: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct FieldMavlinkTelemetryProbeRequest {
+    adapter_id: String,
+    expected_package_sha256: String,
+    observation_id: String,
+    port_name: String,
+    baud_rate: u32,
+    read_deadline_ms: u64,
+    operator_confirmed_read_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FieldMavlinkTelemetryProbeReceipt {
+    schema_version: u8,
+    kind: &'static str,
+    edition_id: &'static str,
+    adapter_id: String,
+    observation_id: String,
+    port_name: String,
+    baud_rate: u32,
+    protocol_version: u8,
+    system_id: u8,
+    component_id: u8,
+    sequence: u8,
+    message_id: u32,
+    message_name: String,
+    frame_sha256: String,
+    frame_bytes: usize,
+    device_open_attempts: u8,
+    telemetry_read_attempts: u8,
+    parameter_read_attempts: u8,
+    hardware_write_attempts: u8,
+    arm_attempts: u8,
+    flight_attempts: u8,
     hardware_authority: bool,
 }
 
@@ -651,6 +691,168 @@ fn inspect_frame(
     }
 }
 
+const FIELD_MAVLINK_BAUD_RATES: [u32; 5] = [57_600, 115_200, 230_400, 460_800, 921_600];
+
+fn validate_probe_contract(
+    root: &Path,
+    request: &FieldMavlinkTelemetryProbeRequest,
+) -> Result<(), String> {
+    if !request.operator_confirmed_read_only
+        || !valid_adapter_id(&request.adapter_id)
+        || !matches!(
+            request.adapter_id.as_str(),
+            "mavlink-common-v2" | "mavlink-px4-v2" | "mavlink-ardupilotmega-v2"
+        )
+        || request.expected_package_sha256.len() != 64
+        || !request
+            .expected_package_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        || request.observation_id.len() != 64
+        || !request
+            .observation_id
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        || crate::field_device::normalize_port_name(&request.port_name).as_deref()
+            != Some(request.port_name.as_str())
+        || !FIELD_MAVLINK_BAUD_RATES.contains(&request.baud_rate)
+        || !(250..=5_000).contains(&request.read_deadline_ms)
+    {
+        return Err("Field MAVLink telemetry probe request is invalid".to_string());
+    }
+    let catalog = load_catalog()?;
+    let entry = catalog
+        .entries
+        .iter()
+        .find(|entry| entry.adapter_id == request.adapter_id)
+        .ok_or_else(|| "Unknown Field adapter".to_string())?;
+    let expected = entry
+        .package_sha256
+        .as_deref()
+        .ok_or_else(|| "Field adapter package hash is missing".to_string())?;
+    if expected != request.expected_package_sha256
+        || installed_package_hash(root, &request.adapter_id)?.as_deref() != Some(expected)
+    {
+        return Err(
+            "Field MAVLink telemetry probe requires the exact installed package".to_string(),
+        );
+    }
+    if entry.capabilities.telemetry_read != "read-only"
+        || entry.safety.installation_grants_authority
+        || entry.safety.discovery_grants_authority
+    {
+        return Err("Field adapter does not permit read-only telemetry".to_string());
+    }
+    Ok(())
+}
+
+fn read_exact_until(
+    reader: &mut dyn Read,
+    buffer: &mut [u8],
+    deadline: Instant,
+) -> Result<(), String> {
+    let mut offset = 0;
+    while offset < buffer.len() {
+        if Instant::now() >= deadline {
+            return Err("Field MAVLink telemetry probe reached its read deadline".to_string());
+        }
+        match reader.read(&mut buffer[offset..]) {
+            Ok(0) => return Err("Field MAVLink telemetry stream ended before a frame".to_string()),
+            Ok(count) => offset += count,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::TimedOut
+                        | std::io::ErrorKind::WouldBlock
+                        | std::io::ErrorKind::Interrupted
+                ) => {}
+            Err(error) => {
+                return Err(format!("Field MAVLink telemetry read failed: {error}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn read_one_mavlink_frame(
+    reader: &mut dyn Read,
+    read_deadline: Duration,
+) -> Result<Vec<u8>, String> {
+    let deadline = Instant::now()
+        .checked_add(read_deadline)
+        .ok_or_else(|| "Field MAVLink telemetry deadline overflowed".to_string())?;
+    let mut magic = [0u8; 1];
+    let mut found = false;
+    for _ in 0..1_024 {
+        read_exact_until(reader, &mut magic, deadline)?;
+        if matches!(magic[0], 0xfe | 0xfd) {
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        return Err("Field MAVLink telemetry did not contain a frame marker".to_string());
+    }
+
+    let mut payload_len = [0u8; 1];
+    read_exact_until(reader, &mut payload_len, deadline)?;
+    let payload_len = payload_len[0] as usize;
+    let mut frame = vec![magic[0], payload_len as u8];
+    let remaining = if magic[0] == 0xfe {
+        6 + payload_len
+    } else {
+        let mut incompatibility_flags = [0u8; 1];
+        read_exact_until(reader, &mut incompatibility_flags, deadline)?;
+        frame.push(incompatibility_flags[0]);
+        9 + payload_len + usize::from(incompatibility_flags[0] & 0x01 == 0x01) * 13
+    };
+    let start = frame.len();
+    frame.resize(start + remaining, 0);
+    read_exact_until(reader, &mut frame[start..], deadline)?;
+    Ok(frame)
+}
+
+fn probe_from_reader(
+    request: &FieldMavlinkTelemetryProbeRequest,
+    reader: &mut dyn Read,
+) -> Result<FieldMavlinkTelemetryProbeReceipt, String> {
+    let frame = read_one_mavlink_frame(reader, Duration::from_millis(request.read_deadline_ms))?;
+    let inspection =
+        match request.adapter_id.as_str() {
+            "mavlink-common-v2" | "mavlink-px4-v2" => {
+                inspect_mavlink_message::<mavlink::common::MavMessage>(&request.adapter_id, &frame)?
+            }
+            "mavlink-ardupilotmega-v2" => inspect_mavlink_message::<
+                mavlink::ardupilotmega::MavMessage,
+            >(&request.adapter_id, &frame)?,
+            _ => return Err("Field adapter has no native telemetry parser".to_string()),
+        };
+    Ok(FieldMavlinkTelemetryProbeReceipt {
+        schema_version: 1,
+        kind: "dronedream-field-mavlink-telemetry-probe-receipt",
+        edition_id: "field",
+        adapter_id: request.adapter_id.clone(),
+        observation_id: request.observation_id.clone(),
+        port_name: request.port_name.clone(),
+        baud_rate: request.baud_rate,
+        protocol_version: inspection.protocol_version,
+        system_id: inspection.system_id,
+        component_id: inspection.component_id,
+        sequence: inspection.sequence,
+        message_id: inspection.message_id,
+        message_name: inspection.message_name,
+        frame_sha256: inspection.frame_sha256,
+        frame_bytes: inspection.frame_bytes,
+        device_open_attempts: 1,
+        telemetry_read_attempts: 1,
+        parameter_read_attempts: 0,
+        hardware_write_attempts: 0,
+        arm_attempts: 0,
+        flight_attempts: 0,
+        hardware_authority: false,
+    })
+}
+
 #[tauri::command]
 pub(crate) fn get_field_adapter_catalog(
     app: AppHandle,
@@ -684,6 +886,27 @@ pub(crate) fn inspect_field_adapter_frame(
     }
     let root = adapter_root(&app)?;
     inspect_frame(&root, &request)
+}
+
+#[tauri::command]
+pub(crate) fn probe_field_mavlink_telemetry(
+    app: AppHandle,
+    request: FieldMavlinkTelemetryProbeRequest,
+) -> Result<FieldMavlinkTelemetryProbeReceipt, String> {
+    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field" {
+        return Err("Field telemetry probing is unavailable in this edition".to_string());
+    }
+    let root = adapter_root(&app)?;
+    validate_probe_contract(&root, &request)?;
+    crate::field_device::validate_field_serial_observation(
+        &request.observation_id,
+        &request.port_name,
+    )?;
+    let mut port = serialport::new(&request.port_name, request.baud_rate)
+        .timeout(Duration::from_millis(100))
+        .open()
+        .map_err(|error| format!("Unable to open the confirmed Field serial port: {error}"))?;
+    probe_from_reader(&request, port.as_mut())
 }
 
 #[cfg(test)]
@@ -928,6 +1151,114 @@ mod tests {
         assert!(inspect_frame(&root, &invalid_frame)
             .unwrap_err()
             .contains("not a MAVLink"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn fake_serial_probe_reads_one_message_without_hardware_authority() {
+        use mavlink::common;
+
+        let root = sandbox("serial-probe");
+        fs::create_dir(&root).unwrap();
+        let package_sha = sha256_hex(MAVLINK_COMMON_RAW.as_bytes());
+        install_to_root(
+            &root,
+            &FieldAdapterInstallRequest {
+                adapter_id: "mavlink-common-v2".to_string(),
+                expected_package_sha256: package_sha.clone(),
+            },
+        )
+        .unwrap();
+        let request = FieldMavlinkTelemetryProbeRequest {
+            adapter_id: "mavlink-common-v2".to_string(),
+            expected_package_sha256: package_sha,
+            observation_id: "a".repeat(64),
+            port_name: "COM7".to_string(),
+            baud_rate: 115_200,
+            read_deadline_ms: 1_000,
+            operator_confirmed_read_only: true,
+        };
+        validate_probe_contract(&root, &request).unwrap();
+
+        let message = common::MavMessage::HEARTBEAT(common::HEARTBEAT_DATA {
+            custom_mode: 0,
+            mavtype: common::MavType::MAV_TYPE_QUADROTOR,
+            autopilot: common::MavAutopilot::MAV_AUTOPILOT_GENERIC,
+            base_mode: common::MavModeFlag::empty(),
+            system_status: common::MavState::MAV_STATE_STANDBY,
+            mavlink_version: 3,
+        });
+        let mut bytes = b"serial-noise".to_vec();
+        mavlink::write_v2_msg(
+            &mut bytes,
+            mavlink::MavHeader {
+                system_id: 9,
+                component_id: 1,
+                sequence: 4,
+            },
+            &message,
+        )
+        .unwrap();
+        let receipt = probe_from_reader(&request, &mut Cursor::new(bytes)).unwrap();
+        assert_eq!(receipt.message_name, "HEARTBEAT");
+        assert_eq!(receipt.system_id, 9);
+        assert_eq!(receipt.device_open_attempts, 1);
+        assert_eq!(receipt.telemetry_read_attempts, 1);
+        assert_eq!(receipt.parameter_read_attempts, 0);
+        assert_eq!(receipt.hardware_write_attempts, 0);
+        assert_eq!(receipt.arm_attempts, 0);
+        assert_eq!(receipt.flight_attempts, 0);
+        assert!(!receipt.hardware_authority);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn serial_probe_contract_rejects_uninstalled_unconfirmed_and_unsafe_requests() {
+        let root = sandbox("serial-probe-deny");
+        fs::create_dir(&root).unwrap();
+        let package_sha = sha256_hex(MAVLINK_COMMON_RAW.as_bytes());
+        let request = FieldMavlinkTelemetryProbeRequest {
+            adapter_id: "mavlink-common-v2".to_string(),
+            expected_package_sha256: package_sha.clone(),
+            observation_id: "a".repeat(64),
+            port_name: "COM7".to_string(),
+            baud_rate: 115_200,
+            read_deadline_ms: 1_000,
+            operator_confirmed_read_only: true,
+        };
+        assert!(validate_probe_contract(&root, &request)
+            .unwrap_err()
+            .contains("exact installed"));
+        install_to_root(
+            &root,
+            &FieldAdapterInstallRequest {
+                adapter_id: request.adapter_id.clone(),
+                expected_package_sha256: package_sha,
+            },
+        )
+        .unwrap();
+        for invalid in [
+            FieldMavlinkTelemetryProbeRequest {
+                operator_confirmed_read_only: false,
+                ..request.clone()
+            },
+            FieldMavlinkTelemetryProbeRequest {
+                port_name: "COM7:escape".to_string(),
+                ..request.clone()
+            },
+            FieldMavlinkTelemetryProbeRequest {
+                baud_rate: 9_600,
+                ..request.clone()
+            },
+            FieldMavlinkTelemetryProbeRequest {
+                read_deadline_ms: 10_000,
+                ..request.clone()
+            },
+        ] {
+            assert!(validate_probe_contract(&root, &invalid)
+                .unwrap_err()
+                .contains("request is invalid"));
+        }
         fs::remove_dir_all(root).unwrap();
     }
 }

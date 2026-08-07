@@ -257,6 +257,7 @@ function fieldControllerKey(vendor: string, model: string): string {
 interface FieldAppProps {
   initialLocale?: FieldLocale;
   initialObservationState?: FieldObservationState;
+  focusOnMount?: boolean;
 }
 
 function savedLocale(): FieldLocale {
@@ -272,6 +273,7 @@ function savedLocale(): FieldLocale {
 export function FieldApp({
   initialLocale,
   initialObservationState = "device-missing",
+  focusOnMount = false,
 }: FieldAppProps) {
   const [locale, setLocale] = useState<FieldLocale>(initialLocale ?? savedLocale);
   const [observationState, setObservationState] =
@@ -289,6 +291,7 @@ export function FieldApp({
   const [deviceScanBusy, setDeviceScanBusy] = useState(false);
   const [deviceScanError, setDeviceScanError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsCloseRef = useRef<HTMLButtonElement>(null);
   const copy = COPY[locale];
@@ -306,6 +309,10 @@ export function FieldApp({
       // Locale persistence is optional and has no safety meaning.
     }
   }, [locale]);
+
+  useEffect(() => {
+    if (focusOnMount) titleRef.current?.focus({ preventScroll: true });
+  }, [focusOnMount]);
 
   const closeSettings = useCallback(() => {
     setSettingsOpen(false);
@@ -448,7 +455,7 @@ export function FieldApp({
           <section id="overview" className="field-overview" aria-labelledby="field-title">
             <div>
               <p className="field-kicker">DroneDream · FIELD 1.0.0</p>
-              <h1 id="field-title">{copy.title}</h1>
+              <h1 ref={titleRef} id="field-title" tabIndex={-1}>{copy.title}</h1>
               <p>{copy.subtitle}</p>
             </div>
             <div className="field-overview-metrics" aria-label={copy.title}>
@@ -580,7 +587,7 @@ export function FieldApp({
             </div>
           </section>
 
-          <FieldAdapterCenter locale={locale} />
+          <FieldAdapterCenter locale={locale} devices={deviceReport?.devices} />
 
           <section id="tuning" className="field-section field-tuning-section" aria-labelledby="field-tuning-title">
             <FieldTuningWorkspace

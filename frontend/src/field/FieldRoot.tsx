@@ -149,7 +149,7 @@ export function FieldRoot() {
   if (entered) {
     return (
       <Suspense fallback={null}>
-        <FieldApp initialLocale={locale} />
+        <FieldApp initialLocale={locale} focusOnMount />
       </Suspense>
     );
   }

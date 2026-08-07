@@ -38,6 +38,17 @@ describe("FieldApp", () => {
       .toBeDisabled();
   });
 
+  it("moves launcher entry focus to the workspace title without granting authority", () => {
+    const { container } = render(<FieldApp initialLocale="en" focusOnMount />);
+    const heading = screen.getByRole("heading", {
+      name: "Real-device operations and autonomous tuning",
+    });
+
+    expect(heading).toHaveFocus();
+    expect(heading).toHaveAttribute("tabindex", "-1");
+    expect(container.querySelector("[data-authority='false']")).toBeTruthy();
+  });
+
   it("updates only the visual navigation selection", () => {
     const { container } = render(<FieldApp initialLocale="en" />);
 
@@ -104,8 +115,8 @@ describe("FieldApp", () => {
     expect(table.getAllByRole("row")).toHaveLength(9);
     expect(table.getByText("MAVLink Common")).toBeInTheDocument();
     expect(table.getByText("DJI Enterprise SDK")).toBeInTheDocument();
-    expect(screen.getByText(/inspect captured frames only/i)).toBeInTheDocument();
-    expect(screen.getByText(/live serial, radio, TCP, and UDP links are not enabled yet/i))
+    expect(screen.getByText(/support offline inspection/i)).toBeInTheDocument();
+    expect(screen.getByText(/one bounded, operator-confirmed read-only serial probe/i))
       .toBeInTheDocument();
     expect(container.querySelector("#adapters[data-authority='false']")).toBeTruthy();
     expect(table.getAllByRole("button", { name: "Install" })

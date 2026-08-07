@@ -6,6 +6,7 @@ import {
   getFieldTuningStatus,
   inspectFieldAdapterFrame,
   installFieldAdapter,
+  probeFieldMavlinkTelemetry,
   prepareFieldHardwareTuning,
 } from "../desktop/bridge";
 
@@ -141,6 +142,49 @@ describe("Field desktop bridge", () => {
       adapterId: "mavlink-common-v2",
       frameBase64: "AQ==",
     })).rejects.toThrow();
+  });
+
+  it("accepts only a read-only bounded serial telemetry receipt", async () => {
+    const receipt = {
+      schemaVersion: 1,
+      kind: "dronedream-field-mavlink-telemetry-probe-receipt",
+      editionId: "field",
+      adapterId: "mavlink-common-v2",
+      observationId: "a".repeat(64),
+      portName: "COM7",
+      baudRate: 115_200,
+      protocolVersion: 2,
+      systemId: 42,
+      componentId: 1,
+      sequence: 7,
+      messageId: 0,
+      messageName: "HEARTBEAT",
+      frameSha256: "c".repeat(64),
+      frameBytes: 21,
+      deviceOpenAttempts: 1,
+      telemetryReadAttempts: 1,
+      parameterReadAttempts: 0,
+      hardwareWriteAttempts: 0,
+      armAttempts: 0,
+      flightAttempts: 0,
+      hardwareAuthority: false,
+    };
+    const invoke = vi.fn(async () => receipt);
+    window.__TAURI__ = { core: { invoke } };
+    const request = {
+      adapterId: "mavlink-common-v2" as const,
+      expectedPackageSha256: "b".repeat(64),
+      observationId: "a".repeat(64),
+      portName: "COM7",
+      baudRate: 115_200 as const,
+      readDeadlineMs: 3_000,
+      operatorConfirmedReadOnly: true as const,
+    };
+
+    await expect(probeFieldMavlinkTelemetry(request)).resolves.toEqual(receipt);
+    expect(invoke).toHaveBeenCalledWith("probe_field_mavlink_telemetry", { request });
+    invoke.mockResolvedValueOnce({ ...receipt, parameterReadAttempts: 1 });
+    await expect(probeFieldMavlinkTelemetry(request)).rejects.toThrow();
   });
 
   it.each([

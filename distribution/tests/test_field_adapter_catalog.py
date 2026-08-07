@@ -58,19 +58,28 @@ class FieldAdapterCatalogTest(unittest.TestCase):
             self.assertNotEqual(entry["deliveryMode"], "embedded-managed")
             self.assertNotEqual(entry["implementationStatus"], "available")
 
-    def test_native_parser_has_no_transport_or_simulator_dependency(self) -> None:
+    def test_native_parser_has_only_bounded_read_only_serial_transport(self) -> None:
         manifest = (ROOT / "desktop/src-tauri/Cargo.toml").read_text(encoding="utf-8")
         mavlink_line = next(line for line in manifest.splitlines() if line.startswith("mavlink ="))
+        serial_line = next(line for line in manifest.splitlines() if line.startswith("serialport ="))
         self.assertIn('version = "=0.17.1"', mavlink_line)
         self.assertIn('"common"', mavlink_line)
         self.assertIn('"ardupilotmega"', mavlink_line)
         self.assertNotRegex(mavlink_line, r"direct-serial|transport-|\btcp\b|\budp\b")
+        self.assertIn('version = "=4.9.0"', serial_line)
+        self.assertIn("default-features = false", serial_line)
 
         source = (ROOT / "desktop/src-tauri/src/field_adapters.rs").read_text(encoding="utf-8")
         self.assertIn("read_any_msg", source)
+        self.assertIn("probe_field_mavlink_telemetry", source)
+        self.assertIn("serialport::new", source)
         self.assertIn("device_open_attempts: 0", source)
+        self.assertIn("device_open_attempts: 1", source)
         self.assertIn("hardware_write_attempts: 0", source)
-        self.assertNotRegex(source, r"serialport|TcpStream|UdpSocket|gazebo|sitl|hitl")
+        self.assertIn("parameter_read_attempts: 0", source)
+        self.assertIn("arm_attempts: 0", source)
+        self.assertIn("flight_attempts: 0", source)
+        self.assertNotRegex(source, r"TcpStream|UdpSocket|gazebo|sitl|hitl")
 
     def test_field_bundle_carries_adapter_notice_and_ui_stays_non_authoritative(self) -> None:
         config = json.loads(
@@ -85,8 +94,10 @@ class FieldAdapterCatalogTest(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("mavlink 0.17.1", notice)
+        self.assertIn("serialport 4.9.0", notice)
         self.assertIn("MIT License", notice)
         self.assertIn("Apache License 2.0", notice)
+        self.assertIn("Mozilla Public License 2.0", notice)
 
         ui = (ROOT / "frontend/src/field/FieldAdapterCenter.tsx").read_text(encoding="utf-8")
         expected_catalog_hash = hashlib.sha256(CATALOG_PATH.read_bytes()).hexdigest()

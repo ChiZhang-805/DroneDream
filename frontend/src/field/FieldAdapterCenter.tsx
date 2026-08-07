@@ -5,6 +5,7 @@ import {
   Download,
   LockKeyhole,
   PackageOpen,
+  RadioReceiver,
   RefreshCw,
   ShieldCheck,
   WifiOff,
@@ -15,8 +16,11 @@ import {
   getFieldAdapterCatalog,
   installFieldAdapter,
   isDesktopRuntime,
+  probeFieldMavlinkTelemetry,
   type FieldAdapterCatalogEntry,
   type FieldAdapterCatalogReport,
+  type FieldDiscoveredDevice,
+  type FieldMavlinkTelemetryProbeReceipt,
 } from "../desktop/bridge";
 import type { FieldLocale } from "./catalog";
 
@@ -25,12 +29,12 @@ const CATALOG_SHA256 = "f1bfbaf7586b712018d84fd8b03571b00bd181ec26559bf4cb9efbd5
 const COPY = {
   en: {
     title: "Protocol adapters",
-    body: "Enable source-bound offline frame inspection without adding proprietary SDKs to the base app.",
+    body: "Enable source-bound frame inspection and bounded read-only serial telemetry without adding proprietary SDKs to the base app.",
     refresh: "Refresh adapter state",
     offline: "Native adapter installation is available in the installed Field app.",
     loadError: "The native adapter catalog could not be verified.",
     installError: "Adapter installation was rejected.",
-    boundary: "These packages inspect captured frames only. Live serial, radio, TCP, and UDP links are not enabled yet. Vehicle Pack validation and the full native safety quorum remain mandatory for every hardware action.",
+    boundary: "Managed MAVLink packages support offline inspection and one bounded, operator-confirmed read-only serial probe. Continuous sessions, radio, TCP, UDP, parameter access, and control remain disabled. Every hardware action still requires Vehicle Pack validation and the full native safety quorum.",
     protocol: "Protocol",
     transports: "Protocol transports",
     telemetry: "Telemetry",
@@ -48,15 +52,25 @@ const COPY = {
     unavailable: "Unavailable",
     vendorControlled: "Vendor controlled",
     verified: "Source-bound catalog",
+    telemetryTitle: "Read-only MAVLink telemetry",
+    telemetryDevice: "Observed port",
+    telemetryAdapter: "Installed adapter",
+    telemetryBaud: "Baud rate",
+    telemetryConfirm: "Open the selected serial port for one read-only frame. No parameter, control, arm, or flight command will be sent.",
+    telemetryProbe: "Read one frame",
+    telemetryBusy: "Reading...",
+    telemetryUnavailable: "Scan the serial registry and install a MAVLink adapter first.",
+    telemetryError: "The read-only telemetry probe was rejected.",
+    telemetryResult: "Received",
   },
   "zh-CN": {
     title: "协议适配器",
-    body: "在不把专有 SDK 塞入基础应用的前提下，启用源绑定的离线帧检查。",
+    body: "在不把专有 SDK 塞入基础应用的前提下，启用源绑定帧检查和有时间上限的只读串口遥测。",
     refresh: "刷新适配器状态",
     offline: "原生适配器安装仅在已安装的 Field 应用中可用。",
     loadError: "无法验证原生适配器目录。",
     installError: "适配器安装被拒绝。",
-    boundary: "这些适配包目前只检查已采集的协议帧，尚未启用实时串口、无线电、TCP 或 UDP 链路。任何真机动作仍必须通过机型包验证和完整原生安全仲裁。",
+    boundary: "受管 MAVLink 适配包支持离线检查，以及一次有时间上限、经操作员确认的只读串口探测。连续会话、无线电、TCP、UDP、参数访问和控制仍处于禁用状态；任何真机动作仍必须通过机型包验证和完整原生安全仲裁。",
     protocol: "协议",
     transports: "协议可用传输方式",
     telemetry: "遥测",
@@ -74,6 +88,16 @@ const COPY = {
     unavailable: "不可用",
     vendorControlled: "由厂商控制",
     verified: "源绑定目录",
+    telemetryTitle: "只读 MAVLink 遥测",
+    telemetryDevice: "已观察端口",
+    telemetryAdapter: "已安装适配器",
+    telemetryBaud: "波特率",
+    telemetryConfirm: "仅为读取一个只读帧而打开所选串口，不发送参数、控制、解锁或飞行命令。",
+    telemetryProbe: "读取一帧",
+    telemetryBusy: "读取中...",
+    telemetryUnavailable: "请先扫描串口注册表并安装一个 MAVLink 适配器。",
+    telemetryError: "只读遥测探测被拒绝。",
+    telemetryResult: "已接收",
   },
 } as const;
 
@@ -101,14 +125,23 @@ function staticCatalog(): FieldAdapterCatalogReport {
 
 interface FieldAdapterCenterProps {
   locale: FieldLocale;
+  devices?: FieldDiscoveredDevice[];
 }
 
-export function FieldAdapterCenter({ locale }: FieldAdapterCenterProps) {
+export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterProps) {
   const copy = COPY[locale];
   const [catalog, setCatalog] = useState<FieldAdapterCatalogReport>(staticCatalog);
   const [busyAdapterId, setBusyAdapterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedObservationId, setSelectedObservationId] = useState("");
+  const [selectedTelemetryAdapterId, setSelectedTelemetryAdapterId] = useState("");
+  const [baudRate, setBaudRate] = useState(115_200);
+  const [readOnlyConfirmed, setReadOnlyConfirmed] = useState(false);
+  const [telemetryBusy, setTelemetryBusy] = useState(false);
+  const [telemetryError, setTelemetryError] = useState<string | null>(null);
+  const [telemetryResult, setTelemetryResult] =
+    useState<FieldMavlinkTelemetryProbeReceipt | null>(null);
   const desktop = isDesktopRuntime();
 
   const loadCatalog = useCallback(async () => {
@@ -149,6 +182,57 @@ export function FieldAdapterCenter({ locale }: FieldAdapterCenterProps) {
     () => catalog.entries.filter((entry) => entry.installed).length,
     [catalog.entries],
   );
+  const installedMavlinkAdapters = useMemo(
+    () => catalog.entries.filter((entry) => (
+      entry.installed
+      && entry.packageSha256 !== null
+      && entry.adapterId.startsWith("mavlink-")
+    )),
+    [catalog.entries],
+  );
+  const selectedDevice = devices.find(
+    (device) => device.observationId === selectedObservationId,
+  ) ?? devices[0] ?? null;
+  const selectedTelemetryAdapter = installedMavlinkAdapters.find(
+    (entry) => entry.adapterId === selectedTelemetryAdapterId,
+  ) ?? installedMavlinkAdapters[0] ?? null;
+
+  const probeTelemetry = useCallback(async () => {
+    if (
+      !desktop
+      || !readOnlyConfirmed
+      || !selectedDevice
+      || !selectedTelemetryAdapter?.packageSha256
+    ) return;
+    setTelemetryBusy(true);
+    setTelemetryError(null);
+    setTelemetryResult(null);
+    try {
+      setTelemetryResult(await probeFieldMavlinkTelemetry({
+        adapterId: selectedTelemetryAdapter.adapterId,
+        expectedPackageSha256: selectedTelemetryAdapter.packageSha256,
+        observationId: selectedDevice.observationId,
+        portName: selectedDevice.portName,
+        baudRate: baudRate as 57600 | 115200 | 230400 | 460800 | 921600,
+        readDeadlineMs: 3_000,
+        operatorConfirmedReadOnly: true,
+      }));
+    } catch (reason) {
+      setTelemetryError(
+        `${copy.telemetryError} ${reason instanceof Error ? reason.message : String(reason)}`,
+      );
+    } finally {
+      setTelemetryBusy(false);
+      setReadOnlyConfirmed(false);
+    }
+  }, [
+    baudRate,
+    copy.telemetryError,
+    desktop,
+    readOnlyConfirmed,
+    selectedDevice,
+    selectedTelemetryAdapter,
+  ]);
 
   const capabilityLabel = (capability: FieldAdapterCatalogEntry["capabilities"]["telemetryRead"]) => ({
     "read-only": copy.readOnly,
@@ -252,6 +336,102 @@ export function FieldAdapterCenter({ locale }: FieldAdapterCenterProps) {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="field-telemetry-probe" data-authority="false">
+        <header>
+          <RadioReceiver aria-hidden="true" />
+          <h3>{copy.telemetryTitle}</h3>
+        </header>
+        <div className="field-telemetry-controls">
+          <label>
+            <span>{copy.telemetryDevice}</span>
+            <select
+              value={selectedDevice?.observationId ?? ""}
+              disabled={!desktop || devices.length === 0 || telemetryBusy}
+              onChange={(event) => setSelectedObservationId(event.target.value)}
+            >
+              {devices.length === 0 ? <option value="">{copy.unavailable}</option> : null}
+              {devices.map((device) => (
+                <option key={device.observationId} value={device.observationId}>
+                  {device.portName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{copy.telemetryAdapter}</span>
+            <select
+              value={selectedTelemetryAdapter?.adapterId ?? ""}
+              disabled={!desktop || installedMavlinkAdapters.length === 0 || telemetryBusy}
+              onChange={(event) => setSelectedTelemetryAdapterId(event.target.value)}
+            >
+              {installedMavlinkAdapters.length === 0
+                ? <option value="">{copy.unavailable}</option>
+                : null}
+              {installedMavlinkAdapters.map((entry) => (
+                <option key={entry.adapterId} value={entry.adapterId}>
+                  {entry.displayName[locale]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{copy.telemetryBaud}</span>
+            <select
+              value={baudRate}
+              disabled={!desktop || telemetryBusy}
+              onChange={(event) => setBaudRate(Number(event.target.value))}
+            >
+              {[57_600, 115_200, 230_400, 460_800, 921_600].map((rate) => (
+                <option key={rate} value={rate}>{rate.toLocaleString("en-US")}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="field-telemetry-confirmation">
+          <input
+            type="checkbox"
+            checked={readOnlyConfirmed}
+            disabled={
+              !desktop
+              || !selectedDevice
+              || !selectedTelemetryAdapter
+              || telemetryBusy
+            }
+            onChange={(event) => setReadOnlyConfirmed(event.target.checked)}
+          />
+          <span>{copy.telemetryConfirm}</span>
+        </label>
+        <button
+          type="button"
+          className="field-primary-command"
+          disabled={
+            !desktop
+            || !readOnlyConfirmed
+            || !selectedDevice
+            || !selectedTelemetryAdapter
+            || telemetryBusy
+          }
+          onClick={() => void probeTelemetry()}
+        >
+          <RadioReceiver aria-hidden="true" />
+          {telemetryBusy ? copy.telemetryBusy : copy.telemetryProbe}
+        </button>
+        {!selectedDevice || !selectedTelemetryAdapter ? (
+          <p className="field-adapter-offline"><WifiOff aria-hidden="true" />{copy.telemetryUnavailable}</p>
+        ) : null}
+        {telemetryError ? <p className="field-adapter-error" role="alert">{telemetryError}</p> : null}
+        {telemetryResult ? (
+          <output className="field-telemetry-result" aria-live="polite">
+            <Check aria-hidden="true" />
+            <strong>{copy.telemetryResult} {telemetryResult.messageName}</strong>
+            <span>
+              MAVLink {telemetryResult.protocolVersion} · system {telemetryResult.systemId}
+              {" · "}component {telemetryResult.componentId}
+            </span>
+          </output>
+        ) : null}
       </div>
 
       <p className="field-adapter-boundary"><LockKeyhole aria-hidden="true" />{copy.boundary}</p>

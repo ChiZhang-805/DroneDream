@@ -37,7 +37,7 @@ fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
     hex::encode(Sha256::digest(bytes.as_ref()))
 }
 
-fn normalize_port_name(value: &str) -> Option<String> {
+pub(crate) fn normalize_port_name(value: &str) -> Option<String> {
     let value = value.trim().to_ascii_uppercase();
     let suffix = value.strip_prefix("COM")?;
     if suffix.is_empty()
@@ -181,6 +181,40 @@ fn report_from_devices(devices: Vec<FieldDeviceObservation>) -> FieldDeviceDisco
     }
 }
 
+fn observation_matches(
+    devices: &[FieldDeviceObservation],
+    observation_id: &str,
+    port_name: &str,
+) -> bool {
+    let Some(port_name) = normalize_port_name(port_name) else {
+        return false;
+    };
+    devices.iter().any(|device| {
+        device.observation_id == observation_id
+            && device.port_name == port_name
+            && !device.port_opened
+            && !device.hardware_authority
+    })
+}
+
+pub(crate) fn validate_field_serial_observation(
+    observation_id: &str,
+    port_name: &str,
+) -> Result<(), String> {
+    if observation_id.len() != 64
+        || !observation_id
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return Err("Field serial observation ID is invalid".to_string());
+    }
+    let devices = discover_windows_serial_map()?;
+    if !observation_matches(&devices, observation_id, port_name) {
+        return Err("Field serial observation is stale, unknown, or mismatched".to_string());
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,7 +230,7 @@ mod tests {
 
     #[test]
     fn discovery_contract_never_opens_or_authorizes_ports() {
-        let report = report_from_devices(vec![FieldDeviceObservation {
+        let devices = vec![FieldDeviceObservation {
             observation_id: sha256_hex("fixture-device"),
             port_name: "COM7".to_string(),
             registry_value_name_sha256: sha256_hex("fixture"),
@@ -204,7 +238,19 @@ mod tests {
             port_opened: false,
             validation_status: "unknown-unvalidated",
             hardware_authority: false,
-        }]);
+        }];
+        assert!(observation_matches(
+            &devices,
+            &sha256_hex("fixture-device"),
+            "com007"
+        ));
+        assert!(!observation_matches(&devices, &sha256_hex("other"), "COM7"));
+        assert!(!observation_matches(
+            &devices,
+            &sha256_hex("fixture-device"),
+            "COM8"
+        ));
+        let report = report_from_devices(devices);
         assert_eq!(report.port_open_attempts, 0);
         assert_eq!(report.write_attempts, 0);
         assert!(!report.hardware_authority);

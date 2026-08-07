@@ -27,3 +27,22 @@ The corresponding license texts are available in the pinned upstream source:
 MAVLink is a protocol and project name. Its inclusion does not imply validation
 of any aircraft, controller, firmware, or Vehicle Pack and does not imply
 upstream endorsement of DroneDream.
+
+## serialport 4.9.0
+
+DroneDream · FIELD uses the cross-platform `serialport` crate from the
+[serialport-rs](https://github.com/serialport/serialport-rs) project for the
+operator-confirmed, bounded read-only serial telemetry probe. The crate is
+compiled without its default `libudev` feature and is licensed under the
+Mozilla Public License 2.0.
+
+Frozen Cargo package checksum:
+
+- `serialport 4.9.0`: `a4d91116f97173694f1642263b2ff837f80d933aa837e2314969f6728f661df3`
+
+The corresponding license text is available in the pinned upstream source:
+
+- [Mozilla Public License 2.0](https://github.com/serialport/serialport-rs/blob/v4.9.0/LICENSE.txt)
+
+Including the library does not validate a serial device or grant parameter,
+arm, flight, or autonomous tuning authority.

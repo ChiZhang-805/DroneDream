@@ -113,6 +113,7 @@ pub fn run() {
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
         field_adapters::install_field_adapter,
+        field_adapters::probe_field_mavlink_telemetry,
         field_device::discover_field_devices,
         field_tuning::get_field_tuning_status,
         field_tuning::run_field_tuning_demo,
