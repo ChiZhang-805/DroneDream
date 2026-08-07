@@ -23,8 +23,8 @@
   },
   "runner": {
     "path": "distribution/sim/tools/invoke-red-lifecycle-fcabd99f.ps1",
-    "bytes": 32894,
-    "sha256": "214064b604b408ae86b3b9d1a14588f3163289071f3423f3b902d72a456a2a1a",
+    "bytes": 33011,
+    "sha256": "3fc99c0c38930d61a5ea53f2275aaa0a8593dbf7cd343b296a073f9e055a8958",
     "modeOrder": ["Plan", "Execute"],
     "maximumExecuteInvocations": 1,
     "automaticRetryAllowed": false

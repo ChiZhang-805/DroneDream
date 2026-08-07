@@ -832,7 +832,8 @@ finally {
 }
 
 if (-not $success) {
-    throw "Sim RED lifecycle failed; evidence is frozen at $receiptPath"
+    $failureMessage = if ($receipt.failure) { [string]$receipt.failure.message } else { "unknown" }
+    throw "Sim RED lifecycle failed: $failureMessage; evidence is frozen at $receiptPath"
 }
 
 if ($Mode -ceq "Execute") {
