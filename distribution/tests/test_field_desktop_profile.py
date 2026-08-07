@@ -45,6 +45,7 @@ class FieldDesktopProfileTests(unittest.TestCase):
     def test_window_and_updater_are_field_specific(self) -> None:
         window = self.config["app"]["windows"][0]
         self.assertEqual(window["title"], "DroneDream · FIELD")
+        self.assertEqual(window["url"], "field.html")
         self.assertEqual((window["width"], window["height"]), (1440, 900))
         self.assertEqual((window["minWidth"], window["minHeight"]), (390, 620))
         endpoints = self.config["plugins"]["updater"]["endpoints"]
@@ -53,6 +54,18 @@ class FieldDesktopProfileTests(unittest.TestCase):
             "desktop-field-channel/latest-field.json",
         ])
         self.assertFalse(self.config["bundle"]["createUpdaterArtifacts"])
+
+    def test_silent_install_persists_language_for_uninstaller(self) -> None:
+        hooks = (ROOT / "desktop" / "src-tauri" / "nsis" / "webview2-health.nsh").read_text(
+            encoding="utf-8"
+        )
+        postinstall = hooks.split("!macro NSIS_HOOK_POSTINSTALL", 1)[1].split(
+            "!macroend", 1
+        )[0]
+        self.assertIn(
+            'WriteRegStr HKCU "${MANUPRODUCTKEY}" "Installer Language" $LANGUAGE',
+            postinstall,
+        )
 
     def test_overlay_binds_the_authorized_field_brand_assets(self) -> None:
         self.assertEqual(self.config["bundle"]["icon"], [

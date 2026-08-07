@@ -10,6 +10,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 IDENTITY = ROOT / "desktop/src-tauri/nsis/edition-identity.nsh"
 RUNTIME_MODE = ROOT / "desktop/src-tauri/nsis/runtime-mode.nsh"
+INSTALLER_HOOKS = ROOT / "desktop/src-tauri/nsis/webview2-health.nsh"
 LANGUAGES = ROOT / "desktop/src-tauri/nsis/installer-languages.nsh"
 FIELD_CONFIG = ROOT / "desktop/src-tauri/tauri.field.conf.json"
 LOCALE_VERIFIER = ROOT / "desktop/scripts/verify-installer-locales.ps1"
@@ -119,6 +120,24 @@ def test_runtime_page_and_ui_implementation_are_compile_time_gated() -> None:
     assert source.index("Function DroneDreamRuntimeModePageLeave") < source.index(
         "!endif", implementation_guard
     )
+
+
+def test_field_compile_branch_excludes_runtime_lifecycle_hooks() -> None:
+    source = INSTALLER_HOOKS.read_text(encoding="utf-8")
+    guard = '!if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"'
+    postinstall = source.split("!macro NSIS_HOOK_POSTINSTALL", 1)[1].split(
+        "!macroend", 1
+    )[0]
+    preuninstall = source.split("!macro NSIS_HOOK_PREUNINSTALL", 1)[1].split(
+        "!macroend", 1
+    )[0]
+    assert postinstall.index(guard) < postinstall.index("--clear-installer-handoff")
+    assert preuninstall.index(guard) < preuninstall.index(
+        "DroneDreamRuntimeOperationProtocol"
+    )
+    field_cleanup = postinstall.split("!else", 1)[1]
+    assert "DeleteRegValue" in field_cleanup
+    assert "ExecWait" not in field_cleanup
 
 
 def test_field_compile_branch_excludes_simulator_and_runtime_choice_copy() -> None:

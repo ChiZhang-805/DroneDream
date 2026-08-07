@@ -67,41 +67,41 @@
   Push $0
   Push $1
 
-  ; Protocol 2 installers hold a durable native quiesce across running-process
-  ; checks, old-version uninstall, executable replacement and receipt clearing.
-  ; Protocol 1 is retained only as a compatibility gate for the status commands
-  ; that version actually implemented.
-  IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_no_existing_operation
-    ReadRegDWORD $1 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
-    ${If} $1 >= 2
-      Call DroneDreamRevalidateRuntimeQuiesce
-      Pop $0
-      ${If} $0 != "ok"
-        StrCpy $1 $0
-        Call DroneDreamBestEffortEndRuntimeQuiesce
-        ${If} $1 == "pending"
+  !if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
+    ; Protocol 2 installers hold a durable native quiesce across running-process
+    ; checks, old-version uninstall, executable replacement and receipt clearing.
+    IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_no_existing_operation
+      ReadRegDWORD $1 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
+      ${If} $1 >= 2
+        Call DroneDreamRevalidateRuntimeQuiesce
+        Pop $0
+        ${If} $0 != "ok"
+          StrCpy $1 $0
+          Call DroneDreamBestEffortEndRuntimeQuiesce
+          ${If} $1 == "pending"
+            Abort "$(DD_UpdatePending)"
+          ${ElseIf} $1 == "busy"
+            Abort "$(DD_UpdateBusy)"
+          ${Else}
+            Abort "$(DD_UpdateIsolationInvalid)"
+          ${EndIf}
+        ${EndIf}
+      ${ElseIf} $1 == 1
+        ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --runtime-operation-status' $0
+        ${If} $0 == 75
+          Abort "$(DD_LegacyRuntimeBusy)"
+        ${ElseIf} $0 != 0
+          Abort "$(DD_RuntimeStateUnknown)"
+        ${EndIf}
+        ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-handoff-status' $0
+        ${If} $0 == 76
           Abort "$(DD_UpdatePending)"
-        ${ElseIf} $1 == "busy"
-          Abort "$(DD_UpdateBusy)"
-        ${Else}
-          Abort "$(DD_UpdateIsolationInvalid)"
+        ${ElseIf} $0 != 0
+          Abort "$(DD_RuntimeRequestUnknown)"
         ${EndIf}
       ${EndIf}
-    ${ElseIf} $1 == 1
-      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --runtime-operation-status' $0
-      ${If} $0 == 75
-        Abort "$(DD_LegacyRuntimeBusy)"
-      ${ElseIf} $0 != 0
-        Abort "$(DD_RuntimeStateUnknown)"
-      ${EndIf}
-      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-handoff-status' $0
-      ${If} $0 == 76
-        Abort "$(DD_UpdatePending)"
-      ${ElseIf} $0 != 0
-        Abort "$(DD_RuntimeRequestUnknown)"
-      ${EndIf}
-    ${EndIf}
-  dronedream_no_existing_operation:
+    dronedream_no_existing_operation:
+  !endif
 
   Call DroneDreamWebView2IsUsable
   Pop $0
@@ -113,7 +113,9 @@
     File "/oname=$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" "${WEBVIEW2BOOTSTRAPPERPATH}"
     ExecWait '"$PLUGINSDIR\MicrosoftEdgeWebview2Setup.exe" /silent /install' $1
     ${If} $1 != 0
-      Call DroneDreamBestEffortEndRuntimeQuiesce
+      !if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
+        Call DroneDreamBestEffortEndRuntimeQuiesce
+      !endif
       Abort "$(DD_WebViewInstallFailed)"
     ${EndIf}
 
@@ -122,7 +124,9 @@
     Call DroneDreamWebView2IsUsable
     Pop $0
     ${If} $0 != "1"
-      Call DroneDreamBestEffortEndRuntimeQuiesce
+      !if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
+        Call DroneDreamBestEffortEndRuntimeQuiesce
+      !endif
       Abort "$(DD_WebViewStillUnusable)"
     ${EndIf}
   ${EndIf}
@@ -134,39 +138,47 @@
 !macro NSIS_HOOK_POSTINSTALL
   Push $0
 
-  ; Clear every previous receipt first. Passive, silent, update, reinstall and
-  ; desktop-only installs stop here and can never trigger a runtime download.
-  ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --clear-installer-handoff' $0
-  ${If} $0 != 0
-    Call DroneDreamBestEffortEndRuntimeQuiesce
-    Abort "$(DD_ClearRequestFailed)"
-  ${EndIf}
+  ; Silent installs do not show the selector, so persist the resolved default
+  ; explicitly to keep the uninstaller from opening a language dialog under /S.
+  WriteRegStr HKCU "${MANUPRODUCTKEY}" "Installer Language" $LANGUAGE
 
-  ; Keep the user's verified Runtime choice across repair installs and updates.
-  ; The native sealing command revalidates the target before any automatic
-  ; operation can start, so a stale or edited registry value still fails closed.
-  WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode" "$DroneDreamInstallMode"
-  WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive" "$DroneDreamRuntimeDrive"
-
-  ${If} $DroneDreamInstallMode != "install-app-only"
-    ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --seal-installer-handoff "$DroneDreamInstallMode" "$DroneDreamRuntimeDrive"' $0
+  !if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
+    ; Clear every previous receipt first. Passive, silent, update, reinstall and
+    ; desktop-only installs stop here and can never trigger a runtime download.
+    ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --clear-installer-handoff' $0
     ${If} $0 != 0
-      ; The old receipt is already gone, so failure is safe and cannot be
-      ; converted into an automatic install by launching the app.
       Call DroneDreamBestEffortEndRuntimeQuiesce
-      Abort "$(DD_SaveRequestFailed)"
+      Abort "$(DD_ClearRequestFailed)"
     ${EndIf}
-  ${EndIf}
 
-  WriteRegDWORD SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol" 2
+    ; Keep the user's verified Runtime choice across repair installs and updates.
+    WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode" "$DroneDreamInstallMode"
+    WriteRegStr SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive" "$DroneDreamRuntimeDrive"
 
-  ; Clear/seal ran under quiesce. Release it with the newly installed binary
-  ; before .onInstSuccess is allowed to auto-launch the application.
-  Call DroneDreamEndRuntimeQuiesce
-  Pop $0
-  ${If} $0 != "ok"
-    Abort "$(DD_ReleaseIsolationFailed)"
-  ${EndIf}
+    ${If} $DroneDreamInstallMode != "install-app-only"
+      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --seal-installer-handoff "$DroneDreamInstallMode" "$DroneDreamRuntimeDrive"' $0
+      ${If} $0 != 0
+        Call DroneDreamBestEffortEndRuntimeQuiesce
+        Abort "$(DD_SaveRequestFailed)"
+      ${EndIf}
+    ${EndIf}
+
+    WriteRegDWORD SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol" 2
+
+    ; Clear/seal ran under quiesce. Release it with the newly installed binary
+    ; before .onInstSuccess is allowed to auto-launch the application.
+    Call DroneDreamEndRuntimeQuiesce
+    Pop $0
+    ${If} $0 != "ok"
+      Abort "$(DD_ReleaseIsolationFailed)"
+    ${EndIf}
+  !else
+    ; Field has no Runtime phase. Remove stale pre-1.0 preview values during an
+    ; overlay without invoking any Runtime command or migration path.
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeInstallMode"
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeDrive"
+    DeleteRegValue SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
+  !endif
 
   ; The standard Tauri shortcut functions intentionally skip existing links
   ; during update mode. Refresh those links after the new executable and icon
@@ -186,50 +198,50 @@
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
-  Push $0
-  Push $1
-  IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_uninstall_no_binary
-    ReadRegDWORD $1 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
-    ${If} $1 >= 2
-      Call un.DroneDreamPrepareRuntimeQuiesce
-      Pop $0
-      ${If} $0 == "pending"
-        Abort "$(DD_UninstallPending)"
-      ${ElseIf} $0 == "busy"
-        Abort "$(DD_UninstallBusy)"
-      ${ElseIf} $0 != "ok"
-        Abort "$(DD_UninstallIsolationFailed)"
-      ${EndIf}
-    ${ElseIf} $1 == 1
-      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --runtime-operation-status' $0
-      ${If} $0 == 75
-        Abort "$(DD_UninstallLegacyBusy)"
-      ${ElseIf} $0 != 0
-        Abort "$(DD_UninstallStateUnknown)"
-      ${EndIf}
-      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-handoff-status' $0
-      ${If} $0 == 76
-        Abort "$(DD_UninstallPending)"
-      ${ElseIf} $0 != 0
-        Abort "$(DD_UninstallRequestUnknown)"
-      ${EndIf}
-    ${EndIf}
-    ${If} $1 >= 1
-      ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --clear-installer-handoff' $0
-      ${If} $0 != 0
-        ${If} $1 >= 2
-          Call un.DroneDreamBestEffortEndRuntimeQuiesce
+  !if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"
+    Push $0
+    Push $1
+    IfFileExists "$INSTDIR\${MAINBINARYNAME}.exe" 0 dronedream_uninstall_no_binary
+      ReadRegDWORD $1 SHCTX "${MANUPRODUCTKEY}" "DroneDreamRuntimeOperationProtocol"
+      ${If} $1 >= 2
+        Call un.DroneDreamPrepareRuntimeQuiesce
+        Pop $0
+        ${If} $0 == "pending"
+          Abort "$(DD_UninstallPending)"
+        ${ElseIf} $0 == "busy"
+          Abort "$(DD_UninstallBusy)"
+        ${ElseIf} $0 != "ok"
+          Abort "$(DD_UninstallIsolationFailed)"
         ${EndIf}
-        Abort "$(DD_UninstallClearFailed)"
+      ${ElseIf} $1 == 1
+        ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --runtime-operation-status' $0
+        ${If} $0 == 75
+          Abort "$(DD_UninstallLegacyBusy)"
+        ${ElseIf} $0 != 0
+          Abort "$(DD_UninstallStateUnknown)"
+        ${EndIf}
+        ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --installer-handoff-status' $0
+        ${If} $0 == 76
+          Abort "$(DD_UninstallPending)"
+        ${ElseIf} $0 != 0
+          Abort "$(DD_UninstallRequestUnknown)"
+        ${EndIf}
       ${EndIf}
-    ${EndIf}
-  dronedream_uninstall_no_binary:
-  ; On successful protocol-2 uninstall the marker intentionally remains until
-  ; this uninstaller (or the live parent updater) exits. No new runtime
-  ; operation can begin between the running-process check and binary deletion.
-  ; Runtime/cache/other WSL distributions are intentionally untouched.
-  Pop $1
-  Pop $0
+      ${If} $1 >= 1
+        ExecWait '"$INSTDIR\${MAINBINARYNAME}.exe" --clear-installer-handoff' $0
+        ${If} $0 != 0
+          ${If} $1 >= 2
+            Call un.DroneDreamBestEffortEndRuntimeQuiesce
+          ${EndIf}
+          Abort "$(DD_UninstallClearFailed)"
+        ${EndIf}
+      ${EndIf}
+    dronedream_uninstall_no_binary:
+    ; On successful protocol-2 uninstall the marker intentionally remains until
+    ; this uninstaller (or the live parent updater) exits.
+    Pop $1
+    Pop $0
+  !endif
 !macroend
 
 Function DroneDreamWebView2IsUsable
