@@ -15,49 +15,60 @@ type ProductCopy = {
   title: string;
   editions: Record<PrimaryEditionId, {
     title: string;
-    audience: string;
-    features: [string, string, string];
+    features: [string, string, string, string, string];
   }>;
 };
 
 const copy: Record<Locale, ProductCopy> = {
   en: {
-    title: "DroneDream Editions",
+    title: "Choose Your DroneDream Edition",
     editions: {
       sim: {
         title: "DroneDream · SIM",
-        audience: "PX4 / Gazebo simulation and parameter research",
-        features: ["Simulation tuning", "Evidence review", "Isolated runtime"],
+        features: [
+          "Pure simulation",
+          "Autonomous tuning",
+          "Candidate parameters",
+          "Holdout evidence",
+          "No real vehicle",
+        ],
       },
       lab: {
         title: "DroneDream · LAB",
-        audience: "Controlled simulation and integration evidence review",
-        features: ["Simulation workflow", "Controlled review", "Lab evidence handoff"],
+        features: [
+          "Sim-to-Real",
+          "Real-to-Sim",
+          "Calibration",
+          "Qualification evidence",
+          "Controlled trials",
+        ],
       },
       field: {
         title: "DroneDream · FIELD",
-        audience: "Evidence review for advanced field preparation",
-        features: ["Readiness evidence", "Safety gates", "Operator review"],
+        features: [
+          "Real vehicle",
+          "Field tuning",
+          "Safety bounds",
+          "Telemetry feedback",
+          "Snapshot rollback",
+        ],
       },
     },
   },
   "zh-CN": {
-    title: "DroneDream 专业版本",
+    title: "选择你的 DroneDream 版本",
     editions: {
       sim: {
         title: "DroneDream · SIM",
-        audience: "面向 PX4 / Gazebo 仿真与参数研究",
-        features: ["仿真调优", "证据审查", "隔离运行环境"],
+        features: ["纯仿真", "自主调优", "候选参数", "留出验证", "不触真机"],
       },
       lab: {
         title: "DroneDream · LAB",
-        audience: "面向受控仿真与集成证据审查",
-        features: ["仿真流程", "受控复核", "实验室证据交接"],
+        features: ["仿真到真机", "真机到仿真", "模型校准", "资格证据", "受控试验"],
       },
       field: {
         title: "DroneDream · FIELD",
-        audience: "面向高级现场准备的证据审查",
-        features: ["就绪证据", "安全门禁", "操作员复核"],
+        features: ["真实设备", "现场调参", "安全边界", "遥测反馈", "快照回滚"],
       },
     },
   },
@@ -132,7 +143,6 @@ export function ProductPage({
                   </picture>
                   <h2 id={titleId}>{editionText.title}</h2>
                 </div>
-                <p className="site-product-edition-audience">{editionText.audience}</p>
                 <ul>
                   {editionText.features.map((feature) => <li key={feature}>{feature}</li>)}
                 </ul>

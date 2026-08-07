@@ -35,17 +35,23 @@ describe("ProductPage", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "DroneDream Editions" }))
+    expect(screen.getByRole("heading", { name: "Choose Your DroneDream Edition" }))
       .toBeVisible();
     expect(screen.getAllByRole("article")).toHaveLength(3);
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
-    expect(screen.getByText("Controlled simulation and integration evidence review"))
-      .toBeVisible();
-    expect(screen.getByText("Evidence review for advanced field preparation"))
-      .toBeVisible();
-    expect(screen.queryByText(/vehicle execution|vehicle lab integration/i)).toBeNull();
+    expect(screen.getByText("Pure simulation")).toBeVisible();
+    expect(screen.getByText("Autonomous tuning")).toBeVisible();
+    expect(screen.getByText("No real vehicle")).toBeVisible();
+    expect(screen.getByText("Sim-to-Real")).toBeVisible();
+    expect(screen.getByText("Real-to-Sim")).toBeVisible();
+    expect(screen.getByText("Qualification evidence")).toBeVisible();
+    expect(screen.getByText("Real vehicle")).toBeVisible();
+    expect(screen.getByText("Field tuning")).toBeVisible();
+    expect(screen.getByText("Telemetry feedback")).toBeVisible();
+    expect(container.querySelectorAll(".site-product-edition li")).toHaveLength(15);
+    expect(container.querySelector(".site-product-edition-audience")).toBeNull();
     const editionPictures = container.querySelectorAll(
       'picture.site-product-edition-picture'
       + '[data-brand-handoff="universal-canonical-brand-donor-v1.1.0"]'
@@ -83,12 +89,12 @@ describe("ProductPage", () => {
   });
 
   it.each([
-    ["en", 1440, "DroneDream Editions"],
-    ["en", 760, "DroneDream Editions"],
-    ["en", 390, "DroneDream Editions"],
-    ["zh-CN", 1440, "DroneDream 专业版本"],
-    ["zh-CN", 760, "DroneDream 专业版本"],
-    ["zh-CN", 390, "DroneDream 专业版本"],
+    ["en", 1440, "Choose Your DroneDream Edition"],
+    ["en", 760, "Choose Your DroneDream Edition"],
+    ["en", 390, "Choose Your DroneDream Edition"],
+    ["zh-CN", 1440, "选择你的 DroneDream 版本"],
+    ["zh-CN", 760, "选择你的 DroneDream 版本"],
+    ["zh-CN", 390, "选择你的 DroneDream 版本"],
   ] as const)(
     "keeps the %s download chooser fail-closed at %ipx",
     (locale, viewportWidth, title) => {
@@ -143,13 +149,18 @@ describe("ProductPage", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "DroneDream 专业版本" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "选择你的 DroneDream 版本" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
-    expect(screen.getByText("面向受控仿真与集成证据审查")).toBeVisible();
-    expect(screen.getByText("面向高级现场准备的证据审查")).toBeVisible();
-    expect(screen.queryByText(/真机联调|真机执行/)).toBeNull();
+    expect(screen.getByText("纯仿真")).toBeVisible();
+    expect(screen.getByText("不触真机")).toBeVisible();
+    expect(screen.getByText("仿真到真机")).toBeVisible();
+    expect(screen.getByText("真机到仿真")).toBeVisible();
+    expect(screen.getByText("资格证据")).toBeVisible();
+    expect(screen.getByText("真实设备")).toBeVisible();
+    expect(screen.getByText("现场调参")).toBeVisible();
+    expect(screen.getByText("遥测反馈")).toBeVisible();
     expect(screen.queryByText("正在准备")).toBeNull();
     expect(screen.queryByText("当前内测预览版")).toBeNull();
   });

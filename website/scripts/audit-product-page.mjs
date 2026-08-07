@@ -139,12 +139,12 @@ const profiles = {
 };
 
 const copy = (locale) => ({
-  title: locale === "zh-CN" ? "DroneDream 专业版本" : "DroneDream Editions",
+  title: locale === "zh-CN" ? "选择你的 DroneDream 版本" : "Choose Your DroneDream Edition",
   productNav: locale === "zh-CN" ? "产品" : "Product",
   priceNav: locale === "zh-CN" ? "价格" : "Price",
   universalDisabled: locale === "zh-CN"
-    ? "DroneDream Universal 正在准备"
-    : "DroneDream Universal is coming soon",
+    ? "DroneDream Universal 下载"
+    : "DroneDream Universal Download",
   headings: ["DroneDream · SIM", "DroneDream · LAB", "DroneDream · FIELD"],
 });
 
