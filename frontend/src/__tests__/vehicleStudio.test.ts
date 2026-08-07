@@ -122,6 +122,20 @@ describe("Universal Vehicle Studio contract", () => {
     await expect(verifyVehiclePackDraft(await rehash(artifactDrift))).rejects.toThrow(/drifted/);
   });
 
+  it("bounds repeated model fields and imported artifact size", async () => {
+    const duplicateSensors = createVehicleModelDraft();
+    duplicateSensors.sensors.push({ ...duplicateSensors.sensors[0] });
+    expect(validateVehicleModel(duplicateSensors).map((issue) => issue.code))
+      .toContain("duplicate-sensor");
+    await expect(buildVehiclePackDraft(duplicateSensors)).rejects.toThrow(/validation issue/);
+
+    const oversized = await buildVehiclePackDraft(createVehicleModelDraft());
+    oversized.payload.artifacts[1].content = "x".repeat(1_048_577);
+    oversized.payload.artifacts[1].sha256 = await sha256Text(oversized.payload.artifacts[1].content);
+    oversized.integrity.payloadSha256 = await sha256Text(canonicalJson(oversized.payload));
+    await expect(verifyVehiclePackDraft(oversized)).rejects.toThrow(/identity is invalid/);
+  });
+
   it("keeps local revisions owner-scoped and restores history as a new revision", () => {
     const storage = memoryStorage();
     const original = createVehicleModelDraft(new Date("2026-08-07T01:00:00.000Z"));
@@ -147,5 +161,15 @@ describe("Universal Vehicle Studio contract", () => {
       { draftId: "empty", revisions: [] },
     ]));
     expect(loadVehicleModels("owner-a", storage)).toEqual([]);
+  });
+
+  it("caps each owner's model library instead of growing local storage without a bound", () => {
+    const storage = memoryStorage();
+    for (let index = 0; index < 55; index += 1) {
+      const draft = createVehicleModelDraft();
+      draft.draftId = `${index.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`;
+      saveVehicleModel("owner-a", draft, storage);
+    }
+    expect(loadVehicleModels("owner-a", storage)).toHaveLength(50);
   });
 });

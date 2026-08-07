@@ -2,10 +2,15 @@ import type {
   VehicleModelDraft,
   VehiclePackTargetEdition,
 } from "./model";
-import { validateVehicleModel } from "./model";
+import {
+  MAX_PARAMETER_FAMILIES,
+  MAX_VEHICLE_SENSORS,
+  validateVehicleModel,
+} from "./model";
 
 export const VEHICLE_PACK_DRAFT_KIND = "dronedream-vehicle-pack-draft-envelope" as const;
 export const VEHICLE_PACK_DRAFT_VERSION = "1.0.0" as const;
+const MAX_ARTIFACT_UTF8_BYTES = 1_048_576;
 
 export interface VehiclePackDraftArtifact {
   path: string;
@@ -232,7 +237,13 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
     || ["armLengthM", "propellerDiameterM", "maximumThrustPerMotorN", "batteryCells", "batteryCapacityMah"]
       .some((key) => typeof propulsion[key] !== "number")
   ) throw new VehiclePackDraftError("Vehicle propulsion is malformed");
-  if (!Array.isArray(value.sensors)) throw new VehiclePackDraftError("Vehicle sensors are malformed");
+  if (
+    !Array.isArray(value.sensors)
+    || value.sensors.length < 1
+    || value.sensors.length > MAX_VEHICLE_SENSORS
+  ) throw new VehiclePackDraftError("Vehicle sensors are malformed");
+  const sensorIds = new Set<string>();
+  const sensorTypes = new Set<string>();
   for (const sensor of value.sensors) {
     if (!isRecord(sensor)) throw new VehiclePackDraftError("Vehicle sensor is malformed");
     assertExactKeys(sensor, ["id", "type", "model", "enabled"], "Vehicle sensor");
@@ -242,6 +253,11 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
       || typeof sensor.model !== "string"
       || typeof sensor.enabled !== "boolean"
     ) throw new VehiclePackDraftError("Vehicle sensor is malformed");
+    if (sensorIds.has(sensor.id) || sensorTypes.has(String(sensor.type))) {
+      throw new VehiclePackDraftError("Vehicle sensors contain duplicates");
+    }
+    sensorIds.add(sensor.id);
+    sensorTypes.add(String(sensor.type));
   }
   if (!isRecord(value.autopilot)) throw new VehiclePackDraftError("Vehicle autopilot is malformed");
   assertExactKeys(value.autopilot, ["family", "controllerModel", "firmwareVersion"], "Vehicle autopilot");
@@ -255,7 +271,9 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
   if (
     !["position", "velocity", "attitude"].includes(String(value.controlTarget.primary))
     || !Array.isArray(value.controlTarget.parameterFamilies)
+    || value.controlTarget.parameterFamilies.length > MAX_PARAMETER_FAMILIES
     || value.controlTarget.parameterFamilies.some((item) => typeof item !== "string")
+    || new Set(value.controlTarget.parameterFamilies).size !== value.controlTarget.parameterFamilies.length
   ) throw new VehiclePackDraftError("Vehicle control target is malformed");
   if (
     !Array.isArray(value.targetEditions)
@@ -343,6 +361,7 @@ export async function verifyVehiclePackDraft(
       expectedArtifacts.get(item.path) !== item.mediaType
       || item.encoding !== "utf-8"
       || typeof item.content !== "string"
+      || new TextEncoder().encode(item.content).byteLength > MAX_ARTIFACT_UTF8_BYTES
       || !/^[0-9a-f]{64}$/.test(item.sha256)
     ) throw new VehiclePackDraftError("Vehicle Pack artifact identity is invalid");
     expectedArtifacts.delete(item.path);

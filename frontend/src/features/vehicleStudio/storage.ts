@@ -3,6 +3,7 @@ import { assertVehicleModelShape } from "./pack";
 
 const STORAGE_PREFIX = "dronedream:vehicle-studio:v1";
 const MAX_REVISIONS = 40;
+const MAX_MODELS = 50;
 
 export interface StoredVehicleModel {
   draftId: string;
@@ -54,6 +55,7 @@ export function saveVehicleModel(
   const next = { draftId: draft.draftId, revisions };
   if (index >= 0) models[index] = next;
   else models.unshift(next);
+  models.splice(MAX_MODELS);
   storage.setItem(storageKey(ownerId), JSON.stringify(models));
   return models;
 }

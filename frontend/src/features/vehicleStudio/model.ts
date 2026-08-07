@@ -1,4 +1,6 @@
 export const VEHICLE_MODEL_SCHEMA_VERSION = 1 as const;
+export const MAX_VEHICLE_SENSORS = 32;
+export const MAX_PARAMETER_FAMILIES = 64;
 
 export type VehicleClass =
   | "multicopter-small"
@@ -113,6 +115,21 @@ export function validateVehicleModel(
   }
   if (draft.controlTarget.parameterFamilies.some((family) => !family.trim() || family.length > 64)) {
     issues.push({ field: "controlTarget.parameterFamilies", code: "invalid-family", message: "Parameter families must contain 1 to 64 characters" });
+  }
+  if (
+    draft.controlTarget.parameterFamilies.length > MAX_PARAMETER_FAMILIES
+    || new Set(draft.controlTarget.parameterFamilies).size !== draft.controlTarget.parameterFamilies.length
+  ) {
+    issues.push({ field: "controlTarget.parameterFamilies", code: "invalid-family-set", message: `Use no more than ${MAX_PARAMETER_FAMILIES} unique parameter families` });
+  }
+  if (draft.sensors.length < 1 || draft.sensors.length > MAX_VEHICLE_SENSORS) {
+    issues.push({ field: "sensors", code: "invalid-sensor-count", message: `Use 1 to ${MAX_VEHICLE_SENSORS} sensors` });
+  }
+  if (
+    new Set(draft.sensors.map((sensor) => sensor.id)).size !== draft.sensors.length
+    || new Set(draft.sensors.map((sensor) => sensor.type)).size !== draft.sensors.length
+  ) {
+    issues.push({ field: "sensors", code: "duplicate-sensor", message: "Sensor identities and types must be unique" });
   }
   for (const sensor of draft.sensors) {
     requireText(`sensors.${sensor.id}.id`, sensor.id, 128);

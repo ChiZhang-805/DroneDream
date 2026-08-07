@@ -26,6 +26,15 @@ class VehicleStudioContractTests(unittest.TestCase):
             payload["properties"]["kind"]["const"],
             "dronedream-vehicle-pack-draft-envelope",
         )
+        model = self.schema["$defs"]["model"]["properties"]
+        self.assertEqual(model["sensors"]["maxItems"], 32)
+        self.assertEqual(
+            model["controlTarget"]["properties"]["parameterFamilies"]["maxItems"],
+            64,
+        )
+        self.assertTrue(
+            model["controlTarget"]["properties"]["parameterFamilies"]["uniqueItems"]
+        )
 
     def test_authority_is_fail_closed(self) -> None:
         authority = self.schema["properties"]["payload"]["properties"]["authority"]["properties"]

@@ -88,6 +88,8 @@ const COPY = {
     imported: "Imported as a new local model draft.",
     importFailed: "The Vehicle Pack draft could not be imported.",
     exportFailed: "The Vehicle Pack draft could not be exported.",
+    saveFailed: "The model could not be saved in local storage.",
+    deleteFailed: "The local model could not be deleted.",
     fileTooLarge: "The Vehicle Pack draft exceeds the 2.5 MB import limit.",
     exportReady: "The export contains a generated Gazebo SDF and a canonical SHA-256 envelope.",
     packBoundary: "Receiving Editions must verify the envelope again. SIM may use generated assets only after its own compatibility gate; LAB/FIELD hardware use remains denied until signed validation evidence exists.",
@@ -140,6 +142,8 @@ const COPY = {
     imported: "已作为新的本地模型草稿导入。",
     importFailed: "无法导入这个 Vehicle Pack 草稿。",
     exportFailed: "无法导出这个 Vehicle Pack 草稿。",
+    saveFailed: "无法将模型保存到本地存储。",
+    deleteFailed: "无法删除这个本地模型。",
     fileTooLarge: "Vehicle Pack 草稿超过 2.5 MB 导入上限。",
     exportReady: "导出包包含自动生成的 Gazebo SDF 和可复算的 SHA-256 完整性封装。",
     packBoundary: "接收端必须再次验证封装。SIM 仍需通过自身兼容性门才能使用生成资产；LAB/FIELD 在获得签名验证证据前继续拒绝真机用途。",
@@ -237,10 +241,14 @@ export function VehicleStudio() {
     setMessage(null);
   };
   const save = () => {
-    const saved = currentRecord ? nextVehicleRevision(draft) : structuredClone(draft);
-    setModels(saveVehicleModel(ownerId, saved));
-    setDraft(saved);
-    setMessage(`${copy.revision} ${saved.revision}`);
+    try {
+      const saved = currentRecord ? nextVehicleRevision(draft) : structuredClone(draft);
+      setModels(saveVehicleModel(ownerId, saved));
+      setDraft(saved);
+      setMessage(`${copy.revision} ${saved.revision}`);
+    } catch {
+      setMessage(copy.saveFailed);
+    }
   };
   const selectModel = (model: StoredVehicleModel) => {
     setDraft(structuredClone(model.revisions[0]));
@@ -323,8 +331,12 @@ export function VehicleStudio() {
             <div>
               <button type="button" className="btn" onClick={save}><Save />{copy.saveRevision}</button>
               {currentRecord ? <button type="button" className="btn btn-danger" aria-label={copy.delete} onClick={() => {
-                setModels(removeVehicleModel(ownerId, draft.draftId));
-                setDraft(createVehicleModelDraft());
+                try {
+                  setModels(removeVehicleModel(ownerId, draft.draftId));
+                  setDraft(createVehicleModelDraft());
+                } catch {
+                  setMessage(copy.deleteFailed);
+                }
               }}><Trash2 /></button> : null}
             </div>
           </div>
