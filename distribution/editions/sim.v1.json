@@ -5,12 +5,12 @@
   "editionVersion": "1.0.0",
   "productDisplayVersion": "1.0.0",
   "displayName": {
-    "en": "DroneDream Sim",
-    "zh-CN": "DroneDream 纯仿真版"
+    "en": "DroneDream · SIM",
+    "zh-CN": "DroneDream · SIM"
   },
   "description": {
-    "en": "Simulation-only PX4 SITL, Gazebo, and Harness workflows with physical hardware actions denied below the UI.",
-    "zh-CN": "仅运行 PX4 SITL、Gazebo 与 Harness；所有真机和 HITL 操作都在前端以下强制拒绝。"
+    "en": "Model + Harness autonomous parameter optimization through repeatable PX4 SITL and Gazebo experiments, with every physical-hardware action denied below the UI.",
+    "zh-CN": "Model + Harness 通过可重复的 PX4 SITL 与 Gazebo 实验自主搜索和优化参数；所有真机和 HITL 操作都在前端以下强制拒绝。"
   },
   "implementationStatus": "integrated-contract",
   "validationTier": "sim-runtime-contract",

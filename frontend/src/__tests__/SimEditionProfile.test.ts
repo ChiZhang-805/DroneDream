@@ -28,6 +28,18 @@ describe("DroneDream · SIM edition profile", () => {
     expect(simCapabilityDecision("field.mode.enter")).toBe("deny");
   });
 
+  it("exposes the autonomous simulation loop without hardware authority", () => {
+    expect(SIM_EDITION.visibleSurfaces).toEqual(expect.arrayContaining([
+      "autonomous-optimization",
+      "model-candidate-planning",
+      "harness-evidence",
+      "px4-sitl",
+      "gazebo",
+    ]));
+    expect(SIM_EDITION.visibleSurfaces).not.toContain("hardware");
+    expect(SIM_EDITION.visibleSurfaces).not.toContain("hitl");
+  });
+
   it("removes hardware identity from a valid Field distribution draft", () => {
     expect(lockDistributionSelectionToSim({
       schemaVersion: 1,

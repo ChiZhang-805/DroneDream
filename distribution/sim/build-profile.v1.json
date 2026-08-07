@@ -28,7 +28,7 @@
   "manifests": {
     "edition": {
       "path": "distribution/editions/sim.v1.json",
-      "sha256": "e6f71a0c80dfdfd3fbe31879e43de7ff5322f0a826888c161534e41a1bff454f"
+      "sha256": "063198c0fff4ade043de4f3998ccb6eb4dedc55000c576abd4d46796067182d4"
     },
     "capabilityPolicy": {
       "path": "distribution/capabilities/core-capabilities.v1.json",
@@ -111,6 +111,30 @@
       "qgroundcontrol",
       "vehicle-pack-hardware"
     ]
+  },
+  "autonomousOptimizationContract": {
+    "requiredOptimizer": "llm_harness",
+    "modelCapabilities": [
+      "select-allowlisted-proposal-tools",
+      "allocate-bounded-candidate-budget",
+      "propose-one-direct-bounded-candidate",
+      "analyze-structured-telemetry-and-failure-feedback",
+      "adapt-next-generation-strategy",
+      "recommend-stop-without-stop-authority"
+    ],
+    "harnessControls": [
+      "parameter-name-type-bound-step-and-choice-validation",
+      "candidate-and-trial-budgets",
+      "deterministic-simulation-dispatch",
+      "failure-classification-and-receipts",
+      "qualification-independent-holdout-and-rollback"
+    ],
+    "maximumModelTurnsPerGeneration": 4,
+    "normalModelTurnsPerGeneration": 2,
+    "hardwareAuthorityGranted": false,
+    "candidateClassification": "simulation-hypothesis-not-hardware-approved",
+    "holdoutOutcomesVisibleToModel": false,
+    "sameJobEvidenceRequired": true
   },
   "installerPlan": {
     "outputReceiptKind": "dronedream-sim-installer-adoption-receipt",

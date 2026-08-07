@@ -31,6 +31,7 @@ PROFILE_KEYS = {
     "source",
     "manifests",
     "deterministicPayload",
+    "autonomousOptimizationContract",
     "installerPlan",
     "acceptance",
     "resourceProtocol",
@@ -67,6 +68,17 @@ PROFILE_PAYLOAD_KEYS = {
     "allowedVehiclePacks",
     "forbiddenEditionIds",
     "forbiddenCommandFragments",
+}
+PROFILE_AUTONOMY_KEYS = {
+    "requiredOptimizer",
+    "modelCapabilities",
+    "harnessControls",
+    "maximumModelTurnsPerGeneration",
+    "normalModelTurnsPerGeneration",
+    "hardwareAuthorityGranted",
+    "candidateClassification",
+    "holdoutOutcomesVisibleToModel",
+    "sameJobEvidenceRequired",
 }
 PROFILE_INSTALLER_KEYS = {
     "outputReceiptKind",
@@ -676,6 +688,34 @@ def validate_build_profile(document: Any, *, repo_root: Path) -> dict[str, Any]:
     if any(item.startswith("hardware") for item in allowed_modules + allowed_caps):
         raise SimInstallerContractError("Sim allowlist contains hardware authority")
 
+    autonomy = _exact_keys(
+        profile["autonomousOptimizationContract"],
+        PROFILE_AUTONOMY_KEYS,
+        "profile.autonomousOptimizationContract",
+    )
+    model_capabilities = _nonempty_string_list(
+        autonomy["modelCapabilities"], "autonomousOptimizationContract.modelCapabilities"
+    )
+    harness_controls = _nonempty_string_list(
+        autonomy["harnessControls"], "autonomousOptimizationContract.harnessControls"
+    )
+    if (
+        autonomy["requiredOptimizer"] != "llm_harness"
+        or autonomy["normalModelTurnsPerGeneration"] != 2
+        or autonomy["maximumModelTurnsPerGeneration"] != 4
+        or autonomy["hardwareAuthorityGranted"] is not False
+        or autonomy["holdoutOutcomesVisibleToModel"] is not False
+        or autonomy["sameJobEvidenceRequired"] is not True
+        or autonomy["candidateClassification"]
+        != "simulation-hypothesis-not-hardware-approved"
+        or "propose-one-direct-bounded-candidate" not in model_capabilities
+        or "analyze-structured-telemetry-and-failure-feedback"
+        not in model_capabilities
+        or "parameter-name-type-bound-step-and-choice-validation"
+        not in harness_controls
+        or "qualification-independent-holdout-and-rollback" not in harness_controls
+    ):
+        raise SimInstallerContractError("autonomous optimization contract drifted")
     installer = _exact_keys(profile["installerPlan"], PROFILE_INSTALLER_KEYS, "installerPlan")
     if (
         installer["outputReceiptKind"] != "dronedream-sim-installer-adoption-receipt"

@@ -1,10 +1,10 @@
-"""Bounded LLM tool selection for iterative DroneDream optimization.
+"""Bounded LLM strategy selection for iterative DroneDream optimization.
 
-The model receives a compact, read-only evidence packet and may choose exactly
-one optimizer from a closed registry. It never receives a callable tool,
-database handle, shell, simulator, filesystem, or credential. The selected
-tool is validated locally and then executed by the deterministic orchestration
-layer in a separate step.
+The model receives compact, read-only evidence and may choose allowlisted proposal
+tools, compare their output, and author one bounded candidate hypothesis. It never
+receives a callable tool, database handle, shell, simulator, filesystem, or
+credential. Every decision and candidate is validated locally before the
+deterministic orchestration layer can execute a simulation Trial.
 """
 
 from __future__ import annotations
@@ -45,7 +45,9 @@ from app.orchestration.harness_budget_planner import (
     HARNESS_PLAN_REVISION_PROMPT_VERSION,
     HarnessBudgetOpportunity,
     HarnessCompiledGenerationPlan,
+    HarnessCompiledModelCandidate,
     HarnessGenerationPlan,
+    HarnessModelCandidateContext,
     HarnessPlanUncertainty,
     HarnessPlanValidation,
     HarnessProposalSummary,
@@ -176,6 +178,8 @@ class HarnessBudgetPlanDecision:
     prompt_sha256: str | None = None
     fallback_reason: str | None = None
     validation: HarnessPlanValidation | None = None
+    uncertainty_level: str = "low"
+    missing_evidence: tuple[str, ...] = ()
     budget_policy_version: str = HARNESS_BUDGET_POLICY_VERSION
     plan_prompt_version: str = HARNESS_BUDGET_PROMPT_VERSION
     evidence_schema_version: str = HARNESS_EVIDENCE_SCHEMA_VERSION
@@ -189,6 +193,7 @@ class HarnessPlanRevisionDecision:
     revision_id: str
     decision_id: str
     selected_proposal_refs: tuple[str, ...]
+    model_candidate: HarnessCompiledModelCandidate | None
     abandoned: bool
     source: HarnessDecisionSource
     model: str | None
@@ -1369,6 +1374,8 @@ def _budget_plan_fallback(
         prompt_sha256=prompt_sha256,
         fallback_reason=reason,
         validation=validation,
+        uncertainty_level="low",
+        missing_evidence=(),
     )
 
 
@@ -1647,6 +1654,8 @@ def select_optimizer_budget_plan(
             evidence_sha256=evidence_sha256,
             prompt_sha256=prompt_sha256,
             validation=validation,
+            uncertainty_level=plan.uncertainty.level,
+            missing_evidence=plan.uncertainty.missing_evidence,
         )
 
     compiled = compile_generation_plan(plan, opportunity)
@@ -1679,6 +1688,8 @@ def select_optimizer_budget_plan(
         evidence_sha256=evidence_sha256,
         prompt_sha256=prompt_sha256,
         validation=validation,
+        uncertainty_level=plan.uncertainty.level,
+        missing_evidence=plan.uncertainty.missing_evidence,
     )
 
 
@@ -1754,6 +1765,7 @@ def _revision_fallback(
         revision_id=revision_id,
         decision_id=decision_id,
         selected_proposal_refs=validation.selected_proposal_refs,
+        model_candidate=None,
         abandoned=False,
         source="deterministic_fallback",
         model=model,
@@ -1770,6 +1782,7 @@ def select_plan_revision(
     plan_decision: HarnessBudgetPlanDecision,
     proposals: tuple[HarnessProposalSummary, ...],
     maximum_dispatch_candidates: int,
+    model_candidate_context: HarnessModelCandidateContext | None = None,
     client: OpenAIClientLike | None = None,
     allow_abandon: bool = False,
 ) -> HarnessPlanRevisionDecision:
@@ -1781,7 +1794,7 @@ def select_plan_revision(
         raise ValueError("a plan revision requires a compiled continue plan")
     if compiled.generation != job.current_generation + 1:
         raise ValueError("compiled plan generation drifted before revision")
-    if not proposals:
+    if not proposals and model_candidate_context is None:
         return _revision_fallback(
             db,
             job,
@@ -1794,10 +1807,14 @@ def select_plan_revision(
             reason="no_usable_proposals",
             model=plan_decision.model,
         )
+    feedback_snapshot, _ = current_harness_evidence_snapshot(db, job)
+    feedback_evidence = feedback_snapshot.model_dump(mode="json", exclude_none=True)
     system, user = build_plan_revision_messages(
         compiled_plan=compiled,
         proposals=proposals,
         maximum_dispatch_candidates=maximum_dispatch_candidates,
+        model_candidate_context=model_candidate_context,
+        feedback_evidence=feedback_evidence,
     )
     settings = get_settings()
     if len(user.encode("utf-8")) > settings.llm_max_prompt_bytes:
@@ -1817,11 +1834,18 @@ def select_plan_revision(
     revision_schema = plan_revision_schema(
         proposals,
         maximum_dispatch_candidates=maximum_dispatch_candidates,
+        model_candidate_context=model_candidate_context,
     )
     revision_evidence = {
         "compiled_plan": compiled.model_dump(mode="json"),
         "proposals": [proposal.model_dump(mode="json") for proposal in proposals],
         "maximum_dispatch_candidates": maximum_dispatch_candidates,
+        "model_candidate_context": (
+            model_candidate_context.model_dump(mode="json")
+            if model_candidate_context is not None
+            else None
+        ),
+        "feedback_evidence": feedback_evidence,
     }
     recovered_turn = recover_existing_cognitive_turn(
         db,
@@ -1955,6 +1979,7 @@ def select_plan_revision(
         raw,
         proposals=proposals,
         maximum_dispatch_candidates=maximum_dispatch_candidates,
+        model_candidate_context=model_candidate_context,
         allow_abandon=allow_abandon,
     )
     if revision is None:
@@ -2007,6 +2032,16 @@ def select_plan_revision(
             "compiled_plan_sha256": compiled.plan_sha256,
             "decision": revision.decision,
             "selected_proposal_refs": list(revision.selected_proposal_refs),
+            "model_candidate_sha256": (
+                validation.model_candidate.candidate_sha256
+                if validation.model_candidate is not None
+                else None
+            ),
+            "model_candidate_changed_parameters": (
+                list(validation.model_candidate.changed_parameters)
+                if validation.model_candidate is not None
+                else []
+            ),
             "revision_prompt_version": HARNESS_PLAN_REVISION_PROMPT_VERSION,
         },
     )
@@ -2014,6 +2049,7 @@ def select_plan_revision(
         revision_id=revision_id,
         decision_id=plan_decision.decision_id,
         selected_proposal_refs=revision.selected_proposal_refs,
+        model_candidate=validation.model_candidate,
         abandoned=revision.decision == "abandon",
         source="model",
         model=plan_decision.model,

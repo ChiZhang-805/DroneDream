@@ -224,6 +224,68 @@
   list-style: none;
 }
 
+.sim-loop-band {
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+}
+
+.sim-loop-action {
+  width: fit-content;
+  margin-top: 1rem;
+}
+
+.sim-loop-action svg {
+  width: 17px;
+  height: 17px;
+}
+
+.sim-loop-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: sim-loop;
+}
+
+.sim-loop-grid > li {
+  display: grid;
+  grid-template-columns: 28px 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 0.65rem;
+  min-height: 112px;
+  padding: 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.sim-loop-grid > li:nth-child(odd) {
+  border-right: 1px solid var(--border);
+}
+
+.sim-loop-grid svg {
+  width: 19px;
+  height: 19px;
+  color: var(--sim-brand-middle);
+}
+
+.sim-loop-index {
+  color: var(--sim-brand-start);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.sim-loop-grid strong {
+  font-size: 0.82rem;
+}
+
+.sim-loop-grid p {
+  margin: 0.3rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
 .sim-capability-item {
   display: grid;
   align-content: space-between;
@@ -286,6 +348,14 @@
   color: #16785c;
 }
 
+.sim-candidate-warning {
+  display: block;
+  margin-top: 0.55rem;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
 .sim-setup-preview {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -339,7 +409,8 @@
 
 @media (max-width: 900px) {
   .sim-overview-header,
-  .sim-overview-band {
+  .sim-overview-band,
+  .sim-loop-band {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
@@ -367,9 +438,15 @@
   }
 
   .sim-capability-grid,
+  .sim-loop-grid,
   .sim-dependency-list,
   .sim-setup-preview {
     grid-template-columns: 1fr;
+  }
+
+
+  .sim-loop-grid > li:nth-child(odd) {
+    border-right: 0;
   }
 
   .sim-setup-preview .btn {

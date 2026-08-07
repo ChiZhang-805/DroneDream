@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -40,7 +40,10 @@ describe("DroneDream Sim experience", () => {
       .toHaveTextContent("PX4 SITL");
     expect(screen.getByRole("list", { name: "External dependencies" }))
       .toHaveTextContent("Runtime Base");
-    expect(screen.getAllByRole("listitem")).toHaveLength(6);
+    const capabilityList = screen.getByRole("list", { name: "Simulation workspace" });
+    const dependencyList = screen.getByRole("list", { name: "External dependencies" });
+    expect(within(capabilityList).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(dependencyList).getAllByRole("listitem")).toHaveLength(2);
     for (const label of [
       "Simulation",
       "PX4 SITL",
@@ -52,6 +55,12 @@ describe("DroneDream Sim experience", () => {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getAllByText("External")).toHaveLength(2);
+    expect(screen.getByRole("list", { name: "Model reasoning, Harness evidence" }))
+      .toHaveTextContent("Telemetry and diagnosis");
+    expect(screen.getByRole("link", { name: /Start optimization job/ }))
+      .toHaveAttribute("href", "/jobs/new");
+    expect(screen.getByText(/not parameters approved for physical aircraft/))
+      .toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open setup preview/ }))
       .toHaveAttribute("href", "/desktop/setup");
     expect(screen.queryByText(/DroneDream Lab/)).not.toBeInTheDocument();
@@ -66,6 +75,8 @@ describe("DroneDream Sim experience", () => {
       .toBeInTheDocument();
     expect(screen.getByText("纯仿真内测预览")).toBeInTheDocument();
     expect(screen.getByText("Sim 仿真机型包")).toBeInTheDocument();
+    expect(screen.getByText("Model 推理，Harness 持证")).toBeInTheDocument();
+    expect(screen.getByText(/不代表已经获准用于真机/)).toBeInTheDocument();
     expect(screen.getAllByText("外置")).toHaveLength(2);
     expect(screen.getByRole("link", { name: /打开设置预览/ }))
       .toBeInTheDocument();

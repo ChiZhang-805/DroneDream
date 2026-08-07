@@ -181,6 +181,25 @@ class SimInstallerContractTests(unittest.TestCase):
         self.assertIn("hardware.arm", payload["forbiddenCapabilities"])
         self.assertFalse(self.profile["resourceProtocol"]["buildAllowed"])
         self.assertFalse(self.profile["resourceProtocol"]["apiKeyUseAllowed"])
+        autonomy = self.profile["autonomousOptimizationContract"]
+        self.assertEqual(autonomy["requiredOptimizer"], "llm_harness")
+        self.assertEqual(autonomy["normalModelTurnsPerGeneration"], 2)
+        self.assertEqual(autonomy["maximumModelTurnsPerGeneration"], 4)
+        self.assertIn("propose-one-direct-bounded-candidate", autonomy["modelCapabilities"])
+        self.assertIn(
+            "qualification-independent-holdout-and-rollback",
+            autonomy["harnessControls"],
+        )
+        self.assertFalse(autonomy["hardwareAuthorityGranted"])
+        self.assertFalse(autonomy["holdoutOutcomesVisibleToModel"])
+        self.assertEqual(
+            autonomy["candidateClassification"],
+            "simulation-hypothesis-not-hardware-approved",
+        )
+
+        edition = load_json(ROOT / "distribution" / "editions" / "sim.v1.json")
+        self.assertEqual(edition["displayName"]["en"], "DroneDream · SIM")
+        self.assertEqual(edition["sourcePolicy"]["developmentBranch"], "codex/software")
 
     def test_build_profile_rejects_sim_manifest_drift(self) -> None:
         invalid = deepcopy(load_json(PROFILE_PATH))
@@ -196,6 +215,22 @@ class SimInstallerContractTests(unittest.TestCase):
         invalid = deepcopy(load_json(PROFILE_PATH))
         invalid["manifests"]["enginePackProfile"]["profileId"] = "unified-sim-lab"
         with self.assertRaisesRegex(sim_contract.SimInstallerContractError, "profile binding"):
+            sim_contract.validate_build_profile(invalid, repo_root=ROOT)
+
+        invalid = deepcopy(load_json(PROFILE_PATH))
+        invalid["autonomousOptimizationContract"]["hardwareAuthorityGranted"] = True
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError,
+            "autonomous optimization contract",
+        ):
+            sim_contract.validate_build_profile(invalid, repo_root=ROOT)
+
+        invalid = deepcopy(load_json(PROFILE_PATH))
+        invalid["autonomousOptimizationContract"]["maximumModelTurnsPerGeneration"] = 5
+        with self.assertRaisesRegex(
+            sim_contract.SimInstallerContractError,
+            "autonomous optimization contract",
+        ):
             sim_contract.validate_build_profile(invalid, repo_root=ROOT)
 
         invalid = deepcopy(load_json(PROFILE_PATH))

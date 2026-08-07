@@ -1,10 +1,15 @@
 import {
+  Activity,
+  BadgeCheck,
+  BrainCircuit,
   Boxes,
   ChevronRight,
   Cpu,
   Database,
+  GitCompareArrows,
   MonitorCog,
   ShieldCheck,
+  Wrench,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
@@ -72,6 +77,15 @@ const DEPENDENCY_ITEMS = [
   { key: "engine", icon: Boxes },
 ] as const;
 
+const AUTONOMOUS_LOOP_ITEMS = [
+  { key: "objective", icon: ShieldCheck },
+  { key: "model", icon: BrainCircuit },
+  { key: "harness", icon: Wrench },
+  { key: "telemetry", icon: Activity },
+  { key: "compare", icon: GitCompareArrows },
+  { key: "qualify", icon: BadgeCheck },
+] as const;
+
 export function SimOverview() {
   const { locale } = useI18n();
   const copy = simCopy(locale);
@@ -103,6 +117,30 @@ export function SimOverview() {
           <code>v{SIM_EDITION.displayVersion}</code>
         </div>
       </header>
+
+      <section className="sim-overview-band sim-loop-band" aria-labelledby="sim-loop-title">
+        <div className="sim-band-heading">
+          <span className="sim-settings-kicker">{copy.loopKicker}</span>
+          <h2 id="sim-loop-title">{copy.loopTitle}</h2>
+          <p>{copy.loopBody}</p>
+          <Link className="btn btn-primary sim-loop-action" to="/jobs/new">
+            {copy.startOptimization}
+            <ChevronRight aria-hidden="true" />
+          </Link>
+        </div>
+        <ol className="sim-loop-grid" aria-label={copy.loopTitle}>
+          {AUTONOMOUS_LOOP_ITEMS.map(({ key, icon: Icon }, index) => (
+            <li key={key}>
+              <span className="sim-loop-index">{String(index + 1).padStart(2, "0")}</span>
+              <Icon aria-hidden="true" />
+              <div>
+                <strong>{copy.loop[key].title}</strong>
+                <p>{copy.loop[key].body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
 
       <section className="sim-overview-band" aria-labelledby="sim-capability-title">
         <div className="sim-band-heading">
@@ -139,6 +177,7 @@ export function SimOverview() {
         <div>
           <h2 id="sim-boundary-title">{copy.boundaryTitle}</h2>
           <p>{copy.boundaryBody}</p>
+          <strong className="sim-candidate-warning">{copy.candidateWarning}</strong>
         </div>
       </section>
 

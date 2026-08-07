@@ -353,11 +353,20 @@ def test_training_only_failure_triggers_and_cooldown(
             selected_proposal_refs=("proposal-a",),
             tool_direction_conflict=False,
             hard_boundary_candidate=False,
+            model_uncertainty_level="high",
+            model_missing_evidence=("local_curvature", "full_fidelity_outcome"),
         )
         assert "domain_failure_spike" in evaluation.diagnosis_reasons
         assert "ood_no_transfer_memory" in evaluation.diagnosis_reasons
+        assert "model_high_uncertainty" in evaluation.diagnosis_reasons
+        assert "model_evidence_gap" in evaluation.diagnosis_reasons
         assert "crash_or_instability" in evaluation.critic_reasons
         assert evaluation.evidence["holdout_outcomes_visible"] is False
+        assert evaluation.evidence["model_uncertainty_level"] == "high"
+        assert evaluation.evidence["model_missing_evidence"] == [
+            "local_curvature",
+            "full_fidelity_outcome",
+        ]
         assert evaluation.evidence["training_failure_summary"] == {
             "unstable_or_simulation_failure_count": 1,
             "timeout_count": 0,
