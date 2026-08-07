@@ -1,0 +1,203 @@
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
+
+$sourceRoot = "@@SOURCE_ROOT@@"
+$runRoot = "@@RUN_ROOT@@"
+$outputRoot = "@@OUTPUT_ROOT@@"
+$cargoTarget = "@@CARGO_TARGET@@"
+$expectedCargoLeaf = "@@CARGO_LEAF@@"
+$expectedHead = "@@PRODUCT_COMMIT@@"
+$expectedEvidenceHead = "@@EVIDENCE_HEAD@@"
+$applicationPath = Join-Path $runRoot "yellow-build-application.json"
+$applicationFileSha256 = "@@APPLICATION_FILE_SHA256@@"
+$applicationCanonicalSha256 = "@@APPLICATION_CANONICAL_SHA256@@"
+$applicationId = "@@APPLICATION_ID@@"
+$overlayPath = Join-Path $runRoot "tauri-yellow-authorized.json"
+$expectedOverlaySha256 = "@@OVERLAY_SHA256@@"
+$runFilesReceiptPath = Join-Path $runRoot "run-files-receipt.json"
+$preflightReceiptPath = Join-Path $runRoot "preflight-receipt.json"
+$updaterKeyPath = "C:\Users\zju20\.tauri\dronedream-updater.key"
+
+function Assert-Contract([bool]$Condition, [string]$Message) {
+    if (-not $Condition) { throw $Message }
+}
+
+function Get-Sha256Lower([string]$Path) {
+    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+}
+
+function Assert-OwnedPath([string]$Path, [string]$OwnedRoot, [string]$Label) {
+    $full = [IO.Path]::GetFullPath($Path)
+    $root = [IO.Path]::GetFullPath($OwnedRoot).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+    Assert-Contract ($full.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) `
+        "$Label escapes owned root."
+}
+
+Assert-Contract ((Get-Sha256Lower $applicationPath) -ceq $applicationFileSha256) `
+    "YELLOW application file changed."
+$application = Get-Content -Raw -Encoding UTF8 -LiteralPath $applicationPath | ConvertFrom-Json
+Assert-Contract ($application.integrity.canonicalSha256 -ceq $applicationCanonicalSha256) `
+    "YELLOW canonical SHA changed."
+Assert-Contract ($application.applicationId -ceq $applicationId) "Application ID changed."
+Assert-Contract ($application.source.productCommit -ceq $expectedHead) `
+    "Approved product source changed."
+Assert-Contract ($application.productContract.profile -ceq "field-lightweight") `
+    "Field profile changed."
+Assert-Contract (-not $application.productContract.fieldRuntimeModePageEnabled) `
+    "Field Runtime mode page must remain disabled."
+Assert-Contract (-not $application.productContract.fieldSimulatorPayloadAllowed) `
+    "Field simulator payload must remain denied."
+Assert-Contract ($application.productContract.validatedHardwarePackCount -eq 0) `
+    "Validated hardware pack count changed."
+Assert-Contract ($application.productContract.hardwareDecision -ceq "deny") `
+    "Hardware decision changed."
+
+Assert-Contract ((Get-Sha256Lower $overlayPath) -ceq $expectedOverlaySha256) `
+    "Authorized overlay changed."
+$runFiles = Get-Content -Raw -Encoding UTF8 -LiteralPath $runFilesReceiptPath |
+    ConvertFrom-Json
+Assert-Contract ($runFiles.decision -ceq "generated-exclusive") `
+    "Command files were not generated exclusively."
+Assert-Contract ($runFiles.application.fileSha256 -ceq $applicationFileSha256) `
+    "Generated application binding changed."
+Assert-Contract ($runFiles.generatedFiles.preflight.sha256 -ceq (Get-Sha256Lower $PSCommandPath)) `
+    "Preflight command file changed after generation."
+Assert-Contract ($runFiles.generatedFiles.build.sha256 -ceq (Get-Sha256Lower (Join-Path $runRoot "invoke-approved-build.ps1"))) `
+    "Build command file changed after generation."
+Assert-Contract ($runFiles.generatedFiles.overlay.sha256 -ceq $expectedOverlaySha256) `
+    "Generated overlay receipt changed."
+
+$head = (& git -C $sourceRoot rev-parse HEAD).Trim()
+$status = (& git -C $sourceRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
+$remoteHead = (& git -C $sourceRoot rev-parse refs/remotes/origin/codex/software-field).Trim()
+& git -C $sourceRoot merge-base --is-ancestor $expectedHead $remoteHead
+$onPushedLineage = $LASTEXITCODE -eq 0
+Assert-Contract ($head -ceq $expectedHead) "Detached product source changed."
+Assert-Contract (-not $status) "Detached product source is not clean."
+Assert-Contract ($remoteHead -ceq $expectedEvidenceHead) "Field evidence head changed."
+Assert-Contract $onPushedLineage "Product source is not on pushed Field lineage."
+
+Assert-OwnedPath $outputRoot $runRoot "outputRoot"
+Assert-Contract ((Split-Path -Leaf $cargoTarget) -ceq $expectedCargoLeaf) `
+    "Cargo target is not source-bound."
+Assert-Contract (-not (Test-Path -LiteralPath $outputRoot)) `
+    "OutputRoot must remain absent before build."
+Assert-Contract (-not (Test-Path -LiteralPath $cargoTarget)) `
+    "Cargo target must remain absent before build."
+Assert-Contract (Test-Path -PathType Leaf -LiteralPath $updaterKeyPath) `
+    "Updater key path unavailable."
+
+$desktopModules = Get-Item -Force -LiteralPath (Join-Path $sourceRoot "desktop\node_modules")
+$frontendModules = Get-Item -Force -LiteralPath (Join-Path $sourceRoot "frontend\node_modules")
+Assert-Contract ($desktopModules.LinkType -ceq "Junction") `
+    "Desktop node_modules is not a junction."
+Assert-Contract ($frontendModules.LinkType -ceq "Junction") `
+    "Frontend node_modules is not a junction."
+Assert-Contract (Test-Path -PathType Leaf -LiteralPath (Join-Path $sourceRoot "desktop\node_modules\@tauri-apps\cli\tauri.js")) `
+    "Pinned Tauri CLI unavailable."
+
+$fieldConfigPath = Join-Path $sourceRoot "desktop\src-tauri\tauri.field.conf.json"
+$fieldConfig = Get-Content -Raw -Encoding UTF8 -LiteralPath $fieldConfigPath | ConvertFrom-Json
+$overlay = Get-Content -Raw -Encoding UTF8 -LiteralPath $overlayPath | ConvertFrom-Json
+Assert-Contract ($fieldConfig.build.beforeBuildCommand -ceq "npm run frontend:field-build-gated") `
+    "Fail-closed Field command changed."
+Assert-Contract ($overlay.build.beforeBuildCommand -ceq "npm run frontend:field-build") `
+    "Authorized Field command changed."
+Assert-Contract ($overlay.build.frontendDist -ceq "../../frontend/field-dist") `
+    "Field frontendDist changed."
+Assert-Contract ($overlay.productName -ceq "DroneDream-Field") `
+    "Field product identity changed."
+Assert-Contract ($overlay.identifier -ceq "io.dronedream.desktop.field") `
+    "Field bundle identity changed."
+$overlay.build.beforeBuildCommand = $fieldConfig.build.beforeBuildCommand
+Assert-Contract (($overlay | ConvertTo-Json -Depth 100 -Compress) -ceq ($fieldConfig | ConvertTo-Json -Depth 100 -Compress)) `
+    "Authorized overlay changes more than beforeBuildCommand."
+
+$sourceBoundVerifier = Join-Path $sourceRoot "distribution\editions\field\build\verify-source-bound-driver.ps1"
+$sourceBoundJson = & $sourceBoundVerifier `
+    -RepoRoot $sourceRoot `
+    -SourceCommit $expectedHead `
+    -RelativePath "desktop/scripts/release-build-driver.psm1" `
+    -ExpectedGitBlob "5195887fae97016693466d7f75e466ca4a5e77e2" `
+    -ExpectedCanonicalSha256 "9c8dfc3c1a9ea584ea27cab53c23c4ca0b05911e6409b87b01d05297a309fc14"
+$sourceBound = $sourceBoundJson | ConvertFrom-Json
+Assert-Contract ($sourceBound.decision -ceq "pass") `
+    "Source-bound driver verification did not pass."
+
+foreach ($command in @("git.exe", "node.exe", "npm.cmd", "rustup.exe")) {
+    Assert-Contract ($null -ne (Get-Command $command -ErrorAction SilentlyContinue)) `
+        "Required command missing: $command"
+}
+$makensis = Join-Path $env:LOCALAPPDATA "tauri\NSIS\makensis.exe"
+Assert-Contract (Test-Path -PathType Leaf -LiteralPath $makensis) `
+    "Cached makensis unavailable."
+& rustup.exe run 1.97.0-x86_64-pc-windows-gnullvm rustc --version | Out-Null
+Assert-Contract ($LASTEXITCODE -eq 0) "Pinned Rust toolchain unavailable."
+
+$os = Get-CimInstance Win32_OperatingSystem
+$cDrive = Get-PSDrive C
+$zDrive = Get-PSDrive Z
+$heavy = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+    $_.ProcessName -match 'cargo|rustc|tauri|makensis|px4|gazebo'
+})
+$memoryFree = [int64]$os.FreePhysicalMemory * 1024
+Assert-Contract ($heavy.Count -eq 0) "Heavy process gate failed."
+Assert-Contract ($memoryFree -ge 6GB) "Available memory is below 6 GiB."
+Assert-Contract ([int64]$cDrive.Free -ge 20GB) "C drive space below 20 GiB."
+Assert-Contract ([int64]$zDrive.Free -ge 10GB) "Z drive space below 10 GiB."
+
+$receipt = [ordered]@{
+    schemaVersion = 1
+    kind = "dronedream-field-yellow-preflight-receipt"
+    decision = "allow-one-build-after-preflight"
+    applicationId = $applicationId
+    source = [ordered]@{
+        productCommit = $head
+        evidenceCommit = $remoteHead
+        clean = $true
+        pushedLineage = $true
+    }
+    authorization = [ordered]@{
+        applicationFileSha256 = $applicationFileSha256
+        applicationCanonicalSha256 = $applicationCanonicalSha256
+        preflightOrdinal = 2
+        buildOrdinal = 1
+        frontendMaximum = 1
+        tauriMaximum = 1
+        cargoMaximum = 1
+        nsisMaximum = 1
+        freshAttemptMaximum = 1
+        retryMaximum = 0
+        cargoJobs = 2
+    }
+    paths = [ordered]@{
+        sourceRoot = $sourceRoot
+        runRoot = $runRoot
+        cargoTarget = $cargoTarget
+        outputRoot = $outputRoot
+        overlay = $overlayPath
+    }
+    resources = [ordered]@{
+        capturedAt = [DateTime]::UtcNow.ToString("o")
+        memoryFreeBytes = $memoryFree
+        cFreeBytes = [int64]$cDrive.Free
+        zFreeBytes = [int64]$zDrive.Free
+        heavyProcessCount = $heavy.Count
+    }
+    safety = [ordered]@{
+        networkAllowed = $false
+        installAllowed = $false
+        runtimeMigrationAllowed = $false
+        deviceOrHardwareAllowed = $false
+        simulationAllowed = $false
+        deploymentAllowed = $false
+        validatedHardwarePackCount = 0
+        hardwareDecision = "deny"
+    }
+    buildInvoked = $false
+}
+$receiptJson = ($receipt | ConvertTo-Json -Depth 20) + "`n"
+$bytes = [Text.UTF8Encoding]::new($false).GetBytes($receiptJson)
+$stream = [IO.File]::Open($preflightReceiptPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write)
+try { $stream.Write($bytes, 0, $bytes.Length) } finally { $stream.Dispose() }
+Write-Host "Field source-bound preflight ordinal 2 passed; build ordinal 1 remains unconsumed."

@@ -1,0 +1,210 @@
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
+
+$sourceRoot = "@@SOURCE_ROOT@@"
+$runRoot = "@@RUN_ROOT@@"
+$outputRoot = "@@OUTPUT_ROOT@@"
+$cargoTarget = "@@CARGO_TARGET@@"
+$expectedCargoLeaf = "@@CARGO_LEAF@@"
+$expectedHead = "@@PRODUCT_COMMIT@@"
+$expectedEvidenceHead = "@@EVIDENCE_HEAD@@"
+$applicationPath = Join-Path $runRoot "yellow-build-application.json"
+$applicationFileSha256 = "@@APPLICATION_FILE_SHA256@@"
+$preflightReceiptPath = Join-Path $runRoot "preflight-receipt.json"
+$runFilesReceiptPath = Join-Path $runRoot "run-files-receipt.json"
+$configPath = Join-Path $runRoot "tauri-yellow-authorized.json"
+$expectedOverlaySha256 = "@@OVERLAY_SHA256@@"
+$updaterKeyPath = "C:\Users\zju20\.tauri\dronedream-updater.key"
+$stdoutPath = Join-Path $runRoot "build.stdout.log"
+$stderrPath = Join-Path $runRoot "build.stderr.log"
+$processReceiptPath = Join-Path $runRoot "build-process.json"
+$failureReceiptPath = Join-Path $runRoot "build-failure-receipt.json"
+
+function Assert-Contract([bool]$Condition, [string]$Message) {
+    if (-not $Condition) { throw $Message }
+}
+
+function Get-Sha256Lower([string]$Path) {
+    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+}
+
+function Get-FileRecord([string]$Path) {
+    $exists = Test-Path -PathType Leaf -LiteralPath $Path
+    return [ordered]@{
+        path = $Path
+        exists = $exists
+        bytes = if ($exists) { (Get-Item -LiteralPath $Path).Length } else { $null }
+        sha256 = if ($exists) { Get-Sha256Lower $Path } else { $null }
+    }
+}
+
+Assert-Contract ((Get-Sha256Lower $applicationPath) -ceq $applicationFileSha256) `
+    "YELLOW application changed."
+Assert-Contract ((Get-Sha256Lower $configPath) -ceq $expectedOverlaySha256) `
+    "Authorized overlay changed."
+$runFiles = Get-Content -Raw -Encoding UTF8 -LiteralPath $runFilesReceiptPath |
+    ConvertFrom-Json
+Assert-Contract ($runFiles.decision -ceq "generated-exclusive") `
+    "Command files were not generated exclusively."
+Assert-Contract ($runFiles.generatedFiles.build.sha256 -ceq (Get-Sha256Lower $PSCommandPath)) `
+    "Build command file changed after generation."
+Assert-Contract ($runFiles.generatedFiles.preflight.sha256 -ceq (Get-Sha256Lower (Join-Path $runRoot "preflight-approved-build.ps1"))) `
+    "Preflight command file changed after generation."
+Assert-Contract (Test-Path -PathType Leaf -LiteralPath $preflightReceiptPath) `
+    "Preflight receipt missing."
+$preflight = Get-Content -Raw -Encoding UTF8 -LiteralPath $preflightReceiptPath |
+    ConvertFrom-Json
+Assert-Contract ($preflight.decision -ceq "allow-one-build-after-preflight") `
+    "Preflight did not allow build."
+Assert-Contract ($preflight.source.productCommit -ceq $expectedHead) `
+    "Preflight product source mismatch."
+Assert-Contract ($preflight.source.evidenceCommit -ceq $expectedEvidenceHead) `
+    "Preflight evidence mismatch."
+Assert-Contract ($preflight.authorization.preflightOrdinal -eq 2) `
+    "Preflight ordinal changed."
+Assert-Contract ($preflight.authorization.buildOrdinal -eq 1) `
+    "Build ordinal changed."
+Assert-Contract ($preflight.authorization.retryMaximum -eq 0) `
+    "Retry maximum changed."
+Assert-Contract (-not $preflight.buildInvoked) "Preflight claims a prior build."
+
+$head = (& git -C $sourceRoot rev-parse HEAD).Trim()
+$status = (& git -C $sourceRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
+$remoteHead = (& git -C $sourceRoot rev-parse refs/remotes/origin/codex/software-field).Trim()
+Assert-Contract ($head -ceq $expectedHead -and -not $status) `
+    "Approved Field source is not exact and clean."
+Assert-Contract ($remoteHead -ceq $expectedEvidenceHead) `
+    "Approved evidence head changed."
+Assert-Contract ((Split-Path -Leaf $cargoTarget) -ceq $expectedCargoLeaf) `
+    "Cargo target is not source-bound."
+Assert-Contract (-not (Test-Path -LiteralPath $outputRoot)) "OutputRoot is not fresh."
+Assert-Contract (-not (Test-Path -LiteralPath $cargoTarget)) "Cargo target is not fresh."
+Assert-Contract (Test-Path -PathType Leaf -LiteralPath $updaterKeyPath) `
+    "Updater key path unavailable."
+
+$env:CARGO_NET_OFFLINE = "true"
+$env:npm_config_offline = "true"
+$env:CARGO_BUILD_JOBS = "2"
+$env:DRONEDREAM_DESKTOP_EDITION_ID = "field"
+$env:DRONEDREAM_EDITION_PROFILE = "field-lightweight"
+$env:VITE_DRONEDREAM_EDITION = "field"
+$env:DRONEDREAM_OAUTH_CLIENT_ID = "3140bbe2-5f0e-4699-8a9b-295d4030f853"
+$env:TAURI_SIGNING_PRIVATE_KEY_PATH = $updaterKeyPath
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+$env:HTTP_PROXY = "http://127.0.0.1:9"
+$env:HTTPS_PROXY = "http://127.0.0.1:9"
+$env:ALL_PROXY = "http://127.0.0.1:9"
+$env:NO_PROXY = ""
+Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:OPENAI_API_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:ANTHROPIC_API_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:GOOGLE_API_KEY -ErrorAction SilentlyContinue
+Remove-Item Env:SUPABASE_SERVICE_ROLE_KEY -ErrorAction SilentlyContinue
+
+$candidateRoot = Join-Path $cargoTarget "x86_64-pc-windows-gnullvm\release\bundle\nsis"
+$candidate = Join-Path $candidateRoot "DroneDream-Field_1.0.0_x64-setup.exe"
+$candidateSignature = "$candidate.sig"
+$candidateMetadata = Join-Path $candidateRoot "latest-field.json"
+$frozenArtifact = Join-Path $outputRoot "DroneDream-Field-1.0.0.exe"
+$frozenSignature = "$frozenArtifact.sig"
+$frozenChecksum = "$frozenArtifact.sha256"
+$frozenMetadata = Join-Path $outputRoot "latest-field.json"
+
+$started = [DateTime]::UtcNow
+$exitCode = 1
+$exceptionText = $null
+try {
+    & (Join-Path $sourceRoot "desktop\scripts\build-windows-llvm.ps1") `
+        -AdditionalConfigPath $configPath `
+        -CargoTargetDir $cargoTarget `
+        -ExpectedProductName "DroneDream-Field" `
+        -EditionId field `
+        -PreserveBundleHistory `
+        1> $stdoutPath 2> $stderrPath
+    $exitCode = $LASTEXITCODE
+} catch {
+    $exceptionText = $_.Exception.Message
+    ($_ | Out-String) | Add-Content -Encoding UTF8 -LiteralPath $stderrPath
+    $exitCode = 1
+}
+$finished = [DateTime]::UtcNow
+
+$candidateRecords = [ordered]@{
+    installer = Get-FileRecord $candidate
+    updaterSignature = Get-FileRecord $candidateSignature
+    updaterMetadata = Get-FileRecord $candidateMetadata
+}
+$frozenRecords = [ordered]@{}
+if ($candidateRecords.installer.exists) {
+    New-Item -ItemType Directory -Path $outputRoot | Out-Null
+    Copy-Item -LiteralPath $candidate -Destination $frozenArtifact
+    if ($candidateRecords.updaterSignature.exists) {
+        Copy-Item -LiteralPath $candidateSignature -Destination $frozenSignature
+    }
+    if ($candidateRecords.updaterMetadata.exists) {
+        Copy-Item -LiteralPath $candidateMetadata -Destination $frozenMetadata
+    }
+    $artifactSha = Get-Sha256Lower $frozenArtifact
+    "$artifactSha  DroneDream-Field-1.0.0.exe" |
+        Set-Content -Encoding ascii -LiteralPath $frozenChecksum
+    $frozenRecords = [ordered]@{
+        installer = Get-FileRecord $frozenArtifact
+        updaterSignature = Get-FileRecord $frozenSignature
+        checksum = Get-FileRecord $frozenChecksum
+        updaterMetadata = Get-FileRecord $frozenMetadata
+    }
+}
+
+$processReceipt = [ordered]@{
+    schemaVersion = 1
+    kind = "dronedream-field-yellow-build-process"
+    sourceCommit = $expectedHead
+    evidenceCommit = $expectedEvidenceHead
+    applicationFileSha256 = $applicationFileSha256
+    preflightReceiptSha256 = Get-Sha256Lower $preflightReceiptPath
+    runFilesReceiptSha256 = Get-Sha256Lower $runFilesReceiptPath
+    overlaySha256 = $expectedOverlaySha256
+    startedAt = $started.ToString("o")
+    finishedAt = $finished.ToString("o")
+    durationSeconds = [Math]::Round(($finished - $started).TotalSeconds, 3)
+    exitCode = $exitCode
+    exception = $exceptionText
+    invocationCounts = [ordered]@{
+        frontend = 1
+        tauri = 1
+        cargo = 1
+        nsis = 1
+        freshAttempt = 1
+        buildScript = 1
+        retry = 0
+    }
+    cargoBuildJobs = 2
+    stdoutPath = $stdoutPath
+    stderrPath = $stderrPath
+    cargoTarget = $cargoTarget
+    outputRoot = $outputRoot
+    candidate = $candidateRecords
+    frozen = $frozenRecords
+}
+$processJson = ($processReceipt | ConvertTo-Json -Depth 12) + "`n"
+[IO.File]::WriteAllText($processReceiptPath, $processJson, [Text.UTF8Encoding]::new($false))
+
+if ($exitCode -ne 0 -or -not $candidateRecords.installer.exists) {
+    $failureReceipt = [ordered]@{
+        schemaVersion = 1
+        kind = "dronedream-field-yellow-build-failure-receipt"
+        sourceCommit = $expectedHead
+        processReceiptPath = $processReceiptPath
+        processReceiptSha256 = Get-Sha256Lower $processReceiptPath
+        candidate = $candidateRecords
+        frozen = $frozenRecords
+        retryAllowed = $false
+        postHocSigningAllowed = $false
+        releaseReady = $false
+    }
+    $failureJson = ($failureReceipt | ConvertTo-Json -Depth 12) + "`n"
+    [IO.File]::WriteAllText($failureReceiptPath, $failureJson, [Text.UTF8Encoding]::new($false))
+    if ($exitCode -eq 0) { exit 70 }
+    exit $exitCode
+}
+exit 0
