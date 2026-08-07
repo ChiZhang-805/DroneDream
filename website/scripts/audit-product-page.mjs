@@ -291,8 +291,20 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
   if (document.querySelector(".site-product-edition-heading span")) {
     violations.push("legacy preparation status badge remains");
   }
-  if (cards.some((card) => card.querySelector("button.site-product-edition-action"))) {
-    violations.push("planned editions still render disabled action buttons");
+  const editionActions = cards.map((card) => card.querySelector(".site-product-edition-action"));
+  if (editionActions.length !== 3 || editionActions.some((action) => !action)) {
+    violations.push("edition download buttons are missing");
+  }
+  for (const [index, action] of editionActions.entries()) {
+    if (!action) continue;
+    const card = cards[index];
+    const edition = card?.dataset.edition ?? `edition-${index}`;
+    if (action.tagName.toLowerCase() !== "button" || !action.disabled) {
+      violations.push(`${edition} planned download button is not disabled`);
+    }
+    if (action.querySelector("img")) {
+      violations.push(`${edition} download action uses a brand image instead of a download icon`);
+    }
   }
   const inventedDownloads = [...document.querySelectorAll(".site-product-edition a[href]")]
     .filter((node) => /DroneDream-(Sim|Lab|Field|Universal)-1\.0\.0\.exe/u.test(node.getAttribute("href") ?? ""));
@@ -310,7 +322,7 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
   if (new Set(themeTokens).size !== 3) violations.push("edition cards do not expose three unique themes");
 
   const desktopBrandHeadings = cards.map((card) => (
-    card.querySelector(".site-product-edition-brand h2")
+    card.querySelector("h2")
   ));
   if (desktopLockup) {
     for (const heading of desktopBrandHeadings) {
@@ -343,7 +355,7 @@ const collectState = async (page, locale) => page.evaluate((expected) => {
     ".site-header,.site-nav,.site-product-page-shell,.site-product-page-header,"
     + ".site-product-page-grid,.site-product-edition,h1,h2",
   )].filter((node) => (
-    visible(node) && !(desktopLockup && desktopBrandHeadings.includes(node))
+    visible(node) && !desktopBrandHeadings.includes(node)
   ));
   for (const [index, node] of critical.entries()) {
     const rect = node.getBoundingClientRect();
