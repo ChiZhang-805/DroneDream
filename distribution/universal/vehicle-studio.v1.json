@@ -19,6 +19,14 @@
     "run-edition-compatibility-gate",
     "promote-through-signed-vehicle-pack-pipeline"
   ],
+  "commonCoreReceiverInspection": {
+    "implemented": true,
+    "verifiesEnvelopeAndArtifactHashes": true,
+    "verifiesTargetEdition": true,
+    "receiverInspectionIsAuthority": false,
+    "decision": "verified-draft-only",
+    "requiredNextGate": "edition-compatibility-and-signed-validation"
+  },
   "authority": {
     "draftOnly": true,
     "frontendIsAuthority": false,

@@ -28,6 +28,11 @@ class VehicleStudioContractTests(unittest.TestCase):
         )
         model = self.schema["$defs"]["model"]["properties"]
         self.assertEqual(model["sensors"]["maxItems"], 32)
+        self.assertEqual(model["body"]["properties"]["massKg"]["maximum"], 1000)
+        self.assertEqual(
+            model["propulsion"]["properties"]["maximumThrustPerMotorN"]["maximum"],
+            100000,
+        )
         self.assertEqual(
             model["controlTarget"]["properties"]["parameterFamilies"]["maxItems"],
             64,
@@ -62,6 +67,10 @@ class VehicleStudioContractTests(unittest.TestCase):
             self.contract["requiredReceiverSequence"][-1],
             "promote-through-signed-vehicle-pack-pipeline",
         )
+        inspection = self.contract["commonCoreReceiverInspection"]
+        self.assertTrue(inspection["implemented"])
+        self.assertFalse(inspection["receiverInspectionIsAuthority"])
+        self.assertEqual(inspection["decision"], "verified-draft-only")
 
     def test_contract_does_not_overstate_current_delivery(self) -> None:
         boundary = self.contract["currentBoundary"]

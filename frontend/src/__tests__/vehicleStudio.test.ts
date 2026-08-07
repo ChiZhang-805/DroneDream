@@ -4,6 +4,7 @@ import {
   buildVehiclePackDraft,
   canonicalJson,
   generateGazeboSdf,
+  inspectVehiclePackDraftForEdition,
   sha256Text,
   verifyVehiclePackDraft,
 } from "../features/vehicleStudio/pack";
@@ -77,6 +78,34 @@ describe("Universal Vehicle Studio contract", () => {
     ]);
   });
 
+  it("freezes a model snapshot before asynchronous artifact hashing", async () => {
+    const draft = createVehicleModelDraft();
+    const originalName = draft.name;
+    const pending = buildVehiclePackDraft(draft);
+    draft.name = "Mutated while hashing";
+    draft.body.massKg = 900;
+    const envelope = await pending;
+    expect(envelope.payload.model.name).toBe(originalName);
+    expect(envelope.payload.model.body.massKg).toBe(1.5);
+    await expect(verifyVehiclePackDraft(envelope)).resolves.toBeDefined();
+  });
+
+  it("provides a fail-closed receiver inspection for the addressed Edition only", async () => {
+    const draft = createVehicleModelDraft();
+    draft.targetEditions = ["sim", "lab"];
+    const envelope = await buildVehiclePackDraft(draft);
+    await expect(inspectVehiclePackDraftForEdition(envelope, "sim")).resolves.toMatchObject({
+      targetEdition: "sim",
+      decision: "verified-draft-only",
+      receiverInspectionIsAuthority: false,
+      promotionAllowed: false,
+      grantsSimulationExecution: false,
+      grantsHardwareAuthority: false,
+    });
+    await expect(inspectVehiclePackDraftForEdition(envelope, "field"))
+      .rejects.toThrow(/not addressed/);
+  });
+
   it("rejects payload, artifact, compatibility, target, authority, and unknown-field tampering", async () => {
     const envelope = await buildVehiclePackDraft(createVehicleModelDraft());
     const variants: unknown[] = [];
@@ -136,6 +165,28 @@ describe("Universal Vehicle Studio contract", () => {
     await expect(verifyVehiclePackDraft(oversized)).rejects.toThrow(/identity is invalid/);
   });
 
+  it("allows redundant sensor types while rejecting duplicate sensor identities and extreme geometry", async () => {
+    const redundantImu = createVehicleModelDraft();
+    redundantImu.sensors.push({
+      id: crypto.randomUUID(),
+      type: "imu",
+      model: "Backup IMU",
+      enabled: true,
+    });
+    expect(validateVehicleModel(redundantImu)).toEqual([]);
+
+    const duplicateId = structuredClone(redundantImu);
+    duplicateId.sensors[3].id = duplicateId.sensors[0].id;
+    expect(validateVehicleModel(duplicateId).map((issue) => issue.code))
+      .toContain("duplicate-sensor");
+
+    const extreme = createVehicleModelDraft();
+    extreme.body.lengthM = 1e200;
+    expect(validateVehicleModel(extreme).map((issue) => issue.code))
+      .toContain("bounded-positive-number");
+    await expect(buildVehiclePackDraft(extreme)).rejects.toThrow(/validation issue/);
+  });
+
   it("keeps local revisions owner-scoped and restores history as a new revision", () => {
     const storage = memoryStorage();
     const original = createVehicleModelDraft(new Date("2026-08-07T01:00:00.000Z"));
@@ -171,5 +222,22 @@ describe("Universal Vehicle Studio contract", () => {
       saveVehicleModel("owner-a", draft, storage);
     }
     expect(loadVehicleModels("owner-a", storage)).toHaveLength(50);
+  });
+
+  it("bounds, sorts, and de-duplicates untrusted local revision records on load", () => {
+    const storage = memoryStorage();
+    const draft = createVehicleModelDraft();
+    const older = structuredClone(draft);
+    older.revision = 1;
+    const newer = structuredClone(draft);
+    newer.revision = 2;
+    storage.setItem("dronedream:vehicle-studio:v1:owner-a", JSON.stringify([
+      null,
+      { draftId: draft.draftId, revisions: [older, newer] },
+      { draftId: draft.draftId, revisions: [older, older] },
+    ]));
+    const loaded = loadVehicleModels("owner-a", storage);
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].revisions.map((revision) => revision.revision)).toEqual([2, 1]);
   });
 });

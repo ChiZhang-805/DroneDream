@@ -21,21 +21,29 @@ export function loadVehicleModels(
   try {
     const value = JSON.parse(storage.getItem(storageKey(ownerId)) ?? "[]") as unknown;
     if (!Array.isArray(value)) return [];
-    return value.filter((item): item is StoredVehicleModel => {
-      if (!item || typeof item !== "object") return false;
+    const loaded: StoredVehicleModel[] = [];
+    for (const item of value.slice(0, MAX_MODELS)) {
+      if (!item || typeof item !== "object") continue;
       const record = item as Partial<StoredVehicleModel>;
       if (
         typeof record.draftId !== "string"
         || !Array.isArray(record.revisions)
         || record.revisions.length === 0
-      ) return false;
+      ) continue;
       try {
-        for (const revision of record.revisions) assertVehicleModelShape(revision);
-        return record.revisions.every((revision) => revision.draftId === record.draftId);
+        const revisions = record.revisions.slice(0, MAX_REVISIONS);
+        for (const revision of revisions) assertVehicleModelShape(revision);
+        if (!revisions.every((revision) => revision.draftId === record.draftId)) continue;
+        if (new Set(revisions.map((revision) => revision.revision)).size !== revisions.length) continue;
+        loaded.push({
+          draftId: record.draftId,
+          revisions: [...revisions].sort((left, right) => right.revision - left.revision),
+        });
       } catch {
-        return false;
+        continue;
       }
-    });
+    }
+    return loaded;
   } catch {
     return [];
   }

@@ -56,6 +56,21 @@ export interface VehiclePackDraftEnvelope {
   };
 }
 
+export interface VehiclePackDraftReceiverInspection {
+  inspectionVersion: 1;
+  kind: "dronedream-vehicle-pack-draft-receiver-inspection";
+  targetEdition: VehiclePackTargetEdition;
+  packId: string;
+  packVersion: string;
+  payloadSha256: string;
+  decision: "verified-draft-only";
+  receiverInspectionIsAuthority: false;
+  promotionAllowed: false;
+  grantsSimulationExecution: false;
+  grantsHardwareAuthority: false;
+  requiredNextGate: "edition-compatibility-and-signed-validation";
+}
+
 export class VehiclePackDraftError extends Error {}
 
 function sorted(value: unknown): unknown {
@@ -135,13 +150,14 @@ async function artifact(
 export async function buildVehiclePackDraft(
   draft: VehicleModelDraft,
 ): Promise<VehiclePackDraftEnvelope> {
-  const issues = validateVehicleModel(draft);
+  const model = structuredClone(draft);
+  const issues = validateVehicleModel(model);
   if (issues.length > 0) {
     throw new VehiclePackDraftError(`Vehicle model has ${issues.length} validation issue(s)`);
   }
-  const packId = `custom-${safeId(draft.name)}-${draft.draftId.slice(0, 8).toLowerCase()}`;
-  const modelJson = `${JSON.stringify(draft, null, 2)}\n`;
-  const sdf = generateGazeboSdf(draft);
+  const packId = `custom-${safeId(model.name)}-${model.draftId.slice(0, 8).toLowerCase()}`;
+  const modelJson = `${JSON.stringify(model, null, 2)}\n`;
+  const sdf = generateGazeboSdf(model);
   const artifacts = await Promise.all([
     artifact("model/vehicle-model.json", "application/json", modelJson),
     artifact("model/model.sdf", "model/sdf+xml", sdf),
@@ -152,14 +168,14 @@ export async function buildVehiclePackDraft(
     transportVersion: VEHICLE_PACK_DRAFT_VERSION,
     sourceEdition: "universal",
     packId,
-    packVersion: `0.1.${Math.max(0, draft.revision - 1)}`,
-    model: draft,
-    targetEditions: [...draft.targetEditions].sort(),
+    packVersion: `0.1.${Math.max(0, model.revision - 1)}`,
+    model,
+    targetEditions: [...model.targetEditions].sort(),
     artifacts,
     compatibility: {
-      autopilotFamily: draft.autopilot.family,
-      controllerModel: draft.autopilot.controllerModel,
-      firmwareVersion: draft.autopilot.firmwareVersion,
+      autopilotFamily: model.autopilot.family,
+      controllerModel: model.autopilot.controllerModel,
+      firmwareVersion: model.autopilot.firmwareVersion,
       simulationGeometryGenerated: true,
       simulationExecutionReady: false,
       hardwareAdapterValidated: false,
@@ -243,7 +259,6 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
     || value.sensors.length > MAX_VEHICLE_SENSORS
   ) throw new VehiclePackDraftError("Vehicle sensors are malformed");
   const sensorIds = new Set<string>();
-  const sensorTypes = new Set<string>();
   for (const sensor of value.sensors) {
     if (!isRecord(sensor)) throw new VehiclePackDraftError("Vehicle sensor is malformed");
     assertExactKeys(sensor, ["id", "type", "model", "enabled"], "Vehicle sensor");
@@ -253,11 +268,10 @@ export function assertVehicleModelShape(value: unknown): asserts value is Vehicl
       || typeof sensor.model !== "string"
       || typeof sensor.enabled !== "boolean"
     ) throw new VehiclePackDraftError("Vehicle sensor is malformed");
-    if (sensorIds.has(sensor.id) || sensorTypes.has(String(sensor.type))) {
-      throw new VehiclePackDraftError("Vehicle sensors contain duplicates");
+    if (sensorIds.has(sensor.id)) {
+      throw new VehiclePackDraftError("Vehicle sensor identities contain duplicates");
     }
     sensorIds.add(sensor.id);
-    sensorTypes.add(String(sensor.type));
   }
   if (!isRecord(value.autopilot)) throw new VehiclePackDraftError("Vehicle autopilot is malformed");
   assertExactKeys(value.autopilot, ["family", "controllerModel", "firmwareVersion"], "Vehicle autopilot");
@@ -390,4 +404,30 @@ export async function verifyVehiclePackDraft(
     throw new VehiclePackDraftError("Vehicle Pack contains an invalid vehicle model");
   }
   return { payload, integrity };
+}
+
+export async function inspectVehiclePackDraftForEdition(
+  value: unknown,
+  targetEdition: VehiclePackTargetEdition,
+): Promise<VehiclePackDraftReceiverInspection> {
+  const envelope = await verifyVehiclePackDraft(value);
+  if (!envelope.payload.targetEditions.includes(targetEdition)) {
+    throw new VehiclePackDraftError(
+      `Vehicle Pack draft is not addressed to DroneDream · ${targetEdition.toUpperCase()}`,
+    );
+  }
+  return {
+    inspectionVersion: 1,
+    kind: "dronedream-vehicle-pack-draft-receiver-inspection",
+    targetEdition,
+    packId: envelope.payload.packId,
+    packVersion: envelope.payload.packVersion,
+    payloadSha256: envelope.integrity.payloadSha256,
+    decision: "verified-draft-only",
+    receiverInspectionIsAuthority: false,
+    promotionAllowed: false,
+    grantsSimulationExecution: false,
+    grantsHardwareAuthority: false,
+    requiredNextGate: "edition-compatibility-and-signed-validation",
+  };
 }
