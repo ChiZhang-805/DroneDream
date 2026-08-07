@@ -90,7 +90,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     shared_ui = profile["sharedUiContract"]
     assert shared_ui["contractId"] == "dronedream-shared-edition-ui/v1"  # type: ignore[index]
     assert shared_ui["donorCommit"] == (  # type: ignore[index]
-        "81550b94270ee4e47eed7d520fb8280bd3a8ee7b"
+        "62ac2345828f50a221c1aaed0ea7273a628c9d5d"
     )
     assert shared_ui["minimumDesktopViewport"] == {  # type: ignore[index]
         "width": 390,

@@ -30,11 +30,11 @@
   },
   "sharedUiContract": {
     "contractId": "dronedream-shared-edition-ui/v1",
-    "donorCommit": "81550b94270ee4e47eed7d520fb8280bd3a8ee7b",
+    "donorCommit": "62ac2345828f50a221c1aaed0ea7273a628c9d5d",
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "5219f7a3f7e204a28b373ad1303e9b7adff4d1966e74c938f52720b14247aa9b"
+        "sha256": "b87893ed613f8b929145f6d4f1fc92d8bac02ec2baf296382eaf54250e96928d"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
