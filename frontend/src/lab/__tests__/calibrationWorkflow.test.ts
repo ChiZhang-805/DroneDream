@@ -15,6 +15,9 @@ describe("Lab calibration workflow", () => {
     const analysis = analyzeLabCalibration(input, "tracking", 15, 4);
 
     expect(input.jobId).toBe("lab_job_fixture_001");
+    expect(input.editionManifestSha256).toBe(
+      "303856056bb9a6dcd36227d704eef5ff29a577da20343a6b564baf6f61f5ee1a",
+    );
     expect(input.grantsHardwareAuthority).toBe(false);
     expect(analysis.aggregateGapPercent).toBeGreaterThan(15);
     expect(analysis.nextAction).toBe("revise-model-and-resimulate");
@@ -54,6 +57,7 @@ describe("Lab calibration workflow", () => {
 
     expect(receipt).toMatchObject({
       trusted: false,
+      source: { editionManifestSha256: input.editionManifestSha256 },
       qualification: { decision: "deny", validatedVehiclePackCount: 0 },
       authority: { presentationOnly: true, grantsHardwareAuthority: false },
     });
@@ -76,6 +80,19 @@ describe("Lab calibration workflow", () => {
       ...fixture,
       evidence: { ...fixture.evidence, simulationReceiptHash: "bad" },
     }))).toThrow(/SHA-256/);
+
+    expect(() => parseLabCalibrationInput("cycle.json", JSON.stringify({
+      ...fixture,
+      undeclaredEvidence: "not-supported",
+    }))).toThrow(/fields do not match/);
+
+    expect(() => parseLabCalibrationInput("cycle.json", JSON.stringify({
+      ...fixture,
+      source: {
+        kind: fixture.source.kind,
+        commonCoreCommit: fixture.source.commonCoreCommit,
+      },
+    }))).toThrow(/fields do not match/);
 
     const input = parseLabCalibrationInput("cycle.json", JSON.stringify(fixture));
     expect(() => analyzeLabCalibration(input, "tracking", 0, 4))
