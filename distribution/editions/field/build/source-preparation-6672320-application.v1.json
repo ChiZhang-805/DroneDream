@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-yellow-source-preparation-application",
+  "applicationId": "field-yellow-6672320-source-preparation-once-v1",
+  "editionId": "field",
+  "status": "prepared-awaiting-exact-continue-signal",
+  "source": {
+    "productCommit": "6672320392f3274a952a7f02a2006aa2bd6e2671",
+    "productTree": "46c877553ad751f78849593ea9ba93a1042ace68",
+    "boundBuildEvidenceHead": "b96aa8491e2e6bbb6436632e704dcb024d4b15bd",
+    "originUrl": "https://github.com/ChiZhang-805/DroneDream.git",
+    "offlineLocalSharedClone": true,
+    "detachedCheckoutRequired": true,
+    "coreLongPathsRequired": true
+  },
+  "toolBinding": {
+    "path": "distribution/editions/field/build/prepare-field-yellow-source.ps1",
+    "sourceCommit": "d1bf90091b7ba5567eaf2fd214b1a254ab6f9d71",
+    "gitBlob": "0f333615824843a98a396d201bbc84a99dba49d7",
+    "canonicalBlobBytes": 11750,
+    "canonicalBlobSha256": "5e99b61d243d2720a2c4c64aebff7d8461b68d3121428f3238e7434108c559c1",
+    "modes": ["Plan", "Prepare"],
+    "planWrites": 0,
+    "wrongCommitDenied": true,
+    "wrongTreeDenied": true,
+    "existingRootDenied": true,
+    "reparseRootDenied": true,
+    "wrongJunctionTargetDenied": true
+  },
+  "generatedApplicationBinding": {
+    "path": "distribution/editions/field/build/yellow-6672320-command-files-application.v2.json",
+    "fileBytes": 10956,
+    "fileSha256": "bed1a83ed616ce571e201598d400ff1ab2c9c49b8f568f5b1c280ed47f5d5fb7",
+    "canonicalSha256": "ac45d0905fdc10df25634ccdb59b753ae0b5281ef00f98e1307f3aa5fc87d75c"
+  },
+  "ownedPaths": {
+    "sourceOwner": "C:\\Users\\zju20",
+    "sourceRoot": "C:\\Users\\zju20\\ddf6672320-preflight2-generate1",
+    "cargoTarget": "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\field-cargo-target\\6672320-preflight2-generate1",
+    "runRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2-generate1",
+    "outputRoot": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2-generate1\\artifact",
+    "sourceRootExistsAtPreparation": false,
+    "cargoTargetExistsAtPreparation": false,
+    "outputRootExistsAtPreparation": false,
+    "runRootExistsAndIsFrozen": true
+  },
+  "junctions": {
+    "desktop": {
+      "path": "C:\\Users\\zju20\\ddf6672320-preflight2-generate1\\desktop\\node_modules",
+      "target": "C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\desktop\\node_modules",
+      "linkType": "Junction"
+    },
+    "frontend": {
+      "path": "C:\\Users\\zju20\\ddf6672320-preflight2-generate1\\frontend\\node_modules",
+      "target": "C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\frontend\\node_modules",
+      "linkType": "Junction"
+    }
+  },
+  "frozenRunFiles": [
+    {
+      "id": "application",
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2-generate1\\yellow-build-application.json",
+      "bytes": 10956,
+      "sha256": "bed1a83ed616ce571e201598d400ff1ab2c9c49b8f568f5b1c280ed47f5d5fb7"
+    },
+    {
+      "id": "overlay",
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2-generate1\\tauri-yellow-authorized.json",
+      "bytes": 3675,
+      "sha256": "dfbfddb4dc50f856f97f3f33112a9e62f0c1359a93afbfe950970e802961d586"
+    },
+    {
+      "id": "preflight",
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2-generate1\\preflight-approved-build.ps1",
+      "bytes": 10663,
+      "sha256": "06a661d30f7fef518e35cd8679043fab48cfb790060968d2bf601cebcab3105f"
+    },
+    {
+      "id": "build",
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2-generate1\\invoke-approved-build.ps1",
+      "bytes": 9635,
+      "sha256": "0c165bb6423888c7a5cff5aee27340b2f65a3f501ca46dcff1522a7826c10c66"
+    },
+    {
+      "id": "receipt",
+      "path": "C:\\Users\\zju20\\.codex\\visualizations\\2026\\08\\05\\019fd0e2-71cc-7742-bfab-612510f37c39\\field-yellow-build-6672320-lightweight-installer-preflight2-generate1\\run-files-receipt.json",
+      "bytes": 4404,
+      "sha256": "20c943eae00f1617859e62d32e7711215de65fc95bf35ad3975e0410c9372748"
+    }
+  ],
+  "attemptOrdinal": {
+    "application": 1,
+    "sourcePreparation": 1,
+    "retryMaximum": 0,
+    "generateConsumed": 1,
+    "preflightConsumed": 0,
+    "buildConsumed": 0
+  },
+  "exactCommands": {
+    "planTemplate": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\build\\prepare-field-yellow-source.ps1 -Application C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\build\\source-preparation-6672320-application.v1.json -ExpectedApplicationSha256 <FROZEN_APPLICATION_SHA256> -ExpectedEvidenceHead <EXACT_TOOL_EVIDENCE_HEAD> -BoundBuildEvidenceHead b96aa8491e2e6bbb6436632e704dcb024d4b15bd -RepoRoot C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream -Plan",
+    "prepareTemplate": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\build\\prepare-field-yellow-source.ps1 -Application C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream\\distribution\\editions\\field\\build\\source-preparation-6672320-application.v1.json -ExpectedApplicationSha256 <FROZEN_APPLICATION_SHA256> -ExpectedEvidenceHead <EXACT_TOOL_EVIDENCE_HEAD> -BoundBuildEvidenceHead b96aa8491e2e6bbb6436632e704dcb024d4b15bd -RepoRoot C:\\Users\\zju20\\.codex\\worktrees\\2833\\DroneDream -Prepare",
+    "prepareRequiresNewExactContinueSignal": true,
+    "preflightAfterPrepareRequiresSuccess": true
+  },
+  "authorization": {
+    "currentMessageAuthorizesPrepare": false,
+    "planAllowed": true,
+    "preflightAllowed": false,
+    "buildAllowed": false,
+    "cargoRunOutputCreationAllowed": false,
+    "runFilesModificationAllowed": false
+  },
+  "integrity": {
+    "canonicalization": "UTF-8 JSON sorted keys compact separators excluding integrity",
+    "canonicalSha256": "cef26c0d8f5497e89abd2046f8d6e8bbb41a844bbfa14bc656391853667fb3f2"
+  }
+}
