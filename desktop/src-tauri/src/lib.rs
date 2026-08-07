@@ -15,6 +15,8 @@ mod field_device;
 #[cfg(dronedream_field)]
 mod field_installer_handoff;
 #[cfg(dronedream_field)]
+mod field_recovery;
+#[cfg(dronedream_field)]
 mod field_tuning;
 #[cfg(not(dronedream_field))]
 mod installer_handoff;
@@ -116,6 +118,9 @@ pub fn run() {
         field_adapters::install_field_adapter,
         field_adapters::probe_field_mavlink_telemetry,
         field_device::discover_field_devices,
+        field_recovery::create_field_parameter_snapshot,
+        field_recovery::compare_field_parameter_snapshot,
+        field_recovery::prepare_field_parameter_rollback,
         field_tuning::get_field_tuning_status,
         field_tuning::run_field_tuning_demo,
         field_tuning::prepare_field_hardware_tuning,

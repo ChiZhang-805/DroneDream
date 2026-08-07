@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  compareFieldParameterSnapshot,
+  createFieldParameterSnapshot,
   discoverFieldDevices,
   getFieldAdapterCatalog,
   getFieldTuningStatus,
@@ -9,6 +11,7 @@ import {
   installFieldAdapter,
   probeFieldMavlinkTelemetry,
   prepareFieldHardwareTuning,
+  prepareFieldParameterRollback,
 } from "../desktop/bridge";
 
 const deviceReport = {
@@ -222,6 +225,96 @@ describe("Field desktop bridge", () => {
     expect(invoke).toHaveBeenCalledWith("probe_field_mavlink_telemetry", { request });
     invoke.mockResolvedValueOnce({ ...receipt, parameterReadAttempts: 1 });
     await expect(probeFieldMavlinkTelemetry(request)).rejects.toThrow();
+  });
+
+  it("accepts content-bound snapshots and keeps rollback execution denied", async () => {
+    const parameters = { MC_ROLL_P: 6.5, MC_PITCH_P: 6.5 };
+    const snapshot = {
+      schemaVersion: 1,
+      kind: "dronedream-field-parameter-snapshot",
+      editionId: "field",
+      executionDomain: "real-hardware",
+      evidenceSource: "operator-imported-read-only",
+      sourceCommit: "a".repeat(40),
+      deviceObservationId: "observation-fixture",
+      vehiclePackId: "holybro-x500-v2-pixhawk6",
+      controllerId: "Holybro::Pixhawk 6C",
+      firmwareVersion: "PX4 1.16.0",
+      adapterId: "mavlink-common-v2",
+      observationSha256: "b".repeat(64),
+      parameterCount: 2,
+      parameters,
+      parameterSetSha256: "c".repeat(64),
+      snapshotSha256: "d".repeat(64),
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      hardwareAuthority: false,
+    };
+    const changes = [{ name: "MC_ROLL_P", before: 6.5, after: 6.8, delta: 0.3 }];
+    const diff = {
+      schemaVersion: 1,
+      kind: "dronedream-field-parameter-diff",
+      editionId: "field",
+      snapshotSha256: "d".repeat(64),
+      currentParameterSetSha256: "e".repeat(64),
+      changedCount: 1,
+      changes,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      hardwareAuthority: false,
+      receiptSha256: "f".repeat(64),
+    };
+    const rollback = {
+      schemaVersion: 1,
+      kind: "dronedream-field-rollback-plan",
+      editionId: "field",
+      snapshotSha256: "d".repeat(64),
+      planSha256: "1".repeat(64),
+      changes,
+      canExecute: false,
+      hardwareAuthority: false,
+      hardwareWriteAttempts: 0,
+      requiredEvidence: [
+        "hardware-validated-vehicle-pack",
+        "controller-and-firmware-match",
+        "signed-current-observation",
+        "transactional-parameter-writer",
+        "operator-confirmation",
+        "native-backend-runtime-quorum",
+      ],
+      blockers: [
+        "field.registry.zero-validated-packs",
+        "field.snapshot.rollback-write-disabled",
+      ],
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "create_field_parameter_snapshot") return snapshot;
+      if (command === "compare_field_parameter_snapshot") return diff;
+      return rollback;
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const snapshotRequest = {
+      deviceObservationId: "observation-fixture",
+      vehiclePackId: "holybro-x500-v2-pixhawk6",
+      controllerId: "Holybro::Pixhawk 6C",
+      firmwareVersion: "PX4 1.16.0",
+      adapterId: "mavlink-common-v2",
+      observationSha256: "b".repeat(64),
+      parameters,
+    };
+    await expect(createFieldParameterSnapshot(snapshotRequest)).resolves.toEqual(snapshot);
+    const diffRequest = { snapshotSha256: "d".repeat(64), currentParameters: { ...parameters, MC_ROLL_P: 6.8 } };
+    await expect(compareFieldParameterSnapshot(diffRequest)).resolves.toEqual(diff);
+    await expect(prepareFieldParameterRollback(diffRequest)).resolves.toEqual(rollback);
+
+    invoke.mockResolvedValueOnce({
+      ...diff,
+      changes: [{ ...changes[0], delta: 9 }],
+    });
+    await expect(compareFieldParameterSnapshot(diffRequest)).rejects.toThrow(/delta/i);
+    invoke.mockResolvedValueOnce({ ...rollback, canExecute: true });
+    await expect(prepareFieldParameterRollback(diffRequest)).rejects.toThrow();
   });
 
   it.each([

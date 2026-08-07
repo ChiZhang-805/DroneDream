@@ -342,6 +342,78 @@ export interface FieldHardwareTuningPlan {
   blockers: string[];
 }
 
+export interface FieldParameterSnapshotRequest {
+  deviceObservationId: string;
+  vehiclePackId: string;
+  controllerId: string;
+  firmwareVersion: string;
+  adapterId: string;
+  observationSha256: string;
+  parameters: Record<string, number>;
+}
+
+export interface FieldParameterSnapshot {
+  schemaVersion: 1;
+  kind: "dronedream-field-parameter-snapshot";
+  editionId: "field";
+  executionDomain: "real-hardware";
+  evidenceSource: "operator-imported-read-only";
+  sourceCommit: string;
+  deviceObservationId: string;
+  vehiclePackId: string;
+  controllerId: string;
+  firmwareVersion: string;
+  adapterId: string;
+  observationSha256: string;
+  parameterCount: number;
+  parameters: Record<string, number>;
+  parameterSetSha256: string;
+  snapshotSha256: string;
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+  hardwareAuthority: false;
+}
+
+export interface FieldParameterDiffRequest {
+  snapshotSha256: string;
+  currentParameters: Record<string, number>;
+}
+
+export interface FieldParameterChange {
+  name: string;
+  before: number | null;
+  after: number | null;
+  delta: number | null;
+}
+
+export interface FieldParameterDiffReceipt {
+  schemaVersion: 1;
+  kind: "dronedream-field-parameter-diff";
+  editionId: "field";
+  snapshotSha256: string;
+  currentParameterSetSha256: string;
+  changedCount: number;
+  changes: FieldParameterChange[];
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+  hardwareAuthority: false;
+  receiptSha256: string;
+}
+
+export interface FieldRollbackPlan {
+  schemaVersion: 1;
+  kind: "dronedream-field-rollback-plan";
+  editionId: "field";
+  snapshotSha256: string;
+  planSha256: string;
+  changes: FieldParameterChange[];
+  canExecute: false;
+  hardwareAuthority: false;
+  hardwareWriteAttempts: 0;
+  requiredEvidence: string[];
+  blockers: string[];
+}
+
 export interface DesktopApiRequest {
   method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
@@ -777,6 +849,33 @@ export function probeFieldMavlinkTelemetry(
 
 export function discoverFieldDevices(): Promise<FieldDeviceDiscoveryReport> {
   return invokeDesktop("discover_field_devices", parseFieldDeviceDiscoveryReport);
+}
+
+export function createFieldParameterSnapshot(
+  request: FieldParameterSnapshotRequest,
+): Promise<FieldParameterSnapshot> {
+  validateFieldSnapshotRequest(request);
+  return invokeDesktop("create_field_parameter_snapshot", parseFieldParameterSnapshot, {
+    request,
+  });
+}
+
+export function compareFieldParameterSnapshot(
+  request: FieldParameterDiffRequest,
+): Promise<FieldParameterDiffReceipt> {
+  validateFieldDiffRequest(request);
+  return invokeDesktop("compare_field_parameter_snapshot", parseFieldParameterDiffReceipt, {
+    request,
+  });
+}
+
+export function prepareFieldParameterRollback(
+  request: FieldParameterDiffRequest,
+): Promise<FieldRollbackPlan> {
+  validateFieldDiffRequest(request);
+  return invokeDesktop("prepare_field_parameter_rollback", parseFieldRollbackPlan, {
+    request,
+  });
 }
 
 export function runFieldTuningDemo(
@@ -2366,6 +2465,218 @@ function parseFieldTuningDemoReceipt(value: unknown): FieldTuningDemoReceipt {
     throw new Error("Field tuning receipt violates its bounded fixture semantics");
   }
   return receipt;
+}
+
+function parseFieldParameterMap(value: unknown, path: string): Record<string, number> {
+  const record = expectRecord(value, path);
+  const entries = Object.entries(record);
+  if (entries.length === 0 || entries.length > 256) {
+    throw new Error(`${path} must contain 1 to 256 parameters`);
+  }
+  return Object.fromEntries(entries.map(([name, raw]) => {
+    if (!/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(name)) {
+      throw new Error(`${path} contains an invalid parameter name`);
+    }
+    const parsed = expectFiniteNumber(raw, `${path}.${name}`);
+    if (Math.abs(parsed) > 1_000_000_000) {
+      throw new Error(`${path}.${name} is outside its numeric bound`);
+    }
+    return [name, parsed];
+  }));
+}
+
+function validateFieldParameterMap(parameters: Record<string, number>, path: string): void {
+  parseFieldParameterMap(parameters, path);
+}
+
+function validateFieldSnapshotRequest(request: FieldParameterSnapshotRequest): void {
+  for (const value of [
+    request.deviceObservationId,
+    request.vehiclePackId,
+    request.controllerId,
+    request.firmwareVersion,
+  ]) {
+    if (!/^[A-Za-z0-9][-A-Za-z0-9 .:_/+]{0,159}$/.test(value) || value.trim() !== value) {
+      throw new Error("Field parameter snapshot identity is invalid.");
+    }
+  }
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(request.adapterId) || request.adapterId.length > 64) {
+    throw new Error("Field parameter snapshot adapter ID is invalid.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(request.observationSha256)) {
+    throw new Error("Field parameter snapshot observation hash is invalid.");
+  }
+  validateFieldParameterMap(request.parameters, "fieldParameterSnapshotRequest.parameters");
+}
+
+function validateFieldDiffRequest(request: FieldParameterDiffRequest): void {
+  if (!/^[a-f0-9]{64}$/.test(request.snapshotSha256)) {
+    throw new Error("Field parameter snapshot hash is invalid.");
+  }
+  validateFieldParameterMap(request.currentParameters, "fieldParameterDiffRequest.currentParameters");
+}
+
+function parseFieldParameterChange(value: unknown, index: number): FieldParameterChange {
+  const path = `fieldParameterChanges[${index}]`;
+  const record = expectExactRecord(value, path, ["name", "before", "after", "delta"]);
+  const nullableNumber = (raw: unknown, field: string): number | null => {
+    if (raw === null) return null;
+    const parsed = expectFiniteNumber(raw, `${path}.${field}`);
+    if (Math.abs(parsed) > 2_000_000_000) {
+      throw new Error(`${path}.${field} is outside its numeric bound`);
+    }
+    return parsed;
+  };
+  const name = expectSafeNonEmptyString(record.name, `${path}.name`);
+  if (!/^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(name)) {
+    throw new Error(`${path}.name is invalid`);
+  }
+  const change = {
+    name,
+    before: nullableNumber(record.before, "before"),
+    after: nullableNumber(record.after, "after"),
+    delta: nullableNumber(record.delta, "delta"),
+  };
+  if (change.before === null && change.after === null) {
+    throw new Error(`${path} has no value on either side`);
+  }
+  if ((change.before === null || change.after === null) !== (change.delta === null)) {
+    throw new Error(`${path}.delta does not match added or removed semantics`);
+  }
+  if (
+    change.before !== null
+    && change.after !== null
+    && change.delta !== null
+    && Math.abs(change.delta - (change.after - change.before))
+      > Number.EPSILON * Math.max(1, Math.abs(change.delta)) * 4
+  ) {
+    throw new Error(`${path}.delta does not match its values`);
+  }
+  return change;
+}
+
+function parseFieldParameterChanges(value: unknown, path: string): FieldParameterChange[] {
+  const raw = expectArray(value, path);
+  if (raw.length > 256) throw new Error(`${path} exceeds its bounded length`);
+  const changes = raw.map(parseFieldParameterChange);
+  if (new Set(changes.map((change) => change.name)).size !== changes.length) {
+    throw new Error(`${path} contains duplicate parameter names`);
+  }
+  return changes;
+}
+
+function parseFieldRecoveryIdentity(value: unknown, path: string): string {
+  const parsed = expectSafeNonEmptyString(value, path);
+  if (!/^[A-Za-z0-9][-A-Za-z0-9 .:_/+]{0,159}$/.test(parsed) || parsed.trim() !== parsed) {
+    throw new Error(`${path} is invalid`);
+  }
+  return parsed;
+}
+
+function parseFieldParameterSnapshot(value: unknown): FieldParameterSnapshot {
+  const path = "fieldParameterSnapshot";
+  const record = expectExactRecord(value, path, [
+    "schemaVersion", "kind", "editionId", "executionDomain", "evidenceSource",
+    "sourceCommit", "deviceObservationId", "vehiclePackId", "controllerId",
+    "firmwareVersion", "adapterId", "observationSha256", "parameterCount",
+    "parameters", "parameterSetSha256", "snapshotSha256", "deviceOpenAttempts",
+    "hardwareWriteAttempts", "hardwareAuthority",
+  ]);
+  const parameters = parseFieldParameterMap(record.parameters, `${path}.parameters`);
+  const parameterCount = expectBoundedNonNegativeInteger(
+    record.parameterCount,
+    `${path}.parameterCount`,
+    256,
+  );
+  if (parameterCount !== Object.keys(parameters).length || parameterCount === 0) {
+    throw new Error(`${path}.parameterCount does not match the parameter set`);
+  }
+  return {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
+    kind: expectLiteral(record.kind, "dronedream-field-parameter-snapshot", `${path}.kind`),
+    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    executionDomain: expectLiteral(record.executionDomain, "real-hardware", `${path}.executionDomain`),
+    evidenceSource: expectLiteral(
+      record.evidenceSource,
+      "operator-imported-read-only",
+      `${path}.evidenceSource`,
+    ),
+    sourceCommit: expectLowercaseHex(record.sourceCommit, `${path}.sourceCommit`, 40),
+    deviceObservationId: parseFieldRecoveryIdentity(record.deviceObservationId, `${path}.deviceObservationId`),
+    vehiclePackId: parseFieldRecoveryIdentity(record.vehiclePackId, `${path}.vehiclePackId`),
+    controllerId: parseFieldRecoveryIdentity(record.controllerId, `${path}.controllerId`),
+    firmwareVersion: parseFieldRecoveryIdentity(record.firmwareVersion, `${path}.firmwareVersion`),
+    adapterId: expectIdentifier(record.adapterId, `${path}.adapterId`),
+    observationSha256: expectLowercaseHex(record.observationSha256, `${path}.observationSha256`, 64),
+    parameterCount,
+    parameters,
+    parameterSetSha256: expectLowercaseHex(record.parameterSetSha256, `${path}.parameterSetSha256`, 64),
+    snapshotSha256: expectLowercaseHex(record.snapshotSha256, `${path}.snapshotSha256`, 64),
+    deviceOpenAttempts: expectLiteral(record.deviceOpenAttempts, 0, `${path}.deviceOpenAttempts`),
+    hardwareWriteAttempts: expectLiteral(record.hardwareWriteAttempts, 0, `${path}.hardwareWriteAttempts`),
+    hardwareAuthority: expectLiteral(record.hardwareAuthority, false, `${path}.hardwareAuthority`),
+  };
+}
+
+function parseFieldParameterDiffReceipt(value: unknown): FieldParameterDiffReceipt {
+  const path = "fieldParameterDiff";
+  const record = expectExactRecord(value, path, [
+    "schemaVersion", "kind", "editionId", "snapshotSha256",
+    "currentParameterSetSha256", "changedCount", "changes", "deviceOpenAttempts",
+    "hardwareWriteAttempts", "hardwareAuthority", "receiptSha256",
+  ]);
+  const changes = parseFieldParameterChanges(record.changes, `${path}.changes`);
+  const changedCount = expectBoundedNonNegativeInteger(record.changedCount, `${path}.changedCount`, 256);
+  if (changes.length !== changedCount) {
+    throw new Error(`${path}.changedCount does not match its changes`);
+  }
+  return {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
+    kind: expectLiteral(record.kind, "dronedream-field-parameter-diff", `${path}.kind`),
+    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    snapshotSha256: expectLowercaseHex(record.snapshotSha256, `${path}.snapshotSha256`, 64),
+    currentParameterSetSha256: expectLowercaseHex(
+      record.currentParameterSetSha256,
+      `${path}.currentParameterSetSha256`,
+      64,
+    ),
+    changedCount,
+    changes,
+    deviceOpenAttempts: expectLiteral(record.deviceOpenAttempts, 0, `${path}.deviceOpenAttempts`),
+    hardwareWriteAttempts: expectLiteral(record.hardwareWriteAttempts, 0, `${path}.hardwareWriteAttempts`),
+    hardwareAuthority: expectLiteral(record.hardwareAuthority, false, `${path}.hardwareAuthority`),
+    receiptSha256: expectLowercaseHex(record.receiptSha256, `${path}.receiptSha256`, 64),
+  };
+}
+
+function parseFieldRollbackPlan(value: unknown): FieldRollbackPlan {
+  const path = "fieldRollbackPlan";
+  const record = expectExactRecord(value, path, [
+    "schemaVersion", "kind", "editionId", "snapshotSha256", "planSha256",
+    "changes", "canExecute", "hardwareAuthority", "hardwareWriteAttempts",
+    "requiredEvidence", "blockers",
+  ]);
+  const plan: FieldRollbackPlan = {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
+    kind: expectLiteral(record.kind, "dronedream-field-rollback-plan", `${path}.kind`),
+    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    snapshotSha256: expectLowercaseHex(record.snapshotSha256, `${path}.snapshotSha256`, 64),
+    planSha256: expectLowercaseHex(record.planSha256, `${path}.planSha256`, 64),
+    changes: parseFieldParameterChanges(record.changes, `${path}.changes`),
+    canExecute: expectLiteral(record.canExecute, false, `${path}.canExecute`),
+    hardwareAuthority: expectLiteral(record.hardwareAuthority, false, `${path}.hardwareAuthority`),
+    hardwareWriteAttempts: expectLiteral(record.hardwareWriteAttempts, 0, `${path}.hardwareWriteAttempts`),
+    requiredEvidence: parseSafeNonEmptyStringArray(record.requiredEvidence, `${path}.requiredEvidence`),
+    blockers: parseSafeNonEmptyStringArray(record.blockers, `${path}.blockers`),
+  };
+  if (
+    plan.requiredEvidence.length < 6
+    || !plan.blockers.includes("field.registry.zero-validated-packs")
+    || !plan.blockers.includes("field.snapshot.rollback-write-disabled")
+  ) {
+    throw new Error("Field rollback plan weakened its native safety boundary");
+  }
+  return plan;
 }
 
 function parseFieldHardwareTuningPlan(value: unknown): FieldHardwareTuningPlan {

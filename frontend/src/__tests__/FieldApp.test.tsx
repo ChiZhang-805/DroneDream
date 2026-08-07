@@ -74,8 +74,9 @@ describe("FieldApp", () => {
     expect(screen.getByText("The observed identity is absent from the source-bound registry."))
       .toBeInTheDocument();
     for (const name of [
-      "Create snapshot",
-      "Apply rollback",
+      "Save snapshot",
+      "Compare drift",
+      "Prepare rollback",
       "Request takeover",
       "Emergency stop",
     ]) {
@@ -153,7 +154,7 @@ describe("FieldApp", () => {
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
     expect(container.querySelector("[data-quorum='missing']")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Emergency stop" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Apply rollback" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Prepare rollback" })).toBeDisabled();
   });
 
   it("provides independent Simplified Chinese safety copy", () => {
@@ -164,13 +165,14 @@ describe("FieldApp", () => {
       .toBeInTheDocument();
     expect(screen.getByText("当前没有达到硬件验证层级的机型包。设备观察结果不能解锁控制权限。"))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "应用回滚" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "准备回滚" })).toBeDisabled();
   });
 
   it("keeps the Field entry independent from the unified app routes", () => {
     const sources = [
       "src/field/FieldApp.tsx",
       "src/field/FieldSettingsDialog.tsx",
+      "src/field/FieldRecoveryWorkspace.tsx",
       "src/field/FieldTuningWorkspace.tsx",
       "src/field/FieldRoot.tsx",
       "src/field/catalog.ts",

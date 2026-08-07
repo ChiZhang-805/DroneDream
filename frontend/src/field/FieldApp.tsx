@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  ArchiveRestore,
   CheckCircle2,
   ChevronRight,
   CircleOff,
   ClipboardCheck,
   FileClock,
   Gauge,
-  HardDrive,
   PackageOpen,
   PackageCheck,
   RadioTower,
   RefreshCw,
-  RotateCcw,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -28,9 +25,13 @@ import {
   type FieldDeviceDiscoveryReport,
 } from "../desktop/bridge";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
-import { FieldAdapterCenter } from "./FieldAdapterCenter";
+import {
+  FieldAdapterCenter,
+  type FieldReadOnlyProtocolEvidence,
+} from "./FieldAdapterCenter";
 import { FieldAuthControl } from "./FieldAuthControl";
 import { FieldSettingsDialog } from "./FieldSettingsDialog";
+import { FieldRecoveryWorkspace } from "./FieldRecoveryWorkspace";
 import { FieldTuningWorkspace } from "./FieldTuningWorkspace";
 import {
   evaluateFieldSafety,
@@ -103,14 +104,6 @@ const COPY = {
     controllers: "Controller contract",
     tier: "Validation tier",
     adapter: "Adapter",
-    recoveryTitle: "Parameter recovery",
-    recoveryBody: "A signed snapshot and exact compatibility proof are required before native recovery can be considered.",
-    snapshot: "Create snapshot",
-    rollback: "Apply rollback",
-    snapshotState: "Snapshot",
-    rollbackState: "Rollback plan",
-    notCaptured: "Not captured",
-    notAuthorized: "Not authorized",
     preflightTitle: "Preflight quorum",
     preflightBody: "Operator confirmation is one input. It cannot replace native, policy, or runtime approval.",
     zone: "Operating zone",
@@ -200,14 +193,6 @@ const COPY = {
     controllers: "飞控合同",
     tier: "验证层级",
     adapter: "适配器",
-    recoveryTitle: "参数恢复",
-    recoveryBody: "原生恢复进入评估前，必须具备签名快照与精确兼容性证据。",
-    snapshot: "创建快照",
-    rollback: "应用回滚",
-    snapshotState: "参数快照",
-    rollbackState: "回滚计划",
-    notCaptured: "尚未捕获",
-    notAuthorized: "未获授权",
     preflightTitle: "飞前仲裁",
     preflightBody: "操作者确认只是输入之一，不能替代原生、策略或运行时批准。",
     zone: "作业区域",
@@ -290,6 +275,8 @@ export function FieldApp({
   const [deviceReport, setDeviceReport] = useState<FieldDeviceDiscoveryReport | null>(null);
   const [deviceScanBusy, setDeviceScanBusy] = useState(false);
   const [deviceScanError, setDeviceScanError] = useState<string | null>(null);
+  const [readOnlyEvidence, setReadOnlyEvidence] =
+    useState<FieldReadOnlyProtocolEvidence | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -587,7 +574,11 @@ export function FieldApp({
             </div>
           </section>
 
-          <FieldAdapterCenter locale={locale} devices={deviceReport?.devices} />
+          <FieldAdapterCenter
+            locale={locale}
+            devices={deviceReport?.devices}
+            onReadOnlyEvidence={setReadOnlyEvidence}
+          />
 
           <section id="tuning" className="field-section field-tuning-section" aria-labelledby="field-tuning-title">
             <FieldTuningWorkspace
@@ -598,11 +589,13 @@ export function FieldApp({
           </section>
 
           <section id="recovery" className="field-section" aria-labelledby="field-recovery-title">
-            <header><div><h2 id="field-recovery-title">{copy.recoveryTitle}</h2><p>{copy.recoveryBody}</p></div><ArchiveRestore /></header>
-            <div className="field-two-column">
-              <div className="field-operation-block"><span>{copy.snapshotState}</span><strong>{copy.notCaptured}</strong><button type="button" disabled><HardDrive />{copy.snapshot}</button></div>
-              <div className="field-operation-block"><span>{copy.rollbackState}</span><strong>{copy.notAuthorized}</strong><button type="button" disabled><RotateCcw />{copy.rollback}</button></div>
-            </div>
+            <FieldRecoveryWorkspace
+              locale={locale}
+              selectedPackId={selectedPackId}
+              selectedControllerId={selectedControllerKey}
+              device={deviceReport?.devices[0]}
+              evidence={readOnlyEvidence ?? undefined}
+            />
           </section>
 
           <section id="preflight" className="field-section" aria-labelledby="field-preflight-title">

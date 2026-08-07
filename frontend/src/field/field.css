@@ -1042,6 +1042,173 @@ input:focus-visible {
   height: 17px;
 }
 
+.field-recovery-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.field-recovery-workspace > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.field-recovery-workspace > header h2,
+.field-recovery-workspace > header p {
+  margin: 0;
+}
+
+.field-recovery-workspace > header p {
+  max-width: 720px;
+  margin-top: 5px;
+  color: var(--field-muted);
+}
+
+.field-recovery-workspace > header > svg {
+  width: 22px;
+  height: 22px;
+  color: var(--dd-brand-middle);
+}
+
+.field-recovery-identity,
+.field-recovery-editors {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field-recovery-editors {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-recovery-identity label,
+.field-recovery-editors label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field-recovery-identity label > span,
+.field-recovery-editors label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--field-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.field-recovery-editors label > span svg {
+  width: 15px;
+  height: 15px;
+}
+
+.field-recovery-identity input,
+.field-recovery-identity select,
+.field-recovery-editors textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+  border-radius: 5px;
+}
+
+.field-recovery-editors textarea {
+  min-height: 190px;
+  resize: vertical;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.field-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.field-recovery-actions button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+  border-radius: 5px;
+  font-weight: 700;
+}
+
+.field-recovery-actions button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.field-recovery-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.field-recovery-receipt {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--field-panel);
+  border: 1px solid var(--field-line);
+  border-radius: 5px;
+  color: var(--field-muted);
+  font-size: 11px;
+}
+
+.field-recovery-receipt svg {
+  width: 16px;
+  height: 16px;
+  color: var(--dd-brand-middle);
+}
+
+.field-recovery-receipt code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--field-ink);
+}
+
+.field-recovery-denial {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #fff4f0;
+  border: 1px solid #e6a596;
+  border-radius: 5px;
+  color: #812d20;
+}
+
+.field-recovery-denial > svg {
+  width: 17px;
+  height: 17px;
+}
+
+.field-recovery-denial ul {
+  grid-column: 2 / -1;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+}
+
+.field-recovery-workspace .field-table-scroll p {
+  margin: 0;
+  padding: 12px;
+  color: var(--field-muted);
+}
+
 .field-gate-grid,
 .field-action-matrix {
   display: grid;
@@ -1337,10 +1504,23 @@ input:focus-visible {
 
   .field-overview-metrics,
   .field-two-column,
+  .field-recovery-identity,
+  .field-recovery-editors,
   .field-control-buttons,
   .field-observation-toolbar,
   .field-compatibility-draft {
     grid-template-columns: 1fr;
+  }
+
+  .field-recovery-receipt,
+  .field-recovery-denial {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .field-recovery-receipt code,
+  .field-recovery-denial code,
+  .field-recovery-denial ul {
+    grid-column: 2;
   }
 
   .field-evidence-status {

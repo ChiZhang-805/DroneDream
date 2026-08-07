@@ -11,6 +11,7 @@ TAURI_CONFIG = ROOT / "desktop/src-tauri/tauri.field.conf.json"
 LIB_SOURCE = ROOT / "desktop/src-tauri/src/lib.rs"
 DEVICE_SOURCE = ROOT / "desktop/src-tauri/src/field_device.rs"
 TUNING_SOURCE = ROOT / "desktop/src-tauri/src/field_tuning.rs"
+RECOVERY_SOURCE = ROOT / "desktop/src-tauri/src/field_recovery.rs"
 
 
 def test_field_tuning_contract_is_real_device_only_and_authority_is_native() -> None:
@@ -66,6 +67,9 @@ def test_field_native_handler_contains_no_runtime_or_simulator_commands() -> Non
         "get_field_tuning_status",
         "run_field_tuning_demo",
         "prepare_field_hardware_tuning",
+        "create_field_parameter_snapshot",
+        "compare_field_parameter_snapshot",
+        "prepare_field_parameter_rollback",
     ):
         assert required in source
 
@@ -125,3 +129,31 @@ def test_tuning_commands_are_fixture_or_plan_only_and_config_has_no_sim_payload(
     resources = "\n".join(config["bundle"]["resources"]).lower()
     for forbidden in ("px4", "gazebo", "sitl", "hitl", "simulator", "runtime/"):
         assert forbidden not in resources
+
+
+def test_field_recovery_persists_only_content_bound_evidence_and_never_writes_hardware() -> None:
+    recovery = RECOVERY_SOURCE.read_text(encoding="utf-8")
+
+    for required in (
+        'kind: "dronedream-field-parameter-snapshot"',
+        'kind: "dronedream-field-parameter-diff"',
+        'kind: "dronedream-field-rollback-plan"',
+        'evidence_source: "operator-imported-read-only"',
+        "OpenOptions::new().write(true).create_new(true)",
+        '"field.registry.zero-validated-packs"',
+        '"field.snapshot.rollback-write-disabled"',
+        "can_execute: false",
+        "hardware_write_attempts: 0",
+        "hardware_authority: false",
+    ):
+        assert required in recovery
+    for forbidden in (
+        "serialport::",
+        "WriteFile",
+        "SetCommState",
+        "PARAM_SET",
+        "COMMAND_LONG",
+        "arm(",
+        "flight(",
+    ):
+        assert forbidden not in recovery

@@ -177,7 +177,8 @@ describe("FieldAdapterCenter", () => {
         installedPackageSha256: "b".repeat(64),
       }, report.entries[1]!],
     });
-    render(<FieldAdapterCenter locale="en" devices={[{
+    const onReadOnlyEvidence = vi.fn();
+    render(<FieldAdapterCenter locale="en" onReadOnlyEvidence={onReadOnlyEvidence} devices={[{
       observationId: "c".repeat(64),
       portName: "COM7",
       registryValueNameSha256: "d".repeat(64),
@@ -204,6 +205,11 @@ describe("FieldAdapterCenter", () => {
       operatorConfirmedReadOnly: true,
     }));
     expect(await screen.findByText(/Received HEARTBEAT/)).toBeInTheDocument();
+    expect(onReadOnlyEvidence).toHaveBeenCalledWith({
+      adapterId: "mavlink-common-v2",
+      observationSha256: "d".repeat(64),
+      deviceObservationId: "c".repeat(64),
+    });
   });
 
   it("inspects one offline frame without invoking a device transport", async () => {
@@ -215,7 +221,8 @@ describe("FieldAdapterCenter", () => {
         installedPackageSha256: "b".repeat(64),
       }, report.entries[1]!],
     });
-    render(<FieldAdapterCenter locale="en" />);
+    const onReadOnlyEvidence = vi.fn();
+    render(<FieldAdapterCenter locale="en" onReadOnlyEvidence={onReadOnlyEvidence} />);
 
     const frame = await screen.findByRole("textbox", {
       name: "Captured frame (canonical base64)",
@@ -229,5 +236,10 @@ describe("FieldAdapterCenter", () => {
     }));
     expect(probeFieldMavlinkTelemetry).not.toHaveBeenCalled();
     expect(await screen.findByText(/Classified MAVLink/)).toBeInTheDocument();
+    expect(onReadOnlyEvidence).toHaveBeenCalledWith({
+      adapterId: "mavlink-common-v2",
+      observationSha256: "e".repeat(64),
+      deviceObservationId: `offline-frame:${"e".repeat(32)}`,
+    });
   });
 });

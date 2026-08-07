@@ -147,9 +147,20 @@ function staticCatalog(): FieldAdapterCatalogReport {
 interface FieldAdapterCenterProps {
   locale: FieldLocale;
   devices?: FieldDiscoveredDevice[];
+  onReadOnlyEvidence?: (evidence: FieldReadOnlyProtocolEvidence) => void;
 }
 
-export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterProps) {
+export interface FieldReadOnlyProtocolEvidence {
+  adapterId: string;
+  observationSha256: string;
+  deviceObservationId: string;
+}
+
+export function FieldAdapterCenter({
+  locale,
+  devices = [],
+  onReadOnlyEvidence,
+}: FieldAdapterCenterProps) {
   const copy = COPY[locale];
   const [catalog, setCatalog] = useState<FieldAdapterCatalogReport>(staticCatalog);
   const [busyAdapterId, setBusyAdapterId] = useState<string | null>(null);
@@ -241,10 +252,16 @@ export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterP
     setInspectorError(null);
     setInspectorResult(null);
     try {
-      setInspectorResult(await inspectFieldProtocolFrame({
+      const result = await inspectFieldProtocolFrame({
         adapterId: selectedInspectorAdapter.adapterId,
         frameBase64: frameBase64.trim(),
-      }));
+      });
+      setInspectorResult(result);
+      onReadOnlyEvidence?.({
+        adapterId: result.adapterId,
+        observationSha256: result.frameSha256,
+        deviceObservationId: `offline-frame:${result.frameSha256.slice(0, 32)}`,
+      });
     } catch (reason) {
       setInspectorError(
         `${copy.inspectorError} ${reason instanceof Error ? reason.message : String(reason)}`,
@@ -252,7 +269,7 @@ export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterP
     } finally {
       setInspectorBusy(false);
     }
-  }, [copy.inspectorError, desktop, frameBase64, selectedInspectorAdapter]);
+  }, [copy.inspectorError, desktop, frameBase64, onReadOnlyEvidence, selectedInspectorAdapter]);
 
   const probeTelemetry = useCallback(async () => {
     if (
@@ -265,7 +282,7 @@ export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterP
     setTelemetryError(null);
     setTelemetryResult(null);
     try {
-      setTelemetryResult(await probeFieldMavlinkTelemetry({
+      const result = await probeFieldMavlinkTelemetry({
         adapterId: selectedTelemetryAdapter.adapterId,
         expectedPackageSha256: selectedTelemetryAdapter.packageSha256,
         observationId: selectedDevice.observationId,
@@ -273,7 +290,13 @@ export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterP
         baudRate: baudRate as 57600 | 115200 | 230400 | 460800 | 921600,
         readDeadlineMs: 3_000,
         operatorConfirmedReadOnly: true,
-      }));
+      });
+      setTelemetryResult(result);
+      onReadOnlyEvidence?.({
+        adapterId: result.adapterId,
+        observationSha256: result.frameSha256,
+        deviceObservationId: result.observationId,
+      });
     } catch (reason) {
       setTelemetryError(
         `${copy.telemetryError} ${reason instanceof Error ? reason.message : String(reason)}`,
@@ -286,6 +309,7 @@ export function FieldAdapterCenter({ locale, devices = [] }: FieldAdapterCenterP
     baudRate,
     copy.telemetryError,
     desktop,
+    onReadOnlyEvidence,
     readOnlyConfirmed,
     selectedDevice,
     selectedTelemetryAdapter,
