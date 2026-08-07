@@ -82,5 +82,46 @@ describe("FieldTuningWorkspace", () => {
     expect(screen.getByRole("button", { name: "运行安全调参演示" })).toBeInTheDocument();
     expect(screen.getByText("Model 提出受边界约束的候选参数，Harness 负责受控实验、遥测评分、失败分类和回滚证据。"))
       .toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "真机记录证据 Harness 作业" })).toBeInTheDocument();
+  });
+
+  it("creates an empty evidence template from the bound snapshot without fake trials", () => {
+    render(
+      <FieldTuningWorkspace
+        locale="en"
+        selectedPackId="holybro-x500-v2-pixhawk6"
+        selectedControllerId="Holybro::Pixhawk 6C"
+        snapshot={{
+          schemaVersion: 1,
+          kind: "dronedream-field-parameter-snapshot",
+          editionId: "field",
+          executionDomain: "real-hardware",
+          evidenceSource: "operator-imported-read-only",
+          sourceCommit: "a".repeat(40),
+          deviceObservationId: "recorded-observation-1",
+          vehiclePackId: "holybro-x500-v2-pixhawk6",
+          controllerId: "Holybro::Pixhawk 6C",
+          firmwareVersion: "PX4 1.16.0",
+          adapterId: "mavlink-common-v2",
+          observationSha256: "b".repeat(64),
+          parameterCount: 1,
+          parameters: { MC_ROLL_P: 6.5 },
+          parameterSetSha256: "c".repeat(64),
+          snapshotSha256: "d".repeat(64),
+          deviceOpenAttempts: 0,
+          hardwareWriteAttempts: 0,
+          hardwareAuthority: false,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create template from snapshot" }));
+    const textarea = screen.getByRole("textbox", { name: "Parameter bounds and recorded trials (JSON)" });
+    const value = JSON.parse((textarea as HTMLTextAreaElement).value) as {
+      parameterBounds: Record<string, unknown>;
+      trials: unknown[];
+    };
+    expect(value.parameterBounds).toHaveProperty("MC_ROLL_P");
+    expect(value.trials).toEqual([]);
   });
 });

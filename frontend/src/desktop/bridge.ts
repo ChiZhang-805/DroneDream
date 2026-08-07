@@ -359,6 +359,114 @@ export interface FieldHardwareTuningPlan {
   planSha256: string;
 }
 
+export interface FieldHarnessParameterBound {
+  min: number;
+  max: number;
+  maxStep: number;
+}
+
+export interface FieldHarnessMetrics {
+  trackingError: number;
+  overshootPercent: number;
+  controlEffort: number;
+  constraintViolations: number;
+  emergencyInterventions: number;
+}
+
+export interface FieldHarnessTrialInput {
+  trialId: string;
+  telemetrySha256: string;
+  parameters: Record<string, number>;
+  metrics: FieldHarnessMetrics;
+  independentHoldout: boolean;
+}
+
+export interface FieldHarnessJobRequest {
+  jobName: string;
+  objective: string;
+  targetScore: number;
+  maxIterations: number;
+  deviceObservationId: string;
+  observationSha256: string;
+  snapshotSha256: string;
+  vehiclePackId: string;
+  controllerId: string;
+  firmwareVersion: string;
+  adapterId: string;
+  parameterBounds: Record<string, FieldHarnessParameterBound>;
+  trials: FieldHarnessTrialInput[];
+}
+
+export interface FieldHarnessTrialReceipt extends FieldHarnessTrialInput {
+  candidateSha256: string;
+  score: number;
+  accepted: boolean;
+  failureClass:
+    | "none"
+    | "objective-miss"
+    | "constraint-violation"
+    | "emergency-intervention";
+}
+
+export interface FieldHarnessJobReceipt {
+  schemaVersion: 1;
+  kind: "dronedream-field-harness-job-receipt";
+  jobId: string;
+  createdAt: string;
+  editionId: "field";
+  executionDomain: "real-device-recorded-evidence";
+  executionMode: "offline-evidence-replay-no-device-io";
+  sourceCommit: string;
+  enginePackId: string;
+  requestSha256: string;
+  jobName: string;
+  objective: string;
+  targetScore: number;
+  deviceObservationId: string;
+  observationSha256: string;
+  snapshotSha256: string;
+  vehiclePackId: string;
+  controllerId: string;
+  firmwareVersion: string;
+  adapterId: string;
+  budget: {
+    maxIterations: number;
+    usedTrainingTrials: number;
+    usedHoldoutTrials: 1;
+    remainingIterations: number;
+  };
+  trials: FieldHarnessTrialReceipt[];
+  selectedCandidateSha256: string;
+  proposedParameters: Record<string, number>;
+  proposedCandidateSha256: string;
+  holdoutTrialId: string;
+  qualification: {
+    status: "recorded-evidence-passed" | "recorded-evidence-rejected";
+    recordedEvidencePassed: boolean;
+    hardwareValid: false;
+    reason: string;
+  };
+  blockers: string[];
+  providerRequests: 0;
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+  armAttempts: 0;
+  flightAttempts: 0;
+  hardwareAuthority: false;
+  receiptSha256: string;
+}
+
+export interface FieldHarnessJobSummary {
+  jobId: string;
+  createdAt: string;
+  jobName: string;
+  objective: string;
+  qualificationStatus: "recorded-evidence-passed" | "recorded-evidence-rejected";
+  recordedEvidencePassed: boolean;
+  hardwareValid: false;
+  receiptSha256: string;
+}
+
 export interface FieldParameterSnapshotRequest {
   deviceObservationId: string;
   vehiclePackId: string;
@@ -1044,6 +1152,26 @@ export function prepareFieldHardwareTuning(
   }
   return invokeDesktop("prepare_field_hardware_tuning", parseFieldHardwareTuningPlan, {
     request,
+  });
+}
+
+export function runFieldHarnessJob(
+  request: FieldHarnessJobRequest,
+): Promise<FieldHarnessJobReceipt> {
+  validateFieldHarnessRequest(request);
+  return invokeDesktop("run_field_harness_job", parseFieldHarnessJobReceipt, { request });
+}
+
+export function listFieldHarnessJobs(): Promise<FieldHarnessJobSummary[]> {
+  return invokeDesktop("list_field_harness_jobs", parseFieldHarnessJobSummaries);
+}
+
+export function loadFieldHarnessJob(jobId: string): Promise<FieldHarnessJobReceipt> {
+  if (!/^field-harness-[a-f0-9]{16}-[a-f0-9]{8}$/.test(jobId)) {
+    return Promise.reject(new Error("Field Harness job id is invalid."));
+  }
+  return invokeDesktop("load_field_harness_job", parseFieldHarnessJobReceipt, {
+    request: { jobId },
   });
 }
 
@@ -2603,6 +2731,269 @@ function parseFieldTuningDemoReceipt(value: unknown): FieldTuningDemoReceipt {
     throw new Error("Field tuning receipt violates its bounded fixture semantics");
   }
   return receipt;
+}
+
+function validateFieldHarnessRequest(request: FieldHarnessJobRequest): void {
+  const identities = [
+    request.jobName,
+    request.objective,
+    request.deviceObservationId,
+    request.vehiclePackId,
+    request.controllerId,
+    request.firmwareVersion,
+    request.adapterId,
+  ];
+  if (
+    identities.some((value) => value.trim() !== value || value.length === 0 || value.length > 240)
+    || !/^[a-f0-9]{64}$/.test(request.observationSha256)
+    || !/^[a-f0-9]{64}$/.test(request.snapshotSha256)
+    || !Number.isFinite(request.targetScore)
+    || request.targetScore < 0.01
+    || request.targetScore > 1
+    || !Number.isInteger(request.maxIterations)
+    || request.maxIterations < 2
+    || request.maxIterations > 32
+    || request.trials.length < 3
+    || request.trials.length > 32
+  ) {
+    throw new Error("Field Harness request is outside its bounded contract.");
+  }
+  const names = Object.keys(request.parameterBounds).sort();
+  if (names.length === 0 || names.length > 64) {
+    throw new Error("Field Harness parameter bounds are empty or oversized.");
+  }
+  for (const name of names) {
+    const bound = request.parameterBounds[name];
+    if (
+      !/^[A-Za-z0-9_.:-]{1,80}$/.test(name)
+      || !Number.isFinite(bound.min)
+      || !Number.isFinite(bound.max)
+      || !Number.isFinite(bound.maxStep)
+      || bound.min >= bound.max
+      || bound.maxStep <= 0
+      || bound.maxStep > bound.max - bound.min
+    ) {
+      throw new Error(`Field Harness parameter bound ${name} is invalid.`);
+    }
+  }
+  for (const trial of request.trials) {
+    const trialNames = Object.keys(trial.parameters).sort();
+    if (
+      trial.trialId.trim() !== trial.trialId
+      || trial.trialId.length === 0
+      || trial.trialId.length > 80
+      || !/^[a-f0-9]{64}$/.test(trial.telemetrySha256)
+      || trialNames.join("\n") !== names.join("\n")
+    ) {
+      throw new Error("Field Harness trial identity or parameter set is invalid.");
+    }
+    for (const name of names) {
+      const parameter = trial.parameters[name];
+      const bound = request.parameterBounds[name];
+      if (!Number.isFinite(parameter) || parameter < bound.min || parameter > bound.max) {
+        throw new Error(`Field Harness trial parameter ${name} is outside its bound.`);
+      }
+    }
+    const metrics = trial.metrics;
+    if (
+      ![metrics.trackingError, metrics.overshootPercent, metrics.controlEffort]
+        .every((metric) => Number.isFinite(metric) && metric >= 0 && metric <= 1_000)
+      || !Number.isSafeInteger(metrics.constraintViolations)
+      || metrics.constraintViolations < 0
+      || !Number.isSafeInteger(metrics.emergencyInterventions)
+      || metrics.emergencyInterventions < 0
+    ) {
+      throw new Error("Field Harness trial metrics are invalid.");
+    }
+  }
+  if (
+    request.trials.filter((trial) => trial.independentHoldout).length !== 1
+    || request.trials.at(-1)?.independentHoldout !== true
+  ) {
+    throw new Error("Field Harness requires one final independent holdout trial.");
+  }
+}
+
+function parseFieldHarnessMetrics(value: unknown, path: string): FieldHarnessMetrics {
+  const record = expectRecord(value, path);
+  return {
+    trackingError: expectFiniteNumber(record.trackingError, `${path}.trackingError`),
+    overshootPercent: expectFiniteNumber(record.overshootPercent, `${path}.overshootPercent`),
+    controlEffort: expectFiniteNumber(record.controlEffort, `${path}.controlEffort`),
+    constraintViolations: expectNonNegativeInteger(
+      record.constraintViolations,
+      `${path}.constraintViolations`,
+    ),
+    emergencyInterventions: expectNonNegativeInteger(
+      record.emergencyInterventions,
+      `${path}.emergencyInterventions`,
+    ),
+  };
+}
+
+function parseFieldHarnessTrial(value: unknown, index: number): FieldHarnessTrialReceipt {
+  const path = `fieldHarnessJob.trials[${index}]`;
+  const record = expectRecord(value, path);
+  const failureClass = expectString(record.failureClass, `${path}.failureClass`);
+  if (![
+    "none",
+    "objective-miss",
+    "constraint-violation",
+    "emergency-intervention",
+  ].includes(failureClass)) {
+    throw new Error(`${path}.failureClass is unsupported`);
+  }
+  return {
+    trialId: expectSafeNonEmptyString(record.trialId, `${path}.trialId`),
+    telemetrySha256: expectLowercaseHex(record.telemetrySha256, `${path}.telemetrySha256`, 64),
+    candidateSha256: expectLowercaseHex(record.candidateSha256, `${path}.candidateSha256`, 64),
+    parameters: parseFieldParameterMap(record.parameters, `${path}.parameters`),
+    metrics: parseFieldHarnessMetrics(record.metrics, `${path}.metrics`),
+    score: expectFiniteNumber(record.score, `${path}.score`),
+    accepted: expectBoolean(record.accepted, `${path}.accepted`),
+    failureClass: failureClass as FieldHarnessTrialReceipt["failureClass"],
+    independentHoldout: expectBoolean(record.independentHoldout, `${path}.independentHoldout`),
+  };
+}
+
+function parseFieldHarnessJobReceipt(value: unknown): FieldHarnessJobReceipt {
+  const path = "fieldHarnessJob";
+  const record = expectRecord(value, path);
+  const budget = expectRecord(record.budget, `${path}.budget`);
+  const qualification = expectRecord(record.qualification, `${path}.qualification`);
+  const status = expectString(qualification.status, `${path}.qualification.status`);
+  if (status !== "recorded-evidence-passed" && status !== "recorded-evidence-rejected") {
+    throw new Error(`${path}.qualification.status is unsupported`);
+  }
+  const receipt: FieldHarnessJobReceipt = {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
+    kind: expectLiteral(record.kind, "dronedream-field-harness-job-receipt", `${path}.kind`),
+    jobId: expectSafeNonEmptyString(record.jobId, `${path}.jobId`),
+    createdAt: expectSafeNonEmptyString(record.createdAt, `${path}.createdAt`),
+    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    executionDomain: expectLiteral(
+      record.executionDomain,
+      "real-device-recorded-evidence",
+      `${path}.executionDomain`,
+    ),
+    executionMode: expectLiteral(
+      record.executionMode,
+      "offline-evidence-replay-no-device-io",
+      `${path}.executionMode`,
+    ),
+    sourceCommit: expectLowercaseHex(record.sourceCommit, `${path}.sourceCommit`, 40),
+    enginePackId: expectSha256Id(record.enginePackId, `${path}.enginePackId`),
+    requestSha256: expectLowercaseHex(record.requestSha256, `${path}.requestSha256`, 64),
+    jobName: expectSafeNonEmptyString(record.jobName, `${path}.jobName`),
+    objective: expectSafeNonEmptyString(record.objective, `${path}.objective`),
+    targetScore: expectFiniteNumber(record.targetScore, `${path}.targetScore`),
+    deviceObservationId: expectSafeNonEmptyString(
+      record.deviceObservationId,
+      `${path}.deviceObservationId`,
+    ),
+    observationSha256: expectLowercaseHex(
+      record.observationSha256,
+      `${path}.observationSha256`,
+      64,
+    ),
+    snapshotSha256: expectLowercaseHex(record.snapshotSha256, `${path}.snapshotSha256`, 64),
+    vehiclePackId: expectSafeNonEmptyString(record.vehiclePackId, `${path}.vehiclePackId`),
+    controllerId: expectSafeNonEmptyString(record.controllerId, `${path}.controllerId`),
+    firmwareVersion: expectSafeNonEmptyString(record.firmwareVersion, `${path}.firmwareVersion`),
+    adapterId: expectSafeNonEmptyString(record.adapterId, `${path}.adapterId`),
+    budget: {
+      maxIterations: expectPositiveInteger(budget.maxIterations, `${path}.budget.maxIterations`),
+      usedTrainingTrials: expectPositiveInteger(
+        budget.usedTrainingTrials,
+        `${path}.budget.usedTrainingTrials`,
+      ),
+      usedHoldoutTrials: expectLiteral(
+        budget.usedHoldoutTrials,
+        1,
+        `${path}.budget.usedHoldoutTrials`,
+      ),
+      remainingIterations: expectNonNegativeInteger(
+        budget.remainingIterations,
+        `${path}.budget.remainingIterations`,
+      ),
+    },
+    trials: expectArray(record.trials, `${path}.trials`).map(parseFieldHarnessTrial),
+    selectedCandidateSha256: expectLowercaseHex(
+      record.selectedCandidateSha256,
+      `${path}.selectedCandidateSha256`,
+      64,
+    ),
+    proposedParameters: parseFieldParameterMap(
+      record.proposedParameters,
+      `${path}.proposedParameters`,
+    ),
+    proposedCandidateSha256: expectLowercaseHex(
+      record.proposedCandidateSha256,
+      `${path}.proposedCandidateSha256`,
+      64,
+    ),
+    holdoutTrialId: expectSafeNonEmptyString(record.holdoutTrialId, `${path}.holdoutTrialId`),
+    qualification: {
+      status,
+      recordedEvidencePassed: expectBoolean(
+        qualification.recordedEvidencePassed,
+        `${path}.qualification.recordedEvidencePassed`,
+      ),
+      hardwareValid: expectLiteral(
+        qualification.hardwareValid,
+        false,
+        `${path}.qualification.hardwareValid`,
+      ),
+      reason: expectSafeNonEmptyString(qualification.reason, `${path}.qualification.reason`),
+    },
+    blockers: parseSafeNonEmptyStringArray(record.blockers, `${path}.blockers`),
+    providerRequests: expectLiteral(record.providerRequests, 0, `${path}.providerRequests`),
+    deviceOpenAttempts: expectLiteral(record.deviceOpenAttempts, 0, `${path}.deviceOpenAttempts`),
+    hardwareWriteAttempts: expectLiteral(
+      record.hardwareWriteAttempts,
+      0,
+      `${path}.hardwareWriteAttempts`,
+    ),
+    armAttempts: expectLiteral(record.armAttempts, 0, `${path}.armAttempts`),
+    flightAttempts: expectLiteral(record.flightAttempts, 0, `${path}.flightAttempts`),
+    hardwareAuthority: expectLiteral(record.hardwareAuthority, false, `${path}.hardwareAuthority`),
+    receiptSha256: expectLowercaseHex(record.receiptSha256, `${path}.receiptSha256`, 64),
+  };
+  if (
+    receipt.trials.filter((trial) => trial.independentHoldout).length !== 1
+    || !receipt.trials.some(
+      (trial) => trial.candidateSha256 === receipt.selectedCandidateSha256,
+    )
+  ) {
+    throw new Error("Field Harness receipt violates holdout or selection semantics");
+  }
+  return receipt;
+}
+
+function parseFieldHarnessJobSummaries(value: unknown): FieldHarnessJobSummary[] {
+  const records = expectArray(value, "fieldHarnessJobSummaries");
+  if (records.length > 1_000) throw new Error("Field Harness job history is oversized");
+  return records.map((value, index) => {
+    const path = `fieldHarnessJobSummaries[${index}]`;
+    const record = expectRecord(value, path);
+    const status = expectString(record.qualificationStatus, `${path}.qualificationStatus`);
+    if (status !== "recorded-evidence-passed" && status !== "recorded-evidence-rejected") {
+      throw new Error(`${path}.qualificationStatus is unsupported`);
+    }
+    return {
+      jobId: expectSafeNonEmptyString(record.jobId, `${path}.jobId`),
+      createdAt: expectSafeNonEmptyString(record.createdAt, `${path}.createdAt`),
+      jobName: expectSafeNonEmptyString(record.jobName, `${path}.jobName`),
+      objective: expectSafeNonEmptyString(record.objective, `${path}.objective`),
+      qualificationStatus: status,
+      recordedEvidencePassed: expectBoolean(
+        record.recordedEvidencePassed,
+        `${path}.recordedEvidencePassed`,
+      ),
+      hardwareValid: expectLiteral(record.hardwareValid, false, `${path}.hardwareValid`),
+      receiptSha256: expectLowercaseHex(record.receiptSha256, `${path}.receiptSha256`, 64),
+    };
+  });
 }
 
 function parseFieldParameterMap(value: unknown, path: string): Record<string, number> {

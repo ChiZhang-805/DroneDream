@@ -1796,6 +1796,191 @@ input:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.field-recorded-harness {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background: color-mix(in srgb, var(--dd-brand-light-surface), #ffffff 62%);
+  border-block: 1px solid var(--field-line);
+}
+
+.field-recorded-harness > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.field-recorded-harness h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.field-recorded-harness h3 svg,
+.field-harness-history summary svg {
+  width: 18px;
+  height: 18px;
+  color: var(--dd-brand-middle);
+}
+
+.field-recorded-harness header p {
+  max-width: 780px;
+  margin: 7px 0 0;
+  color: var(--field-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.field-recorded-harness header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--field-danger);
+  font: 11px/1.3 ui-monospace, "Cascadia Mono", monospace;
+  white-space: nowrap;
+}
+
+.field-recorded-harness header > span svg {
+  width: 15px;
+  height: 15px;
+}
+
+.field-recorded-harness-grid,
+.field-recorded-harness-grid label {
+  display: grid;
+  gap: 8px;
+}
+
+.field-recorded-harness-grid label > span {
+  color: var(--field-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.field-recorded-harness-grid input,
+.field-recorded-harness-grid textarea {
+  width: 100%;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+  border-radius: 5px;
+}
+
+.field-recorded-harness-grid input {
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.field-recorded-harness-grid textarea {
+  min-height: 190px;
+  padding: 12px;
+  resize: vertical;
+  font: 11px/1.5 ui-monospace, "Cascadia Mono", monospace;
+}
+
+.field-recorded-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.field-recorded-actions button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.field-recorded-actions button:not(.field-primary-command) {
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+}
+
+.field-recorded-actions svg {
+  width: 17px;
+  height: 17px;
+}
+
+.field-recorded-result {
+  display: grid;
+  gap: 12px 20px;
+  padding: 14px 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-block: 1px solid var(--field-line);
+}
+
+.field-recorded-result > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.field-recorded-result span {
+  color: var(--field-muted);
+  font-size: 11px;
+}
+
+.field-recorded-result code {
+  overflow-wrap: anywhere;
+}
+
+.field-recorded-result p {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--field-danger);
+  font-size: 12px;
+  grid-column: 1 / -1;
+}
+
+.field-recorded-result p svg {
+  width: 16px;
+  height: 16px;
+}
+
+.field-harness-history summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.field-harness-history ul {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.field-harness-history li {
+  display: grid;
+  gap: 6px 12px;
+  padding: 9px 0;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  border-bottom: 1px solid var(--field-line);
+  font-size: 11px;
+}
+
+.field-harness-history p {
+  margin: 10px 0 0;
+  color: var(--field-muted);
+  font-size: 12px;
+}
+
 .field-tuning-controls {
   display: grid;
   align-items: end;
@@ -2362,6 +2547,19 @@ input:focus-visible {
 }
 
 @media (max-width: 760px) {
+  .field-recorded-harness > header {
+    flex-direction: column;
+  }
+
+  .field-recorded-result,
+  .field-harness-history li {
+    grid-template-columns: 1fr;
+  }
+
+  .field-recorded-result p {
+    grid-column: auto;
+  }
+
   .field-inspector-controls,
   .field-telemetry-controls {
     grid-template-columns: 1fr;
@@ -2413,6 +2611,14 @@ input:focus-visible {
 }
 
 @media (max-width: 440px) {
+  .field-recorded-harness {
+    padding: 16px 0;
+  }
+
+  .field-recorded-actions button {
+    width: 100%;
+  }
+
   .field-tuning-header h2 {
     font-size: 21px;
   }

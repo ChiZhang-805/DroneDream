@@ -15,6 +15,7 @@ import {
   prepareFieldPreflight,
   prepareFieldHardwareTuning,
   prepareFieldParameterRollback,
+  runFieldHarnessJob,
 } from "../desktop/bridge";
 
 const deviceReport = {
@@ -43,6 +44,100 @@ const deviceReport = {
 describe("Field desktop bridge", () => {
   beforeEach(() => {
     delete window.__TAURI__;
+  });
+
+  it("accepts a persisted recorded-evidence Harness receipt without authority drift", async () => {
+    const parameters = { MC_ROLL_P: 6.4 };
+    const trial = (id: string, holdout: boolean) => ({
+      trialId: id,
+      telemetrySha256: id === "holdout" ? "d".repeat(64) : "c".repeat(64),
+      candidateSha256: "e".repeat(64),
+      parameters,
+      metrics: {
+        trackingError: 0.3,
+        overshootPercent: 7,
+        controlEffort: 0.4,
+        constraintViolations: 0,
+        emergencyInterventions: 0,
+      },
+      score: 0.25,
+      accepted: true,
+      failureClass: "none",
+      independentHoldout: holdout,
+    });
+    const receipt = {
+      schemaVersion: 1,
+      kind: "dronedream-field-harness-job-receipt",
+      jobId: `field-harness-${"a".repeat(16)}-${"b".repeat(8)}`,
+      createdAt: "2026-08-07T12:00:00Z",
+      editionId: "field",
+      executionDomain: "real-device-recorded-evidence",
+      executionMode: "offline-evidence-replay-no-device-io",
+      sourceCommit: "a".repeat(40),
+      enginePackId: `sha256:${"b".repeat(64)}`,
+      requestSha256: "c".repeat(64),
+      jobName: "Field evidence",
+      objective: "Reduce tracking error",
+      targetScore: 0.5,
+      deviceObservationId: "observation-1",
+      observationSha256: "a".repeat(64),
+      snapshotSha256: "b".repeat(64),
+      vehiclePackId: "holybro-x500-v2-pixhawk6",
+      controllerId: "Holybro::Pixhawk 6C",
+      firmwareVersion: "PX4 1.16.0",
+      adapterId: "mavlink-common-v2",
+      budget: {
+        maxIterations: 4,
+        usedTrainingTrials: 2,
+        usedHoldoutTrials: 1,
+        remainingIterations: 2,
+      },
+      trials: [trial("training-1", false), trial("training-2", false), trial("holdout", true)],
+      selectedCandidateSha256: "e".repeat(64),
+      proposedParameters: parameters,
+      proposedCandidateSha256: "f".repeat(64),
+      holdoutTrialId: "holdout",
+      qualification: {
+        status: "recorded-evidence-passed",
+        recordedEvidencePassed: true,
+        hardwareValid: false,
+        reason: "Recorded evidence never grants hardware authority",
+      },
+      blockers: ["field.registry.zero-validated-packs"],
+      providerRequests: 0,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      armAttempts: 0,
+      flightAttempts: 0,
+      hardwareAuthority: false,
+      receiptSha256: "a".repeat(64),
+    };
+    const invoke = vi.fn(async () => receipt);
+    window.__TAURI__ = { core: { invoke } };
+    const request = {
+      jobName: "Field evidence",
+      objective: "Reduce tracking error",
+      targetScore: 0.5,
+      maxIterations: 4,
+      deviceObservationId: "observation-1",
+      observationSha256: "a".repeat(64),
+      snapshotSha256: "b".repeat(64),
+      vehiclePackId: "holybro-x500-v2-pixhawk6",
+      controllerId: "Holybro::Pixhawk 6C",
+      firmwareVersion: "PX4 1.16.0",
+      adapterId: "mavlink-common-v2",
+      parameterBounds: { MC_ROLL_P: { min: 5, max: 8, maxStep: 0.2 } },
+      trials: [
+        { trialId: "training-1", telemetrySha256: "c".repeat(64), parameters, metrics: trial("training-1", false).metrics, independentHoldout: false },
+        { trialId: "training-2", telemetrySha256: "c".repeat(64), parameters, metrics: trial("training-2", false).metrics, independentHoldout: false },
+        { trialId: "holdout", telemetrySha256: "d".repeat(64), parameters, metrics: trial("holdout", true).metrics, independentHoldout: true },
+      ],
+    };
+
+    await expect(runFieldHarnessJob(request)).resolves.toEqual(receipt);
+    expect(invoke).toHaveBeenCalledWith("run_field_harness_job", { request });
+    invoke.mockResolvedValueOnce({ ...receipt, hardwareWriteAttempts: 1 });
+    await expect(runFieldHarnessJob(request)).rejects.toThrow();
   });
 
   it("accepts read-only discovery while preserving zero hardware authority", async () => {

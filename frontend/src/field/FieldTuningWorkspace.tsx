@@ -3,7 +3,9 @@ import {
   Ban,
   CheckCircle2,
   CircleGauge,
+  FileJson2,
   FlaskConical,
+  History,
   Play,
   RotateCcw,
   ShieldCheck,
@@ -14,8 +16,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getFieldTuningStatus,
   isDesktopRuntime,
+  listFieldHarnessJobs,
   prepareFieldHardwareTuning,
+  runFieldHarnessJob,
   runFieldTuningDemo,
+  type FieldHarnessJobReceipt,
+  type FieldHarnessJobSummary,
+  type FieldHarnessParameterBound,
+  type FieldHarnessTrialInput,
   type FieldHardwareTuningPlan,
   type FieldParameterSnapshot,
   type FieldTuningDemoReceipt,
@@ -73,6 +81,21 @@ const COPY = {
     snapshotMissing: "No parameter snapshot bound",
     job: "Harness job",
     writeBudget: "Parameter write budget",
+    recordedTitle: "Recorded-device Harness job",
+    recordedBody: "Import content-bound trial telemetry collected from this snapshot. The local Model proposes the next bounded candidate; Harness scores every trial, checks the final independent holdout, and stores a tamper-evident receipt.",
+    jobName: "Job name",
+    jobNameValue: "Field attitude evidence review",
+    evidenceJson: "Parameter bounds and recorded trials (JSON)",
+    evidenceTemplate: "Create template from snapshot",
+    evidenceRun: "Analyze evidence and propose next trial",
+    evidenceRunning: "Analyzing evidence...",
+    evidenceNeedsSnapshot: "Create or load a parameter snapshot before running a recorded-device job.",
+    evidenceInvalid: "The JSON must contain parameterBounds and at least two training trials followed by one independent holdout.",
+    proposed: "Next bounded proposal",
+    evidenceVerdict: "Recorded evidence verdict",
+    hardwareStillDenied: "This result does not write parameters or grant hardware authority.",
+    history: "Persisted job history",
+    noHistory: "No persisted Harness jobs yet.",
   },
   "zh-CN": {
     title: "真机自主调参",
@@ -118,6 +141,21 @@ const COPY = {
     snapshotMissing: "尚未绑定参数快照",
     job: "Harness 作业",
     writeBudget: "参数写入预算",
+    recordedTitle: "真机记录证据 Harness 作业",
+    recordedBody: "导入与当前快照绑定的真实试验遥测。Model 提出下一组受步长约束的候选参数，Harness 对试验评分、检查最后一组独立留出证据，并保存防篡改回执。",
+    jobName: "作业名称",
+    jobNameValue: "现场姿态调参证据复核",
+    evidenceJson: "参数边界与真机试验记录（JSON）",
+    evidenceTemplate: "根据快照生成模板",
+    evidenceRun: "分析证据并提出下一组试验参数",
+    evidenceRunning: "正在分析证据...",
+    evidenceNeedsSnapshot: "请先创建或加载参数快照，再运行真机记录证据作业。",
+    evidenceInvalid: "JSON 必须包含参数边界、至少两组训练试验，以及最后一组独立留出试验。",
+    proposed: "下一组受限候选参数",
+    evidenceVerdict: "记录证据判定",
+    hardwareStillDenied: "该结果不会写入参数，也不会授予真机权限。",
+    history: "已保存作业历史",
+    noHistory: "尚无已保存的 Harness 作业。",
   },
 } as const;
 
@@ -145,12 +183,17 @@ export function FieldTuningWorkspace({
   const [statusSource, setStatusSource] = useState<"native" | "browser">("browser");
   const [receipt, setReceipt] = useState<FieldTuningDemoReceipt | null>(null);
   const [hardwarePlan, setHardwarePlan] = useState<FieldHardwareTuningPlan | null>(null);
+  const [jobName, setJobName] = useState<string>(copy.jobNameValue);
+  const [evidenceJson, setEvidenceJson] = useState("");
+  const [harnessReceipt, setHarnessReceipt] = useState<FieldHarnessJobReceipt | null>(null);
+  const [jobHistory, setJobHistory] = useState<FieldHarnessJobSummary[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setObjective(copy.objectiveValue);
-  }, [copy.objectiveValue]);
+    setJobName(copy.jobNameValue);
+  }, [copy.jobNameValue, copy.objectiveValue]);
 
   useEffect(() => {
     if (!isDesktopRuntime()) return;
@@ -160,7 +203,68 @@ export function FieldTuningWorkspace({
         setStatusSource("native");
       })
       .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
+    void listFieldHarnessJobs()
+      .then(setJobHistory)
+      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason)));
   }, []);
+
+  const createEvidenceTemplate = () => {
+    if (!snapshot) {
+      setError(copy.evidenceNeedsSnapshot);
+      return;
+    }
+    const parameterBounds = Object.fromEntries(
+      Object.entries(snapshot.parameters).map(([name, value]) => {
+        const span = Math.max(Math.abs(value) * 0.25, 0.1);
+        return [name, {
+          min: Number((value - span).toFixed(6)),
+          max: Number((value + span).toFixed(6)),
+          maxStep: Number(Math.max(span * 0.1, 0.001).toFixed(6)),
+        }];
+      }),
+    );
+    setEvidenceJson(JSON.stringify({ parameterBounds, trials: [] }, null, 2));
+    setError(null);
+  };
+
+  const runRecordedHarness = async () => {
+    if (!snapshot) {
+      setError(copy.evidenceNeedsSnapshot);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const parsed = JSON.parse(evidenceJson) as {
+        parameterBounds?: Record<string, FieldHarnessParameterBound>;
+        trials?: FieldHarnessTrialInput[];
+      };
+      if (!parsed.parameterBounds || !Array.isArray(parsed.trials) || parsed.trials.length < 3) {
+        throw new Error(copy.evidenceInvalid);
+      }
+      const next = await runFieldHarnessJob({
+        jobName,
+        objective,
+        targetScore,
+        maxIterations: Math.max(iterations, parsed.trials.length - 1),
+        deviceObservationId: snapshot.deviceObservationId,
+        observationSha256: snapshot.observationSha256,
+        snapshotSha256: snapshot.snapshotSha256,
+        vehiclePackId: snapshot.vehiclePackId,
+        controllerId: snapshot.controllerId,
+        firmwareVersion: snapshot.firmwareVersion,
+        adapterId: snapshot.adapterId,
+        parameterBounds: parsed.parameterBounds,
+        trials: parsed.trials,
+      });
+      setHarnessReceipt(next);
+      setJobHistory(await listFieldHarnessJobs());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const selectedCandidate = useMemo(
     () => receipt?.candidates.find(
@@ -228,6 +332,73 @@ export function FieldTuningWorkspace({
         <li><FlaskConical aria-hidden="true" /><span>02</span><strong>{copy.harness}</strong></li>
         <li><ShieldCheck aria-hidden="true" /><span>03</span><strong>{copy.evidence}</strong></li>
       </ol>
+
+      <section className="field-recorded-harness" aria-labelledby="field-recorded-harness-title">
+        <header>
+          <div>
+            <h3 id="field-recorded-harness-title"><FileJson2 aria-hidden="true" />{copy.recordedTitle}</h3>
+            <p>{copy.recordedBody}</p>
+          </div>
+          <span><ShieldCheck aria-hidden="true" />hardwareAuthority=false</span>
+        </header>
+        <div className="field-recorded-harness-grid">
+          <label>
+            <span>{copy.jobName}</span>
+            <input value={jobName} maxLength={80} onChange={(event) => setJobName(event.target.value)} />
+          </label>
+          <label className="field-recorded-json">
+            <span>{copy.evidenceJson}</span>
+            <textarea
+              value={evidenceJson}
+              spellCheck={false}
+              rows={10}
+              placeholder={'{\n  "parameterBounds": {},\n  "trials": []\n}'}
+              onChange={(event) => setEvidenceJson(event.target.value)}
+            />
+          </label>
+          <div className="field-recorded-actions">
+            <button type="button" onClick={createEvidenceTemplate}>
+              <FileJson2 aria-hidden="true" />{copy.evidenceTemplate}
+            </button>
+            <button
+              type="button"
+              className="field-primary-command"
+              disabled={busy || !snapshot || jobName.trim() === "" || evidenceJson.trim() === ""}
+              onClick={() => void runRecordedHarness()}
+            >
+              <Sparkles aria-hidden="true" />{busy ? copy.evidenceRunning : copy.evidenceRun}
+            </button>
+          </div>
+        </div>
+        {!snapshot ? <p className="field-inline-boundary"><Ban aria-hidden="true" />{copy.evidenceNeedsSnapshot}</p> : null}
+        {harnessReceipt ? (
+          <div className="field-recorded-result" aria-live="polite">
+            <div>
+              <span>{copy.evidenceVerdict}</span>
+              <strong>{harnessReceipt.qualification.recordedEvidencePassed ? copy.passed : copy.rejected}</strong>
+              <code>{compactHash(harnessReceipt.receiptSha256)}</code>
+            </div>
+            <div>
+              <span>{copy.proposed}</span>
+              <code>{JSON.stringify(harnessReceipt.proposedParameters)}</code>
+              <code>{compactHash(harnessReceipt.proposedCandidateSha256)}</code>
+            </div>
+            <p><ShieldCheck aria-hidden="true" />{copy.hardwareStillDenied}</p>
+          </div>
+        ) : null}
+        <details className="field-harness-history">
+          <summary><History aria-hidden="true" />{copy.history} ({jobHistory.length})</summary>
+          {jobHistory.length === 0 ? <p>{copy.noHistory}</p> : (
+            <ul>{jobHistory.map((job) => (
+              <li key={job.jobId}>
+                <strong>{job.jobName}</strong>
+                <span>{job.qualificationStatus}</span>
+                <code>{compactHash(job.receiptSha256)}</code>
+              </li>
+            ))}</ul>
+          )}
+        </details>
+      </section>
 
       <div className="field-tuning-controls">
         <label>

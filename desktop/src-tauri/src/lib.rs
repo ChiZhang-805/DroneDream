@@ -13,6 +13,8 @@ mod field_adapters;
 #[cfg(dronedream_field)]
 mod field_device;
 #[cfg(dronedream_field)]
+mod field_harness;
+#[cfg(dronedream_field)]
 mod field_installer_handoff;
 #[cfg(dronedream_field)]
 mod field_preflight;
@@ -120,6 +122,9 @@ pub fn run() {
         field_adapters::install_field_adapter,
         field_adapters::probe_field_mavlink_telemetry,
         field_device::discover_field_devices,
+        field_harness::run_field_harness_job,
+        field_harness::list_field_harness_jobs,
+        field_harness::load_field_harness_job,
         field_recovery::create_field_parameter_snapshot,
         field_recovery::list_field_parameter_snapshots,
         field_recovery::load_field_parameter_snapshot,
