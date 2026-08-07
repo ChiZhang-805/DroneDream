@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
-const { chromium } = require("../../../../frontend/node_modules/playwright");
+const { chromium } = require(resolve(process.cwd(), "frontend", "node_modules", "playwright"));
 
 const [endpoint, phase, outputPath] = process.argv.slice(2);
 if (!endpoint || !phase || !outputPath) {
