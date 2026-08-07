@@ -11,6 +11,8 @@ mod engine_pack;
 #[cfg(dronedream_field)]
 mod field_device;
 #[cfg(dronedream_field)]
+mod field_installer_handoff;
+#[cfg(dronedream_field)]
 mod field_tuning;
 #[cfg(not(dronedream_field))]
 mod installer_handoff;
@@ -35,6 +37,16 @@ pub(crate) const MINIMUM_WINDOWS_BUILD: u32 = 19041;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(dronedream_field)]
+    match field_installer_handoff::handle_early_command_line() {
+        Ok(true) => return,
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!("Field installer command failed: {error}");
+            std::process::exit(64);
+        }
+    }
+
     #[cfg(not(dronedream_field))]
     match installer_handoff::handle_early_command_line() {
         Ok(true) => return,

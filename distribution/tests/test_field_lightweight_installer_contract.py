@@ -93,6 +93,20 @@ def test_only_field_disables_the_runtime_mode_installer_page() -> None:
     }
 
 
+def test_field_consumes_shared_clear_command_before_webview_startup() -> None:
+    module = (ROOT / "desktop/src-tauri/src/field_installer_handoff.rs").read_text(
+        encoding="utf-8"
+    )
+    lib = (ROOT / "desktop/src-tauri/src/lib.rs").read_text(encoding="utf-8")
+    assert 'command == "--clear-installer-handoff"' in module
+    assert "return Ok(true);" in module
+    assert "Runtime installer handoff commands are unavailable in Field." in module
+    assert "field_installer_handoff::handle_early_command_line()" in lib
+    assert lib.index("field_installer_handoff::handle_early_command_line()") < lib.index(
+        "webview2_preflight::ensure_ready_before_tauri()"
+    )
+
+
 def test_runtime_page_and_ui_implementation_are_compile_time_gated() -> None:
     source = RUNTIME_MODE.read_text(encoding="utf-8")
     guard = '!if "${DRONEDREAM_RUNTIME_MODE_PAGE_ENABLED}" == "1"'
