@@ -82,6 +82,115 @@ export interface EnginePackStatus {
   message: string | null;
 }
 
+export interface FieldTuningStatus {
+  schemaVersion: 1;
+  kind: "dronedream-field-tuning-status";
+  editionId: "field";
+  executionDomain: "real-hardware";
+  runtimeProfile: "field-lightweight";
+  sourceCommit: string;
+  enginePackId: string;
+  contractSha256: string;
+  simulationSupported: false;
+  modelRole: "proposal-only";
+  harnessRole: "bounded-execution-evidence-and-rollback";
+  demoAvailable: boolean;
+  hardwareAuthority: false;
+  validatedPackCount: number;
+  blockers: string[];
+}
+
+export interface FieldDiscoveredDevice {
+  observationId: string;
+  portName: string;
+  registryValueNameSha256: string;
+  transport: "windows-serial-registry-readonly";
+  portOpened: false;
+  validationStatus: "unknown-unvalidated";
+  hardwareAuthority: false;
+}
+
+export interface FieldDeviceDiscoveryReport {
+  schemaVersion: 1;
+  kind: "dronedream-field-device-discovery-report";
+  editionId: "field";
+  source: "windows-serial-registry-readonly";
+  supported: boolean;
+  portOpenAttempts: 0;
+  writeAttempts: 0;
+  hardwareAuthority: false;
+  devices: FieldDiscoveredDevice[];
+  diagnostics: string[];
+}
+
+export interface FieldTuningDemoRequest {
+  objective: string;
+  maxIterations: number;
+  targetScore: number;
+}
+
+export interface FieldTuningCandidateReceipt {
+  iteration: number;
+  proposalSource: "deterministic-model-fixture";
+  parameters: Record<string, number>;
+  candidateSha256: string;
+  trackingError: number;
+  overshootPercent: number;
+  controlEffort: number;
+  score: number;
+  accepted: boolean;
+  failureClass: "none";
+}
+
+export interface FieldTuningDemoReceipt {
+  schemaVersion: 1;
+  kind: "dronedream-field-tuning-demo-receipt";
+  jobId: string;
+  editionId: "field";
+  executionDomain: "real-hardware";
+  executionMode: "fixture-only-no-device-io";
+  sourceCommit: string;
+  enginePackId: string;
+  objective: string;
+  budget: {
+    maxIterations: number;
+    usedIterations: number;
+    providerRequests: 0;
+    hardwareTrials: 0;
+  };
+  candidates: FieldTuningCandidateReceipt[];
+  selectedCandidateSha256: string;
+  holdout: { independent: true; score: number; passed: boolean; fixture: true };
+  qualification: {
+    status: "demo-qualified" | "demo-rejected";
+    hardwareValid: false;
+    reason: string;
+  };
+  hardwareActionsPerformed: string[];
+  hardwareAuthority: false;
+  receiptSha256: string;
+}
+
+export interface FieldHardwareTuningRequest {
+  deviceId: string;
+  vehiclePackId: string;
+  controllerId: string;
+  firmwareVersion: string;
+  objective: string;
+}
+
+export interface FieldHardwareTuningPlan {
+  schemaVersion: 1;
+  kind: "dronedream-field-hardware-tuning-plan";
+  editionId: "field";
+  executionDomain: "real-hardware";
+  requestSha256: string;
+  canExecute: false;
+  hardwareAuthority: false;
+  requiredEvidence: string[];
+  blockers: string[];
+}
+
 export interface DesktopApiRequest {
   method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
@@ -437,6 +546,45 @@ export function getInstallerLocale(): Promise<InstallerLocale> {
   return invokeDesktop("get_installer_locale", (value) => {
     if (value === "en" || value === "zh-CN") return value;
     throw new Error("installer locale must be en or zh-CN");
+  });
+}
+
+export function getFieldTuningStatus(): Promise<FieldTuningStatus> {
+  return invokeDesktop("get_field_tuning_status", parseFieldTuningStatus);
+}
+
+export function discoverFieldDevices(): Promise<FieldDeviceDiscoveryReport> {
+  return invokeDesktop("discover_field_devices", parseFieldDeviceDiscoveryReport);
+}
+
+export function runFieldTuningDemo(
+  request: FieldTuningDemoRequest,
+): Promise<FieldTuningDemoReceipt> {
+  if (
+    request.objective.trim() === "" ||
+    request.objective.length > 120 ||
+    !Number.isInteger(request.maxIterations) ||
+    request.maxIterations < 2 ||
+    request.maxIterations > 8 ||
+    !Number.isFinite(request.targetScore) ||
+    request.targetScore < 0.15 ||
+    request.targetScore > 0.9
+  ) {
+    return Promise.reject(new Error("Field tuning demo request is outside its bounded contract."));
+  }
+  return invokeDesktop("run_field_tuning_demo", parseFieldTuningDemoReceipt, { request });
+}
+
+export function prepareFieldHardwareTuning(
+  request: FieldHardwareTuningRequest,
+): Promise<FieldHardwareTuningPlan> {
+  for (const value of Object.values(request)) {
+    if (value.trim() === "" || value.length > 160) {
+      return Promise.reject(new Error("Field hardware tuning request is invalid."));
+    }
+  }
+  return invokeDesktop("prepare_field_hardware_tuning", parseFieldHardwareTuningPlan, {
+    request,
   });
 }
 
@@ -1120,6 +1268,281 @@ function parseEnginePackStatus(value: unknown): EnginePackStatus {
   return status;
 }
 
+function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
+  const record = expectRecord(value, "fieldTuningStatus");
+  const status: FieldTuningStatus = {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldTuningStatus.schemaVersion"),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-tuning-status",
+      "fieldTuningStatus.kind",
+    ),
+    editionId: expectLiteral(record.editionId, "field", "fieldTuningStatus.editionId"),
+    executionDomain: expectLiteral(
+      record.executionDomain,
+      "real-hardware",
+      "fieldTuningStatus.executionDomain",
+    ),
+    runtimeProfile: expectLiteral(
+      record.runtimeProfile,
+      "field-lightweight",
+      "fieldTuningStatus.runtimeProfile",
+    ),
+    sourceCommit: expectLowercaseHex(record.sourceCommit, "fieldTuningStatus.sourceCommit", 40),
+    enginePackId: expectSha256Id(record.enginePackId, "fieldTuningStatus.enginePackId"),
+    contractSha256: expectLowercaseHex(
+      record.contractSha256,
+      "fieldTuningStatus.contractSha256",
+      64,
+    ),
+    simulationSupported: expectLiteral(
+      record.simulationSupported,
+      false,
+      "fieldTuningStatus.simulationSupported",
+    ),
+    modelRole: expectLiteral(record.modelRole, "proposal-only", "fieldTuningStatus.modelRole"),
+    harnessRole: expectLiteral(
+      record.harnessRole,
+      "bounded-execution-evidence-and-rollback",
+      "fieldTuningStatus.harnessRole",
+    ),
+    demoAvailable: expectBoolean(record.demoAvailable, "fieldTuningStatus.demoAvailable"),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldTuningStatus.hardwareAuthority",
+    ),
+    validatedPackCount: expectNonNegativeInteger(
+      record.validatedPackCount,
+      "fieldTuningStatus.validatedPackCount",
+    ),
+    blockers: parseSafeNonEmptyStringArray(record.blockers, "fieldTuningStatus.blockers"),
+  };
+  if (status.validatedPackCount !== 0 || status.blockers.length === 0) {
+    throw new Error("Field tuning status must preserve the zero-pack denial");
+  }
+  return status;
+}
+
+function parseFieldDeviceDiscoveryReport(value: unknown): FieldDeviceDiscoveryReport {
+  const record = expectRecord(value, "fieldDeviceDiscovery");
+  const devices = expectArray(record.devices, "fieldDeviceDiscovery.devices").map(
+    (item, index): FieldDiscoveredDevice => {
+      const path = `fieldDeviceDiscovery.devices[${index}]`;
+      const device = expectRecord(item, path);
+      return {
+        observationId: expectLowercaseHex(device.observationId, `${path}.observationId`, 64),
+        portName: expectCanonicalComPort(device.portName, `${path}.portName`),
+        registryValueNameSha256: expectLowercaseHex(
+          device.registryValueNameSha256,
+          `${path}.registryValueNameSha256`,
+          64,
+        ),
+        transport: expectLiteral(
+          device.transport,
+          "windows-serial-registry-readonly",
+          `${path}.transport`,
+        ),
+        portOpened: expectLiteral(device.portOpened, false, `${path}.portOpened`),
+        validationStatus: expectLiteral(
+          device.validationStatus,
+          "unknown-unvalidated",
+          `${path}.validationStatus`,
+        ),
+        hardwareAuthority: expectLiteral(
+          device.hardwareAuthority,
+          false,
+          `${path}.hardwareAuthority`,
+        ),
+      };
+    },
+  );
+  const report: FieldDeviceDiscoveryReport = {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldDeviceDiscovery.schemaVersion"),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-device-discovery-report",
+      "fieldDeviceDiscovery.kind",
+    ),
+    editionId: expectLiteral(record.editionId, "field", "fieldDeviceDiscovery.editionId"),
+    source: expectLiteral(
+      record.source,
+      "windows-serial-registry-readonly",
+      "fieldDeviceDiscovery.source",
+    ),
+    supported: expectBoolean(record.supported, "fieldDeviceDiscovery.supported"),
+    portOpenAttempts: expectLiteral(
+      record.portOpenAttempts,
+      0,
+      "fieldDeviceDiscovery.portOpenAttempts",
+    ),
+    writeAttempts: expectLiteral(record.writeAttempts, 0, "fieldDeviceDiscovery.writeAttempts"),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldDeviceDiscovery.hardwareAuthority",
+    ),
+    devices,
+    diagnostics: parseSafeNonEmptyStringArray(
+      record.diagnostics,
+      "fieldDeviceDiscovery.diagnostics",
+    ),
+  };
+  if (new Set(devices.map((device) => device.portName)).size !== devices.length) {
+    throw new Error("fieldDeviceDiscovery devices must use unique ports");
+  }
+  return report;
+}
+
+function parseFieldTuningCandidate(
+  value: unknown,
+  index: number,
+): FieldTuningCandidateReceipt {
+  const path = `fieldTuningReceipt.candidates[${index}]`;
+  const record = expectRecord(value, path);
+  const rawParameters = expectRecord(record.parameters, `${path}.parameters`);
+  const parameters = Object.fromEntries(
+    Object.entries(rawParameters).map(([name, parameter]) => [
+      name,
+      expectFiniteNumber(parameter, `${path}.parameters.${name}`),
+    ]),
+  );
+  if (Object.keys(parameters).length === 0) throw new Error(`${path}.parameters must not be empty`);
+  return {
+    iteration: expectPositiveInteger(record.iteration, `${path}.iteration`),
+    proposalSource: expectLiteral(
+      record.proposalSource,
+      "deterministic-model-fixture",
+      `${path}.proposalSource`,
+    ),
+    parameters,
+    candidateSha256: expectLowercaseHex(record.candidateSha256, `${path}.candidateSha256`, 64),
+    trackingError: expectFiniteNumber(record.trackingError, `${path}.trackingError`),
+    overshootPercent: expectFiniteNumber(record.overshootPercent, `${path}.overshootPercent`),
+    controlEffort: expectFiniteNumber(record.controlEffort, `${path}.controlEffort`),
+    score: expectFiniteNumber(record.score, `${path}.score`),
+    accepted: expectBoolean(record.accepted, `${path}.accepted`),
+    failureClass: expectLiteral(record.failureClass, "none", `${path}.failureClass`),
+  };
+}
+
+function parseFieldTuningDemoReceipt(value: unknown): FieldTuningDemoReceipt {
+  const record = expectRecord(value, "fieldTuningReceipt");
+  const budget = expectRecord(record.budget, "fieldTuningReceipt.budget");
+  const holdout = expectRecord(record.holdout, "fieldTuningReceipt.holdout");
+  const qualification = expectRecord(record.qualification, "fieldTuningReceipt.qualification");
+  const status = expectString(qualification.status, "fieldTuningReceipt.qualification.status");
+  if (status !== "demo-qualified" && status !== "demo-rejected") {
+    throw new Error("fieldTuningReceipt.qualification.status is unsupported");
+  }
+  const receipt: FieldTuningDemoReceipt = {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldTuningReceipt.schemaVersion"),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-tuning-demo-receipt",
+      "fieldTuningReceipt.kind",
+    ),
+    jobId: expectSafeNonEmptyString(record.jobId, "fieldTuningReceipt.jobId"),
+    editionId: expectLiteral(record.editionId, "field", "fieldTuningReceipt.editionId"),
+    executionDomain: expectLiteral(
+      record.executionDomain,
+      "real-hardware",
+      "fieldTuningReceipt.executionDomain",
+    ),
+    executionMode: expectLiteral(
+      record.executionMode,
+      "fixture-only-no-device-io",
+      "fieldTuningReceipt.executionMode",
+    ),
+    sourceCommit: expectLowercaseHex(record.sourceCommit, "fieldTuningReceipt.sourceCommit", 40),
+    enginePackId: expectSha256Id(record.enginePackId, "fieldTuningReceipt.enginePackId"),
+    objective: expectSafeNonEmptyString(record.objective, "fieldTuningReceipt.objective"),
+    budget: {
+      maxIterations: expectPositiveInteger(budget.maxIterations, "fieldTuningReceipt.budget.maxIterations"),
+      usedIterations: expectPositiveInteger(budget.usedIterations, "fieldTuningReceipt.budget.usedIterations"),
+      providerRequests: expectLiteral(budget.providerRequests, 0, "fieldTuningReceipt.budget.providerRequests"),
+      hardwareTrials: expectLiteral(budget.hardwareTrials, 0, "fieldTuningReceipt.budget.hardwareTrials"),
+    },
+    candidates: expectArray(record.candidates, "fieldTuningReceipt.candidates")
+      .map(parseFieldTuningCandidate),
+    selectedCandidateSha256: expectLowercaseHex(
+      record.selectedCandidateSha256,
+      "fieldTuningReceipt.selectedCandidateSha256",
+      64,
+    ),
+    holdout: {
+      independent: expectLiteral(holdout.independent, true, "fieldTuningReceipt.holdout.independent"),
+      score: expectFiniteNumber(holdout.score, "fieldTuningReceipt.holdout.score"),
+      passed: expectBoolean(holdout.passed, "fieldTuningReceipt.holdout.passed"),
+      fixture: expectLiteral(holdout.fixture, true, "fieldTuningReceipt.holdout.fixture"),
+    },
+    qualification: {
+      status,
+      hardwareValid: expectLiteral(
+        qualification.hardwareValid,
+        false,
+        "fieldTuningReceipt.qualification.hardwareValid",
+      ),
+      reason: expectSafeNonEmptyString(
+        qualification.reason,
+        "fieldTuningReceipt.qualification.reason",
+      ),
+    },
+    hardwareActionsPerformed: parseStringArray(
+      record.hardwareActionsPerformed,
+      "fieldTuningReceipt.hardwareActionsPerformed",
+    ),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldTuningReceipt.hardwareAuthority",
+    ),
+    receiptSha256: expectLowercaseHex(record.receiptSha256, "fieldTuningReceipt.receiptSha256", 64),
+  };
+  if (
+    receipt.candidates.length !== receipt.budget.usedIterations ||
+    receipt.hardwareActionsPerformed.length !== 0 ||
+    !receipt.candidates.some((candidate) => candidate.candidateSha256 === receipt.selectedCandidateSha256)
+  ) {
+    throw new Error("Field tuning receipt violates its bounded fixture semantics");
+  }
+  return receipt;
+}
+
+function parseFieldHardwareTuningPlan(value: unknown): FieldHardwareTuningPlan {
+  const record = expectRecord(value, "fieldHardwarePlan");
+  const plan: FieldHardwareTuningPlan = {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldHardwarePlan.schemaVersion"),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-hardware-tuning-plan",
+      "fieldHardwarePlan.kind",
+    ),
+    editionId: expectLiteral(record.editionId, "field", "fieldHardwarePlan.editionId"),
+    executionDomain: expectLiteral(
+      record.executionDomain,
+      "real-hardware",
+      "fieldHardwarePlan.executionDomain",
+    ),
+    requestSha256: expectLowercaseHex(record.requestSha256, "fieldHardwarePlan.requestSha256", 64),
+    canExecute: expectLiteral(record.canExecute, false, "fieldHardwarePlan.canExecute"),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      "fieldHardwarePlan.hardwareAuthority",
+    ),
+    requiredEvidence: parseSafeNonEmptyStringArray(
+      record.requiredEvidence,
+      "fieldHardwarePlan.requiredEvidence",
+    ),
+    blockers: parseSafeNonEmptyStringArray(record.blockers, "fieldHardwarePlan.blockers"),
+  };
+  if (plan.blockers.length === 0 || plan.requiredEvidence.length < 8) {
+    throw new Error("Field hardware plan removed mandatory safety evidence");
+  }
+  return plan;
+}
+
 function validateRuntimeSemantics(report: RuntimeStatusReport): void {
   if (report.runtimeName !== RUNTIME_NAME) {
     throw new Error(`report.runtimeName must equal ${RUNTIME_NAME}`);
@@ -1685,6 +2108,15 @@ function expectControllerKey(value: unknown, path: string): string {
   return controllerKey;
 }
 
+function expectCanonicalComPort(value: unknown, path: string): string {
+  const port = expectString(value, path);
+  const match = /^COM([1-9][0-9]{0,2})$/u.exec(port);
+  if (!match || Number(match[1]) > 999) {
+    throw new Error(`${path} must be a canonical COM port`);
+  }
+  return port;
+}
+
 function expectLowercaseHex(
   value: unknown,
   path: string,
@@ -1773,6 +2205,36 @@ function expectIsoTimestamp(value: unknown, path: string): string {
 function expectBoolean(value: unknown, path: string): boolean {
   if (typeof value !== "boolean") throw new Error(`${path} must be a boolean`);
   return value;
+}
+
+function expectLiteral<const T extends string | number | boolean>(
+  value: unknown,
+  expected: T,
+  path: string,
+): T {
+  if (value !== expected) throw new Error(`${path} must equal ${String(expected)}`);
+  return expected;
+}
+
+function expectSha256Id(value: unknown, path: string): string {
+  const identity = expectString(value, path);
+  if (!/^sha256:[0-9a-f]{64}$/u.test(identity)) {
+    throw new Error(`${path} must be a SHA-256 identity`);
+  }
+  return identity;
+}
+
+function expectFiniteNumber(value: unknown, path: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${path} must be a finite number`);
+  }
+  return value;
+}
+
+function expectPositiveInteger(value: unknown, path: string): number {
+  const number = expectNonNegativeInteger(value, path);
+  if (number < 1) throw new Error(`${path} must be positive`);
+  return number;
 }
 
 function expectNonNegativeNumber(value: unknown, path: string): number {

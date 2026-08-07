@@ -91,7 +91,7 @@ describe("DistributionSetupPanel", () => {
   it("normalizes edition and region changes and persists only the versioned draft", () => {
     renderPanel("settings");
 
-    fireEvent.click(screen.getByRole("radio", { name: /DroneDream Field/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /DroneDream · FIELD/ }));
     fireEvent.change(screen.getByRole("combobox", { name: /Region/ }), {
       target: { value: "cn" },
     });

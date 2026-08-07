@@ -43,8 +43,8 @@
       "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico"
     },
     "publisher": "DroneDream",
-    "shortDescription": "Fail-closed field readiness for supported aircraft",
-    "longDescription": "DroneDream · FIELD provides read-only device observation, compatibility review, parameter recovery planning, and preflight safety status. Hardware control remains unavailable until native safety contracts are satisfied."
+    "shortDescription": "Real-device operations and autonomous field tuning",
+    "longDescription": "DroneDream · FIELD provides read-only device discovery and the safety-gated workflow for telemetry, bounded Model + Harness parameter tuning, qualification evidence, snapshots, rollback, preflight, takeover, and emergency operations. It contains no simulation stage, and hardware execution remains gated by native safety contracts."
   },
   "plugins": {
     "updater": {

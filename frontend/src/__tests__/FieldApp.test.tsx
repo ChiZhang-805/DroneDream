@@ -25,7 +25,7 @@ describe("FieldApp", () => {
       "aria-current",
       "page",
     );
-    expect(screen.getByRole("heading", { name: "Field readiness" }))
+    expect(screen.getByRole("heading", { name: "Real-device operations and autonomous tuning" }))
       .toBeInTheDocument();
     expect(screen.getByText("0 / 7")).toBeInTheDocument();
     expect(container.querySelector(".field-brand-lockup")).toHaveAttribute(
@@ -131,7 +131,7 @@ describe("FieldApp", () => {
   it("provides independent Simplified Chinese safety copy", () => {
     render(<FieldApp initialLocale="zh-CN" initialObservationState="firmware-drift" />);
 
-    expect(screen.getByRole("heading", { name: "真机就绪状态" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "真机操作与自主调参" })).toBeInTheDocument();
     expect(within(screen.getByRole("status")).getByText("固件漂移"))
       .toBeInTheDocument();
     expect(screen.getByText("当前没有达到硬件验证层级的机型包。设备观察结果不能解锁控制权限。"))
@@ -143,13 +143,15 @@ describe("FieldApp", () => {
     const sources = [
       "src/field/FieldApp.tsx",
       "src/field/FieldSettingsDialog.tsx",
+      "src/field/FieldTuningWorkspace.tsx",
       "src/field/catalog.ts",
       "src/field/main.tsx",
       "src/field/safety.ts",
+      "src/field/tuning.ts",
     ].map((path) => readFileSync(resolve(process.cwd(), path), "utf8")).join("\n");
 
     expect(sources).not.toMatch(/AppShell|react-router|\/assistant|\/scenarios/);
-    expect(sources).not.toMatch(/gazebo|sitl|hitl|simulation/i);
+    expect(sources).not.toMatch(/gazebo|sitl|hitl|SimulatorAdapter|simulation\.execute/i);
     expect(sources).toContain("EditionThemeProvider");
     expect(sources).toContain("EditionSettingsSurface");
     expect(sources).toContain('consumerProfile="field-lightweight"');

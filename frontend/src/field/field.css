@@ -32,13 +32,15 @@ body {
 }
 
 button,
-select {
+select,
+input {
   font: inherit;
 }
 
 button,
 a,
-select {
+select,
+input {
   outline: none;
 }
 
@@ -47,6 +49,12 @@ a:focus-visible,
 select:focus-visible {
   box-shadow: 0 0 0 3px rgb(215 70 165 / 25%);
   border-color: var(--field-focus);
+}
+
+input:focus-visible {
+  box-shadow: 0 0 0 3px rgb(215 70 165 / 25%);
+  border-color: var(--field-focus);
+  outline: none;
 }
 
 .field-app {
@@ -644,7 +652,7 @@ select:focus-visible {
 .field-observation-toolbar {
   display: grid;
   align-items: end;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 280px) auto;
   gap: 20px;
   padding: 14px 16px;
   background: var(--dd-brand-light-surface);
@@ -670,6 +678,65 @@ select:focus-visible {
   background: #ffffff;
   border: 1px solid #cfc8c3;
   border-radius: 5px;
+}
+
+.field-device-scan {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 11px;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid #cfc8c3;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.field-device-scan:disabled {
+  color: var(--field-muted);
+  background: #f3f0ee;
+  cursor: not-allowed;
+}
+
+.field-device-scan svg {
+  width: 16px;
+  height: 16px;
+}
+
+.field-device-scan-boundary,
+.field-device-scan-error {
+  margin: 8px 0 0;
+  color: var(--field-muted);
+  font-size: 11px;
+}
+
+.field-device-scan-error {
+  color: var(--field-danger);
+}
+
+.field-device-observations {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+}
+
+.field-device-observations strong {
+  font-size: 12px;
+}
+
+.field-device-observations span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--field-muted);
+  font-size: 11px;
 }
 
 .field-device-grid {
@@ -1176,5 +1243,431 @@ select:focus-visible {
 
   .field-auth-spinner {
     animation: none;
+  }
+}
+
+.field-tuning-section {
+  padding-top: 38px;
+}
+
+.field-tuning-workspace {
+  display: grid;
+  gap: 22px;
+}
+
+.field-tuning-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.field-tuning-header h2,
+.field-tuning-results h3,
+.field-hardware-gate h3,
+.field-gate-evidence h4 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.field-tuning-header h2 {
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.field-tuning-header p,
+.field-hardware-gate header p {
+  max-width: 760px;
+  margin: 8px 0 0;
+  color: var(--field-muted);
+  line-height: 1.55;
+}
+
+.field-tuning-domain {
+  display: grid;
+  min-width: 230px;
+  gap: 8px;
+}
+
+.field-tuning-domain > span {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  color: var(--field-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.field-tuning-domain svg,
+.field-inline-boundary svg,
+.field-tuning-error svg,
+.field-gate-evidence p svg {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+}
+
+.field-live-indicator {
+  width: 9px;
+  height: 9px;
+  background: var(--dd-brand-middle);
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dd-brand-middle), transparent 62%);
+}
+
+.field-tuning-flow {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  border-block: 1px solid var(--field-line);
+}
+
+.field-tuning-flow li {
+  position: relative;
+  display: grid;
+  min-height: 76px;
+  align-items: center;
+  gap: 3px 10px;
+  padding: 14px 18px;
+  grid-template-columns: 28px minmax(0, 1fr);
+}
+
+.field-tuning-flow li + li {
+  border-left: 1px solid var(--field-line);
+}
+
+.field-tuning-flow svg {
+  width: 21px;
+  height: 21px;
+  color: var(--dd-brand-middle);
+  grid-row: 1 / span 2;
+}
+
+.field-tuning-flow span {
+  color: var(--field-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.field-tuning-flow strong {
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.field-tuning-controls {
+  display: grid;
+  align-items: end;
+  gap: 12px;
+  grid-template-columns: minmax(260px, 1fr) 112px 112px minmax(190px, auto);
+}
+
+.field-tuning-controls label {
+  display: grid;
+  gap: 7px;
+}
+
+.field-tuning-controls label > span {
+  color: var(--field-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.field-tuning-controls input {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+  border-radius: 5px;
+}
+
+.field-primary-command,
+.field-hardware-gate > button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.field-primary-command {
+  color: #ffffff;
+  background: var(--dd-brand-dark-surface);
+  border: 1px solid var(--dd-brand-dark-surface);
+}
+
+.field-primary-command:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.field-primary-command svg,
+.field-hardware-gate > button svg {
+  width: 17px;
+  height: 17px;
+}
+
+.field-inline-boundary,
+.field-contract-line,
+.field-tuning-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 0;
+  font-size: 12px;
+}
+
+.field-inline-boundary {
+  color: var(--field-muted);
+}
+
+.field-contract-line {
+  flex-wrap: wrap;
+  padding: 9px 12px;
+  color: var(--field-muted);
+  background: color-mix(in srgb, var(--dd-brand-light-surface), #ffffff 58%);
+  border-left: 3px solid var(--dd-brand-start);
+}
+
+.field-contract-line code {
+  color: var(--field-ink);
+}
+
+.field-tuning-error {
+  padding: 10px 12px;
+  color: var(--field-danger);
+  background: var(--field-danger-bg);
+  border: 1px solid color-mix(in srgb, var(--field-danger), transparent 72%);
+}
+
+.field-tuning-results {
+  display: grid;
+  align-items: stretch;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 220px;
+}
+
+.field-tuning-results > section {
+  min-width: 0;
+}
+
+.field-tuning-results > section > header,
+.field-hardware-gate > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.field-tuning-results > section > header svg,
+.field-hardware-gate > header > svg {
+  width: 20px;
+  height: 20px;
+  color: var(--dd-brand-middle);
+}
+
+.field-tuning-results table {
+  min-width: 720px;
+}
+
+.field-tuning-results tr[data-selected="true"] {
+  background: color-mix(in srgb, var(--dd-brand-light-surface), #ffffff 44%);
+}
+
+.field-result-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dd-brand-dark-surface);
+  font-weight: 700;
+}
+
+.field-result-selected svg {
+  width: 15px;
+  height: 15px;
+  color: var(--dd-brand-middle);
+}
+
+.field-holdout {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  padding: 18px;
+  color: #ffffff;
+  background: var(--dd-brand-dark-surface);
+  border-top: 3px solid var(--dd-brand-start);
+}
+
+.field-holdout > svg {
+  width: 28px;
+  height: 28px;
+  color: var(--dd-brand-start);
+}
+
+.field-holdout div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid rgb(255 255 255 / 20%);
+}
+
+.field-holdout span,
+.field-holdout p {
+  color: rgb(255 255 255 / 72%);
+  font-size: 11px;
+}
+
+.field-holdout code {
+  color: #ffffff;
+  font-size: 10px;
+}
+
+.field-holdout p {
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+
+.field-hardware-gate {
+  display: grid;
+  gap: 14px;
+  padding-top: 22px;
+  border-top: 1px solid var(--field-line);
+}
+
+.field-hardware-gate > button {
+  width: max-content;
+  color: var(--field-ink);
+  background: #ffffff;
+  border: 1px solid var(--field-line);
+}
+
+.field-gate-evidence {
+  display: grid;
+  gap: 16px 24px;
+  padding: 16px 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-block: 1px solid var(--field-line);
+}
+
+.field-gate-evidence h4 {
+  font-size: 12px;
+}
+
+.field-gate-evidence ul {
+  display: grid;
+  gap: 5px;
+  margin: 9px 0 0;
+  padding-left: 18px;
+  color: var(--field-muted);
+  font: 11px/1.4 ui-monospace, "Cascadia Mono", monospace;
+}
+
+.field-gate-evidence p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--field-danger);
+  font-size: 12px;
+  font-weight: 700;
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 1100px) {
+  .field-tuning-controls {
+    grid-template-columns: minmax(260px, 1fr) 112px 112px;
+  }
+
+  .field-primary-command {
+    width: max-content;
+    grid-column: 1 / -1;
+  }
+
+  .field-tuning-results {
+    grid-template-columns: 1fr;
+  }
+
+  .field-holdout {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .field-holdout > svg,
+  .field-holdout p {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .field-tuning-header {
+    flex-direction: column;
+  }
+
+  .field-tuning-domain {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .field-tuning-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .field-tuning-flow li + li {
+    border-top: 1px solid var(--field-line);
+    border-left: 0;
+  }
+
+  .field-tuning-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .field-tuning-controls label:first-child,
+  .field-primary-command {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
+  .field-holdout,
+  .field-gate-evidence {
+    grid-template-columns: 1fr;
+  }
+
+  .field-holdout > svg,
+  .field-holdout p,
+  .field-gate-evidence p {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 440px) {
+  .field-tuning-header h2 {
+    font-size: 21px;
+  }
+
+  .field-tuning-domain,
+  .field-tuning-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .field-tuning-controls label:first-child,
+  .field-primary-command {
+    grid-column: auto;
+  }
+
+  .field-hardware-gate > button {
+    width: 100%;
   }
 }

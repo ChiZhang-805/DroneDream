@@ -15,7 +15,7 @@
       },
       "field": {
         "path": "distribution/editions/field.v1.json",
-        "sha256": "13b585d4cd9adb90b11d6332f4fad796df8fdeeb107581da6903bd134ae2ae27"
+        "sha256": "cbd2c3a10843601469f91ef7d097c72459becaa6e60c387e39b721e76680bd08"
       }
     },
     "vehiclePackRegistry": {
@@ -87,10 +87,10 @@
     {
       "editionId": "field",
       "editionVersion": "1.0.0",
-      "displayName": {"en": "DroneDream Field", "zh-CN": "DroneDream 真机轻量版"},
+      "displayName": {"en": "DroneDream · FIELD", "zh-CN": "DroneDream · FIELD"},
       "description": {
-        "en": "A lightweight hardware and ground-station edition that omits Gazebo but retains qualification and preflight gates.",
-        "zh-CN": "不安装大型 Gazebo 的轻量真机与地面站版本，同时保留资格回执和安全预检。"
+        "en": "A real-device edition for aircraft operations and safety-bounded autonomous parameter tuning with no simulation stage.",
+        "zh-CN": "完全用于真机操作和安全边界内自主参数调优的版本，不包含任何仿真阶段。"
       },
       "implementationStatus": "contract-only",
       "validationTier": "contract-only",

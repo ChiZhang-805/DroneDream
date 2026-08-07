@@ -11,17 +11,25 @@ import {
   HardDrive,
   PackageCheck,
   RadioTower,
+  RefreshCw,
   RotateCcw,
   Settings,
   ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
 } from "lucide-react";
 
 import { BrandLockup } from "../components/BrandLockup";
+import {
+  discoverFieldDevices,
+  isDesktopRuntime,
+  type FieldDeviceDiscoveryReport,
+} from "../desktop/bridge";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
 import { FieldAuthControl } from "./FieldAuthControl";
 import { FieldSettingsDialog } from "./FieldSettingsDialog";
+import { FieldTuningWorkspace } from "./FieldTuningWorkspace";
 import {
   evaluateFieldSafety,
   FIELD_HARDWARE_ACTIONS,
@@ -33,24 +41,31 @@ const COPY = {
   en: {
     skip: "Skip to Field overview",
     edition: "FIELD",
-    preview: "Internal safety preview",
+    preview: "Safety-gated field workspace",
     locale: "Language",
     settings: "Settings",
     nav: "Field navigation",
     overview: "Overview",
     devices: "Device",
     compatibility: "Compatibility",
+    tuning: "Autonomous tuning",
     recovery: "Snapshot & rollback",
     preflight: "Preflight",
     control: "Safety control",
-    title: "Field readiness",
-    subtitle: "Read-only device observation and compatibility review",
+    title: "Real-device operations and autonomous tuning",
+    subtitle: "Connect, observe, tune, qualify, recover, and operate supported aircraft without a simulation stage.",
     zeroTitle: "Hardware authority unavailable",
     zeroBody: "No Vehicle Pack has a validated hardware tier. Device observations cannot unlock control.",
     validated: "Validated packs",
     quorum: "Three-layer quorum",
     source: "Observation source",
     sourceValue: "Built-in read-only fixture",
+    scan: "Scan serial registry",
+    scanning: "Scanning...",
+    scanBoundary: "Read-only registry scan. Ports remain closed.",
+    scanUnavailable: "Native scan is available only in the installed Field app.",
+    observedPorts: "Observed unopened ports",
+    noPorts: "No serial ports observed",
     observation: "Observation state",
     states: {
       offline: "Offline",
@@ -117,29 +132,36 @@ const COPY = {
       arm: "Arm",
       flight: "Flight",
     },
-    footer: "DroneDream · FIELD 1.0.0 · contract-only",
+    footer: "DroneDream · FIELD 1.0.0 · real-device workspace",
   },
   "zh-CN": {
     skip: "跳到 Field 概览",
     edition: "FIELD",
-    preview: "内部安全预览",
+    preview: "安全门控真机工作区",
     locale: "语言",
     settings: "设置",
     nav: "Field 导航",
     overview: "概览",
     devices: "设备",
     compatibility: "兼容性",
+    tuning: "自主调参",
     recovery: "快照与回滚",
     preflight: "飞前检查",
     control: "安全控制",
-    title: "真机就绪状态",
-    subtitle: "只读设备观察与兼容性复核",
+    title: "真机操作与自主调参",
+    subtitle: "在完全无仿真的工作流中连接、观察、调参、验证、恢复并操作受支持的无人机。",
     zeroTitle: "真机权限不可用",
     zeroBody: "当前没有达到硬件验证层级的机型包。设备观察结果不能解锁控制权限。",
     validated: "已验证机型包",
     quorum: "三层仲裁",
     source: "观察来源",
     sourceValue: "内置只读测试数据",
+    scan: "扫描串口注册表",
+    scanning: "正在扫描...",
+    scanBoundary: "仅只读扫描注册表，所有端口保持关闭。",
+    scanUnavailable: "原生扫描仅在已安装的 Field 应用中可用。",
+    observedPorts: "观察到的未打开端口",
+    noPorts: "未观察到串口",
     observation: "观察状态",
     states: {
       offline: "离线",
@@ -206,7 +228,7 @@ const COPY = {
       arm: "解锁",
       flight: "飞行",
     },
-    footer: "DroneDream · FIELD 1.0.0 · 合同阶段",
+    footer: "DroneDream · FIELD 1.0.0 · 真机工作区",
   },
 } as const;
 
@@ -214,6 +236,7 @@ const NAVIGATION = [
   ["overview", "overview", Gauge],
   ["device", "devices", RadioTower],
   ["compatibility", "compatibility", PackageCheck],
+  ["tuning", "tuning", Sparkles],
   ["recovery", "recovery", FileClock],
   ["preflight", "preflight", ClipboardCheck],
   ["control", "control", ShieldAlert],
@@ -257,6 +280,9 @@ export function FieldApp({
     ),
   );
   const [operatorAcknowledged, setOperatorAcknowledged] = useState(false);
+  const [deviceReport, setDeviceReport] = useState<FieldDeviceDiscoveryReport | null>(null);
+  const [deviceScanBusy, setDeviceScanBusy] = useState(false);
+  const [deviceScanError, setDeviceScanError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
   const settingsCloseRef = useRef<HTMLButtonElement>(null);
@@ -279,6 +305,18 @@ export function FieldApp({
   const closeSettings = useCallback(() => {
     setSettingsOpen(false);
     requestAnimationFrame(() => settingsButtonRef.current?.focus());
+  }, []);
+
+  const scanDevices = useCallback(async () => {
+    setDeviceScanBusy(true);
+    setDeviceScanError(null);
+    try {
+      setDeviceReport(await discoverFieldDevices());
+    } catch (error) {
+      setDeviceScanError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDeviceScanBusy(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -422,7 +460,7 @@ export function FieldApp({
           <section id="device" className="field-section" aria-labelledby="field-device-title">
             <header><div><h2 id="field-device-title">{copy.deviceTitle}</h2><p>{copy.deviceBody}</p></div><RadioTower /></header>
             <div className="field-observation-toolbar">
-              <div><span>{copy.source}</span><strong>{copy.sourceValue}</strong></div>
+              <div><span>{copy.source}</span><strong>{deviceReport?.source ?? copy.sourceValue}</strong></div>
               <label>
                 <span>{copy.observation}</span>
                 <select
@@ -434,7 +472,29 @@ export function FieldApp({
                   ))}
                 </select>
               </label>
+              <button
+                type="button"
+                className="field-device-scan"
+                disabled={!isDesktopRuntime() || deviceScanBusy}
+                title={!isDesktopRuntime() ? copy.scanUnavailable : copy.scanBoundary}
+                onClick={() => void scanDevices()}
+              >
+                <RefreshCw className={deviceScanBusy ? "field-auth-spinner" : undefined} aria-hidden="true" />
+                {deviceScanBusy ? copy.scanning : copy.scan}
+              </button>
             </div>
+            <p className="field-device-scan-boundary">{copy.scanBoundary}</p>
+            {deviceScanError ? <p className="field-device-scan-error" role="alert">{deviceScanError}</p> : null}
+            {deviceReport ? (
+              <div className="field-device-observations" role="status" data-authority="false">
+                <strong>{copy.observedPorts}</strong>
+                {deviceReport.devices.length === 0
+                  ? <span>{copy.noPorts}</span>
+                  : deviceReport.devices.map((device) => (
+                    <span key={device.observationId}><code>{device.portName}</code>{device.validationStatus}</span>
+                  ))}
+              </div>
+            ) : null}
             <p className="field-observation-result" role="status">
               <CircleOff aria-hidden="true" />
               <strong>{copy.states[observationState]}</strong>
@@ -513,6 +573,14 @@ export function FieldApp({
                 </tbody>
               </table>
             </div>
+          </section>
+
+          <section id="tuning" className="field-section field-tuning-section" aria-labelledby="field-tuning-title">
+            <FieldTuningWorkspace
+              locale={locale}
+              selectedPackId={selectedPackId}
+              selectedControllerId={selectedControllerKey}
+            />
           </section>
 
           <section id="recovery" className="field-section" aria-labelledby="field-recovery-title">

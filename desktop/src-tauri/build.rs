@@ -158,6 +158,10 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
     println!("cargo:rustc-env=DRONEDREAM_DESKTOP_EDITION_ID={edition_id}");
     println!("cargo:rustc-env=DRONEDREAM_EDITION_PROFILE={edition_profile}");
     println!("cargo:rustc-env=DRONEDREAM_OAUTH_CLIENT_ID={oauth_client_id}");
+    println!("cargo:rustc-check-cfg=cfg(dronedream_field)");
+    if edition_id == "field" {
+        println!("cargo:rustc-cfg=dronedream_field");
+    }
     edition_profile
 }
 

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-tuning-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "field",
+  "executionDomain": "real-hardware",
+  "simulationAllowed": false,
+  "model": {
+    "role": "propose-candidates-and-experiment-strategy",
+    "directHardwareAuthority": false,
+    "receives": [
+      "structured-objective",
+      "bounded-parameter-domain",
+      "prior-trial-evidence",
+      "failure-taxonomy",
+      "telemetry-summary"
+    ]
+  },
+  "harness": {
+    "role": "bounded-execution-evidence-qualification-and-rollback",
+    "phases": [
+      "snapshot",
+      "candidate-validation",
+      "operator-confirmation",
+      "controlled-trial",
+      "telemetry-capture",
+      "scoring",
+      "failure-classification",
+      "reflection",
+      "qualification",
+      "independent-holdout",
+      "publish-or-rollback"
+    ],
+    "failClosed": true,
+    "candidateWritesAreTransactional": true,
+    "independentHoldoutRequired": true
+  },
+  "authority": {
+    "frontendGrantsAuthority": false,
+    "modelGrantsAuthority": false,
+    "requiredLayers": ["native", "backend", "runtime", "operator"],
+    "zeroValidatedPackDecision": "deny",
+    "deviceDiscoveryGrantsAuthority": false
+  },
+  "requiredSafetyEvidence": [
+    "validated-vehicle-pack",
+    "controller-and-firmware-match",
+    "parameter-snapshot",
+    "transaction-rollback",
+    "operator-confirmation",
+    "preflight",
+    "safety-zone",
+    "control-takeover",
+    "emergency-stop"
+  ],
+  "demo": {
+    "executionMode": "fixture-only-no-device-io",
+    "hardwareEvidenceValid": false,
+    "hardwareAuthority": false
+  }
+}

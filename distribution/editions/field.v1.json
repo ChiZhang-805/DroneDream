@@ -5,12 +5,12 @@
   "editionVersion": "1.0.0",
   "productDisplayVersion": "1.0.0",
   "displayName": {
-    "en": "DroneDream Field",
-    "zh-CN": "DroneDream 真机轻量版"
+    "en": "DroneDream · FIELD",
+    "zh-CN": "DroneDream · FIELD"
   },
   "description": {
-    "en": "A lightweight hardware and ground-station edition that omits Gazebo while retaining qualification and preflight safety contracts.",
-    "zh-CN": "不安装大型 Gazebo 的轻量真机与地面站版本，同时保留可信资格回执和规定安全预检。"
+    "en": "A real-device edition for aircraft operations and safety-bounded autonomous parameter tuning with no simulation stage.",
+    "zh-CN": "完全用于真机操作和安全边界内自主参数调优的版本，不包含任何仿真阶段。"
   },
   "implementationStatus": "contract-only",
   "validationTier": "contract-only",
@@ -61,7 +61,7 @@
   },
   "runtimeProfile": {
     "profileId": "lightweight-hardware",
-    "currentAvailability": "contract-only",
+    "currentAvailability": "implemented",
     "includesLargeSimulator": false
   },
   "qualification": {
@@ -84,8 +84,8 @@
     "forcePushAllowed": false
   },
   "knownGaps": [
-    "The current Runtime Base is a full simulation image; the lightweight hardware profile does not yet exist.",
-    "No real-hardware capability is implemented or validated by this manifest alone.",
-    "A dedicated Field installer, hardware bridge, and promotion manifest have not yet been built or published."
+    "No Vehicle Pack currently has the hardware-validated tier, so real parameter writes, arm, and flight remain denied.",
+    "The deterministic tuning demo is not hardware evidence and cannot authorize a device.",
+    "Real-device transport and lifecycle acceptance require validated hardware evidence before release promotion."
   ]
 }
