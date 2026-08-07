@@ -119,6 +119,8 @@ pub fn run() {
         field_adapters::probe_field_mavlink_telemetry,
         field_device::discover_field_devices,
         field_recovery::create_field_parameter_snapshot,
+        field_recovery::list_field_parameter_snapshots,
+        field_recovery::load_field_parameter_snapshot,
         field_recovery::compare_field_parameter_snapshot,
         field_recovery::prepare_field_parameter_rollback,
         field_tuning::get_field_tuning_status,

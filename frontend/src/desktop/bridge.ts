@@ -391,6 +391,25 @@ export interface FieldParameterSnapshot {
   hardwareAuthority: false;
 }
 
+export interface FieldParameterSnapshotSummary {
+  schemaVersion: 1;
+  kind: "dronedream-field-parameter-snapshot-summary";
+  editionId: "field";
+  sourceCommit: string;
+  deviceObservationId: string;
+  vehiclePackId: string;
+  controllerId: string;
+  firmwareVersion: string;
+  adapterId: string;
+  observationSha256: string;
+  parameterCount: number;
+  parameterSetSha256: string;
+  snapshotSha256: string;
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+  hardwareAuthority: false;
+}
+
 export interface FieldParameterDiffRequest {
   snapshotSha256: string;
   currentParameters: Record<string, number>;
@@ -874,6 +893,21 @@ export function createFieldParameterSnapshot(
   validateFieldSnapshotRequest(request);
   return invokeDesktop("create_field_parameter_snapshot", parseFieldParameterSnapshot, {
     request,
+  });
+}
+
+export function listFieldParameterSnapshots(): Promise<FieldParameterSnapshotSummary[]> {
+  return invokeDesktop("list_field_parameter_snapshots", parseFieldParameterSnapshotSummaries);
+}
+
+export function loadFieldParameterSnapshot(
+  snapshotSha256: string,
+): Promise<FieldParameterSnapshot> {
+  if (!/^[a-f0-9]{64}$/.test(snapshotSha256)) {
+    return Promise.reject(new Error("Field parameter snapshot hash is invalid."));
+  }
+  return invokeDesktop("load_field_parameter_snapshot", parseFieldParameterSnapshot, {
+    request: { snapshotSha256 },
   });
 }
 
@@ -2651,6 +2685,95 @@ function parseFieldParameterSnapshot(value: unknown): FieldParameterSnapshot {
     hardwareWriteAttempts: expectLiteral(record.hardwareWriteAttempts, 0, `${path}.hardwareWriteAttempts`),
     hardwareAuthority: expectLiteral(record.hardwareAuthority, false, `${path}.hardwareAuthority`),
   };
+}
+
+function parseFieldParameterSnapshotSummary(
+  value: unknown,
+  index: number,
+): FieldParameterSnapshotSummary {
+  const path = `fieldParameterSnapshotSummaries[${index}]`;
+  const record = expectExactRecord(value, path, [
+    "schemaVersion", "kind", "editionId", "sourceCommit", "deviceObservationId",
+    "vehiclePackId", "controllerId", "firmwareVersion", "adapterId",
+    "observationSha256", "parameterCount", "parameterSetSha256", "snapshotSha256",
+    "deviceOpenAttempts", "hardwareWriteAttempts", "hardwareAuthority",
+  ]);
+  const parameterCount = expectBoundedNonNegativeInteger(
+    record.parameterCount,
+    `${path}.parameterCount`,
+    256,
+  );
+  if (parameterCount === 0) {
+    throw new Error(`${path}.parameterCount must be positive`);
+  }
+  return {
+    schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
+    kind: expectLiteral(
+      record.kind,
+      "dronedream-field-parameter-snapshot-summary",
+      `${path}.kind`,
+    ),
+    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    sourceCommit: expectLowercaseHex(record.sourceCommit, `${path}.sourceCommit`, 40),
+    deviceObservationId: parseFieldRecoveryIdentity(
+      record.deviceObservationId,
+      `${path}.deviceObservationId`,
+    ),
+    vehiclePackId: parseFieldRecoveryIdentity(record.vehiclePackId, `${path}.vehiclePackId`),
+    controllerId: parseFieldRecoveryIdentity(record.controllerId, `${path}.controllerId`),
+    firmwareVersion: parseFieldRecoveryIdentity(
+      record.firmwareVersion,
+      `${path}.firmwareVersion`,
+    ),
+    adapterId: expectIdentifier(record.adapterId, `${path}.adapterId`),
+    observationSha256: expectLowercaseHex(
+      record.observationSha256,
+      `${path}.observationSha256`,
+      64,
+    ),
+    parameterCount,
+    parameterSetSha256: expectLowercaseHex(
+      record.parameterSetSha256,
+      `${path}.parameterSetSha256`,
+      64,
+    ),
+    snapshotSha256: expectLowercaseHex(
+      record.snapshotSha256,
+      `${path}.snapshotSha256`,
+      64,
+    ),
+    deviceOpenAttempts: expectLiteral(
+      record.deviceOpenAttempts,
+      0,
+      `${path}.deviceOpenAttempts`,
+    ),
+    hardwareWriteAttempts: expectLiteral(
+      record.hardwareWriteAttempts,
+      0,
+      `${path}.hardwareWriteAttempts`,
+    ),
+    hardwareAuthority: expectLiteral(
+      record.hardwareAuthority,
+      false,
+      `${path}.hardwareAuthority`,
+    ),
+  };
+}
+
+function parseFieldParameterSnapshotSummaries(
+  value: unknown,
+): FieldParameterSnapshotSummary[] {
+  const records = expectArray(value, "fieldParameterSnapshotSummaries");
+  if (records.length > 128) {
+    throw new Error("fieldParameterSnapshotSummaries exceeds its bounded length");
+  }
+  const summaries = records.map(parseFieldParameterSnapshotSummary);
+  if (summaries.some((summary, index) => (
+    index > 0 && summaries[index - 1]!.snapshotSha256 >= summary.snapshotSha256
+  ))) {
+    throw new Error("fieldParameterSnapshotSummaries is not strictly ordered");
+  }
+  return summaries;
 }
 
 function parseFieldParameterDiffReceipt(value: unknown): FieldParameterDiffReceipt {

@@ -4,20 +4,25 @@ import {
   Braces,
   Check,
   FileDiff,
+  FolderOpen,
   HardDrive,
+  RefreshCw,
   RotateCcw,
   ShieldCheck,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   compareFieldParameterSnapshot,
   createFieldParameterSnapshot,
   isDesktopRuntime,
+  listFieldParameterSnapshots,
+  loadFieldParameterSnapshot,
   prepareFieldParameterRollback,
   type FieldDiscoveredDevice,
   type FieldParameterDiffReceipt,
   type FieldParameterSnapshot,
+  type FieldParameterSnapshotSummary,
   type FieldRollbackPlan,
 } from "../desktop/bridge";
 import type { FieldLocale } from "./catalog";
@@ -33,6 +38,10 @@ const COPY = {
     baseline: "Baseline parameters (JSON)",
     current: "Current parameters (JSON)",
     capture: "Save snapshot",
+    history: "Saved snapshots for this aircraft",
+    historyEmpty: "No compatible saved snapshots",
+    refreshHistory: "Refresh saved snapshots",
+    loadHistory: "Load snapshot",
     compare: "Compare drift",
     rollback: "Prepare rollback",
     snapshot: "Snapshot",
@@ -46,6 +55,7 @@ const COPY = {
     denied: "Rollback execution denied",
     unavailable: "Snapshot tools are available in the installed Field app.",
     invalid: "Enter a JSON object containing 1 to 256 finite numeric parameters.",
+    mismatch: "The saved snapshot does not match the selected Vehicle Pack and controller.",
     evidence: "Imported values are evidence only. Saving, comparing, or planning never opens a device or grants hardware authority.",
   },
   "zh-CN": {
@@ -57,6 +67,10 @@ const COPY = {
     baseline: "基线参数（JSON）",
     current: "当前参数（JSON）",
     capture: "保存快照",
+    history: "此无人机的已保存快照",
+    historyEmpty: "没有兼容的已保存快照",
+    refreshHistory: "刷新已保存快照",
+    loadHistory: "加载快照",
     compare: "比较差异",
     rollback: "准备回滚",
     snapshot: "快照",
@@ -70,6 +84,7 @@ const COPY = {
     denied: "回滚执行已拒绝",
     unavailable: "快照工具仅在已安装的 Field 应用中可用。",
     invalid: "请输入包含 1 到 256 个有限数值参数的 JSON 对象。",
+    mismatch: "已保存快照与当前选择的机型包和飞控不匹配。",
     evidence: "导入值仅作为证据。保存、比较或规划不会打开设备，也不会授予真机权限。",
   },
 } as const;
@@ -127,6 +142,9 @@ export function FieldRecoveryWorkspace({
   const [baselineText, setBaselineText] = useState(DEFAULT_PARAMETERS);
   const [currentText, setCurrentText] = useState(DEFAULT_PARAMETERS);
   const [snapshot, setSnapshot] = useState<FieldParameterSnapshot | null>(null);
+  const [history, setHistory] = useState<FieldParameterSnapshotSummary[]>([]);
+  const [selectedHistorySha, setSelectedHistorySha] = useState("");
+  const [historyBusy, setHistoryBusy] = useState(false);
   const [diff, setDiff] = useState<FieldParameterDiffReceipt | null>(null);
   const [rollback, setRollback] = useState<FieldRollbackPlan | null>(null);
   const [busy, setBusy] = useState<"snapshot" | "diff" | "rollback" | null>(null);
@@ -141,6 +159,46 @@ export function FieldRecoveryWorkspace({
     setObservationSha256(evidence.observationSha256);
     setAdapterId(evidence.adapterId);
   }, [evidence]);
+
+  const refreshHistory = useCallback(async () => {
+    if (!desktop) return;
+    setHistoryBusy(true);
+    try {
+      setHistory(await listFieldParameterSnapshots());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setHistoryBusy(false);
+    }
+  }, [desktop]);
+
+  useEffect(() => {
+    void refreshHistory();
+  }, [refreshHistory]);
+
+  const compatibleHistory = useMemo(
+    () => history.filter((entry) => (
+      entry.vehiclePackId === selectedPackId && entry.controllerId === selectedControllerId
+    )),
+    [history, selectedControllerId, selectedPackId],
+  );
+
+  useEffect(() => {
+    if (!compatibleHistory.some((entry) => entry.snapshotSha256 === selectedHistorySha)) {
+      setSelectedHistorySha(compatibleHistory[0]?.snapshotSha256 ?? "");
+    }
+  }, [compatibleHistory, selectedHistorySha]);
+
+  useEffect(() => {
+    if (
+      snapshot
+      && (snapshot.vehiclePackId !== selectedPackId || snapshot.controllerId !== selectedControllerId)
+    ) {
+      setSnapshot(null);
+      setDiff(null);
+      setRollback(null);
+    }
+  }, [selectedControllerId, selectedPackId, snapshot]);
 
   const observationValid = /^[a-f0-9]{64}$/.test(observationSha256);
   const identity = useMemo(() => ({
@@ -173,12 +231,63 @@ export function FieldRecoveryWorkspace({
       setSnapshot(next);
       onSnapshotCreated?.(next);
       setCurrentText(JSON.stringify(parameters, null, 2));
+      setHistory((current) => {
+        const summary: FieldParameterSnapshotSummary = {
+          schemaVersion: 1,
+          kind: "dronedream-field-parameter-snapshot-summary",
+          editionId: "field",
+          sourceCommit: next.sourceCommit,
+          deviceObservationId: next.deviceObservationId,
+          vehiclePackId: next.vehiclePackId,
+          controllerId: next.controllerId,
+          firmwareVersion: next.firmwareVersion,
+          adapterId: next.adapterId,
+          observationSha256: next.observationSha256,
+          parameterCount: next.parameterCount,
+          parameterSetSha256: next.parameterSetSha256,
+          snapshotSha256: next.snapshotSha256,
+          deviceOpenAttempts: 0,
+          hardwareWriteAttempts: 0,
+          hardwareAuthority: false,
+        };
+        return [...current.filter((entry) => entry.snapshotSha256 !== next.snapshotSha256), summary]
+          .sort((left, right) => left.snapshotSha256.localeCompare(right.snapshotSha256));
+      });
+      setSelectedHistorySha(next.snapshotSha256);
     } catch (reason) {
       setError(reason instanceof SyntaxError || (reason instanceof Error && /shape|count|parameter/.test(reason.message))
         ? copy.invalid
         : reason instanceof Error ? reason.message : String(reason));
     } finally {
       setBusy(null);
+    }
+  };
+
+  const loadSelectedSnapshot = async () => {
+    if (!selectedHistorySha) return;
+    setHistoryBusy(true);
+    setError(null);
+    setDiff(null);
+    setRollback(null);
+    try {
+      const loaded = await loadFieldParameterSnapshot(selectedHistorySha);
+      if (
+        loaded.vehiclePackId !== selectedPackId
+        || loaded.controllerId !== selectedControllerId
+      ) {
+        throw new Error(copy.mismatch);
+      }
+      setSnapshot(loaded);
+      setObservationSha256(loaded.observationSha256);
+      setFirmwareVersion(loaded.firmwareVersion);
+      setAdapterId(loaded.adapterId);
+      setBaselineText(JSON.stringify(loaded.parameters, null, 2));
+      setCurrentText(JSON.stringify(loaded.parameters, null, 2));
+      onSnapshotCreated?.(loaded);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setHistoryBusy(false);
     }
   };
 
@@ -229,6 +338,37 @@ export function FieldRecoveryWorkspace({
       </header>
       <p className="field-inline-boundary"><ShieldCheck aria-hidden="true" />{copy.evidence}</p>
       {!desktop ? <p className="field-adapter-offline"><Ban aria-hidden="true" />{copy.unavailable}</p> : null}
+
+      <div className="field-recovery-history" data-authority="false">
+        <label>
+          <span>{copy.history}</span>
+          <select
+            value={selectedHistorySha}
+            disabled={!desktop || historyBusy || compatibleHistory.length === 0}
+            onChange={(event) => setSelectedHistorySha(event.target.value)}
+          >
+            {compatibleHistory.length === 0 ? <option value="">{copy.historyEmpty}</option> : null}
+            {compatibleHistory.map((entry) => (
+              <option key={entry.snapshotSha256} value={entry.snapshotSha256}>
+                {entry.firmwareVersion} · {entry.parameterCount} · {shortHash(entry.snapshotSha256)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="field-icon-command"
+          aria-label={copy.refreshHistory}
+          title={copy.refreshHistory}
+          disabled={!desktop || historyBusy}
+          onClick={() => void refreshHistory()}
+        ><RefreshCw aria-hidden="true" /></button>
+        <button
+          type="button"
+          disabled={!desktop || historyBusy || !selectedHistorySha}
+          onClick={() => void loadSelectedSnapshot()}
+        ><FolderOpen aria-hidden="true" />{copy.loadHistory}</button>
+      </div>
 
       <div className="field-recovery-identity">
         <label><span>{copy.observation}</span><input value={observationSha256} maxLength={64} spellCheck={false} onChange={(event) => setObservationSha256(event.target.value.trim().toLowerCase())} /></label>

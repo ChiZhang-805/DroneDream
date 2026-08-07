@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FieldRecoveryWorkspace } from "../field/FieldRecoveryWorkspace";
@@ -6,6 +6,8 @@ import { FieldRecoveryWorkspace } from "../field/FieldRecoveryWorkspace";
 const bridge = vi.hoisted(() => ({
   compare: vi.fn(),
   create: vi.fn(),
+  list: vi.fn(),
+  load: vi.fn(),
   rollback: vi.fn(),
 }));
 
@@ -15,6 +17,8 @@ vi.mock("../desktop/bridge", async (importOriginal) => {
     ...original,
     isDesktopRuntime: () => true,
     createFieldParameterSnapshot: bridge.create,
+    listFieldParameterSnapshots: bridge.list,
+    loadFieldParameterSnapshot: bridge.load,
     compareFieldParameterSnapshot: bridge.compare,
     prepareFieldParameterRollback: bridge.rollback,
   };
@@ -45,6 +49,25 @@ const snapshot = {
 describe("FieldRecoveryWorkspace", () => {
   beforeEach(() => {
     bridge.create.mockReset().mockResolvedValue(snapshot);
+    bridge.list.mockReset().mockResolvedValue([{
+      schemaVersion: 1,
+      kind: "dronedream-field-parameter-snapshot-summary",
+      editionId: "field",
+      sourceCommit: snapshot.sourceCommit,
+      deviceObservationId: snapshot.deviceObservationId,
+      vehiclePackId: snapshot.vehiclePackId,
+      controllerId: snapshot.controllerId,
+      firmwareVersion: snapshot.firmwareVersion,
+      adapterId: snapshot.adapterId,
+      observationSha256: snapshot.observationSha256,
+      parameterCount: snapshot.parameterCount,
+      parameterSetSha256: snapshot.parameterSetSha256,
+      snapshotSha256: snapshot.snapshotSha256,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      hardwareAuthority: false,
+    }]);
+    bridge.load.mockReset().mockResolvedValue(snapshot);
     bridge.compare.mockReset().mockResolvedValue({
       schemaVersion: 1,
       kind: "dronedream-field-parameter-diff",
@@ -74,6 +97,30 @@ describe("FieldRecoveryWorkspace", () => {
         "field.snapshot.rollback-write-disabled",
       ],
     });
+  });
+
+  it("reloads a compatible persisted snapshot without hardware authority", async () => {
+    const onSnapshotCreated = vi.fn();
+    const { container } = render(
+      <FieldRecoveryWorkspace
+        locale="en"
+        selectedPackId="holybro-x500-v2-pixhawk6"
+        selectedControllerId="Holybro::Pixhawk 6C"
+        onSnapshotCreated={onSnapshotCreated}
+      />,
+    );
+
+    const history = await screen.findByRole("combobox", {
+      name: "Saved snapshots for this aircraft",
+    });
+    expect(history).toHaveValue(snapshot.snapshotSha256);
+    fireEvent.click(screen.getByRole("button", { name: "Load snapshot" }));
+
+    await waitFor(() => expect(bridge.load).toHaveBeenCalledWith(snapshot.snapshotSha256));
+    expect(await screen.findByText("dddddddddd...dddddddd")).toBeInTheDocument();
+    expect(onSnapshotCreated).toHaveBeenCalledWith(snapshot);
+    expect(container.querySelector("[data-authority='false'][data-hardware-write-attempts='0']"))
+      .toBeTruthy();
   });
 
   it("captures, compares, and prepares only a denied rollback plan", async () => {

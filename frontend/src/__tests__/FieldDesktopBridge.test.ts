@@ -9,6 +9,8 @@ import {
   inspectFieldAdapterFrame,
   inspectFieldProtocolFrame,
   installFieldAdapter,
+  listFieldParameterSnapshots,
+  loadFieldParameterSnapshot,
   probeFieldMavlinkTelemetry,
   prepareFieldHardwareTuning,
   prepareFieldParameterRollback,
@@ -251,6 +253,24 @@ describe("Field desktop bridge", () => {
       hardwareAuthority: false,
     };
     const changes = [{ name: "MC_ROLL_P", before: 6.5, after: 6.8, delta: 0.3 }];
+    const summary = {
+      schemaVersion: 1,
+      kind: "dronedream-field-parameter-snapshot-summary",
+      editionId: "field",
+      sourceCommit: snapshot.sourceCommit,
+      deviceObservationId: snapshot.deviceObservationId,
+      vehiclePackId: snapshot.vehiclePackId,
+      controllerId: snapshot.controllerId,
+      firmwareVersion: snapshot.firmwareVersion,
+      adapterId: snapshot.adapterId,
+      observationSha256: snapshot.observationSha256,
+      parameterCount: snapshot.parameterCount,
+      parameterSetSha256: snapshot.parameterSetSha256,
+      snapshotSha256: snapshot.snapshotSha256,
+      deviceOpenAttempts: 0,
+      hardwareWriteAttempts: 0,
+      hardwareAuthority: false,
+    };
     const diff = {
       schemaVersion: 1,
       kind: "dronedream-field-parameter-diff",
@@ -289,6 +309,8 @@ describe("Field desktop bridge", () => {
     };
     const invoke = vi.fn(async (command: string) => {
       if (command === "create_field_parameter_snapshot") return snapshot;
+      if (command === "list_field_parameter_snapshots") return [summary];
+      if (command === "load_field_parameter_snapshot") return snapshot;
       if (command === "compare_field_parameter_snapshot") return diff;
       return rollback;
     });
@@ -304,6 +326,13 @@ describe("Field desktop bridge", () => {
       parameters,
     };
     await expect(createFieldParameterSnapshot(snapshotRequest)).resolves.toEqual(snapshot);
+    await expect(listFieldParameterSnapshots()).resolves.toEqual([summary]);
+    await expect(loadFieldParameterSnapshot(snapshot.snapshotSha256)).resolves.toEqual(snapshot);
+    await expect(loadFieldParameterSnapshot("invalid")).rejects.toThrow(/hash/i);
+    invoke.mockResolvedValueOnce([{ ...summary, parameterCount: 0 }]);
+    await expect(listFieldParameterSnapshots()).rejects.toThrow(/positive/i);
+    invoke.mockResolvedValueOnce([summary, summary]);
+    await expect(listFieldParameterSnapshots()).rejects.toThrow(/ordered/i);
     const diffRequest = { snapshotSha256: "d".repeat(64), currentParameters: { ...parameters, MC_ROLL_P: 6.8 } };
     await expect(compareFieldParameterSnapshot(diffRequest)).resolves.toEqual(diff);
     await expect(prepareFieldParameterRollback(diffRequest)).resolves.toEqual(rollback);

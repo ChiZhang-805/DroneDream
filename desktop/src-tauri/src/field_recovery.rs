@@ -52,6 +52,33 @@ pub(crate) struct FieldParameterSnapshot {
     hardware_authority: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FieldParameterSnapshotSummary {
+    schema_version: u8,
+    kind: &'static str,
+    edition_id: &'static str,
+    source_commit: String,
+    device_observation_id: String,
+    vehicle_pack_id: String,
+    controller_id: String,
+    firmware_version: String,
+    adapter_id: String,
+    observation_sha256: String,
+    parameter_count: usize,
+    parameter_set_sha256: String,
+    snapshot_sha256: String,
+    device_open_attempts: u8,
+    hardware_write_attempts: u8,
+    hardware_authority: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct FieldParameterSnapshotLoadRequest {
+    snapshot_sha256: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct FieldParameterDiffRequest {
@@ -357,6 +384,66 @@ fn load_snapshot(root: &Path, snapshot_sha256: &str) -> Result<FieldParameterSna
     Ok(snapshot)
 }
 
+fn snapshot_summary(snapshot: FieldParameterSnapshot) -> FieldParameterSnapshotSummary {
+    FieldParameterSnapshotSummary {
+        schema_version: 1,
+        kind: "dronedream-field-parameter-snapshot-summary",
+        edition_id: "field",
+        source_commit: snapshot.source_commit,
+        device_observation_id: snapshot.device_observation_id,
+        vehicle_pack_id: snapshot.vehicle_pack_id,
+        controller_id: snapshot.controller_id,
+        firmware_version: snapshot.firmware_version,
+        adapter_id: snapshot.adapter_id,
+        observation_sha256: snapshot.observation_sha256,
+        parameter_count: snapshot.parameter_count,
+        parameter_set_sha256: snapshot.parameter_set_sha256,
+        snapshot_sha256: snapshot.snapshot_sha256,
+        device_open_attempts: 0,
+        hardware_write_attempts: 0,
+        hardware_authority: false,
+    }
+}
+
+fn list_snapshots_at(root: &Path) -> Result<Vec<FieldParameterSnapshotSummary>, String> {
+    ensure_plain_directory(root)?;
+    let mut hashes = Vec::new();
+    for entry in fs::read_dir(root)
+        .map_err(|error| format!("Unable to list Field parameter snapshots: {error}"))?
+    {
+        let entry = entry
+            .map_err(|error| format!("Unable to inspect Field parameter snapshot: {error}"))?;
+        let path = entry.path();
+        if hashes.len() >= 128 {
+            return Err("Field parameter snapshot history exceeds its bound".to_string());
+        }
+        if !entry
+            .file_type()
+            .map_err(|error| format!("Unable to inspect Field snapshot type: {error}"))?
+            .is_file()
+            || contains_reparse_point(&path)?
+        {
+            return Err("Field parameter snapshot history contains an unsafe entry".to_string());
+        }
+        let name = entry
+            .file_name()
+            .into_string()
+            .map_err(|_| "Field parameter snapshot filename is not UTF-8".to_string())?;
+        let hash = name
+            .strip_suffix(".json")
+            .filter(|value| valid_hash(value))
+            .ok_or_else(|| {
+                "Field parameter snapshot history contains an unknown filename".to_string()
+            })?;
+        hashes.push(hash.to_string());
+    }
+    hashes.sort();
+    hashes
+        .into_iter()
+        .map(|hash| load_snapshot(root, &hash).map(snapshot_summary))
+        .collect()
+}
+
 pub(crate) fn resolve_field_snapshot_binding(
     app: &AppHandle,
     snapshot_sha256: &str,
@@ -471,6 +558,21 @@ pub(crate) fn create_field_parameter_snapshot(
 }
 
 #[tauri::command]
+pub(crate) fn list_field_parameter_snapshots(
+    app: AppHandle,
+) -> Result<Vec<FieldParameterSnapshotSummary>, String> {
+    list_snapshots_at(&snapshot_root(&app)?)
+}
+
+#[tauri::command]
+pub(crate) fn load_field_parameter_snapshot(
+    app: AppHandle,
+    request: FieldParameterSnapshotLoadRequest,
+) -> Result<FieldParameterSnapshot, String> {
+    load_snapshot(&snapshot_root(&app)?, &request.snapshot_sha256)
+}
+
+#[tauri::command]
 pub(crate) fn compare_field_parameter_snapshot(
     app: AppHandle,
     request: FieldParameterDiffRequest,
@@ -555,6 +657,51 @@ mod tests {
         assert!(plan
             .blockers
             .contains(&"field.registry.zero-validated-packs".to_string()));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn history_lists_and_loads_only_content_bound_snapshots() {
+        let root = sandbox("history");
+        fs::create_dir(&root).unwrap();
+        let first = create_snapshot_at(&root, request()).unwrap();
+        let mut second_request = request();
+        second_request.firmware_version = "PX4 1.16.1".to_string();
+        second_request
+            .parameters
+            .insert("MC_ROLL_P".to_string(), 6.7);
+        let second = create_snapshot_at(&root, second_request).unwrap();
+
+        let history = list_snapshots_at(&root).unwrap();
+        assert_eq!(history.len(), 2);
+        assert!(history
+            .windows(2)
+            .all(|pair| pair[0].snapshot_sha256 < pair[1].snapshot_sha256));
+        assert!(history.iter().all(|summary| {
+            summary.device_open_attempts == 0
+                && summary.hardware_write_attempts == 0
+                && !summary.hardware_authority
+        }));
+        assert_eq!(
+            load_snapshot(&root, &second.snapshot_sha256)
+                .unwrap()
+                .parameters["MC_ROLL_P"],
+            6.7
+        );
+        assert!(history
+            .iter()
+            .any(|summary| summary.snapshot_sha256 == first.snapshot_sha256));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn history_rejects_unknown_entries_instead_of_hiding_them() {
+        let root = sandbox("history-negative");
+        fs::create_dir(&root).unwrap();
+        create_snapshot_at(&root, request()).unwrap();
+        fs::write(root.join("unexpected.txt"), b"not snapshot evidence").unwrap();
+        let error = list_snapshots_at(&root).expect_err("unknown evidence must fail closed");
+        assert!(error.contains("unknown filename"));
         fs::remove_dir_all(root).unwrap();
     }
 
