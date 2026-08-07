@@ -66,6 +66,7 @@
     "mayIssueSimulationReceipt": true,
     "mayConsumeTrustedReceipt": true,
     "closedLoopContract": "distribution/editions/lab/model-harness-closed-loop.v1.json",
+    "simFieldIntegrationContract": "distribution/editions/lab/sim-field-integration.v1.json",
     "sameJobBidirectionalCalibrationRequired": true,
     "independentHoldoutRequired": true,
     "hardwareActionRule": "trusted-sim-or-hitl-receipt-or-prescribed-preflight",

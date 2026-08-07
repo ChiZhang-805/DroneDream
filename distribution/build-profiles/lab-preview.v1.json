@@ -22,7 +22,8 @@
     "coexistenceAndAuth": "distribution/editions/lab/coexistence-and-auth.v1.json",
     "universalDonorRequests": "distribution/editions/lab/universal-donor-requests.v1.json",
     "safetyOauthSourceReadiness": "distribution/editions/lab/safety-oauth-source-readiness.v1.json",
-    "modelHarnessClosedLoop": "distribution/editions/lab/model-harness-closed-loop.v1.json"
+    "modelHarnessClosedLoop": "distribution/editions/lab/model-harness-closed-loop.v1.json",
+    "simFieldIntegration": "distribution/editions/lab/sim-field-integration.v1.json"
   },
   "commonCore": {
     "authorityName": "Universal/Core",
@@ -66,6 +67,7 @@
     "distribution/tests/test_lab_brand_assets.py",
     "distribution/tests/test_lab_coexistence_contract.py",
     "distribution/tests/test_lab_model_harness_contract.py",
+    "distribution/tests/test_lab_sim_field_integration.py",
     "distribution/tests/test_lab_preview_contract.py",
     "distribution/tests/test_lab_safety_oauth_readiness.py",
     "distribution/tests/test_lab_website_handoff.py",
@@ -73,6 +75,7 @@
     "distribution/tools/lab_preinstall_acceptance.py",
     "distribution/tools/verify_lab_coexistence_contract.py",
     "distribution/tools/verify_lab_model_harness_contract.py",
+    "distribution/tools/verify_lab_sim_field_integration.py",
     "distribution/tools/verify_lab_preview_artifact.py",
     "distribution/tools/verify_lab_preview_contract.py",
     "distribution/tools/verify_lab_safety_oauth_readiness.py",
