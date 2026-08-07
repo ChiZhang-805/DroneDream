@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-simulation-qualification-receipt",
+  "testOnly": true,
+  "source": {
+    "editionId": "sim",
+    "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9"
+  },
+  "vehicle": {
+    "packId": "px4-gazebo-x500-reference"
+  },
+  "qualification": {
+    "level": "sim",
+    "decision": "pass",
+    "evidenceHash": "1111111111111111111111111111111111111111111111111111111111111111",
+    "holdoutContractHash": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "parameterCandidate": {
+    "hash": "d4bb303ead211a98d99d03e69399fe8f604d640ffe837b974c9533065e5ebf23",
+    "parameters": [
+      {"name": "MC_PITCH_P", "value": 6.4, "unit": null},
+      {"name": "MC_ROLL_P", "value": 6.4, "unit": null},
+      {"name": "MPC_XY_VEL_P_ACC", "value": 1.8, "unit": null}
+    ]
+  }
+}

@@ -27,6 +27,10 @@ describe("Lab calibration workspace", () => {
     expect(root).toHaveAttribute("data-grants-hardware-authority", "false");
     expect(screen.getByText("Proposal only")).toBeInTheDocument();
     expect(screen.getByText("Constraints enforced")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "SIM / FIELD evidence bridge" }))
+      .toBeInTheDocument();
+    expect(screen.getByText("Evidence import never grants hardware authority."))
+      .toBeInTheDocument();
 
     const file = new File([JSON.stringify(fixture)], "lab-cycle.fake.json", {
       type: "application/json",
@@ -40,7 +44,9 @@ describe("Lab calibration workspace", () => {
     expect(screen.getByRole("button", { name: "DENY" })).toBeDisabled();
     expect(screen.getByRole("link", { name: /Open simulation optimization/ }))
       .toHaveAttribute("href", "/jobs/new");
-    const progression = screen.getByRole("list");
+    const progression = container.querySelector<HTMLOListElement>(".lab-stage-list");
+    expect(progression).not.toBeNull();
+    if (!progression) throw new Error("Lab workflow progression is missing.");
     expect(within(progression).getByText("Model calibration")).toBeInTheDocument();
     expect(within(progression).getByText("Independent holdout")).toBeInTheDocument();
   });
@@ -66,5 +72,7 @@ describe("Lab calibration workspace", () => {
     expect(screen.getByText("仅提出建议")).toBeInTheDocument();
     expect(screen.getByText("强制约束")).toBeInTheDocument();
     expect(screen.getByText("真机权限")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "SIM / FIELD 证据桥" }))
+      .toBeInTheDocument();
   });
 });

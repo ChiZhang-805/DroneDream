@@ -24,6 +24,7 @@ import {
   type LabCalibrationInput,
   type LabObjective,
 } from "./calibrationWorkflow";
+import { LabEvidenceBridgePanel } from "./LabEvidenceBridgePanel";
 
 const COPY = {
   en: {
@@ -226,6 +227,8 @@ export function LabCalibrationWorkspace() {
         <span><Gauge aria-hidden="true" /><small>{copy.harness}</small><strong>{copy.harnessState}</strong></span>
         <span className="is-denied"><LockKeyhole aria-hidden="true" /><small>{copy.authority}</small><strong>{copy.authorityState}</strong></span>
       </div>
+
+      <LabEvidenceBridgePanel />
 
       <div className="lab-calibration-controls">
         <label>
