@@ -9,6 +9,9 @@ param(
     [string]$ExpectedEvidenceHead,
 
     [Parameter(Mandatory = $true)]
+    [string]$BoundBuildEvidenceHead,
+
+    [Parameter(Mandatory = $true)]
     [string]$RepoRoot,
 
     [switch]$Plan,
@@ -93,6 +96,8 @@ Assert-Contract ($ExpectedApplicationSha256 -cmatch '^[0-9a-f]{64}$') `
     "Expected application SHA-256 must be lowercase hexadecimal."
 Assert-Contract ($ExpectedEvidenceHead -cmatch '^[0-9a-f]{40}$') `
     "Expected evidence HEAD must be an exact lowercase object ID."
+Assert-Contract ($BoundBuildEvidenceHead -cmatch '^[0-9a-f]{40}$') `
+    "Bound build evidence HEAD must be an exact lowercase object ID."
 Assert-Contract (Test-Path -PathType Container -LiteralPath $RepoRoot) `
     "Evidence repository does not exist."
 Assert-Contract (Test-Path -PathType Leaf -LiteralPath $Application) `
@@ -173,11 +178,17 @@ Assert-Contract ($resolvedProduct -ceq $productCommit) `
 $productTree = Invoke-Git $resolvedRepo @("rev-parse", "$productCommit^{tree}")
 Assert-Contract ($productTree -ceq [string]$document.source.productTree) `
     "Product tree changed."
-$remoteEvidence = Invoke-Git $resolvedRepo @(
-    "rev-parse", "refs/remotes/origin/codex/software-field"
+$resolvedBuildEvidence = Invoke-Git $resolvedRepo @(
+    "rev-parse", "--verify", "$BoundBuildEvidenceHead^{commit}"
 )
-Assert-Contract ($remoteEvidence -ceq $ExpectedEvidenceHead) `
-    "Local authoritative evidence ref changed."
+Assert-Contract ($resolvedBuildEvidence -ceq $BoundBuildEvidenceHead) `
+    "Bound build evidence commit is unavailable."
+Invoke-Git $resolvedRepo @(
+    "merge-base", "--is-ancestor", $productCommit, $BoundBuildEvidenceHead
+) | Out-Null
+Invoke-Git $resolvedRepo @(
+    "merge-base", "--is-ancestor", $BoundBuildEvidenceHead, $ExpectedEvidenceHead
+) | Out-Null
 $originUrl = Invoke-Git $resolvedRepo @("config", "--get", "remote.origin.url")
 Assert-Contract ($originUrl -ceq [string]$document.source.originUrl) `
     "Authoritative origin URL changed."
@@ -209,7 +220,7 @@ if ($Prepare) {
     Invoke-Git $sourceRoot @(
         "update-ref",
         "refs/remotes/origin/codex/software-field",
-        $ExpectedEvidenceHead
+        $BoundBuildEvidenceHead
     ) | Out-Null
     Invoke-Git $sourceRoot @("checkout", "--detach", $productCommit) | Out-Null
 
@@ -234,7 +245,7 @@ if ($Prepare) {
     Assert-Contract ($preparedTree -ceq [string]$document.source.productTree) `
         "Prepared source tree changed."
     Assert-Contract (-not $preparedStatus) "Prepared source is not clean."
-    Assert-Contract ($preparedRemote -ceq $ExpectedEvidenceHead) `
+    Assert-Contract ($preparedRemote -ceq $BoundBuildEvidenceHead) `
         "Prepared evidence ref changed."
     foreach ($entry in @(
         @($desktopLink, $expectedDesktopTarget, "desktop"),
@@ -257,6 +268,7 @@ $result = [ordered]@{
     productSource = $productCommit
     productTree = [string]$document.source.productTree
     evidenceHead = $ExpectedEvidenceHead
+    boundBuildEvidenceHead = $BoundBuildEvidenceHead
     sourceRoot = $sourceRoot
     sourcePreparationOrdinal = 1
     retryMaximum = 0

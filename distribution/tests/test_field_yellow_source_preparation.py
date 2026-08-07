@@ -106,6 +106,7 @@ def _run(application: Path, mode: str) -> subprocess.CompletedProcess[str]:
             "-Application", str(application),
             "-ExpectedApplicationSha256", sha,
             "-ExpectedEvidenceHead", _git("rev-parse", "HEAD"),
+            "-BoundBuildEvidenceHead", EVIDENCE,
             "-RepoRoot", str(ROOT), mode,
         ],
         cwd=ROOT,
@@ -134,6 +135,10 @@ def test_prepare_creates_exact_detached_source_and_junctions(tmp_path: Path) -> 
     assert receipt["decision"] == "prepared-once"
     assert _git_at(source_root, "rev-parse", "HEAD") == PRODUCT
     assert _git_at(source_root, "rev-parse", "HEAD^{tree}") == TREE
+    assert (
+        _git_at(source_root, "rev-parse", "refs/remotes/origin/codex/software-field")
+        == EVIDENCE
+    )
     assert _git_at(source_root, "status", "--porcelain=v1") == ""
     for area in ("desktop", "frontend"):
         item = source_root / area / "node_modules"
