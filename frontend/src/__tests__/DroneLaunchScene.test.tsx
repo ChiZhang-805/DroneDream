@@ -34,6 +34,27 @@ describe("DroneLaunchScene localization", () => {
     expect(scene).toHaveAttribute("data-theme-grants-hardware-authority", "false");
   });
 
+  it("accepts Field telemetry labels without changing the shared scene authority", () => {
+    const { container } = render(
+      <I18nProvider>
+        <EditionThemeProvider edition="field">
+          <DroneLaunchScene
+            active
+            telemetryActiveLabel="SAFETY GATES ACTIVE"
+            telemetryStandbyLabel="SAFE STANDBY"
+            telemetrySystemLabel="REAL DEVICE DOMAIN"
+          />
+        </EditionThemeProvider>
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText("REAL DEVICE DOMAIN")).toBeInTheDocument();
+    expect(screen.getByText("SAFETY GATES ACTIVE")).toBeInTheDocument();
+    expect(screen.queryByText("PX4 / SITL")).not.toBeInTheDocument();
+    expect(container.querySelector(".drone-launch-scene"))
+      .toHaveAttribute("data-theme-grants-hardware-authority", "false");
+  });
+
   it("renders an English-only telemetry overlay in English", () => {
     renderScene("en");
 

@@ -23,6 +23,9 @@ type DroneLaunchSceneProps = {
   active?: boolean;
   progress?: number | null;
   starflightControllerRef?: MutableRefObject<(() => void) | null>;
+  telemetryActiveLabel?: string;
+  telemetryStandbyLabel?: string;
+  telemetrySystemLabel?: string;
   visualOffsetX?: number;
 };
 
@@ -518,6 +521,9 @@ export function DroneLaunchScene({
   active = false,
   progress = null,
   starflightControllerRef,
+  telemetryActiveLabel,
+  telemetryStandbyLabel,
+  telemetrySystemLabel,
   visualOffsetX = 0,
 }: DroneLaunchSceneProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -1156,10 +1162,10 @@ export function DroneLaunchScene({
         {t("launcher.tagline")}
       </h1>
       <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">
-        <span>{t("launcher.telemetry.system")}</span>
+        <span>{telemetrySystemLabel ?? t("launcher.telemetry.system")}</span>
         <strong>{active
-          ? t("launcher.telemetry.linkActive")
-          : t("launcher.telemetry.standby")}</strong>
+          ? telemetryActiveLabel ?? t("launcher.telemetry.linkActive")
+          : telemetryStandbyLabel ?? t("launcher.telemetry.standby")}</strong>
       </div>
       <div className="drone-launch-hud drone-launch-hud-right" aria-hidden="true">
         <span>{t("launcher.telemetry.attitude")}</span>

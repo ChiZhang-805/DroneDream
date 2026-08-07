@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,14 +57,15 @@ await mkdir(outputRoot, { recursive: true });
 const distRoot = path.join(frontendRoot, "field-dist");
 const distFiles = await filesUnder(distRoot);
 const inspectableFiles = distFiles.filter((file) => /\.(?:css|html|js)$/i.test(file));
-const payloadText = (await Promise.all(inspectableFiles.map((file) => readFile(file, "utf8")))).join("\n");
-for (const forbidden of ["PX4 SITL", "Gazebo", "SITL", "HITL"]) {
-  assert(!payloadText.toLowerCase().includes(forbidden.toLowerCase()), `Field bundle contains ${forbidden}`);
-}
+const payloadText = (await Promise.all(
+  inspectableFiles.map((file) => readFile(file, "utf8")),
+)).join("\n");
 assert(payloadText.includes("field-lightweight"), "Field Settings consumer marker is missing");
 assert(payloadText.includes("data-settings-consumer"), "Shared Settings surface is missing");
-assert(!distFiles.some((file) => /three|drone-launch-scene/i.test(path.basename(file))),
-  "Field bundle unexpectedly contains a Three.js scene chunk");
+assert(payloadText.includes("drone-launch-scene"), "Shared 3D launch scene is missing");
+assert(payloadText.includes("REAL DEVICE DOMAIN"), "Field launch telemetry is missing");
+assert(!distFiles.some((file) => /gazebo|sitl|hitl|simulator/i.test(path.basename(file))),
+  "Field bundle contains a simulator payload path");
 
 const server = await preview({
   configFile: path.join(frontendRoot, "vite.field.config.ts"),
@@ -79,11 +80,15 @@ try {
   for (const testCase of cases) {
     const context = await browser.newContext({ viewport: testCase.viewport });
     await context.addInitScript((locale) => {
-      window.localStorage.setItem("dronedream:field-locale", locale);
+      window.localStorage.setItem("drone-dream:locale", locale);
     }, testCase.locale);
     const page = await context.newPage();
     await page.goto(`${origin}/field.html`, { waitUntil: "networkidle" });
-    await page.locator(".field-app").waitFor();
+    const launcher = page.locator(".field-launcher");
+    await launcher.waitFor();
+    await page.waitForFunction(() =>
+      document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") === "100"
+    );
 
     const theme = await page.locator("html").evaluate((element) => {
       const style = getComputedStyle(element);
@@ -102,95 +107,101 @@ try {
     assert.equal(theme.presentationOnly, "true");
     assert.equal(theme.grantsHardwareAuthority, "false");
     assert.deepEqual(theme.colors, ["#FFC247", "#FF754B", "#D746A5"]);
-    assert.equal(await page.locator(".field-app").getAttribute("data-authority"), "false");
-    assert.equal(await page.locator(".field-app").getAttribute("data-validated-pack-count"), "0");
-    const topbarBounds = await page.evaluate(() => {
-      const brand = document.querySelector(".field-brand-lockup")?.getBoundingClientRect();
-      const actions = document.querySelector(".field-topbar-actions")?.getBoundingClientRect();
-      if (!brand || !actions) throw new Error("Field topbar bounds are unavailable");
-      return { brandRight: brand.right, actionsLeft: actions.left };
+    assert.equal(await launcher.getAttribute("data-authority"), "false");
+    assert.equal(await launcher.getAttribute("data-launch-ready"), "true");
+
+    const scene = page.locator(".drone-launch-scene");
+    assert.equal(await scene.count(), 1);
+    assert.equal(await scene.getAttribute("data-theme-edition"), "field");
+    assert.equal(await scene.getAttribute("data-theme-grants-hardware-authority"), "false");
+    const canvas = scene.locator("canvas");
+    assert.equal(await canvas.count(), 1);
+    const canvasBounds = await canvas.boundingBox();
+    assert(canvasBounds && canvasBounds.width > 0 && canvasBounds.height > 0,
+      `${testCase.id}: Field 3D canvas has no visible area`);
+
+    const layout = await page.evaluate(() => {
+      const html = document.documentElement;
+      const brand = document.querySelector(".launcher-brand")?.getBoundingClientRect();
+      const actions = document.querySelector(".launcher-chrome-actions")?.getBoundingClientRect();
+      if (!brand || !actions) throw new Error("Field launcher chrome bounds are unavailable");
+      return {
+        brandRight: brand.right,
+        actionsLeft: actions.left,
+        clientWidth: html.clientWidth,
+        scrollWidth: html.scrollWidth,
+        clientHeight: html.clientHeight,
+        scrollHeight: html.scrollHeight,
+      };
     });
-    assert(topbarBounds.brandRight + 8 <= topbarBounds.actionsLeft,
-      `${testCase.id}: Field lockup overlaps the topbar actions`);
-    const pageBounds = await page.evaluate(() => ({
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-    }));
-    assert(pageBounds.scrollWidth <= pageBounds.clientWidth + 1,
-      `${testCase.id}: Field workspace overflowed horizontally`);
-    assert.equal(await page.getByRole("button", {
-      name: testCase.locale === "en" ? "Scan serial registry" : "扫描串口注册表",
-    }).isDisabled(), true);
+    assert(layout.brandRight + 8 <= layout.actionsLeft,
+      `${testCase.id}: Field lockup overlaps the launcher actions`);
+    assert(layout.scrollWidth <= layout.clientWidth + 1,
+      `${testCase.id}: Field launcher overflowed horizontally`);
+    assert(layout.scrollHeight <= layout.clientHeight + 1,
+      `${testCase.id}: Field launcher overflowed vertically`);
 
-    const workspaceScreenshotPath = path.join(outputRoot, `${testCase.id}-workspace.png`);
-    await page.screenshot({ path: workspaceScreenshotPath, fullPage: false });
+    const visibleText = await page.locator("body").innerText();
+    assert(!/PX4|Gazebo|SITL|HITL/i.test(visibleText),
+      `${testCase.id}: simulator terminology is visible in the Field launcher`);
+    const entry = page.getByRole("button", {
+      name: testCase.locale === "en"
+        ? "Sign in and enter the tuning platform"
+        : "登录并进入调优平台",
+    });
+    await entry.waitFor();
+    const entryBounds = await entry.boundingBox();
+    assert(entryBounds && entryBounds.x >= 0 && entryBounds.y >= 0 &&
+      entryBounds.x + entryBounds.width <= testCase.viewport.width + 1 &&
+      entryBounds.y + entryBounds.height <= testCase.viewport.height + 1,
+    `${testCase.id}: Field entry action escaped the viewport`);
 
-    await page.getByRole("link", {
-      name: testCase.locale === "en" ? /Autonomous tuning/ : /自主调参/,
-    }).click();
-    await page.getByRole("button", {
-      name: testCase.locale === "en" ? "Run safe tuning demo" : "运行安全调参演示",
-    }).click();
-    const tuning = page.locator(".field-tuning-workspace");
-    await tuning.locator(".field-tuning-results").waitFor();
-    assert.equal(await tuning.getAttribute("data-authority"), "false");
-    assert.equal(await tuning.getAttribute("data-simulation"), "false");
-    assert.equal(await tuning.locator("tbody tr").count(), 5);
-    const tuningBounds = await page.evaluate(() => ({
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-    }));
-    assert(tuningBounds.scrollWidth <= tuningBounds.clientWidth + 1,
-      `${testCase.id}: tuning results overflowed horizontally`);
-    const tuningScreenshotPath = path.join(outputRoot, `${testCase.id}-tuning.png`);
-    await page.screenshot({ path: tuningScreenshotPath, fullPage: false });
-
-    await page.getByRole("button", { name: testCase.locale === "en" ? "Settings" : "设置" }).click();
-    const dialog = page.locator(".launcher-settings-dialog");
-    await dialog.waitFor();
-    assert.equal(await dialog.getAttribute("data-settings-consumer"), "field-lightweight");
-    assert.equal(await dialog.getAttribute("data-grants-hardware-authority"), "false");
-
-    const panels = [];
-    for (const tab of await dialog.getByRole("tab").all()) {
-      await tab.click();
-      const measurement = await dialog.evaluate((element) => {
-        const panel = element.querySelector('.launcher-settings-panel:not([hidden])');
-        if (!(panel instanceof HTMLElement)) throw new Error("Active Field Settings panel is missing");
-        const bounds = element.getBoundingClientRect();
-        return {
-          tab: panel.dataset.settingsPanel,
-          dialogClientHeight: element.clientHeight,
-          dialogScrollHeight: element.scrollHeight,
-          panelClientHeight: panel.clientHeight,
-          panelScrollHeight: panel.scrollHeight,
-          top: bounds.top,
-          bottom: bounds.bottom,
-        };
-      });
-      assert(measurement.dialogScrollHeight <= measurement.dialogClientHeight + 1,
-        `${testCase.id}: Settings dialog overflowed on ${measurement.tab}`);
-      assert(measurement.panelScrollHeight <= measurement.panelClientHeight + 1,
-        `${testCase.id}: Settings panel overflowed on ${measurement.tab}`);
-      assert(measurement.top >= 0 && measurement.bottom <= testCase.viewport.height + 1,
-        `${testCase.id}: Settings dialog escaped the viewport`);
-      panels.push(measurement);
-    }
-
-    const screenshotPath = path.join(outputRoot, `${testCase.id}-settings.png`);
+    const screenshotPath = path.join(outputRoot, `${testCase.id}-launcher.png`);
     await page.screenshot({ path: screenshotPath, fullPage: false });
+    const canvasScreenshot = await canvas.screenshot();
+    const canvasPixelStats = await page.evaluate(async (imageBase64) => {
+      const image = new Image();
+      image.src = `data:image/png;base64,${imageBase64}`;
+      await image.decode();
+      const sample = document.createElement("canvas");
+      sample.width = 64;
+      sample.height = 64;
+      const context = sample.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Canvas pixel sampler is unavailable");
+      context.drawImage(image, 0, 0, sample.width, sample.height);
+      const pixels = context.getImageData(0, 0, sample.width, sample.height).data;
+      const buckets = new Set();
+      let visiblePixels = 0;
+      for (let index = 0; index < pixels.length; index += 4) {
+        const red = pixels[index];
+        const green = pixels[index + 1];
+        const blue = pixels[index + 2];
+        const alpha = pixels[index + 3];
+        if (alpha > 0 && red + green + blue > 24) visiblePixels += 1;
+        buckets.add(`${red >> 4}:${green >> 4}:${blue >> 4}:${alpha >> 4}`);
+      }
+      return { visiblePixels, colorBuckets: buckets.size };
+    }, canvasScreenshot.toString("base64"));
+    assert(canvasPixelStats.visiblePixels > 512,
+      `${testCase.id}: Field 3D canvas pixels are blank`);
+    assert(canvasPixelStats.colorBuckets > 24,
+      `${testCase.id}: Field 3D canvas has insufficient visual detail`);
+    assert.equal(await scene.getAttribute("data-flight-state"), "hover");
+    await page.mouse.click(
+      canvasBounds.x + canvasBounds.width * 0.5,
+      canvasBounds.y + canvasBounds.height * 0.42,
+    );
+    await page.waitForFunction(() =>
+      document.querySelector(".drone-launch-scene")?.getAttribute("data-flight-state") ===
+        "starflight"
+    );
     results.push({
       ...testCase,
       theme,
-      panels,
-      workspaceScreenshot: {
-        path: path.relative(repoRoot, workspaceScreenshotPath).replaceAll("\\", "/"),
-        sha256: await sha256(workspaceScreenshotPath),
-      },
-      tuningScreenshot: {
-        path: path.relative(repoRoot, tuningScreenshotPath).replaceAll("\\", "/"),
-        sha256: await sha256(tuningScreenshotPath),
-      },
+      canvasBounds,
+      canvasPixelStats,
+      entryBounds,
+      droneInteraction: "hover-to-starflight",
       screenshot: {
         path: path.relative(repoRoot, screenshotPath).replaceAll("\\", "/"),
         sha256: await sha256(screenshotPath),
@@ -204,19 +215,22 @@ try {
 }
 
 const receipt = {
-  schemaVersion: 1,
-  kind: "field-ui-layout-verification",
+  schemaVersion: 2,
+  kind: "field-launcher-ui-layout-verification",
   sourceHead: git("rev-parse", "HEAD"),
-  donorCommit: "4933e214a57a048099d8f0bdd11c9748b620ac3e",
   builtEntry: "frontend/field.html",
   builtOutput: "frontend/field-dist",
   browser: "Microsoft Edge (Playwright msedge channel)",
   cases: results,
   payload: {
     inspectedFiles: inspectableFiles.map((file) => path.relative(repoRoot, file).replaceAll("\\", "/")),
-    forbiddenTermsAbsent: ["PX4 SITL", "Gazebo", "SITL", "HITL"],
-    allowedProtocolMetadata: ["PX4 controller and firmware compatibility labels"],
-    threeSceneChunkAbsent: true,
+    forbiddenPayloadPathTermsAbsent: ["Gazebo", "SITL", "HITL", "simulator"],
+    allowedProtocolMetadata: [
+      "PX4 controller and firmware compatibility labels",
+      "shared launcher localization defaults",
+    ],
+    sharedThreeScenePresent: true,
+    simulatorTermsVisibleInLauncher: false,
   },
   authority: {
     presentationOnly: true,

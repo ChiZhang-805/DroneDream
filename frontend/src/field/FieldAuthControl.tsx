@@ -15,7 +15,9 @@ import type { FieldLocale } from "./catalog";
 
 const COPY = {
   en: {
+    enter: "Enter the tuning platform",
     signIn: "Sign in to DroneDream · FIELD",
+    signInAndEnter: "Sign in and enter the tuning platform",
     signOut: "Sign out of DroneDream · FIELD",
     waiting: "Waiting for browser authorization",
     adopting: "Opening Field session",
@@ -24,7 +26,9 @@ const COPY = {
     failed: "Field sign-in could not be completed.",
   },
   "zh-CN": {
+    enter: "进入调优平台",
     signIn: "登录 DroneDream · FIELD",
+    signInAndEnter: "登录并进入调优平台",
     signOut: "退出 DroneDream · FIELD",
     waiting: "等待浏览器授权",
     adopting: "正在建立 Field 会话",
@@ -36,7 +40,19 @@ const COPY = {
 
 type AuthStatus = "idle" | "waiting" | "adopting";
 
-export function FieldAuthControl({ locale }: { locale: FieldLocale }) {
+interface FieldAuthControlProps {
+  locale: FieldLocale;
+  launcher?: boolean;
+  launcherReady?: boolean;
+  onAuthenticated?: () => void;
+}
+
+export function FieldAuthControl({
+  locale,
+  launcher = false,
+  launcherReady = true,
+  onAuthenticated,
+}: FieldAuthControlProps) {
   const { account, configured, signOut } = useAuthOrLocal();
   const [status, setStatus] = useState<AuthStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +87,7 @@ export function FieldAuthControl({ locale }: { locale: FieldLocale }) {
       if (!mounted.current) return;
       setStatus("adopting");
       await adoptBrowserAuthSession(session);
+      if (mounted.current) onAuthenticated?.();
     } catch (cause) {
       if (sessionIssued) {
         await clearBrowserAuthVault().catch(() => false);
@@ -95,8 +112,21 @@ export function FieldAuthControl({ locale }: { locale: FieldLocale }) {
   };
 
   return (
-    <div className="field-auth-control" data-authority="false">
-      {account ? (
+    <div
+      className={`field-auth-control${launcher ? " field-auth-control-launcher" : ""}`}
+      data-authority="false"
+    >
+      {account && launcher ? (
+        <button
+          type="button"
+          disabled={!launcherReady}
+          onClick={onAuthenticated}
+          aria-label={copy.enter}
+        >
+          <LogIn aria-hidden="true" />
+          <span>{copy.enter}</span>
+        </button>
+      ) : account ? (
         <button type="button" onClick={() => void endSession()} aria-label={copy.signOut}>
           <LogOut aria-hidden="true" />
           <span>{account.displayName}</span>
@@ -104,14 +134,20 @@ export function FieldAuthControl({ locale }: { locale: FieldLocale }) {
       ) : (
         <button
           type="button"
-          disabled={!available || status !== "idle"}
+          disabled={!available || status !== "idle" || (launcher && !launcherReady)}
           onClick={() => void startSignIn()}
-          aria-label={copy.signIn}
+          aria-label={launcher ? copy.signInAndEnter : copy.signIn}
         >
           {status === "idle"
             ? <LogIn aria-hidden="true" />
             : <LoaderCircle className="field-auth-spinner" aria-hidden="true" />}
-          <span>{status === "waiting" ? copy.waiting : status === "adopting" ? copy.adopting : copy.signIn}</span>
+          <span>{status === "waiting"
+            ? copy.waiting
+            : status === "adopting"
+              ? copy.adopting
+              : launcher
+                ? copy.signInAndEnter
+                : copy.signIn}</span>
         </button>
       )}
       <span className="field-auth-status" role={error ? "alert" : undefined} aria-live="polite">

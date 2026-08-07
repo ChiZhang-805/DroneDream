@@ -144,6 +144,7 @@ describe("FieldApp", () => {
       "src/field/FieldApp.tsx",
       "src/field/FieldSettingsDialog.tsx",
       "src/field/FieldTuningWorkspace.tsx",
+      "src/field/FieldRoot.tsx",
       "src/field/catalog.ts",
       "src/field/main.tsx",
       "src/field/safety.ts",
@@ -154,6 +155,7 @@ describe("FieldApp", () => {
     expect(sources).not.toMatch(/gazebo|sitl|hitl|SimulatorAdapter|simulation\.execute/i);
     expect(sources).toContain("EditionThemeProvider");
     expect(sources).toContain("EditionSettingsSurface");
+    expect(sources).toContain("DroneLaunchScene");
     expect(sources).toContain('consumerProfile="field-lightweight"');
   });
 

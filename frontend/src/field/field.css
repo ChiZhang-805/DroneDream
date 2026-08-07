@@ -61,6 +61,99 @@ input:focus-visible {
   min-height: 100vh;
 }
 
+.field-launcher {
+  background: var(--dd-brand-dark-surface);
+}
+
+.field-launcher .launcher-chrome {
+  border-bottom-color: color-mix(in srgb, var(--dd-brand-start) 24%, transparent);
+  background: rgb(20 8 10 / 96%);
+}
+
+.field-launcher .launcher-hero-visual {
+  background:
+    linear-gradient(180deg, rgb(40 20 13 / 18%), rgb(16 7 10 / 82%)),
+    var(--dd-brand-dark-surface);
+}
+
+.field-launcher .launcher-hero-visual::before {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--dd-brand-start) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--dd-brand-end) 8%, transparent) 1px, transparent 1px);
+}
+
+.field-launcher .launcher-progress-track > span,
+.field-launcher .field-auth-control-launcher button {
+  background: linear-gradient(
+    90deg,
+    var(--dd-brand-start),
+    var(--dd-brand-middle),
+    var(--dd-brand-end)
+  );
+}
+
+.field-launcher .launcher-progress-percent,
+.field-launcher .drone-launch-hud strong {
+  color: var(--dd-brand-start);
+}
+
+.field-launcher .launcher-runtime-indicator.is-checked > span {
+  background: var(--dd-brand-start);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--dd-brand-start) 72%, transparent);
+}
+
+.field-launcher-language {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-start) 36%, transparent);
+  border-radius: 6px;
+  color: var(--dd-brand-light-surface);
+  background: rgb(255 255 255 / 4%);
+  cursor: pointer;
+}
+
+.field-launcher-language:hover,
+.field-launcher-language:focus-visible {
+  border-color: var(--dd-brand-start);
+  color: var(--dd-brand-start);
+}
+
+.field-auth-control-launcher {
+  align-items: center;
+}
+
+.field-auth-control-launcher button {
+  min-width: min(340px, calc(100vw - 32px));
+  min-height: 52px;
+  justify-content: center;
+  padding: 12px 22px;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-start) 54%, transparent);
+  border-radius: 7px;
+  color: var(--dd-brand-dark-surface);
+  box-shadow: 0 16px 34px rgb(0 0 0 / 34%);
+  font-size: 16px;
+  font-weight: 760;
+}
+
+.field-auth-control-launcher button:disabled {
+  cursor: wait;
+  filter: grayscale(0.35);
+  opacity: 0.62;
+}
+
+.field-auth-control-launcher .field-auth-status {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  width: min(520px, calc(100vw - 32px));
+  color: var(--dd-brand-light-surface);
+  text-align: center;
+  transform: translateX(-50%);
+}
+
 .field-skip-link {
   position: fixed;
   z-index: 20;
@@ -1170,6 +1263,20 @@ input:focus-visible {
     height: 1px;
     overflow: hidden;
     clip: rect(0 0 0 0);
+  }
+
+  .field-auth-control-launcher button {
+    width: min(340px, calc(100vw - 32px));
+    padding: 12px 16px;
+  }
+
+  .field-auth-control-launcher button span {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
   }
 
   .field-settings-languages,

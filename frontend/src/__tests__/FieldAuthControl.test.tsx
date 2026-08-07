@@ -107,4 +107,64 @@ describe("FieldAuthControl", () => {
     await waitFor(() => expect(mocks.signOut).toHaveBeenCalledTimes(1));
     expect(mocks.beginBrowserAuth).not.toHaveBeenCalled();
   });
+
+  it("keeps the launcher action disabled until the Field workspace is ready", () => {
+    render(
+      <FieldAuthControl
+        launcher
+        launcherReady={false}
+        locale="en"
+        onAuthenticated={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", {
+      name: "Sign in and enter the tuning platform",
+    })).toBeDisabled();
+  });
+
+  it("enters the launcher only after adopting the Field browser session", async () => {
+    const onAuthenticated = vi.fn();
+    render(
+      <FieldAuthControl
+        launcher
+        launcherReady
+        locale="en"
+        onAuthenticated={onAuthenticated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Sign in and enter the tuning platform",
+    }));
+
+    await waitFor(() => expect(mocks.adoptBrowserAuthSession).toHaveBeenCalledWith(
+      FIELD_SESSION,
+    ));
+    expect(onAuthenticated).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets an existing Field account enter without signing out", () => {
+    mocks.account = {
+      id: "field-user",
+      email: "field@example.invalid",
+      displayName: "Field operator",
+      avatarUrl: null,
+    };
+    const onAuthenticated = vi.fn();
+    render(
+      <FieldAuthControl
+        launcher
+        launcherReady
+        locale="en"
+        onAuthenticated={onAuthenticated}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Enter the tuning platform" }));
+
+    expect(onAuthenticated).toHaveBeenCalledTimes(1);
+    expect(mocks.signOut).not.toHaveBeenCalled();
+    expect(mocks.beginBrowserAuth).not.toHaveBeenCalled();
+  });
 });
