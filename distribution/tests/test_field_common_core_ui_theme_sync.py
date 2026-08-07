@@ -43,7 +43,7 @@ def test_field_entry_reaches_shared_surface_without_palette_fork() -> None:
     assert "FieldSettingsDialog" in app
     assert "EditionSettingsSurface" in settings
     assert 'consumerProfile="field-lightweight"' in settings
-    assert "../styles.css" not in main
+    assert 'import "../styles.css";' in main
     for duplicate in ("--field-yellow", "--field-coral", "--field-pink"):
         assert duplicate not in css
     for color in ("#ffc247", "#ff754b", "#d746a5", "#fff8ef", "#28140d"):

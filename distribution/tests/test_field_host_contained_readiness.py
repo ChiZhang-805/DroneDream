@@ -5,7 +5,6 @@ import json
 import subprocess
 import sys
 import unittest
-from copy import deepcopy
 from pathlib import Path
 from types import ModuleType
 
@@ -218,10 +217,15 @@ class FieldHostContainedReadinessTests(unittest.TestCase):
         self.assertTrue(checks["no-service-task-autorun-create"])
         self.assertTrue(checks["shared-handoff-identified"])
         self.assertTrue(checks["field-ui-no-device-api"])
+        self.assertTrue(checks["field-controls-disabled"])
         self.assertTrue(checks["field-updater-endpoint"])
         self.assertTrue(checks["field-profile-and-icon"])
         self.assertTrue(checks["executor-owned-environment"])
         self.assertTrue(checks["executor-budget-and-rollback"])
+        self.assertIn(
+            "frontend/src/field/FieldPreflightWorkspace.tsx",
+            audit["sourceFiles"],
+        )
 
     def test_requestable_plan_preserves_vm_evidence_and_claims_no_vm_isolation(self) -> None:
         contract = self.contract()

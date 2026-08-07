@@ -28,6 +28,9 @@ NSIS_PATH = ROOT / "desktop" / "src-tauri" / "nsis" / "installer.nsi"
 NSIS_IDENTITY_PATH = ROOT / "desktop" / "src-tauri" / "nsis" / "edition-identity.nsh"
 HANDOFF_PATH = ROOT / "desktop" / "src-tauri" / "src" / "installer_handoff.rs"
 FIELD_APP_PATH = ROOT / "frontend" / "src" / "field" / "FieldApp.tsx"
+FIELD_PREFLIGHT_PATH = (
+    ROOT / "frontend" / "src" / "field" / "FieldPreflightWorkspace.tsx"
+)
 FIELD_SAFETY_PATH = ROOT / "frontend" / "src" / "field" / "safety.ts"
 EXECUTOR_PATH = (
     ROOT / "distribution" / "tools" / "execute_field_host_contained_acceptance.ps1"
@@ -274,6 +277,7 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
     nsis_identity = NSIS_IDENTITY_PATH.read_text(encoding="utf-8")
     handoff = HANDOFF_PATH.read_text(encoding="utf-8")
     field_app = FIELD_APP_PATH.read_text(encoding="utf-8")
+    field_preflight = FIELD_PREFLIGHT_PATH.read_text(encoding="utf-8")
     field_safety = FIELD_SAFETY_PATH.read_text(encoding="utf-8")
     executor = EXECUTOR_PATH.read_text(encoding="utf-8")
     artifact_manifest = load_json(ARTIFACT_MANIFEST_PATH)
@@ -331,8 +335,16 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
     check("no-service-task-autorun-create", not any(marker in nsis for marker in forbidden_create), "installer.nsi forbidden create markers")
     check("shared-handoff-identified", 'const RECEIPT_DIRECTORY: &str = "io.dronedream.desktop";' in handoff, "installer_handoff.rs:RECEIPT_DIRECTORY")
     check("field-ui-no-native-invoke", "invoke(" not in field_app and "@tauri-apps/api" not in field_app, "FieldApp.tsx")
-    check("field-ui-no-device-api", all(marker not in (field_app + field_safety).lower() for marker in ("navigator.serial", "navigator.usb", "serialport", "webusb")), "Field frontend sources")
-    check("field-controls-disabled", "disabled" in field_app and "FIELD_HARDWARE_ACTIONS" in field_app, "FieldApp.tsx controls")
+    field_frontend = field_app + field_preflight + field_safety
+    check("field-ui-no-device-api", all(marker not in field_frontend.lower() for marker in ("navigator.serial", "navigator.usb", "serialport", "webusb")), "Field frontend sources")
+    check(
+        "field-controls-disabled",
+        "FIELD_HARDWARE_ACTIONS" in field_preflight
+        and field_preflight.count('<button type="button" disabled>') >= 2
+        and "actions: Object.fromEntries(" in field_safety
+        and "FIELD_HARDWARE_ACTIONS.map((action) => [action, false])" in field_safety,
+        "FieldPreflightWorkspace.tsx controls and safety.ts action decisions",
+    )
     check(
         "field-profile-and-icon",
         artifact_manifest.get("payload", {}).get("enginePack", {}).get("profileId")
@@ -373,6 +385,7 @@ def audit_source(contract: dict[str, Any]) -> dict[str, Any]:
                 NSIS_PATH,
                 HANDOFF_PATH,
                 FIELD_APP_PATH,
+                FIELD_PREFLIGHT_PATH,
                 FIELD_SAFETY_PATH,
                 EXECUTOR_PATH,
                 ARTIFACT_MANIFEST_PATH,
