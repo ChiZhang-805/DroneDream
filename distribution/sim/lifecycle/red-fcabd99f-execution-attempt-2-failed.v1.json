@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-final-candidate-lifecycle-failure",
+  "receiptVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "failed-runner-silent-language-selection-assumption-rolled-back",
+  "productSourceCommit": "79a718dae55c274cf4803a57129e5789012dca03",
+  "artifact": {
+    "bytes": 11944855,
+    "sha256": "fcabd99fcd3add8c4a19ca429b05faafc2a6ad8f5989cf32b62549ec0ec3299e",
+    "rebuilt": false,
+    "relabelled": false
+  },
+  "execution": {
+    "ordinal": 2,
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 1,
+    "pkceBoundaryChecks": 0,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "verifiedBeforeFailure": {
+    "installerExitCode": 0,
+    "uninstallRegistration": "pass",
+    "installedPayload": "pass",
+    "productVersion": "pass",
+    "desktopShortcutTargetAndIcon": "pass",
+    "startMenuShortcutTargetAndIcon": "pass",
+    "appOnlyProtocol2": "pass",
+    "runtimeProfileId": "sim-only",
+    "artifactAppUserModelId": "io.dronedream.sim"
+  },
+  "failure": {
+    "stage": "fresh-en-diagnostic",
+    "classification": "runner-silent-nsis-language-selection-assumption",
+    "expectedLanguage": 1033,
+    "observedLanguage": 2052,
+    "diagnostic": "installer-init language=2052",
+    "productDefectObserved": false,
+    "rootCause": "Silent MUI selection used the host or stored language; the /L=1033 process argument did not deterministically select English."
+  },
+  "rollback": {
+    "ownedUninstallerInvoked": true,
+    "ownedUninstallerExitCode": 0,
+    "installRootAbsent": true,
+    "uninstallKeyAbsent": true,
+    "shortcutsAbsent": true,
+    "preExistingPreferenceKeyPreserved": true,
+    "protectedStateParity": true,
+    "runtimeState": "Stopped"
+  },
+  "externalReceipt": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Sim-RED/sim-red-final-fcabd99f-ordinal2/evidence/lifecycle-receipt.json",
+    "bytes": 34856,
+    "sha256": "f92d6a6f7e0a1770e9669f4896cee8f20ca015f045f39cb1ce549074b2d045cb"
+  },
+  "nextAttempt": {
+    "deterministicLanguageSelection": "exact-sim-owned-mui-registry-value-then-restore",
+    "requiresNewRunnerHash": true,
+    "requiresNewApplicationHash": true,
+    "requiresNewOwnedRunRoot": true,
+    "artifactMayRemainIdentical": true,
+    "sameExecutionMayBeRetried": false
+  },
+  "nonClaims": {
+    "freshEnglishValidated": false,
+    "overlayChineseValidated": false,
+    "applicationLaunched": false,
+    "webView2Validated": false,
+    "uninstallLifecycleValidated": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false
+  }
+}

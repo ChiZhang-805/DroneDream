@@ -30,6 +30,20 @@ ATTEMPT_1_FAILURE = (
     / "lifecycle"
     / "red-fcabd99f-execution-attempt-1-failed.v1.json"
 )
+APPLICATION_3 = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-final-application-3.v1.json"
+)
+ATTEMPT_2_FAILURE = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "lifecycle"
+    / "red-fcabd99f-execution-attempt-2-failed.v1.json"
+)
 
 
 def sha256(path: Path) -> str:
@@ -170,3 +184,24 @@ def test_second_lifecycle_application_repairs_only_runner_unicode_and_uses_new_r
     assert failure["rollback"]["protectedStateParity"] is True
     assert second["priorAttempt"]["externalReceiptSha256"] == failure["externalReceipt"]["sha256"]
     assert second["priorAttempt"]["sameRunRootReuseAllowed"] is False
+
+
+def test_third_lifecycle_application_selects_locales_through_owned_preference() -> None:
+    second = json.loads(APPLICATION_2.read_text(encoding="utf-8"))
+    third = json.loads(APPLICATION_3.read_text(encoding="utf-8"))
+    failure = json.loads(ATTEMPT_2_FAILURE.read_text(encoding="utf-8"))
+    assert third["artifact"] == second["artifact"]
+    assert third["ownedSurface"]["runRoot"] != second["ownedSurface"]["runRoot"]
+    runner = ROOT / third["runner"]["path"]
+    assert runner.stat().st_size == third["runner"]["bytes"]
+    assert sha256(runner) == third["runner"]["sha256"]
+    runner_text = runner.read_text(encoding="utf-8-sig")
+    assert 'Set-OwnedInstallerLanguage -Language "1033"' in runner_text
+    assert 'Set-OwnedInstallerLanguage -Language "2052"' in runner_text
+    assert 'ValidateSet("1033", "2052")' in runner_text
+    counts = third["acceptanceMatrix"]["exactMaximumCounts"]
+    assert counts["installerLanguagePreferenceWrites"] == 2
+    assert counts["failureLanguagePreferenceCleanupWrites"] == 1
+    assert failure["failure"]["observedLanguage"] == 2052
+    assert failure["rollback"]["protectedStateParity"] is True
+    assert third["priorAttempt"]["externalReceiptSha256"] == failure["externalReceipt"]["sha256"]
