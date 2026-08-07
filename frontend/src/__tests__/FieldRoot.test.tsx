@@ -1,29 +1,29 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { I18nProvider } from "../i18n/I18nProvider";
+import { FieldLocaleProvider } from "../field/FieldLocaleProvider";
 
 vi.mock("../components/DroneLaunchScene", () => ({
-  DroneLaunchScene: ({
+  DroneLaunchSceneCore: ({
     active,
     progress,
-    telemetryActiveLabel,
-    telemetryStandbyLabel,
-    telemetrySystemLabel,
+    labels,
   }: {
     active: boolean;
     progress: number;
-    telemetryActiveLabel: string;
-    telemetryStandbyLabel: string;
-    telemetrySystemLabel: string;
+    labels: {
+      active: string;
+      standby: string;
+      system: string;
+    };
   }) => (
     <div
       data-testid="field-drone-scene"
       data-active={String(active)}
       data-progress={progress}
-      data-telemetry-active={telemetryActiveLabel}
-      data-telemetry-standby={telemetryStandbyLabel}
-      data-telemetry-system={telemetrySystemLabel}
+      data-telemetry-active={labels.active}
+      data-telemetry-standby={labels.standby}
+      data-telemetry-system={labels.system}
     />
   ),
 }));
@@ -74,9 +74,9 @@ describe("FieldRoot", () => {
   it("loads the shared 3D launch scene to 100 percent before offering entry", async () => {
     vi.useFakeTimers();
     const { container } = render(
-      <I18nProvider>
+      <FieldLocaleProvider>
         <FieldRoot />
-      </I18nProvider>,
+      </FieldLocaleProvider>,
     );
 
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "8");
@@ -101,9 +101,9 @@ describe("FieldRoot", () => {
   it("switches the launcher to Chinese and enters the Field workspace after auth", async () => {
     vi.useFakeTimers();
     render(
-      <I18nProvider>
+      <FieldLocaleProvider>
         <FieldRoot />
-      </I18nProvider>,
+      </FieldLocaleProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Switch to Simplified Chinese" }));
     await finishLoading();

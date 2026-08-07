@@ -29,6 +29,24 @@ type DroneLaunchSceneProps = {
   visualOffsetX?: number;
 };
 
+export type DroneLaunchSceneLabels = {
+  locale: "en" | "zh-CN";
+  tagline: string;
+  system: string;
+  active: string;
+  standby: string;
+  attitude: string;
+  hold: string;
+  cruise: string;
+};
+
+type DroneLaunchSceneCoreProps = Omit<
+  DroneLaunchSceneProps,
+  "telemetryActiveLabel" | "telemetryStandbyLabel" | "telemetrySystemLabel"
+> & {
+  labels: DroneLaunchSceneLabels;
+};
+
 const CARBON = 0x171827;
 const GRAPHITE = 0x30334a;
 const METAL = 0x697087;
@@ -517,21 +535,18 @@ function buildGalacticDust(
   return { dust, material };
 }
 
-export function DroneLaunchScene({
+export function DroneLaunchSceneCore({
   active = false,
   progress = null,
   starflightControllerRef,
-  telemetryActiveLabel,
-  telemetryStandbyLabel,
-  telemetrySystemLabel,
+  labels,
   visualOffsetX = 0,
-}: DroneLaunchSceneProps) {
+}: DroneLaunchSceneCoreProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const attitudeValueRef = useRef<HTMLSpanElement>(null);
   const activeRef = useRef(active);
   const [fallback, setFallback] = useState(false);
   const [starflightActive, setStarflightActive] = useState(false);
-  const { locale, t } = useI18n();
   const reducedMotion = usePrefersReducedMotion();
   const editionTheme = useEditionTheme();
   const sceneTheme = editionTheme.three;
@@ -1157,20 +1172,18 @@ export function DroneLaunchScene({
     >
       <div className="drone-launch-aura" aria-hidden="true" />
       <h1
-        className={`drone-launch-tagline drone-launch-tagline-${locale === "zh-CN" ? "zh" : "en"}${starflightActive ? " is-hidden" : ""}`}
+        className={`drone-launch-tagline drone-launch-tagline-${labels.locale === "zh-CN" ? "zh" : "en"}${starflightActive ? " is-hidden" : ""}`}
       >
-        {t("launcher.tagline")}
+        {labels.tagline}
       </h1>
       <div className="drone-launch-hud drone-launch-hud-left" aria-hidden="true">
-        <span>{telemetrySystemLabel ?? t("launcher.telemetry.system")}</span>
-        <strong>{active
-          ? telemetryActiveLabel ?? t("launcher.telemetry.linkActive")
-          : telemetryStandbyLabel ?? t("launcher.telemetry.standby")}</strong>
+        <span>{labels.system}</span>
+        <strong>{active ? labels.active : labels.standby}</strong>
       </div>
       <div className="drone-launch-hud drone-launch-hud-right" aria-hidden="true">
-        <span>{t("launcher.telemetry.attitude")}</span>
+        <span>{labels.attitude}</span>
         <strong>
-          {t(starflightActive ? "launcher.telemetry.cruise" : "launcher.telemetry.hold")} ·{" "}
+          {starflightActive ? labels.cruise : labels.hold} ·{" "}
           <span ref={attitudeValueRef}>+0.0°</span>
         </strong>
       </div>
@@ -1184,5 +1197,29 @@ export function DroneLaunchScene({
         </div>
       ) : null}
     </div>
+  );
+}
+
+export function DroneLaunchScene({
+  telemetryActiveLabel,
+  telemetryStandbyLabel,
+  telemetrySystemLabel,
+  ...props
+}: DroneLaunchSceneProps) {
+  const { locale, t } = useI18n();
+  return (
+    <DroneLaunchSceneCore
+      {...props}
+      labels={{
+        locale,
+        tagline: t("launcher.tagline"),
+        system: telemetrySystemLabel ?? t("launcher.telemetry.system"),
+        active: telemetryActiveLabel ?? t("launcher.telemetry.linkActive"),
+        standby: telemetryStandbyLabel ?? t("launcher.telemetry.standby"),
+        attitude: t("launcher.telemetry.attitude"),
+        hold: t("launcher.telemetry.hold"),
+        cruise: t("launcher.telemetry.cruise"),
+      }}
+    />
   );
 }

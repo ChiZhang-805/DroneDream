@@ -80,7 +80,7 @@ try {
   for (const testCase of cases) {
     const context = await browser.newContext({ viewport: testCase.viewport });
     await context.addInitScript((locale) => {
-      window.localStorage.setItem("drone-dream:locale", locale);
+      window.localStorage.setItem("dronedream:field:locale", locale);
     }, testCase.locale);
     const page = await context.newPage();
     await page.goto(`${origin}/field.html`, { waitUntil: "networkidle" });

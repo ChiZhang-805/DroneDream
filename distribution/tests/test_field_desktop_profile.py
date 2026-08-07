@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FIELD_CONFIG = ROOT / "desktop" / "src-tauri" / "tauri.field.conf.json"
+FIELD_VITE_CONFIG = ROOT / "frontend" / "vite.field.config.ts"
 DESKTOP_PACKAGE = ROOT / "desktop" / "package.json"
 BUILD_GATE = ROOT / "desktop" / "scripts" / "verify-field-preview-build-authorization.ps1"
 COEXISTENCE_CONTRACT = ROOT / "distribution" / "desktop" / "edition-coexistence.v1.json"
@@ -41,6 +42,15 @@ class FieldDesktopProfileTests(unittest.TestCase):
             "devUrl": "http://127.0.0.1:5174/field.html",
             "frontendDist": "../../frontend/field-dist",
         })
+
+    def test_field_frontend_does_not_copy_shared_simulation_manuals(self) -> None:
+        vite_source = FIELD_VITE_CONFIG.read_text(encoding="utf-8")
+        self.assertIn("publicDir: false", vite_source)
+        self.assertNotIn("copyPublicDir: true", vite_source)
+        self.assertIn('find: "./BrandLockup"', vite_source)
+        self.assertIn("./src/field/FieldBrandLockup.tsx", vite_source)
+        self.assertIn('find: "../i18n/I18nProvider"', vite_source)
+        self.assertIn("./src/field/FieldI18nShim.tsx", vite_source)
 
     def test_window_and_updater_are_field_specific(self) -> None:
         window = self.config["app"]["windows"][0]

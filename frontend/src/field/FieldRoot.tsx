@@ -1,9 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 
-import { BrandLockup } from "../components/BrandLockup";
-import { DroneLaunchScene } from "../components/DroneLaunchScene";
-import { useI18n } from "../i18n/I18nProvider";
+import { DroneLaunchSceneCore } from "../components/DroneLaunchScene";
 import { FieldAuthControl } from "./FieldAuthControl";
+import { FieldBrandLockup } from "./FieldBrandLockup";
+import { useFieldLocale } from "./FieldLocaleProvider";
 import type { FieldLocale } from "./catalog";
 
 const FieldApp = lazy(async () => {
@@ -20,6 +20,10 @@ const COPY = {
     active: "SAFETY GATES ACTIVE",
     standby: "SAFE STANDBY",
     language: "Switch to Simplified Chinese",
+    tagline: "Let Every Flight Flow Like a Dream",
+    attitude: "ATTITUDE",
+    hold: "HOLD",
+    cruise: "STARFLIGHT",
   },
   "zh-CN": {
     brand: "DroneDream · FIELD",
@@ -29,6 +33,10 @@ const COPY = {
     active: "安全门已启用",
     standby: "安全待机",
     language: "切换到 English",
+    tagline: "蝶 梦 水 云 乡",
+    attitude: "飞行姿态",
+    hold: "悬停",
+    cruise: "星际巡航",
   },
 } as const;
 
@@ -53,7 +61,7 @@ function FieldLaunchScreen({
     >
       <header className="launcher-chrome">
         <div className="launcher-brand" aria-label={copy.brand}>
-          <BrandLockup edition="field" variant="compact" />
+          <FieldBrandLockup variant="compact" />
         </div>
         <div className="launcher-chrome-actions">
           <span className={`launcher-runtime-indicator${ready ? " is-checked" : ""}`}>
@@ -75,12 +83,19 @@ function FieldLaunchScreen({
         <div className="desktop-launcher">
           <div className="launcher-hero">
             <div className="launcher-hero-visual">
-              <DroneLaunchScene
+              <DroneLaunchSceneCore
                 active={ready}
                 progress={progress}
-                telemetryActiveLabel={copy.active}
-                telemetryStandbyLabel={copy.standby}
-                telemetrySystemLabel={copy.system}
+                labels={{
+                  locale,
+                  tagline: copy.tagline,
+                  system: copy.system,
+                  active: copy.active,
+                  standby: copy.standby,
+                  attitude: copy.attitude,
+                  hold: copy.hold,
+                  cruise: copy.cruise,
+                }}
               />
             </div>
             {ready ? (
@@ -119,7 +134,7 @@ function FieldLaunchScreen({
 }
 
 export function FieldRoot() {
-  const { locale, setLocale } = useI18n();
+  const { locale, setLocale } = useFieldLocale();
   const [progress, setProgress] = useState(8);
   const [entered, setEntered] = useState(false);
 

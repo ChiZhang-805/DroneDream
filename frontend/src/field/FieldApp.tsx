@@ -16,7 +16,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { BrandLockup } from "../components/BrandLockup";
 import {
   discoverFieldDevices,
   isDesktopRuntime,
@@ -29,6 +28,7 @@ import {
   type FieldReadOnlyProtocolEvidence,
 } from "./FieldAdapterCenter";
 import { FieldAuthControl } from "./FieldAuthControl";
+import { FieldBrandLockup } from "./FieldBrandLockup";
 import { FieldSettingsDialog } from "./FieldSettingsDialog";
 import { FieldRecoveryWorkspace } from "./FieldRecoveryWorkspace";
 import { FieldPreflightWorkspace } from "./FieldPreflightWorkspace";
@@ -373,9 +373,8 @@ export function FieldApp({
       <a className="field-skip-link" href="#overview">{copy.skip}</a>
       <header className="field-topbar">
         <div className="field-brand" aria-label="DroneDream · FIELD">
-          <BrandLockup
+          <FieldBrandLockup
             className="field-brand-lockup"
-            edition="field"
             variant="compact"
           />
         </div>

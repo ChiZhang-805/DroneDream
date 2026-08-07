@@ -109,8 +109,7 @@ class FieldBrandAssetTests(unittest.TestCase):
         vite_source = FIELD_VITE.read_text(encoding="utf-8")
         desktop_config = json.loads(FIELD_CONFIG.read_text(encoding="utf-8"))
 
-        self.assertIn("BrandLockup", app_source)
-        self.assertIn('edition="field"', app_source)
+        self.assertIn("FieldBrandLockup", app_source)
         self.assertNotIn("../distribution/editions/field/branding", vite_source)
         self.assertIn('data-authority="false"', app_source)
         self.assertEqual(
