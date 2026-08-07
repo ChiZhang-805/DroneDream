@@ -90,7 +90,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     shared_ui = profile["sharedUiContract"]
     assert shared_ui["contractId"] == "dronedream-shared-edition-ui/v1"  # type: ignore[index]
     assert shared_ui["donorCommit"] == (  # type: ignore[index]
-        "ad125aa71dde48c9a02b0144be4885595073c1d9"
+        "81550b94270ee4e47eed7d520fb8280bd3a8ee7b"
     )
     assert shared_ui["minimumDesktopViewport"] == {  # type: ignore[index]
         "width": 390,
@@ -126,7 +126,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert vehicle_studio["grantsSimulationExecution"] is False
     assert vehicle_studio["grantsHardwareAuthority"] is False
     assert vehicle_studio["productSourceCommit"] == (
-        "ad125aa71dde48c9a02b0144be4885595073c1d9"
+        "81550b94270ee4e47eed7d520fb8280bd3a8ee7b"
     )
     for source_file in vehicle_studio["sourceFiles"]:
         path = ROOT / source_file["path"]

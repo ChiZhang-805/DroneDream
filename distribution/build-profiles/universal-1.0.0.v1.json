@@ -30,7 +30,7 @@
   },
   "sharedUiContract": {
     "contractId": "dronedream-shared-edition-ui/v1",
-    "donorCommit": "ad125aa71dde48c9a02b0144be4885595073c1d9",
+    "donorCommit": "81550b94270ee4e47eed7d520fb8280bd3a8ee7b",
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
@@ -50,7 +50,7 @@
       },
       {
         "path": "frontend/src/styles.css",
-        "sha256": "19a7807a277646f9fc85f0047fc20df1c87605d7a8b810ed2b81ab45b2d443cd"
+        "sha256": "eb14976bc3866467bd32258c95d4d9425c8f4bc424540775c3b62679af9fd026"
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
@@ -87,7 +87,7 @@
     "vehicleStudio": {
       "ownerEdition": "universal",
       "route": "/vehicle-studio",
-      "productSourceCommit": "ad125aa71dde48c9a02b0144be4885595073c1d9",
+      "productSourceCommit": "81550b94270ee4e47eed7d520fb8280bd3a8ee7b",
       "contract": "distribution/universal/vehicle-studio.v1.json",
       "schema": "distribution/schemas/vehicle-pack-draft-envelope.schema.json",
       "shareTargets": ["sim", "lab", "field"],
@@ -97,9 +97,11 @@
       "grantsSimulationExecution": false,
       "grantsHardwareAuthority": false,
       "sourceFiles": [
-        {"path": "frontend/src/pages/VehicleStudio.tsx", "sha256": "cc9e4d6f7abde0748b84c3a1d270cabf7614fa2dd7272f343cf5debf29494837"},
+        {"path": "frontend/src/pages/VehicleStudio.tsx", "sha256": "ff1f370855bd5da4bee6c330b00c7599325969db566f2550ba7e2eeace22aa26"},
+        {"path": "frontend/src/components/VehicleModelPreview3D.tsx", "sha256": "1111d9ef8f0fb6fde60884e9aa48d2746cbf97132f16a99d9cb3d507ca00c8d3"},
         {"path": "frontend/src/features/vehicleStudio/model.ts", "sha256": "8bd19421f9dec258fed7d0e1cb705e210af6f0e491b4e1263ff0e83c2cdc977d"},
         {"path": "frontend/src/features/vehicleStudio/pack.ts", "sha256": "82454a93ec0b8c4382971b6d51d033dca8521e569837aab9c39ba9252770684a"},
+        {"path": "frontend/src/features/vehicleStudio/preview.ts", "sha256": "939d720edb9e03f20a344d98e1abf0ba884fe8e81b2c0a09edb8e2ecba5d9d35"},
         {"path": "frontend/src/features/vehicleStudio/storage.ts", "sha256": "65fbffacae77e3508b5aca477ccfb2227ac4847a4fa1dda54d1b524c05456559"},
         {"path": "frontend/src/router.tsx", "sha256": "cca6a3dbb3463cdb36ab6bce96119f2a5abfe5600873818095dea4c4369d5b84"},
         {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "61e9d37e35c5bf59b049a1094e9ed020006159ca7c80bdc992d2a70d72371b6c"},
