@@ -155,6 +155,7 @@ def test_launcher_inspector_covers_the_installed_3d_auth_boundary() -> None:
         '"--dd-brand-end": "#d746a5"',
         'authButtonClicked: false',
         'fieldAppEntered: false',
+        'stage: "preclassification"',
         'forbiddenNetwork.length !== 0',
         'live3dInteractionObserved: true',
     ):

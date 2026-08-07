@@ -86,6 +86,17 @@ try {
     };
   }, expectedTheme);
 
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, `${JSON.stringify({
+    schemaVersion: 1,
+    kind: "dronedream-field-installed-launcher-inspection",
+    phase,
+    stage: "preclassification",
+    viewport: { width: 390, height: 620 },
+    shell,
+    passed: false,
+  }, null, 2)}\n`, "utf8");
+
   if (shell.authority !== "false" || shell.launchReady !== "true"
       || shell.progressNow !== "100" || shell.progressText !== "100%") {
     throw new Error("Field launcher readiness contract drifted.");
@@ -143,7 +154,6 @@ try {
   }
 
   const screenshotPath = resolve(dirname(outputPath), `${phase}-field-launcher-390x620.png`);
-  mkdirSync(dirname(outputPath), { recursive: true });
   await page.screenshot({ path: screenshotPath, fullPage: false });
   const result = {
     schemaVersion: 1,
