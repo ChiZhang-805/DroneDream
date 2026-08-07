@@ -230,7 +230,9 @@ def test_fourth_lifecycle_application_replaces_zero_mutation_transport_abort() -
     runner = ROOT / fourth["runner"]["path"]
     assert runner.stat().st_size == fourth["runner"]["bytes"]
     assert sha256(runner) == fourth["runner"]["sha256"]
-    assert "sim-red-final-fcabd99f-ordinal4" in runner.read_text(encoding="utf-8-sig")
+    runner_text = runner.read_text(encoding="utf-8-sig")
+    assert "sim-red-final-fcabd99f-ordinal4" in runner_text
+    assert "executionOrdinal = 4" in runner_text
     assert aborted["execution"]["commandTransportExitCode"] == 124
     assert aborted["execution"]["freshInstallerInvocations"] == 0
     assert aborted["verifiedAfterAbort"]["ownedRunRootAbsent"] is True
