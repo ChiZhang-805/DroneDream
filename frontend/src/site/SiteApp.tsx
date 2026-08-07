@@ -988,9 +988,10 @@ export function SiteApp({
     [editionAvailability],
   );
   const universalRelease = getEditionRelease(editionReleaseRegistry, "universal");
-  const universalPendingLabel = locale === "zh-CN"
-    ? "DroneDream Universal 正在准备"
-    : "DroneDream Universal is coming soon";
+  const softwareDownloadsEnabled = false;
+  const universalDownloadLabel = locale === "zh-CN"
+    ? "DroneDream Universal 下载"
+    : "DroneDream Universal Download";
 
   const selectPhaseFromKeyboard = (
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -1041,14 +1042,6 @@ export function SiteApp({
     setAuthCaptchaCycle((current) => current + 1);
     setAuthError(null);
     navigateWithinSite(websiteAuthUrl(mode, returnPath));
-  };
-
-  const openConsole = () => {
-    if (auth.account) {
-      window.location.assign("/console/");
-      return;
-    }
-    openAccount("sign-in", "/console/");
   };
 
   useEffect(() => {
@@ -1168,10 +1161,6 @@ export function SiteApp({
               <AccountIcon />
               <strong>{auth.account.displayName}</strong>
               <span>{auth.account.email}</span>
-              <a className="site-button site-button-primary" href="/console/">
-                {copy.openConsole}
-                <ArrowRightIcon />
-              </a>
               <button
                 type="button"
                 className="site-auth-text-button"
@@ -1367,13 +1356,6 @@ export function SiteApp({
               </a>
             );
           })}
-          <button
-            type="button"
-            disabled={!accountCommunityActionsEnabled}
-            onClick={openConsole}
-          >
-            {copy.console}
-          </button>
         </nav>
         <div className="site-header-actions">
           <button
@@ -1394,7 +1376,7 @@ export function SiteApp({
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z" /></svg>
             {copy.language}
           </button>
-          {universalRelease.downloadReady && universalRelease.downloadUrl ? (
+          {softwareDownloadsEnabled && universalRelease.downloadReady && universalRelease.downloadUrl ? (
             <a
               className="site-header-download"
               data-brand-handoff="existing-universal-mother-brand"
@@ -1421,8 +1403,7 @@ export function SiteApp({
               data-edition="universal"
               data-release-registry="exact-edition-exe-v1"
               disabled
-              title={universalPendingLabel}
-              aria-label={universalPendingLabel}
+              aria-label={universalDownloadLabel}
             >
               <img
                 alt=""
@@ -1467,6 +1448,7 @@ export function SiteApp({
           <ProductPage
             availability={editionAvailability}
             locale={locale}
+            softwareDownloadsEnabled={softwareDownloadsEnabled}
           />
         ) : sitePage === "pricing" ? (
           <PricingPage
@@ -1499,14 +1481,15 @@ export function SiteApp({
                 <span className="site-hero-line site-hero-line-accent">{copy.heroAccent}</span>
               </h1>
               <div className="site-hero-actions">
-                <a
+                <button
+                  type="button"
                   className="site-button site-button-primary"
-                  href={release.downloadUrl}
-                  download={release.fileName}
+                  disabled
+                  aria-label={copy.downloadWindows}
                 >
                   <DownloadIcon />
                   {copy.downloadWindows}
-                </a>
+                </button>
                 <a className="site-button site-button-ghost" href="#product">
                   <ArrowRightIcon />
                   {copy.explore}
@@ -1699,14 +1682,15 @@ export function SiteApp({
                 <p className="site-eyebrow">{copy.downloadEyebrow}</p>
                 <h2>{copy.downloadTitle}</h2>
                 <p data-copy-block data-copy-id="download-body">{copy.downloadBody}</p>
-                <a
+                <button
+                  type="button"
                   className="site-button site-button-primary"
-                  href={release.downloadUrl}
-                  download={release.fileName}
+                  disabled
+                  aria-label={copy.downloadAgain}
                 >
                   <DownloadIcon />
                   {copy.downloadAgain}
-                </a>
+                </button>
               </div>
               <div className="site-release-card">
                 <dl>

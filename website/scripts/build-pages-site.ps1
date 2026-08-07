@@ -162,6 +162,21 @@ $consoleHtml = Join-Path $outputDirectory "console\index.html"
 if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
     throw "The console build completed without producing $consoleHtml"
 }
+$disabledConsoleHtml = @'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>DroneDream</title>
+    <script>window.location.replace("/");</script>
+  </head>
+  <body></body>
+</html>
+'@
+$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+[IO.File]::WriteAllText($consoleHtml, $disabledConsoleHtml, $utf8WithoutBom)
 
 # GitHub Pages has no server-side SPA fallback. Publish real index files for
 # every fixed console route so direct navigation returns HTTP 200 instead of
@@ -202,7 +217,6 @@ foreach ($marker in @(
 }
 
 Copy-Item -LiteralPath $siteHtml -Destination (Join-Path $outputDirectory "index.html") -Force
-$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
 $pagesNotFoundHtml = @'
 <!doctype html>
 <html lang="en">

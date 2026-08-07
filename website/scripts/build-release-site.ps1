@@ -107,11 +107,25 @@ $consoleHtml = Join-Path $outputDirectory "console\index.html"
 if (-not (Test-Path -LiteralPath $consoleHtml -PathType Leaf)) {
     throw "The console build completed without producing $consoleHtml"
 }
+$disabledConsoleHtml = @'
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>DroneDream</title>
+    <script>window.location.replace("/");</script>
+  </head>
+  <body></body>
+</html>
+'@
+$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($consoleHtml, $disabledConsoleHtml, $utf8WithoutBom)
 Copy-Item -LiteralPath $siteHtml -Destination (Join-Path $outputDirectory "index.html") -Force
 
 $metadataPath = Join-Path $downloadsDirectory "latest.json"
 $metadataJson = $metadata | ConvertTo-Json
-$utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($metadataPath, "$metadataJson$([Environment]::NewLine)", $utf8WithoutBom)
 
 # Publish an integrity manifest for the complete static release, not just the

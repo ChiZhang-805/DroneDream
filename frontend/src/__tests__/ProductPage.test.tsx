@@ -107,11 +107,24 @@ describe("ProductPage", () => {
     },
   );
 
-  it("enables only a product whose complete published artifact binding is present", () => {
+  it("keeps published product bindings hidden while software downloads are closed", () => {
     render(
       <ProductPage
         availability={publishedSimAvailability()}
         locale="en"
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: "DroneDream-Sim-1.0.0.exe" }))
+      .toBeNull();
+  });
+
+  it("enables only a product whose complete published artifact binding is present when downloads are opened", () => {
+    render(
+      <ProductPage
+        availability={publishedSimAvailability()}
+        locale="en"
+        softwareDownloadsEnabled
       />,
     );
 

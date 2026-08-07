@@ -429,6 +429,16 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .site-button-primary:hover { transform: translateY(-3px); box-shadow: 0 18px 48px rgba(111, 203, 255, 0.28); }
+.site-button:disabled {
+  opacity: 0.48;
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+}
+.site-button:disabled:hover {
+  box-shadow: none;
+  transform: none;
+}
 .site-button-ghost { border-color: rgba(255, 255, 255, 0.2); color: #fff; background: rgba(255, 255, 255, 0.045); backdrop-filter: blur(10px); }
 .site-button-ghost:hover { transform: translateY(-3px); border-color: rgba(104, 232, 255, 0.5); background: rgba(104, 232, 255, 0.08); }
 

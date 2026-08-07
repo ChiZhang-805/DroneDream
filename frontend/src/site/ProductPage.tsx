@@ -74,9 +74,11 @@ function DownloadIcon() {
 export function ProductPage({
   availability,
   locale,
+  softwareDownloadsEnabled = false,
 }: {
   availability: EditionAvailabilityDocument;
   locale: Locale;
+  softwareDownloadsEnabled?: boolean;
 }) {
   const text = copy[locale];
   const registry = buildEditionReleaseRegistry(availability);
@@ -134,7 +136,7 @@ export function ProductPage({
                 <ul>
                   {editionText.features.map((feature) => <li key={feature}>{feature}</li>)}
                 </ul>
-                {release.downloadReady && release.downloadUrl ? (
+                {softwareDownloadsEnabled && release.downloadReady && release.downloadUrl ? (
                   <a
                     className="site-product-edition-action"
                     href={release.downloadUrl}

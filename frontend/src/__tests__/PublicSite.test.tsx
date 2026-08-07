@@ -49,12 +49,13 @@ describe("DroneDream public website", () => {
     expect(screen.queryByText("WINDOWS RELEASE")).toBeNull();
     expect(screen.getByText(/This preview candidate is not Authenticode-signed/i)).toBeVisible();
     expect(screen.getByText(/Verify its SHA-256 before installation/i)).toBeVisible();
-    expect(screen.getByRole("link", { name: "Download Windows preview" }))
-      .toHaveAttribute("href", fallbackRelease.downloadUrl);
-    expect(screen.getByRole("button", { name: "DroneDream Universal is coming soon" }))
+    expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Download Windows preview" }))
+      .toBeDisabled();
+    expect(screen.getByRole("button", { name: "DroneDream Universal Download" }))
       .toBeDisabled();
     const universalDownload = screen.getByRole("button", {
-      name: "DroneDream Universal is coming soon",
+      name: "DroneDream Universal Download",
     });
     expect(universalDownload).toHaveAttribute("data-edition", "universal");
     expect(universalDownload).toHaveAttribute("data-release-registry", "exact-edition-exe-v1");
@@ -105,7 +106,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("link", { name: "Price" })).toHaveAttribute("href", "/pricing/");
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
     expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/community/");
-    expect(screen.getByRole("button", { name: "Console" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Console" })).toBeNull();
     expectContentLinksToUseIcons(container);
 
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -122,7 +123,7 @@ describe("DroneDream public website", () => {
     ));
   });
 
-  it("unlocks only the Universal header entry from an accepted Universal registry item", async () => {
+  it("keeps the Universal header download closed even when metadata is accepted", async () => {
     const availability = structuredClone(fallbackEditionAvailability);
     const universal = availability.editions.find(({ id }) => id === "universal");
     if (!universal) throw new Error("Missing Universal fixture");
@@ -148,29 +149,29 @@ describe("DroneDream public website", () => {
     }));
     renderSite();
 
-    const link = await screen.findByRole("link", { name: /DroneDream Universal.*Download/ });
-    expect(link).toHaveAttribute("href", "/downloads/DroneDream-Universal-1.0.0.exe");
-    expect(link).toHaveAttribute("download", "DroneDream-Universal-1.0.0.exe");
-    expect(link).toHaveAttribute("data-edition", "universal");
+    const button = await screen.findByRole("button", { name: "DroneDream Universal Download" });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("data-edition", "universal");
+    expect(document.querySelector('a[href*="DroneDream-Universal-1.0.0.exe"]')).toBeNull();
     expect(document.querySelector('a[href*="DroneDream-Sim-1.0.0.exe"]')).toBeNull();
     expect(document.querySelector('a[href*="DroneDream-Lab-1.0.0.exe"]')).toBeNull();
     expect(document.querySelector('a[href*="DroneDream-Field-1.0.0.exe"]')).toBeNull();
   });
 
-  it("keeps static downloads available while HTTP-mirror sensitive entries are disabled", () => {
+  it("keeps software downloads and HTTP-mirror sensitive entries disabled", () => {
     render(
       <I18nProvider>
         <SiteApp sensitiveCloudActionsEnabled={false} />
       </I18nProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Console" })).not.toHaveAttribute("title");
+    expect(screen.queryByRole("button", { name: "Console" })).toBeNull();
     expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Login" })).not.toHaveAttribute("title");
-    expect(screen.getByRole("link", { name: "Download Windows preview" }))
-      .toHaveAttribute("href", fallbackRelease.downloadUrl);
-    expect(screen.getByRole("button", { name: "DroneDream Universal is coming soon" }))
+    expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Download Windows preview" }))
+      .toBeDisabled();
+    expect(screen.getByRole("button", { name: "DroneDream Universal Download" }))
       .toBeDisabled();
   });
 
@@ -191,13 +192,14 @@ describe("DroneDream public website", () => {
     expect(document.querySelector('[data-auth-source="website"]')).toBeNull();
     expect(screen.queryByRole("status")).toBeNull();
     expect(document.body).not.toHaveTextContent("HTTP mirror");
-    expect(screen.getByRole("button", { name: "Console" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Console" })).toBeNull();
     expect(screen.getByRole("button", { name: "Login" })).toBeDisabled();
-    expect(screen.getByRole("link", { name: "Download Windows preview" }))
-      .toHaveAttribute("href", fallbackRelease.downloadUrl);
+    expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Download Windows preview" }))
+      .toBeDisabled();
   });
 
-  it("opens account, community, and console for the approved internal preview while payment stays disabled", async () => {
+  it("opens account and community for the approved internal preview while console and payment stay disabled", async () => {
     const { unmount } = render(
       <I18nProvider>
         <SiteApp
@@ -208,7 +210,7 @@ describe("DroneDream public website", () => {
     );
 
     expect(screen.getByRole("button", { name: "Login" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Console" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Console" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Login" }));
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeVisible();
     expect(document.querySelector('[data-auth-source="website"]')).not.toBeNull();
@@ -599,9 +601,10 @@ title: "DroneDream 1.0.0 用户说明书"
     expect(screen.getByText(/当前为未签名的预览候选版本/)).toBeVisible();
     expect(screen.getByText(/Windows 可能显示“未知发布者”警告/)).toBeVisible();
     expect(screen.getByText(/请务必确认下载文件与本页记录一致后再安装/)).toBeVisible();
-    expect(screen.getByRole("link", { name: "下载 Windows 预览版" }))
-      .toHaveAttribute("href", fallbackRelease.downloadUrl);
-    expect(screen.getByRole("button", { name: "DroneDream Universal 正在准备" }))
+    expect(screen.queryByRole("link", { name: "下载 Windows 预览版" })).toBeNull();
+    expect(screen.getByRole("button", { name: "下载 Windows 预览版" }))
+      .toBeDisabled();
+    expect(screen.getByRole("button", { name: "DroneDream Universal 下载" }))
       .toBeDisabled();
     expect(screen.getByRole("link", { name: "产品" })).toHaveAttribute("href", "/product/");
     expect(screen.getByRole("link", { name: "价格" })).toHaveAttribute("href", "/pricing/");
@@ -686,8 +689,10 @@ title: "DroneDream 1.0.0 用户说明书"
     renderSite();
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
-    expect(screen.getByRole("link", { name: "Download Windows preview" }))
-      .toHaveAttribute("href", nextRelease.downloadUrl);
+    expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Download Windows preview" }))
+      .toBeDisabled();
+    expect(document.body).not.toContainHTML(nextRelease.downloadUrl);
   });
 
   it("uses a valid GitHub Release manifest for the distinct current preview", async () => {
@@ -709,8 +714,10 @@ title: "DroneDream 1.0.0 用户说明书"
     renderSite();
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
-    expect(screen.getByRole("link", { name: "Download Windows preview" }))
-      .toHaveAttribute("href", nextRelease.downloadUrl);
+    expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Download Windows preview" }))
+      .toBeDisabled();
+    expect(document.body).not.toContainHTML(nextRelease.downloadUrl);
   });
 
   it("does not replace the embedded release with stale metadata", async () => {
@@ -730,9 +737,10 @@ title: "DroneDream 1.0.0 用户说明书"
     renderSite();
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
-    expect(screen.getByRole("link", { name: "Download Windows preview" }))
-      .toHaveAttribute("href", fallbackRelease.downloadUrl);
-    expect(screen.getByRole("link", { name: "Download Windows preview" }))
-      .not.toHaveAttribute("href", staleRelease.downloadUrl);
+    expect(screen.queryByRole("link", { name: "Download Windows preview" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Download Windows preview" }))
+      .toBeDisabled();
+    expect(document.body).not.toContainHTML(fallbackRelease.downloadUrl);
+    expect(document.body).not.toContainHTML(staleRelease.downloadUrl);
   });
 });
