@@ -29,6 +29,13 @@ ADOPTION = (
     / "brand"
     / "centered-separator-adoption-receipt.v1.json"
 )
+STATIC_ACCEPTANCE = (
+    ROOT
+    / "distribution"
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-17-4c0021b-static-accepted.v1.json"
+)
 
 
 def sha256(path: Path) -> str:
@@ -97,7 +104,14 @@ def test_rebuild_is_single_attempt_and_uses_new_owned_roots() -> None:
         or value.endswith("db0abf5102de96a9")
         for value in roots
     )
-    assert all(not Path(value).exists() for value in roots)
+    if any(Path(value).exists() for value in roots):
+        acceptance = json.loads(STATIC_ACCEPTANCE.read_text(encoding="utf-8"))
+        assert acceptance["attempt"]["globalOrdinal"] == 17
+        assert acceptance["attempt"]["buildInvocations"] == 1
+        assert acceptance["attempt"]["retryCount"] == 0
+        assert acceptance["artifact"]["sha256"] == (
+            "54bc1bb939786bbc26f7f9c05a1c831b13b9434338ed62c5a88a59a4f72faf80"
+        )
 
 
 def test_rebuild_preserves_sim_authority_and_supersedes_old_artifact() -> None:

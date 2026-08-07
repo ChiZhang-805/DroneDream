@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-final-candidate-static-acceptance",
+  "recordVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "static-accepted-lifecycle-pending",
+  "sourceSeparation": {
+    "productSourceCommit": "4c0021b28161a9fa2210e6deab0edab2e4f8372d",
+    "productSourceTree": "20c1004aeed51a71d2b427ad2ae1ea9b220517ff",
+    "buildApplicationEvidenceHead": "d44dbdd5558ee1a1c3cd0b20ef515f8180baff9b",
+    "recordCommitPolicy": "commit-containing-this-record-and-tests",
+    "evidenceIsProductSource": false,
+    "sourceTreeWasClean": true
+  },
+  "buildProfile": {
+    "path": "distribution/sim/build-profile.v1.json",
+    "bytes": 6519,
+    "sha256": "452a7b8f0fe2a3a7db95a8d68aed9ece6c204826234e4405c35d1317d737000d",
+    "commonCoreCommit": "4024e546fe6eaf298a37375924315a9816f6bf41",
+    "commonCoreHash": "c7e7da4cbd0dfca633e930e944e0ad240c908090c76800c7cb4a3d923aafcea8"
+  },
+  "attempt": {
+    "globalOrdinal": 17,
+    "sourceBuildInvocationOrdinal": 1,
+    "sourceBuildInvocationMaximum": 1,
+    "buildInvocations": 1,
+    "frontendBuilds": 1,
+    "tauriBuilds": 1,
+    "cargoBuilds": 1,
+    "nsisBuilds": 1,
+    "artifactBuilds": 1,
+    "retryCount": 0,
+    "outerLauncherExitCode": 1,
+    "outerLauncherClassification": "false-negative-expected-non-git-probe-native-error-state-leak",
+    "actualBuildState": "complete"
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b/bundle/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "productName": "DroneDream · SIM",
+    "version": "1.0.0",
+    "bytes": 11920986,
+    "sha256": "54bc1bb939786bbc26f7f9c05a1c831b13b9434338ed62c5a88a59a4f72faf80",
+    "authenticodeState": "NotSigned",
+    "peCertificateTableOffset": 0,
+    "peCertificateTableSize": 0
+  },
+  "updater": {
+    "signaturePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b/bundle/DroneDream-Sim-1.0.0.exe.sig",
+    "signatureBytes": 428,
+    "signatureSha256": "8e5ba03eaff41a3fd881779f9bc3fb1fc84fa81b2ac7fe68a61efdf546e36e04",
+    "payloadSignatureVerification": "pass-ed25519-over-blake2b-512",
+    "trustedCommentSignatureVerification": "pass",
+    "configuredKeyId": "BA3FDCAF71CE2FF5",
+    "metadataPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-4c0021b-ordinal17/x86_64-pc-windows-gnullvm/release/bundle/nsis/latest-sim.json",
+    "metadataBytes": 1016,
+    "metadataSha256": "31f4ccbdf17b87c9d73e7c103b03a96b2e3a023a68bfcddd4000215fbf7a89a3"
+  },
+  "evidence": {
+    "root": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal17-4c0021b",
+    "buildReceiptSha256": "ae1738ba6d82249a428f39655316af71de93e25c3962caa5a3690042ca5b44a4",
+    "artifactManifestSha256": "09189cec30d40bd3b31803ae4bd4cb263ff4f202f346ebd183daaae5f501b9cd",
+    "payloadAuditSha256": "c8aacf3cfdc992363fb0150e8ba90926b6b0b4a5cf14977024f3f24fe2655ec5",
+    "outerExitReconciliationSha256": "d9c17616b03695f8d2db795b4c77ad0b93ec1a860d9bec47adededb36f9e30d6",
+    "updaterSignatureVerificationSha256": "3e414f45c3c0b4a7e39ac370bda27acf0770c142e6922eaad832922ac90b2a36",
+    "buildTranscriptSha256": "4beb33d66f490bff721f64e758b90176b63fd939c9670dc25778573f413513a8"
+  },
+  "payload": {
+    "enginePackProfileId": "sim-only",
+    "enginePackProfileSha256": "439265c2df93661a8e9b7df2f75a24996c115cf414065d22e6c960037d71a177",
+    "fileCount": 220,
+    "simulatorScriptCount": 6,
+    "backendSimulatorFileCount": 16,
+    "editionManifestPaths": ["distribution/editions/sim.v1.json"],
+    "vehicleMetadataPaths": [
+      "distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+      "distribution/vehicle-packs/registry.v1.json"
+    ],
+    "runtimeBaseEmbedded": false,
+    "runtimeExecutableCount": 0,
+    "validatedVehiclePackCount": 0,
+    "forbiddenFindingCount": 0,
+    "hardwarePayloadAllowed": false,
+    "contractPassed": true
+  },
+  "brandAndInstaller": {
+    "centeredSeparatorAssetSha256": "f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e",
+    "separatorGapLeftPx": 53,
+    "separatorGapRightPx": 53,
+    "separatorTolerancePx": 0,
+    "installerIcoSha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+    "installerIcoBytes": 54431,
+    "displayNameUsesUnicodeCenteredDot": true,
+    "displayNameCenteredDotCodePoint": 183,
+    "generatedNsiSha256": "8cf343e86eb284f60c765f33f639102b8758ca6645485132928802bb0ec03850",
+    "englishAndSimplifiedChinese": true,
+    "webView2BootstrapperAndLoader": true,
+    "currentUserInstallMode": true,
+    "sideBySideIdentity": "DroneDream-Sim"
+  },
+  "modelHarness": {
+    "requiredOptimizer": "llm_harness",
+    "normalModelTurnsPerGeneration": 2,
+    "maximumModelTurnsPerGeneration": 4,
+    "modelSelectsAllowlistedTools": true,
+    "feedbackDrivenDiagnosisAndCriticTurns": true,
+    "harnessOwnsBudgetsValidationExecutionQualificationHoldoutRollback": true,
+    "candidateClassification": "simulation-hypothesis-not-hardware-approved",
+    "hardwareAuthorityGranted": false,
+    "realModelProviderInvokedDuringAcceptance": false,
+    "modelApiKeyRead": false
+  },
+  "verification": {
+    "releaseSourcePolicy": "pass",
+    "brandProductionBundleHash": "pass",
+    "updaterCryptographicVerification": "pass",
+    "simPayloadContract": "pass"
+  },
+  "lifecycle": {
+    "eligible": true,
+    "validated": false
+  },
+  "nonClaims": {
+    "releaseReady": false,
+    "websiteHandoffReady": false,
+    "websiteDeployed": false,
+    "runtimeStarted": false,
+    "px4Started": false,
+    "gazeboStarted": false,
+    "hardwareUsed": false,
+    "realModelProviderUsed": false
+  },
+  "nextGate": "exact-artifact-isolated-lifecycle-acceptance"
+}
