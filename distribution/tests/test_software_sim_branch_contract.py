@@ -243,6 +243,12 @@ YELLOW_ATTEMPT_14_PLAN_PATH = (
     / "desktop"
     / "yellow-build-attempt-14-6dd792c-plan-ready.v1.json"
 )
+YELLOW_ATTEMPT_14_FAILURE_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-14-6dd792c-postbuild-dependency-tree-failed.v1.json"
+)
 ORDINAL_9_DEPENDENCY_DIFFERENCE_PATH = (
     DISTRIBUTION
     / "sim"
@@ -2658,7 +2664,7 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
         self.assertEqual(receipt["executedCounts"]["buildScriptInvocations"], 0)
         self.assertTrue(receipt["nextGate"]["ordinalThirteenPermanentlyConsumed"])
 
-    def test_yellow_attempt_14_binds_fixed_product_and_absent_roots(self) -> None:
+    def test_yellow_attempt_14_binds_fixed_product_and_frozen_failure(self) -> None:
         application = load_json(YELLOW_ATTEMPT_14_APPLICATION_PATH)
         source = application["sourceSeparation"]
         self.assertEqual(
@@ -2677,14 +2683,15 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             application["dependencyBundle"]["bundleId"],
             "npm-win32-x64-9df2276dd596a145",
         )
-        for path in (
-            application["ownedBuildSurface"]["sourceRoot"],
-            application["ownedBuildSurface"]["runRoot"],
-            application["ownedBuildSurface"]["cargoTargetDir"],
-            application["attemptOwnedCacheSnapshot"]["snapshotRoot"],
-            application["dependencyBundle"]["dependencyRoot"],
-        ):
-            self.assertFalse(Path(path).exists(), path)
+        self.assertFalse(application["ownedBuildSurface"]["sourceRootExistsAtPlanFreeze"])
+        self.assertFalse(application["ownedBuildSurface"]["runRootExistsAtPlanFreeze"])
+        self.assertFalse(application["ownedBuildSurface"]["cargoTargetDirExistsAtPlanFreeze"])
+        self.assertFalse(
+            application["attemptOwnedCacheSnapshot"]["snapshotRootExistsAtPlanFreeze"]
+        )
+        self.assertFalse(
+            application["dependencyBundle"]["dependencyRootExistsAtPlanFreeze"]
+        )
         plan = load_json(YELLOW_ATTEMPT_14_PLAN_PATH)
         self.assertEqual(
             hashlib.sha256(YELLOW_ATTEMPT_14_APPLICATION_PATH.read_bytes()).hexdigest(),
@@ -2694,6 +2701,15 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             plan["entryScript"]["sha256"],
             plan["exactFutureCommand"]["executeAuthorizedSequence"],
         )
+        receipt = load_json(YELLOW_ATTEMPT_14_FAILURE_PATH)
+        self.assertEqual(receipt["state"], "failed-frozen-no-retry")
+        self.assertEqual(receipt["failure"]["stage"], "postbuild-dependency-verification")
+        self.assertEqual(receipt["executedCounts"]["buildScript"], 1)
+        self.assertEqual(receipt["executedCounts"]["nsis"], 1)
+        self.assertEqual(receipt["executedCounts"]["fixedArtifact"], 0)
+        self.assertFalse(receipt["internalFailureArtifact"]["releaseAsset"])
+        self.assertFalse(receipt["internalFailureArtifact"]["installAuthorized"])
+        self.assertFalse(receipt["nextGate"]["ordinalFourteenMayBeRetried"])
 
     def test_shared_lifecycle_contract_normalizes_sim_registration(self) -> None:
         result = run_lifecycle_contract(

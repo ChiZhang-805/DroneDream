@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-failure-receipt",
+  "state": "failed-frozen-no-retry",
+  "editionId": "sim",
+  "attempt": {
+    "globalCommandApplicationOrdinal": 14,
+    "sourceBuildInvocationOrdinal": 1,
+    "sourceBuildInvocationMaximum": 1,
+    "retry": 0,
+    "permanentlyConsumed": true
+  },
+  "sourceSeparation": {
+    "productSourceCommit": "6dd792cdef74536a6495f92de23b54f49d696f40",
+    "productSourceTree": "500d15f7c6c2a4877f3fccf38f2fefff09097008",
+    "evidenceHeadBeforeReceipt": "917b3210f729832057e624052c7e1248e12656d4",
+    "evidenceIsProductSource": false
+  },
+  "frozenInputs": {
+    "application": {
+      "path": "distribution/sim/desktop/yellow-build-attempt-14-6dd792c-application.v1.json",
+      "bytes": 16291,
+      "sha256": "6d77237d98c8d5c50d4fedeeeb653c5a072ce3fd171cf91fd4aa0c7c1bd55825"
+    },
+    "entryScript": {
+      "path": "distribution/sim/desktop/invoke-yellow-build-attempt-14-6dd792c.ps1",
+      "bytes": 27180,
+      "sha256": "9d62bd92a6ed8b21106c60ff4fe58764e12146794bdb0a5da18372c1e9cf17c3"
+    },
+    "plan": {
+      "path": "distribution/sim/desktop/yellow-build-attempt-14-6dd792c-plan-ready.v1.json",
+      "bytes": 9597,
+      "sha256": "d5527bdbaa58b3eef8ddc1fe08cfb73c2642114ac3427e941b17083088f113a3"
+    }
+  },
+  "failure": {
+    "stage": "postbuild-dependency-verification",
+    "class": "dependency-tree-undeclared-or-missing-entries",
+    "message": "The dependency tree contains undeclared or missing entries.",
+    "buildProcessExitWasSuccessBeforePostbuild": true,
+    "fixedArtifactPromoted": false,
+    "updaterCompanionProduced": false
+  },
+  "executedCounts": {
+    "preflight": 1,
+    "prepare": 1,
+    "execute": 1,
+    "snapshot": 1,
+    "selectedCacheCopies": 646,
+    "npmCi": 2,
+    "junctionsCreated": 2,
+    "buildScript": 1,
+    "frontend": 1,
+    "tauriCli": 1,
+    "cargo": 1,
+    "nsis": 1,
+    "internalArtifact": 1,
+    "fixedArtifact": 0,
+    "retry": 0
+  },
+  "internalFailureArtifact": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-6dd792c-ordinal14/x86_64-pc-windows-gnullvm/release/bundle/nsis/DroneDream-Sim_1.0.0_x64-setup.exe",
+    "bytes": 11933973,
+    "sha256": "edbfe8a03790273c7d5a0273a2f41b13ae50ef9dd7123d47c42a7c7fe844eb96",
+    "authenticode": "NotSigned",
+    "peCertificateTableBytes": 0,
+    "signaturePathExists": false,
+    "releaseAsset": false,
+    "installAuthorized": false,
+    "websiteHandoffAuthorized": false
+  },
+  "ownedRoots": {
+    "sourceRoot": "C:/Users/zju20/dds14",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal14-6dd792c",
+    "cargoTargetDir": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-6dd792c-ordinal14",
+    "snapshotRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm-snapshots/npm-snapshot-ordinal14-6dd792c",
+    "dependencyRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-9df2276dd596a145",
+    "desktopNodeModulesJunctionStillPresent": true,
+    "frontendNodeModulesJunctionStillPresent": true,
+    "preserveReadOnly": true
+  },
+  "externalEvidence": {
+    "buildTranscript": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal14-6dd792c/receipt/build-transcript.log",
+      "bytes": 9172,
+      "sha256": "3fbee09b3a20f6d01a65e50a9abd6e8c24ab15e4defbc188ff8b367b8e7bb77f"
+    },
+    "attemptLockSha256": "d08e4ad211b1c444a22851daca884c6a72a9fe2312af91ab8f9051e12863b964",
+    "dependencyPreparationReceiptSha256": "ce007876530b3e20b1af88727908343af1275679180a9625450e1adf90e41e25",
+    "offlineCacheSnapshotSha256": "a98f003610e629c1a0ef6cfa4bf6f76d2668065af3792d3117ea3ed4d6923ea6"
+  },
+  "nextGate": {
+    "ordinalFourteenMayBeRetried": false,
+    "oldArtifactMayBeRelabeled": false,
+    "newExactSourceRequired": true,
+    "dependencyPostbuildContractMustBeFixed": true,
+    "newBuildMustUseANewOrdinal": true
+  }
+}
