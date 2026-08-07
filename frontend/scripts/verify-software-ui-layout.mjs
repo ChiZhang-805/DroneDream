@@ -36,7 +36,7 @@ const settingsOnly = Boolean(args.get("--settings-only"));
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 
-const cases = [
+const baseCases = [
   { id: "desktop-en", locale: "en", edition: "sim", viewport: { width: 1440, height: 1000 } },
   { id: "desktop-zh", locale: "zh-CN", edition: "sim", viewport: { width: 1440, height: 1000 } },
   { id: "tablet-en", locale: "en", edition: "sim", viewport: { width: 760, height: 900 } },
@@ -44,6 +44,15 @@ const cases = [
   { id: "mobile-en", locale: "en", edition: "sim", viewport: { width: 390, height: 844 } },
   { id: "mobile-zh", locale: "zh-CN", edition: "sim", viewport: { width: 390, height: 844 } },
 ].filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520);
+const cases = baseCases.flatMap((testCase) => (
+  settingsOnly
+    ? ["dark", "light"].map((appearance) => ({
+        ...testCase,
+        id: `${testCase.id}-${appearance}`,
+        appearance,
+      }))
+    : [{ ...testCase, appearance: "dark" }]
+));
 const canonicalThemeColors = Object.freeze({
   universal: ["#FF5574", "#6A4CFF", "#E657D1"],
   sim: ["#00D9FF", "#2671FF", "#744CFF"],
@@ -171,6 +180,7 @@ async function verifySettings(page, testCase) {
     const style = getComputedStyle(element);
     return {
       edition: element.dataset.brandEdition,
+      appearance: element.dataset.ddAppearance,
       presentationOnly: element.dataset.themePresentationOnly,
       grantsHardwareAuthority: element.dataset.themeGrantsHardwareAuthority,
       colors: [
@@ -181,11 +191,44 @@ async function verifySettings(page, testCase) {
     };
   });
   assert.equal(themeBinding.edition, testCase.edition);
+  assert.equal(themeBinding.appearance, testCase.appearance);
   assert.equal(themeBinding.presentationOnly, "true");
   assert.equal(themeBinding.grantsHardwareAuthority, "false");
   assert.deepEqual(themeBinding.colors, canonicalThemeColors[testCase.edition]);
   const assistantModel = page.locator(".assistant-model-button");
   await assistantModel.waitFor();
+  const workspacePresentation = await page.evaluate(() => {
+    const heading = document.querySelector(".assistant-empty-state h1");
+    const stage = document.querySelector(".app-main:has(.experiment-assistant-page)");
+    const brand = document.querySelector(".app-title .brand-lockup");
+    const rgb = (value) => (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+    const luminance = (value) => {
+      const channels = rgb(value).map((channel) => {
+        const normalized = channel / 255;
+        return normalized <= 0.03928
+          ? normalized / 12.92
+          : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    };
+    const foreground = getComputedStyle(heading).color;
+    const rawBackground = getComputedStyle(stage).backgroundColor;
+    const background = rawBackground === "rgba(0, 0, 0, 0)"
+      ? document.documentElement.dataset.ddAppearance === "dark"
+        ? "rgb(7, 27, 49)"
+        : "rgb(241, 250, 255)"
+      : rawBackground;
+    const lighter = Math.max(luminance(foreground), luminance(background));
+    const darker = Math.min(luminance(foreground), luminance(background));
+    return {
+      brandEdition: brand?.getAttribute("data-brand-edition"),
+      foreground,
+      background,
+      contrast: (lighter + 0.05) / (darker + 0.05),
+    };
+  });
+  assert.equal(workspacePresentation.brandEdition, testCase.edition);
+  assert(workspacePresentation.contrast >= 4.5);
   assert.equal(await assistantModel.locator("option").count(), 3);
   assert.equal(
     await assistantModel.getAttribute("aria-label"),
@@ -217,6 +260,7 @@ async function verifySettings(page, testCase) {
     `${testCase.id}: Settings modal must render above the mobile application header`,
   );
   const panelMeasurements = [];
+  const panelImages = [];
   for (const tab of await dialog.getByRole("tab").all()) {
     await tab.click();
     const measurement = await dialog.evaluate((element) => {
@@ -237,6 +281,7 @@ async function verifySettings(page, testCase) {
         grantsHardwareAuthority: element.getAttribute("data-grants-hardware-authority"),
       };
     });
+    const panelImage = await screenshot(page, testCase.id, `settings-${measurement.tab}`);
     assert(
       measurement.dialogScrollHeight <= measurement.dialogClientHeight + 1,
       `${testCase.id}: Settings dialog vertically overflowed on ${measurement.tab}`,
@@ -250,6 +295,7 @@ async function verifySettings(page, testCase) {
     assert(measurement.panelBottom <= measurement.dialogBottom + 1);
     assert.equal(measurement.grantsHardwareAuthority, "false");
     panelMeasurements.push(measurement);
+    panelImages.push(panelImage);
   }
   await dialog.getByRole("tab", {
     name: testCase.locale === "en" ? "Model" : "模型",
@@ -317,10 +363,19 @@ async function verifySettings(page, testCase) {
   );
   assert.equal(metrics.managedModelOptions, 3);
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
-  assert.equal(metrics.foregroundColor, "rgb(247, 242, 255)");
-  assert.equal(metrics.mutedColor, "rgb(214, 183, 234)");
-  assert.equal(metrics.accessModeColor, "rgb(247, 242, 255)");
-  assert.equal(metrics.headingColor, "rgb(30, 23, 33)");
+  const expectedSettingsColors = testCase.appearance === "light"
+    ? {
+        foreground: "rgb(16, 40, 59)",
+        muted: "rgb(92, 113, 129)",
+      }
+    : {
+        foreground: "rgb(244, 248, 255)",
+        muted: "rgb(174, 189, 208)",
+      };
+  assert.equal(metrics.foregroundColor, expectedSettingsColors.foreground);
+  assert.equal(metrics.mutedColor, expectedSettingsColors.muted);
+  assert.equal(metrics.accessModeColor, expectedSettingsColors.foreground);
+  assert.equal(metrics.headingColor, expectedSettingsColors.foreground);
   const manage = usage.locator(".settings-model-plan-row .btn");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
@@ -332,9 +387,11 @@ async function verifySettings(page, testCase) {
   return {
     ...metrics,
     themeBinding,
+    workspacePresentation,
     layerBinding,
     settingsViewport,
     panelMeasurements,
+    panelImages,
     keyboardFocusOrder: "manage-subscription -> refresh-usage",
     assistantModelImage,
     image,
@@ -1121,9 +1178,10 @@ let failure;
 try {
   for (const testCase of cases) {
     const context = await browser.newContext({ viewport: testCase.viewport });
-    await context.addInitScript(({ locale }) => {
+    await context.addInitScript(({ locale, appearance }) => {
       window.localStorage.setItem("drone-dream:locale", locale);
-    }, { locale: testCase.locale });
+      window.localStorage.setItem("dronedream:appearance", appearance);
+    }, { locale: testCase.locale, appearance: testCase.appearance });
     await context.route("**/api/v1/**", (route) => route.fulfill({
       status: 503,
       contentType: "application/json",

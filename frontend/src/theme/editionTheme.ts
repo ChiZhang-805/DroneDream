@@ -14,12 +14,15 @@ export type EditionTheme3D = Readonly<{
   gridMinor: number;
 }>;
 
+export type AppearanceMode = "dark" | "light";
+
 export type EditionTheme = Readonly<{
   id: BrandEditionId;
   productName: string;
   gradientStops: readonly [string, string, string];
   lightSurface: string;
   darkSurface: string;
+  appearance: AppearanceMode;
   presentationOnly: true;
   grantsHardwareAuthority: false;
   three: EditionTheme3D;
@@ -32,24 +35,27 @@ function hexColorNumber(value: string): number {
   return Number.parseInt(value.slice(1), 16);
 }
 
-function createTheme(id: BrandEditionId): EditionTheme {
+function createTheme(id: BrandEditionId, appearance: AppearanceMode = "dark"): EditionTheme {
   const token = EDITION_BRAND_TOKENS[id];
   const [primary, secondary, tertiary] = token.gradientStops;
-  const darkSurface = hexColorNumber(token.darkSurface);
+  const sceneSurface = hexColorNumber(
+    appearance === "dark" ? token.darkSurface : token.lightSurface,
+  );
   return Object.freeze({
     id,
     productName: token.productName,
     gradientStops: token.gradientStops,
     lightSurface: token.lightSurface,
     darkSurface: token.darkSurface,
+    appearance,
     presentationOnly: BRAND_PRESENTATION_ONLY,
     grantsHardwareAuthority: BRAND_GRANTS_HARDWARE_AUTHORITY,
     three: Object.freeze({
       primary: hexColorNumber(primary),
       secondary: hexColorNumber(secondary),
       tertiary: hexColorNumber(tertiary),
-      darkSurface,
-      fog: darkSurface,
+      darkSurface: sceneSurface,
+      fog: sceneSurface,
       gridMinor: hexColorNumber(secondary),
     }),
   });
@@ -64,4 +70,11 @@ export const EDITION_THEMES = Object.freeze({
 
 export function editionTheme(id: BrandEditionId): EditionTheme {
   return EDITION_THEMES[id];
+}
+
+export function editionThemeForAppearance(
+  id: BrandEditionId,
+  appearance: AppearanceMode,
+): EditionTheme {
+  return createTheme(id, appearance);
 }

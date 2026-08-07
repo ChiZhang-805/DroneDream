@@ -31,6 +31,734 @@
   --dd-theme-panel: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, var(--bg-elev));
 }
 
+/* ---------- SIM appearance and full-height settings contract ---------- */
+
+:root[data-dd-appearance="light"] {
+  color-scheme: light;
+  --bg: #f1faff;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #e5f4fc;
+  --border: #bdd7e6;
+  --border-strong: #8fbfd8;
+  --text: #10283b;
+  --text-muted: #5c7181;
+  --text-dim: #334f63;
+  --panel: #ffffff;
+  --success: #167052;
+  --warning: #8a5a00;
+  --danger: #b92755;
+  --dd-theme-panel: color-mix(in srgb, var(--dd-brand-light-surface) 78%, #ffffff);
+}
+
+:root[data-dd-appearance="light"] body,
+:root[data-dd-appearance="light"] .app-shell,
+:root[data-dd-appearance="light"] .app-body {
+  color: var(--text);
+  background: var(--bg);
+}
+
+:root[data-dd-appearance="light"] .app-sidebar {
+  color: var(--text);
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 84%, #ffffff);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--dd-brand-middle) 14%, transparent);
+}
+
+:root[data-dd-appearance="light"] .app-header,
+:root[data-dd-appearance="light"] .launcher-chrome {
+  color: var(--text);
+  border-color: var(--border);
+  background: rgba(241, 250, 255, 0.96);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-backdrop {
+  background: rgba(28, 58, 78, 0.28);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .launcher-settings-dialog,
+.app-shell-launcher .launcher-settings-dialog {
+  color-scheme: dark;
+  color: #f4f8ff;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 38%, transparent);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 94%, #030813);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .launcher-settings-dialog {
+  color-scheme: light;
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--dd-brand-light-surface);
+  box-shadow: 0 28px 80px rgba(22, 56, 77, 0.2);
+}
+
+.settings-general-panel,
+.settings-memory-panel,
+.settings-model-panel,
+.settings-runtime-panel {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.settings-general-panel h3,
+.settings-memory-panel h3,
+.settings-model-panel h3,
+.settings-runtime-panel h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.settings-general-section {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.settings-section-label {
+  color: #aebdd0;
+  font-size: 0.7rem;
+  font-weight: 720;
+  text-transform: uppercase;
+}
+
+.settings-appearance-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.settings-appearance-options button {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, transparent);
+  border-radius: 10px;
+  color: inherit;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-appearance-options button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-appearance-options button.selected {
+  border-color: var(--dd-brand-start);
+  color: #ffffff;
+  background: color-mix(in srgb, var(--dd-brand-middle) 44%, var(--dd-brand-dark-surface));
+}
+
+.settings-toggle-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.72rem 0.8rem;
+  border-block: 1px solid color-mix(in srgb, var(--dd-brand-middle) 18%, transparent);
+}
+
+.settings-toggle-row > svg {
+  width: 20px;
+  height: 20px;
+  color: var(--dd-brand-start);
+}
+
+.settings-toggle-row > span {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.settings-toggle-row small,
+.settings-inline-message {
+  color: #aebdd0;
+  font-size: 0.7rem;
+}
+
+.settings-switch {
+  position: relative;
+  display: inline-flex;
+  width: 42px;
+  height: 24px;
+}
+
+.settings-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.settings-switch > span {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 48%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 28%, transparent);
+  cursor: pointer;
+}
+
+.settings-switch > span::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform 150ms ease;
+}
+
+.settings-switch input:checked + span {
+  border-color: var(--dd-brand-start);
+  background: var(--dd-brand-middle);
+}
+
+.settings-switch input:checked + span::after {
+  transform: translateX(18px);
+}
+
+.settings-switch input:focus-visible + span {
+  outline: 2px solid var(--dd-brand-start);
+  outline-offset: 2px;
+}
+
+.settings-inline-message {
+  margin: -0.3rem 0 0;
+}
+
+.settings-general-footer,
+.settings-runtime-last-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: auto;
+  padding-top: 0.72rem;
+  border-top: 1px solid color-mix(in srgb, var(--dd-brand-middle) 18%, transparent);
+}
+
+.settings-general-footer > div,
+.settings-runtime-last-check {
+  color: #aebdd0;
+  font-size: 0.7rem;
+}
+
+.settings-general-footer > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.settings-general-footer strong,
+.settings-runtime-last-check strong {
+  color: inherit;
+  font-size: 0.78rem;
+}
+
+.settings-general-footer .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.settings-general-footer .btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.settings-memory-facts,
+.settings-model-loop {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.settings-memory-facts {
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+
+.settings-memory-facts > div,
+.settings-model-loop > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
+  padding: 0.62rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 18%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 68%, transparent);
+}
+
+.settings-memory-facts > div {
+  align-content: center;
+  justify-items: start;
+  gap: 0.42rem;
+}
+
+.settings-memory-facts > div > svg {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 0.25rem;
+  color: var(--dd-brand-start);
+}
+
+.settings-memory-facts span,
+.settings-model-loop span {
+  color: #aebdd0;
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.settings-memory-facts strong,
+.settings-model-loop strong {
+  font-size: 0.76rem;
+}
+
+.settings-model-loop {
+  margin-top: auto;
+}
+
+.settings-runtime-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 24px;
+  font-size: 0.76rem;
+}
+
+.settings-runtime-summary > svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+}
+
+.settings-runtime-summary > svg.is-spinning {
+  animation: runtime-check-spin 900ms linear infinite;
+}
+
+.settings-runtime-summary-healthy > svg { color: var(--success); }
+.settings-runtime-summary-warning > svg { color: var(--warning); }
+.settings-runtime-summary-error > svg { color: var(--danger); }
+
+.settings-runtime-checks {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-runtime-checks li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 43px;
+  border-bottom: 1px solid color-mix(in srgb, var(--dd-brand-middle) 14%, transparent);
+}
+
+.settings-runtime-checks li > svg {
+  width: 18px;
+  height: 18px;
+  color: #6f8190;
+}
+
+.settings-runtime-checks li > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+}
+
+.settings-runtime-checks li strong {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-runtime-checks li small,
+.settings-runtime-diagnostic {
+  overflow: hidden;
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-runtime-checks li[data-check-status="checking"] > svg {
+  color: var(--dd-brand-start);
+  animation: runtime-check-spin 900ms linear infinite;
+}
+
+.settings-runtime-checks li[data-check-status="passed"] > svg { color: var(--success); }
+.settings-runtime-checks li[data-check-status="failed"] > svg { color: var(--danger); }
+
+@keyframes runtime-check-spin {
+  to { transform: rotate(360deg); }
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-section-label,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-toggle-row small,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-inline-message,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-general-footer > div,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-runtime-last-check,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-facts span,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-loop span {
+  color: var(--text-muted);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-usage .settings-model-period,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-usage .settings-model-usage-footer {
+  color: var(--text-muted);
+}
+
+/* The legacy workspace defines its own palette on .app-shell. Rebind the
+   semantic tokens at the same element so the appearance control is global. */
+:root[data-dd-appearance="dark"] .app-shell {
+  --bg: #071b31;
+  --bg-elev: #0b2743;
+  --bg-elev-2: #113552;
+  --border: #174a6e;
+  --border-strong: #2671ff;
+  --text: #f4f8ff;
+  --text-muted: #aebdd0;
+  --text-dim: #d6e2ef;
+  --panel: #0b2743;
+}
+
+:root[data-dd-appearance="light"] .app-shell {
+  --bg: #f1faff;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #e5f4fc;
+  --border: #bdd7e6;
+  --border-strong: #8fbfd8;
+  --text: #10283b;
+  --text-muted: #5c7181;
+  --text-dim: #334f63;
+  --panel: #ffffff;
+}
+
+@media (max-width: 520px) {
+  :root .settings-model-panel {
+    gap: 0.25rem;
+  }
+
+  :root .settings-model-access-mode {
+    gap: 0.35rem;
+  }
+
+  :root .settings-model-access-mode > button {
+    min-height: 44px;
+    gap: 0.08rem;
+    padding: 0.3rem 0.42rem;
+  }
+
+  :root .settings-model-access-mode > button span {
+    font-size: 0.6rem;
+  }
+
+  :root .settings-model-usage {
+    gap: 0.28rem;
+    padding: 0.42rem;
+  }
+
+  :root .settings-model-plan-row,
+  :root .settings-model-quota-heading,
+  :root .settings-model-usage-footer {
+    gap: 0.35rem;
+  }
+
+  :root .settings-model-usage-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.22rem;
+  }
+
+  :root .settings-model-usage-grid > div {
+    min-height: 43px;
+    padding: 0.28rem;
+  }
+
+  :root .settings-model-usage-grid span {
+    font-size: 0.55rem;
+  }
+
+  :root .settings-model-usage-grid strong {
+    font-size: 0.7rem;
+  }
+
+  :root .settings-model-period,
+  :root .settings-model-security-note,
+  :root .settings-model-usage-footer {
+    font-size: 0.58rem;
+    line-height: 1.25;
+  }
+
+  :root .settings-model-loop {
+    gap: 0.25rem;
+  }
+
+  :root .settings-model-loop > div {
+    gap: 0.08rem;
+    padding: 0.32rem;
+  }
+
+  :root .settings-model-loop strong {
+    font-size: 0.65rem;
+  }
+
+  :root .settings-model-loop span {
+    font-size: 0.55rem;
+    line-height: 1.2;
+  }
+}
+
+:root .launcher-settings-dialog .btn-primary {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--dd-brand-start) 72%, transparent);
+  background: linear-gradient(
+    90deg,
+    var(--dd-brand-start),
+    var(--dd-brand-middle),
+    var(--dd-brand-end)
+  );
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-grid label > span,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-access-mode > button span,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-grid label > span,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-profile-row label > span {
+  color: var(--text-muted);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog :disabled {
+  opacity: 0.7;
+  color: var(--text-muted);
+  -webkit-text-fill-color: var(--text-muted);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-consent:has(input:disabled) {
+  opacity: 0.78;
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-consent strong {
+  color: var(--text);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-message,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-inline-message {
+  color: var(--danger);
+}
+
+/* The workspace follows the selected appearance, including semantic content. */
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) {
+  color-scheme: dark;
+  background: var(--bg);
+  color: var(--text);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) a {
+  color: var(--dd-brand-start);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-sidebar {
+  border-right-color: var(--border);
+  background: #081f36;
+  box-shadow: 12px 0 32px rgba(0, 8, 20, 0.22);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-header {
+  border-bottom-color: var(--border);
+  background: rgba(7, 27, 49, 0.96);
+  color: var(--text);
+  box-shadow: 0 8px 24px rgba(0, 8, 20, 0.18);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-footer {
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a {
+  color: var(--text-dim);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a:hover {
+  background: rgba(0, 217, 255, 0.09);
+  color: var(--text);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a.active {
+  background: linear-gradient(90deg, rgba(0, 217, 255, 0.16), rgba(116, 76, 255, 0.14));
+  color: var(--dd-brand-start);
+  box-shadow: inset 3px 0 0 var(--dd-brand-start);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-button,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-copy strong,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-title,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-header-title {
+  color: var(--text);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-copy small,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-header-meta,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-footer-content {
+  color: var(--text-muted);
+}
+
+:root[data-dd-appearance="dark"] .app-main:has(.experiment-assistant-page) {
+  background: #071b31;
+}
+
+:root[data-dd-appearance="dark"] .assistant-empty-state h1,
+:root[data-dd-appearance="dark"] .assistant-example-body,
+:root[data-dd-appearance="dark"] .assistant-composer textarea,
+:root[data-dd-appearance="dark"] .assistant-add-popover a,
+:root[data-dd-appearance="dark"] .assistant-add-popover button {
+  color: var(--text);
+}
+
+:root[data-dd-appearance="dark"] .assistant-empty-state > p,
+:root[data-dd-appearance="dark"] .assistant-reference-privacy,
+:root[data-dd-appearance="dark"] .assistant-model-button,
+:root[data-dd-appearance="dark"] .assistant-composer-status {
+  color: var(--text-muted);
+}
+
+:root[data-dd-appearance="dark"] .assistant-examples button,
+:root[data-dd-appearance="dark"] .assistant-composer,
+:root[data-dd-appearance="dark"] .assistant-add-popover,
+:root[data-dd-appearance="dark"] .assistant-draft-result {
+  border-color: var(--border);
+  background: var(--bg-elev);
+  box-shadow: 0 12px 30px rgba(0, 8, 20, 0.22);
+}
+
+:root[data-dd-appearance="dark"] .assistant-reference-files > span {
+  border-color: var(--border);
+  background: var(--bg-elev-2);
+  color: var(--text-dim);
+}
+
+:root[data-dd-appearance="dark"] .assistant-add-button,
+:root[data-dd-appearance="dark"] .assistant-voice-button,
+:root[data-dd-appearance="dark"] .assistant-model-button {
+  color: var(--text-dim);
+}
+
+:root[data-dd-appearance="dark"] .assistant-add-button:hover,
+:root[data-dd-appearance="dark"] .assistant-voice-button:hover,
+:root[data-dd-appearance="dark"] .assistant-model-button:hover,
+:root[data-dd-appearance="dark"] .assistant-add-popover a:hover,
+:root[data-dd-appearance="dark"] .assistant-add-popover button:hover {
+  background: var(--bg-elev-2);
+  color: var(--dd-brand-start);
+}
+
+:root[data-dd-appearance="dark"] .assistant-composer textarea::placeholder {
+  color: #8297ac;
+}
+
+@media (max-width: 520px) {
+  :root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-sidebar,
+  :root[data-dd-appearance="dark"] .app-mobile-menu-panel,
+  :root[data-dd-appearance="dark"] .app-mobile-settings-entry {
+    border-color: var(--border);
+    background: #081f36;
+    color: var(--text-dim);
+  }
+
+  :root[data-dd-appearance="dark"] .app-mobile-menu-button {
+    border-color: var(--border);
+    background: var(--bg-elev);
+    color: var(--text);
+  }
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .launcher-settings-tabs button,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .launcher-language-options button,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-appearance-options button,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-facts > div,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-loop > div,
+:root[data-dd-appearance="light"] .launcher-settings-dialog input,
+:root[data-dd-appearance="light"] .launcher-settings-dialog select,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .settings-model-usage {
+  color: var(--text);
+  border-color: var(--border);
+  background: #ffffff;
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .launcher-settings-tabs button[aria-selected="true"],
+:root[data-dd-appearance="light"] .launcher-settings-dialog .launcher-language-options button.selected,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-appearance-options button.selected {
+  color: #12334b;
+  border-color: var(--dd-brand-middle);
+  background: color-mix(in srgb, var(--dd-brand-start) 18%, #ffffff);
+}
+
+:root[data-dd-appearance="light"] .drone-launch-tagline,
+:root[data-dd-appearance="light"] .drone-launch-hud,
+:root[data-dd-appearance="light"] .launcher-progress-footer {
+  color: #10283b;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+@media (max-width: 520px) {
+  .settings-general-panel,
+  .settings-memory-panel,
+  .settings-model-panel,
+  .settings-runtime-panel {
+    gap: 0.42rem;
+  }
+
+  .settings-general-panel h3,
+  .settings-memory-panel h3,
+  .settings-model-panel h3,
+  .settings-runtime-panel h3 {
+    font-size: 0.84rem;
+  }
+
+  .launcher-language-options button,
+  .settings-appearance-options button {
+    min-height: 42px;
+  }
+
+  .settings-toggle-row {
+    padding: 0.48rem 0.55rem;
+  }
+
+  .settings-toggle-row small {
+    display: none;
+  }
+
+  .settings-memory-facts,
+  .settings-model-loop {
+    gap: 0.3rem;
+  }
+
+  .settings-memory-facts > div,
+  .settings-model-loop > div {
+    padding: 0.42rem;
+  }
+
+  .settings-runtime-checks li {
+    min-height: 37px;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -12525,4 +13253,153 @@ body {
     font-size: 0.64rem;
     line-height: 1.3;
   }
+}
+
+/* Keep these layout and appearance rules after legacy workspace overrides. */
+:root .settings-general-panel,
+:root .settings-memory-panel,
+:root .settings-model-panel,
+:root .settings-runtime-panel {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .launcher-settings-dialog {
+  color-scheme: dark;
+  color: #f4f8ff;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 38%, transparent);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 94%, #030813);
+}
+
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .launcher-settings-tabs button,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .launcher-language-options button,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .settings-model-usage,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .settings-model-grid input,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .settings-model-grid select,
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .settings-model-profile-row select {
+  color: #f4f8ff;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 24%, transparent);
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+}
+
+:root[data-dd-appearance="dark"] .launcher-settings-dialog h3,
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-model-period {
+  color: #f4f8ff;
+}
+
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-section-label,
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-toggle-row small,
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-inline-message,
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-general-footer > div,
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-runtime-last-check,
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-memory-facts span,
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-model-loop span,
+:root[data-dd-appearance="dark"] .launcher-settings-dialog .settings-model-period {
+  color: #aebdd0;
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .launcher-settings-dialog {
+  color-scheme: light;
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--dd-brand-light-surface);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .launcher-settings-tabs button,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .launcher-language-options button,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-appearance-options button,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-facts > div,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-loop > div,
+:root[data-dd-appearance="light"] .launcher-settings-dialog input,
+:root[data-dd-appearance="light"] .launcher-settings-dialog select,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .settings-model-access-mode > button,
+:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .settings-model-usage {
+  color: var(--text);
+  border-color: var(--border);
+  background: #ffffff;
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog h3 {
+  color: var(--text);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-usage,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-usage strong,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-usage label,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-usage span,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-usage p {
+  color: var(--text);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-period,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-security-note,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-usage-footer,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-loop span {
+  color: var(--text-muted);
+}
+
+/* Final semantic appearance overrides must follow the legacy workspace theme. */
+:root[data-dd-appearance="dark"] .app-shell {
+  --bg: #071b31;
+  --bg-elev: #0b2743;
+  --bg-elev-2: #113552;
+  --border: #174a6e;
+  --border-strong: #2671ff;
+  --text: #f4f8ff;
+  --text-muted: #aebdd0;
+  --text-dim: #d6e2ef;
+  --panel: #0b2743;
+}
+
+:root[data-dd-appearance="light"] .app-shell {
+  --bg: #f1faff;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #e5f4fc;
+  --border: #bdd7e6;
+  --border-strong: #8fbfd8;
+  --text: #10283b;
+  --text-muted: #5c7181;
+  --text-dim: #334f63;
+  --panel: #ffffff;
+}
+
+:root .launcher-settings-dialog .btn-primary {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--dd-brand-start) 72%, transparent);
+  background: linear-gradient(
+    90deg,
+    var(--dd-brand-start),
+    var(--dd-brand-middle),
+    var(--dd-brand-end)
+  );
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-grid label > span,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-access-mode > button span,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-grid label > span,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-model-profile-row label > span {
+  color: var(--text-muted);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog :disabled {
+  opacity: 0.7;
+  color: var(--text-muted);
+  -webkit-text-fill-color: var(--text-muted);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-consent:has(input:disabled) {
+  opacity: 0.78;
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-consent strong {
+  color: var(--text);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-message,
+:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-inline-message {
+  color: var(--danger);
 }

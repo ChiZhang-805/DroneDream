@@ -1144,6 +1144,7 @@ export function DroneLaunchScene({
       data-progress={progress ?? undefined}
       data-flight-state={starflightActive ? "starflight" : "hover"}
       data-theme-edition={editionTheme.id}
+      data-theme-appearance={editionTheme.appearance}
       data-theme-primary={`#${sceneTheme.primary.toString(16).padStart(6, "0")}`}
       data-theme-secondary={`#${sceneTheme.secondary.toString(16).padStart(6, "0")}`}
       data-theme-tertiary={`#${sceneTheme.tertiary.toString(16).padStart(6, "0")}`}

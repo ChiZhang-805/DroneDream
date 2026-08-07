@@ -346,10 +346,11 @@ afterEach(() => {
     queryClient.clear();
   });
 
-  it("does not auto-start from the explicit setup route", async () => {
+  it("auto-starts an owned installed runtime from the explicit setup route", async () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return autoStartableRuntime;
+      if (command === "start_runtime") return readyRuntime;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
@@ -372,7 +373,10 @@ afterEach(() => {
       expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
         .toHaveLength(1);
     });
-    expect(invoke.mock.calls.some(([command]) => command === "start_runtime")).toBe(false);
+    await waitFor(() => {
+      expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+        .toHaveLength(1);
+    });
 
     router.dispose();
   });
@@ -429,7 +433,7 @@ afterEach(() => {
     expect(invoke.mock.calls.filter(([command]) => command === "probe_system_prerequisites"))
       .toHaveLength(1);
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
-      .toHaveLength(1);
+      .toHaveLength(0);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Check environment" }))
         .not.toBeDisabled();
@@ -497,7 +501,7 @@ afterEach(() => {
       ([command]) => command === "probe_runtime_status",
     )).toHaveLength(initialRuntimeProbeCount + 1);
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "99");
+      .toHaveAttribute("aria-valuenow", "0");
 
     router.dispose();
   });

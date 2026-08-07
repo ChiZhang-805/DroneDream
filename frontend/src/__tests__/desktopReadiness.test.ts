@@ -8,6 +8,7 @@ import {
   canAutoStartRuntime,
   clearRuntimeAutoStartFailure,
   ensureOverallDesktopReadiness,
+  getDesktopReadinessProgress,
   isOverallDesktopReady,
   isRuntimeConfirmedMissing,
   isRuntimeFullyReady,
@@ -198,6 +199,80 @@ describe("desktop readiness", () => {
     ]);
     expect(firstStarting).toHaveBeenCalledTimes(1);
     expect(secondStarting).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops at zero when Runtime is missing and leaves later checks pending", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_runtime_status") return missingRuntime;
+      if (command === "probe_system_prerequisites") return prerequisites;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const snapshot = await ensureOverallDesktopReadiness({ autoStart: true });
+    const progress = getDesktopReadinessProgress();
+
+    expect(snapshot.ready).toBe(false);
+    expect(progress.percent).toBe(0);
+    expect(progress.running).toBe(false);
+    expect(progress.checks[0]).toEqual(expect.objectContaining({
+      id: "runtime",
+      status: "failed",
+    }));
+    expect(progress.checks.slice(1).every((check) => check.status === "pending"))
+      .toBe(true);
+    expect(invoke.mock.calls.some(([command]) => command === "start_runtime"))
+      .toBe(false);
+  });
+
+  it("auto-starts one owned stopped Runtime and completes all seven checks", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_runtime_status") return stoppedRuntime;
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "start_runtime") return readyRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    const snapshot = await ensureOverallDesktopReadiness({ autoStart: true });
+    const progress = getDesktopReadinessProgress();
+
+    expect(snapshot.ready).toBe(true);
+    expect(progress).toEqual(expect.objectContaining({ percent: 100, running: false }));
+    expect(progress.checks.every((check) => check.status === "passed")).toBe(true);
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(1);
+  });
+
+  it("fails closed at the first unhealthy component and leaves later checks pending", async () => {
+    const unhealthyRuntime: RuntimeStatusReport = {
+      ...readyRuntime,
+      ready: false,
+      components: readyRuntime.components.map((component) =>
+        component.id === "local-backend"
+          ? { ...component, status: "unhealthy", detail: "health check failed" }
+          : component,
+      ),
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_runtime_status") return unhealthyRuntime;
+      if (command === "probe_system_prerequisites") return prerequisites;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    await ensureOverallDesktopReadiness({ autoStart: true });
+    const progress = getDesktopReadinessProgress();
+
+    expect(progress.percent).toBe(57);
+    expect(progress.running).toBe(false);
+    expect(progress.checks.find((check) => check.id === "backend"))
+      .toEqual(expect.objectContaining({
+        status: "failed",
+        detail: "health check failed",
+      }));
+    expect(progress.checks.find((check) => check.id === "px4")?.status).toBe("pending");
+    expect(progress.checks.find((check) => check.id === "gazebo")?.status).toBe("pending");
   });
 
   it("suppresses automatic retry after failure until readiness is restored", async () => {

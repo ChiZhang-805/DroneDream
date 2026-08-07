@@ -9,9 +9,12 @@ import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
+  BellRing,
   Box,
   BotMessageSquare,
   Camera,
+  CheckCircle2,
+  Circle,
   CircleUserRound,
   Download,
   History,
@@ -22,10 +25,15 @@ import {
   MapPinned,
   Menu,
   MoreHorizontal,
+  Moon,
+  LoaderCircle,
+  RotateCcw,
   Save,
   Settings,
   ShieldCheck,
+  Sun,
   X,
+  XCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -57,6 +65,14 @@ import {
 } from "./desktop/access";
 import type { DesktopRuntimeAccess } from "./desktop/access";
 import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
+import type { DesktopReadinessCheckId } from "./desktop/readiness";
+import {
+  EXPERIMENT_NOTIFICATION_CHANGE_EVENT,
+  experimentNotificationsEnabled,
+  requestExperimentNotificationPermission,
+  sendExperimentCompletionNotification,
+  setExperimentNotificationsEnabled,
+} from "./desktop/experimentNotifications";
 import {
   approveDesktopStartupGateWithoutCloudAuth,
   setDesktopStartupGateState,
@@ -106,10 +122,9 @@ import type {
 } from "./types/api";
 import {
   SimBrandLockup,
-  SimEditionSettingsPanel,
 } from "./editions/sim/SimEditionExperience";
 import { SIM_EDITION, simCopy } from "./editions/sim/profile";
-import { EditionThemeProvider } from "./theme/EditionThemeProvider";
+import { EditionThemeProvider, useEditionTheme } from "./theme/EditionThemeProvider";
 
 const NAV_ITEMS: {
   to: string;
@@ -370,6 +385,16 @@ function LanguageRegionIcon({ region }: { region: "west" | "east" }) {
   );
 }
 
+const RUNTIME_CHECK_LABELS: Readonly<Record<DesktopReadinessCheckId, TranslationKey>> = {
+  runtime: "settings.runtime.check.runtime",
+  system: "settings.runtime.check.system",
+  ownership: "settings.runtime.check.ownership",
+  manifest: "settings.runtime.check.manifest",
+  backend: "settings.runtime.check.backend",
+  px4: "settings.runtime.check.px4",
+  gazebo: "settings.runtime.check.gazebo",
+};
+
 type RuntimeHealthLevel = "unknown" | "healthy" | "warning" | "error";
 
 const COMPONENT_STATE_KEY: Record<RuntimeComponentState, TranslationKey> = {
@@ -381,8 +406,7 @@ const COMPONENT_STATE_KEY: Record<RuntimeComponentState, TranslationKey> = {
 };
 
 function runtimeHealthLevel(access: DesktopRuntimeAccess): RuntimeHealthLevel {
-  if (!access.desktopRuntime) return "unknown";
-  if (!access.snapshot) return "unknown";
+  if (!access.desktopRuntime || !access.snapshot) return "unknown";
   if (!access.snapshot.ready) return "error";
   const { prerequisites, runtime } = access.snapshot;
   const hasWarning = prerequisites.probeErrors.length > 0 ||
@@ -403,6 +427,7 @@ function SettingsDialog({
   onClose: () => void;
 }) {
   const { locale, setLocale, t } = useI18n();
+  const editionTheme = useEditionTheme();
   const auth = useAuth();
   const {
     settings: modelAccess,
@@ -445,6 +470,32 @@ function SettingsDialog({
     useState<string | null>(null);
   const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
     useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    experimentNotificationsEnabled,
+  );
+  const [notificationMessage, setNotificationMessage] = useState<string | null>(null);
+  const [notificationPermissionBusy, setNotificationPermissionBusy] = useState(false);
+  const changeNotifications = async (enabled: boolean) => {
+    setNotificationMessage(null);
+    if (!enabled) {
+      setExperimentNotificationsEnabled(false);
+      setNotificationsEnabled(false);
+      return;
+    }
+    setNotificationPermissionBusy(true);
+    try {
+      const granted = await requestExperimentNotificationPermission();
+      setExperimentNotificationsEnabled(granted);
+      setNotificationsEnabled(granted);
+      if (!granted) setNotificationMessage(t("settings.general.notificationDenied"));
+    } catch {
+      setExperimentNotificationsEnabled(false);
+      setNotificationsEnabled(false);
+      setNotificationMessage(t("settings.general.notificationFailed"));
+    } finally {
+      setNotificationPermissionBusy(false);
+    }
+  };
   const openSubscriptionPage = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
   ) => {
@@ -629,7 +680,7 @@ function SettingsDialog({
     { id: "general", label: locale === "zh-CN" ? "常规" : "General" },
     { id: "memory", label: locale === "zh-CN" ? "记忆" : "Memory" },
     { id: "model", label: locale === "zh-CN" ? "模型" : "Model" },
-    ...(access.desktopRuntime
+    ...(access.desktopRuntime || docsPreview
       ? [{ id: "runtime", label: locale === "zh-CN" ? "运行环境" : "Runtime" } as const]
       : []),
   ];
@@ -668,15 +719,13 @@ function SettingsDialog({
         : level === "error"
           ? t("settings.runtime.error")
           : t("settings.runtime.unknown");
-  const statusIcon = access.isChecking
-    ? "…"
+  const RuntimeSummaryIcon = access.isChecking
+    ? LoaderCircle
     : level === "healthy"
-      ? "✓"
-      : level === "warning"
-        ? "!"
-        : level === "error"
-          ? "×"
-          : "?";
+      ? CheckCircle2
+      : level === "warning" || level === "error"
+        ? XCircle
+        : Circle;
   const lastChecked = access.lastFullCheckAt
     ? new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
         dateStyle: "short",
@@ -697,6 +746,10 @@ function SettingsDialog({
       consumerProfile="sim"
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
+        <section className="settings-general-panel" aria-labelledby="settings-general-title">
+        <h3 id="settings-general-title">{t("settings.general.title")}</h3>
+        <div className="settings-general-section">
+        <span className="settings-section-label">{t("app.interfaceLanguage")}</span>
         <fieldset className="launcher-language-options" aria-label={t("app.interfaceLanguage")}>
         <button
           type="button"
@@ -721,14 +774,77 @@ function SettingsDialog({
           <i aria-hidden="true">✓</i>
         </button>
         </fieldset>
-        <SimEditionSettingsPanel />
+        </div>
+        <div className="settings-general-section">
+          <span className="settings-section-label">{t("settings.general.appearance")}</span>
+          <div className="settings-appearance-options" role="group" aria-label={t("settings.general.appearance")}>
+            <button
+              type="button"
+              className={editionTheme.appearance === "dark" ? "selected" : undefined}
+              aria-pressed={editionTheme.appearance === "dark"}
+              onClick={() => editionTheme.setAppearance("dark")}
+            >
+              <Moon aria-hidden="true" />
+              <span>{t("settings.general.dark")}</span>
+            </button>
+            <button
+              type="button"
+              className={editionTheme.appearance === "light" ? "selected" : undefined}
+              aria-pressed={editionTheme.appearance === "light"}
+              onClick={() => editionTheme.setAppearance("light")}
+            >
+              <Sun aria-hidden="true" />
+              <span>{t("settings.general.light")}</span>
+            </button>
+          </div>
+        </div>
+        <div className="settings-toggle-row">
+          <BellRing aria-hidden="true" />
+          <span>
+            <strong>{t("settings.general.notifications")}</strong>
+            <small>{t("settings.general.notificationsDetail")}</small>
+          </span>
+          <label className="settings-switch">
+            <input
+              type="checkbox"
+              checked={notificationsEnabled}
+              disabled={notificationPermissionBusy}
+              aria-label={t("settings.general.notifications")}
+              onChange={(event) => void changeNotifications(event.target.checked)}
+            />
+            <span aria-hidden="true" />
+          </label>
+        </div>
+        {notificationMessage ? (
+          <p className="settings-inline-message" role="status">{notificationMessage}</p>
+        ) : null}
+        <div className="settings-general-footer">
+          <div>
+            <span>{t("settings.general.version")}</span>
+            <strong>DroneDream · SIM {SIM_EDITION.displayVersion}</strong>
+          </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setLocale("en");
+              editionTheme.resetAppearance();
+              setExperimentNotificationsEnabled(false);
+              setNotificationsEnabled(false);
+              setNotificationMessage(null);
+            }}
+          >
+            <RotateCcw aria-hidden="true" />
+            {t("settings.general.restore")}
+          </button>
+        </div>
+        </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "memory"} id="memory">
         <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
         <div className="settings-memory-heading">
           <div>
             <h3 id="settings-memory-title">{t("settings.memory.title")}</h3>
-            <p>{t("settings.memory.description")}</p>
           </div>
           <span className={experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
             {t(
@@ -749,10 +865,7 @@ function SettingsDialog({
               memory_enabled: event.target.checked,
             }))}
           />
-          <span>
-            <strong>{t("settings.memory.consent")}</strong>
-            <small>{t("settings.memory.consentDetail")}</small>
-          </span>
+          <strong>{t("settings.memory.consent")}</strong>
         </label>
         <div className="settings-memory-grid">
           <label htmlFor="settings_default_template">
@@ -813,11 +926,27 @@ function SettingsDialog({
             />
           </label>
         </div>
-        <p className="settings-memory-policy">
-          {t("settings.memory.policy", {
-            days: experiencePreferences?.retention_days ?? 90,
-          })}
-        </p>
+        <div className="settings-memory-facts">
+          <div>
+            <History aria-hidden="true" />
+            <span>{t("settings.memory.retention")}</span>
+            <strong>{experiencePreferences?.retention_days ?? 90} {t("settings.memory.days")}</strong>
+          </div>
+          <div>
+            <Save aria-hidden="true" />
+            <span>{t("settings.memory.lastUpdated")}</span>
+            <strong>{experiencePreferences?.updated_at
+              ? new Intl.DateTimeFormat(locale === "zh-CN" ? "zh-CN" : "en", {
+                  dateStyle: "medium",
+                }).format(new Date(experiencePreferences.updated_at))
+              : t("settings.memory.notSaved")}</strong>
+          </div>
+          <div>
+            <ShieldCheck aria-hidden="true" />
+            <span>{t("settings.memory.scope")}</span>
+            <strong>{t("settings.memory.verifiedOnly")}</strong>
+          </div>
+        </div>
         <div className="settings-memory-actions">
           <button
             type="button"
@@ -1125,9 +1254,23 @@ function SettingsDialog({
             <p className="settings-model-security-note">{t("settings.model.securityNote")}</p>
           </>
         )}
+        <div className="settings-model-loop" aria-label={t("settings.model.loopTitle")}>
+          <div>
+            <strong>{t("settings.model.loopModel")}</strong>
+            <span>{t("settings.model.loopModelDetail")}</span>
+          </div>
+          <div>
+            <strong>{t("settings.model.loopHarness")}</strong>
+            <span>{t("settings.model.loopHarnessDetail")}</span>
+          </div>
+          <div>
+            <strong>{t("settings.model.loopBoundary")}</strong>
+            <span>{t("settings.model.loopBoundaryDetail")}</span>
+          </div>
+        </div>
         </section>
       </EditionSettingsPanel>
-      {access.desktopRuntime ? (
+      {access.desktopRuntime || docsPreview ? (
         <EditionSettingsPanel active={activeSettingsTab === "runtime"} id="runtime">
           <section className="settings-runtime-panel" aria-labelledby="settings-runtime-title">
           <div className="settings-runtime-heading">
@@ -1145,32 +1288,40 @@ function SettingsDialog({
                 : t("settings.runtime.checkNow")}
             </button>
           </div>
-          <div
-            className={`settings-runtime-status settings-runtime-status-${access.isChecking ? "checking" : level}`}
-            role="status"
-            aria-live="polite"
-          >
-            <span className="settings-runtime-status-icon" aria-hidden="true">{statusIcon}</span>
-            <div>
-              <strong>{statusLabel}</strong>
-              <small>{t("settings.runtime.lastChecked")}: {lastChecked}</small>
-            </div>
+          <div className={`settings-runtime-summary settings-runtime-summary-${level}`} role="status">
+            <RuntimeSummaryIcon
+              aria-hidden="true"
+              className={access.isChecking ? "is-spinning" : undefined}
+            />
+            <strong>{statusLabel}</strong>
           </div>
+          <ol className="settings-runtime-checks" aria-live="polite">
+            {access.progress.checks.map((check) => {
+              const StatusIcon = check.status === "passed"
+                ? CheckCircle2
+                : check.status === "failed"
+                  ? XCircle
+                  : check.status === "checking"
+                    ? LoaderCircle
+                    : Circle;
+              return (
+                <li key={check.id} data-check-status={check.status}>
+                  <StatusIcon aria-hidden="true" />
+                  <span>
+                    <strong>{t(RUNTIME_CHECK_LABELS[check.id])}</strong>
+                    {check.status === "failed" && check.detail ? <small>{check.detail}</small> : null}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
           {!access.isChecking && level !== "healthy" && uniqueDetails.length > 0 ? (
-            <details className="settings-runtime-details">
-              <summary>{t("settings.runtime.viewDetails")}</summary>
-              <div className="settings-runtime-details-scroll">
-                <ul>
-                  {uniqueDetails.slice(0, 4).map((detail) => <li key={detail}>{detail}</li>)}
-                  {uniqueDetails.length > 4 ? (
-                    <li>{locale === "zh-CN"
-                      ? `另有 ${uniqueDetails.length - 4} 项诊断信息`
-                      : `${uniqueDetails.length - 4} more diagnostic items`}</li>
-                  ) : null}
-                </ul>
-              </div>
-            </details>
+            <p className="settings-runtime-diagnostic">{uniqueDetails[0]}</p>
           ) : null}
+          <div className="settings-runtime-last-check">
+            <span>{t("settings.runtime.lastChecked")}</span>
+            <strong>{lastChecked}</strong>
+          </div>
           </section>
         </EditionSettingsPanel>
       ) : null}
@@ -2063,6 +2214,11 @@ function AppShellContent() {
   const exitPromptRef = useRef<ExitPromptState | null>(null);
   const exitCheckInFlightRef = useRef(false);
   const exitApprovedRef = useRef(false);
+  const [completionNotificationsEnabled, setCompletionNotificationsEnabled] = useState(
+    experimentNotificationsEnabled,
+  );
+  const notificationActiveJobsRef = useRef<Set<string>>(new Set());
+  const notificationBaselineReadyRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
@@ -2109,6 +2265,64 @@ function AppShellContent() {
       : sidebarUpdateBusy
         ? t("updater.sidebarProgress")
         : t("updater.sidebarRetry");
+
+  useEffect(() => {
+    const sync = () => setCompletionNotificationsEnabled(experimentNotificationsEnabled());
+    window.addEventListener(EXPERIMENT_NOTIFICATION_CHANGE_EVENT, sync);
+    return () => window.removeEventListener(EXPERIMENT_NOTIFICATION_CHANGE_EVENT, sync);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !completionNotificationsEnabled ||
+      !desktopRuntime ||
+      !runtimeAccess.canUseRuntime ||
+      !auth.account
+    ) {
+      notificationActiveJobsRef.current = new Set();
+      notificationBaselineReadyRef.current = false;
+      return undefined;
+    }
+
+    let active = true;
+    let polling = false;
+    const poll = async () => {
+      if (polling) return;
+      polling = true;
+      try {
+        const results = await Promise.all(
+          EXIT_GUARD_JOB_STATUSES.map(listActiveJobsForStatus),
+        );
+        if (!active) return;
+        const current = new Set(results.flatMap((result) => result.jobs.map((job) => job.id)));
+        if (notificationBaselineReadyRef.current) {
+          const completed = [...notificationActiveJobsRef.current].filter((id) => !current.has(id));
+          for (const jobId of completed) {
+            try {
+              const job = await apiClient.getJob(jobId);
+              if (!active) return;
+              await sendExperimentCompletionNotification(job, locale);
+            } catch {
+              // Notification failures never mutate or retry the tuning job.
+            }
+          }
+        } else {
+          notificationBaselineReadyRef.current = true;
+        }
+        notificationActiveJobsRef.current = current;
+      } catch {
+        // The watcher is advisory; a failed poll must not affect the workspace.
+      } finally {
+        polling = false;
+      }
+    };
+    void poll();
+    const interval = window.setInterval(() => void poll(), 15_000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [auth.account, completionNotificationsEnabled, desktopRuntime, locale, runtimeAccess.canUseRuntime]);
   const handleSidebarUpdate = useCallback(() => {
     if (updater.status === "available") {
       void updater.installAvailableUpdate();
@@ -2613,8 +2827,8 @@ function AppShellContent() {
             <SimBrandLockup className="sim-sidebar-lockup" />
           </Link>
         ) : (
-          <a href="/" className="app-title" aria-label="DroneDream">
-            <BrandLockup variant="compact" />
+          <a href="/" className="app-title" aria-label="DroneDream · SIM">
+            <BrandLockup edition="sim" variant="compact" />
           </a>
         )}
         {mobileNavigationEnabled ? (

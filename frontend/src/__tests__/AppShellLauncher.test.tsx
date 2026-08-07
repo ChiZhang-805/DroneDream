@@ -273,7 +273,7 @@ describe("desktop launcher chrome", () => {
     expect(dialog).toHaveAttribute("data-presentation-only", "true");
     expect(dialog).toHaveAttribute("data-grants-hardware-authority", "false");
     expect(within(dialog).queryByText("DroneDream")).not.toBeInTheDocument();
-    expect(within(dialog).queryByText("Interface language")).not.toBeInTheDocument();
+    expect(within(dialog).getByText("Interface language")).toBeInTheDocument();
     expect(within(dialog).queryByText(
       "Run a full Windows, WSL, backend, PX4, and Gazebo check. DroneDream reuses the result until you check again or a real run detects a problem.",
     )).not.toBeInTheDocument();
@@ -334,7 +334,7 @@ describe("desktop launcher chrome", () => {
     expect(within(chineseDialog).getByRole("button", { name: "检查运行环境" }))
       .toBeInTheDocument();
     expect(within(chineseDialog).getByText("运行环境正常")).toBeInTheDocument();
-    expect(within(chineseDialog).queryByText("界面语言")).not.toBeInTheDocument();
+    expect(within(chineseDialog).getByText("界面语言")).toBeInTheDocument();
     expect(within(chineseDialog).queryByText("Simplified Chinese")).not.toBeInTheDocument();
     expect(within(chineseDialog).queryByText(
       "全面检查 Windows、WSL、本地后端、PX4 与 Gazebo。检查结果会在本次软件运行期间复用，除非你手动重检或真实运行发现异常。",
@@ -448,15 +448,12 @@ describe("desktop launcher chrome", () => {
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     expect(await screen.findByText("Ready with warnings")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("View details"));
     expect(screen.getByText("Optional GPU telemetry is unavailable.")).toBeInTheDocument();
-    expect(screen.getByText("Optional GPU telemetry is unavailable.").closest(
-      ".settings-runtime-details-scroll",
-    )).toBeInTheDocument();
+    expect(screen.getByText("Runtime Base installed and started")).toBeInTheDocument();
+    expect(screen.getByText("Gazebo simulation environment")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Check environment" }));
     expect(await screen.findByText("Environment unavailable")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("View details"));
     expect(screen.getByText("DroneDreamRuntime is not installed.")).toBeInTheDocument();
     expect(runtimeProbeCount).toBe(2);
 

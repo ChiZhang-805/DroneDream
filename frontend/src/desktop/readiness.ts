@@ -18,6 +18,43 @@ export interface DesktopReadinessSnapshot {
   autoStartFailed: boolean;
 }
 
+export type DesktopReadinessCheckId =
+  | "runtime"
+  | "system"
+  | "ownership"
+  | "manifest"
+  | "backend"
+  | "px4"
+  | "gazebo";
+
+export type DesktopReadinessCheckStatus =
+  | "pending"
+  | "checking"
+  | "passed"
+  | "failed";
+
+export interface DesktopReadinessCheck {
+  id: DesktopReadinessCheckId;
+  status: DesktopReadinessCheckStatus;
+  detail: string | null;
+}
+
+export interface DesktopReadinessProgress {
+  checks: readonly DesktopReadinessCheck[];
+  percent: number;
+  running: boolean;
+}
+
+export const DESKTOP_READINESS_CHECK_IDS: readonly DesktopReadinessCheckId[] = [
+  "runtime",
+  "system",
+  "ownership",
+  "manifest",
+  "backend",
+  "px4",
+  "gazebo",
+];
+
 export interface EnsureDesktopReadinessOptions {
   autoStart?: boolean;
   onStarting?: () => void;
@@ -29,6 +66,111 @@ let runtimeStartInFlight: Promise<DesktopReadinessSnapshot> | null = null;
 let fullReadinessProbeInFlight: Promise<DesktopReadinessSnapshot> | null = null;
 let autoStartFailureKey: string | null = null;
 let runtimeLifetimeClaimed = false;
+
+type DesktopReadinessProgressListener = (progress: DesktopReadinessProgress) => void;
+
+function emptyReadinessProgress(): DesktopReadinessProgress {
+  return {
+    checks: DESKTOP_READINESS_CHECK_IDS.map((id) => ({
+      id,
+      status: "pending",
+      detail: null,
+    })),
+    percent: 0,
+    running: false,
+  };
+}
+
+let desktopReadinessProgress = emptyReadinessProgress();
+const desktopReadinessProgressListeners = new Set<DesktopReadinessProgressListener>();
+
+function publishReadinessProgress(
+  checks: readonly DesktopReadinessCheck[],
+  running: boolean,
+): DesktopReadinessProgress {
+  const passed = checks.filter((check) => check.status === "passed").length;
+  desktopReadinessProgress = {
+    checks,
+    percent: Math.round((passed / DESKTOP_READINESS_CHECK_IDS.length) * 100),
+    running,
+  };
+  for (const listener of desktopReadinessProgressListeners) {
+    listener(desktopReadinessProgress);
+  }
+  return desktopReadinessProgress;
+}
+
+function updateReadinessCheck(
+  id: DesktopReadinessCheckId,
+  status: DesktopReadinessCheckStatus,
+  detail: string | null = null,
+  running = true,
+): void {
+  let reachedFailure = false;
+  const checks = desktopReadinessProgress.checks.map((check) => {
+    if (check.id === id) {
+      reachedFailure = status === "failed";
+      return { id, status, detail };
+    }
+    if (reachedFailure) return { ...check, status: "pending" as const, detail: null };
+    return check;
+  });
+  publishReadinessProgress(checks, running);
+}
+
+function beginReadinessChecks(): void {
+  const progress = emptyReadinessProgress();
+  publishReadinessProgress(
+    progress.checks.map((check, index) => ({
+      ...check,
+      status: index === 0 ? "checking" : "pending",
+    })),
+    true,
+  );
+}
+
+function componentCheck(
+  runtime: RuntimeStatusReport,
+  id: DesktopReadinessCheckId,
+  componentId: string,
+): boolean {
+  updateReadinessCheck(id, "checking");
+  const component = runtime.components.find((candidate) => candidate.id === componentId);
+  const passed = component?.status === "ready";
+  updateReadinessCheck(
+    id,
+    passed ? "passed" : "failed",
+    component?.detail ?? component?.status ?? "missing",
+    passed,
+  );
+  return passed;
+}
+
+function completeRuntimeComponentChecks(runtime: RuntimeStatusReport): boolean {
+  const checks: ReadonlyArray<[DesktopReadinessCheckId, string]> = [
+    ["ownership", "host-ownership"],
+    ["manifest", "runtime-manifest"],
+    ["backend", "local-backend"],
+    ["px4", "px4"],
+    ["gazebo", "gazebo"],
+  ];
+  for (const [id, componentId] of checks) {
+    if (!componentCheck(runtime, id, componentId)) return false;
+  }
+  publishReadinessProgress(desktopReadinessProgress.checks, false);
+  return true;
+}
+
+export function getDesktopReadinessProgress(): DesktopReadinessProgress {
+  return desktopReadinessProgress;
+}
+
+export function subscribeDesktopReadinessProgress(
+  listener: DesktopReadinessProgressListener,
+): () => void {
+  desktopReadinessProgressListeners.add(listener);
+  return () => desktopReadinessProgressListeners.delete(listener);
+}
 
 export interface DesktopReadinessSession {
   snapshot: DesktopReadinessSnapshot;
@@ -74,6 +216,7 @@ export function resetDesktopReadinessSession(): void {
   runtimeStartInFlight = null;
   autoStartFailureKey = null;
   runtimeLifetimeClaimed = false;
+  desktopReadinessProgress = emptyReadinessProgress();
   resetDesktopStartupGateSession();
 }
 
@@ -178,10 +321,27 @@ export function canAutoStartRuntime(
 }
 
 export async function probeOverallDesktopReadiness(): Promise<DesktopReadinessSnapshot> {
-  const [prerequisites, runtime] = await Promise.all([
-    probeSystemPrerequisitesWithStartupGrace(),
-    probeRuntimeStatus(),
-  ]);
+  beginReadinessChecks();
+  const runtime = await probeRuntimeStatus();
+  if (!runtime.installed) {
+    updateReadinessCheck("runtime", "failed", "not-installed", false);
+  } else {
+    updateReadinessCheck("runtime", "passed", runtime.version);
+    updateReadinessCheck("system", "checking");
+  }
+  const prerequisites = await probeSystemPrerequisitesWithStartupGrace();
+  const prerequisitesReady = areDesktopPrerequisitesReady(prerequisites);
+  if (runtime.installed) {
+    updateReadinessCheck(
+      "system",
+      prerequisitesReady ? "passed" : "failed",
+      prerequisites.probeErrors[0] ?? null,
+      prerequisitesReady,
+    );
+    if (prerequisitesReady && runtime.running) {
+      completeRuntimeComponentChecks(runtime);
+    }
+  }
   const ready = isOverallDesktopReady(prerequisites, runtime);
   if (!runtime.running) runtimeLifetimeClaimed = false;
   if (ready || !runtime.installed) clearRuntimeAutoStartFailure();
@@ -204,7 +364,18 @@ async function startRuntimeForSnapshot(
     shouldAutoStart = () => true,
   } = options;
 
-  if (!autoStart || !shouldAutoStart()) return snapshot;
+  if (!autoStart || !shouldAutoStart()) {
+    if (snapshot.runtime.running && !snapshot.ready) {
+      completeRuntimeComponentChecks(snapshot.runtime);
+    }
+    return snapshot;
+  }
+
+  if (snapshot.ready) {
+    runtimeLifetimeClaimed = true;
+    publishReadinessProgress(desktopReadinessProgress.checks, false);
+    return snapshot;
+  }
 
   // The full startup check claims the Runtime lifetime once. Later route
   // guards reuse that result instead of probing or issuing another start.
@@ -219,14 +390,27 @@ async function startRuntimeForSnapshot(
     (!snapshot.ready &&
       !canAutoStartRuntime(snapshot.prerequisites, snapshot.runtime))
   ) {
+    if (snapshot.runtime.installed && !snapshot.runtime.running) {
+      updateReadinessCheck("runtime", "failed", "start-not-authorized", false);
+    }
     return snapshot;
   }
 
   onStarting?.();
+  updateReadinessCheck("runtime", "checking", snapshot.runtime.version);
   const failureKey = runtimeIdentityKey(snapshot.runtime);
   const operation: Promise<DesktopReadinessSnapshot> = startRuntime()
     .then((runtime) => {
       const ready = isOverallDesktopReady(snapshot.prerequisites, runtime);
+      updateReadinessCheck(
+        "runtime",
+        runtime.installed && runtime.running ? "passed" : "failed",
+        runtime.version,
+        runtime.installed && runtime.running,
+      );
+      if (runtime.installed && runtime.running) {
+        completeRuntimeComponentChecks(runtime);
+      }
       runtimeLifetimeClaimed = ready;
       if (ready) {
         clearRuntimeAutoStartFailure();
@@ -243,6 +427,12 @@ async function startRuntimeForSnapshot(
     .catch((error: unknown) => {
       runtimeLifetimeClaimed = false;
       autoStartFailureKey = failureKey;
+      updateReadinessCheck(
+        "runtime",
+        "failed",
+        error instanceof Error ? error.message : "start-failed",
+        false,
+      );
       rememberDesktopReadiness({
         ...snapshot,
         autoStartFailed: true,

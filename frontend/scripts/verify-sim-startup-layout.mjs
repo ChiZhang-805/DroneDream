@@ -1,0 +1,378 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+import { chromium } from "playwright";
+import { createServer } from "vite";
+
+const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
+const repoRoot = path.resolve(frontendRoot, "..");
+const args = new Map(process.argv.slice(2).map((argument) => {
+  const [key, ...value] = argument.split("=");
+  return [key, value.join("=") || true];
+}));
+const label = String(args.get("--label") || "working-tree");
+const outputRoot = path.resolve(
+  repoRoot,
+  String(args.get("--output") || path.join(
+    "frontend",
+    "node_modules",
+    ".cache",
+    "sim-startup-layout",
+    label,
+  )),
+);
+const host = "127.0.0.1";
+const port = Number(args.get("--port") || 5198);
+const origin = `http://${host}:${port}`;
+
+process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
+process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
+process.env.VITE_SUPABASE_URL = "https://visual-fixture.supabase.co";
+process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_visual_fixture";
+const productionEnvironment = await readFile(
+  path.join(frontendRoot, ".env.production"),
+  "utf8",
+);
+const runtimeManifestLines = productionEnvironment.match(
+  /^VITE_RUNTIME_RELEASE_MANIFEST_URL=(\S+)$/gm,
+) ?? [];
+assert.equal(runtimeManifestLines.length, 1);
+process.env.VITE_RUNTIME_RELEASE_MANIFEST_URL = runtimeManifestLines[0].split("=", 2)[1];
+
+const viewports = [
+  { id: "desktop", width: 1440, height: 900 },
+  { id: "tablet", width: 760, height: 900 },
+  { id: "mobile", width: 390, height: 700 },
+];
+const cases = ["en", "zh-CN"].flatMap((locale) =>
+  ["dark", "light"].flatMap((appearance) =>
+    viewports.flatMap((viewport) =>
+      ["missing", "auto-ready"].map((scenario) => ({
+        id: `${viewport.id}-${locale === "en" ? "en" : "zh"}-${appearance}-${scenario}`,
+        locale,
+        appearance,
+        scenario,
+        viewport,
+      })),
+    ),
+  ),
+);
+
+const componentIds = [
+  "wsl-runtime",
+  "host-ownership",
+  "runtime-manifest",
+  "local-backend",
+  "px4",
+  "gazebo",
+];
+
+function git(...gitArgs) {
+  return execFileSync("git", gitArgs, { cwd: repoRoot, encoding: "utf8" }).trim();
+}
+
+async function sha256File(filePath) {
+  return createHash("sha256").update(await readFile(filePath)).digest("hex");
+}
+
+function desktopFixture(scenario) {
+  const ready = {
+    runtimeName: "DroneDreamRuntime",
+    installed: true,
+    running: true,
+    ready: true,
+    version: "2026.08",
+    dataRoot: "X:\\DroneDreamVisualFixture\\Runtime",
+    components: componentIds.map((id) => ({
+      id,
+      label: id,
+      status: "ready",
+      required: true,
+      version: null,
+      detail: null,
+    })),
+    diagnostics: [],
+  };
+  const missing = {
+    ...ready,
+    installed: false,
+    running: false,
+    ready: false,
+    version: null,
+    dataRoot: null,
+    components: ready.components.map((component) => ({
+      ...component,
+      status: "missing",
+    })),
+  };
+  const stopped = {
+    ...ready,
+    running: false,
+    ready: false,
+    components: ready.components.map((component) => ({
+      ...component,
+      status: component.id === "host-ownership" ? "ready" : "stopped",
+    })),
+  };
+  return { ready, missing, stopped, scenario };
+}
+
+async function installDesktopFixture(context, testCase) {
+  await context.addInitScript(({ locale, appearance, fixture }) => {
+    window.localStorage.setItem("drone-dream:locale", locale);
+    window.localStorage.setItem("dronedream:appearance", appearance);
+    const calls = [];
+    window.__SIM_VISUAL_CALLS__ = calls;
+    const prerequisites = {
+      platform: "windows",
+      supported: true,
+      windows: {
+        caption: "Windows 11 Pro",
+        version: "10.0.26100",
+        buildNumber: "26100",
+        architecture: "64-bit",
+      },
+      wsl: { executableAvailable: true, distributions: [] },
+      memory: { totalBytes: 34359738368, availableBytes: 17179869184 },
+      disks: [{
+        drive: "C:",
+        totalBytes: 1099511627776,
+        freeBytes: 536870912000,
+        isSystemDrive: true,
+      }],
+      gpus: [],
+      probeErrors: [],
+    };
+    const installPlan = {
+      runtimeName: "DroneDreamRuntime",
+      targetRoot: "C:\\DroneDream",
+      estimatedDownloadBytes: 8589934592,
+      estimatedInstalledBytes: 25769803776,
+      requiresAdministrator: true,
+      requiresRestart: false,
+      canInstall: true,
+      blockers: [],
+      steps: [
+        ["preflight", "Validate prerequisites", null],
+        ["enable-wsl", "Enable WSL2", null],
+        ["download", "Download runtime", 8589934592],
+        ["import", "Import runtime", 25769803776],
+        ["smoke-test", "Verify runtime", null],
+      ].map(([id, title, estimatedBytes]) => ({
+        id,
+        title,
+        description: String(title),
+        requiresAdministrator: id === "enable-wsl",
+        destructive: false,
+        estimatedBytes,
+      })),
+    };
+    const idleInstall = {
+      operationId: null,
+      phase: "idle",
+      bytesDownloaded: 0,
+      bytesTotal: null,
+      currentPart: null,
+      totalParts: null,
+      message: null,
+      error: null,
+      resumable: false,
+      requiresRestart: false,
+      targetRoot: null,
+      installedVersion: null,
+      updatedAt: null,
+    };
+    window.__TAURI__ = {
+      core: {
+        invoke: async (command) => {
+          calls.push(command);
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") {
+            return fixture.scenario === "missing" ? fixture.missing : fixture.stopped;
+          }
+          if (command === "start_runtime") return fixture.ready;
+          if (command === "get_runtime_install_progress") return idleInstall;
+          if (command === "get_runtime_install_plan") return installPlan;
+          if (command === "get_installer_runtime_intent") {
+            return { status: "none", mode: null, targetRoot: null, message: null };
+          }
+          if (command === "restore_browser_auth_vault") return null;
+          if (command === "clear_browser_auth_vault") return true;
+          if (command === "get_installer_locale") return locale;
+          if (command === "desktop_api_request") {
+            return {
+              status: 401,
+              contentType: "application/json",
+              bodyBase64: btoa(JSON.stringify({
+                success: false,
+                data: null,
+                error: {
+                  code: "UNAUTHORIZED",
+                  message: "Missing bearer token",
+                  details: null,
+                },
+              })),
+            };
+          }
+          if (command.includes("updater") || command.includes("plugin:updater")) return null;
+          throw new Error(`Offline startup fixture rejected command: ${command}`);
+        },
+      },
+    };
+  }, {
+    locale: testCase.locale,
+    appearance: testCase.appearance,
+    fixture: desktopFixture(testCase.scenario),
+  });
+}
+
+async function verifyCase(browser, testCase) {
+  const context = await browser.newContext({ viewport: testCase.viewport });
+  await installDesktopFixture(context, testCase);
+  await context.route("**/api/v1/**", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ detail: "Offline startup visual fixture" }),
+  }));
+  const page = await context.newPage();
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  try {
+    await page.goto(`${origin}/desktop/setup`, { waitUntil: "networkidle" });
+    const progress = page.getByRole("progressbar");
+    await progress.waitFor();
+    const expectedPercent = testCase.scenario === "missing" ? "0" : "100";
+    try {
+      await page.waitForFunction((expected) => {
+        return document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") === expected;
+      }, expectedPercent, { timeout: 5000 });
+    } catch (error) {
+      const diagnosticPath = path.join(outputRoot, `${testCase.id}-progress-diagnostic.png`);
+      await page.screenshot({ path: diagnosticPath, fullPage: false });
+      const diagnostic = await page.evaluate(() => ({
+        value: document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
+        calls: window.__SIM_VISUAL_CALLS__,
+        text: document.body.innerText,
+      }));
+      throw new Error(`Startup progress did not reach ${expectedPercent}: ${JSON.stringify(diagnostic)}`, { cause: error });
+    }
+
+    const downloadText = testCase.locale === "en" ? "Download the Runtime" : "下载 Runtime";
+    const signInText = testCase.locale === "en"
+      ? "Sign in and enter tuning workspace"
+      : "登录并进入调优工作区";
+    const download = page.getByRole("button", { name: downloadText });
+    const signIn = page.getByRole("button", { name: signInText });
+    const startRuntime = page.getByRole("button", { name: /Start Runtime|启动 Runtime/i });
+    const repairRuntime = page.getByRole("button", { name: /Repair Runtime|修复 Runtime/i });
+
+    if (testCase.scenario === "missing") {
+      await page.waitForTimeout(500);
+      if (await download.count() === 0 || !(await download.isVisible())) {
+        const diagnosticPath = path.join(outputRoot, `${testCase.id}-diagnostic.png`);
+        await page.screenshot({ path: diagnosticPath, fullPage: false });
+        const detailsButton = page.getByRole("button", { name: /View error information|查看错误信息/ });
+        if (await detailsButton.count()) await detailsButton.click();
+        throw new Error(`Missing Runtime did not expose its download action. Visible text: ${await page.locator("body").innerText()}`);
+      }
+      assert.equal(await signIn.count(), 0);
+    } else {
+      await signIn.waitFor();
+      assert.equal(await download.count(), 0);
+    }
+    assert.equal(await startRuntime.count(), 0);
+    assert.equal(await repairRuntime.count(), 0);
+    assert.equal(await download.count() > 0 && await signIn.count() > 0, false);
+
+    const dimensions = await page.evaluate(() => ({
+      documentWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      documentHeight: document.documentElement.clientHeight,
+      scrollHeight: document.documentElement.scrollHeight,
+      brandEdition: document.querySelector(".launcher-brand [data-brand-edition]")
+        ?.getAttribute("data-brand-edition"),
+      appearance: document.documentElement.dataset.ddAppearance,
+      grantsHardwareAuthority: document.documentElement.dataset.themeGrantsHardwareAuthority,
+      calls: window.__SIM_VISUAL_CALLS__,
+    }));
+    assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
+    assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
+    assert.equal(dimensions.appearance, testCase.appearance);
+    assert.equal(dimensions.brandEdition, "sim");
+    assert.equal(dimensions.grantsHardwareAuthority, "false");
+    if (testCase.scenario === "auto-ready") {
+      assert.equal(dimensions.calls.filter((command) => command === "start_runtime").length, 1);
+    } else {
+      assert.equal(dimensions.calls.includes("start_runtime"), false);
+    }
+    assert.equal(pageErrors.length, 0);
+
+    const imagePath = path.join(outputRoot, `${testCase.id}.png`);
+    await page.screenshot({ path: imagePath, fullPage: false });
+    return {
+      case: testCase,
+      status: "pass",
+      expectedPercent: Number(expectedPercent),
+      dimensions,
+      image: {
+        path: path.relative(repoRoot, imagePath).replaceAll("\\", "/"),
+        sha256: await sha256File(imagePath),
+      },
+    };
+  } finally {
+    await context.close();
+  }
+}
+
+await mkdir(outputRoot, { recursive: true });
+const server = await createServer({
+  root: frontendRoot,
+  server: { host, port, strictPort: true },
+  logLevel: "error",
+});
+await server.listen();
+const browser = await chromium.launch({ channel: "msedge", headless: true });
+const results = [];
+let failure;
+
+try {
+  for (const testCase of cases) {
+    try {
+      results.push(await verifyCase(browser, testCase));
+    } catch (error) {
+      results.push({ case: testCase, status: "fail", error: String(error?.stack ?? error) });
+      failure = error;
+      break;
+    }
+  }
+} finally {
+  await browser.close();
+  await server.close();
+}
+
+const receipt = {
+  schema_version: 1,
+  subject_commit: git("rev-parse", "HEAD"),
+  subject_dirty: Boolean(git("status", "--short")),
+  branch: git("branch", "--show-current"),
+  browser: "Microsoft Edge (Playwright msedge channel)",
+  api_mode: "offline fixtures only; native Runtime and backend not started",
+  generated_at: new Date().toISOString(),
+  cases: results,
+  status: failure ? "fail" : "pass",
+};
+const receiptPath = path.join(outputRoot, "sim-startup-layout-receipt.json");
+await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+const receiptSha256 = await sha256File(receiptPath);
+console.log(JSON.stringify({
+  status: receipt.status,
+  receipt: path.relative(repoRoot, receiptPath).replaceAll("\\", "/"),
+  receipt_sha256: receiptSha256,
+  completed_cases: results.length,
+}, null, 2));
+if (failure) throw failure;

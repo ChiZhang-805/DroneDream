@@ -14,10 +14,15 @@ import { isDesktopRuntime } from "./bridge";
 import {
   clearRuntimeAutoStartFailure,
   ensureOverallDesktopReadiness,
+  getDesktopReadinessProgress,
   getDesktopReadinessSession,
   subscribeDesktopReadiness,
+  subscribeDesktopReadinessProgress,
 } from "./readiness";
-import type { DesktopReadinessSnapshot } from "./readiness";
+import type {
+  DesktopReadinessProgress,
+  DesktopReadinessSnapshot,
+} from "./readiness";
 
 export type DesktopRuntimeAccessStatus =
   | "browser"
@@ -34,6 +39,7 @@ export interface DesktopRuntimeAccess {
   snapshot: DesktopReadinessSnapshot | null;
   lastFullCheckAt: number | null;
   isChecking: boolean;
+  progress: DesktopReadinessProgress;
   refresh: () => Promise<void>;
 }
 
@@ -44,6 +50,7 @@ const BROWSER_ACCESS: DesktopRuntimeAccess = {
   snapshot: null,
   lastFullCheckAt: null,
   isChecking: false,
+  progress: getDesktopReadinessProgress(),
   refresh: async () => undefined,
 };
 
@@ -81,6 +88,7 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     desktopRuntime ? initialSession?.lastFullCheckAt ?? null : null,
   );
   const [isChecking, setIsChecking] = useState(shouldCheckBeforeWorkspace);
+  const [progress, setProgress] = useState(getDesktopReadinessProgress);
 
   const applySnapshot = useCallback((next: DesktopReadinessSnapshot) => {
     snapshotRef.current = next;
@@ -129,6 +137,8 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     });
   }, [applySnapshot, desktopRuntime]);
 
+  useEffect(() => subscribeDesktopReadinessProgress(setProgress), []);
+
   useEffect(() => {
     if (!desktopRuntime) {
       setStatus("browser");
@@ -151,7 +161,7 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     setIsChecking(true);
     let automaticStartAttempted = false;
     void ensureOverallDesktopReadiness({
-      autoStart: false,
+      autoStart: true,
       shouldAutoStart: () => requestId.current === currentRequest,
       onStarting: () => {
         automaticStartAttempted = true;
@@ -179,8 +189,9 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     snapshot,
     lastFullCheckAt,
     isChecking,
+    progress,
     refresh,
-  }), [desktopRuntime, isChecking, lastFullCheckAt, refresh, snapshot, status]);
+  }), [desktopRuntime, isChecking, lastFullCheckAt, progress, refresh, snapshot, status]);
 
   return (
     <DesktopRuntimeAccessContext.Provider value={value}>

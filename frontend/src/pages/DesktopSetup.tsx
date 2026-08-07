@@ -53,6 +53,7 @@ import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
   clearRuntimeAutoStartFailure,
+  getDesktopReadinessSession,
   isOverallDesktopReady,
   isRuntimeConfirmedMissing,
   isRuntimeFullyReady,
@@ -608,6 +609,28 @@ export function DesktopSetup() {
     }
   }, [browserAuthStatus, localChecksReady, locale, t]);
 
+  useEffect(() => {
+    const accessSnapshot = runtimeAccess.snapshot;
+    if (!accessSnapshot) return;
+    let active = true;
+    void verifyRuntimeSessionContract(accessSnapshot.runtime)
+      .then((runtime) => {
+        if (!active) return;
+        setState((current) => ({
+          ...current,
+          prerequisites: accessSnapshot.prerequisites,
+          prerequisitesFresh: true,
+          runtime,
+          runtimeFresh: true,
+          issues: replaceIssues(current.issues, ["prerequisites", "runtime"], []),
+        }));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [runtimeAccess.snapshot]);
+
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
     const currentRequest = ++requestId.current;
@@ -620,17 +643,36 @@ export function DesktopSetup() {
       runtimeFresh: false,
     }));
 
-    const [prerequisites, runtime] = await Promise.allSettled([
-      probeSystemPrerequisitesWithStartupGrace(),
-      probeRuntimeStatus().then(verifyRuntimeSessionContract),
-    ]);
+    let prerequisites: PromiseSettledResult<SystemPrerequisiteReport>;
+    let runtime: PromiseSettledResult<RuntimeStatusReport>;
+    if (runtimeAccess.desktopRuntime) {
+      await refreshRuntimeAccess();
+      const session = getDesktopReadinessSession();
+      if (session) {
+        prerequisites = { status: "fulfilled", value: session.snapshot.prerequisites };
+        try {
+          runtime = {
+            status: "fulfilled",
+            value: await verifyRuntimeSessionContract(session.snapshot.runtime),
+          };
+        } catch (reason) {
+          runtime = { status: "rejected", reason };
+        }
+      } else {
+        const reason = new Error("Desktop readiness check did not publish a result.");
+        prerequisites = { status: "rejected", reason };
+        runtime = { status: "rejected", reason };
+      }
+    } else {
+      [runtime] = await Promise.allSettled([
+        probeRuntimeStatus().then(verifyRuntimeSessionContract),
+      ]);
+      if (requestId.current !== currentRequest) return;
+      [prerequisites] = await Promise.allSettled([
+        probeSystemPrerequisitesWithStartupGrace(),
+      ]);
+    }
     if (requestId.current !== currentRequest) return;
-
-    // Keep the navigation/action gate in sync after every explicit setup-page
-    // check, including transitions from ready to stopped or uncertain. The
-    // access provider performs its own fail-closed probe, so stale local
-    // reports are never promoted into global readiness.
-    void refreshRuntimeAccess();
 
     const probeIssues: ProbeIssue[] = [];
     if (prerequisites.status === "rejected") {
@@ -734,7 +776,7 @@ export function DesktopSetup() {
       issues: replaceIssues(current.issues, ["plan"], planIssues),
       planLoading: false,
     }));
-  }, [desktopAvailable, refreshRuntimeAccess]);
+  }, [desktopAvailable, refreshRuntimeAccess, runtimeAccess.desktopRuntime]);
 
   const selectRuntimeDrive = useCallback(async (drive: string) => {
     if (
@@ -1366,6 +1408,7 @@ export function DesktopSetup() {
           }
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
+          environmentPercent={runtimeAccess.progress.percent}
           onCancel={() => void cancelInstall()}
         />
 
@@ -1453,24 +1496,6 @@ export function DesktopSetup() {
           </div>
         ) : (
           <>
-            {state.runtimeFresh && state.runtime?.installed ? (
-              <div className="launcher-ready-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary launcher-primary-action"
-                  disabled={runtimeCommandBusy}
-                  onClick={() => void runRuntimeAction(
-                    state.runtime?.running ? "repair" : "start",
-                  )}
-                >
-                  {runtimeCommandBusy
-                    ? t("desktop.runtimeActionRunning")
-                    : state.runtime.running
-                      ? t("desktop.repairRuntime")
-                      : t("desktop.startRuntime")}
-                </button>
-              </div>
-            ) : null}
             {installState.snapshot?.phase !== "completed" &&
             ((showInstallPlanner && state.plan) ||
               (installState.snapshot && installState.snapshot.phase !== "idle")) ? (
@@ -2559,6 +2584,7 @@ function RuntimeLauncherHero({
   accountRequired,
   automaticStartPending,
   commandBusy,
+  environmentPercent,
   onCancel,
 }: {
   snapshot: RuntimeInstallSnapshot | null;
@@ -2569,6 +2595,7 @@ function RuntimeLauncherHero({
   accountRequired: boolean;
   automaticStartPending: boolean;
   commandBusy: boolean;
+  environmentPercent: number;
   onCancel: () => void;
 }) {
   const { t } = useI18n();
@@ -2581,13 +2608,7 @@ function RuntimeLauncherHero({
     ? 100
     : measuredPercent !== null
       ? Math.min(measuredPercent, 99)
-      : checking ||
-          gateBlocked ||
-          accountRequired ||
-          automaticStartPending ||
-          phase === "completed"
-        ? 99
-        : null;
+      : Math.min(environmentPercent, 99);
   const status = ready
     ? t("launcher.status.ready")
     : commandBusy && active
@@ -2879,6 +2900,7 @@ function RuntimeInstallControls({
     automaticStartWillRun && !planCanInstall;
 
   let startLabel = t("desktop.installNow");
+  if (launcherMode && phase === "idle") startLabel = t("launcher.downloadRuntime");
   if (phase === "failed") startLabel = t("desktop.retryInstall");
   if (phase === "cancelled") startLabel = t("desktop.resumeInstall");
   if (phase === "waitingForRestart") startLabel = t("desktop.continueInstall");

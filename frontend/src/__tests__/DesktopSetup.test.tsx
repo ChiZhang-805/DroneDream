@@ -977,7 +977,7 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("link", { name: "Open tuning workspace" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "99");
+      .toHaveAttribute("aria-valuenow", "0");
 
     await waitFor(() => {
       expect(prerequisiteAttempts).toBe(2);
@@ -1041,7 +1041,7 @@ describe("DesktopSetup", () => {
     expect(screen.getByText(/removes verified temporary files only after a successful import/i))
       .toBeInTheDocument();
     expect(screen.getByText("Runtime download is not published yet")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
+    expect(screen.getByRole("button", { name: "Download the Runtime" }))
       .toBeDisabled();
     expect(invoke).toHaveBeenCalledWith(
       "get_runtime_install_plan",
@@ -1125,7 +1125,7 @@ describe("DesktopSetup", () => {
     expect(page.container.querySelector(".desktop-launcher > .section-card"))
       .not.toBeInTheDocument();
     expect(screen.queryByText(/Keep DroneDream open while/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
+    expect(screen.queryByRole("button", { name: "Download the Runtime" }))
       .not.toBeInTheDocument();
     expect(page.installerIntentInvoke).toHaveBeenCalledTimes(1);
     expect(page.installerInvoke).toHaveBeenCalledTimes(1);
@@ -1238,7 +1238,7 @@ describe("DesktopSetup", () => {
     );
     expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
       .not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
+    expect(screen.getByRole("button", { name: "Download the Runtime" }))
       .toBeEnabled();
 
     resolveAutoStart(noInstallerAutoStart);
@@ -1431,7 +1431,7 @@ describe("DesktopSetup", () => {
 
     expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
       .not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
+    expect(screen.getByRole("button", { name: "Download the Runtime" }))
       .toBeDisabled();
     expect(screen.getByRole("dialog", { name: "Setup needs attention" }))
       .toBeInTheDocument();
@@ -1652,7 +1652,7 @@ describe("DesktopSetup", () => {
     expect(await screen.findByRole("button", { name: "Pause installation" }))
       .toBeEnabled();
     expect(screen.getByText("3.0 GiB / 8.0 GiB")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
+    expect(screen.queryByRole("button", { name: "Download the Runtime" }))
       .not.toBeInTheDocument();
     expect(progressCalls).toBeGreaterThanOrEqual(2);
   });
@@ -1692,7 +1692,7 @@ describe("DesktopSetup", () => {
       .toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" }))
       .toBeEnabled();
-    expect(screen.queryByRole("button", { name: "Install DroneDreamRuntime" }))
+    expect(screen.queryByRole("button", { name: "Download the Runtime" }))
       .not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Runtime disk" }))
       .not.toBeInTheDocument();
@@ -1727,7 +1727,7 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText("已选择仅安装桌面程序")).toBeInTheDocument();
     expect(screen.getByText(/以后可以在此页面核对方案并手动安装/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "安装 DroneDreamRuntime" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "下载 Runtime" })).toBeEnabled();
     expect(page.installerIntentInvoke).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(page.installerInvoke).toHaveBeenCalledTimes(1));
     expect(invoke).not.toHaveBeenCalledWith(
@@ -1883,7 +1883,7 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText("The terminal installer request was cleaned up"))
       .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Install DroneDreamRuntime" }))
+    expect(screen.getByRole("button", { name: "Download the Runtime" }))
       .toBeEnabled();
     expect(page.installerDiscardInvoke).toHaveBeenCalledTimes(1);
     expect(invoke).not.toHaveBeenCalledWith(
@@ -2034,7 +2034,7 @@ describe("DesktopSetup", () => {
 
     renderPage();
     const install = await screen.findByRole("button", {
-      name: "Install DroneDreamRuntime",
+      name: "Download the Runtime",
     });
     expect(install).toBeEnabled();
     await user.click(install);
@@ -2487,7 +2487,6 @@ describe("DesktopSetup", () => {
   });
 
   it("shows attention for an installed runtime with an unhealthy required component", async () => {
-    const user = userEvent.setup();
     const contradictoryRuntime: RuntimeStatusReport = {
       ...runtime,
       ready: false,
@@ -2500,7 +2499,6 @@ describe("DesktopSetup", () => {
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return contradictoryRuntime;
-      if (command === "repair_runtime") return runtime;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
@@ -2509,13 +2507,12 @@ describe("DesktopSetup", () => {
     expect(await screen.findByText("The installed runtime needs attention.")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Create a tuning experiment" }))
       .not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Repair and restart runtime" }));
-    expect(await screen.findByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith("repair_runtime", undefined);
+    expect(screen.queryByRole("button", { name: "Repair and restart runtime" }))
+      .not.toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalledWith("repair_runtime", undefined);
   });
 
-  it("starts an installed runtime that is currently stopped", async () => {
-    const user = userEvent.setup();
+  it("does not expose a manual start control for an installed stopped runtime", async () => {
     const stoppedRuntime: RuntimeStatusReport = {
       ...runtime,
       running: false,
@@ -2530,9 +2527,8 @@ describe("DesktopSetup", () => {
     window.__TAURI__ = { core: { invoke } };
     renderPage();
 
-    await user.click(await screen.findByRole("button", { name: "Start runtime" }));
-    expect(await screen.findByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(invoke).toHaveBeenCalledWith("start_runtime", undefined);
+    expect(await screen.findByText("Ready to install")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start runtime" })).not.toBeInTheDocument();
   });
 
   it("rejects a native plan whose canInstall flag contradicts its blockers", async () => {
