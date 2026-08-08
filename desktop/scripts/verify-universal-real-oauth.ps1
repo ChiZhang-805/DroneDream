@@ -539,7 +539,17 @@ try {
         }
         Write-AtomicText $postAuthSignalPath "complete"
         Wait-Until { $oauthObserverProcess.Refresh(); $oauthObserverProcess.HasExited } 60 "Installed-app OAuth observer did not settle after authenticated UI validation."
-        if ($oauthObserverProcess.ExitCode -ne 0) { throw "Installed-app OAuth observer failed after authenticated UI validation." }
+        # Windows PowerShell 5.1 can expose a null ExitCode for an asynchronous
+        # Start-Process -PassThru -NoNewWindow child even after HasExited is
+        # true. The observer's atomic, versioned terminal checkpoint is the
+        # durable fail-closed authority: a crash, schema drift, or non-passing
+        # terminal state remains a hard failure.
+        $settledObservation = Import-ObserverCheckpoint $observerPath $counts $receipt
+        if (-not [bool]$settledObservation.passed -or
+            [string]$settledObservation.stage -cne "completed" -or
+            [string]$settledObservation.terminalState -cne "passed") {
+            throw "Installed-app OAuth observer failed after authenticated UI validation."
+        }
         $oauthObserverProcess.Dispose(); $oauthObserverProcess = $null
     }
     else {

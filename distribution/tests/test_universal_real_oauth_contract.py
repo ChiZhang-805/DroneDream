@@ -91,6 +91,24 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
     assert 'Post-auth UI observation failed closed' in observer
 
 
+def test_authenticated_observer_settlement_uses_the_durable_terminal_checkpoint() -> None:
+    powershell = POWERSHELL.read_text(encoding="utf-8")
+    settlement = powershell.index(
+        'Wait-Until { $oauthObserverProcess.Refresh(); $oauthObserverProcess.HasExited } 60'
+    )
+    checkpoint = powershell.index(
+        'Import-ObserverCheckpoint $observerPath $counts $receipt', settlement
+    )
+    terminal = powershell.index(
+        '[string]$settledObservation.terminalState -cne "passed"', checkpoint
+    )
+    dispose = powershell.index(
+        '$oauthObserverProcess.Dispose(); $oauthObserverProcess = $null', terminal
+    )
+    assert settlement < checkpoint < terminal < dispose
+    assert '$oauthObserverProcess.ExitCode -ne 0' not in powershell
+
+
 def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
     observer = INSTALLED_UI.read_text(encoding="utf-8")
     assert 'const authenticatedWorkspace = args.get("--authenticated-workspace") === "true"' in observer
