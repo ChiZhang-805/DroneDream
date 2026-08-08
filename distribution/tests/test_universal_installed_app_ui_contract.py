@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 POWERSHELL = ROOT / "desktop/scripts/verify-universal-installed-app-ui.ps1"
 BROWSER = ROOT / "frontend/scripts/verify-installed-universal-ui.mjs"
+OFFLINE_BROWSER = ROOT / "frontend/scripts/verify-software-ui-layout.mjs"
 
 
 def test_headed_verifier_has_exact_bounded_execution_contract() -> None:
@@ -86,7 +87,11 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
     script = BROWSER.read_text(encoding="utf-8")
     for fragment in (
         'chromium.connectOverCDP(cdpEndpoint)',
-        'dronedream:universal-mode:v1',
+        'dronedream:universal-workspace:v2',
+        'window.location.pathname !== "/desktop/setup"',
+        'nextEdition === "universal" ? "sim" : nextEdition',
+        '"/vehicle-studio"',
+        'startupTheme',
         'drone-dream:locale',
         'data-theme-grants-hardware-authority',
         'data-grants-hardware-authority',
@@ -105,6 +110,17 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
     assert "password" not in script.lower()
     assert "token" not in script.lower()
     assert "requestId" not in script
+
+
+def test_ui_verifiers_use_the_current_universal_workspace_storage_contract() -> None:
+    for verifier in (BROWSER, OFFLINE_BROWSER):
+        script = verifier.read_text(encoding="utf-8")
+        assert 'dronedream:universal-workspace:v2' in script
+        assert 'dronedream:universal-mode:v1' not in script
+
+    offline = OFFLINE_BROWSER.read_text(encoding="utf-8")
+    assert 'testCase.edition === "universal"' in offline
+    assert '"/vehicle-studio"' in offline
 
 
 def test_headed_plan_matrix_is_two_sizes_two_locales_four_themes() -> None:

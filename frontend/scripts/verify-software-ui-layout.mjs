@@ -166,7 +166,10 @@ async function verifySettings(page, testCase) {
       ? { width: 390, height: 700 }
       : testCase.viewport;
   await page.setViewportSize(settingsViewport);
-  await page.goto(`${origin}/assistant?docsPreview=1`, { waitUntil: "networkidle" });
+  const settingsSurface = testCase.edition === "universal"
+    ? "/vehicle-studio"
+    : "/assistant";
+  await page.goto(`${origin}${settingsSurface}?docsPreview=1`, { waitUntil: "networkidle" });
   const themeBinding = await page.locator("html").evaluate((element) => {
     const style = getComputedStyle(element);
     return {
@@ -184,15 +187,20 @@ async function verifySettings(page, testCase) {
   assert.equal(themeBinding.presentationOnly, "true");
   assert.equal(themeBinding.grantsHardwareAuthority, "false");
   assert.deepEqual(themeBinding.colors, canonicalThemeColors[testCase.edition]);
-  const assistantModel = page.locator(".assistant-model-button");
-  await assistantModel.waitFor();
-  assert.equal(await assistantModel.locator("option").count(), 3);
-  assert.equal(
-    await assistantModel.getAttribute("aria-label"),
-    testCase.locale === "en" ? "Model" : "模型",
-  );
-  await assistantModel.scrollIntoViewIfNeeded();
-  const assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
+  let assistantModelImage = null;
+  if (testCase.edition !== "universal") {
+    const assistantModel = page.locator(".assistant-model-button");
+    await assistantModel.waitFor();
+    assert.equal(await assistantModel.locator("option").count(), 3);
+    assert.equal(
+      await assistantModel.getAttribute("aria-label"),
+      testCase.locale === "en" ? "Model" : "模型",
+    );
+    await assistantModel.scrollIntoViewIfNeeded();
+    assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
+  } else {
+    await page.locator(".vehicle-studio-page").waitFor();
+  }
   if (testCase.viewport.width <= 520) {
     await page.locator(".app-mobile-menu-button").click();
     await page.locator(".app-mobile-settings-entry").click();
@@ -537,7 +545,7 @@ async function verifyFixedScenarios(page, testCase) {
         documentScrollWidth: document.documentElement.scrollWidth,
       };
     });
-    assert.equal(mobileMenu.links.length, 5);
+    assert.equal(mobileMenu.links.length, 6);
     assert(mobileMenu.account.bottom <= mobileMenu.links[0].top + 1);
     assert(mobileMenu.links.at(-1).bottom <= mobileMenu.settings.top + 1);
     assert(mobileMenu.links.every((entry) => closeEnough(
@@ -558,14 +566,14 @@ async function verifyFixedScenarios(page, testCase) {
     ), `${testCase.id}: mobile menu is not right-aligned with its trigger`);
     assert(
       mobileMenu.panel.width < mobileMenu.documentWidth * 0.65,
-      `${testCase.id}: mobile menu is ${mobileMenu.panel.width}px instead of shrink-wrapping its longest row`,
+      `${testCase.id}: mobile menu is ${mobileMenu.panel.width}px instead of shrink-wrapping its longest row; ${JSON.stringify(mobileMenu)}`,
     );
     assert.equal(mobileMenu.documentScrollWidth, mobileMenu.documentWidth);
     mobileMenuMetrics = { ...mobileMenu, trigger: menuButtonBounds };
     mobileMenuImage = await screenshot(page, testCase.id, "mobile-navigation");
   }
   await activeEntry.waitFor();
-  assert.equal(await navEntries.count(), 5);
+  assert.equal(await navEntries.count(), 6);
   assert.equal(await cards.count(), 4);
   assert(await activeEntry.evaluate((element) => element.classList.contains("active")));
 
@@ -660,17 +668,25 @@ async function verifyFixedScenarios(page, testCase) {
         `${testCase.id}: trailing navigation entry did not receive its full-width row`,
       );
     } else {
-      const penultimateEntry = metrics.navEntries.at(-2);
-      assert(penultimateEntry);
-      assert(closeEnough(penultimateEntry.top, trailingEntry.top, 1));
-      assert(penultimateEntry.top > metrics.navEntries.at(-3).top);
-      assert(penultimateEntry.left > metrics.nav.left);
-      assert(trailingEntry.right < metrics.nav.right);
-      assert(closeEnough(
-        (penultimateEntry.left + trailingEntry.right) / 2,
-        (metrics.nav.left + metrics.nav.right) / 2,
-        2,
-      ));
+      assert(metrics.navEntries.every((entry) => (
+        entry.left >= metrics.nav.left - 1
+        && entry.right <= metrics.nav.right + 1
+      )), `${testCase.id}: tablet navigation entry escaped its navigation bounds`);
+      for (let index = 1; index < metrics.navEntries.length; index += 1) {
+        const previous = metrics.navEntries[index - 1];
+        const current = metrics.navEntries[index];
+        if (closeEnough(previous.top, current.top, 1)) {
+          assert(
+            current.left >= previous.right - 1,
+            `${testCase.id}: tablet navigation entries overlap within a row`,
+          );
+        } else {
+          assert(
+            current.top >= previous.bottom - 1,
+            `${testCase.id}: tablet navigation rows overlap vertically`,
+          );
+        }
+      }
     }
   }
 
@@ -1121,16 +1137,20 @@ let failure;
 try {
   for (const testCase of cases) {
     const context = await browser.newContext({ viewport: testCase.viewport });
-    await context.addInitScript(({ locale, edition }) => {
-      window.localStorage.setItem("drone-dream:locale", locale);
-      window.localStorage.setItem("dronedream:universal-mode:v1", edition);
-    }, { locale: testCase.locale, edition: testCase.edition });
     await context.route("**/api/v1/**", (route) => route.fulfill({
       status: 503,
       contentType: "application/json",
       body: JSON.stringify({ detail: "Offline visual-validation fixture" }),
     }));
     const page = await context.newPage();
+    await page.goto(`${origin}/`, { waitUntil: "domcontentloaded" });
+    await page.evaluate(({ locale, workspace }) => {
+      window.localStorage.setItem("drone-dream:locale", locale);
+      window.localStorage.setItem("dronedream:universal-workspace:v2", workspace);
+    }, {
+      locale: testCase.locale,
+      workspace: testCase.edition === "universal" ? "sim" : testCase.edition,
+    });
     const pageErrors = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
     const entry = { case: testCase };
@@ -1145,6 +1165,25 @@ try {
         await context.close();
         continue;
       }
+      // The remainder of this legacy matrix exercises the shared SIM/common
+      // workflow. LAB and FIELD have dedicated workflow verifiers; keeping
+      // their presentation checks above separate avoids pretending that
+      // Universal exposes a fourth "universal" tuning workspace.
+      if (testCase.edition !== "sim") {
+        await page.evaluate(() => {
+          const selector = document.querySelector(".universal-mode-switch select");
+          if (!(selector instanceof HTMLSelectElement)) {
+            throw new Error("Universal workspace selector is missing");
+          }
+          selector.value = "sim";
+          selector.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        await page.waitForFunction(() => (
+          document.documentElement.dataset.brandEdition === "sim"
+          && window.localStorage.getItem("dronedream:universal-workspace:v2") === "sim"
+        ));
+      }
+      entry.sharedWorkflowWorkspace = "sim";
       entry.distributionSetup = await verifyDistributionSetup(page, testCase);
       entry.avatar = await verifyAvatar(page, testCase, avatarBytes);
       entry.fixedScenarios = await verifyFixedScenarios(page, testCase);

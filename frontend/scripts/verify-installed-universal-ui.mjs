@@ -75,6 +75,12 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert(pages.length >= 1, "Installed app exposed no WebView page");
   const page = pages.find((candidate) => /(?:tauri|localhost)/u.test(candidate.url())) ?? pages[0];
   await page.waitForLoadState("domcontentloaded");
+  await page.evaluate(() => {
+    if (window.location.pathname !== "/desktop/setup") {
+      window.history.replaceState({}, "", "/desktop/setup");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+  });
   await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
 
   const initialViewport = await page.evaluate(() => ({
@@ -90,12 +96,57 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     `${caseId}: actual app client height ${initialViewport.height} != ${expectedHeight}`,
   );
 
-  await page.evaluate(({ nextLocale, nextEdition }) => {
+  const startupTheme = await page.locator("html").evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      edition: element.dataset.brandEdition,
+      productMode: element.dataset.productMode,
+      presentationOnly: element.dataset.themePresentationOnly,
+      grantsHardwareAuthority: element.dataset.themeGrantsHardwareAuthority,
+      colors: [
+        style.getPropertyValue("--dd-brand-start").trim().toUpperCase(),
+        style.getPropertyValue("--dd-brand-middle").trim().toUpperCase(),
+        style.getPropertyValue("--dd-brand-end").trim().toUpperCase(),
+      ],
+    };
+  });
+  assert.equal(startupTheme.edition, "universal");
+  assert.equal(startupTheme.productMode, "universal");
+  assert.equal(startupTheme.presentationOnly, "true");
+  assert.equal(startupTheme.grantsHardwareAuthority, "false");
+  assert.deepEqual(startupTheme.colors, canonicalColors.universal);
+  const scene = await page.locator(".drone-launch-scene").evaluate((element) => ({
+    edition: element.getAttribute("data-theme-edition"),
+    colors: [
+      element.getAttribute("data-theme-primary")?.toUpperCase(),
+      element.getAttribute("data-theme-secondary")?.toUpperCase(),
+      element.getAttribute("data-theme-tertiary")?.toUpperCase(),
+    ],
+    grantsHardwareAuthority: element.getAttribute("data-theme-grants-hardware-authority"),
+  }));
+  assert.equal(scene.edition, "universal");
+  assert.equal(scene.grantsHardwareAuthority, "false");
+  assert.deepEqual(scene.colors, canonicalColors.universal);
+  const sceneScreenshot = await saveScreenshot(page, "scene");
+
+  const presentationRoute = edition === "universal"
+    ? "/vehicle-studio"
+    : edition === "sim"
+      ? "/assistant"
+      : `/${edition}`;
+  await page.evaluate(({ nextLocale, nextEdition, nextRoute }) => {
     window.localStorage.setItem("drone-dream:locale", nextLocale);
-    window.localStorage.setItem("dronedream:universal-mode:v1", nextEdition);
-  }, { nextLocale: locale, nextEdition: edition });
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
+    window.localStorage.setItem(
+      "dronedream:universal-workspace:v2",
+      nextEdition === "universal" ? "sim" : nextEdition,
+    );
+    window.location.assign(nextRoute);
+  }, { nextLocale: locale, nextEdition: edition, nextRoute: presentationRoute });
+  await page.waitForLoadState("domcontentloaded");
+  await page.locator(".launcher-settings-button:visible").first().waitFor({
+    state: "visible",
+    timeout: 30_000,
+  });
 
   const theme = await page.locator("html").evaluate((element) => {
     const style = getComputedStyle(element);
@@ -116,20 +167,6 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert.equal(theme.presentationOnly, "true");
   assert.equal(theme.grantsHardwareAuthority, "false");
   assert.deepEqual(theme.colors, canonicalColors[edition]);
-
-  const scene = await page.locator(".drone-launch-scene").evaluate((element) => ({
-    edition: element.getAttribute("data-theme-edition"),
-    colors: [
-      element.getAttribute("data-theme-primary")?.toUpperCase(),
-      element.getAttribute("data-theme-secondary")?.toUpperCase(),
-      element.getAttribute("data-theme-tertiary")?.toUpperCase(),
-    ],
-    grantsHardwareAuthority: element.getAttribute("data-theme-grants-hardware-authority"),
-  }));
-  assert.equal(scene.edition, edition);
-  assert.equal(scene.grantsHardwareAuthority, "false");
-  assert.deepEqual(scene.colors, canonicalColors[edition]);
-  const sceneScreenshot = await saveScreenshot(page, "scene");
 
   const settingsButton = page.locator(".launcher-settings-button:visible").first();
   await settingsButton.waitFor({ state: "visible" });
@@ -200,6 +237,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     presentationOnly: true,
     grantsHardwareAuthority: false,
     actualClientViewport: initialViewport,
+    startupTheme,
     theme,
     scene,
     settingsOpenCount: 1,
