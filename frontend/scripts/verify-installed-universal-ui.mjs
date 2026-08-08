@@ -102,16 +102,15 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert(pages.length >= 1, "Installed app exposed no WebView page");
   const page = pages.find((candidate) => /(?:tauri|localhost)/u.test(candidate.url())) ?? pages[0];
   await page.waitForLoadState("domcontentloaded");
-  await page.evaluate(() => {
+  await page.evaluate((nextLocale) => {
     // Packaged desktop builds use createHashRouter. Changing pathname here
     // reloads the WebView at an unowned resource URL and the app falls back to
     // its Universal launcher, which can masquerade as a failed theme switch.
-    if (window.location.hash !== "#/desktop/setup") {
-      const launcherUrl = new URL(window.location.href);
-      launcherUrl.hash = "/desktop/setup";
-      window.location.replace(launcherUrl.href);
-    }
-  });
+    window.localStorage.setItem("drone-dream:locale", nextLocale);
+    const launcherUrl = new URL(window.location.href);
+    launcherUrl.hash = "/desktop/setup";
+    window.location.replace(launcherUrl.href);
+  }, locale);
   await page.waitForURL((url) => url.hash === "#/desktop/setup");
   await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
 
@@ -165,50 +164,17 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert.deepEqual(scene.colors, canonicalColors.universal);
   const sceneScreenshot = await saveScreenshot(page, "scene");
 
-  const presentationRoute = edition === "universal"
-    ? "/vehicle-studio"
-    : edition === "sim"
-      ? "/assistant"
-      : `/${edition}`;
-  await page.evaluate(({ nextLocale, nextEdition, nextRoute }) => {
-    window.localStorage.setItem("drone-dream:locale", nextLocale);
-    window.localStorage.setItem(
-      "dronedream:universal-workspace:v2",
-      nextEdition === "universal" ? "sim" : nextEdition,
-    );
-    // Preserve the packaged app resource URL and change only the router hash.
-    const presentationUrl = new URL(window.location.href);
-    presentationUrl.hash = nextRoute;
-    window.location.replace(presentationUrl.href);
-  }, { nextLocale: locale, nextEdition: edition, nextRoute: presentationRoute });
-  await page.waitForURL((url) => url.hash === `#${presentationRoute}`);
-  await page.waitForLoadState("domcontentloaded");
-  await page.locator(
-    ".launcher-settings-button:visible, .app-mobile-menu-button:visible",
-  ).first().waitFor({
-    state: "visible",
-    timeout: 30_000,
-  });
-
-  const theme = await page.locator("html").evaluate((element) => {
-    const style = getComputedStyle(element);
-    return {
-      edition: element.dataset.brandEdition,
-      productMode: element.dataset.productMode,
-      presentationOnly: element.dataset.themePresentationOnly,
-      grantsHardwareAuthority: element.dataset.themeGrantsHardwareAuthority,
-      colors: [
-        style.getPropertyValue("--dd-brand-start").trim().toUpperCase(),
-        style.getPropertyValue("--dd-brand-middle").trim().toUpperCase(),
-        style.getPropertyValue("--dd-brand-end").trim().toUpperCase(),
-      ],
-    };
-  });
-  assert.equal(theme.edition, edition);
-  assert.equal(theme.productMode, edition);
+  // This prerequisite intentionally stays on the unauthenticated launcher.
+  // Authenticated workspace/theme coverage belongs to the later exact OAuth
+  // matrix; navigating there here would correctly raise the mandatory account
+  // dialog and make a pre-auth observer fight the product's security gate.
+  assert.equal(edition, "universal");
+  const theme = startupTheme;
+  assert.equal(theme.edition, "universal");
+  assert.equal(theme.productMode, "universal");
   assert.equal(theme.presentationOnly, "true");
   assert.equal(theme.grantsHardwareAuthority, "false");
-  assert.deepEqual(theme.colors, canonicalColors[edition]);
+  assert.deepEqual(theme.colors, canonicalColors.universal);
 
   const settingsButton = await visibleSettingsButton(page);
   assert((await settingsButton.getAttribute("aria-label"))?.trim(), "Settings button needs an accessible label");

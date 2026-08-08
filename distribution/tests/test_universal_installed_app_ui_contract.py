@@ -83,17 +83,13 @@ def test_headed_verifier_protects_every_non_universal_edition_namespace() -> Non
     assert "Edition registry path escaped the HKCU Software contract." in script
 
 
-def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -> None:
+def test_headed_browser_observer_covers_the_pre_auth_launcher_without_bypassing_the_account_gate() -> None:
     script = BROWSER.read_text(encoding="utf-8")
     for fragment in (
         'chromium.connectOverCDP(cdpEndpoint)',
-        'dronedream:universal-workspace:v2',
-        'window.location.hash !== "#/desktop/setup"',
         'launcherUrl.hash = "/desktop/setup"',
-        'presentationUrl.hash = nextRoute',
-        'url.hash === `#${presentationRoute}`',
-        'nextEdition === "universal" ? "sim" : nextEdition',
-        '"/vehicle-studio"',
+        'assert.equal(edition, "universal")',
+        'This prerequisite intentionally stays on the unauthenticated launcher.',
         'startupTheme',
         'drone-dream:locale',
         'data-theme-grants-hardware-authority',
@@ -121,6 +117,8 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
     assert "await browser.close()" not in script
     assert "window.location.assign(nextRoute)" not in script
     assert 'window.history.replaceState({}, "", "/desktop/setup")' not in script
+    assert '"/vehicle-studio"' not in script
+    assert 'dronedream:universal-workspace:v2' not in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
     assert "requestId" not in script
@@ -131,22 +129,23 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
 
 
 def test_ui_verifiers_use_the_current_universal_workspace_storage_contract() -> None:
-    for verifier in (BROWSER, OFFLINE_BROWSER):
-        script = verifier.read_text(encoding="utf-8")
-        assert 'dronedream:universal-workspace:v2' in script
-        assert 'dronedream:universal-mode:v1' not in script
+    script = BROWSER.read_text(encoding="utf-8")
+    assert 'dronedream:universal-workspace:v2' not in script
+    assert 'dronedream:universal-mode:v1' not in script
 
     offline = OFFLINE_BROWSER.read_text(encoding="utf-8")
+    assert 'dronedream:universal-workspace:v2' in offline
     assert 'testCase.edition === "universal"' in offline
     assert '"/vehicle-studio"' in offline
 
 
-def test_headed_plan_matrix_is_two_sizes_two_locales_four_themes() -> None:
+def test_headed_plan_matrix_is_two_sizes_two_locales_on_the_universal_launcher() -> None:
     script = POWERSHELL.read_text(encoding="utf-8-sig")
     assert '[ordered]@{ id = "minimum"; width = 390; height = 700 }' in script
     assert '[ordered]@{ id = "desktop"; width = 1440; height = 900 }' in script
     assert '@("en", "zh-CN")' in script
-    assert '@("universal", "sim", "lab", "field")' in script
+    assert 'presentationEdition = "universal"' in script
+    assert 'authenticatedWorkspaceMatrixDeferredToOAuthReceipt = $true' in script
 
 
 def test_headed_tools_parse_without_execution() -> None:

@@ -75,14 +75,12 @@ $matrix = @(
         [ordered]@{ id = "desktop"; width = 1440; height = 900 }
     )) {
         foreach ($locale in @("en", "zh-CN")) {
-            foreach ($edition in @("universal", "sim", "lab", "field")) {
-                [ordered]@{
-                    id = "$($viewport.id)-$($locale.Replace('-',''))-$edition"
-                    width = $viewport.width
-                    height = $viewport.height
-                    locale = $locale
-                    presentationEdition = $edition
-                }
+            [ordered]@{
+                id = "$($viewport.id)-$($locale.Replace('-',''))-universal"
+                width = $viewport.width
+                height = $viewport.height
+                locale = $locale
+                presentationEdition = "universal"
             }
         }
     }
@@ -541,6 +539,7 @@ $plan = [ordered]@{
         installOrRepairAllowed = $false
     }
     presentationMatrix = $matrix
+    authenticatedWorkspaceMatrixDeferredToOAuthReceipt = $true
     authority = [ordered]@{
         presentationOnly = $true
         grantsHardwareAuthority = $false
