@@ -105,6 +105,8 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "integrated-in-universal"
     )
     visual = shared_ui["visualEvidence"]  # type: ignore[index]
+    assert visual["subjectCommit"] == "4933e214a57a048099d8f0bdd11c9748b620ac3e"
+    assert visual["subjectCommit"] != shared_ui["donorCommit"]
     assert visual["caseCount"] == 6
     assert visual["locales"] == ["en", "zh-CN"]
     assert visual["viewportWidths"] == [390, 760, 1440]
@@ -211,6 +213,7 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'payloadContractId = "dronedream-universal-engine-payload/v1"',
         'dronedream-shared-edition-ui/v1',
         'Invoke-GitText @("merge-base", "--is-ancestor"',
+        'visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit',
         'Universal shared UI source binding drifted:',
         'Universal shared UI visual evidence hash drifted.',
         'Universal Vehicle Studio identity or safety policy drifted.',

@@ -91,7 +91,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $profile.brand.grantsHardwareAuthority -ne $false -or
     $sharedUi.contractId -cne "dronedream-shared-edition-ui/v1" -or
     $sharedUi.donorCommit -cnotmatch "^[0-9a-f]{40}$" -or
-    $sharedUi.visualEvidence.subjectCommit -cne $sharedUi.donorCommit -or
+    $sharedUi.visualEvidence.subjectCommit -cnotmatch "^[0-9a-f]{40}$" -or
     $sharedUi.visualEvidence.caseCount -ne 6 -or
     $sharedUi.visualEvidence.runtimePanelHeadedValidationStatus -cne "pending-exact-desktop-runtime-red-validation" -or
     $sharedUi.minimumDesktopViewport.width -ne 390 -or
@@ -107,6 +107,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     throw "Universal build identity or safety policy drifted."
 }
 Invoke-GitText @("merge-base", "--is-ancestor", [string]$sharedUi.donorCommit, $sourceCommit) | Out-Null
+Invoke-GitText @("merge-base", "--is-ancestor", [string]$sharedUi.visualEvidence.subjectCommit, $sourceCommit) | Out-Null
 $sharedUiSourceRefs = @()
 foreach ($expectedRef in @($sharedUi.sourceFiles)) {
     if ($expectedRef.path -cnotmatch "^frontend/src/" -or
@@ -128,7 +129,7 @@ if ($sharedUiEvidenceRef.sha256 -cne [string]$sharedUi.visualEvidence.sha256) {
 }
 $sharedUiEvidence = Get-Content -LiteralPath (Join-Path $repoRoot $sharedUiEvidenceRef.path) `
     -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($sharedUiEvidence.subject_commit -cne [string]$sharedUi.donorCommit -or
+if ($sharedUiEvidence.subject_commit -cne [string]$sharedUi.visualEvidence.subjectCommit -or
     $sharedUiEvidence.subject_dirty -ne $false -or
     $sharedUiEvidence.status -cne "pass" -or
     @($sharedUiEvidence.cases).Count -ne [int]$sharedUi.visualEvidence.caseCount -or
@@ -241,6 +242,7 @@ if (-not $Build) {
         sharedUi = [ordered]@{
             contractId = [string]$sharedUi.contractId
             donorCommit = [string]$sharedUi.donorCommit
+            visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit
             sourceFiles = $sharedUiSourceRefs
             visualEvidence = $sharedUiEvidenceRef
             minimumDesktopViewport = $sharedUi.minimumDesktopViewport
@@ -448,6 +450,7 @@ $buildReceipt = [ordered]@{
     sharedUi = [ordered]@{
         contractId = [string]$sharedUi.contractId
         donorCommit = [string]$sharedUi.donorCommit
+        visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit
         sourceFiles = $sharedUiSourceRefs
         visualEvidence = $sharedUiEvidenceRef
         minimumDesktopViewport = $sharedUi.minimumDesktopViewport
