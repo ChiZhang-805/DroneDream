@@ -68,13 +68,18 @@ function Get-ExactChromeWindow([switch]$AllowRelatedDroneDreamTitle) {
         [System.Windows.Automation.TreeScope]::Children,
         [System.Windows.Automation.Condition]::TrueCondition
     )
-    $matches = @($windows | Where-Object {
-        $titleMatches = if ($AllowRelatedDroneDreamTitle) {
-            $_.Current.Name -match 'DroneDream - Google Chrome$'
-        }
-        else { $_.Current.Name -ceq $receipt.exactWindowTitle }
-        $titleMatches -and $_.Current.ClassName -ceq $receipt.exactWindowClass
-    })
+    $matches = if ($AllowRelatedDroneDreamTitle) {
+        @($windows | Where-Object {
+            $_.Current.Name -match 'DroneDream - Google Chrome$' -and
+            $_.Current.ClassName -ceq $receipt.exactWindowClass
+        })
+    }
+    else {
+        @($windows | Where-Object {
+            $_.Current.Name -ceq $receipt.exactWindowTitle -and
+            $_.Current.ClassName -ceq $receipt.exactWindowClass
+        })
+    }
     if ($matches.Count -ne 1) { return $null }
     $window = $matches[0]
     $process = Get-Process -Id $window.Current.ProcessId -ErrorAction Stop
