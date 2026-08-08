@@ -95,6 +95,29 @@ async function visibleSettingsButton(page) {
   return mobileButton;
 }
 
+async function assertAuthenticatedAccountSurface(page) {
+  const desktopAccount = page.locator(".app-account-button:visible").first();
+  if (await desktopAccount.isVisible()) return;
+
+  const menuButton = page.locator(".app-mobile-menu-button:visible").first();
+  await menuButton.waitFor({ state: "visible", timeout: 30_000 });
+  if ((await menuButton.getAttribute("aria-expanded")) !== "true") {
+    await menuButton.click();
+  }
+  const menuPanel = page.locator(".app-mobile-menu-panel.is-open:visible").first();
+  await menuPanel.waitFor({ state: "visible", timeout: 30_000 });
+  await menuPanel.locator(".app-account-button:visible").first().waitFor({
+    state: "visible",
+    timeout: 30_000,
+  });
+
+  // Restore the collapsed state so the Settings helper exercises its own
+  // keyboard/focus contract from the same deterministic starting point.
+  await menuButton.click();
+  await menuPanel.waitFor({ state: "hidden", timeout: 30_000 });
+  assert.equal(await menuButton.getAttribute("aria-expanded"), "false");
+}
+
 const browser = await chromium.connectOverCDP(cdpEndpoint);
 {
   const contexts = browser.contexts();
@@ -104,7 +127,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   const page = pages.find((candidate) => /(?:tauri|localhost)/u.test(candidate.url())) ?? pages[0];
   await page.waitForLoadState("domcontentloaded");
   if (authenticatedWorkspace) {
-    await page.locator(".app-account-button").waitFor({ state: "visible", timeout: 30_000 });
+    await assertAuthenticatedAccountSurface(page);
     const workspaceRoute = {
       universal: "/vehicle-studio",
       sim: "/assistant",

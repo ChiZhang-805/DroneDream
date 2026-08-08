@@ -104,6 +104,8 @@ def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
     ):
         assert surface in observer
     assert 'document.querySelector(".universal-mode-switch select")' in observer
+    assert "async function assertAuthenticatedAccountSurface(page)" in observer
+    assert 'menuPanel.locator(".app-account-button:visible")' in observer
     assert 'data-theme-grants-hardware-authority' in observer
     assert 'validationSurface: authenticatedWorkspace ? "authenticated-workspace" : "pre-auth-launcher"' in observer
     assert 'languageSelectionCount: 1' in observer
