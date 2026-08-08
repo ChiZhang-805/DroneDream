@@ -6,6 +6,7 @@ import type {
 } from "../desktop/bridge";
 import {
   canAutoStartRuntime,
+  claimDesktopRuntimeLifetime,
   clearRuntimeAutoStartFailure,
   ensureOverallDesktopReadiness,
   isOverallDesktopReady,
@@ -198,6 +199,29 @@ describe("desktop readiness", () => {
     ]);
     expect(firstStarting).toHaveBeenCalledTimes(1);
     expect(secondStarting).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not issue a second start after a forced probe already reports ready", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return readyRuntime;
+      if (command === "start_runtime") {
+        throw new Error("a ready Runtime must not be started again");
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    claimDesktopRuntimeLifetime(readyRuntime);
+
+    const snapshot = await ensureOverallDesktopReadiness({
+      autoStart: true,
+      force: true,
+    });
+
+    expect(snapshot.ready).toBe(true);
+    expect(snapshot.autoStartFailed).toBe(false);
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(0);
   });
 
   it("suppresses automatic retry after failure until readiness is restored", async () => {

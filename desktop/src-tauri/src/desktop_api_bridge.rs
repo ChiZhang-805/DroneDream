@@ -677,6 +677,40 @@ fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
         .into()
 }
 
+#[cfg(all(test, target_os = "windows"))]
+pub(crate) fn verify_live_anonymous_session_contract_for_test() -> Result<(), String> {
+    let credential = load_runtime_bridge_credential_sync()?;
+    let response = forward_request(
+        &Uuid::new_v4().to_string(),
+        &credential,
+        DesktopApiRequest {
+            method: "GET".to_string(),
+            path: "/api/v1/session".to_string(),
+            body: None,
+            access_token: None,
+            accept: Some("application/json".to_string()),
+            idempotency_key: None,
+        },
+    )?;
+    let body = base64::engine::general_purpose::STANDARD
+        .decode(&response.body_base64)
+        .map_err(|_| "The live session response was not valid base64.".to_string())?;
+    let payload: serde_json::Value = serde_json::from_slice(&body)
+        .map_err(|_| "The live session response was not valid JSON.".to_string())?;
+    let code = payload
+        .get("error")
+        .and_then(|error| error.get("code"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("missing");
+    if response.status == 401 && code == "UNAUTHORIZED" {
+        return Ok(());
+    }
+    Err(format!(
+        "The signed anonymous session probe returned status {} with error code {code}.",
+        response.status
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

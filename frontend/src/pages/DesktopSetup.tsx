@@ -51,6 +51,7 @@ import { adoptBrowserAuthSession } from "../features/auth/browserAuth";
 import { browserAuthConfiguration } from "../features/auth/supabaseClient";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
+  claimDesktopRuntimeLifetime,
   clearRuntimeAutoStartFailure,
   isOverallDesktopReady,
   isRuntimeConfirmedMissing,
@@ -443,7 +444,6 @@ export function DesktopSetup() {
   );
   const launcherErrorDetails = [
     ...state.issues.map((issue) => `${issue.command}: ${issue.message}`),
-    runtimeCommandError,
     installState.commandError,
     installState.snapshot?.error
       ? `${installState.snapshot.error.code}: ${installState.snapshot.error.message}`
@@ -855,7 +855,14 @@ export function DesktopSetup() {
     setRuntimeCommandBusy(true);
     try {
       const nativeRuntime = action === "start" ? await startRuntime() : await repairRuntime();
+      claimDesktopRuntimeLifetime(nativeRuntime);
       const runtime = await verifyRuntimeSessionContract(nativeRuntime);
+      const sessionFailure = runtimeSessionContractFailure(runtime);
+      if (sessionFailure) {
+        setRuntimeCommandError(
+          `${action === "start" ? "start_runtime" : "repair_runtime"}: ${sessionFailure}`,
+        );
+      }
       if (isRuntimeFullyReady(runtime)) clearRuntimeAutoStartFailure();
       setState((current) => ({
         ...current,
@@ -1379,6 +1386,12 @@ export function DesktopSetup() {
         {runtimeSessionFailureKey ? (
           <Alert tone="warning" title={t("launcher.runtimeSessionApiTitle")}>
             <p>{t(runtimeSessionFailureKey)}</p>
+          </Alert>
+        ) : null}
+
+        {runtimeCommandError ? (
+          <Alert tone="warning" title={t("desktop.runtimeActionFailed")}>
+            <code>{runtimeCommandError}</code>
           </Alert>
         ) : null}
 

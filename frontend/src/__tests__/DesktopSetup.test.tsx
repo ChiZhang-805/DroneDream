@@ -2535,6 +2535,51 @@ describe("DesktopSetup", () => {
     expect(invoke).toHaveBeenCalledWith("start_runtime", undefined);
   });
 
+  it("surfaces a stable error when the post-start account session contract fails", async () => {
+    const user = userEvent.setup();
+    const stoppedRuntime: RuntimeStatusReport = {
+      ...runtime,
+      running: false,
+      ready: false,
+    };
+    runtimeSessionContractMocks.verify.mockImplementation(async (report) => {
+      const runtimeReport = report as RuntimeStatusReport;
+      if (!runtimeReport.running) return runtimeReport;
+      return {
+        ...runtimeReport,
+        ready: false,
+        components: [
+          ...runtimeReport.components,
+          {
+            id: "account-session-api",
+            label: "Desktop account-session API",
+            status: "unhealthy" as const,
+            required: true,
+            version: null,
+            detail: "runtime_session_api_unavailable",
+          },
+        ],
+        diagnostics: ["runtime_session_api_unavailable"],
+      };
+    });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return stoppedRuntime;
+      if (command === "start_runtime") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Start runtime" }));
+
+    expect(await screen.findByText("start_runtime: runtime_session_api_unavailable"))
+      .toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in and enter tuning workspace" }))
+      .not.toBeInTheDocument();
+    expect(invoke).toHaveBeenCalledWith("start_runtime", undefined);
+  });
+
   it("rejects a native plan whose canInstall flag contradicts its blockers", async () => {
     const contradictoryPlan = {
       ...plan,

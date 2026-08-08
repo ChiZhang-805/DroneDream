@@ -4457,6 +4457,38 @@ mod tests {
             )
         );
     }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "requires an installed, owned DroneDreamRuntime"]
+    fn live_runtime_maintenance_reaches_ready_before_the_observer_deadline() {
+        let keepalive = crate::runtime_keepalive::RuntimeKeepalive::default();
+        let release_handle = keepalive.clone();
+        let started = Instant::now();
+        let result = tauri::async_runtime::block_on(run_runtime_maintenance(
+            RuntimeInstaller::default(),
+            keepalive,
+            false,
+        ));
+        let elapsed = started.elapsed();
+        let session_contract = if result.as_ref().is_ok_and(|report| report.is_ready()) {
+            crate::desktop_api_bridge::verify_live_anonymous_session_contract_for_test()
+        } else {
+            Ok(())
+        };
+        let _ = release_handle.release();
+
+        let report = result.unwrap_or_else(|error| {
+            panic!("live Runtime maintenance failed after {elapsed:?}: {error}")
+        });
+        assert!(report.is_ready(), "maintenance returned a non-ready report");
+        session_contract
+            .unwrap_or_else(|error| panic!("live signed session contract failed: {error}"));
+        assert!(
+            elapsed < RUNTIME_MAINTENANCE_TIMEOUT,
+            "maintenance exceeded its native deadline: {elapsed:?}"
+        );
+    }
     use ed25519_dalek::{Signer, SigningKey};
     use std::sync::atomic::AtomicUsize;
     use std::time::{SystemTime, UNIX_EPOCH};
