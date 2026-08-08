@@ -102,6 +102,7 @@ import {
 import {
   loadUniversalMode,
   persistUniversalMode,
+  type UniversalWorkspaceId,
 } from "./features/distribution/universalMode";
 import { useI18n } from "./i18n/I18nProvider";
 import type { TranslationKey } from "./i18n/I18nProvider";
@@ -159,7 +160,40 @@ const CORE_NAV_ITEMS: NavigationItem[] = [
   },
 ];
 
-const NAV_ITEMS: NavigationItem[] = CORE_NAV_ITEMS;
+const FIELD_NAV_ITEMS: NavigationItem[] = [
+  {
+    to: "/field",
+    labelKey: "app.fieldWorkspace",
+    end: true,
+    icon: RadioTower,
+  },
+  ...CORE_NAV_ITEMS.filter((item) => item.to === "/vehicle-studio" || item.externalUrl),
+];
+
+const MODE_NAV_ITEMS: Record<UniversalWorkspaceId, NavigationItem[]> = {
+  sim: CORE_NAV_ITEMS,
+  lab: [
+    {
+      to: "/lab",
+      labelKey: "app.labWorkspace",
+      end: true,
+      icon: RadioTower,
+    },
+    {
+      to: "/lab/hardware",
+      labelKey: "app.hardwareLab",
+      icon: RadioTower,
+    },
+    ...CORE_NAV_ITEMS,
+  ],
+  field: FIELD_NAV_ITEMS,
+};
+
+const MODE_LANDING_PATH: Record<UniversalWorkspaceId, string> = {
+  sim: "/assistant",
+  lab: "/lab",
+  field: "/field",
+};
 
 const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
   "CREATED",
@@ -2120,6 +2154,12 @@ function AppShellContent() {
   useEffect(() => {
     persistUniversalMode(universalMode);
   }, [universalMode]);
+  const handleUniversalModeChange = useCallback((mode: UniversalWorkspaceId) => {
+    setUniversalMode(mode);
+    setMobileMenuOpen(false);
+    navigate(MODE_LANDING_PATH[mode]);
+  }, [navigate]);
+  const navigationItems = MODE_NAV_ITEMS[universalMode];
   const sidebarUpdateLabel = updater.status === "available"
     ? updater.error
       ? t("updater.sidebarDeferred")
@@ -2656,13 +2696,13 @@ function AppShellContent() {
           <UniversalModeSwitch
             mode={universalMode}
             locale={locale}
-            onChange={setUniversalMode}
+            onChange={handleUniversalModeChange}
           />
           <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">
             {runtimeNavDescription}
           </span>
-          {NAV_ITEMS.map((item) => {
+          {navigationItems.map((item) => {
             const ItemIcon = item.icon;
             const destination = desktopRuntime && item.desktopTo
               ? item.desktopTo

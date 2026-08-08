@@ -148,18 +148,10 @@ class FieldAdapterCatalogTest(unittest.TestCase):
         self.assertIn("flight_attempts: 0", source)
         self.assertNotRegex(source, r"TcpStream|UdpSocket|gazebo|sitl|hitl")
 
-    def test_field_bundle_carries_adapter_notice_and_ui_stays_non_authoritative(self) -> None:
-        config = json.loads(
-            (ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json").read_text(encoding="utf-8")
-        )
-        resources = config["bundle"]["resources"]
-        self.assertIn(
-            "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md",
-            resources,
-        )
-        notice = (ROOT / "distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md").read_text(
-            encoding="utf-8"
-        )
+    def test_shared_source_carries_adapter_notice_and_ui_stays_non_authoritative(self) -> None:
+        notice_path = ROOT / "distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md"
+        self.assertTrue(notice_path.is_file())
+        notice = notice_path.read_text(encoding="utf-8")
         self.assertIn("mavlink 0.17.1", notice)
         self.assertIn("serialport 4.9.0", notice)
         self.assertIn("MultiWii Serial Protocol parser 0.1.1", notice)

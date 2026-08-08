@@ -138,7 +138,7 @@ fn validate_metrics(metrics: &LabCalibrationMetrics) -> bool {
 }
 
 fn validate_request(request: &LabCalibrationCycleRequest) -> Result<(), String> {
-    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "lab"
+    if !matches!(env!("DRONEDREAM_DESKTOP_EDITION_ID"), "universal" | "lab")
         || env!("DRONEDREAM_EDITION_PROFILE") != "unified-sim-lab"
     {
         return Err("Lab calibration is unavailable in this edition".to_string());

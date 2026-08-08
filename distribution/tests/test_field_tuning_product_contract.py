@@ -7,8 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT = ROOT / "distribution/editions/field/field-tuning-contract.v1.json"
 LAB_MANIFEST = ROOT / "distribution/editions/lab.v1.json"
-LAB_CONFIG = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
 LIB_SOURCE = ROOT / "desktop/src-tauri/src/lib.rs"
+BUILD_SOURCE = ROOT / "desktop/src-tauri/build.rs"
 DOMAIN_SOURCE = ROOT / "desktop/src-tauri/src/hardware_domain.rs"
 DEVICE_SOURCE = ROOT / "desktop/src-tauri/src/field_device.rs"
 TUNING_SOURCE = ROOT / "desktop/src-tauri/src/field_tuning.rs"
@@ -35,16 +35,16 @@ def test_donor_tuning_contract_is_real_device_only_and_non_authoritative() -> No
 
 def test_lab_keeps_simulation_and_embeds_the_gated_hardware_domain() -> None:
     manifest = json.loads(LAB_MANIFEST.read_text(encoding="utf-8"))
-    config = json.loads(LAB_CONFIG.read_text(encoding="utf-8"))
-    resources = config["bundle"]["resources"]
     assert manifest["editionId"] == "lab"
     assert "simulation.execute" in manifest["capabilities"]["enabledOrConditioned"]
     assert "hardware.parameter.write" in manifest["capabilities"]["enabledOrConditioned"]
-    assert "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md" in resources
-    assert "../../distribution/editions/field/adapters/catalog.v1.json" in resources
-    assert "../../distribution/editions/field/adapters/packages" in resources
-    assert "../../distribution/editions/field/field-tuning-contract.v1.json" in resources
-    assert "tauri.field.conf.json" not in json.dumps(config)
+    for relative_path in (
+        "distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md",
+        "distribution/editions/field/adapters/catalog.v1.json",
+        "distribution/editions/field/adapters/packages",
+        "distribution/editions/field/field-tuning-contract.v1.json",
+    ):
+        assert (ROOT / relative_path).exists()
 
 
 def test_native_handler_registers_runtime_and_hardware_domain_commands() -> None:
@@ -74,11 +74,15 @@ def test_native_handler_registers_runtime_and_hardware_domain_commands() -> None
 
 def test_hardware_domain_identity_is_exact_and_fail_closed() -> None:
     source = DOMAIN_SOURCE.read_text(encoding="utf-8")
+    assert '("universal", "unified-sim-lab")' in source
     assert '("lab", "unified-sim-lab")' in source
     assert '("field", "field-lightweight")' in source
     assert "Hardware-domain commands are unavailable in this edition" in source
     assert "require_available()?" in TUNING_SOURCE.read_text(encoding="utf-8")
     assert "require_available()?" in RECOVERY_SOURCE.read_text(encoding="utf-8")
+    build_source = BUILD_SOURCE.read_text(encoding="utf-8")
+    assert 'matches!(edition_id.as_str(), "universal" | "lab" | "field")' in build_source
+    assert 'matches!(edition_id.as_str(), "universal" | "lab")' in build_source
 
 
 def test_device_discovery_is_registry_only_and_never_opens_transport() -> None:

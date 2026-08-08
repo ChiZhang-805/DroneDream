@@ -2,7 +2,6 @@ import { LockKeyhole, RadioTower, ShieldCheck } from "lucide-react";
 
 import { FieldApp } from "../field/FieldApp";
 import { useI18n } from "../i18n/I18nProvider";
-import "../field/field.css";
 import "./lab-hardware.css";
 
 const COPY = {

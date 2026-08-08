@@ -1,5 +1,11 @@
 pub(crate) fn edition_id() -> &'static str {
-    env!("DRONEDREAM_DESKTOP_EDITION_ID")
+    match env!("DRONEDREAM_DESKTOP_EDITION_ID") {
+        // Universal embeds the mature FIELD hardware-domain module alongside
+        // the LAB calibration module. It never creates a new authority
+        // domain: hardware receipts continue to use the canonical FIELD id.
+        "universal" => "field",
+        edition => edition,
+    }
 }
 
 pub(crate) fn runtime_profile() -> &'static str {
@@ -7,8 +13,10 @@ pub(crate) fn runtime_profile() -> &'static str {
 }
 
 pub(crate) fn require_available() -> Result<(), String> {
-    match (edition_id(), runtime_profile()) {
-        ("lab", "unified-sim-lab") | ("field", "field-lightweight") => Ok(()),
+    match (env!("DRONEDREAM_DESKTOP_EDITION_ID"), runtime_profile()) {
+        ("universal", "unified-sim-lab")
+        | ("lab", "unified-sim-lab")
+        | ("field", "field-lightweight") => Ok(()),
         _ => Err("Hardware-domain commands are unavailable in this edition".to_string()),
     }
 }
@@ -19,7 +27,12 @@ mod tests {
 
     #[test]
     fn compiled_identity_is_exact_and_hardware_scoped() {
-        require_available().expect("Lab or Field hardware domain must be compiled explicitly");
+        require_available()
+            .expect("Universal, Lab, or Field hardware domain must be compiled explicitly");
         assert!(matches!(edition_id(), "lab" | "field"));
+        if env!("DRONEDREAM_DESKTOP_EDITION_ID") == "universal" {
+            assert_eq!(edition_id(), "field");
+            assert_eq!(runtime_profile(), "unified-sim-lab");
+        }
     }
 }

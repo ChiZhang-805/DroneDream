@@ -277,6 +277,10 @@ describe("environment-aware routing", () => {
 
     expect(children.find((route) => route.path === "lab")?.lazy)
       .toEqual(expect.any(Function));
+    expect(children.find((route) => route.path === "lab/hardware")?.lazy)
+      .toEqual(expect.any(Function));
+    expect(children.find((route) => route.path === "field")?.lazy)
+      .toEqual(expect.any(Function));
     expect(router.state.location.pathname).toBe("/lab");
 
     router.dispose();

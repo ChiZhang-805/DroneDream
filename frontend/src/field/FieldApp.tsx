@@ -33,6 +33,7 @@ import {
   type FieldObservationState,
 } from "./safety";
 import { hardwareDomainEdition } from "./hardwareDomain";
+import "./field.css";
 
 type FieldPageId = "assistant" | "device" | "compatibility" | "tuning" | "recovery" | "operations";
 
@@ -170,15 +171,17 @@ function FieldPageHeading({
   icon: Icon,
   title,
   body,
+  edition,
 }: {
   icon: typeof RadioTower;
   title: string;
   body: string;
+  edition: "lab" | "field";
 }) {
   return (
     <header className="field-page-heading">
       <div>
-        <span className="field-page-eyebrow"><Icon aria-hidden="true" />{hardwareDomainEdition === "lab" ? "LAB · HARDWARE" : "FIELD"}</span>
+        <span className="field-page-eyebrow"><Icon aria-hidden="true" />{edition === "lab" ? "LAB · HARDWARE" : "FIELD"}</span>
         <h1>{title}</h1>
         <p>{body}</p>
       </div>
@@ -192,6 +195,7 @@ function FieldWorkspace({
   focusOnMount = false,
   embeddedInLab = false,
 }: FieldAppProps) {
+  const presentationEdition = embeddedInLab ? "lab" as const : hardwareDomainEdition;
   const [locale, setLocale] = useState<FieldLocale>(initialLocale ?? savedLocale);
   const [activePage, setActivePage] = useState<FieldPageId>("assistant");
   const [observationState, setObservationState] = useState<FieldObservationState>(initialObservationState);
@@ -255,7 +259,7 @@ function FieldWorkspace({
     const [title, body] = copy.page.device;
     return (
       <div className="field-page field-device-page">
-        <FieldPageHeading icon={RadioTower} title={title} body={body} />
+        <FieldPageHeading icon={RadioTower} title={title} body={body} edition={presentationEdition} />
         <div className="field-device-dashboard">
           <section className="field-compact-panel field-device-observation-panel">
             <div className="field-panel-toolbar">
@@ -302,7 +306,7 @@ function FieldWorkspace({
     const [title, body] = copy.page.compatibility;
     return (
       <div className="field-page field-compatibility-page">
-        <FieldPageHeading icon={PackageCheck} title={title} body={body} />
+        <FieldPageHeading icon={PackageCheck} title={title} body={body} edition={presentationEdition} />
         <section className="field-compact-panel field-compatibility-controls" data-authority="false">
           <label><span>{copy.selectedPack}</span><select value={selectedPackId} onChange={(event) => {
             const pack = FIELD_CATALOG.vehiclePacks.find((candidate) => candidate.packId === event.target.value) ?? FIRST_FIELD_PACK;
@@ -329,20 +333,20 @@ function FieldWorkspace({
     if (activePage === "compatibility") return renderCompatibilityPage();
     if (activePage === "tuning") {
       const [title, body] = copy.page.tuning;
-      return <div className="field-page"><FieldPageHeading icon={SlidersHorizontal} title={title} body={body} /><div className="field-page-component"><FieldTuningWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
+      return <div className="field-page"><FieldPageHeading icon={SlidersHorizontal} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldTuningWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
     }
     if (activePage === "recovery") {
       const [title, body] = copy.page.recovery;
-      return <div className="field-page"><FieldPageHeading icon={History} title={title} body={body} /><div className="field-page-component"><FieldRecoveryWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} device={deviceReport?.devices[0]} evidence={readOnlyEvidence ?? undefined} onSnapshotCreated={setLatestSnapshot} /></div></div>;
+      return <div className="field-page"><FieldPageHeading icon={History} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldRecoveryWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} device={deviceReport?.devices[0]} evidence={readOnlyEvidence ?? undefined} onSnapshotCreated={setLatestSnapshot} /></div></div>;
     }
     const [title, body] = copy.page.operations;
-    return <div className="field-page"><FieldPageHeading icon={ShieldCheck} title={title} body={body} /><div className="field-page-component"><FieldPreflightWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
+    return <div className="field-page"><FieldPageHeading icon={ShieldCheck} title={title} body={body} edition={presentationEdition} /><div className="field-page-component"><FieldPreflightWorkspace locale={locale} selectedPackId={selectedPackId} selectedControllerId={selectedControllerKey} snapshot={latestSnapshot ?? undefined} /></div></div>;
   };
 
   return (
     <div
       className={`field-app${embeddedInLab ? " field-app-embedded-lab" : ""}`}
-      data-brand-edition={hardwareDomainEdition}
+      data-brand-edition={presentationEdition}
       data-authority="false"
       data-validated-pack-count={decision.validatedPackCount}
       data-quorum={decision.threeLayerQuorum}
@@ -364,7 +368,7 @@ function FieldWorkspace({
 export function FieldApp(props: FieldAppProps) {
   const auth = useOptionalAuth();
   return (
-    <ModelAccessProvider accountScope={`${hardwareDomainEdition}:${auth?.account?.id ?? "local"}`}>
+    <ModelAccessProvider accountScope={`${props.embeddedInLab ? "lab" : hardwareDomainEdition}:${auth?.account?.id ?? "local"}`}>
       <FieldWorkspace {...props} />
     </ModelAccessProvider>
   );
