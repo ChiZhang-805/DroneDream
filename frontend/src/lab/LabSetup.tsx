@@ -70,7 +70,7 @@ const COPY = {
     subtitle:
       "Model + Harness connects simulation search, controlled real observations, model calibration, independent holdout, and evidence issuance in one bounded job.",
     edition: "Edition",
-    editionValue: "Lab preview",
+    editionValue: "DroneDream · LAB",
     packs: "Validated packs",
     packsValue: "0 of 8",
     authority: "Hardware authority",
@@ -139,7 +139,7 @@ const COPY = {
     operatorBody:
       "Confirmation requires a short-lived one-time challenge bound to an authorization request. A checkbox or workspace switch is not accepted.",
     challenge: "Operator challenge",
-    challengeUnavailable: "Unavailable until the three authority layers allow",
+    challengeUnavailable: "Unavailable: authority quorum denied",
     confirm: "Confirm hardware action",
     deniedCapabilities: "Denied capability IDs",
   },
@@ -149,7 +149,7 @@ const COPY = {
     subtitle:
       "Model + Harness 在同一份受预算约束的作业中贯通仿真搜索、受控真实观测、模型校准、独立 holdout 与证据签发。",
     edition: "版本",
-    editionValue: "Lab 内测预览",
+    editionValue: "DroneDream · LAB",
     packs: "已验证机型包",
     packsValue: "0 / 8",
     authority: "真机权限",
@@ -218,7 +218,7 @@ const COPY = {
     operatorBody:
       "人工确认必须使用绑定授权请求的短时一次性 challenge；复选框或工作区切换不被接受。",
     challenge: "操作员 challenge",
-    challengeUnavailable: "三层权限全部允许后才可签发",
+    challengeUnavailable: "不可用：权限法定人数为拒绝",
     confirm: "确认真机动作",
     deniedCapabilities: "被拒绝的能力 ID",
   },
