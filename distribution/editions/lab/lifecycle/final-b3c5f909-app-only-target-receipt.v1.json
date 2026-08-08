@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-app-only-target-receipt",
+  "editionId": "lab",
+  "state": "target-only-no-execution-evidence",
+  "artifact": {
+    "productSourceCommit": "b3c5f90948f206472e3e12504d8205cb563ac9dc",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12468471,
+    "sha256": "cf3ce9dd592995f90c9c0ed7dad014bfb74108a39d066194c8f315a012111811",
+    "authenticodeStatus": "NotSigned"
+  },
+  "requiredOutcome": {
+    "result": "segment-a-app-only-passed",
+    "freshInstall": "passed",
+    "overlayInstall": "passed",
+    "uninstallAndOwnedRollback": "passed",
+    "shortcutIdentity": "passed",
+    "webView2ExistingRuntimeOnly": "passed",
+    "languages": ["en", "zh-CN"],
+    "settingsSingleScreen": "passed",
+    "fixedThemeEdition": "lab",
+    "themePalette": ["#A7E84A", "#20C77A", "#087E69"],
+    "settingsOrThemeGrantsHardwareAuthority": false,
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny"
+  },
+  "requiredExactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "applicationCloses": 2,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "languageSurfaceAssertions": 4,
+    "settingsSingleScreenChecks": 2,
+    "labThemeChecks": 2,
+    "authorityFalseChecks": 2,
+    "shortcutIdentityChecks": 3,
+    "protectedStateSnapshots": 5,
+    "protectedStateParityChecks": 4,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "accountReads": 0,
+    "artifactBuilds": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "requiredFinalState": {
+    "labInstallRootAbsent": true,
+    "labUninstallKeyAbsent": true,
+    "labOwnedAppDataAbsent": true,
+    "labShortcutsAbsent": true,
+    "labOwnedPreferenceKeyAbsent": true,
+    "protectedStateMatchesBaseline": true
+  },
+  "failurePolicy": {
+    "stopAtFirstFailure": true,
+    "automaticRetryAllowed": false,
+    "preservePartialEvidence": true,
+    "historicalArtifactDeletionAllowed": false
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-app-only-lifecycle-application",
+  "editionId": "lab",
+  "state": "exact-one-shot-execution-ready",
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "b3c5f90948f206472e3e12504d8205cb563ac9dc",
+    "artifactProductSourceTree": "272125dace28293f206f223865df6ac42ef0bdb2",
+    "executionEvidenceIsArtifactSource": false,
+    "productRuntimeSemanticsChanged": false
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-b3c5f909-attempt11/DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12468471,
+    "sha256": "cf3ce9dd592995f90c9c0ed7dad014bfb74108a39d066194c8f315a012111811",
+    "version": "1.0.0",
+    "authenticodeStatus": "NotSigned",
+    "updaterSignatureSha256": "77e1a8ca1ecc48e3b82cd98cd2c4938065bab9a7c2c6b344f0875bafd8ab2ab6",
+    "mayBeRebuiltRelabeledOverwrittenOrDeletedByThisApplication": false
+  },
+  "plan": {
+    "path": "distribution/editions/lab/lifecycle/final-b3c5f909-app-only-plan.v1.json",
+    "bytes": 2082,
+    "sha256": "9be96a26b83d138bc5c5163fccb36be2ef44c966e96f97b1456964b298c71331"
+  },
+  "targetReceipt": {
+    "path": "distribution/editions/lab/lifecycle/final-b3c5f909-app-only-target-receipt.v1.json",
+    "bytes": 2225,
+    "sha256": "0fe69e2d0751e411b344782407e8b5d97b23cd983a03ae7ac1a58e098714aeaf"
+  },
+  "executionTools": {
+    "adapter": {
+      "path": "distribution/editions/lab/lifecycle/run-lab-final-app-only-lifecycle.ps1",
+      "lfNormalizedBytes": 33347,
+      "lfNormalizedSha256": "7d704aa296f9165875fadff45b0e500c69b747035d34611fa94a46cbf3794756"
+    },
+    "liveInspector": {
+      "path": "distribution/editions/lab/lifecycle/inspect-lab-e3b427e-live-webview2.mjs",
+      "lfNormalizedBytes": 12682,
+      "lfNormalizedSha256": "ff5e4d8819a34c7f000a74ede064f945a617aa71ee6cd6468bc1b31a48171ef5"
+    },
+    "requestDiagnosticsClassifier": {
+      "path": "distribution/editions/lab/lifecycle/lab-request-origin-diagnostics.mjs",
+      "lfNormalizedBytes": 5903,
+      "lfNormalizedSha256": "b13b6bcb9c6c482340f24a6de0f5542c6b6c098e45254f406f2fb3c1e7ab8941"
+    }
+  },
+  "attempt": {
+    "segmentAOrdinal": 1,
+    "maximumExecutionInvocations": 1,
+    "automaticRetryMaximum": 0,
+    "priorAttemptResult": "none-new-product-source"
+  },
+  "ownedIsolation": {
+    "providerClass": "current-user-owned-app-namespace",
+    "ownedBase": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED",
+    "runId": "lab-final-b3c5f909-segment-a-1",
+    "runRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-final-b3c5f909-segment-a-1",
+    "runRootMustBeAbsentBeforeExecution": true,
+    "runRootReuseAllowed": false,
+    "mutationAllowedOnlyForExactLabIdentity": true
+  },
+  "segments": {
+    "a": {
+      "orderedStages": ["fresh-install-and-live-ui", "same-version-overlay-and-live-ui", "uninstall-owned-cleanup-and-parity"],
+      "exactCounts": {
+        "freshInstallerInvocations": 1,
+        "overlayInstallerInvocations": 1,
+        "applicationLaunches": 2,
+        "applicationCloses": 2,
+        "uninstallerInvocations": 1,
+        "ownedPreferenceKeyCleanupInvocations": 1,
+        "liveWebView2Inspections": 2,
+        "languageTransitions": 2,
+        "languageSurfaceAssertions": 4,
+        "settingsSingleScreenChecks": 2,
+        "labThemeChecks": 2,
+        "authorityFalseChecks": 2,
+        "shortcutIdentityChecks": 3,
+        "protectedStateSnapshots": 5,
+        "protectedStateParityChecks": 4,
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "providerTokenExchanges": 0,
+        "accountReads": 0,
+        "artifactBuilds": 0,
+        "runtimeStartsOrMigrations": 0,
+        "px4Starts": 0,
+        "gazeboStarts": 0,
+        "hardwareActions": 0,
+        "uploadsOrDeployments": 0
+      }
+    },
+    "b": {
+      "state": "fail-closed-not-executed",
+      "blocksSegmentA": false
+    }
+  },
+  "liveAssertions": {
+    "documentElementEdition": "lab",
+    "appShellRequired": true,
+    "languages": ["en", "zh-CN"],
+    "settingsDialogAndPanelNoVerticalOverflow": true,
+    "themePalette": ["#A7E84A", "#20C77A", "#087E69"],
+    "threeDCanvasMustBeNonblankAndResponsive": true,
+    "themeSettingsAndThreeDGrantHardwareAuthority": false,
+    "themeAndSettingsPresentationOnly": true,
+    "webView2Provider": "existing-system-runtime-read-only"
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "frontendSettingsThemeOrWorkspaceCountsAsAuthority": false
+  },
+  "authorization": {
+    "segmentAExecutionDecision": "prepared-awaiting-new-exact-red-authorization",
+    "segmentBExecutionDecision": "deny-before-real-auth-boundary",
+    "browserOauthProviderRuntimePx4GazeboHardwareAllowed": false
+  }
+}
