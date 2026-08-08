@@ -213,13 +213,13 @@ try {
     await primary.press("Enter");
 
     await page.waitForFunction(
-      () => window.location.pathname === "/assistant" && Boolean(document.querySelector(".app-account-button")),
+      () => window.location.hash === "#/assistant" && Boolean(document.querySelector(".app-account-button")),
       undefined,
       { timeout: oauthTimeoutMs },
     );
     evidence.callbackSessionObserved = true;
     evidence.accountSurfaceObserved = true;
-    evidence.postCallbackPath = await page.evaluate(() => window.location.pathname);
+    evidence.postCallbackPath = await page.evaluate(() => window.location.hash.slice(1));
 
     let postAuthUiDecision = "complete";
     if (postAuthHoldSignal) {

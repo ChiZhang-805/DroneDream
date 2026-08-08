@@ -102,6 +102,13 @@ def test_observer_is_bounded_and_never_owns_or_logs_the_external_browser() -> No
         assert forbidden not in text
 
 
+def test_installed_observer_uses_the_packaged_hash_router_after_callback() -> None:
+    text = OBSERVER.read_text(encoding="utf-8")
+    assert 'window.location.hash === "#/assistant"' in text
+    assert "window.location.hash.slice(1)" in text
+    assert 'window.location.pathname === "/assistant"' not in text
+
+
 def test_attempts_are_durable_before_side_effects_and_runtime_failure_is_bounded() -> None:
     observer = OBSERVER.read_text(encoding="utf-8")
     powershell = POWERSHELL.read_text(encoding="utf-8")
