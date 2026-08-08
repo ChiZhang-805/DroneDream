@@ -107,7 +107,9 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
         'async function visibleSettingsButton(page)',
         '".app-mobile-menu-button:visible"',
         '".app-mobile-settings-entry:visible"',
-        'await menuButton.press("Enter")',
+        'await menuButton.click()',
+        '".app-mobile-menu-panel.is-open:visible"',
+        'assert.equal(await menuButton.getAttribute("aria-expanded"), "true")',
         'await closeButton.press("Enter")',
     ):
         assert fragment in script

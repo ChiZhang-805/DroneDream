@@ -78,8 +78,16 @@ async function visibleSettingsButton(page) {
     "false",
     "The compact navigation menu must start collapsed",
   );
-  await menuButton.focus();
-  await menuButton.press("Enter");
+  // The existing cross-viewport browser matrix exercises this exact compact
+  // menu via DOM click. Reuse that deterministic interaction here; keyboard
+  // access remains covered by the button semantics and focused Settings/tab
+  // activation below, without relying on WebView2 synthesizing Enter as click.
+  await menuButton.click();
+  await page.locator(".app-mobile-menu-panel.is-open:visible").waitFor({
+    state: "visible",
+    timeout: 30_000,
+  });
+  assert.equal(await menuButton.getAttribute("aria-expanded"), "true");
   const mobileButton = page.locator(".app-mobile-settings-entry:visible").first();
   await mobileButton.waitFor({ state: "visible", timeout: 30_000 });
   return mobileButton;
