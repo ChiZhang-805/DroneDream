@@ -304,7 +304,17 @@ function Get-WebView2Record {
 function Get-ProtectedState {
     $otherRoots = @("DroneDream", "DroneDream-Universal", "DroneDream-Sim", "DroneDream-Field") |
         ForEach-Object {
-            $excluded = if ($_ -eq "DroneDream") { @("codex-cache") } else { @() }
+            $excluded = if ($_ -eq "DroneDream") {
+                @(
+                    "codex-cache",
+                    "codex-dependencies",
+                    "codex-handoffs",
+                    "codex-runs",
+                    "codex-sandboxes",
+                    "handoffs",
+                    "validation"
+                )
+            } else { @() }
             Get-PathRecord `
                 -Path (Join-Path $env:LOCALAPPDATA $_) `
                 -HashDirectoryContents $true `

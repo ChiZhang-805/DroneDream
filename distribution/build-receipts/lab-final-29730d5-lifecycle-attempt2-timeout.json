@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-lifecycle-failure-receipt",
+  "result": "failed-no-retry-rolled-back",
+  "classification": "protected-snapshot-still-included-nonproduct-development-directories",
+  "artifact": {
+    "productSourceCommit": "29730d5d9928817872d7b9dca9e853873b7acdc3",
+    "bytes": 12464388,
+    "sha256BeforeAndAfter": "c8357f8b936e2109a7a88679744875bac15d8c89127a09b57895b37bbfd89c7e",
+    "invalidatedByThisAttempt": false
+  },
+  "executionEvidenceSourceCommit": "041712bc9b7976b298f157ffdac9886fb7b681cb",
+  "application": {
+    "path": "distribution/editions/lab/lifecycle/final-29730d5-app-only-application-v2.v1.json",
+    "sha256": "1c73e58c4f7204c3950d10499f5dff22dceca02b201278240f83229961e4d966"
+  },
+  "ownedOutputRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-final-29730d5-segment-a-2",
+  "observedCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "browserLaunches": 0,
+    "runtimeStartsOrMigrations": 0,
+    "hardwareActions": 0
+  },
+  "rollback": {
+    "labInstallRootAbsent": true,
+    "labUninstallKeyAbsent": true,
+    "labProductPreferenceKeyAbsent": true,
+    "labOwnedAppDataAbsent": true,
+    "droneDreamDesktopProcessCount": 0,
+    "protectedParityProvenByThisAttempt": false,
+    "cleanupRestrictedToExactLabNamespace": true
+  },
+  "rootCauseFix": {
+    "productCodeChanged": false,
+    "lifecycleToolChanged": true,
+    "nonProductDirectoriesExcluded": [
+      "codex-cache",
+      "codex-dependencies",
+      "codex-handoffs",
+      "codex-runs",
+      "codex-sandboxes",
+      "handoffs",
+      "validation"
+    ],
+    "installedProductFilesRemainContentHashed": true
+  },
+  "sameApplicationMayBeRunAgain": false,
+  "automaticRetryPerformed": false,
+  "historicalEvidenceDeleted": false,
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}
