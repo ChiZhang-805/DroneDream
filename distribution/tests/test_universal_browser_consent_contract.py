@@ -56,6 +56,8 @@ class UniversalBrowserConsentContractTest(unittest.TestCase):
         self.assertIn("[switch]$AllowBrowserConsentAction", source)
         self.assertIn('Save-ExecutionCheckpoint "browser-consent-attempted"', source)
         self.assertIn("$counts.browserAction++", source)
+        self.assertIn("Get-BytesSha256Lower $encoded", source)
+        self.assertNotIn("::HashData", source)
         self.assertIn(
             "$counts.browserAction -ne $(if ($AllowBrowserConsentAction) { 1 } else { 0 })",
             source,

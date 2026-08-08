@@ -117,6 +117,14 @@ function Write-AtomicText([string]$Path, [string]$Value) {
     finally { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
 }
 
+function Get-BytesSha256Lower([byte[]]$Bytes) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        return (([BitConverter]::ToString($sha.ComputeHash($Bytes))) -replace "-", "").ToLowerInvariant()
+    }
+    finally { $sha.Dispose() }
+}
+
 function Import-ObserverCheckpoint([string]$Path, $Counts, $Receipt) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
     $observation = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
@@ -187,7 +195,7 @@ function Get-AuditRecords {
             $records += [ordered]@{
                 file = $file.FullName
                 line = $lineNumber
-                lineSha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($encoded)).ToLowerInvariant()
+                lineSha256 = Get-BytesSha256Lower $encoded
                 value = $value
             }
         }
