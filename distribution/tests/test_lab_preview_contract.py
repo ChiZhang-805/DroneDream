@@ -12,10 +12,7 @@ LAB_EDITION = ROOT / "distribution" / "editions" / "lab.v1.json"
 VEHICLE_PACK_REGISTRY = ROOT / "distribution" / "vehicle-packs" / "registry.v1.json"
 LAB_UI_ADAPTER = ROOT / "frontend" / "src" / "lab" / "vehicle-pack-adapter.v1.json"
 LAB_UI_RECEIPT = (
-    ROOT
-    / "distribution"
-    / "build-receipts"
-    / "lab-ui-1.0.0-19f6185.functional-prebrand.json"
+    ROOT / "distribution" / "build-receipts" / "lab-ui-1.0.0-19f6185.functional-prebrand.json"
 )
 READINESS_RECEIPT = (
     ROOT
@@ -73,23 +70,17 @@ class LabPreviewContractTests(unittest.TestCase):
         result = lab_preview.verify_lab_preview_contract()
         self.assertEqual(result["artifactFileName"], "DroneDream-Lab-1.0.0.exe")
         self.assertEqual(result["profile"], "distribution/build-profiles/lab-preview.v1.json")
-        profile = json.loads(
-            (ROOT / result["profile"]).read_text(encoding="utf-8")
-        )
+        profile = json.loads((ROOT / result["profile"]).read_text(encoding="utf-8"))
         self.assertEqual(
             profile["commonCore"]["productSourceHash"],
-            lab_artifact.common_core_hash(
-                profile["commonCore"]["productSourceCommit"]
-            ),
+            lab_artifact.common_core_hash(profile["commonCore"]["productSourceCommit"]),
         )
         self.assertEqual(profile["signaturePolicy"]["authenticode"], "not-signed")
         self.assertEqual(profile["signaturePolicy"]["tauriUpdaterSignature"], "required")
         self.assertEqual(profile["signaturePolicy"]["updaterKeyId"], "BA3FDCAF71CE2FF5")
 
     def test_lab_build_separates_internal_product_and_unicode_display_names(self) -> None:
-        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(
-            encoding="utf-8"
-        )
+        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(encoding="utf-8")
         self.assertIn(
             "Get-Content -LiteralPath $tauriOverlayPath -Raw -Encoding UTF8",
             script,
@@ -107,9 +98,7 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertNotIn('"DroneDream · LAB"', script)
 
     def test_lab_build_writes_python_compatible_receipt_bytes(self) -> None:
-        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(
-            encoding="utf-8"
-        )
+        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(encoding="utf-8")
         self.assertIn(
             '$coreListing.Replace("`r`n", "`n").Replace("`r", "`n").Trim()',
             script,
@@ -127,20 +116,18 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertIn('representation = "relative-to-receipt-parent"', script)
         self.assertIn("path = $artifactName", script)
         self.assertIn('path = "${artifactName}.sig"', script)
-        self.assertNotIn('$artifactPath.Replace($repoRoot', script)
+        self.assertNotIn("$artifactPath.Replace($repoRoot", script)
         self.assertIn("edition-owned build-attempts root", script)
 
     def test_lab_build_accepts_only_branch_or_explicit_detached_exact_source(self) -> None:
-        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(
-            encoding="utf-8"
-        )
+        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(encoding="utf-8")
 
         self.assertIn("[string]$ExpectedSourceCommit", script)
         self.assertIn(
             '$ExpectedSourceCommit -cnotmatch "^[0-9a-f]{40}$"',
             script,
         )
-        self.assertIn('$sourceCommit -cne $ExpectedSourceCommit', script)
+        self.assertIn("$sourceCommit -cne $ExpectedSourceCommit", script)
         self.assertIn('$sourceCheckoutMode = "branch"', script)
         self.assertIn('$sourceCheckoutMode = "detached-exact"', script)
         self.assertIn(
@@ -149,11 +136,30 @@ class LabPreviewContractTests(unittest.TestCase):
         )
         self.assertIn("branch = $sourceBranch", script)
         self.assertNotIn("branch = $checkoutBranch", script)
+        self.assertIn(
+            "$readinessTool --expected-source-commit $sourceCommit",
+            script,
+        )
+
+    def test_readiness_source_state_records_expected_commit(self) -> None:
+        source = lab_readiness._source_state("a" * 40)
+
+        self.assertEqual(source["expectedSourceCommit"], "a" * 40)
+        self.assertIn(source["checkoutMode"], {"branch", "detached-exact"})
+
+    def test_readiness_rejects_malformed_expected_source(self) -> None:
+        with self.assertRaisesRegex(
+            lab_readiness.LabYellowReadinessError,
+            "full lowercase Git commit",
+        ):
+            lab_readiness.evaluate_readiness(
+                require_clean=False,
+                toolchain_state=fake_gnullvm_toolchain(),
+                expected_source_commit="not-a-commit",
+            )
 
     def test_shared_llvm_build_uses_ordered_cli_config_overlays(self) -> None:
-        script = (ROOT / "desktop/scripts/build-windows-llvm.ps1").read_text(
-            encoding="utf-8"
-        )
+        script = (ROOT / "desktop/scripts/build-windows-llvm.ps1").read_text(encoding="utf-8")
         edition_index = script.index('"--config", $additionalConfig')
         llvm_index = script.index('"--config", $llvmBundleConfig', edition_index)
         self.assertLess(edition_index, llvm_index)
@@ -231,9 +237,12 @@ class LabPreviewContractTests(unittest.TestCase):
         receipt["commonCoreCommit"] = common_core_commit
         receipt["commonCoreHash"] = lab_artifact.common_core_hash(common_core_commit)
         receipt["testOnly"] = False
-        with tempfile.TemporaryDirectory() as artifact_root, self.assertRaisesRegex(
-            lab_artifact.LabPreviewArtifactError,
-            "artifact file is missing",
+        with (
+            tempfile.TemporaryDirectory() as artifact_root,
+            self.assertRaisesRegex(
+                lab_artifact.LabPreviewArtifactError,
+                "artifact file is missing",
+            ),
         ):
             lab_artifact.validate_receipt(
                 receipt,
@@ -451,9 +460,7 @@ class LabPreviewContractTests(unittest.TestCase):
         )
         self.assertTrue(result["safetyAndOAuthSourceReadiness"]["sourceReady"])
         self.assertFalse(
-            result["safetyAndOAuthSourceReadiness"]["oauth"][
-                "providerExecutionEvidenceCollected"
-            ]
+            result["safetyAndOAuthSourceReadiness"]["oauth"]["providerExecutionEvidenceCollected"]
         )
         self.assertEqual(
             result["commonCore"]["productSourceCommit"],
@@ -465,7 +472,9 @@ class LabPreviewContractTests(unittest.TestCase):
         )
         self.assertFalse(result["commonCore"]["observedOriginHeadIsProductSource"])
         self.assertTrue(result["publicSupabaseClientConfigSource"]["sourceUsesVitePublicEnv"])
-        self.assertTrue(result["publicSupabaseClientConfigSource"]["desktopVerifierRejectsServiceRole"])
+        self.assertTrue(
+            result["publicSupabaseClientConfigSource"]["desktopVerifierRejectsServiceRole"]
+        )
         self.assertFalse(result["publicSupabaseClientConfigSource"]["actualEnvironmentRead"])
         self.assertEqual(result["vehiclePacks"]["validatedPackCount"], 0)
         self.assertEqual(result["safety"]["hardwareActionDecisionAtZeroValidatedPacks"], "deny")
@@ -478,12 +487,8 @@ class LabPreviewContractTests(unittest.TestCase):
         )
         self.assertFalse(result["websiteExactExeHandoff"]["releaseReady"])
         self.assertEqual(result["toolchain"]["selectedToolchain"], "gnullvm")
-        self.assertFalse(
-            result["toolchain"]["candidates"]["gnullvm"]["requiresMsvcLinkExe"]
-        )
-        self.assertFalse(
-            result["toolchain"]["candidates"]["msvc"]["linkerAvailable"]
-        )
+        self.assertFalse(result["toolchain"]["candidates"]["gnullvm"]["requiresMsvcLinkExe"])
+        self.assertFalse(result["toolchain"]["candidates"]["msvc"]["linkerAvailable"])
         self.assertTrue(all(value is False for value in result["sideEffects"].values()))
 
     def test_lab_yellow_readiness_blocks_when_pinned_gnullvm_bytes_drift(self) -> None:
@@ -519,9 +524,7 @@ class LabPreviewContractTests(unittest.TestCase):
         toolchain = lab_readiness._toolchain_state()
         self.assertFalse(toolchain["tauriInvoked"])
         self.assertFalse(toolchain["nsisInvoked"])
-        self.assertFalse(
-            toolchain["candidates"]["gnullvm"]["requiresMsvcLinkExe"]
-        )
+        self.assertFalse(toolchain["candidates"]["gnullvm"]["requiresMsvcLinkExe"])
         self.assertIsInstance(toolchain["candidates"]["gnullvm"]["blockers"], list)
 
     def test_real_readiness_receipt_preserves_the_linker_blocker(self) -> None:
@@ -547,9 +550,7 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertTrue(all(value is False for value in receipt["sideEffects"].values()))
 
     def test_website_handoff_readiness_receipt_preserves_awaiting_state(self) -> None:
-        receipt = json.loads(
-            WEBSITE_HANDOFF_READINESS_RECEIPT.read_text(encoding="utf-8")
-        )
+        receipt = json.loads(WEBSITE_HANDOFF_READINESS_RECEIPT.read_text(encoding="utf-8"))
         self.assertEqual(
             receipt["source"]["head"],
             "d3adbcce59ba08113599b6ac6d772cb32394c30d",

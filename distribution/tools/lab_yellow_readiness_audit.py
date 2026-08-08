@@ -24,7 +24,6 @@ import verify_lab_preview_contract as profile_verifier
 import verify_lab_safety_oauth_readiness as safety_oauth_verifier
 import verify_lab_website_handoff as website_handoff_verifier
 
-
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE_PATH = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 LAB_MANIFEST_PATH = ROOT / "distribution/editions/lab.v1.json"
@@ -106,9 +105,7 @@ def _pinned_file(path: Path | None, expected: dict[str, Any]) -> dict[str, Any]:
         "expectedBytes": expected["bytes"],
         "expectedSha256": expected["sha256"],
         "matchesPin": (
-            exists
-            and observed_bytes == expected["bytes"]
-            and observed_sha256 == expected["sha256"]
+            exists and observed_bytes == expected["bytes"] and observed_sha256 == expected["sha256"]
         ),
     }
 
@@ -142,11 +139,22 @@ def _file_ref(path: Path) -> dict[str, str]:
     return {"path": path.relative_to(ROOT).as_posix(), "sha256": _sha256_file(path)}
 
 
-def _source_state() -> dict[str, Any]:
+def _source_state(expected_source_commit: str | None = None) -> dict[str, Any]:
+    branch = _git("branch", "--show-current")
+    head = _git("rev-parse", "--verify", "HEAD")
+    upstream = _git(
+        "rev-parse",
+        "--abbrev-ref",
+        "--symbolic-full-name",
+        "@{u}",
+        check=False,
+    )
     return {
-        "branch": _git("branch", "--show-current"),
-        "head": _git("rev-parse", "--verify", "HEAD"),
-        "upstream": _git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"),
+        "branch": branch,
+        "head": head,
+        "upstream": upstream,
+        "checkoutMode": "branch" if branch else "detached-exact",
+        "expectedSourceCommit": expected_source_commit,
         "statusPorcelain": _git("status", "--porcelain=v1", "--untracked-files=all"),
     }
 
@@ -214,7 +222,9 @@ def _vehicle_pack_state() -> dict[str, Any]:
         and pack.get("currentValidationTier") == "validated"
     ]
     selected = next(
-        pack for pack in packs if isinstance(pack, dict) and pack.get("packId") == "holybro-s500-v2-pixhawk6c"
+        pack
+        for pack in packs
+        if isinstance(pack, dict) and pack.get("packId") == "holybro-s500-v2-pixhawk6c"
     )
     return {
         "registry": _file_ref(REGISTRY_PATH),
@@ -254,17 +264,16 @@ def _brand_state() -> dict[str, Any]:
         )
 
     expected_icons = [
-        f"../../{entry['repositoryPath']}"
-        for entry in derivatives
-        if isinstance(entry, dict)
+        f"../../{entry['repositoryPath']}" for entry in derivatives if isinstance(entry, dict)
     ]
     integration = manifest.get("integration")
     theme = manifest.get("theme")
     source_authority = manifest.get("sourceAuthority")
     merge_head = _git("rev-parse", "--verify", "MERGE_HEAD", check=False)
-    donor_is_ancestor = _git_success(
-        "merge-base", "--is-ancestor", CANONICAL_BRAND_DONOR_COMMIT, "HEAD"
-    ) or merge_head == CANONICAL_BRAND_DONOR_COMMIT
+    donor_is_ancestor = (
+        _git_success("merge-base", "--is-ancestor", CANONICAL_BRAND_DONOR_COMMIT, "HEAD")
+        or merge_head == CANONICAL_BRAND_DONOR_COMMIT
+    )
     donor_paths = tuple(
         path
         for path in _git(
@@ -289,8 +298,7 @@ def _brand_state() -> dict[str, Any]:
         and source_authority.get("donorCommit") == CANONICAL_BRAND_DONOR_COMMIT
         and source_authority.get("canonicalContract", {}).get("sha256")
         == _sha256_file(BRAND_DONOR_PATH)
-        and donor.get("editions", {}).get("lab", {}).get("productName")
-        == "DroneDream · LAB"
+        and donor.get("editions", {}).get("lab", {}).get("productName") == "DroneDream · LAB"
         and donor.get("safety", {}).get("grantsHardwareAuthority") is False
         and donor.get("approval", {}).get("editionLabelHeightRatio") == 0.9
         and donor.get("approval", {}).get("preserveNaturalLabelWidth") is True
@@ -300,12 +308,10 @@ def _brand_state() -> dict[str, Any]:
         and theme.get("grantsHardwareAuthority") is False
         and all(ref["matchesManifest"] for ref in refs)
         and overlay.get("productName") == "DroneDream-Lab"
-        and overlay.get("app", {}).get("windows", [{}])[0].get("title")
-        == "DroneDream · LAB"
+        and overlay.get("app", {}).get("windows", [{}])[0].get("title") == "DroneDream · LAB"
         and overlay.get("bundle", {}).get("icon") == expected_icons
         and isinstance(integration, dict)
-        and integration.get("application")
-        == "canonical-large-label-lockup-selected-by-lab-gate"
+        and integration.get("application") == "canonical-large-label-lockup-selected-by-lab-gate"
         and integration.get("installer") == "canonical-lab-icon-bound-in-overlay-not-built"
         and integration.get("shortcut") == "canonical-lab-executable-icon-bound-not-built"
     )
@@ -379,9 +385,7 @@ def _toolchain_state(profile: dict[str, Any] | None = None) -> dict[str, Any]:
 
     local_app_data = os.environ.get("LOCALAPPDATA")
     package_root = (
-        Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
-        if local_app_data
-        else None
+        Path(local_app_data) / "Microsoft" / "WinGet" / "Packages" if local_app_data else None
     )
     llvm_roots: list[Path] = []
     if package_root and package_root.is_dir():
@@ -445,8 +449,7 @@ def _toolchain_state(profile: dict[str, Any] | None = None) -> dict[str, Any]:
         "expectedVersion": tauri_policy["version"],
         "entrypoint": tauri_entrypoint,
         "matchesPin": (
-            tauri_package_version == tauri_policy["version"]
-            and tauri_entrypoint["matchesPin"]
+            tauri_package_version == tauri_policy["version"] and tauri_entrypoint["matchesPin"]
         ),
     }
 
@@ -457,10 +460,13 @@ def _toolchain_state(profile: dict[str, Any] | None = None) -> dict[str, Any]:
         if local_app_data
         else None
     )
-    nsis = _pinned_file(nsis_path, {
-        "bytes": nsis_policy["executableBytes"],
-        "sha256": nsis_policy["executableSha256"],
-    })
+    nsis = _pinned_file(
+        nsis_path,
+        {
+            "bytes": nsis_policy["executableBytes"],
+            "sha256": nsis_policy["executableSha256"],
+        },
+    )
     nsis["invoked"] = False
 
     node_path = shutil.which("node.exe") or shutil.which("node")
@@ -603,12 +609,18 @@ def evaluate_readiness(
     *,
     require_clean: bool = True,
     toolchain_state: dict[str, Any] | None = None,
+    expected_source_commit: str | None = None,
 ) -> dict[str, Any]:
     """Return the Lab YELLOW build request readiness audit as JSON data."""
 
     profile = _load_json(PROFILE_PATH)
     manifest = _load_json(LAB_MANIFEST_PATH)
-    source = _source_state()
+    if expected_source_commit is not None and (
+        len(expected_source_commit) != 40
+        or any(character not in "0123456789abcdef" for character in expected_source_commit)
+    ):
+        raise LabYellowReadinessError("expected source commit must be a full lowercase Git commit")
+    source = _source_state(expected_source_commit)
     common_core = _common_core_binding()
     supabase = _supabase_public_config_source()
     vehicle_packs = _vehicle_pack_state()
@@ -624,16 +636,28 @@ def evaluate_readiness(
     )
 
     request_blockers: list[str] = []
-    if source["branch"] != "codex/software-lab":
-        request_blockers.append("source branch is not codex/software-lab")
-    if source["upstream"] != "origin/codex/software-lab":
+    branch_checkout = source["branch"] == "codex/software-lab"
+    detached_exact_checkout = (
+        not source["branch"]
+        and expected_source_commit is not None
+        and source["head"] == expected_source_commit
+    )
+    if not branch_checkout and not detached_exact_checkout:
+        request_blockers.append(
+            "source is neither codex/software-lab nor the detached exact expected commit"
+        )
+    if branch_checkout and source["upstream"] != "origin/codex/software-lab":
         request_blockers.append("upstream is not origin/codex/software-lab")
+    if expected_source_commit is not None and source["head"] != expected_source_commit:
+        request_blockers.append("HEAD does not match the expected source commit")
     if require_clean and source["statusPorcelain"]:
         request_blockers.append("source tree is not clean")
     if not common_core["productSourceExists"]:
         request_blockers.append("Universal/Core product source commit is unavailable")
     if not common_core["productSourceIsAncestorOfLabHead"]:
-        request_blockers.append("Lab source does not descend from the Universal/Core product source")
+        request_blockers.append(
+            "Lab source does not descend from the Universal/Core product source"
+        )
     if not supabase["sourceUsesVitePublicEnv"] or not supabase["desktopVerifierRejectsServiceRole"]:
         request_blockers.append("public Supabase client configuration source is not closed")
     if vehicle_packs["validatedPackCount"] != 0:
@@ -646,9 +670,7 @@ def evaluate_readiness(
     if toolchain.get("selectedToolchain") != "gnullvm":
         gnullvm = toolchain.get("candidates", {}).get("gnullvm", {})
         gnullvm_blockers = gnullvm.get("blockers", [])
-        request_blockers.extend(
-            f"strict pinned gnullvm: {blocker}" for blocker in gnullvm_blockers
-        )
+        request_blockers.extend(f"strict pinned gnullvm: {blocker}" for blocker in gnullvm_blockers)
         if not gnullvm_blockers:
             request_blockers.append("strict pinned gnullvm toolchain is not ready")
 
@@ -656,9 +678,15 @@ def evaluate_readiness(
         "No Lab preview EXE has been built by this GREEN audit.",
         "No real Lab artifact receipt exists for installation acceptance.",
         "Lab preview remains unsigned internal-test material until YELLOW build evidence exists.",
-        "There are zero validated Vehicle Packs; hardware write, arm, HITL, and flight stay denied.",
+        (
+            "There are zero validated Vehicle Packs; hardware write, arm, HITL, "
+            "and flight stay denied."
+        ),
         "No codex/release-lab branch or production promotion is authorized by this audit.",
-        "Website exact artifact remains not release-ready until validation, publication, and cross-Edition evidence are complete.",
+        (
+            "Website exact artifact remains not release-ready until validation, "
+            "publication, and cross-Edition evidence are complete."
+        ),
     ]
 
     return {
@@ -708,7 +736,10 @@ def evaluate_readiness(
             "requestable": not request_blockers,
             "classification": "YELLOW",
             "requiresControllerApprovalBeforeBuild": True,
-            "requestedCommand": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop\\scripts\\build-lab-preview.ps1 -Build -Toolchain gnullvm",
+            "requestedCommand": (
+                "powershell -NoProfile -ExecutionPolicy Bypass -File "
+                "desktop\\scripts\\build-lab-preview.ps1 -Build -Toolchain gnullvm"
+            ),
             "expectedReceiptKind": "dronedream-lab-preview-artifact-receipt",
             "requestBlockers": request_blockers,
         },
@@ -726,6 +757,10 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="for unit tests only; the CLI still records the dirty state in JSON",
     )
+    parser.add_argument(
+        "--expected-source-commit",
+        help="allow a detached clean checkout only when HEAD matches this exact commit",
+    )
     return parser
 
 
@@ -733,7 +768,10 @@ def main() -> int:
     parser = _parser()
     args = parser.parse_args()
     try:
-        result = evaluate_readiness(require_clean=not args.allow_dirty)
+        result = evaluate_readiness(
+            require_clean=not args.allow_dirty,
+            expected_source_commit=args.expected_source_commit,
+        )
     except (LabYellowReadinessError, profile_verifier.LabPreviewContractError) as exc:
         parser.error(str(exc))
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))

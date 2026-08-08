@@ -185,7 +185,10 @@ if (-not $python) {
     throw "Python is required for the read-only Lab toolchain readiness gate."
 }
 $readinessTool = Join-Path $repoRoot "distribution\tools\lab_yellow_readiness_audit.py"
-$readinessJson = (& $python.Source $readinessTool | Out-String)
+$readinessJson = (
+    & $python.Source $readinessTool --expected-source-commit $sourceCommit |
+        Out-String
+)
 if ($LASTEXITCODE -ne 0) {
     throw "The Lab YELLOW readiness audit failed before the build."
 }

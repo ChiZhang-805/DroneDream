@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-failure-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-final-e17dd04-attempt9",
+  "editionId": "lab",
+  "result": "failed-before-frontend-tauri-cargo-nsis",
+  "source": {
+    "commit": "e17dd040189836abbeefbd6c175010331f1dc030",
+    "tree": "42d2f14365dca22018fffeb21b5f9caa24f699d0",
+    "checkoutMode": "detached-exact",
+    "clean": true
+  },
+  "attempt": {
+    "globalOrdinal": 9,
+    "controllerInvocationCount": 1,
+    "buildScriptInvocationCount": 1,
+    "frontendBuildCount": 0,
+    "tauriBuildCount": 0,
+    "cargoBuildCount": 0,
+    "nsisBuildCount": 0,
+    "artifactWriteCount": 0,
+    "exitCode": 1,
+    "automaticRetryCount": 0
+  },
+  "failure": {
+    "stage": "readiness-source-identity",
+    "classification": "detached-upstream-assumption",
+    "message": "The readiness audit required a branch upstream after the build script accepted an exact detached source.",
+    "productCompilationStarted": false,
+    "productDefectObserved": false,
+    "sameOutputRootMayBeReused": false
+  },
+  "evidence": {
+    "ownedRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-e17dd04-attempt9",
+    "stdout": {
+      "path": "build.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "build.stderr.log",
+      "bytes": 640,
+      "sha256": "4a81ef91f02cf38f3e631fa119160a65fa0d2b31ccccb420fd6ed0bab0f65efc"
+    },
+    "rawLogsPreserved": true,
+    "secretsRecorded": false
+  },
+  "artifact": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "created": false,
+    "updaterSignatureCreated": false,
+    "artifactReceiptCreated": false
+  },
+  "sideEffects": {
+    "installerRun": false,
+    "runtimeMigrationOrStart": false,
+    "px4OrGazeboStarted": false,
+    "oauthProviderCalled": false,
+    "hardwareAccess": false,
+    "uploadedOrDeployed": false
+  }
+}
