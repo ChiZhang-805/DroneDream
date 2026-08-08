@@ -954,6 +954,16 @@ mod tests {
         .clone()
     }
 
+    fn bind_fixture_to_active_edition_manifest(value: &mut Value) {
+        let manifest = match value.pointer("/editionId").and_then(Value::as_str) {
+            Some("sim") => include_str!("../../../distribution/editions/sim.v1.json"),
+            Some("lab") => include_str!("../../../distribution/editions/lab.v1.json"),
+            Some("field") => include_str!("../../../distribution/editions/field.v1.json"),
+            _ => panic!("fixture edition must select an active edition manifest"),
+        };
+        value["policy"]["editionManifestSha256"] = Value::String(sha256_hex(manifest.as_bytes()));
+    }
+
     fn refresh_context(value: &mut Value) {
         let hash = canonical_hash(&context_value(value).expect("context")).expect("context hash");
         for receipt in value
@@ -967,6 +977,7 @@ mod tests {
 
     fn fixture() -> (Value, NativeTrustedObservation) {
         let mut value = fixture_value();
+        bind_fixture_to_active_edition_manifest(&mut value);
         value["source"]["repositoryCommit"] =
             Value::String(env!("DRONEDREAM_SOURCE_COMMIT").to_string());
         refresh_context(&mut value);
