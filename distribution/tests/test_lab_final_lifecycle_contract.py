@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LIFECYCLE = ROOT / "distribution/editions/lab/lifecycle"
-APPLICATION = LIFECYCLE / "final-29730d5-app-only-application.v1.json"
+APPLICATION = LIFECYCLE / "final-29730d5-app-only-application-v2.v1.json"
 PLAN = LIFECYCLE / "final-29730d5-app-only-plan.v1.json"
 TARGET = LIFECYCLE / "final-29730d5-app-only-target-receipt.v1.json"
 RUNNER = LIFECYCLE / "run-lab-final-app-only-lifecycle.ps1"
@@ -59,7 +59,7 @@ def test_final_lifecycle_is_one_shot_owned_and_fail_closed() -> None:
 
     assert application["attempt"]["maximumExecutionInvocations"] == 1
     assert application["attempt"]["automaticRetryMaximum"] == 0
-    assert application["ownedIsolation"]["runId"] == "lab-final-29730d5-segment-a-1"
+    assert application["ownedIsolation"]["runId"] == "lab-final-29730d5-segment-a-2"
     assert counts == _load(PLAN)["exactCounts"]
     assert counts == _load(TARGET)["requiredExactCounts"]
     for name in (
@@ -91,6 +91,8 @@ def test_final_lifecycle_runner_is_parameterized_and_parses() -> None:
     assert "$productSource = $ExpectedProductSourceCommit" in source
     assert "maximumExecutionInvocations -ne 1" in source
     assert "automaticRetryMaximum -ne 0" in source
+    assert '@("codex-cache")' in source
+    assert "ExcludedTopLevelNames" in source
     assert "e3b427e9d1d6209495d629c399a1962913f2d00c" not in source
     for forbidden in (
         "OPENAI_API_KEY",

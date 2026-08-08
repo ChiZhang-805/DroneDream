@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-lifecycle-failure-receipt",
+  "result": "failed-no-retry-rolled-back",
+  "classification": "protected-snapshot-included-build-cache-and-exceeded-controller-timeout",
+  "artifact": {
+    "productSourceCommit": "29730d5d9928817872d7b9dca9e853873b7acdc3",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12464388,
+    "sha256BeforeAndAfter": "c8357f8b936e2109a7a88679744875bac15d8c89127a09b57895b37bbfd89c7e",
+    "invalidatedByThisAttempt": false
+  },
+  "executionEvidenceSourceCommit": "2f3ee26f63b5088d0f20596afc03654415259b45",
+  "application": {
+    "path": "distribution/editions/lab/lifecycle/final-29730d5-app-only-application.v1.json",
+    "sha256": "55b11dffe69c9fd3a0bcc5a31dad68b5ba61e89982610488ae1227671d1cd245"
+  },
+  "ownedOutputRoot": "C:/Users/zju20/AppData/Local/DroneDream-Codex/Lab-RED/lab-final-29730d5-segment-a-1",
+  "preservedOutput": {
+    "relativePath": "temp/DroneDream/installer-diagnostics.log",
+    "bytes": 30,
+    "sha256": "d9b574711f8020e050916757214c0510ba34ae93c9a6876baf4416a017517bdd"
+  },
+  "observedCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "applicationCloses": 0,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "liveWebView2Inspections": 0,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "rollback": {
+    "labInstallRootAbsent": true,
+    "labUninstallKeyAbsent": true,
+    "labProductPreferenceKeyAbsent": true,
+    "labRoamingAppDataAbsent": true,
+    "labLocalAppDataAbsent": true,
+    "labDesktopShortcutAbsent": true,
+    "labStartMenuShortcutAbsent": true,
+    "droneDreamDesktopProcessCount": 0,
+    "oauthPort49212ListenerCount": 0,
+    "sharedDroneDreamRegistryParentPreserved": true,
+    "protectedParityProvenByThisAttempt": false,
+    "reason": "The controller timeout interrupted the in-memory protected snapshot before it could be persisted; cleanup was restricted to the exact Lab-owned namespace."
+  },
+  "rootCauseFix": {
+    "productCodeChanged": false,
+    "lifecycleToolChanged": true,
+    "excludedFromRecursiveProtectedProductHash": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache",
+    "exclusionReason": "Build cache is not an installed application product surface and is protected by zero mutation rather than repeated content hashing."
+  },
+  "sameApplicationMayBeRunAgain": false,
+  "automaticRetryPerformed": false,
+  "historicalEvidenceDeleted": false,
+  "releaseReady": false,
+  "websiteHandoffReady": false
+}

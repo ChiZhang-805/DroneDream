@@ -199,9 +199,20 @@ $result = "not-executed"
 $failure = $null
 
 function Get-DirectoryContentDigest {
-    param([string]$Path)
+    param(
+        [string]$Path,
+        [string[]]$ExcludedTopLevelNames = @()
+    )
     $records = [Collections.Generic.List[string]]::new()
-    foreach ($file in @(Get-ChildItem -LiteralPath $Path -File -Recurse | Sort-Object FullName)) {
+    $files = foreach ($child in @(Get-ChildItem -LiteralPath $Path)) {
+        if ($ExcludedTopLevelNames -contains $child.Name) { continue }
+        if ($child.PSIsContainer) {
+            Get-ChildItem -LiteralPath $child.FullName -File -Recurse
+        } else {
+            $child
+        }
+    }
+    foreach ($file in @($files | Sort-Object FullName)) {
         $relative = $file.FullName.Substring($Path.TrimEnd("\").Length + 1).Replace("\", "/")
         $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         $records.Add("$relative|$($file.Length)|$hash")
@@ -216,7 +227,11 @@ function Get-DirectoryContentDigest {
 }
 
 function Get-PathRecord {
-    param([string]$Path, [bool]$HashDirectoryContents = $false)
+    param(
+        [string]$Path,
+        [bool]$HashDirectoryContents = $false,
+        [string[]]$ExcludedTopLevelNames = @()
+    )
     $item = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
     return [ordered]@{
         path = $Path
@@ -225,10 +240,11 @@ function Get-PathRecord {
         length = if ($null -ne $item -and -not $item.PSIsContainer) { [long]$item.Length } else { $null }
         lastWriteTimeUtc = if ($null -ne $item) { $item.LastWriteTimeUtc.ToString("O") } else { $null }
         contentSha256 = if ($null -ne $item -and $item.PSIsContainer -and $HashDirectoryContents) {
-            Get-DirectoryContentDigest -Path $item.FullName
+            Get-DirectoryContentDigest -Path $item.FullName -ExcludedTopLevelNames $ExcludedTopLevelNames
         } elseif ($null -ne $item -and -not $item.PSIsContainer) {
             (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         } else { $null }
+        excludedTopLevelNames = @($ExcludedTopLevelNames)
     }
 }
 
@@ -287,7 +303,13 @@ function Get-WebView2Record {
 
 function Get-ProtectedState {
     $otherRoots = @("DroneDream", "DroneDream-Universal", "DroneDream-Sim", "DroneDream-Field") |
-        ForEach-Object { Get-PathRecord -Path (Join-Path $env:LOCALAPPDATA $_) -HashDirectoryContents $true }
+        ForEach-Object {
+            $excluded = if ($_ -eq "DroneDream") { @("codex-cache") } else { @() }
+            Get-PathRecord `
+                -Path (Join-Path $env:LOCALAPPDATA $_) `
+                -HashDirectoryContents $true `
+                -ExcludedTopLevelNames $excluded
+        }
     $otherKeys = @("DroneDream", "DroneDream-Universal", "DroneDream-Sim", "DroneDream-Field") |
         ForEach-Object {
             Get-RegistryRecord -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\$_"
@@ -728,5 +750,3 @@ try {
 }
 
 if ($result -eq "segment-a-failed-no-retry") { exit 1 }
-
-
