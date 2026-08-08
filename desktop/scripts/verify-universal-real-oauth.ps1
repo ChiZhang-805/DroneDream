@@ -449,22 +449,28 @@ try {
     if ($RunAuthenticatedUiMatrix) {
         $observerArguments += "--post-auth-hold-signal=$postAuthSignalPath"
         $oauthObserverProcess = Start-Process -FilePath (Get-Command node).Source -ArgumentList $observerArguments -PassThru -NoNewWindow
-        $browserConsentState = @{ attempted = $false }
+        $browserConsentState = @{ attempted = $false; observedAtUtc = $null }
         Wait-Until {
             $oauthObserverProcess.Refresh()
             if ($oauthObserverProcess.HasExited) { return $true }
             if (-not (Test-Path -LiteralPath $observerPath -PathType Leaf)) { return $false }
             try { $checkpoint = Get-Content -LiteralPath $observerPath -Raw | ConvertFrom-Json }
             catch { return $false }
+            if ($checkpoint.stage -ceq "authenticated-ui-ready") { return $true }
             if ($AllowBrowserConsentAction -and -not $browserConsentState.attempted -and $checkpoint.stage -ceq "oauth-attempted") {
-                $browserConsentState.attempted = $true
-                $counts.browserAction++
-                Save-ExecutionCheckpoint "browser-consent-attempted"
-                $consentReceipt = Join-Path $executionRoot "browser-consent.json"
-                & $browserConsentVerifier -OutputReceipt $consentReceipt -TimeoutSeconds 90 -Execute
-                if ($LASTEXITCODE -ne 0) { throw "Bounded browser consent action failed." }
+                if ($null -eq $browserConsentState.observedAtUtc) {
+                    $browserConsentState.observedAtUtc = [DateTime]::UtcNow
+                }
+                elseif (([DateTime]::UtcNow - [DateTime]$browserConsentState.observedAtUtc).TotalSeconds -ge 10) {
+                    $browserConsentState.attempted = $true
+                    $counts.browserAction++
+                    Save-ExecutionCheckpoint "browser-consent-attempted"
+                    $consentReceipt = Join-Path $executionRoot "browser-consent.json"
+                    & $browserConsentVerifier -OutputReceipt $consentReceipt -TimeoutSeconds 90 -Execute
+                    if ($LASTEXITCODE -ne 0) { throw "Bounded browser consent action failed." }
+                }
             }
-            return ($checkpoint.stage -ceq "authenticated-ui-ready")
+            return $false
         } 900 "Installed-app OAuth observer did not expose an authenticated UI hold."
         $oauthObserverProcess.Refresh()
         if ($oauthObserverProcess.HasExited) {
@@ -588,7 +594,7 @@ try {
         $counts.oauthTransaction -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.callback -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.authorizationCodeExchange -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
-        $counts.browserAction -ne $(if ($AllowBrowserConsentAction) { 1 } else { 0 }) -or
+        $counts.browserAction -gt $(if ($AllowBrowserConsentAction) { 1 } else { 0 }) -or
         $counts.localLogout -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.authenticatedUiCases -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or
         $counts.settingsOpen -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or

@@ -62,16 +62,24 @@ class UniversalBrowserConsentContractTest(unittest.TestCase):
         self.assertNotIn("Password", source)
         self.assertNotIn("Cookie", source)
 
-    def test_oauth_receipt_requires_the_declared_browser_action_count(self) -> None:
+    def test_oauth_receipt_allows_automatic_approval_before_one_bounded_action(self) -> None:
         source = OAUTH.read_text(encoding="utf-8")
         self.assertIn("[switch]$AllowBrowserConsentAction", source)
         self.assertIn('Save-ExecutionCheckpoint "browser-consent-attempted"', source)
         self.assertIn("$counts.browserAction++", source)
-        self.assertIn("$browserConsentState = @{ attempted = $false }", source)
+        self.assertIn(
+            "$browserConsentState = @{ attempted = $false; observedAtUtc = $null }",
+            source,
+        )
+        self.assertIn(
+            'if ($checkpoint.stage -ceq "authenticated-ui-ready") { return $true }',
+            source,
+        )
+        self.assertIn(".TotalSeconds -ge 10", source)
         self.assertIn("Get-BytesSha256Lower $encoded", source)
         self.assertNotIn("::HashData", source)
         self.assertIn(
-            "$counts.browserAction -ne $(if ($AllowBrowserConsentAction) { 1 } else { 0 })",
+            "$counts.browserAction -gt $(if ($AllowBrowserConsentAction) { 1 } else { 0 })",
             source,
         )
 
