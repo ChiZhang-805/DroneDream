@@ -29,12 +29,16 @@ function expectContentLinksToUseIcons(container: HTMLElement) {
 }
 
 describe("DroneDream public website", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
 
   beforeEach(() => {
     window.history.replaceState(null, "", "/");
     window.localStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "en");
+    vi.stubEnv("VITE_BILLING_CHECKOUT_URL", "https://billing.test/functions/v1/billing-checkout");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
   });
 

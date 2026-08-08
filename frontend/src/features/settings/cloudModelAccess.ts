@@ -158,6 +158,13 @@ export const billingCheckoutUrl = deriveFunctionUrl(
   import.meta.env.VITE_BILLING_CHECKOUT_URL as string | undefined,
 );
 
+function resolveBillingCheckoutUrl(): string {
+  return deriveFunctionUrl(
+    "billing-checkout",
+    import.meta.env.VITE_BILLING_CHECKOUT_URL as string | undefined,
+  );
+}
+
 function authenticatedHeaders(): Record<string, string> {
   const token = getAuthAccessToken();
   if (!token) {
@@ -362,7 +369,7 @@ export async function completeManagedModelChat(
 
 export function getBillingAvailability(): Promise<BillingAvailability> {
   return cloudRequest<BillingAvailability>(
-    billingCheckoutUrl,
+    resolveBillingCheckoutUrl(),
     "/availability",
     { method: "GET" },
     false,
@@ -373,7 +380,7 @@ export function createBillingCheckout(
   planId: Exclude<ManagedModelPlanId, "free">,
   paymentMethod: PaymentMethod,
 ): Promise<BillingCheckout> {
-  return cloudRequest<BillingCheckout>(billingCheckoutUrl, "/create", {
+  return cloudRequest<BillingCheckout>(resolveBillingCheckoutUrl(), "/create", {
     method: "POST",
     body: JSON.stringify({
       plan_id: planId,
