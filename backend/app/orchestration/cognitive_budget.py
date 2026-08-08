@@ -91,6 +91,8 @@ _TRIGGER_FAMILY = {
     "timeout_or_sensor_anomaly": "physical_failure",
     "near_threshold_uncertain": "threshold",
     "hard_boundary_candidate": "boundary",
+    "model_high_uncertainty": "uncertainty",
+    "model_evidence_gap": "evidence_gap",
 }
 _SEVERITY_ESCALATION = frozenset(
     {
@@ -1027,6 +1029,8 @@ def evaluate_adaptive_triggers(
     selected_proposal_refs: Sequence[str],
     tool_direction_conflict: bool,
     hard_boundary_candidate: bool,
+    model_uncertainty_level: str = "low",
+    model_missing_evidence: Sequence[str] = (),
 ) -> CognitiveTriggerEvaluation:
     """Evaluate versioned T3/T4 triggers without holdout outcomes."""
 
@@ -1038,6 +1042,10 @@ def evaluate_adaptive_triggers(
         diagnosis.append("trailing_stagnation")
     if tool_direction_conflict:
         diagnosis.append("tool_direction_conflict")
+    if model_uncertainty_level == "high":
+        diagnosis.append("model_high_uncertainty")
+    if len(model_missing_evidence) >= 2:
+        diagnosis.append("model_evidence_gap")
     if (
         latest is not None
         and latest.incumbent_score_before is not None
@@ -1098,6 +1106,8 @@ def evaluate_adaptive_triggers(
         "selected_proposal_refs": list(selected_proposal_refs),
         "selected_tools": selected_tools,
         "training_failure_summary": failures,
+        "model_uncertainty_level": model_uncertainty_level,
+        "model_missing_evidence": list(model_missing_evidence),
         "holdout_outcomes_visible": False,
     }
     return CognitiveTriggerEvaluation(

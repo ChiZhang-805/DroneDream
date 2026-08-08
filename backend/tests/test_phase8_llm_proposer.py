@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from sqlalchemy import select
 
 from app.parameters import CATALOG_VERSION
 
@@ -3328,19 +3329,95 @@ def test_harness_plan_history_accepts_bound_search_exhaustion(
         )
 
     assert result.status == "search_space_exhausted"
-    assert len(client.calls) == 1
+    assert len(client.calls) == 2
     assert result_event.payload_json["selected_proposal_refs"] == []
     assert result_event.payload_json["dispatched_candidates"] == 0
     assert result_event.payload_json["dispatched_trials"] == 0
-    assert result_event.payload_json["revision_fallback_reason"] == (
-        "no_usable_proposals"
-    )
+    assert result_event.payload_json["revision_fallback_reason"] == "client_error"
     assert len(history) == 1
     assert history[0].decision_source == "model"
     assert history[0].revision_source == "deterministic_fallback"
     assert history[0].status == "search_space_exhausted"
     assert history[0].usable_proposal_count == 0
-    assert history[0].provider_call_count == 1
+    assert history[0].provider_call_count == 2
+
+
+def test_harness_model_recovers_from_empty_tool_output_with_bounded_candidate(
+    llm_ctx,
+    monkeypatch,
+):
+    ctx = llm_ctx
+    job_id = _create_harness_job(ctx)
+    client = SequenceOpenAIClient(
+        [
+            {
+                "schema_version": "1.0",
+                "decision": "continue",
+                "generation_goal": "Recover from an empty numerical proposal batch.",
+                "tool_calls": [
+                    {
+                        "tool_id": "optimizer_portfolio",
+                        "allocation": 1,
+                        "fidelity_mode": "force_full",
+                        "focus": ["failure_recovery"],
+                    }
+                ],
+                "stop": {"recommended": False, "reason_code": None},
+                "uncertainty": {
+                    "level": "medium",
+                    "missing_evidence": ["local_curvature"],
+                },
+            },
+            {
+                "schema_version": "1.0",
+                "decision": "dispatch",
+                "selected_proposal_refs": [],
+                "model_candidate": {
+                    "label": "feedback recovery",
+                    "rationale": (
+                        "Use a conservative gain change after the tool returned no candidates."
+                    ),
+                    "expected_effect": "Probe whether a small gain increase improves tracking.",
+                    "risk_assessment": (
+                        "May increase overshoot; Harness simulation and holdout remain mandatory."
+                    ),
+                    "parameters": [{"name": "kp_xy", "value": 1.1}],
+                },
+                "rationale": "Dispatch one Harness-validated simulation hypothesis.",
+            },
+        ]
+    )
+    monkeypatch.setattr(
+        ctx["job_manager"],
+        "execute_prepared_experimental_generation",
+        lambda _prepared: [],
+    )
+
+    with ctx["db_module"].SessionLocal() as db:
+        _seed_harness_evidence(ctx, db, job_id)
+        job = db.get(ctx["models"].Job, job_id)
+        result = ctx["job_manager"].dispatch_next_harness_generation(
+            db,
+            job,
+            client=client,
+        )
+        db.flush()
+        model_candidate = db.scalar(
+            select(ctx["models"].CandidateParameterSet).where(
+                ctx["models"].CandidateParameterSet.job_id == job_id,
+                ctx["models"].CandidateParameterSet.proposal_reason == "model_guided",
+            )
+        )
+
+    assert result.status == "dispatched"
+    assert result.dispatched_candidates == 1
+    assert len(client.calls) == 2
+    assert model_candidate is not None
+    assert model_candidate.parameter_json["kp_xy"] == 1.1
+    orchestration = model_candidate.optimizer_metadata_json["harness_orchestration"]
+    assert orchestration["authority"] == "proposal_only"
+    assert orchestration["hardware_authority"] is False
+    assert len(orchestration["candidate_sha256"]) == 64
 
 
 def test_harness_parallel_safe_tool_calls_run_concurrently_in_canonical_order(

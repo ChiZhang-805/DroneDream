@@ -3,9 +3,10 @@
 The provider may propose allocations and a stop recommendation, but this module
 keeps authority in deterministic code.  A plan is accepted only against one
 immutable budget opportunity, compiled into canonical tool order, and optionally
-followed by one bounded candidate-selection turn after pure proposal tools return.
-Neither turn can create Trials, choose parameter values, set seeds, or expand the
-frozen budget.
+followed by one bounded candidate-strategy turn after pure proposal tools return.
+That second turn may author one candidate hypothesis inside an explicit parameter
+domain. Deterministic code validates it and remains the sole owner of Trials,
+seeds, execution, qualification, holdout, and the frozen budget.
 """
 
 from __future__ import annotations
@@ -24,7 +25,7 @@ HARNESS_BUDGET_PLAN_SCHEMA_VERSION = "1.0"
 HARNESS_BUDGET_POLICY_VERSION = "1.0"
 HARNESS_BUDGET_PROMPT_VERSION = "1.0"
 HARNESS_PLAN_REVISION_SCHEMA_VERSION = "1.0"
-HARNESS_PLAN_REVISION_PROMPT_VERSION = "1.0"
+HARNESS_PLAN_REVISION_PROMPT_VERSION = "1.1"
 
 HarnessPlanDecision = Literal["continue", "stop"]
 HarnessFidelityMode = Literal["auto", "force_full"]
@@ -326,19 +327,121 @@ class HarnessProposalSummary(_ClosedModel):
     normalized_distance_from_incumbent: float = Field(ge=0.0, le=1.0)
 
 
+class HarnessModelCandidateDomain(_ClosedModel):
+    """One bounded parameter domain exposed to the revision turn."""
+
+    name: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
+    minimum: float
+    maximum: float
+    incumbent: float
+    step: float | None = Field(default=None, gt=0.0)
+    value_type: Literal["float", "integer", "boolean", "enum"]
+    choices: tuple[float, ...] = Field(default=(), max_length=64)
+
+    @model_validator(mode="after")
+    def _validate_domain(self) -> HarnessModelCandidateDomain:
+        values = (self.minimum, self.maximum, self.incumbent, *self.choices)
+        if any(not math.isfinite(value) for value in values):
+            raise ValueError("model-candidate domains require finite values")
+        if self.minimum > self.maximum:
+            raise ValueError("model-candidate domain bounds are reversed")
+        if not self.minimum <= self.incumbent <= self.maximum:
+            raise ValueError("model-candidate incumbent is outside its domain")
+        if any(not self.minimum <= value <= self.maximum for value in self.choices):
+            raise ValueError("model-candidate choices must remain inside the domain")
+        if len(set(self.choices)) != len(self.choices):
+            raise ValueError("model-candidate choices must be unique")
+        return self
+
+
+class HarnessModelCandidateContext(_ClosedModel):
+    """Deterministic authority for one optional model-authored candidate."""
+
+    schema_id: Literal["dronedream.harness-model-candidate-context/v1"] = (
+        "dronedream.harness-model-candidate-context/v1"
+    )
+    domains: tuple[HarnessModelCandidateDomain, ...] = Field(
+        min_length=1,
+        max_length=128,
+    )
+    maximum_changed_parameters: int = Field(ge=1, le=16)
+
+    @model_validator(mode="after")
+    def _validate_context(self) -> HarnessModelCandidateContext:
+        names = [domain.name for domain in self.domains]
+        if len(set(names)) != len(names):
+            raise ValueError("model-candidate domains must have unique names")
+        if self.maximum_changed_parameters > len(self.domains):
+            raise ValueError("model-candidate change cap exceeds the domain count")
+        return self
+
+
+class HarnessModelParameterValue(_ClosedModel):
+    name: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
+    value: float
+
+    @model_validator(mode="after")
+    def _validate_finite(self) -> HarnessModelParameterValue:
+        if not math.isfinite(self.value):
+            raise ValueError("model-candidate parameter values must be finite")
+        return self
+
+
+class HarnessModelCandidateDraft(_ClosedModel):
+    """Provider-authored hypothesis; it has no execution authority."""
+
+    label: str = Field(min_length=1, max_length=64)
+    rationale: str = Field(min_length=1, max_length=512)
+    expected_effect: str = Field(min_length=1, max_length=512)
+    risk_assessment: str = Field(min_length=1, max_length=512)
+    parameters: tuple[HarnessModelParameterValue, ...] = Field(
+        min_length=1,
+        max_length=16,
+    )
+
+    @model_validator(mode="after")
+    def _validate_unique_parameters(self) -> HarnessModelCandidateDraft:
+        names = [item.name for item in self.parameters]
+        if len(set(names)) != len(names):
+            raise ValueError("model-candidate parameter names must be unique")
+        return self
+
+
+class HarnessCompiledModelCandidate(_ClosedModel):
+    """Harness-validated full candidate derived from a model hypothesis."""
+
+    schema_id: Literal["dronedream.compiled-model-candidate/v1"] = (
+        "dronedream.compiled-model-candidate/v1"
+    )
+    label: str = Field(min_length=1, max_length=64)
+    rationale: str = Field(min_length=1, max_length=512)
+    expected_effect: str = Field(min_length=1, max_length=512)
+    risk_assessment: str = Field(min_length=1, max_length=512)
+    changed_parameters: tuple[str, ...] = Field(min_length=1, max_length=16)
+    parameters: dict[str, float] = Field(min_length=1, max_length=128)
+    candidate_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class HarnessPlanRevision(_ClosedModel):
     schema_version: Literal["1.0"] = "1.0"
     decision: Literal["dispatch", "abandon"]
     selected_proposal_refs: tuple[str, ...] = Field(default=(), max_length=8)
+    model_candidate: HarnessModelCandidateDraft | None = None
     rationale: str = Field(min_length=1, max_length=256)
 
     @model_validator(mode="after")
     def _validate_shape(self) -> HarnessPlanRevision:
         if len(set(self.selected_proposal_refs)) != len(self.selected_proposal_refs):
             raise ValueError("selected proposal references must be unique")
-        if self.decision == "dispatch" and not self.selected_proposal_refs:
-            raise ValueError("dispatch revisions require at least one proposal")
-        if self.decision == "abandon" and self.selected_proposal_refs:
+        if (
+            self.decision == "dispatch"
+            and not self.selected_proposal_refs
+            and self.model_candidate is None
+        ):
+            raise ValueError("dispatch revisions require a tool or model candidate")
+        if self.decision == "abandon" and (
+            self.selected_proposal_refs or self.model_candidate is not None
+        ):
             raise ValueError("abandon revisions cannot select proposals")
         return self
 
@@ -349,6 +452,7 @@ class HarnessRevisionValidation(_ClosedModel):
     )
     accepted: bool
     selected_proposal_refs: tuple[str, ...] = ()
+    model_candidate: HarnessCompiledModelCandidate | None = None
     rejection_code: str | None = Field(default=None, max_length=64)
     fallback_used: bool = False
 
@@ -356,6 +460,8 @@ class HarnessRevisionValidation(_ClosedModel):
     def _validate_result(self) -> HarnessRevisionValidation:
         if self.accepted == (self.rejection_code is not None):
             raise ValueError("accepted revisions cannot carry a rejection code")
+        if not self.accepted and self.model_candidate is not None:
+            raise ValueError("rejected revisions cannot carry a model candidate")
         return self
 
 
@@ -834,6 +940,7 @@ def validate_plan_revision(
     *,
     proposals: Sequence[HarnessProposalSummary],
     maximum_dispatch_candidates: int,
+    model_candidate_context: HarnessModelCandidateContext | None = None,
     allow_abandon: bool = False,
 ) -> tuple[HarnessPlanRevision | None, HarnessRevisionValidation]:
     """Validate the optional second turn without exposing parameter values."""
@@ -852,7 +959,8 @@ def validate_plan_revision(
             accepted=False,
             rejection_code="unknown_proposal_reference",
         )
-    if len(selected) > maximum_dispatch_candidates:
+    candidate_count = 1 if revision.model_candidate is not None else 0
+    if len(selected) + candidate_count > maximum_dispatch_candidates:
         return None, HarnessRevisionValidation(
             accepted=False,
             rejection_code="dispatch_capacity_exceeded",
@@ -862,9 +970,85 @@ def validate_plan_revision(
             accepted=False,
             rejection_code="abandon_not_authorized",
         )
+    compiled_candidate = None
+    if revision.model_candidate is not None:
+        if model_candidate_context is None:
+            return None, HarnessRevisionValidation(
+                accepted=False,
+                rejection_code="model_candidate_not_authorized",
+            )
+        compiled_candidate, rejection_code = _compile_model_candidate(
+            revision.model_candidate,
+            context=model_candidate_context,
+        )
+        if compiled_candidate is None:
+            return None, HarnessRevisionValidation(
+                accepted=False,
+                rejection_code=rejection_code,
+            )
     return revision, HarnessRevisionValidation(
         accepted=True,
         selected_proposal_refs=selected,
+        model_candidate=compiled_candidate,
+    )
+
+
+def _compile_model_candidate(
+    draft: HarnessModelCandidateDraft,
+    *,
+    context: HarnessModelCandidateContext,
+) -> tuple[HarnessCompiledModelCandidate | None, str]:
+    """Compile one provider hypothesis without silently changing its values."""
+
+    domains = {domain.name: domain for domain in context.domains}
+    requested = {item.name: item.value for item in draft.parameters}
+    if any(name not in domains for name in requested):
+        return None, "unknown_model_candidate_parameter"
+    if len(requested) > context.maximum_changed_parameters:
+        return None, "model_candidate_change_cap_exceeded"
+
+    changed: list[str] = []
+    parameters = {domain.name: domain.incumbent for domain in context.domains}
+    for name, raw_value in requested.items():
+        domain = domains[name]
+        value = float(raw_value)
+        if not domain.minimum <= value <= domain.maximum:
+            return None, "model_candidate_out_of_bounds"
+        if domain.choices and value not in domain.choices:
+            return None, "model_candidate_choice_mismatch"
+        if domain.value_type in {"integer", "boolean", "enum"} and not value.is_integer():
+            return None, "model_candidate_type_mismatch"
+        if domain.value_type == "boolean" and value not in {0.0, 1.0}:
+            return None, "model_candidate_type_mismatch"
+        if domain.step is not None:
+            step_count = (value - domain.minimum) / domain.step
+            if not math.isclose(step_count, round(step_count), abs_tol=1e-9):
+                return None, "model_candidate_step_mismatch"
+        if math.isclose(value, domain.incumbent, rel_tol=0.0, abs_tol=1e-12):
+            continue
+        parameters[name] = value
+        changed.append(name)
+    if not changed:
+        return None, "model_candidate_noop"
+    canonical = {
+        "label": draft.label,
+        "rationale": draft.rationale,
+        "expected_effect": draft.expected_effect,
+        "risk_assessment": draft.risk_assessment,
+        "changed_parameters": sorted(changed),
+        "parameters": {name: parameters[name] for name in sorted(parameters)},
+    }
+    return (
+        HarnessCompiledModelCandidate(
+            label=draft.label,
+            rationale=draft.rationale,
+            expected_effect=draft.expected_effect,
+            risk_assessment=draft.risk_assessment,
+            changed_parameters=tuple(sorted(changed)),
+            parameters=parameters,
+            candidate_sha256=_sha256(canonical),
+        ),
+        "accepted",
     )
 
 
@@ -896,8 +1080,43 @@ def plan_revision_schema(
     proposals: Sequence[HarnessProposalSummary],
     *,
     maximum_dispatch_candidates: int,
+    model_candidate_context: HarnessModelCandidateContext | None = None,
 ) -> dict[str, object]:
     proposal_refs = [item.proposal_ref for item in proposals]
+    model_candidate_schema: dict[str, object] = {"type": "null"}
+    if model_candidate_context is not None:
+        parameter_names = [domain.name for domain in model_candidate_context.domains]
+        model_candidate_schema = {
+            "type": ["object", "null"],
+            "properties": {
+                "label": {"type": "string", "minLength": 1, "maxLength": 64},
+                "rationale": {"type": "string", "minLength": 1, "maxLength": 512},
+                "expected_effect": {"type": "string", "minLength": 1, "maxLength": 512},
+                "risk_assessment": {"type": "string", "minLength": 1, "maxLength": 512},
+                "parameters": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": model_candidate_context.maximum_changed_parameters,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string", "enum": parameter_names},
+                            "value": {"type": "number"},
+                        },
+                        "required": ["name", "value"],
+                        "additionalProperties": False,
+                    },
+                },
+            },
+            "required": [
+                "label",
+                "rationale",
+                "expected_effect",
+                "risk_assessment",
+                "parameters",
+            ],
+            "additionalProperties": False,
+        }
     return {
         "type": "object",
         "properties": {
@@ -908,12 +1127,14 @@ def plan_revision_schema(
                 "maxItems": maximum_dispatch_candidates,
                 "items": {"type": "string", "enum": proposal_refs},
             },
+            "model_candidate": model_candidate_schema,
             "rationale": {"type": "string", "minLength": 1, "maxLength": 256},
         },
         "required": [
             "schema_version",
             "decision",
             "selected_proposal_refs",
+            "model_candidate",
             "rationale",
         ],
         "additionalProperties": False,
@@ -925,23 +1146,33 @@ def build_plan_revision_messages(
     compiled_plan: HarnessCompiledGenerationPlan,
     proposals: Sequence[HarnessProposalSummary],
     maximum_dispatch_candidates: int,
+    model_candidate_context: HarnessModelCandidateContext | None = None,
+    feedback_evidence: Mapping[str, object] | None = None,
 ) -> tuple[str, str]:
-    """Build the sole optional post-tool turn from bounded, ID-free summaries."""
+    """Build the sole optional post-tool turn from bounded evidence."""
 
-    if not proposals:
-        raise ValueError("plan revision requires at least one proposal summary")
+    if not proposals and model_candidate_context is None:
+        raise ValueError("plan revision requires proposals or a candidate context")
     system = (
-        "You are DroneDream's bounded candidate-batch selector. Pure proposal tools "
-        "have returned typed summaries. Select proposal references only; you cannot "
-        "change parameter values, tool identity, fidelity, budgets, seeds, or any "
-        "simulation contract. This is the final and only post-tool model turn. Return "
-        "only JSON matching the strict schema."
+        "You are DroneDream's bounded simulation candidate strategist. Compare the "
+        "typed tool proposals and feedback. You may select tool proposal references "
+        "and optionally author one parameter hypothesis within the supplied domains. "
+        "Explain its expected effect and risk. The Harness validates every value and "
+        "owns budgets, seeds, simulation execution, qualification, holdout, rollback, "
+        "and all authority. Your candidate consumes the same fixed candidate capacity; "
+        "it cannot expand any budget or authorize hardware. Return only strict JSON."
     )
     payload = {
         "schema_version": HARNESS_PLAN_REVISION_PROMPT_VERSION,
         "compiled_plan_sha256": compiled_plan.plan_sha256,
         "maximum_dispatch_candidates": maximum_dispatch_candidates,
         "proposals": [item.model_dump(mode="json") for item in proposals],
+        "feedback_evidence": dict(feedback_evidence or {}),
+        "model_candidate_context": (
+            model_candidate_context.model_dump(mode="json")
+            if model_candidate_context is not None
+            else None
+        ),
     }
     return system, _canonical_json(payload)
 
@@ -986,8 +1217,11 @@ __all__ = [
     "HARNESS_PLAN_REVISION_SCHEMA_VERSION",
     "HarnessBudgetOpportunity",
     "HarnessCompiledGenerationPlan",
+    "HarnessCompiledModelCandidate",
     "HarnessCompiledToolCall",
     "HarnessGenerationPlan",
+    "HarnessModelCandidateContext",
+    "HarnessModelCandidateDomain",
     "HarnessPlanRevision",
     "HarnessPlanValidation",
     "HarnessProposalSummary",

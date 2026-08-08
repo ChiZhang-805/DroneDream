@@ -11,6 +11,8 @@ from pydantic import ValidationError
 
 from app.orchestration.harness_budget_planner import (
     HarnessGenerationPlan,
+    HarnessModelCandidateContext,
+    HarnessModelCandidateDomain,
     HarnessPlanUncertainty,
     HarnessStopRecommendation,
     HarnessToolAllocation,
@@ -71,6 +73,30 @@ def _valid_plan() -> dict[str, object]:
             "missing_evidence": ["local_curvature"],
         },
     }
+
+
+def _candidate_context() -> HarnessModelCandidateContext:
+    return HarnessModelCandidateContext(
+        domains=(
+            HarnessModelCandidateDomain(
+                name="MPC_XY_P",
+                minimum=0.5,
+                maximum=2.0,
+                incumbent=1.0,
+                step=0.1,
+                value_type="float",
+            ),
+            HarnessModelCandidateDomain(
+                name="MODE",
+                minimum=0.0,
+                maximum=2.0,
+                incumbent=0.0,
+                value_type="enum",
+                choices=(0.0, 1.0, 2.0),
+            ),
+        ),
+        maximum_changed_parameters=2,
+    )
 
 
 def test_opportunity_bounds_capacity_by_remaining_full_trial_budget() -> None:
@@ -372,6 +398,99 @@ def test_second_turn_rejects_unknown_or_over_budget_references(
     assert revision is None
     assert report.accepted is False
     assert report.rejection_code == expected_code
+
+
+def test_second_turn_compiles_one_bounded_model_candidate() -> None:
+    revision, report = validate_plan_revision(
+        {
+            "schema_version": "1.0",
+            "decision": "dispatch",
+            "selected_proposal_refs": ["proposal_0"],
+            "model_candidate": {
+                "label": "damped recovery",
+                "rationale": "Reduce error while retaining a conservative mode.",
+                "expected_effect": "Lower tracking error after the last failure.",
+                "risk_assessment": "May slow response; Harness must verify it.",
+                "parameters": [
+                    {"name": "MPC_XY_P", "value": 1.2},
+                    {"name": "MODE", "value": 1.0},
+                ],
+            },
+            "rationale": "Compare a numerical proposal with a feedback-led hypothesis.",
+        },
+        proposals=_proposal_summaries(),
+        maximum_dispatch_candidates=2,
+        model_candidate_context=_candidate_context(),
+    )
+
+    assert revision is not None
+    assert report.accepted is True
+    assert report.model_candidate is not None
+    assert report.model_candidate.parameters == {"MPC_XY_P": 1.2, "MODE": 1.0}
+    assert report.model_candidate.changed_parameters == ("MODE", "MPC_XY_P")
+    assert len(report.model_candidate.candidate_sha256) == 64
+
+
+@pytest.mark.parametrize(
+    ("parameters", "expected_code"),
+    [
+        ([{"name": "UNKNOWN", "value": 1.0}], "unknown_model_candidate_parameter"),
+        ([{"name": "MPC_XY_P", "value": 2.1}], "model_candidate_out_of_bounds"),
+        ([{"name": "MPC_XY_P", "value": 1.25}], "model_candidate_step_mismatch"),
+        ([{"name": "MODE", "value": 1.5}], "model_candidate_choice_mismatch"),
+        ([{"name": "MPC_XY_P", "value": 1.0}], "model_candidate_noop"),
+    ],
+)
+def test_second_turn_rejects_invalid_model_candidates(
+    parameters: list[dict[str, object]],
+    expected_code: str,
+) -> None:
+    revision, report = validate_plan_revision(
+        {
+            "schema_version": "1.0",
+            "decision": "dispatch",
+            "selected_proposal_refs": [],
+            "model_candidate": {
+                "label": "invalid",
+                "rationale": "Exercise deterministic rejection.",
+                "expected_effect": "None until validated.",
+                "risk_assessment": "Must fail closed.",
+                "parameters": parameters,
+            },
+            "rationale": "negative contract",
+        },
+        proposals=_proposal_summaries(),
+        maximum_dispatch_candidates=2,
+        model_candidate_context=_candidate_context(),
+    )
+
+    assert revision is None
+    assert report.accepted is False
+    assert report.rejection_code == expected_code
+
+
+def test_second_turn_model_candidate_consumes_shared_capacity() -> None:
+    revision, report = validate_plan_revision(
+        {
+            "schema_version": "1.0",
+            "decision": "dispatch",
+            "selected_proposal_refs": ["proposal_0", "proposal_1"],
+            "model_candidate": {
+                "label": "extra",
+                "rationale": "Should not expand the frozen batch.",
+                "expected_effect": "No effect because it must be rejected.",
+                "risk_assessment": "Capacity expansion.",
+                "parameters": [{"name": "MPC_XY_P", "value": 1.2}],
+            },
+            "rationale": "negative capacity contract",
+        },
+        proposals=_proposal_summaries(),
+        maximum_dispatch_candidates=2,
+        model_candidate_context=_candidate_context(),
+    )
+
+    assert revision is None
+    assert report.rejection_code == "dispatch_capacity_exceeded"
 
 
 def test_second_turn_abandon_requires_policy_and_invalid_response_falls_back() -> None:

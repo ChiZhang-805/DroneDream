@@ -333,11 +333,16 @@ def run_adaptive_cognitive_review(
     selected_proposal_refs: Sequence[str],
     proposal_details: Mapping[str, Mapping[str, object]],
     hard_bounds: Sequence[Mapping[str, object]],
+    additional_proposal_refs: Sequence[str] = (),
     client: OpenAIClientLike | None = None,
 ) -> AdaptiveCognitiveReviewResult:
     """Apply deterministic-gated T3/T4 reviews without expanding proposals."""
 
-    available_refs = tuple(item.proposal_ref for item in proposals)
+    available_refs = tuple(
+        dict.fromkeys(
+            [item.proposal_ref for item in proposals] + list(additional_proposal_refs)
+        )
+    )
     current_refs = tuple(selected_proposal_refs)
     if not current_refs:
         return AdaptiveCognitiveReviewResult(selected_proposal_refs=())

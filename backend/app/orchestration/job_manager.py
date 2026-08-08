@@ -64,7 +64,10 @@ from app.orchestration.experimental_optimizer import (
 from app.orchestration.harness_budget_planner import (
     HarnessBudgetOpportunity,
     HarnessCompiledGenerationPlan,
+    HarnessCompiledModelCandidate,
     HarnessCompiledToolCall,
+    HarnessModelCandidateContext,
+    HarnessModelCandidateDomain,
     HarnessProposalSummary,
     HarnessStopReason,
     build_budget_opportunity,
@@ -2079,6 +2082,87 @@ def _harness_candidate_proposal(
     )
 
 
+def _model_candidate_context(job: models.Job) -> HarnessModelCandidateContext | None:
+    """Expose only tunable bounds and the projected incumbent to the model."""
+
+    search_space = search_space_for_job(
+        job,
+        baseline_parameters=_baseline_parameters_for_job(job),
+    )
+    tunable = search_space.tunable
+    if not tunable or len(tunable) > 128:
+        return None
+    raw_incumbent = _harness_incumbent_parameters(job)
+    incumbent = search_space.project(
+        {
+            domain.name: raw_incumbent.get(domain.name, domain.baseline)
+            for domain in search_space.domains
+        }
+    )
+    return HarnessModelCandidateContext(
+        domains=tuple(
+            HarnessModelCandidateDomain(
+                name=domain.name,
+                minimum=domain.minimum,
+                maximum=domain.maximum,
+                incumbent=incumbent[domain.name],
+                step=domain.step,
+                value_type=cast(Any, domain.value_type),
+                choices=domain.choices,
+            )
+            for domain in tunable
+        ),
+        maximum_changed_parameters=min(16, len(tunable)),
+    )
+
+
+def _model_candidate_proposal(
+    job: models.Job,
+    candidate: HarnessCompiledModelCandidate,
+    *,
+    generation_index: int,
+    plan_decision_id: str,
+    plan: HarnessCompiledGenerationPlan,
+    revision_id: str,
+) -> CandidateProposal:
+    """Create an auditable proposal after deterministic Harness validation."""
+
+    search_space = search_space_for_job(
+        job,
+        baseline_parameters=_baseline_parameters_for_job(job),
+    )
+    incumbent = _harness_incumbent_parameters(job)
+    parameters = {
+        domain.name: incumbent.get(domain.name, domain.baseline)
+        for domain in search_space.domains
+    }
+    parameters.update(candidate.parameters)
+    projected = search_space.project(parameters)
+    return CandidateProposal(
+        generation_index=generation_index,
+        label=candidate.label,
+        strategy="model_guided",
+        parameters=projected,
+        metadata={
+            "harness_orchestration": {
+                "schema_id": "dronedream.harness-model-candidate-orchestration/v1",
+                "decision_id": plan_decision_id,
+                "revision_id": revision_id,
+                "revision_source": "model",
+                "plan_sha256": plan.plan_sha256,
+                "proposal_ref": "model_candidate",
+                "candidate_sha256": candidate.candidate_sha256,
+                "changed_parameters": list(candidate.changed_parameters),
+                "expected_effect": candidate.expected_effect,
+                "risk_assessment": candidate.risk_assessment,
+                "authority": "proposal_only",
+                "hardware_authority": False,
+            },
+            "model_rationale": candidate.rationale,
+        },
+    )
+
+
 def _cognitive_review_inputs(
     job: models.Job,
     *,
@@ -2088,6 +2172,7 @@ def _cognitive_review_inputs(
         tuple[CandidateProposal, _HarnessToolCallResult],
     ],
     selected_refs: tuple[str, ...],
+    model_proposal: CandidateProposal | None = None,
 ) -> tuple[
     dict[str, dict[str, object]],
     list[dict[str, object]],
@@ -2136,6 +2221,41 @@ def _cognitive_review_inputs(
             "normalized_distance_from_incumbent": (summary.normalized_distance_from_incumbent),
             "normalized_parameters": normalized_parameters,
             "near_hard_bound_parameters": sorted(boundary_parameters),
+        }
+    if model_proposal is not None:
+        ref = "model_candidate"
+        normalized_parameters: dict[str, float] = {}
+        boundary_parameters: list[str] = []
+        for domain in search_space.tunable:
+            value = float(model_proposal.parameters.get(domain.name, domain.baseline))
+            span = domain.maximum - domain.minimum
+            unit = 0.0 if span <= 0 else (value - domain.minimum) / span
+            normalized_parameters[domain.name] = round(max(0.0, min(1.0, unit)), 6)
+            if span > 0 and (unit <= 0.02 or unit >= 0.98):
+                boundary_parameters.append(domain.name)
+            if span > 0:
+                delta = (value - float(incumbent.get(domain.name, domain.baseline))) / span
+                if abs(delta) >= 0.02:
+                    tool_directions.setdefault(domain.name, {}).setdefault(
+                        "model_direct_candidate",
+                        [],
+                    ).append(delta)
+        if boundary_parameters:
+            hard_boundary_candidate = True
+        orchestration = cast(
+            Mapping[str, object],
+            model_proposal.metadata.get("harness_orchestration", {}),
+        )
+        proposal_details[ref] = {
+            "proposal_ref": ref,
+            "tool_id": "model_direct_candidate",
+            "candidate_sha256": orchestration.get("candidate_sha256"),
+            "changed_parameters": orchestration.get("changed_parameters", []),
+            "expected_effect": orchestration.get("expected_effect"),
+            "risk_assessment": orchestration.get("risk_assessment"),
+            "normalized_parameters": normalized_parameters,
+            "near_hard_bound_parameters": sorted(boundary_parameters),
+            "hardware_authority": False,
         }
     tool_direction_conflict = False
     for directions_by_tool in tool_directions.values():
@@ -2292,27 +2412,39 @@ def dispatch_next_harness_generation(
         job,
         tool_results=tool_results,
     )
+    model_candidate_context = _model_candidate_context(job)
     revision_started = time.perf_counter_ns()
     revision = select_plan_revision(
         db,
         job,
         plan_decision=decision,
         proposals=summaries,
-        maximum_dispatch_candidates=min(
-            opportunity.candidate_capacity,
-            len(summaries),
-        )
-        if summaries
-        else 1,
+        maximum_dispatch_candidates=opportunity.candidate_capacity,
+        model_candidate_context=model_candidate_context,
         client=client,
     )
     revision_wall_ms = (time.perf_counter_ns() - revision_started) / 1_000_000
     selected_refs = revision.selected_proposal_refs
-    revision_selected_refs = selected_refs
+    model_candidate = revision.model_candidate
+    model_proposal = (
+        _model_candidate_proposal(
+            job,
+            model_candidate,
+            generation_index=generation_index,
+            plan_decision_id=decision.decision_id,
+            plan=plan,
+            revision_id=revision.revision_id,
+        )
+        if model_candidate is not None
+        else None
+    )
+    review_selected_refs = selected_refs + (
+        ("model_candidate",) if model_candidate is not None else ()
+    )
+    revision_selected_refs = review_selected_refs
     cognitive_review = None
     if (
-        summaries
-        and selected_refs
+        review_selected_refs
         and not revision.abandoned
         and decision.source == "model"
         and revision.source == "model"
@@ -2326,17 +2458,27 @@ def dispatch_next_harness_generation(
             job,
             summaries=summaries,
             proposal_by_ref=proposal_by_ref,
-            selected_refs=selected_refs,
+            selected_refs=review_selected_refs,
+            model_proposal=model_proposal,
         )
         trigger_snapshot, _ = current_harness_evidence_snapshot(db, job)
         trigger = evaluate_adaptive_triggers(
             job,
             generation_index=generation_index,
             snapshot=trigger_snapshot,
-            proposal_tools={item.proposal_ref: item.tool_id for item in summaries},
-            selected_proposal_refs=selected_refs,
+            proposal_tools={
+                **{item.proposal_ref: item.tool_id for item in summaries},
+                **(
+                    {"model_candidate": "model_direct_candidate"}
+                    if model_candidate is not None
+                    else {}
+                ),
+            },
+            selected_proposal_refs=review_selected_refs,
             tool_direction_conflict=tool_direction_conflict,
             hard_boundary_candidate=hard_boundary_candidate,
+            model_uncertainty_level=decision.uncertainty_level,
+            model_missing_evidence=decision.missing_evidence,
         )
         cognitive_review = run_adaptive_cognitive_review(
             db,
@@ -2344,12 +2486,19 @@ def dispatch_next_harness_generation(
             generation_index=generation_index,
             trigger=trigger,
             proposals=summaries,
-            selected_proposal_refs=selected_refs,
+            selected_proposal_refs=review_selected_refs,
             proposal_details=proposal_details,
             hard_bounds=hard_bounds,
+            additional_proposal_refs=(
+                ("model_candidate",) if model_candidate is not None else ()
+            ),
             client=client,
         )
-        selected_refs = cognitive_review.selected_proposal_refs
+        reviewed_refs = cognitive_review.selected_proposal_refs
+        selected_refs = tuple(ref for ref in reviewed_refs if ref != "model_candidate")
+        if "model_candidate" not in reviewed_refs:
+            model_candidate = None
+            model_proposal = None
         record_event(
             db,
             job.id,
@@ -2362,7 +2511,10 @@ def dispatch_next_harness_generation(
                 "diagnosis_trigger_reasons": list(trigger.diagnosis_reasons),
                 "critic_trigger_reasons": list(trigger.critic_reasons),
                 "suppressed_by_cooldown": list(trigger.suppressed_by_cooldown),
-                "available_proposal_refs": [item.proposal_ref for item in summaries],
+                "available_proposal_refs": [
+                    *[item.proposal_ref for item in summaries],
+                    *(("model_candidate",) if revision.model_candidate is not None else ()),
+                ],
                 "input_selected_proposal_refs": list(revision_selected_refs),
                 "diagnosis_decision": cognitive_review.diagnosis_decision,
                 "critic_decision": cognitive_review.critic_decision,
@@ -2396,7 +2548,7 @@ def dispatch_next_harness_generation(
         }
         for result in tool_results
     ]
-    if not summaries or not selected_refs or revision.abandoned:
+    if (not selected_refs and model_candidate is None) or revision.abandoned:
         status = "search_space_exhausted"
         record_event(
             db,
@@ -2415,6 +2567,11 @@ def dispatch_next_harness_generation(
                 "provider_call_count": provider_call_count,
                 "provider_success_count": provider_success_count,
                 "selected_proposal_refs": list(selected_refs),
+                "model_candidate_sha256": (
+                    model_candidate.candidate_sha256
+                    if model_candidate is not None
+                    else None
+                ),
                 "dispatched_candidates": 0,
                 "dispatched_trials": 0,
                 "planned_candidates": plan.projected_candidate_count,
@@ -2457,6 +2614,7 @@ def dispatch_next_harness_generation(
     summary_by_ref = {summary.proposal_ref: summary for summary in summaries}
     dispatched_candidates = 0
     dispatched_trials = 0
+    dispatched_parameter_sets: set[tuple[tuple[str, float], ...]] = set()
     for proposal_ref in selected_refs:
         proposal, tool_result = proposal_by_ref[proposal_ref]
         compiled_proposal = _harness_candidate_proposal(
@@ -2468,6 +2626,10 @@ def dispatch_next_harness_generation(
             revision_id=revision.revision_id,
             revision_source=revision.source,
         )
+        parameter_fingerprint = tuple(sorted(compiled_proposal.parameters.items()))
+        if parameter_fingerprint in dispatched_parameter_sets:
+            continue
+        dispatched_parameter_sets.add(parameter_fingerprint)
         candidate = _create_optimizer_candidate(
             db,
             job,
@@ -2484,6 +2646,26 @@ def dispatch_next_harness_generation(
             raise RuntimeError("Harness dispatch exceeded the remaining Trial budget")
         dispatched_candidates += 1
         dispatched_trials += len(trials)
+    if model_candidate is not None and model_proposal is not None:
+        compiled_proposal = model_proposal
+        parameter_fingerprint = tuple(sorted(compiled_proposal.parameters.items()))
+        if parameter_fingerprint not in dispatched_parameter_sets:
+            candidate = _create_optimizer_candidate(
+                db,
+                job,
+                compiled_proposal,
+                trial_count=0,
+            )
+            trials = _dispatch_optimizer_trials(
+                db,
+                job,
+                candidate,
+                trials_per_candidate=full_trials_per_candidate,
+            )
+            if dispatched_trials + len(trials) > remaining_trials:
+                raise RuntimeError("Harness dispatch exceeded the remaining Trial budget")
+            dispatched_candidates += 1
+            dispatched_trials += len(trials)
     if dispatched_candidates == 0:
         return AdaptiveDispatchResult(
             status="search_space_exhausted",
@@ -2510,6 +2692,11 @@ def dispatch_next_harness_generation(
             "provider_call_count": provider_call_count,
             "provider_success_count": provider_success_count,
             "selected_proposal_refs": list(selected_refs),
+            "model_candidate_sha256": (
+                model_candidate.candidate_sha256
+                if model_candidate is not None
+                else None
+            ),
             "dispatched_candidates": dispatched_candidates,
             "dispatched_trials": dispatched_trials,
             "planned_candidates": plan.projected_candidate_count,

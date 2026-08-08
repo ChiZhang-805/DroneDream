@@ -103,7 +103,13 @@ import type { TranslationKey, TranslationParams } from "../i18n/I18nProvider";
 
 type Translate = (key: TranslationKey, params?: TranslationParams) => string;
 type FormState = ExperimentFormState;
-const DEFAULTS = EXPERIMENT_FORM_DEFAULTS;
+const DEFAULTS: FormState = (
+  ["sim", "lab"].includes(
+    (import.meta.env.VITE_DRONEDREAM_EDITION as string | undefined)?.toLowerCase() ?? "",
+  )
+    ? { ...EXPERIMENT_FORM_DEFAULTS, optimizer_strategy: "llm_harness" }
+    : EXPERIMENT_FORM_DEFAULTS
+);
 
 function isDraftRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
