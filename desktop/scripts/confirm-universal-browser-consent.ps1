@@ -119,11 +119,13 @@ function Find-ConsentTarget {
             $rowMinX = $width; $rowMaxX = -1; $rowCount = 0
             for ($x = $xStart; $x -lt $xEnd; $x += 2) {
                 $pixel = $bitmap.GetPixel($x, $y)
-                if ($pixel.R -ge 65 -and $pixel.R -le 155 -and
-                    $pixel.G -ge 25 -and $pixel.G -le 125 -and
-                    $pixel.B -ge 145 -and
-                    ($pixel.B - $pixel.R) -ge 35 -and
-                    ($pixel.B - $pixel.G) -ge 55) {
+                $maximum = [Math]::Max($pixel.R, [Math]::Max($pixel.G, $pixel.B))
+                $minimum = [Math]::Min($pixel.R, [Math]::Min($pixel.G, $pixel.B))
+                $isBrandGradientPixel =
+                    $pixel.B -ge 135 -and
+                    ($maximum - $minimum) -ge 50 -and
+                    (($pixel.B - $pixel.G) -ge 20 -or ($pixel.R - $pixel.G) -ge 30)
+                if ($isBrandGradientPixel) {
                     $rowCount++
                     if ($x -lt $rowMinX) { $rowMinX = $x }
                     if ($x -gt $rowMaxX) { $rowMaxX = $x }
@@ -158,8 +160,10 @@ function Find-ConsentTarget {
         $count = $candidate[0].sampledPixels
         $buttonWidth = $maxX - $minX
         $buttonHeight = $maxY - $minY + 2
+        $buttonCenterX = ($minX + $maxX) / 2
         if ($buttonWidth -lt 280 -or $buttonWidth -gt 760 -or
-            $buttonHeight -lt 35 -or $buttonHeight -gt 100) { return $null }
+            $buttonHeight -lt 35 -or $buttonHeight -gt 100 -or
+            $buttonCenterX -lt ($width * 0.35) -or $buttonCenterX -gt ($width * 0.65)) { return $null }
         return [ordered]@{
             handle = [IntPtr]$window.Current.NativeWindowHandle
             processId = [int]$window.Current.ProcessId
