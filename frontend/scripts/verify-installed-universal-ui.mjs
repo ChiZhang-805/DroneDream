@@ -67,6 +67,24 @@ async function saveScreenshot(page, surface) {
   };
 }
 
+async function visibleSettingsButton(page) {
+  const desktopButton = page.locator(".launcher-settings-button:visible").first();
+  if (await desktopButton.isVisible()) return desktopButton;
+
+  const menuButton = page.locator(".app-mobile-menu-button:visible").first();
+  await menuButton.waitFor({ state: "visible", timeout: 30_000 });
+  assert.equal(
+    await menuButton.getAttribute("aria-expanded"),
+    "false",
+    "The compact navigation menu must start collapsed",
+  );
+  await menuButton.focus();
+  await menuButton.press("Enter");
+  const mobileButton = page.locator(".app-mobile-settings-entry:visible").first();
+  await mobileButton.waitFor({ state: "visible", timeout: 30_000 });
+  return mobileButton;
+}
+
 const browser = await chromium.connectOverCDP(cdpEndpoint);
 {
   const contexts = browser.contexts();
@@ -152,7 +170,9 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   }, { nextLocale: locale, nextEdition: edition, nextRoute: presentationRoute });
   await page.waitForURL((url) => url.hash === `#${presentationRoute}`);
   await page.waitForLoadState("domcontentloaded");
-  await page.locator(".launcher-settings-button:visible").first().waitFor({
+  await page.locator(
+    ".launcher-settings-button:visible, .app-mobile-menu-button:visible",
+  ).first().waitFor({
     state: "visible",
     timeout: 30_000,
   });
@@ -177,8 +197,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert.equal(theme.grantsHardwareAuthority, "false");
   assert.deepEqual(theme.colors, canonicalColors[edition]);
 
-  const settingsButton = page.locator(".launcher-settings-button:visible").first();
-  await settingsButton.waitFor({ state: "visible" });
+  const settingsButton = await visibleSettingsButton(page);
   assert((await settingsButton.getAttribute("aria-label"))?.trim(), "Settings button needs an accessible label");
   await settingsButton.focus();
   await settingsButton.press("Enter");

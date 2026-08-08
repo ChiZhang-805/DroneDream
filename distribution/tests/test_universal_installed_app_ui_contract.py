@@ -104,6 +104,10 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
         'measurement.dialogScrollHeight <= measurement.dialogClientHeight + 1',
         'measurement.panelScrollHeight <= measurement.panelClientHeight + 1',
         'await settingsButton.press("Enter")',
+        'async function visibleSettingsButton(page)',
+        '".app-mobile-menu-button:visible"',
+        '".app-mobile-settings-entry:visible"',
+        'await menuButton.press("Enter")',
         'await closeButton.press("Enter")',
     ):
         assert fragment in script
@@ -115,6 +119,10 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
     assert "password" not in script.lower()
     assert "token" not in script.lower()
     assert "requestId" not in script
+
+    powershell = POWERSHELL.read_text(encoding="utf-8-sig")
+    assert "$Process.Kill()" in powershell
+    assert "$Process.Kill($true)" not in powershell
 
 
 def test_ui_verifiers_use_the_current_universal_workspace_storage_contract() -> None:

@@ -434,7 +434,11 @@ function Close-ThisBatchAppOnce {
     $script:counts.appClose++
     if (-not $Process.CloseMainWindow() -or -not $Process.WaitForExit(15000)) {
         if (-not $Process.HasExited) {
-            $Process.Kill($true)
+            # Windows PowerShell 5.1 targets .NET Framework, where the
+            # Process.Kill(bool entireProcessTree) overload is unavailable.
+            # The isolated uninstaller remains responsible for owned child
+            # cleanup after this bounded parent-process recovery.
+            $Process.Kill()
             $Process.WaitForExit()
         }
         throw "Installed app required forced recovery after its single close operation."
