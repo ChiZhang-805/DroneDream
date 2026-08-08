@@ -939,7 +939,24 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
 
     entered = threading.Event()
     release = threading.Event()
+    heartbeat_renewed = threading.Event()
     provider_wait_timeout_seconds = 30.0
+
+    original_renew_finalization_claim = ctx["aggregation"]._renew_finalization_claim
+
+    def track_heartbeat_renewal(*args, **kwargs):
+        renewed = original_renew_finalization_claim(*args, **kwargs)
+        if renewed and threading.current_thread().name.startswith(
+            "finalization-lease-"
+        ):
+            heartbeat_renewed.set()
+        return renewed
+
+    monkeypatch.setattr(
+        ctx["aggregation"],
+        "_renew_finalization_claim",
+        track_heartbeat_renewal,
+    )
 
     class BlockingClient:
         def __init__(self) -> None:
@@ -986,11 +1003,21 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
         assert initial_token is not None
         assert initial_expiry is not None
 
-        time.sleep(0.2)
+        assert heartbeat_renewed.wait(timeout=provider_wait_timeout_seconds), (
+            "finalization heartbeat never renewed the live claim"
+        )
+        committed_renewal_deadline = time.monotonic() + provider_wait_timeout_seconds
+        while True:
+            with ctx["db_module"].SessionLocal() as db:
+                job = db.get(ctx["models"].Job, job_id)
+                assert job.finalization_claim_token == initial_token
+                if job.finalization_lease_expires_at > initial_expiry:
+                    break
+            assert time.monotonic() < committed_renewal_deadline, (
+                "finalization heartbeat renewal was not committed"
+            )
+            time.sleep(0.01)
         with ctx["db_module"].SessionLocal() as db:
-            job = db.get(ctx["models"].Job, job_id)
-            assert job.finalization_claim_token == initial_token
-            assert job.finalization_lease_expires_at > initial_expiry
             assert ctx["aggregation"].finalize_ready_jobs(db, limit=1) == []
         assert client.calls == 1
 
