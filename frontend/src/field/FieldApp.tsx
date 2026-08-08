@@ -92,7 +92,7 @@ const COPY = {
     skip: "跳到工作区",
     settings: "设置",
     nav: "Field 导航",
-    assistant: "调优对话",
+    assistant: "Chatting",
     device: "设备",
     compatibility: "兼容性",
     tuning: "调优",

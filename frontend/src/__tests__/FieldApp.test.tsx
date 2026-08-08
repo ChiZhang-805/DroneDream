@@ -48,12 +48,13 @@ describe("FieldApp", () => {
     expect(within(navigation).getAllByRole("button")).toHaveLength(6);
     expect(within(navigation).getByRole("button", { name: "Chatting" }))
       .toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("heading", { name: "Plan a real-device tuning session" }))
+    expect(screen.getByRole("heading", { name: "What real-device experiment should we prepare?" }))
       .toBeInTheDocument();
     expect(container.querySelector(".field-sidebar nav a")).toBeNull();
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
     expect(container.querySelector("[data-validated-pack-count='0']")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Start controlled test" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Start controlled test" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   });
 
   it("moves launcher focus to the active page without granting authority", async () => {
@@ -69,7 +70,7 @@ describe("FieldApp", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Device" }));
     expect(screen.getByRole("heading", { name: "Device & adapters" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Plan a real-device tuning session" }))
+    expect(screen.queryByRole("heading", { name: "What real-device experiment should we prepare?" }))
       .not.toBeInTheDocument();
     expect(container.querySelector(".field-active-page")).toHaveAttribute("data-page", "device");
 
@@ -151,9 +152,9 @@ describe("FieldApp", () => {
   it("provides independent Simplified Chinese page navigation", async () => {
     await renderField("zh-CN", "firmware-drift");
 
-    expect(screen.getByRole("button", { name: "调优对话" }))
+    expect(screen.getByRole("button", { name: "Chatting" }))
       .toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("heading", { name: "规划真机调优实验" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "想准备怎样的真机调优实验？" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "设备" }));
     expect(screen.getByRole("heading", { name: "设备与适配器" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "观察状态" })).toHaveValue("firmware-drift");
