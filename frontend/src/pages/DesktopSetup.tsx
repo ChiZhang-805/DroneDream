@@ -630,7 +630,10 @@ export function DesktopSetup() {
     // check, including transitions from ready to stopped or uncertain. The
     // access provider performs its own fail-closed probe, so stale local
     // reports are never promoted into global readiness.
-    void refreshRuntimeAccess();
+    // The launcher owns an explicit Start runtime action. Its passive status
+    // synchronization must never race that action by starting Runtime in the
+    // background.
+    void refreshRuntimeAccess({ autoStart: false });
 
     const probeIssues: ProbeIssue[] = [];
     if (prerequisites.status === "rejected") {
@@ -870,7 +873,10 @@ export function DesktopSetup() {
         runtimeFresh: true,
         issues: replaceIssues(current.issues, ["runtime"], []),
       }));
-      await refreshRuntimeAccess();
+      // The command above is the one authoritative start/repair attempt. The
+      // follow-up refresh observes its result and must not dispatch a second
+      // maintenance command if the first status probe is briefly stale.
+      await refreshRuntimeAccess({ autoStart: false });
     } catch (error) {
       setRuntimeCommandError(
         `${action === "start" ? "start_runtime" : "repair_runtime"}: ${errorMessage(error)}`,

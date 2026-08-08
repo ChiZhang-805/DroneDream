@@ -364,10 +364,14 @@ afterEach(() => {
     queryClient.clear();
   });
 
-  it("does not auto-start from the explicit setup route", async () => {
+  it("does not auto-start from the real setup route and starts exactly once on request", async () => {
     const invoke = vi.fn(async (command: string) => {
+      if (command === "get_installer_runtime_intent") {
+        return { status: "none", mode: null, targetRoot: null, message: null };
+      }
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return autoStartableRuntime;
+      if (command === "start_runtime") return readyRuntime;
       throw new Error(`Unexpected command: ${command}`);
     });
     window.__TAURI__ = { core: { invoke } };
@@ -375,7 +379,7 @@ afterEach(() => {
       {
         path: "/",
         element: <AppShell />,
-        children: [{ path: "desktop/setup", element: <div>Setup placeholder</div> }],
+        children: [{ path: "desktop/setup", element: <DesktopSetup /> }],
       },
     ], { initialEntries: ["/desktop/setup"] });
 
@@ -385,12 +389,23 @@ afterEach(() => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("Setup placeholder")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Start runtime" }))
+      .toBeInTheDocument();
     await waitFor(() => {
-      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
-        .toHaveLength(1);
+      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status").length)
+        .toBeGreaterThanOrEqual(2);
     });
     expect(invoke.mock.calls.some(([command]) => command === "start_runtime")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Start runtime" }));
+    await waitFor(() => {
+      expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+        .toHaveLength(1);
+    });
+    expect(await screen.findByText("The installed runtime is ready."))
+      .toBeInTheDocument();
+    expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
+      .toHaveLength(1);
 
     router.dispose();
   });

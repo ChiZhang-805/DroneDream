@@ -27,6 +27,10 @@ export type DesktopRuntimeAccessStatus =
   | "ready"
   | "blocked";
 
+export interface DesktopRuntimeAccessRefreshOptions {
+  autoStart?: boolean;
+}
+
 export interface DesktopRuntimeAccess {
   desktopRuntime: boolean;
   status: DesktopRuntimeAccessStatus;
@@ -34,7 +38,7 @@ export interface DesktopRuntimeAccess {
   snapshot: DesktopReadinessSnapshot | null;
   lastFullCheckAt: number | null;
   isChecking: boolean;
-  refresh: () => Promise<void>;
+  refresh: (options?: DesktopRuntimeAccessRefreshOptions) => Promise<void>;
 }
 
 const BROWSER_ACCESS: DesktopRuntimeAccess = {
@@ -88,7 +92,9 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     setStatus(next.ready ? "ready" : next.autoStartFailed ? "startFailed" : "blocked");
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (
+    options: DesktopRuntimeAccessRefreshOptions = {},
+  ) => {
     if (!desktopRuntime) {
       setStatus("browser");
       return;
@@ -101,7 +107,7 @@ export function DesktopRuntimeAccessProvider({ children }: { children: ReactNode
     let automaticStartAttempted = false;
     try {
       const snapshot = await ensureOverallDesktopReadiness({
-        autoStart: true,
+        autoStart: options.autoStart ?? true,
         force: true,
         shouldAutoStart: () => requestId.current === currentRequest,
         onStarting: () => {
