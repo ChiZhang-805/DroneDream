@@ -273,6 +273,48 @@ def test_source_drift_is_recorded_and_not_counted_as_success(
         assert receipt.outcome.error_code == "source_drift"
 
 
+def test_repository_source_fallback_is_frozen_without_repeated_git(
+    monkeypatch,
+) -> None:
+    from app.orchestration import cognitive_budget
+
+    cognitive_budget._repository_source_commit.cache_clear()
+    monkeypatch.delenv("DRONEDREAM_SOURCE_COMMIT", raising=False)
+    monkeypatch.delenv("DRONEDREAM_ENGINE_PACK_MANIFEST", raising=False)
+    monkeypatch.setattr(cognitive_budget.shutil, "which", lambda _name: "git")
+    calls: list[tuple[object, ...]] = []
+
+    def fake_run(*args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(stdout="7" * 40)
+
+    monkeypatch.setattr(cognitive_budget.subprocess, "run", fake_run)
+    try:
+        assert cognitive_budget.resolve_source_commit() == "7" * 40
+        assert cognitive_budget.resolve_source_commit() == "7" * 40
+        assert len(calls) == 1
+    finally:
+        cognitive_budget._repository_source_commit.cache_clear()
+
+
+def test_active_manifest_is_rechecked_despite_repository_fallback_cache(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from app.orchestration import cognitive_budget
+
+    manifest = tmp_path / "engine-pack-manifest.json"
+    monkeypatch.delenv("DRONEDREAM_SOURCE_COMMIT", raising=False)
+    monkeypatch.setenv("DRONEDREAM_ENGINE_PACK_MANIFEST", str(manifest))
+    cognitive_budget._repository_source_commit.cache_clear()
+
+    manifest.write_text('{"source":{"gitCommit":"' + "8" * 40 + '"}}', encoding="utf-8")
+    assert cognitive_budget.resolve_source_commit() == "8" * 40
+
+    manifest.write_text('{"source":{"gitCommit":"' + "9" * 40 + '"}}', encoding="utf-8")
+    assert cognitive_budget.resolve_source_commit() == "9" * 40
+
+
 def test_job_provider_turn_cap_is_atomic_and_fail_closed(
     cognitive_db,
     monkeypatch,

@@ -18,6 +18,7 @@ import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
 
@@ -262,7 +263,17 @@ def _manifest_source_commit(path: Path) -> str:
     return commit
 
 
+@lru_cache(maxsize=1)
 def _repository_source_commit() -> str | None:
+    """Freeze the repository fallback once per backend process.
+
+    Configured and active Engine Pack commits are intentionally resolved on
+    every call by :func:`resolve_source_commit`.  The repository lookup is only
+    the final development fallback; spawning ``git`` for every cognitive turn
+    is both expensive and would allow an in-flight process to silently change
+    its execution provenance after a checkout moves.
+    """
+
     git = shutil.which("git")
     if git is None:
         return None
