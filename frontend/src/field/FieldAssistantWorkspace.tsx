@@ -65,6 +65,7 @@ const COPY = {
     cancel: "Cancel",
     voiceUnavailable: "Voice input is unavailable. Continue typing.",
     plan: "Experiment plan",
+    conversation: "Chat",
     objective: "Objective",
     profile: "Test profile",
     trials: "Trial budget",
@@ -104,6 +105,7 @@ const COPY = {
     cancel: "取消",
     voiceUnavailable: "当前无法使用语音输入，请继续打字。",
     plan: "实验方案",
+    conversation: "对话",
     objective: "调优目标",
     profile: "测试类型",
     trials: "试验预算",
@@ -279,6 +281,7 @@ export function FieldAssistantWorkspace({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [voiceConsent, setVoiceConsent] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"chat" | "plan">("chat");
   const pendingRef = useRef(false);
   const voice = useVoiceInput({
     locale,
@@ -341,6 +344,7 @@ export function FieldAssistantWorkspace({
       );
       const nextPlan = parseFieldPlan(completion.choices[0]?.message.content ?? "");
       setPlan(nextPlan);
+      setMobilePanel("plan");
       setMessages((current) => [
         ...current,
         { id: messageId(), role: "assistant", content: nextPlan.summary },
@@ -359,11 +363,47 @@ export function FieldAssistantWorkspace({
     setPlan(null);
     setComposer("");
     setError(null);
+    setMobilePanel("chat");
   };
 
   return (
-    <div className="field-assistant-workspace" data-authority="false" data-execution-domain="real-hardware">
-      <section className="field-assistant-chat" aria-labelledby="field-assistant-title">
+    <div
+      className="field-assistant-workspace"
+      data-authority="false"
+      data-execution-domain="real-hardware"
+      data-has-plan={plan ? "true" : "false"}
+      data-mobile-panel={mobilePanel}
+    >
+      <div className="field-assistant-mobile-tabs" role="tablist" aria-label={copy.title}>
+        <button
+          id="field-assistant-chat-tab"
+          type="button"
+          role="tab"
+          aria-selected={mobilePanel === "chat"}
+          aria-controls="field-assistant-chat-panel"
+          onClick={() => setMobilePanel("chat")}
+        >
+          <Bot aria-hidden="true" />
+          {copy.conversation}
+        </button>
+        <button
+          id="field-assistant-plan-tab"
+          type="button"
+          role="tab"
+          aria-selected={mobilePanel === "plan"}
+          aria-controls="field-assistant-plan-panel"
+          onClick={() => setMobilePanel("plan")}
+        >
+          <ClipboardList aria-hidden="true" />
+          {copy.plan}
+        </button>
+      </div>
+      <section
+        id="field-assistant-chat-panel"
+        className="field-assistant-chat"
+        role="tabpanel"
+        aria-labelledby="field-assistant-chat-tab field-assistant-title"
+      >
         <header className="field-assistant-toolbar">
           <span><Bot aria-hidden="true" />CHATTING</span>
           <button type="button" className="field-icon-command" title={copy.clear} aria-label={copy.clear} onClick={clear}>
@@ -394,33 +434,6 @@ export function FieldAssistantWorkspace({
                 <p>{message.content}</p>
               </article>
             ))}
-            {plan ? (
-              <section className="field-assistant-plan-card" aria-label={copy.plan} data-authority="false">
-                <header>
-                  <div><ClipboardList aria-hidden="true" /><strong>{copy.plan}</strong></div>
-                  <span>{copy.ready}</span>
-                </header>
-                <dl className="field-assistant-context">
-                  <div><dt>{copy.pack}</dt><dd>{selectedPackName}</dd></div>
-                  <div><dt>{copy.controller}</dt><dd>{selectedControllerName}</dd></div>
-                  <div><dt>{copy.authority}</dt><dd><ShieldCheck aria-hidden="true" />{copy.denied}</dd></div>
-                </dl>
-                <div className="field-assistant-plan-body">
-                  <section><span><Gauge />{copy.objective}</span><p>{plan.objective}</p></section>
-                  <div className="field-assistant-plan-metrics">
-                    <div><span>{copy.profile}</span><strong>{plan.testProfile}</strong></div>
-                    <div><span>{copy.trials}</span><strong>{plan.trialBudget}</strong></div>
-                  </div>
-                  <section><span><SlidersHorizontal />{copy.parameters}</span><div className="field-assistant-chips">{plan.parameters.map((parameter) => <code key={parameter}>{parameter}</code>)}</div></section>
-                  <section><span><ShieldCheck />{copy.constraints}</span><ul>{plan.constraints.map((constraint) => <li key={constraint}>{constraint}</li>)}</ul></section>
-                  {plan.questions.length ? <section><span>{copy.questions}</span><ul>{plan.questions.map((question) => <li key={question}>{question}</li>)}</ul></section> : null}
-                </div>
-                <footer>
-                  <button type="button" onClick={onOpenTuning}>{copy.openControls}</button>
-                  <button type="button" disabled title={copy.executeBlocked}>{copy.execute}</button>
-                </footer>
-              </section>
-            ) : null}
           </div>}
           {pending ? <article className="field-assistant-message assistant pending"><p>{copy.sending}</p></article> : null}
         </div>
@@ -486,6 +499,47 @@ export function FieldAssistantWorkspace({
           {error ? <p className="field-assistant-error" role="alert">{error}</p> : null}
         </form>
       </section>
+
+      <aside
+        id="field-assistant-plan-panel"
+        className="field-assistant-plan-shell"
+        role="tabpanel"
+        aria-labelledby="field-assistant-plan-tab"
+        data-authority="false"
+      >
+        {plan ? (
+          <section className="field-assistant-plan-card" data-authority="false">
+            <header>
+              <div><ClipboardList aria-hidden="true" /><strong>{copy.plan}</strong></div>
+              <span>{copy.ready}</span>
+            </header>
+            <dl className="field-assistant-context">
+              <div><dt>{copy.pack}</dt><dd>{selectedPackName}</dd></div>
+              <div><dt>{copy.controller}</dt><dd>{selectedControllerName}</dd></div>
+              <div><dt>{copy.authority}</dt><dd><ShieldCheck aria-hidden="true" />{copy.denied}</dd></div>
+            </dl>
+            <div className="field-assistant-plan-body">
+              <section><span><Gauge />{copy.objective}</span><p>{plan.objective}</p></section>
+              <div className="field-assistant-plan-metrics">
+                <div><span>{copy.profile}</span><strong>{plan.testProfile}</strong></div>
+                <div><span>{copy.trials}</span><strong>{plan.trialBudget}</strong></div>
+              </div>
+              <section><span><SlidersHorizontal />{copy.parameters}</span><div className="field-assistant-chips">{plan.parameters.map((parameter) => <code key={parameter}>{parameter}</code>)}</div></section>
+              <section><span><ShieldCheck />{copy.constraints}</span><ul>{plan.constraints.map((constraint) => <li key={constraint}>{constraint}</li>)}</ul></section>
+              {plan.questions.length ? <section><span>{copy.questions}</span><ul>{plan.questions.map((question) => <li key={question}>{question}</li>)}</ul></section> : null}
+            </div>
+            <footer>
+              <button type="button" onClick={onOpenTuning}>{copy.openControls}</button>
+              <button type="button" disabled title={copy.executeBlocked}>{copy.execute}</button>
+            </footer>
+          </section>
+        ) : mobilePanel === "plan" ? (
+          <div className="field-assistant-plan-placeholder">
+            <Bot aria-hidden="true" />
+            <span>{copy.idle}</span>
+          </div>
+        ) : null}
+      </aside>
     </div>
   );
 }
