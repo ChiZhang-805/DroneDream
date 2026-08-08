@@ -2224,15 +2224,18 @@ def _cognitive_review_inputs(
         }
     if model_proposal is not None:
         ref = "model_candidate"
-        normalized_parameters: dict[str, float] = {}
-        boundary_parameters: list[str] = []
+        model_normalized_parameters: dict[str, float] = {}
+        model_boundary_parameters: list[str] = []
         for domain in search_space.tunable:
             value = float(model_proposal.parameters.get(domain.name, domain.baseline))
             span = domain.maximum - domain.minimum
             unit = 0.0 if span <= 0 else (value - domain.minimum) / span
-            normalized_parameters[domain.name] = round(max(0.0, min(1.0, unit)), 6)
+            model_normalized_parameters[domain.name] = round(
+                max(0.0, min(1.0, unit)),
+                6,
+            )
             if span > 0 and (unit <= 0.02 or unit >= 0.98):
-                boundary_parameters.append(domain.name)
+                model_boundary_parameters.append(domain.name)
             if span > 0:
                 delta = (value - float(incumbent.get(domain.name, domain.baseline))) / span
                 if abs(delta) >= 0.02:
@@ -2240,7 +2243,7 @@ def _cognitive_review_inputs(
                         "model_direct_candidate",
                         [],
                     ).append(delta)
-        if boundary_parameters:
+        if model_boundary_parameters:
             hard_boundary_candidate = True
         orchestration = cast(
             Mapping[str, object],
@@ -2253,8 +2256,8 @@ def _cognitive_review_inputs(
             "changed_parameters": orchestration.get("changed_parameters", []),
             "expected_effect": orchestration.get("expected_effect"),
             "risk_assessment": orchestration.get("risk_assessment"),
-            "normalized_parameters": normalized_parameters,
-            "near_hard_bound_parameters": sorted(boundary_parameters),
+            "normalized_parameters": model_normalized_parameters,
+            "near_hard_bound_parameters": sorted(model_boundary_parameters),
             "hardware_authority": False,
         }
     tool_direction_conflict = False
