@@ -14,6 +14,7 @@ param(
     [ValidateRange(49152, 65535)][int]$CdpPort = 49321,
     [ValidatePattern("^$|^[0-9a-f]{64}$")][string]$ExpectedPlanSha256 = "",
     [switch]$RunAuthenticatedUiMatrix,
+    [switch]$AllowBrowserConsentAction,
     [switch]$Execute
 )
 
@@ -38,6 +39,7 @@ $uiScreenshotRoot = Join-Path $executionRoot "authenticated-ui-screenshots"
 $webViewProfileRoot = Join-Path $executionRoot "webview2-profile"
 $nodeVerifier = Join-Path $repoRoot "frontend\scripts\verify-installed-universal-oauth.mjs"
 $uiVerifier = Join-Path $repoRoot "frontend\scripts\verify-installed-universal-ui.mjs"
+$browserConsentVerifier = Join-Path $PSScriptRoot "confirm-universal-browser-consent.ps1"
 $installDirectory = Join-Path $env:LOCALAPPDATA "DroneDream-Universal"
 $applicationPath = Join-Path $installDirectory "drone-dream-desktop.exe"
 $uninstallerPath = Join-Path $installDirectory "uninstall.exe"
@@ -279,6 +281,7 @@ else {
 
 if (-not (Test-Path -LiteralPath $nodeVerifier -PathType Leaf)) { throw "Installed-app OAuth observer is missing." }
 if ($RunAuthenticatedUiMatrix -and -not (Test-Path -LiteralPath $uiVerifier -PathType Leaf)) { throw "Authenticated installed-app UI observer is missing." }
+if ($AllowBrowserConsentAction -and -not (Test-Path -LiteralPath $browserConsentVerifier -PathType Leaf)) { throw "Bounded browser consent helper is missing." }
 if (-not $outputRootPath.StartsWith(([IO.Path]::GetFullPath($validationRoot) + [IO.Path]::DirectorySeparatorChar), [StringComparison]::OrdinalIgnoreCase)) { throw "OutputRoot must be a new owned child of the artifact validation directory." }
 if ((Get-PortRecord 49210).listenerCount -ne 0 -or (Get-PortRecord $CdpPort).listenerCount -ne 0) { throw "OAuth callback or CDP port is already occupied." }
 if ((Test-Path -LiteralPath $installDirectory) -or (Test-Path -LiteralPath $uninstallKey) -or (Test-Path -LiteralPath $productKey)) { throw "Universal test identity is not isolated before planning." }
@@ -292,6 +295,7 @@ $plan = [ordered]@{
     kind = if ($runtimeDiagnosisOnly) { "dronedream-universal-runtime-diagnosis-plan" } else { "dronedream-universal-real-oauth-plan" }
     mode = $Mode
     runAuthenticatedUiMatrix = [bool]$RunAuthenticatedUiMatrix
+    allowBrowserConsentAction = [bool]$AllowBrowserConsentAction
     resourceClass = "RED"
     executionAuthorized = $false
     productSourceCommit = $ProductSourceCommit
@@ -345,7 +349,7 @@ $plan = [ordered]@{
         oauthTransaction = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
         callback = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
         authorizationCodeExchange = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
-        browserAction = 0
+        browserAction = if ($AllowBrowserConsentAction) { 1 } else { 0 }
         localLogout = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
         appClose = 1
         isolatedUninstaller = 1
@@ -383,7 +387,8 @@ $actualPlanSha = (Get-FileHash -LiteralPath $planPath -Algorithm SHA256).Hash.To
 if ($actualPlanSha -cne $ExpectedPlanSha256) { throw "Frozen validation plan SHA drifted." }
 $frozenPlan = Get-Content -LiteralPath $planPath -Raw | ConvertFrom-Json
 if ($frozenPlan.schemaVersion -ne 2 -or $frozenPlan.mode -cne $Mode -or
-    [bool]$frozenPlan.runAuthenticatedUiMatrix -ne [bool]$RunAuthenticatedUiMatrix) {
+    [bool]$frozenPlan.runAuthenticatedUiMatrix -ne [bool]$RunAuthenticatedUiMatrix -or
+    [bool]$frozenPlan.allowBrowserConsentAction -ne [bool]$AllowBrowserConsentAction) {
     throw "Frozen validation plan mode drifted."
 }
 if (Test-Path -LiteralPath $executionRoot) { throw "Refusing to overwrite an existing validation execution root." }
@@ -436,12 +441,22 @@ try {
     if ($RunAuthenticatedUiMatrix) {
         $observerArguments += "--post-auth-hold-signal=$postAuthSignalPath"
         $oauthObserverProcess = Start-Process -FilePath (Get-Command node).Source -ArgumentList $observerArguments -PassThru -NoNewWindow
+        $browserConsentAttempted = $false
         Wait-Until {
             $oauthObserverProcess.Refresh()
             if ($oauthObserverProcess.HasExited) { return $true }
             if (-not (Test-Path -LiteralPath $observerPath -PathType Leaf)) { return $false }
-            try { return ((Get-Content -LiteralPath $observerPath -Raw | ConvertFrom-Json).stage -ceq "authenticated-ui-ready") }
+            try { $checkpoint = Get-Content -LiteralPath $observerPath -Raw | ConvertFrom-Json }
             catch { return $false }
+            if ($AllowBrowserConsentAction -and -not $browserConsentAttempted -and $checkpoint.stage -ceq "oauth-attempted") {
+                $browserConsentAttempted = $true
+                $counts.browserAction++
+                Save-ExecutionCheckpoint "browser-consent-attempted"
+                $consentReceipt = Join-Path $executionRoot "browser-consent.json"
+                & $browserConsentVerifier -OutputReceipt $consentReceipt -TimeoutSeconds 90 -Execute
+                if ($LASTEXITCODE -ne 0) { throw "Bounded browser consent action failed." }
+            }
+            return ($checkpoint.stage -ceq "authenticated-ui-ready")
         } 900 "Installed-app OAuth observer did not expose an authenticated UI hold."
         $oauthObserverProcess.Refresh()
         if ($oauthObserverProcess.HasExited) {
@@ -565,7 +580,7 @@ try {
         $counts.oauthTransaction -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.callback -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.authorizationCodeExchange -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
-        $counts.browserAction -ne 0 -or
+        $counts.browserAction -ne $(if ($AllowBrowserConsentAction) { 1 } else { 0 }) -or
         $counts.localLogout -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.authenticatedUiCases -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or
         $counts.settingsOpen -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or
