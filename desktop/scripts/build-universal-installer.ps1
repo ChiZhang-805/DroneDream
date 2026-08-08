@@ -76,6 +76,7 @@ $coexistence = Get-Content -LiteralPath $coexistencePath -Raw -Encoding UTF8 | C
 $browserAuth = Get-Content -LiteralPath $browserAuthPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $sharedUi = $profile.sharedUiContract
+$vehicleStudio = $profile.universalExclusiveCapabilities.vehicleStudio
 if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $overlay.productName -cne "DroneDream-Universal" -or
     $profile.enginePackProfile -cne "unified-sim-lab" -or
@@ -100,7 +101,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $sharedUi.activeSettingsPanelVerticalOverflowAllowed -ne $false -or
     $sharedUi.presentationOnly -ne $true -or
     $sharedUi.grantsHardwareAuthority -ne $false -or
-    $sharedUi.fieldLightweightEntryIntegrationStatus -cne "downstream-required-not-claimed" -or
+    $sharedUi.fieldLightweightEntryIntegrationStatus -cne "integrated-in-universal" -or
     $profile.capabilityAuthority.frontendCanAuthorize -ne $false -or
     $profile.capabilityAuthority.hardwareActionDecision -cne "deny") {
     throw "Universal build identity or safety policy drifted."
@@ -142,6 +143,35 @@ foreach ($case in @($sharedUiEvidence.cases)) {
             throw "Universal shared UI visual evidence violates the no-overflow or authority contract."
         }
     }
+}
+$vehicleStudioTargets = @($vehicleStudio.shareTargets)
+if ($vehicleStudio.ownerEdition -cne "universal" -or
+    $vehicleStudio.productSourceCommit -cnotmatch "^[0-9a-f]{40}$" -or
+    $vehicleStudio.contract -cne "distribution/universal/vehicle-studio.v1.json" -or
+    $vehicleStudio.schema -cne "distribution/schemas/vehicle-pack-draft-envelope.schema.json" -or
+    $vehicleStudio.transport -cne "file-based-draft-envelope" -or
+    ($vehicleStudioTargets -join ",") -cne "sim,lab,field" -or
+    $vehicleStudio.automaticReceiverInstallation -ne $false -or
+    $vehicleStudio.modelHarnessStartsOnExchange -ne $false -or
+    $vehicleStudio.grantsSimulationExecution -ne $false -or
+    $vehicleStudio.grantsHardwareAuthority -ne $false) {
+    throw "Universal Vehicle Studio identity or safety policy drifted."
+}
+Invoke-GitText @("merge-base", "--is-ancestor", [string]$vehicleStudio.productSourceCommit, $sourceCommit) | Out-Null
+$vehicleStudioSourceRefs = @()
+foreach ($expectedRef in @($vehicleStudio.sourceFiles)) {
+    if ($expectedRef.path -cnotmatch "^(frontend/src/|distribution/(schemas|universal)/)" -or
+        $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$") {
+        throw "Universal Vehicle Studio source binding is malformed."
+    }
+    $actualRef = New-RepoFileRef ([string]$expectedRef.path)
+    if ($actualRef.sha256 -cne [string]$expectedRef.sha256) {
+        throw "Universal Vehicle Studio source binding drifted: $($expectedRef.path)"
+    }
+    $vehicleStudioSourceRefs += $actualRef
+}
+if ($vehicleStudioSourceRefs.Count -ne 10) {
+    throw "Universal Vehicle Studio contract must bind exactly ten source files."
 }
 $coexistenceMatches = @($coexistence.editions | Where-Object { $_.editionId -ceq "universal" })
 $browserAuthMatches = @($browserAuth.editions | Where-Object { $_.editionId -ceq "universal" })
@@ -219,6 +249,17 @@ if (-not $Build) {
             runtimePanelHeadedValidationStatus = [string]$sharedUi.visualEvidence.runtimePanelHeadedValidationStatus
             fieldLightweightEntryIntegrationStatus = [string]$sharedUi.fieldLightweightEntryIntegrationStatus
             presentationOnly = $true
+            grantsHardwareAuthority = $false
+        }
+        vehicleStudio = [ordered]@{
+            productSourceCommit = [string]$vehicleStudio.productSourceCommit
+            contract = New-RepoFileRef ([string]$vehicleStudio.contract)
+            schema = New-RepoFileRef ([string]$vehicleStudio.schema)
+            sourceFiles = $vehicleStudioSourceRefs
+            shareTargets = $vehicleStudioTargets
+            automaticReceiverInstallation = $false
+            modelHarnessStartsOnExchange = $false
+            grantsSimulationExecution = $false
             grantsHardwareAuthority = $false
         }
         appAuthClientId = $expectedAppAuthClientId
@@ -415,6 +456,17 @@ $buildReceipt = [ordered]@{
         runtimePanelHeadedValidationStatus = [string]$sharedUi.visualEvidence.runtimePanelHeadedValidationStatus
         fieldLightweightEntryIntegrationStatus = [string]$sharedUi.fieldLightweightEntryIntegrationStatus
         presentationOnly = $true
+        grantsHardwareAuthority = $false
+    }
+    vehicleStudio = [ordered]@{
+        productSourceCommit = [string]$vehicleStudio.productSourceCommit
+        contract = New-RepoFileRef ([string]$vehicleStudio.contract)
+        schema = New-RepoFileRef ([string]$vehicleStudio.schema)
+        sourceFiles = $vehicleStudioSourceRefs
+        shareTargets = $vehicleStudioTargets
+        automaticReceiverInstallation = $false
+        modelHarnessStartsOnExchange = $false
+        grantsSimulationExecution = $false
         grantsHardwareAuthority = $false
     }
     desktopContracts = [ordered]@{

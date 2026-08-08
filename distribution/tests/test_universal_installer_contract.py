@@ -102,7 +102,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert shared_ui["presentationOnly"] is True  # type: ignore[index]
     assert shared_ui["grantsHardwareAuthority"] is False  # type: ignore[index]
     assert shared_ui["fieldLightweightEntryIntegrationStatus"] == (  # type: ignore[index]
-        "downstream-required-not-claimed"
+        "integrated-in-universal"
     )
     visual = shared_ui["visualEvidence"]  # type: ignore[index]
     assert visual["caseCount"] == 6
@@ -213,6 +213,10 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'Invoke-GitText @("merge-base", "--is-ancestor"',
         'Universal shared UI source binding drifted:',
         'Universal shared UI visual evidence hash drifted.',
+        'Universal Vehicle Studio identity or safety policy drifted.',
+        'Universal Vehicle Studio source binding drifted:',
+        'Universal Vehicle Studio contract must bind exactly ten source files.',
+        'vehicleStudio = [ordered]@{',
         'dialogScrollHeight -gt $measurement.dialogClientHeight',
         'panelScrollHeight -gt $measurement.panelClientHeight',
         'runtimePanelHeadedValidationStatus',

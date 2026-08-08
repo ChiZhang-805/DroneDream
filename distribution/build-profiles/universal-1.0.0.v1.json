@@ -34,7 +34,7 @@
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "b87893ed613f8b929145f6d4f1fc92d8bac02ec2baf296382eaf54250e96928d"
+        "sha256": "8c0d4d69942a980f30eec22a0d4c90e800f086c653bea0915e86c7a8e2d748b9"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
@@ -80,7 +80,7 @@
     "activeSettingsPanelVerticalOverflowAllowed": false,
     "presentationOnly": true,
     "grantsHardwareAuthority": false,
-    "fieldLightweightEntryIntegrationStatus": "downstream-required-not-claimed"
+    "fieldLightweightEntryIntegrationStatus": "integrated-in-universal"
   },
   "workspaceModes": ["sim", "lab", "field"],
   "universalExclusiveCapabilities": {
@@ -103,8 +103,8 @@
         {"path": "frontend/src/features/vehicleStudio/pack.ts", "sha256": "82454a93ec0b8c4382971b6d51d033dca8521e569837aab9c39ba9252770684a"},
         {"path": "frontend/src/features/vehicleStudio/preview.ts", "sha256": "939d720edb9e03f20a344d98e1abf0ba884fe8e81b2c0a09edb8e2ecba5d9d35"},
         {"path": "frontend/src/features/vehicleStudio/storage.ts", "sha256": "65fbffacae77e3508b5aca477ccfb2227ac4847a4fa1dda54d1b524c05456559"},
-        {"path": "frontend/src/router.tsx", "sha256": "cca6a3dbb3463cdb36ab6bce96119f2a5abfe5600873818095dea4c4369d5b84"},
-        {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "61e9d37e35c5bf59b049a1094e9ed020006159ca7c80bdc992d2a70d72371b6c"},
+        {"path": "frontend/src/router.tsx", "sha256": "45784bd059824fdb321357ba42be9a4d0bb1c277d9b952c64f3ebdd26e2df4ea"},
+        {"path": "frontend/src/i18n/I18nProvider.tsx", "sha256": "c7af6f84defcaa390a033dce10073fb2afd27833c72edaf228765c20930f3f5c"},
         {"path": "distribution/schemas/vehicle-pack-draft-envelope.schema.json", "sha256": "6f4025c7a62eadbc4467d771c610697840f6cd04f276f6a259a5be8fac82f7d9"},
         {"path": "distribution/universal/vehicle-studio.v1.json", "sha256": "515f8f9a95a6388793d0a1e0a5f8dd82dbec7e5534c2717fd52c800eb33e6e6b"}
       ]
