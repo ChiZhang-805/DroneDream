@@ -4,6 +4,7 @@ ROOT = Path(__file__).resolve().parents[2]
 POWERSHELL = ROOT / "desktop/scripts/verify-universal-real-oauth.ps1"
 OBSERVER = ROOT / "frontend/scripts/verify-installed-universal-oauth.mjs"
 INSTALLED_UI = ROOT / "frontend/scripts/verify-installed-universal-ui.mjs"
+EXIT_CONFIRMATION = ROOT / "frontend/scripts/confirm-installed-universal-exit.mjs"
 RUNTIME_INSTALLER = ROOT / "desktop/src-tauri/src/runtime_installer.rs"
 
 
@@ -107,6 +108,22 @@ def test_authenticated_observer_settlement_uses_the_durable_terminal_checkpoint(
     )
     assert settlement < checkpoint < terminal < dispose
     assert '$oauthObserverProcess.ExitCode -ne 0' not in powershell
+
+
+def test_authenticated_app_close_handles_the_existing_exit_guard_once() -> None:
+    powershell = POWERSHELL.read_text(encoding="utf-8")
+    helper = EXIT_CONFIRMATION.read_text(encoding="utf-8")
+    assert "exitGuardConfirmationMax = 1" in powershell
+    assert "$counts.exitGuardConfirmation++" in powershell
+    assert 'Save-ExecutionCheckpoint "exit-guard-confirmation-attempted"' in powershell
+    assert '"--cdp-endpoint=http://127.0.0.1:$CdpPort"' in powershell
+    assert "App did not close after its bounded exit contract." in powershell
+    assert '.locator(".app-exit-dialog")' in helper
+    assert '.locator(".app-exit-confirm")' in helper
+    assert "receipt.confirmationClicks += 1" in helper
+    assert "await browser.close" not in helper
+    for forbidden in ("access_token", "refresh_token", "password", "cookie", "requestId"):
+        assert forbidden not in helper
 
 
 def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:

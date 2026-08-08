@@ -36,9 +36,11 @@ $observerPath = Join-Path $executionRoot "app-observation.json"
 $postAuthSignalPath = Join-Path $executionRoot "post-auth-ui.signal"
 $uiCaseRoot = Join-Path $executionRoot "authenticated-ui-cases"
 $uiScreenshotRoot = Join-Path $executionRoot "authenticated-ui-screenshots"
+$exitConfirmationReceiptPath = Join-Path $executionRoot "exit-confirmation.json"
 $webViewProfileRoot = Join-Path $executionRoot "webview2-profile"
 $nodeVerifier = Join-Path $repoRoot "frontend\scripts\verify-installed-universal-oauth.mjs"
 $uiVerifier = Join-Path $repoRoot "frontend\scripts\verify-installed-universal-ui.mjs"
+$exitVerifier = Join-Path $repoRoot "frontend\scripts\confirm-installed-universal-exit.mjs"
 $browserConsentVerifier = Join-Path $PSScriptRoot "confirm-universal-browser-consent.ps1"
 $installDirectory = Join-Path $env:LOCALAPPDATA "DroneDream-Universal"
 $applicationPath = Join-Path $installDirectory "drone-dream-desktop.exe"
@@ -289,6 +291,7 @@ else {
 
 if (-not (Test-Path -LiteralPath $nodeVerifier -PathType Leaf)) { throw "Installed-app OAuth observer is missing." }
 if ($RunAuthenticatedUiMatrix -and -not (Test-Path -LiteralPath $uiVerifier -PathType Leaf)) { throw "Authenticated installed-app UI observer is missing." }
+if (-not (Test-Path -LiteralPath $exitVerifier -PathType Leaf)) { throw "Installed-app exit confirmation verifier is missing." }
 if ($AllowBrowserConsentAction -and -not (Test-Path -LiteralPath $browserConsentVerifier -PathType Leaf)) { throw "Bounded browser consent helper is missing." }
 if (-not $outputRootPath.StartsWith(([IO.Path]::GetFullPath($validationRoot) + [IO.Path]::DirectorySeparatorChar), [StringComparison]::OrdinalIgnoreCase)) { throw "OutputRoot must be a new owned child of the artifact validation directory." }
 if ((Get-PortRecord 49210).listenerCount -ne 0 -or (Get-PortRecord $CdpPort).listenerCount -ne 0) { throw "OAuth callback or CDP port is already occupied." }
@@ -320,6 +323,7 @@ $plan = [ordered]@{
         postAuthUiSignal = if ($RunAuthenticatedUiMatrix) { $postAuthSignalPath } else { $null }
         authenticatedUiCases = if ($RunAuthenticatedUiMatrix) { $uiCaseRoot } else { $null }
         authenticatedUiScreenshots = if ($RunAuthenticatedUiMatrix) { $uiScreenshotRoot } else { $null }
+        exitConfirmationReceipt = $exitConfirmationReceiptPath
     }
     auth = [ordered]@{
         executionAllowed = (-not $runtimeDiagnosisOnly)
@@ -360,6 +364,7 @@ $plan = [ordered]@{
         browserAction = if ($AllowBrowserConsentAction) { 1 } else { 0 }
         localLogout = if ($runtimeDiagnosisOnly) { 0 } else { 1 }
         appClose = 1
+        exitGuardConfirmationMax = 1
         isolatedUninstaller = 1
         ownedCleanupMax = 1
         authenticatedUiCases = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }
@@ -402,7 +407,7 @@ if ($frozenPlan.schemaVersion -ne 2 -or $frozenPlan.mode -cne $Mode -or
 }
 if (Test-Path -LiteralPath $executionRoot) { throw "Refusing to overwrite an existing validation execution root." }
 
-$counts = [ordered]@{ installerFreshSilentNoShortcut = 0; appLaunch = 0; runtimeStart = 0; diagnosisSettlement = 0; credentialVaultRestoreProbe = 0; loginButton = 0; oauthTransaction = 0; callback = 0; authorizationCodeExchange = 0; browserAction = 0; localLogout = 0; authenticatedUiCases = 0; languageSelections = 0; settingsOpen = 0; settingsTabActivations = 0; screenshots = 0; appClose = 0; isolatedUninstaller = 0; ownedCleanup = 0 }
+$counts = [ordered]@{ installerFreshSilentNoShortcut = 0; appLaunch = 0; runtimeStart = 0; diagnosisSettlement = 0; credentialVaultRestoreProbe = 0; loginButton = 0; oauthTransaction = 0; callback = 0; authorizationCodeExchange = 0; browserAction = 0; localLogout = 0; authenticatedUiCases = 0; languageSelections = 0; settingsOpen = 0; settingsTabActivations = 0; screenshots = 0; appClose = 0; exitGuardConfirmation = 0; isolatedUninstaller = 0; ownedCleanup = 0 }
 $receipt = [ordered]@{ schemaVersion = 2; kind = if ($runtimeDiagnosisOnly) { "dronedream-universal-runtime-diagnosis-receipt" } else { "dronedream-universal-real-oauth-receipt" }; mode = $Mode; planSha256 = $ExpectedPlanSha256; productSourceCommit = $ProductSourceCommit; toolSourceCommit = $head; artifact = $artifact; startedAt = [DateTime]::UtcNow.ToString("O"); passed = $false; counts = $counts }
 $app = $null
 $oauthObserverProcess = $null
@@ -600,7 +605,26 @@ try {
     $counts.appClose++
     Save-ExecutionCheckpoint "app-close-attempted"
     $app.CloseMainWindow() | Out-Null
-    Wait-Until { $app.HasExited } 15 "App did not close."
+    $closeGraceDeadline = [DateTime]::UtcNow.AddSeconds(2)
+    while (-not $app.HasExited -and [DateTime]::UtcNow -lt $closeGraceDeadline) {
+        Start-Sleep -Milliseconds 100
+        $app.Refresh()
+    }
+    if (-not $app.HasExited) {
+        $counts.exitGuardConfirmation++
+        Save-ExecutionCheckpoint "exit-guard-confirmation-attempted"
+        & node $exitVerifier `
+            "--cdp-endpoint=http://127.0.0.1:$CdpPort" `
+            "--output=$exitConfirmationReceiptPath"
+        if ($LASTEXITCODE -ne 0) { throw "Installed-app exit confirmation failed." }
+        $exitConfirmationReceipt = Get-Content -LiteralPath $exitConfirmationReceiptPath -Raw | ConvertFrom-Json
+        if ($exitConfirmationReceipt.kind -cne "dronedream-installed-universal-exit-confirmation-receipt" -or
+            -not $exitConfirmationReceipt.passed -or
+            [int]$exitConfirmationReceipt.confirmationClicks -ne 1) {
+            throw "Installed-app exit confirmation produced an invalid receipt."
+        }
+    }
+    Wait-Until { $app.Refresh(); $app.HasExited } 90 "App did not close after its bounded exit contract."
     $app.Dispose(); $app = $null
     $counts.isolatedUninstaller++
     Save-ExecutionCheckpoint "uninstaller-attempted"
@@ -635,6 +659,7 @@ try {
         $counts.settingsTabActivations -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 4 } else { 0 }) -or
         $counts.screenshots -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 2 } else { 0 }) -or
         $counts.appClose -ne 1 -or
+        $counts.exitGuardConfirmation -gt 1 -or
         $counts.isolatedUninstaller -ne 1 -or
         $counts.ownedCleanup -gt 1) {
         throw "Universal OAuth execution counts drifted from the frozen bounded plan."
