@@ -270,6 +270,13 @@ async function verifySettings(page, testCase) {
       const panelBounds = panel.getBoundingClientRect();
       const notificationList = panel.querySelector(".settings-notification-list");
       const modelLoop = panel.querySelector(".settings-model-loop");
+      const closeButton = element.querySelector(".launcher-settings-close");
+      const emphasizedButton = panel.querySelector(
+        ".settings-general-footer .btn, .settings-runtime-check",
+      );
+      const runtimeChecks = panel.querySelector(".settings-runtime-checks");
+      const runtimeSummary = panel.querySelector(".settings-runtime-summary");
+      const runtimeCheckLabel = runtimeChecks?.querySelector("li strong");
       return {
         tab: panel.dataset.settingsPanel,
         dialogClientHeight: element.clientHeight,
@@ -290,6 +297,11 @@ async function verifySettings(page, testCase) {
         memoryFactCount: panel.querySelectorAll(".settings-memory-facts").length,
         modelLoopVisible: modelLoop instanceof HTMLElement
           && modelLoop.getBoundingClientRect().bottom <= panelBounds.bottom + 1,
+        closeButtonColor: closeButton ? getComputedStyle(closeButton).color : null,
+        emphasizedButtonColor: emphasizedButton ? getComputedStyle(emphasizedButton).color : null,
+        emphasizedButtonBackground: emphasizedButton
+          ? getComputedStyle(emphasizedButton).backgroundColor
+          : null,
         runtimeRowsWithoutBorders: Array.from(
           panel.querySelectorAll(".settings-runtime-checks li"),
         ).every((row) => getComputedStyle(row).borderBottomWidth === "0px"),
@@ -297,6 +309,13 @@ async function verifySettings(page, testCase) {
           const footer = panel.querySelector(".settings-runtime-last-check");
           return footer === null || getComputedStyle(footer).borderTopWidth === "0px";
         })(),
+        runtimeSummaryAfterChecks: Boolean(
+          runtimeChecks
+          && runtimeSummary
+          && (runtimeChecks.compareDocumentPosition(runtimeSummary) & Node.DOCUMENT_POSITION_FOLLOWING),
+        ),
+        runtimeSummaryFontSize: runtimeSummary ? getComputedStyle(runtimeSummary).fontSize : null,
+        runtimeCheckFontSize: runtimeCheckLabel ? getComputedStyle(runtimeCheckLabel).fontSize : null,
       };
     });
     const panelImage = await screenshot(page, testCase.id, `settings-${measurement.tab}`);
@@ -312,12 +331,17 @@ async function verifySettings(page, testCase) {
     assert(measurement.panelTop >= measurement.dialogTop - 1);
     assert(measurement.panelBottom <= measurement.dialogBottom + 1);
     assert.equal(measurement.grantsHardwareAuthority, "false");
+    if (testCase.appearance === "light") {
+      assert.equal(measurement.closeButtonColor, "rgb(23, 51, 75)");
+    }
     if (measurement.tab === "general") {
       assert.deepEqual(measurement.notificationList, {
         borderRadius: "0px",
         backgroundColor: "rgba(0, 0, 0, 0)",
         rowCount: 6,
       });
+      assert.equal(measurement.emphasizedButtonColor, "rgb(255, 255, 255)");
+      assert.equal(measurement.emphasizedButtonBackground, "rgb(15, 74, 145)");
     }
     if (measurement.tab === "memory") {
       assert.equal(measurement.memoryDefaultCount, 6);
@@ -327,6 +351,10 @@ async function verifySettings(page, testCase) {
     if (measurement.tab === "runtime") {
       assert.equal(measurement.runtimeRowsWithoutBorders, true);
       assert.equal(measurement.runtimeLastCheckWithoutBorder, true);
+      assert.equal(measurement.runtimeSummaryAfterChecks, true);
+      assert.equal(measurement.runtimeSummaryFontSize, measurement.runtimeCheckFontSize);
+      assert.equal(measurement.emphasizedButtonColor, "rgb(255, 255, 255)");
+      assert.equal(measurement.emphasizedButtonBackground, "rgb(15, 74, 145)");
     }
     panelMeasurements.push(measurement);
     panelImages.push(panelImage);
@@ -416,6 +444,14 @@ async function verifySettings(page, testCase) {
   await page.keyboard.press("Tab");
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
+  await dialog.locator(".settings-model-access-mode > button").nth(1).click();
+  const addProfile = dialog.locator(".settings-model-profile-row .btn").first();
+  assert.equal(await addProfile.evaluate((element) => getComputedStyle(element).color), "rgb(255, 255, 255)");
+  assert.equal(
+    await addProfile.evaluate((element) => getComputedStyle(element).backgroundColor),
+    "rgb(15, 74, 145)",
+  );
+  const apiKeyModelImage = await screenshot(page, testCase.id, "settings-model-api-key");
   await dialog.locator(".launcher-settings-close").click();
   await page.setViewportSize(testCase.viewport);
   return {
@@ -426,6 +462,7 @@ async function verifySettings(page, testCase) {
     settingsViewport,
     panelMeasurements,
     panelImages,
+    apiKeyModelImage,
     keyboardFocusOrder: "manage-subscription -> refresh-usage",
     assistantModelImage,
     image,

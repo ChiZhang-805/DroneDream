@@ -7,12 +7,15 @@ import type {
 import {
   canAutoStartRuntime,
   clearRuntimeAutoStartFailure,
+  DESKTOP_READINESS_CHECK_IDS,
+  DESKTOP_READINESS_SUCCESS_REVEAL_DELAY_MS,
   ensureOverallDesktopReadiness,
   getDesktopReadinessProgress,
   isOverallDesktopReady,
   isRuntimeConfirmedMissing,
   isRuntimeFullyReady,
   resetDesktopReadinessSession,
+  subscribeDesktopReadinessProgress,
 } from "../desktop/readiness";
 
 const componentIds = [
@@ -88,6 +91,10 @@ afterEach(() => {
 });
 
 describe("desktop readiness", () => {
+  it("uses an exact three-second success reveal delay outside tests", () => {
+    expect(DESKTOP_READINESS_SUCCESS_REVEAL_DELAY_MS).toBe(3_000);
+  });
+
   it("requires supported Windows, known memory, WSL, and a fully ready runtime", () => {
     expect(isOverallDesktopReady(prerequisites, readyRuntime)).toBe(true);
     expect(isOverallDesktopReady({ ...prerequisites, supported: false }, readyRuntime))
@@ -226,6 +233,10 @@ describe("desktop readiness", () => {
   });
 
   it("auto-starts one owned stopped Runtime and completes all seven checks", async () => {
+    const observedStatuses: Array<readonly string[]> = [];
+    const unsubscribe = subscribeDesktopReadinessProgress((progress) => {
+      observedStatuses.push(progress.checks.map((check) => `${check.id}:${check.status}`));
+    });
     const invoke = vi.fn(async (command: string) => {
       if (command === "probe_runtime_status") return stoppedRuntime;
       if (command === "probe_system_prerequisites") return prerequisites;
@@ -236,12 +247,22 @@ describe("desktop readiness", () => {
 
     const snapshot = await ensureOverallDesktopReadiness({ autoStart: true });
     const progress = getDesktopReadinessProgress();
+    unsubscribe();
 
     expect(snapshot.ready).toBe(true);
     expect(progress).toEqual(expect.objectContaining({ percent: 100, running: false }));
     expect(progress.checks.every((check) => check.status === "passed")).toBe(true);
     expect(invoke.mock.calls.filter(([command]) => command === "start_runtime"))
       .toHaveLength(1);
+    const firstPassedIndexes = DESKTOP_READINESS_CHECK_IDS.map((id) =>
+      observedStatuses.findIndex((statuses) => statuses.includes(`${id}:passed`))
+    );
+    expect(firstPassedIndexes.every((index) => index >= 0)).toBe(true);
+    expect(firstPassedIndexes).toEqual([...firstPassedIndexes].sort((left, right) => left - right));
+    for (const [checkIndex, id] of DESKTOP_READINESS_CHECK_IDS.entries()) {
+      expect(observedStatuses.slice(0, firstPassedIndexes[checkIndex]))
+        .toContainEqual(expect.arrayContaining([`${id}:checking`]));
+    }
   });
 
   it("fails closed at the first unhealthy component and leaves later checks pending", async () => {

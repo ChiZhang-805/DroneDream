@@ -381,6 +381,12 @@ describe("desktop launcher chrome", () => {
     expect(within(chineseDialog).getByRole("button", { name: "English" })).toBeInTheDocument();
     expect(within(chineseDialog).getByRole("button", { name: "简体中文" })).toBeInTheDocument();
     fireEvent.click(within(chineseDialog).getByRole("tab", { name: "运行环境" }));
+    const runtimeChecks = chineseDialog.querySelector(".settings-runtime-checks");
+    const runtimeSummary = chineseDialog.querySelector(".settings-runtime-summary");
+    expect(runtimeChecks).not.toBeNull();
+    expect(runtimeSummary).not.toBeNull();
+    expect(runtimeChecks?.compareDocumentPosition(runtimeSummary as Node))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(within(chineseDialog).getByRole("button", { name: "检查运行环境" }))
       .toBeInTheDocument();
     expect(within(chineseDialog).getByText("运行环境正常")).toBeInTheDocument();

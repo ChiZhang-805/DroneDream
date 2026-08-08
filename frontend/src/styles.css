@@ -330,7 +330,11 @@
   align-items: center;
   gap: 0.45rem;
   min-height: 24px;
-  font-size: 0.76rem;
+  font-size: 0.84rem;
+}
+
+.settings-runtime-summary strong {
+  font-size: inherit;
 }
 
 .settings-runtime-summary > svg {
@@ -13620,4 +13624,81 @@ body {
 :root[data-dd-appearance="light"] .launcher-settings-dialog .settings-memory-message,
 :root[data-dd-appearance="light"] .launcher-settings-dialog .settings-inline-message {
   color: var(--danger);
+}
+
+/* Keep final light-mode contrast rules after all legacy launcher declarations. */
+:root .launcher-settings-dialog .btn:not(:disabled) {
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+}
+
+:root .launcher-settings-dialog .btn:not(.btn-primary):not(:disabled) {
+  border-color: #2671ff;
+  background: #0f4a91;
+}
+
+:root .launcher-settings-dialog .btn:not(.btn-primary):hover:not(:disabled),
+:root .launcher-settings-dialog .btn:not(.btn-primary):focus-visible:not(:disabled) {
+  border-color: #00d9ff;
+  background: #092f61;
+}
+
+:root[data-dd-appearance="light"] .launcher-runtime-indicator {
+  color: #17334b;
+  border-color: rgba(38, 113, 255, 0.22);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+:root[data-dd-appearance="light"] .launcher-runtime-indicator.is-checked {
+  color: #10283b;
+  border-color: rgba(19, 139, 98, 0.34);
+  background: rgba(210, 247, 233, 0.9);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-button {
+  color: #17334b;
+  border-color: rgba(38, 113, 255, 0.24);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-button:hover,
+:root[data-dd-appearance="light"] .launcher-settings-button:focus-visible {
+  color: #061a2c;
+  border-color: rgba(38, 113, 255, 0.55);
+  background: #dceeff;
+}
+
+:root[data-dd-appearance="light"] .drone-launch-hud {
+  color: rgba(255, 255, 255, 0.82);
+  border-left-color: rgba(0, 217, 255, 0.72);
+  background: linear-gradient(90deg, rgba(7, 42, 86, 0.96), rgba(38, 113, 255, 0.78));
+  box-shadow: 0 8px 24px rgba(18, 72, 145, 0.18);
+  text-shadow: none;
+}
+
+:root[data-dd-appearance="light"] .drone-launch-hud strong {
+  color: #ffffff;
+}
+
+:root[data-dd-appearance="light"] .drone-launch-hud-right {
+  border-right-color: rgba(116, 76, 255, 0.72);
+  border-left: 0;
+  background: linear-gradient(270deg, rgba(45, 29, 112, 0.96), rgba(38, 113, 255, 0.78));
+}
+
+:root[data-dd-appearance="light"] .drone-launch-hud-right strong {
+  color: #ffffff;
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-close {
+  color: #17334b;
+  border-color: rgba(38, 113, 255, 0.22);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+:root[data-dd-appearance="light"] .launcher-settings-close:hover,
+:root[data-dd-appearance="light"] .launcher-settings-close:focus-visible {
+  color: #061a2c;
+  border-color: rgba(38, 113, 255, 0.56);
+  background: #dceeff;
 }

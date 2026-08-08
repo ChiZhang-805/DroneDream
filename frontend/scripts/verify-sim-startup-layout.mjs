@@ -129,6 +129,22 @@ async function installDesktopFixture(context, testCase) {
     window.localStorage.setItem("dronedream:appearance", appearance);
     const calls = [];
     window.__SIM_VISUAL_CALLS__ = calls;
+    const readinessTransitions = [];
+    window.__SIM_READINESS_TRANSITIONS__ = readinessTransitions;
+    let lastReadinessPercent = null;
+    const recordReadinessPercent = () => {
+      const value = document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow");
+      if (value === null || value === undefined || value === lastReadinessPercent) return;
+      lastReadinessPercent = value;
+      readinessTransitions.push({ percent: Number(value), atMs: performance.now() });
+    };
+    const readinessObserver = new MutationObserver(recordReadinessPercent);
+    readinessObserver.observe(document, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["aria-valuenow"],
+    });
     const prerequisites = {
       platform: "windows",
       supported: true,
@@ -251,7 +267,7 @@ async function verifyCase(browser, testCase) {
     try {
       await page.waitForFunction((expected) => {
         return document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") === expected;
-      }, expectedPercent, { timeout: 5000 });
+      }, expectedPercent, { timeout: 26_000 });
     } catch (error) {
       const diagnosticPath = path.join(outputRoot, `${testCase.id}-progress-diagnostic.png`);
       await page.screenshot({ path: diagnosticPath, fullPage: false });
@@ -300,9 +316,24 @@ async function verifyCase(browser, testCase) {
       appearance: document.documentElement.dataset.ddAppearance,
       grantsHardwareAuthority: document.documentElement.dataset.themeGrantsHardwareAuthority,
       calls: window.__SIM_VISUAL_CALLS__,
+      readinessTransitions: window.__SIM_READINESS_TRANSITIONS__,
       sceneStars: document.querySelector(".drone-launch-scene")?.getAttribute("data-scene-stars"),
       sceneParticles: document.querySelector(".drone-launch-scene")
         ?.getAttribute("data-scene-particles"),
+      lightContrast: (() => {
+        const runtimeIndicator = document.querySelector(".launcher-runtime-indicator");
+        const settingsButton = document.querySelector(".launcher-settings-button");
+        const leftHud = document.querySelector(".drone-launch-hud-left");
+        const leftHudStrong = leftHud?.querySelector("strong");
+        if (!runtimeIndicator || !settingsButton || !leftHud || !leftHudStrong) return null;
+        return {
+          runtimeIndicatorColor: getComputedStyle(runtimeIndicator).color,
+          settingsButtonColor: getComputedStyle(settingsButton).color,
+          hudColor: getComputedStyle(leftHud).color,
+          hudStrongColor: getComputedStyle(leftHudStrong).color,
+          hudBackground: getComputedStyle(leftHud).backgroundImage,
+        };
+      })(),
     }));
     assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
     assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
@@ -311,6 +342,17 @@ async function verifyCase(browser, testCase) {
     assert.equal(dimensions.grantsHardwareAuthority, "false");
     assert.equal(dimensions.sceneStars, testCase.appearance === "light" ? "false" : "true");
     assert.equal(dimensions.sceneParticles, testCase.appearance === "light" ? "false" : "true");
+    if (testCase.appearance === "light") {
+      assert(dimensions.lightContrast, `${testCase.id}: light contrast metrics are missing`);
+      assert.equal(
+        dimensions.lightContrast.runtimeIndicatorColor,
+        testCase.scenario === "auto-ready" ? "rgb(16, 40, 59)" : "rgb(23, 51, 75)",
+      );
+      assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(23, 51, 75)");
+      assert.equal(dimensions.lightContrast.hudColor, "rgba(255, 255, 255, 0.82)");
+      assert.equal(dimensions.lightContrast.hudStrongColor, "rgb(255, 255, 255)");
+      assert.match(dimensions.lightContrast.hudBackground, /rgba\(7, 42, 86, 0\.96\)/u);
+    }
     const imagePath = path.join(outputRoot, `${testCase.id}.png`);
     await page.screenshot({ path: imagePath, fullPage: false });
     const canvasScreenshot = await page.locator(".drone-launch-canvas").screenshot({ type: "png" });
@@ -357,8 +399,22 @@ async function verifyCase(browser, testCase) {
     }
     if (testCase.scenario === "auto-ready") {
       assert.equal(dimensions.calls.filter((command) => command === "start_runtime").length, 1);
+      assert.deepEqual(
+        dimensions.readinessTransitions.map((transition) => transition.percent),
+        [0, 14, 29, 43, 57, 71, 86, 100],
+        `${testCase.id}: readiness percentages skipped or repeated`,
+      );
+      for (let index = 1; index < dimensions.readinessTransitions.length; index += 1) {
+        const elapsed = dimensions.readinessTransitions[index].atMs
+          - dimensions.readinessTransitions[index - 1].atMs;
+        assert(
+          elapsed >= 2_900,
+          `${testCase.id}: readiness step ${index} was revealed after only ${elapsed.toFixed(1)}ms`,
+        );
+      }
     } else {
       assert.equal(dimensions.calls.includes("start_runtime"), false);
+      assert.deepEqual(dimensions.readinessTransitions.map((transition) => transition.percent), [0]);
     }
     assert.equal(pageErrors.length, 0);
 

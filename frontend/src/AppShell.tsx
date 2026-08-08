@@ -1380,13 +1380,6 @@ function SettingsDialog({
                 : t("settings.runtime.checkNow")}
             </button>
           </div>
-          <div className={`settings-runtime-summary settings-runtime-summary-${level}`} role="status">
-            <RuntimeSummaryIcon
-              aria-hidden="true"
-              className={access.isChecking ? "is-spinning" : undefined}
-            />
-            <strong>{statusLabel}</strong>
-          </div>
           <ol className="settings-runtime-checks" aria-live="polite">
             {access.progress.checks.map((check) => {
               const StatusIcon = check.status === "passed"
@@ -1407,6 +1400,13 @@ function SettingsDialog({
               );
             })}
           </ol>
+          <div className={`settings-runtime-summary settings-runtime-summary-${level}`} role="status">
+            <RuntimeSummaryIcon
+              aria-hidden="true"
+              className={access.isChecking ? "is-spinning" : undefined}
+            />
+            <strong>{statusLabel}</strong>
+          </div>
           {!access.isChecking && snapshot && level !== "healthy" && uniqueDetails.length > 0 ? (
             <p className="settings-runtime-diagnostic">{uniqueDetails[0]}</p>
           ) : null}

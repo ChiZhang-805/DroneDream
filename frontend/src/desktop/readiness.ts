@@ -55,6 +55,11 @@ export const DESKTOP_READINESS_CHECK_IDS: readonly DesktopReadinessCheckId[] = [
   "gazebo",
 ];
 
+export const DESKTOP_READINESS_SUCCESS_REVEAL_DELAY_MS = 3_000;
+const activeSuccessRevealDelayMs = import.meta.env.MODE === "test"
+  ? 0
+  : DESKTOP_READINESS_SUCCESS_REVEAL_DELAY_MS;
+
 export interface EnsureDesktopReadinessOptions {
   autoStart?: boolean;
   onStarting?: () => void;
@@ -118,6 +123,18 @@ function updateReadinessCheck(
   publishReadinessProgress(checks, running);
 }
 
+async function revealSuccessfulReadinessCheck(
+  id: DesktopReadinessCheckId,
+  detail: string | null = null,
+): Promise<void> {
+  if (activeSuccessRevealDelayMs > 0) {
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, activeSuccessRevealDelayMs);
+    });
+  }
+  updateReadinessCheck(id, "passed", detail);
+}
+
 function beginReadinessChecks(): void {
   const progress = emptyReadinessProgress();
   publishReadinessProgress(
@@ -129,24 +146,24 @@ function beginReadinessChecks(): void {
   );
 }
 
-function componentCheck(
+async function componentCheck(
   runtime: RuntimeStatusReport,
   id: DesktopReadinessCheckId,
   componentId: string,
-): boolean {
+): Promise<boolean> {
   updateReadinessCheck(id, "checking");
   const component = runtime.components.find((candidate) => candidate.id === componentId);
   const passed = component?.status === "ready";
-  updateReadinessCheck(
-    id,
-    passed ? "passed" : "failed",
-    component?.detail ?? component?.status ?? "missing",
-    passed,
-  );
+  const detail = component?.detail ?? component?.status ?? "missing";
+  if (passed) {
+    await revealSuccessfulReadinessCheck(id, detail);
+  } else {
+    updateReadinessCheck(id, "failed", detail, false);
+  }
   return passed;
 }
 
-function completeRuntimeComponentChecks(runtime: RuntimeStatusReport): boolean {
+async function completeRuntimeComponentChecks(runtime: RuntimeStatusReport): Promise<boolean> {
   const checks: ReadonlyArray<[DesktopReadinessCheckId, string]> = [
     ["ownership", "host-ownership"],
     ["manifest", "runtime-manifest"],
@@ -155,7 +172,7 @@ function completeRuntimeComponentChecks(runtime: RuntimeStatusReport): boolean {
     ["gazebo", "gazebo"],
   ];
   for (const [id, componentId] of checks) {
-    if (!componentCheck(runtime, id, componentId)) return false;
+    if (!await componentCheck(runtime, id, componentId)) return false;
   }
   publishReadinessProgress(desktopReadinessProgress.checks, false);
   return true;
@@ -244,7 +261,7 @@ export function clearRuntimeAutoStartFailure(): void {
 
 function areDesktopPrerequisitesReady(
   prerequisites: SystemPrerequisiteReport | null,
-): prerequisites is SystemPrerequisiteReport {
+): boolean {
   return Boolean(
     prerequisites &&
     prerequisites.platform.toLowerCase() === "windows" &&
@@ -325,21 +342,20 @@ export async function probeOverallDesktopReadiness(): Promise<DesktopReadinessSn
   const runtime = await probeRuntimeStatus();
   if (!runtime.installed) {
     updateReadinessCheck("runtime", "failed", "not-installed", false);
-  } else {
-    updateReadinessCheck("runtime", "passed", runtime.version);
+  } else if (runtime.running) {
+    await revealSuccessfulReadinessCheck("runtime", runtime.version);
     updateReadinessCheck("system", "checking");
   }
   const prerequisites = await probeSystemPrerequisitesWithStartupGrace();
   const prerequisitesReady = areDesktopPrerequisitesReady(prerequisites);
-  if (runtime.installed) {
-    updateReadinessCheck(
-      "system",
-      prerequisitesReady ? "passed" : "failed",
-      prerequisites.probeErrors[0] ?? null,
-      prerequisitesReady,
-    );
+  if (runtime.installed && runtime.running) {
+    if (prerequisitesReady) {
+      await revealSuccessfulReadinessCheck("system");
+    } else {
+      updateReadinessCheck("system", "failed", prerequisites.probeErrors[0] ?? null, false);
+    }
     if (prerequisitesReady && runtime.running) {
-      completeRuntimeComponentChecks(runtime);
+      await completeRuntimeComponentChecks(runtime);
     }
   }
   const ready = isOverallDesktopReady(prerequisites, runtime);
@@ -366,7 +382,7 @@ async function startRuntimeForSnapshot(
 
   if (!autoStart || !shouldAutoStart()) {
     if (snapshot.runtime.running && !snapshot.ready) {
-      completeRuntimeComponentChecks(snapshot.runtime);
+      await completeRuntimeComponentChecks(snapshot.runtime);
     }
     return snapshot;
   }
@@ -400,16 +416,30 @@ async function startRuntimeForSnapshot(
   updateReadinessCheck("runtime", "checking", snapshot.runtime.version);
   const failureKey = runtimeIdentityKey(snapshot.runtime);
   const operation: Promise<DesktopReadinessSnapshot> = startRuntime()
-    .then((runtime) => {
+    .then(async (runtime) => {
       const ready = isOverallDesktopReady(snapshot.prerequisites, runtime);
-      updateReadinessCheck(
-        "runtime",
-        runtime.installed && runtime.running ? "passed" : "failed",
-        runtime.version,
-        runtime.installed && runtime.running,
-      );
       if (runtime.installed && runtime.running) {
-        completeRuntimeComponentChecks(runtime);
+        await revealSuccessfulReadinessCheck("runtime", runtime.version);
+        updateReadinessCheck("system", "checking");
+        if (areDesktopPrerequisitesReady(snapshot.prerequisites)) {
+          await revealSuccessfulReadinessCheck("system");
+        } else {
+          updateReadinessCheck(
+            "system",
+            "failed",
+            snapshot.prerequisites.probeErrors[0] ?? null,
+            false,
+          );
+        }
+      } else {
+        updateReadinessCheck("runtime", "failed", runtime.version, false);
+      }
+      if (
+        runtime.installed &&
+        runtime.running &&
+        areDesktopPrerequisitesReady(snapshot.prerequisites)
+      ) {
+        await completeRuntimeComponentChecks(runtime);
       }
       runtimeLifetimeClaimed = ready;
       if (ready) {
