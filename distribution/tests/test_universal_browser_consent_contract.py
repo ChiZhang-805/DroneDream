@@ -42,6 +42,8 @@ class UniversalBrowserConsentContractTest(unittest.TestCase):
         source = HELPER.read_text(encoding="utf-8")
         self.assertIn('exactWindowTitle = "DroneDream - Google Chrome"', source)
         self.assertIn('exactWindowClass = "Chrome_WidgetWin_1"', source)
+        self.assertIn("'DroneDream - Google Chrome$'", source)
+        self.assertIn("Get-ExactChromeWindow -AllowRelatedDroneDreamTitle", source)
         self.assertIn("Get-AuthenticodeSignature", source)
         self.assertIn("Sort-Object sampledPixels -Descending", source)
         self.assertIn("$rowCount -ge 100", source)

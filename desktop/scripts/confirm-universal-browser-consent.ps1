@@ -62,15 +62,18 @@ public static class DroneDreamConsentNative {
 }
 "@
 
-function Get-ExactChromeWindow {
+function Get-ExactChromeWindow([switch]$AllowRelatedDroneDreamTitle) {
     $desktop = [System.Windows.Automation.AutomationElement]::RootElement
     $windows = $desktop.FindAll(
         [System.Windows.Automation.TreeScope]::Children,
         [System.Windows.Automation.Condition]::TrueCondition
     )
     $matches = @($windows | Where-Object {
-        $_.Current.Name -ceq $receipt.exactWindowTitle -and
-        $_.Current.ClassName -ceq $receipt.exactWindowClass
+        $titleMatches = if ($AllowRelatedDroneDreamTitle) {
+            $_.Current.Name -match 'DroneDream - Google Chrome$'
+        }
+        else { $_.Current.Name -ceq $receipt.exactWindowTitle }
+        $titleMatches -and $_.Current.ClassName -ceq $receipt.exactWindowClass
     })
     if ($matches.Count -ne 1) { return $null }
     $window = $matches[0]
@@ -174,7 +177,7 @@ function Find-ConsentTarget {
 
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 $target = $null
-$latestTabWindow = Get-ExactChromeWindow
+$latestTabWindow = Get-ExactChromeWindow -AllowRelatedDroneDreamTitle
 if ($null -eq $latestTabWindow) { throw "The exact signed Chrome window is unavailable." }
 $latestTabHandle = [IntPtr]$latestTabWindow.Current.NativeWindowHandle
 if (-not [DroneDreamConsentNative]::SetForegroundWindow($latestTabHandle)) { throw "Unable to focus the exact consent window." }
