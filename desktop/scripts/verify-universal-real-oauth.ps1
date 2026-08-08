@@ -7,12 +7,13 @@ param(
     [Parameter(Mandatory = $true)][ValidatePattern("^[0-9a-f]{64}$")][string]$ExpectedLifecycleReceiptSha256,
     [Parameter(Mandatory = $true)][string]$VisibleInstallerReceipt,
     [Parameter(Mandatory = $true)][ValidatePattern("^[0-9a-f]{64}$")][string]$ExpectedVisibleInstallerReceiptSha256,
-    [Parameter(Mandatory = $true)][string]$InstalledAppReceipt,
-    [Parameter(Mandatory = $true)][ValidatePattern("^[0-9a-f]{64}$")][string]$ExpectedInstalledAppReceiptSha256,
+    [string]$InstalledAppReceipt = "",
+    [ValidatePattern("^$|^[0-9a-f]{64}$")][string]$ExpectedInstalledAppReceiptSha256 = "",
     [Parameter(Mandatory = $true)][string]$OutputRoot,
     [ValidateSet("oauth", "runtime-diagnosis")][string]$Mode = "oauth",
     [ValidateRange(49152, 65535)][int]$CdpPort = 49321,
     [ValidatePattern("^$|^[0-9a-f]{64}$")][string]$ExpectedPlanSha256 = "",
+    [switch]$RunAuthenticatedUiMatrix,
     [switch]$Execute
 )
 
@@ -23,7 +24,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
 $lifecyclePath = (Resolve-Path -LiteralPath $LifecycleReceipt).Path
 $visibleInstallerPath = (Resolve-Path -LiteralPath $VisibleInstallerReceipt).Path
-$installedAppPath = (Resolve-Path -LiteralPath $InstalledAppReceipt).Path
+$installedAppPath = if ($InstalledAppReceipt) { (Resolve-Path -LiteralPath $InstalledAppReceipt).Path } else { $null }
 $outputRootPath = [IO.Path]::GetFullPath($OutputRoot)
 $validationRoot = Join-Path (Split-Path -Parent $installerPath) "validation"
 $runtimeDiagnosisOnly = $Mode -ceq "runtime-diagnosis"
@@ -31,8 +32,12 @@ $planPath = Join-Path $outputRootPath $(if ($runtimeDiagnosisOnly) { "universal-
 $executionRoot = Join-Path $outputRootPath $(if ($runtimeDiagnosisOnly) { "universal-runtime-diagnosis-red1" } else { "universal-real-oauth-red1" })
 $receiptPath = Join-Path $executionRoot "receipt.json"
 $observerPath = Join-Path $executionRoot "app-observation.json"
+$postAuthSignalPath = Join-Path $executionRoot "post-auth-ui.signal"
+$uiCaseRoot = Join-Path $executionRoot "authenticated-ui-cases"
+$uiScreenshotRoot = Join-Path $executionRoot "authenticated-ui-screenshots"
 $webViewProfileRoot = Join-Path $executionRoot "webview2-profile"
 $nodeVerifier = Join-Path $repoRoot "frontend\scripts\verify-installed-universal-oauth.mjs"
+$uiVerifier = Join-Path $repoRoot "frontend\scripts\verify-installed-universal-ui.mjs"
 $installDirectory = Join-Path $env:LOCALAPPDATA "DroneDream-Universal"
 $applicationPath = Join-Path $installDirectory "drone-dream-desktop.exe"
 $uninstallerPath = Join-Path $installDirectory "uninstall.exe"
@@ -40,6 +45,24 @@ $uninstallKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Drone
 $productKey = "HKCU:\Software\DroneDream\DroneDream-Universal"
 $auditRoot = Join-Path $env:LOCALAPPDATA "io.dronedream.desktop.universal\audit\browser-auth"
 $redirectUri = "http://127.0.0.1:49210/desktop-auth/universal/callback"
+$uiMatrix = @(
+    foreach ($viewport in @(
+        [ordered]@{ id = "minimum"; width = 390; height = 700 },
+        [ordered]@{ id = "desktop"; width = 1440; height = 900 }
+    )) {
+        foreach ($locale in @("en", "zh-CN")) {
+            foreach ($edition in @("universal", "sim", "lab", "field")) {
+                [ordered]@{
+                    id = "$($viewport.id)-$($locale.Replace('-',''))-$edition"
+                    width = $viewport.width
+                    height = $viewport.height
+                    locale = $locale
+                    presentationEdition = $edition
+                }
+            }
+        }
+    }
+)
 
 function Get-GitText([string[]]$Arguments) {
     $output = & git -C $repoRoot @Arguments 2>&1
@@ -81,6 +104,17 @@ function Write-AtomicJson([string]$Path, $Value) {
     finally { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
 }
 
+function Write-AtomicText([string]$Path, [string]$Value) {
+    $directory = Split-Path -Parent $Path
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+    $temporary = "$Path.tmp-$PID"
+    try {
+        [IO.File]::WriteAllText($temporary, "$Value`n", [Text.UTF8Encoding]::new($false))
+        Move-Item -LiteralPath $temporary -Destination $Path -Force
+    }
+    finally { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
+}
+
 function Import-ObserverCheckpoint([string]$Path, $Counts, $Receipt) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
     $observation = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
@@ -102,7 +136,7 @@ function Import-ObserverCheckpoint([string]$Path, $Counts, $Receipt) {
         }
         $Counts[$key] = [int]$value
     }
-    $allowedStages = @("initialized", "connected", "runtime-start-attempted", "runtime-ready", "runtime-already-ready", "runtime-start-failed", "runtime-diagnosis-completed", "oauth-attempted", "local-logout-attempted", "completed")
+    $allowedStages = @("initialized", "connected", "runtime-start-attempted", "runtime-ready", "runtime-already-ready", "runtime-start-failed", "runtime-diagnosis-completed", "oauth-attempted", "authenticated-ui-ready", "local-logout-attempted", "completed")
     if ($observation.stage -notin $allowedStages) { throw "Installed-app OAuth observer checkpoint has an unknown stage." }
     $allowedRuntimeFailures = @($null, "runtime_service_unhealthy", "runtime_host_connectivity", "runtime_health_unknown", "runtime_maintenance_deadline_exceeded", "runtime_operation_busy", "runtime_update_quiesce_active", "runtime_not_installed", "runtime_error_unclassified", "runtime_start_pending_timeout")
     if ($observation.runtimeFailureCode -notin $allowedRuntimeFailures) {
@@ -229,9 +263,22 @@ $artifact = Get-FileRecord $installerPath
 if ($artifact.bytes -ne $ExpectedBytes -or $artifact.sha256 -cne $ExpectedSha256) { throw "Frozen Universal artifact drifted." }
 $lifecycle = Assert-Receipt $lifecyclePath $ExpectedLifecycleReceiptSha256 { param($d) $d.productSourceCommit -ceq $ProductSourceCommit -and $d.installerLifecycleReady -eq $true } "Lifecycle"
 $visible = Assert-Receipt $visibleInstallerPath $ExpectedVisibleInstallerReceiptSha256 { param($d) $d.productSourceCommit -ceq $ProductSourceCommit -and $d.result.visibleInstallerUiReady -eq $true } "Visible installer"
-$headed = Assert-Receipt $installedAppPath $ExpectedInstalledAppReceiptSha256 { param($d) $d.productSourceCommit -ceq $ProductSourceCommit -and $d.passed -eq $true } "Installed app"
+$headed = $null
+if ($RunAuthenticatedUiMatrix) {
+    if ($runtimeDiagnosisOnly) { throw "Authenticated UI matrix is unavailable in Runtime diagnosis mode." }
+    if ($InstalledAppReceipt -or $ExpectedInstalledAppReceiptSha256) {
+        throw "Authenticated UI matrix replaces, rather than combines with, a pre-auth installed-app success gate."
+    }
+}
+else {
+    if (-not $installedAppPath -or -not $ExpectedInstalledAppReceiptSha256) {
+        throw "OAuth-only validation requires a prior successful installed-app receipt."
+    }
+    $headed = Assert-Receipt $installedAppPath $ExpectedInstalledAppReceiptSha256 { param($d) $d.productSourceCommit -ceq $ProductSourceCommit -and $d.passed -eq $true } "Installed app"
+}
 
 if (-not (Test-Path -LiteralPath $nodeVerifier -PathType Leaf)) { throw "Installed-app OAuth observer is missing." }
+if ($RunAuthenticatedUiMatrix -and -not (Test-Path -LiteralPath $uiVerifier -PathType Leaf)) { throw "Authenticated installed-app UI observer is missing." }
 if (-not $outputRootPath.StartsWith(([IO.Path]::GetFullPath($validationRoot) + [IO.Path]::DirectorySeparatorChar), [StringComparison]::OrdinalIgnoreCase)) { throw "OutputRoot must be a new owned child of the artifact validation directory." }
 if ((Get-PortRecord 49210).listenerCount -ne 0 -or (Get-PortRecord $CdpPort).listenerCount -ne 0) { throw "OAuth callback or CDP port is already occupied." }
 if ((Test-Path -LiteralPath $installDirectory) -or (Test-Path -LiteralPath $uninstallKey) -or (Test-Path -LiteralPath $productKey)) { throw "Universal test identity is not isolated before planning." }
@@ -244,6 +291,7 @@ $plan = [ordered]@{
     schemaVersion = 2
     kind = if ($runtimeDiagnosisOnly) { "dronedream-universal-runtime-diagnosis-plan" } else { "dronedream-universal-real-oauth-plan" }
     mode = $Mode
+    runAuthenticatedUiMatrix = [bool]$RunAuthenticatedUiMatrix
     resourceClass = "RED"
     executionAuthorized = $false
     productSourceCommit = $ProductSourceCommit
@@ -257,6 +305,9 @@ $plan = [ordered]@{
         plan = $planPath
         executionReceipt = $receiptPath
         appObservation = $observerPath
+        postAuthUiSignal = if ($RunAuthenticatedUiMatrix) { $postAuthSignalPath } else { $null }
+        authenticatedUiCases = if ($RunAuthenticatedUiMatrix) { $uiCaseRoot } else { $null }
+        authenticatedUiScreenshots = if ($RunAuthenticatedUiMatrix) { $uiScreenshotRoot } else { $null }
     }
     auth = [ordered]@{
         executionAllowed = (-not $runtimeDiagnosisOnly)
@@ -299,9 +350,14 @@ $plan = [ordered]@{
         appClose = 1
         isolatedUninstaller = 1
         ownedCleanupMax = 1
+        authenticatedUiCases = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }
+        settingsOpen = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }
+        settingsTabActivations = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 4 } else { 0 }
+        screenshots = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 2 } else { 0 }
     }
     portsAtPlan = @((Get-PortRecord 49210), (Get-PortRecord $CdpPort))
     resourcesAtPlan = Get-ResourceRecord
+    authenticatedUiMatrix = if ($RunAuthenticatedUiMatrix) { $uiMatrix } else { @() }
     protectedStateAtPlan = Get-ProtectedState
     failurePolicy = [ordered]@{
         retryCap = 0
@@ -326,12 +382,16 @@ if (-not $ExpectedPlanSha256) { throw "Execute requires ExpectedPlanSha256." }
 $actualPlanSha = (Get-FileHash -LiteralPath $planPath -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualPlanSha -cne $ExpectedPlanSha256) { throw "Frozen validation plan SHA drifted." }
 $frozenPlan = Get-Content -LiteralPath $planPath -Raw | ConvertFrom-Json
-if ($frozenPlan.schemaVersion -ne 2 -or $frozenPlan.mode -cne $Mode) { throw "Frozen validation plan mode drifted." }
+if ($frozenPlan.schemaVersion -ne 2 -or $frozenPlan.mode -cne $Mode -or
+    [bool]$frozenPlan.runAuthenticatedUiMatrix -ne [bool]$RunAuthenticatedUiMatrix) {
+    throw "Frozen validation plan mode drifted."
+}
 if (Test-Path -LiteralPath $executionRoot) { throw "Refusing to overwrite an existing validation execution root." }
 
-$counts = [ordered]@{ installerFreshSilentNoShortcut = 0; appLaunch = 0; runtimeStart = 0; diagnosisSettlement = 0; credentialVaultRestoreProbe = 0; loginButton = 0; oauthTransaction = 0; callback = 0; authorizationCodeExchange = 0; browserAction = 0; localLogout = 0; appClose = 0; isolatedUninstaller = 0; ownedCleanup = 0 }
+$counts = [ordered]@{ installerFreshSilentNoShortcut = 0; appLaunch = 0; runtimeStart = 0; diagnosisSettlement = 0; credentialVaultRestoreProbe = 0; loginButton = 0; oauthTransaction = 0; callback = 0; authorizationCodeExchange = 0; browserAction = 0; localLogout = 0; authenticatedUiCases = 0; settingsOpen = 0; settingsTabActivations = 0; screenshots = 0; appClose = 0; isolatedUninstaller = 0; ownedCleanup = 0 }
 $receipt = [ordered]@{ schemaVersion = 2; kind = if ($runtimeDiagnosisOnly) { "dronedream-universal-runtime-diagnosis-receipt" } else { "dronedream-universal-real-oauth-receipt" }; mode = $Mode; planSha256 = $ExpectedPlanSha256; productSourceCommit = $ProductSourceCommit; toolSourceCommit = $head; artifact = $artifact; startedAt = [DateTime]::UtcNow.ToString("O"); passed = $false; counts = $counts }
 $app = $null
+$oauthObserverProcess = $null
 $installed = $false
 $uninstalled = $false
 $cleaned = $false
@@ -365,8 +425,75 @@ try {
         [Environment]::SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", $oldProfile, "Process")
     }
     Wait-Until { (Get-PortRecord $CdpPort).listenerCount -eq 1 } 45 "Installed app did not open loopback CDP."
-    & node $nodeVerifier "--cdp-endpoint=http://127.0.0.1:$CdpPort" "--output=$observerPath" "--runtime-ready-timeout-ms=300000" "--oauth-timeout-ms=600000" "--mode=$Mode"
-    if ($LASTEXITCODE -ne 0) { throw "Installed-app $Mode observer failed before its bounded outcome." }
+    $observerArguments = @(
+        $nodeVerifier,
+        "--cdp-endpoint=http://127.0.0.1:$CdpPort",
+        "--output=$observerPath",
+        "--runtime-ready-timeout-ms=300000",
+        "--oauth-timeout-ms=600000",
+        "--mode=$Mode"
+    )
+    if ($RunAuthenticatedUiMatrix) {
+        $observerArguments += "--post-auth-hold-signal=$postAuthSignalPath"
+        $oauthObserverProcess = Start-Process -FilePath (Get-Command node).Source -ArgumentList $observerArguments -PassThru -NoNewWindow
+        Wait-Until {
+            $oauthObserverProcess.Refresh()
+            if ($oauthObserverProcess.HasExited) { return $true }
+            if (-not (Test-Path -LiteralPath $observerPath -PathType Leaf)) { return $false }
+            try { return ((Get-Content -LiteralPath $observerPath -Raw | ConvertFrom-Json).stage -ceq "authenticated-ui-ready") }
+            catch { return $false }
+        } 900 "Installed-app OAuth observer did not expose an authenticated UI hold."
+        $oauthObserverProcess.Refresh()
+        if ($oauthObserverProcess.HasExited) {
+            $null = Import-ObserverCheckpoint $observerPath $counts $receipt
+            throw "Installed-app OAuth observer exited before authenticated UI validation."
+        }
+
+        $receipt["authenticatedUiCases"] = @()
+        foreach ($case in $uiMatrix) {
+            $caseReceiptPath = Join-Path $uiCaseRoot "$($case.id).json"
+            & node $uiVerifier `
+                "--cdp-endpoint=http://127.0.0.1:$CdpPort" `
+                "--output=$caseReceiptPath" `
+                "--screenshot-root=$uiScreenshotRoot" `
+                "--case-id=$($case.id)" `
+                "--locale=$($case.locale)" `
+                "--edition=$($case.presentationEdition)" `
+                "--width=$($case.width)" `
+                "--height=$($case.height)" `
+                "--emulate-viewport=true"
+            if ($LASTEXITCODE -ne 0) { throw "Authenticated installed-app UI case $($case.id) failed." }
+            $caseReceipt = Get-Content -LiteralPath $caseReceiptPath -Raw | ConvertFrom-Json
+            if ($caseReceipt.kind -cne "dronedream-installed-universal-ui-case-receipt" -or
+                $caseReceipt.caseId -cne $case.id -or
+                $caseReceipt.locale -cne $case.locale -or
+                $caseReceipt.presentationEdition -cne $case.presentationEdition -or
+                -not $caseReceipt.presentationOnly -or $caseReceipt.grantsHardwareAuthority -or
+                $caseReceipt.settingsOpenCount -ne 1 -or $caseReceipt.settingsTabActivationCount -ne 4 -or
+                @($caseReceipt.screenshots.PSObject.Properties).Count -ne 2) {
+                throw "Authenticated installed-app UI case $($case.id) produced an invalid receipt."
+            }
+            $counts.authenticatedUiCases++
+            $counts.settingsOpen++
+            $counts.settingsTabActivations += 4
+            $counts.screenshots += 2
+            $receipt.authenticatedUiCases += [ordered]@{
+                caseId = $case.id
+                receipt = Get-FileRecord $caseReceiptPath
+                sceneScreenshotSha256 = $caseReceipt.screenshots.scene.sha256
+                settingsScreenshotSha256 = $caseReceipt.screenshots.settings.sha256
+            }
+            Save-ExecutionCheckpoint "authenticated-ui-case-$($case.id)-completed"
+        }
+        Write-AtomicText $postAuthSignalPath "complete"
+        Wait-Until { $oauthObserverProcess.Refresh(); $oauthObserverProcess.HasExited } 60 "Installed-app OAuth observer did not settle after authenticated UI validation."
+        if ($oauthObserverProcess.ExitCode -ne 0) { throw "Installed-app OAuth observer failed after authenticated UI validation." }
+        $oauthObserverProcess.Dispose(); $oauthObserverProcess = $null
+    }
+    else {
+        & node @observerArguments
+        if ($LASTEXITCODE -ne 0) { throw "Installed-app $Mode observer failed before its bounded outcome." }
+    }
     $observation = Import-ObserverCheckpoint $observerPath $counts $receipt
     if ($runtimeDiagnosisOnly) {
         if (-not $observation.passed -or -not $observation.diagnosisComplete) { throw "Runtime observer did not produce one bounded diagnosis." }
@@ -440,6 +567,10 @@ try {
         $counts.authorizationCodeExchange -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.browserAction -ne 0 -or
         $counts.localLogout -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
+        $counts.authenticatedUiCases -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or
+        $counts.settingsOpen -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or
+        $counts.settingsTabActivations -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 4 } else { 0 }) -or
+        $counts.screenshots -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 2 } else { 0 }) -or
         $counts.appClose -ne 1 -or
         $counts.isolatedUninstaller -ne 1 -or
         $counts.ownedCleanup -gt 1) {
@@ -452,6 +583,24 @@ catch {
     throw
 }
 finally {
+    if ($null -ne $oauthObserverProcess) {
+        try {
+            $oauthObserverProcess.Refresh()
+            if (-not $oauthObserverProcess.HasExited) {
+                if (-not (Test-Path -LiteralPath $postAuthSignalPath -PathType Leaf)) {
+                    Write-AtomicText $postAuthSignalPath "abort"
+                }
+                try { Wait-Until { $oauthObserverProcess.Refresh(); $oauthObserverProcess.HasExited } 45 "OAuth observer did not settle after an authenticated UI abort." }
+                catch {
+                    $receipt["oauthObserverRecoveryError"] = $_.Exception.Message
+                    Stop-Process -Id $oauthObserverProcess.Id -Force -ErrorAction SilentlyContinue
+                    Wait-Until { $oauthObserverProcess.Refresh(); $oauthObserverProcess.HasExited } 10 "OAuth observer process remained after bounded recovery."
+                }
+            }
+        }
+        catch { $receipt["oauthObserverRecoveryError"] = $_.Exception.Message }
+        finally { $oauthObserverProcess.Dispose(); $oauthObserverProcess = $null }
+    }
     try { $null = Import-ObserverCheckpoint $observerPath $counts $receipt }
     catch { $receipt["observerCheckpointError"] = $_.Exception.Message }
     if ($null -ne $app) {

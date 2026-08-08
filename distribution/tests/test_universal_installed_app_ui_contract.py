@@ -111,6 +111,9 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
         '".app-mobile-menu-panel.is-open:visible"',
         'assert.equal(await menuButton.getAttribute("aria-expanded"), "true")',
         'await closeButton.press("Enter")',
+        'const emulateViewport = args.get("--emulate-viewport") === "true"',
+        'await page.setViewportSize({ width: expectedWidth, height: expectedHeight })',
+        'cdp-emulated-installed-webview',
     ):
         assert fragment in script
     assert "CDP must remain loopback-only" in script

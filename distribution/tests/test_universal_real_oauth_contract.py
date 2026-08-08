@@ -18,8 +18,10 @@ def test_oauth_tool_is_source_bound_and_plan_only_by_default() -> None:
 
 def test_oauth_plan_binds_all_prior_success_gates_and_exact_caps() -> None:
     text = POWERSHELL.read_text(encoding="utf-8")
-    for gate in ("LifecycleReceipt", "VisibleInstallerReceipt", "InstalledAppReceipt"):
+    for gate in ("LifecycleReceipt", "VisibleInstallerReceipt"):
         assert gate in text
+    assert "OAuth-only validation requires a prior successful installed-app receipt." in text
+    assert "Authenticated UI matrix replaces, rather than combines with" in text
     for exact in (
         "installerFreshSilentNoShortcut = 1",
         "appLaunch = 1",
@@ -42,6 +44,36 @@ def test_oauth_plan_binds_all_prior_success_gates_and_exact_caps() -> None:
     ):
         assert f"{exact} = if ($runtimeDiagnosisOnly) {{ 0 }} else {{ 1 }}" in text
     assert "Universal OAuth execution counts drifted from the frozen bounded plan" in text
+
+
+def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() -> None:
+    powershell = POWERSHELL.read_text(encoding="utf-8")
+    observer = OBSERVER.read_text(encoding="utf-8")
+
+    assert "[switch]$RunAuthenticatedUiMatrix" in powershell
+    assert 'Authenticated UI matrix is unavailable in Runtime diagnosis mode.' in powershell
+    for exact_count in (
+        "authenticatedUiCases = if ($RunAuthenticatedUiMatrix)",
+        "settingsOpen = if ($RunAuthenticatedUiMatrix)",
+        "settingsTabActivations = if ($RunAuthenticatedUiMatrix)",
+        "screenshots = if ($RunAuthenticatedUiMatrix)",
+    ):
+        assert exact_count in powershell
+    assert '@("en", "zh-CN")' in powershell
+    assert '@("universal", "sim", "lab", "field")' in powershell
+    assert '"--emulate-viewport=true"' in powershell
+    assert 'Start-Process -FilePath (Get-Command node).Source' in powershell
+    assert 'stage -ceq "authenticated-ui-ready"' in powershell
+    assert 'Write-AtomicText $postAuthSignalPath "complete"' in powershell
+    assert 'Write-AtomicText $postAuthSignalPath "abort"' in powershell
+    assert 'process.exit' not in powershell
+
+    ready = observer.index('await persist("authenticated-ui-ready")')
+    signal = observer.index("await waitForPostAuthUiSignal()", ready)
+    logout = observer.index('await persist("local-logout-attempted")', signal)
+    assert ready < signal < logout
+    assert 'decision === "complete" || decision === "abort"' in observer
+    assert 'Post-auth UI observation failed closed' in observer
 
 
 def test_runtime_prerequisite_is_existing_start_only_and_physics_stays_off() -> None:
@@ -102,8 +134,11 @@ def test_attempts_are_durable_before_side_effects_and_runtime_failure_is_bounded
         assert code in observer
 
     assert "function Import-ObserverCheckpoint" in powershell
-    finally_block = powershell.index("finally {", powershell.index("& node $nodeVerifier"))
-    assert powershell.index("Import-ObserverCheckpoint $observerPath", finally_block) > finally_block
+    finally_block = powershell.index("finally {", powershell.index("$observerArguments = @("))
+    assert (
+        powershell.index("Import-ObserverCheckpoint $observerPath", finally_block)
+        > finally_block
+    )
     assert 'rawRuntimeErrorRecorded = $false' in powershell
 
     app_close_increment = powershell.index("$counts.appClose++")
@@ -126,7 +161,10 @@ def test_runtime_diagnosis_mode_is_frozen_and_cannot_consume_oauth() -> None:
 
     assert '[ValidateSet("oauth", "runtime-diagnosis")]' in powershell
     assert 'mode = $Mode' in powershell
-    assert 'if ($frozenPlan.schemaVersion -ne 2 -or $frozenPlan.mode -cne $Mode)' in powershell
+    assert (
+        "[bool]$frozenPlan.runAuthenticatedUiMatrix -ne "
+        "[bool]$RunAuthenticatedUiMatrix"
+    ) in powershell
     assert 'executionAllowed = (-not $runtimeDiagnosisOnly)' in powershell
     assert 'loginButton = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell
     assert 'oauthTransaction = if ($runtimeDiagnosisOnly) { 0 } else { 1 }' in powershell

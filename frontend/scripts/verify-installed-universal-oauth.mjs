@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
@@ -21,12 +21,22 @@ const outputPath = path.resolve(required("--output"));
 const runtimeReadyTimeoutMs = Number(required("--runtime-ready-timeout-ms"));
 const oauthTimeoutMs = Number(required("--oauth-timeout-ms"));
 const mode = required("--mode");
+const postAuthHoldSignal = args.get("--post-auth-hold-signal")
+  ? path.resolve(String(args.get("--post-auth-hold-signal")))
+  : null;
 
 assert(/^http:\/\/127\.0\.0\.1:\d+$/u.test(cdpEndpoint), "CDP must remain loopback-only");
 assert(Number.isInteger(runtimeReadyTimeoutMs) && runtimeReadyTimeoutMs <= 300_000);
 assert(Number.isInteger(oauthTimeoutMs) && oauthTimeoutMs <= 600_000);
 assert(["oauth", "runtime-diagnosis"].includes(mode), "Unknown installed-app observer mode");
 const runtimeDiagnosisOnly = mode === "runtime-diagnosis";
+if (postAuthHoldSignal) {
+  assert(!runtimeDiagnosisOnly, "Runtime diagnosis cannot pause for authenticated UI observation");
+  assert(
+    path.dirname(postAuthHoldSignal) === path.dirname(outputPath),
+    "Post-auth hold signal must remain beside the observer receipt",
+  );
+}
 
 async function atomicJson(filePath, value) {
   await mkdir(path.dirname(filePath), { recursive: true });
@@ -86,6 +96,24 @@ function isRuntimeStart(text) {
 
 function isSignIn(text) {
   return text === "sign in and enter tuning workspace" || text === "登录并进入调优平台";
+}
+
+async function waitForPostAuthUiSignal() {
+  const deadline = Date.now() + 15 * 60_000;
+  while (Date.now() < deadline) {
+    try {
+      const decision = (await readFile(postAuthHoldSignal, "utf8")).trim();
+      assert(
+        decision === "complete" || decision === "abort",
+        "Post-auth UI signal has an unsupported value",
+      );
+      return decision;
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+  throw new Error("Post-auth UI observation did not settle within its bounded hold");
 }
 
 const browser = await chromium.connectOverCDP(cdpEndpoint);
@@ -193,6 +221,13 @@ try {
     evidence.accountSurfaceObserved = true;
     evidence.postCallbackPath = await page.evaluate(() => window.location.pathname);
 
+    let postAuthUiDecision = "complete";
+    if (postAuthHoldSignal) {
+      await persist("authenticated-ui-ready");
+      postAuthUiDecision = await waitForPostAuthUiSignal();
+      evidence.postAuthUiMatrixObserved = postAuthUiDecision === "complete";
+    }
+
     const accountButton = page.locator(".app-account-button:visible").first();
     await accountButton.focus();
     await accountButton.press("Enter");
@@ -206,6 +241,8 @@ try {
     await signOut.press("Enter");
     await signOut.waitFor({ state: "hidden", timeout: 30_000 });
     evidence.localLogoutObserved = true;
+
+    assert.equal(postAuthUiDecision, "complete", "Post-auth UI observation failed closed");
 
     assert.deepEqual(counts, {
       runtimeStart: counts.runtimeStart,

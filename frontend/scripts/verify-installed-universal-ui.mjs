@@ -27,6 +27,7 @@ const locale = required("--locale");
 const edition = required("--edition");
 const expectedWidth = Number(required("--width"));
 const expectedHeight = Number(required("--height"));
+const emulateViewport = args.get("--emulate-viewport") === "true";
 
 const canonicalColors = Object.freeze({
   universal: ["#FF5574", "#6A4CFF", "#E657D1"],
@@ -113,6 +114,10 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   });
   await page.waitForURL((url) => url.hash === "#/desktop/setup");
   await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
+
+  if (emulateViewport) {
+    await page.setViewportSize({ width: expectedWidth, height: expectedHeight });
+  }
 
   const initialViewport = await page.evaluate(() => ({
     width: window.innerWidth,
@@ -273,6 +278,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     presentationOnly: true,
     grantsHardwareAuthority: false,
     actualClientViewport: initialViewport,
+    viewportControl: emulateViewport ? "cdp-emulated-installed-webview" : "native-window-client-size",
     startupTheme,
     theme,
     scene,
