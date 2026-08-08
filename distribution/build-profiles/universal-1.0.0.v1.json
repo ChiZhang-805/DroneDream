@@ -50,7 +50,7 @@
       },
       {
         "path": "frontend/src/styles.css",
-        "sha256": "eb14976bc3866467bd32258c95d4d9425c8f4bc424540775c3b62679af9fd026"
+        "sha256": "2750225f005e411fc05a32f210913a81b86ed3ad0047f4aa636efdca9eb2d96e"
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
@@ -81,6 +81,16 @@
     "presentationOnly": true,
     "grantsHardwareAuthority": false,
     "fieldLightweightEntryIntegrationStatus": "integrated-in-universal"
+  },
+  "integratedWorkspaceUiContract": {
+    "contractId": "dronedream-universal-integrated-workspaces/v2",
+    "manifest": "distribution/universal/integrated-workspaces.v2.json",
+    "sha256": "d5951dc0a8e7edf13b57980f926618fa8eed2ec9c3d73b8d091dba939761112d",
+    "sourceFileCount": 10,
+    "workspaceModes": ["sim", "lab", "field"],
+    "createsCrossEditionHarnessOrchestrator": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
   },
   "workspaceModes": ["sim", "lab", "field"],
   "universalExclusiveCapabilities": {

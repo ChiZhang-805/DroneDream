@@ -12,6 +12,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/universal-1.0.0.v1.json"
+INTEGRATED_WORKSPACES = ROOT / "distribution/universal/integrated-workspaces.v2.json"
 OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
 FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
@@ -120,6 +121,46 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         path = ROOT / source_file["path"]
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == source_file["sha256"]
+    integrated_ui = profile["integratedWorkspaceUiContract"]
+    assert integrated_ui == {  # type: ignore[comparison-overlap]
+        "contractId": "dronedream-universal-integrated-workspaces/v2",
+        "manifest": "distribution/universal/integrated-workspaces.v2.json",
+        "sha256": hashlib.sha256(INTEGRATED_WORKSPACES.read_bytes()).hexdigest(),
+        "sourceFileCount": 10,
+        "workspaceModes": ["sim", "lab", "field"],
+        "createsCrossEditionHarnessOrchestrator": False,
+        "presentationOnly": True,
+        "grantsHardwareAuthority": False,
+    }
+    integrated_manifest = _json(INTEGRATED_WORKSPACES)
+    assert integrated_manifest["workspaceSwitchMeaning"] == (
+        "presentation-and-module-selection-only"
+    )
+    assert integrated_manifest["createsCrossEditionHarnessOrchestrator"] is False
+    assert integrated_manifest["validatedVehiclePackCount"] == 0
+    assert integrated_manifest["hardwareActionDecision"] == "deny"
+    assert integrated_manifest["donors"]["lab"]["productSource"] == (  # type: ignore[index]
+        "b3c5f90948f206472e3e12504d8205cb563ac9dc"
+    )
+    assert integrated_manifest["donors"]["lab"]["evidenceHeadIsProductSource"] is False  # type: ignore[index]
+    assert integrated_manifest["donors"]["field"]["productSource"] == (  # type: ignore[index]
+        "7d3d0c34d0e385d88312db34601667a384ecc9c5"
+    )
+    integrated_sources = integrated_manifest["sourceFiles"]  # type: ignore[index]
+    assert len(integrated_sources) == 10
+    for source_file in integrated_sources:
+        path = ROOT / source_file["path"]
+        assert path.is_file()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == source_file["sha256"]
+        if source_file["integration"] == "byte-exact":
+            actual_blob = subprocess.run(
+                ["git", "hash-object", "--", source_file["path"]],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            assert actual_blob == source_file["donorBlob"]
     vehicle_studio = profile["universalExclusiveCapabilities"]["vehicleStudio"]
     assert vehicle_studio["ownerEdition"] == "universal"
     assert vehicle_studio["shareTargets"] == ["sim", "lab", "field"]
@@ -216,6 +257,12 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit',
         'Universal shared UI source binding drifted:',
         'Universal shared UI visual evidence hash drifted.',
+        'dronedream-universal-integrated-workspaces/v2',
+        'Universal integrated workspace manifest hash drifted.',
+        'Universal integrated workspace source binding drifted:',
+        'Universal integrated workspace byte-exact donor drifted:',
+        'createsCrossEditionHarnessOrchestrator = $false',
+        'integratedWorkspaceUi = [ordered]@{',
         'Universal Vehicle Studio identity or safety policy drifted.',
         'Universal Vehicle Studio source binding drifted:',
         'Universal Vehicle Studio contract must bind exactly ten source files.',

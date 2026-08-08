@@ -76,6 +76,7 @@ $coexistence = Get-Content -LiteralPath $coexistencePath -Raw -Encoding UTF8 | C
 $browserAuth = Get-Content -LiteralPath $browserAuthPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $sharedUi = $profile.sharedUiContract
+$integratedUi = $profile.integratedWorkspaceUiContract
 $vehicleStudio = $profile.universalExclusiveCapabilities.vehicleStudio
 if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $overlay.productName -cne "DroneDream-Universal" -or
@@ -102,6 +103,14 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $sharedUi.presentationOnly -ne $true -or
     $sharedUi.grantsHardwareAuthority -ne $false -or
     $sharedUi.fieldLightweightEntryIntegrationStatus -cne "integrated-in-universal" -or
+    $integratedUi.contractId -cne "dronedream-universal-integrated-workspaces/v2" -or
+    $integratedUi.manifest -cne "distribution/universal/integrated-workspaces.v2.json" -or
+    $integratedUi.sha256 -cnotmatch "^[0-9a-f]{64}$" -or
+    $integratedUi.sourceFileCount -ne 10 -or
+    (@($integratedUi.workspaceModes) -join ",") -cne "sim,lab,field" -or
+    $integratedUi.createsCrossEditionHarnessOrchestrator -ne $false -or
+    $integratedUi.presentationOnly -ne $true -or
+    $integratedUi.grantsHardwareAuthority -ne $false -or
     $profile.capabilityAuthority.frontendCanAuthorize -ne $false -or
     $profile.capabilityAuthority.hardwareActionDecision -cne "deny") {
     throw "Universal build identity or safety policy drifted."
@@ -144,6 +153,49 @@ foreach ($case in @($sharedUiEvidence.cases)) {
             throw "Universal shared UI visual evidence violates the no-overflow or authority contract."
         }
     }
+}
+$integratedUiRef = New-RepoFileRef ([string]$integratedUi.manifest)
+if ($integratedUiRef.sha256 -cne [string]$integratedUi.sha256) {
+    throw "Universal integrated workspace manifest hash drifted."
+}
+$integratedUiManifest = Get-Content -LiteralPath (Join-Path $repoRoot $integratedUiRef.path) `
+    -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($integratedUiManifest.kind -cne "dronedream-universal-integrated-workspaces" -or
+    $integratedUiManifest.contractId -cne [string]$integratedUi.contractId -or
+    (@($integratedUiManifest.workspaceModes) -join ",") -cne "sim,lab,field" -or
+    $integratedUiManifest.workspaceSwitchMeaning -cne "presentation-and-module-selection-only" -or
+    $integratedUiManifest.createsCrossEditionHarnessOrchestrator -ne $false -or
+    $integratedUiManifest.presentationOnly -ne $true -or
+    $integratedUiManifest.grantsHardwareAuthority -ne $false -or
+    $integratedUiManifest.validatedVehiclePackCount -ne 0 -or
+    $integratedUiManifest.hardwareActionDecision -cne "deny" -or
+    $integratedUiManifest.universalExclusiveCapability.id -cne "vehicle-studio" -or
+    $integratedUiManifest.universalExclusiveCapability.route -cne "/vehicle-studio" -or
+    $integratedUiManifest.universalExclusiveCapability.grantsHardwareAuthority -ne $false) {
+    throw "Universal integrated workspace identity or authority policy drifted."
+}
+$integratedUiSourceRefs = @()
+foreach ($expectedRef in @($integratedUiManifest.sourceFiles)) {
+    if ($expectedRef.path -cnotmatch "^frontend/(scripts|src)/" -or
+        $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$" -or
+        $expectedRef.donorBlob -cnotmatch "^[0-9a-f]{40}$" -or
+        $expectedRef.integration -cnotmatch "^(byte-exact|semantic-[a-z0-9-]+)$") {
+        throw "Universal integrated workspace source binding is malformed."
+    }
+    $actualRef = New-RepoFileRef ([string]$expectedRef.path)
+    if ($actualRef.sha256 -cne [string]$expectedRef.sha256) {
+        throw "Universal integrated workspace source binding drifted: $($expectedRef.path)"
+    }
+    if ($expectedRef.integration -ceq "byte-exact") {
+        $actualBlob = Invoke-GitText @("hash-object", "--", [string]$expectedRef.path)
+        if ($actualBlob -cne [string]$expectedRef.donorBlob) {
+            throw "Universal integrated workspace byte-exact donor drifted: $($expectedRef.path)"
+        }
+    }
+    $integratedUiSourceRefs += $actualRef
+}
+if ($integratedUiSourceRefs.Count -ne [int]$integratedUi.sourceFileCount) {
+    throw "Universal integrated workspace contract source count drifted."
 }
 $vehicleStudioTargets = @($vehicleStudio.shareTargets)
 if ($vehicleStudio.ownerEdition -cne "universal" -or
@@ -250,6 +302,18 @@ if (-not $Build) {
             activeSettingsPanelVerticalOverflowAllowed = $false
             runtimePanelHeadedValidationStatus = [string]$sharedUi.visualEvidence.runtimePanelHeadedValidationStatus
             fieldLightweightEntryIntegrationStatus = [string]$sharedUi.fieldLightweightEntryIntegrationStatus
+            presentationOnly = $true
+            grantsHardwareAuthority = $false
+        }
+        integratedWorkspaceUi = [ordered]@{
+            contractId = [string]$integratedUi.contractId
+            manifest = $integratedUiRef
+            labProductSource = [string]$integratedUiManifest.donors.lab.productSource
+            labEvidenceHead = [string]$integratedUiManifest.donors.lab.evidenceHead
+            fieldProductSource = [string]$integratedUiManifest.donors.field.productSource
+            sourceFiles = $integratedUiSourceRefs
+            workspaceModes = @($integratedUiManifest.workspaceModes)
+            createsCrossEditionHarnessOrchestrator = $false
             presentationOnly = $true
             grantsHardwareAuthority = $false
         }
@@ -458,6 +522,18 @@ $buildReceipt = [ordered]@{
         activeSettingsPanelVerticalOverflowAllowed = $false
         runtimePanelHeadedValidationStatus = [string]$sharedUi.visualEvidence.runtimePanelHeadedValidationStatus
         fieldLightweightEntryIntegrationStatus = [string]$sharedUi.fieldLightweightEntryIntegrationStatus
+        presentationOnly = $true
+        grantsHardwareAuthority = $false
+    }
+    integratedWorkspaceUi = [ordered]@{
+        contractId = [string]$integratedUi.contractId
+        manifest = $integratedUiRef
+        labProductSource = [string]$integratedUiManifest.donors.lab.productSource
+        labEvidenceHead = [string]$integratedUiManifest.donors.lab.evidenceHead
+        fieldProductSource = [string]$integratedUiManifest.donors.field.productSource
+        sourceFiles = $integratedUiSourceRefs
+        workspaceModes = @($integratedUiManifest.workspaceModes)
+        createsCrossEditionHarnessOrchestrator = $false
         presentationOnly = $true
         grantsHardwareAuthority = $false
     }
