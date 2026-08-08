@@ -150,7 +150,7 @@ class FieldAdapterCatalogTest(unittest.TestCase):
 
     def test_field_bundle_carries_adapter_notice_and_ui_stays_non_authoritative(self) -> None:
         config = json.loads(
-            (ROOT / "desktop/src-tauri/tauri.field.conf.json").read_text(encoding="utf-8")
+            (ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json").read_text(encoding="utf-8")
         )
         resources = config["bundle"]["resources"]
         self.assertIn(

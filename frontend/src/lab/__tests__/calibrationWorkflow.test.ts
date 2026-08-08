@@ -16,7 +16,7 @@ describe("Lab calibration workflow", () => {
 
     expect(input.jobId).toBe("lab_job_fixture_001");
     expect(input.editionManifestSha256).toBe(
-      "303856056bb9a6dcd36227d704eef5ff29a577da20343a6b564baf6f61f5ee1a",
+      "96953004774b7044129c491d3ff251213d4c7bf09d188d3d3c00724343aebf3c",
     );
     expect(input.grantsHardwareAuthority).toBe(false);
     expect(analysis.aggregateGapPercent).toBeGreaterThan(15);

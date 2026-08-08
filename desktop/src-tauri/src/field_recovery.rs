@@ -14,6 +14,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::distribution_plan::native_hardware_validated_pack_count;
 use crate::field_adapters::validate_parameter_snapshot_adapter;
+use crate::hardware_domain;
 
 const SOURCE_COMMIT: &str = env!("DRONEDREAM_SOURCE_COMMIT");
 
@@ -258,7 +259,7 @@ fn snapshot_root(app: &AppHandle) -> Result<PathBuf, String> {
     }
     let snapshots = local.join("parameter-snapshots");
     ensure_plain_directory(&snapshots)?;
-    let field = snapshots.join("field");
+    let field = snapshots.join(hardware_domain::edition_id());
     ensure_plain_directory(&field)?;
     Ok(field)
 }
@@ -271,7 +272,7 @@ fn snapshot_with_hash(
     let mut snapshot = FieldParameterSnapshot {
         schema_version: 1,
         kind: "dronedream-field-parameter-snapshot".to_string(),
-        edition_id: "field".to_string(),
+        edition_id: hardware_domain::edition_id().to_string(),
         execution_domain: "real-hardware".to_string(),
         evidence_source: "operator-imported-read-only".to_string(),
         source_commit: SOURCE_COMMIT.to_string(),
@@ -357,7 +358,7 @@ fn load_snapshot(root: &Path, snapshot_sha256: &str) -> Result<FieldParameterSna
         || snapshot.parameter_set_sha256 != canonical_sha256(&snapshot.parameters)?
         || snapshot.schema_version != 1
         || snapshot.kind != "dronedream-field-parameter-snapshot"
-        || snapshot.edition_id != "field"
+        || snapshot.edition_id != hardware_domain::edition_id()
         || snapshot.execution_domain != "real-hardware"
         || snapshot.evidence_source != "operator-imported-read-only"
         || snapshot.source_commit.len() != 40
@@ -391,7 +392,7 @@ fn snapshot_summary(snapshot: FieldParameterSnapshot) -> FieldParameterSnapshotS
     FieldParameterSnapshotSummary {
         schema_version: 1,
         kind: "dronedream-field-parameter-snapshot-summary",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         source_commit: snapshot.source_commit,
         device_observation_id: snapshot.device_observation_id,
         vehicle_pack_id: snapshot.vehicle_pack_id,
@@ -500,7 +501,7 @@ fn compare_at(
     let mut receipt = FieldParameterDiffReceipt {
         schema_version: 1,
         kind: "dronedream-field-parameter-diff",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         snapshot_sha256: snapshot.snapshot_sha256,
         current_parameter_set_sha256: canonical_sha256(&request.current_parameters)?,
         changed_count: changes.len(),
@@ -531,7 +532,7 @@ fn rollback_plan_at(
     let mut plan = FieldRollbackPlan {
         schema_version: 1,
         kind: "dronedream-field-rollback-plan",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         snapshot_sha256: diff.snapshot_sha256,
         plan_sha256: String::new(),
         changes: diff.changes,
@@ -557,6 +558,7 @@ pub(crate) fn create_field_parameter_snapshot(
     app: AppHandle,
     request: FieldParameterSnapshotRequest,
 ) -> Result<FieldParameterSnapshot, String> {
+    hardware_domain::require_available()?;
     create_snapshot_at(&snapshot_root(&app)?, request)
 }
 
@@ -564,6 +566,7 @@ pub(crate) fn create_field_parameter_snapshot(
 pub(crate) fn list_field_parameter_snapshots(
     app: AppHandle,
 ) -> Result<Vec<FieldParameterSnapshotSummary>, String> {
+    hardware_domain::require_available()?;
     list_snapshots_at(&snapshot_root(&app)?)
 }
 
@@ -572,6 +575,7 @@ pub(crate) fn load_field_parameter_snapshot(
     app: AppHandle,
     request: FieldParameterSnapshotLoadRequest,
 ) -> Result<FieldParameterSnapshot, String> {
+    hardware_domain::require_available()?;
     load_snapshot(&snapshot_root(&app)?, &request.snapshot_sha256)
 }
 
@@ -580,6 +584,7 @@ pub(crate) fn compare_field_parameter_snapshot(
     app: AppHandle,
     request: FieldParameterDiffRequest,
 ) -> Result<FieldParameterDiffReceipt, String> {
+    hardware_domain::require_available()?;
     compare_at(&snapshot_root(&app)?, &request)
 }
 
@@ -588,6 +593,7 @@ pub(crate) fn prepare_field_parameter_rollback(
     app: AppHandle,
     request: FieldParameterDiffRequest,
 ) -> Result<FieldRollbackPlan, String> {
+    hardware_domain::require_available()?;
     rollback_plan_at(&snapshot_root(&app)?, &request)
 }
 

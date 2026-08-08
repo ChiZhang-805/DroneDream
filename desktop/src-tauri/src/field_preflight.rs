@@ -14,6 +14,7 @@ use crate::distribution_plan::{
     native_hardware_validated_pack_count, native_safety_catalog_snapshot,
 };
 use crate::field_recovery::resolve_field_snapshot_binding;
+use crate::hardware_domain;
 
 const SOURCE_COMMIT: &str = env!("DRONEDREAM_SOURCE_COMMIT");
 
@@ -125,7 +126,9 @@ fn prepare_at(
         return Err("Field preflight evidence identity is invalid".to_string());
     }
 
-    let catalog = native_safety_catalog_snapshot("field", &request.vehicle_pack_id)?;
+    hardware_domain::require_available()?;
+    let catalog =
+        native_safety_catalog_snapshot(hardware_domain::edition_id(), &request.vehicle_pack_id)?;
     let validated_pack_count = native_hardware_validated_pack_count()?;
     let pack_validated = catalog
         .vehicle_pack
@@ -251,7 +254,7 @@ fn prepare_at(
     let mut plan = FieldPreflightPlan {
         schema_version: 1,
         kind: "dronedream-field-preflight-plan",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         execution_domain: "real-hardware",
         source_commit: SOURCE_COMMIT,
         request_sha256,

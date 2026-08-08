@@ -1,40 +1,23 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "distribution/editions/lab/sim-field-integration.v1.json"
-AUDIT_PATH = (
-    ROOT
-    / "distribution/editions/lab/field-45e897fa-evidence-bridge-audit.v1.json"
+SYNC_PATH = ROOT / "distribution/editions/lab/field-2f8fa285-capability-sync.v1.json"
+HISTORICAL_AUDIT_PATH = (
+    ROOT / "distribution/editions/lab/field-45e897fa-evidence-bridge-audit.v1.json"
 )
-FIELD_PRODUCT_SOURCE = "45e897faca6b48773f0a49d2f4d74ec67ae967fe"
-FIELD_PRODUCT_TREE = "bd513282437004fde4464a33b498c5e98a01e5f3"
+SIM_PRODUCT_SOURCE = "ef70567fe4c34f261fc9f16defb6e98e95f337dc"
+SIM_PRODUCT_TREE = "c102508870dcc98e534e1f4e51696bfed77ff18b"
+SIM_MODEL_HARNESS_SOURCE = "38731d530fdf3bfed6dde43167856f9c6b4a5d67"
+FIELD_PRODUCT_SOURCE = "2f8fa28564dab7b1ff264c853705535373cb9068"
+FIELD_PRODUCT_TREE = "afb7b4db584bf71e03d2f0b707b8b992e96bc7e7"
+FIELD_AUTH_SOURCE = "1129b561a187edf9ddb3214f3e8c993be31f281b"
 COMMON_CORE_COMMIT = "e374d3f8d96b1265fcdb06864208b676566e94d9"
-FIELD_SURFACES = [
-    {
-        "path": "distribution/editions/field.v1.json",
-        "bytes": 2936,
-        "sha256": "cbd2c3a10843601469f91ef7d097c72459becaa6e60c387e39b721e76680bd08",
-    },
-    {
-        "path": "distribution/editions/field/field-tuning-contract.v1.json",
-        "bytes": 1988,
-        "sha256": "141a29cc9425c3857ddcf477e41d168184095adc9c7031deb16ef474b40f8815",
-    },
-    {
-        "path": "frontend/src/field/tuning.ts",
-        "bytes": 4988,
-        "sha256": "c95e1d80b76f5f1c9a92965394839610c3043df901c8764802159dc6e3abfcb7",
-    },
-    {
-        "path": "desktop/src-tauri/src/field_harness.rs",
-        "bytes": 29049,
-        "sha256": "5154c102c68a7c20e8c1d0d7744e90973f903d4fa8fd347a1371fb4da570264e",
-    },
-]
 
 
 class LabSimFieldIntegrationError(ValueError):
@@ -47,10 +30,11 @@ def _mapping(value: Any, label: str) -> dict[str, Any]:
     return value
 
 
-def _require_denied(mapping: dict[str, Any], keys: tuple[str, ...], label: str) -> None:
-    for key in keys:
-        if mapping.get(key) != "deny":
-            raise LabSimFieldIntegrationError(f"{label} must fail closed: {key}")
+def _load(path: Path) -> dict[str, Any]:
+    try:
+        return _mapping(json.loads(path.read_text(encoding="utf-8")), str(path))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise LabSimFieldIntegrationError(f"cannot read {path}: {exc}") from exc
 
 
 def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
@@ -58,23 +42,34 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         contract.get("schemaVersion") != 1
         or contract.get("kind") != "dronedream-lab-sim-field-integration"
         or contract.get("editionId") != "lab"
-        or contract.get("integrationState")
-        != "field-donor-accepted-sim-donor-pending"
+        or contract.get("integrationState") != "sim-and-field-capabilities-integrated"
     ):
         raise LabSimFieldIntegrationError("Lab integration identity drifted")
 
-    donor = _mapping(contract.get("fieldDonor"), "fieldDonor")
-    if donor != {
-        "branch": "codex/software-field",
-        "productSource": FIELD_PRODUCT_SOURCE,
-        "tree": FIELD_PRODUCT_TREE,
-        "commonCoreCommit": COMMON_CORE_COMMIT,
-        "originExactAtHandoff": True,
-        "integrationMode": "semantic-receipt-adapter",
-        "fieldSourceCopiedIntoLab": False,
-        "acceptedSurfaces": FIELD_SURFACES,
-    }:
-        raise LabSimFieldIntegrationError("Field donor identity or audited surfaces drifted")
+    sim = _mapping(contract.get("simDonor"), "simDonor")
+    if (
+        sim.get("productSource") != SIM_PRODUCT_SOURCE
+        or sim.get("tree") != SIM_PRODUCT_TREE
+        or sim.get("modelHarnessFeatureSource") != SIM_MODEL_HARNESS_SOURCE
+        or sim.get("integrationMode") != "path-limited-semantic-forward-sync"
+        or sim.get("standaloneSimShellCopiedIntoLab") is not False
+        or sim.get("sharedCoreForkCreated") is not False
+    ):
+        raise LabSimFieldIntegrationError("SIM donor binding drifted")
+
+    field = _mapping(contract.get("fieldDonor"), "fieldDonor")
+    if (
+        field.get("productSource") != FIELD_PRODUCT_SOURCE
+        or field.get("tree") != FIELD_PRODUCT_TREE
+        or field.get("authWireContractSource") != FIELD_AUTH_SOURCE
+        or field.get("commonCoreCommit") != COMMON_CORE_COMMIT
+        or field.get("integrationMode") != "path-limited-semantic-forward-sync"
+        or field.get("fieldStandaloneShellCopiedIntoLab") is not False
+        or field.get("fieldNoSimulationInstallerPolicyAppliedToLab") is not False
+        or field.get("sharedCoreForkCreated") is not False
+        or field.get("syncReceipt") != SYNC_PATH.relative_to(ROOT).as_posix()
+    ):
+        raise LabSimFieldIntegrationError("FIELD donor binding drifted")
 
     principles = _mapping(contract.get("principles"), "principles")
     for key in (
@@ -84,7 +79,7 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
         "labOwnsBidirectionalCalibration",
     ):
         if principles.get(key) is not True:
-            raise LabSimFieldIntegrationError(f"integration requirement is missing: {key}")
+            raise LabSimFieldIntegrationError(f"integration requirement missing: {key}")
     for key in (
         "copyOrForkCommonCore",
         "manualCodeCopyAllowed",
@@ -97,145 +92,96 @@ def validate_contract(contract: dict[str, Any]) -> dict[str, Any]:
     sim_input = _mapping(contract.get("simInput"), "simInput")
     field_input = _mapping(contract.get("fieldInput"), "fieldInput")
     if (
-        sim_input.get("donorState") != "awaiting-exact-product-source"
+        sim_input.get("donorState") != "accepted-exact-product-source"
+        or sim_input.get("productSource") != SIM_PRODUCT_SOURCE
         or sim_input.get("hardwareAuthority") is not False
-    ):
-        raise LabSimFieldIntegrationError("SIM donor or authority gate drifted")
-    if (
-        field_input.get("envelopeKind")
-        != "dronedream-field-harness-job-receipt"
-        or field_input.get("executionDomain")
-        != "real-device-recorded-evidence"
-        or field_input.get("executionMode")
-        != "offline-evidence-replay-no-device-io"
         or field_input.get("receiptHardwareAuthority") is not False
         or field_input.get("liveHardwareAuthority")
         != "external-native-backend-runtime-quorum-only"
     ):
-        raise LabSimFieldIntegrationError("FIELD receipt boundary drifted")
-    for binding in (
-        "sourceCommit",
-        "enginePackId",
-        "requestSha256",
-        "observationSha256",
-        "snapshotSha256",
-        "vehiclePackId",
-        "controllerId",
-        "firmwareVersion",
-        "selectedCandidateSha256",
-        "holdoutTrialId",
-        "receiptSha256",
-    ):
-        if binding not in field_input.get("requiredBindings", ()):
-            raise LabSimFieldIntegrationError(f"FIELD binding is missing: {binding}")
+        raise LabSimFieldIntegrationError("evidence authority boundary drifted")
 
     metrics = _mapping(contract.get("metricCompatibility"), "metricCompatibility")
     if (
-        metrics.get("fieldMetrics")
-        != [
-            "trackingError",
-            "overshootPercent",
-            "controlEffort",
-            "constraintViolations",
-            "emergencyInterventions",
-        ]
-        or metrics.get("labCalibrationMetrics")
-        != ["trackingRmseM", "maxErrorM", "energyWh", "overshootCount"]
-        or metrics.get("directMappingAllowed") is not False
+        metrics.get("directMappingAllowed") is not False
         or metrics.get("normalizationReceiptRequired") is not True
         or metrics.get("missingNormalizationDecision") != "deny"
     ):
-        raise LabSimFieldIntegrationError("cross-domain metric normalization drifted")
+        raise LabSimFieldIntegrationError("metric normalization drifted")
 
     join = _mapping(contract.get("join"), "join")
     if join.get("sameLabJobRequired") is not True:
-        raise LabSimFieldIntegrationError("SIM and FIELD evidence must join in one Lab job")
-    _require_denied(
-        join,
-        (
-            "mismatchDecision",
-            "unboundEvidenceDecision",
-            "replayDecision",
-            "crossJobEvidenceDecision",
-        ),
-        "join",
-    )
-
-    outputs = contract.get("labOwnedOutputs")
-    if not isinstance(outputs, list) or len(outputs) != 6 or len(set(outputs)) != len(outputs):
-        raise LabSimFieldIntegrationError("Lab-owned output contract drifted")
-    if not all(isinstance(item, str) and item.startswith("dronedream-lab-") for item in outputs):
-        raise LabSimFieldIntegrationError("Lab output escaped the edition namespace")
+        raise LabSimFieldIntegrationError("SIM and FIELD evidence must share one Lab job")
+    for key in (
+        "mismatchDecision",
+        "unboundEvidenceDecision",
+        "replayDecision",
+        "crossJobEvidenceDecision",
+    ):
+        if join.get(key) != "deny":
+            raise LabSimFieldIntegrationError(f"join must deny {key}")
 
     gate = _mapping(contract.get("currentGate"), "currentGate")
-    if gate != {
-        "validatedVehiclePackCount": 0,
-        "simDonorAccepted": False,
-        "fieldDonorAccepted": True,
-        "fieldEvidenceAdapterState": "accepted-offline-recorded-evidence-only",
-        "jobBindingDecision": "deny",
-        "metricNormalizationDecision": "deny",
-        "hardwareExecutionDecision": "deny",
-        "qualificationIssueDecision": "deny",
-        "fieldHandoffDecision": "deny",
-    }:
-        raise LabSimFieldIntegrationError("current integration gate must remain denied")
+    if (
+        gate.get("validatedVehiclePackCount") != 0
+        or gate.get("simDonorAccepted") is not True
+        or gate.get("fieldDonorAccepted") is not True
+        or gate.get("jobBindingDecision") != "conditional-exact-match"
+        or gate.get("metricNormalizationDecision") != "explicit-receipt-required"
+        or gate.get("hardwareExecutionDecision") != "deny"
+        or gate.get("qualificationIssueDecision") != "deny"
+        or gate.get("fieldHandoffDecision") != "draft-only"
+    ):
+        raise LabSimFieldIntegrationError("current integration gate drifted")
     return contract
 
 
-def validate_audit(audit: dict[str, Any]) -> dict[str, Any]:
+def validate_sync(sync: dict[str, Any]) -> dict[str, Any]:
+    donor = _mapping(sync.get("donor"), "sync.donor")
+    adaptation = _mapping(sync.get("labAdaptations"), "sync.labAdaptations")
     if (
-        audit.get("schemaVersion") != 1
-        or audit.get("kind") != "dronedream-lab-field-donor-audit"
-        or audit.get("editionId") != "lab"
-        or audit.get("auditMode") != "read-only-path-level"
+        sync.get("schemaVersion") != 1
+        or sync.get("kind") != "dronedream-lab-field-capability-donor-sync"
+        or sync.get("editionId") != "lab"
+        or donor.get("productSource") != FIELD_PRODUCT_SOURCE
+        or donor.get("tree") != FIELD_PRODUCT_TREE
+        or donor.get("authWireContractSource") != FIELD_AUTH_SOURCE
+        or adaptation.get("compiledEditionId") != "lab"
+        or adaptation.get("runtimeProfile") != "unified-sim-lab"
+        or adaptation.get("fieldInstallerPolicyIncluded") is not False
+        or adaptation.get("fieldBrandIncluded") is not False
+        or adaptation.get("labSimulationPayloadRetained") is not True
+        or adaptation.get("hardwareAuthority") is not False
+        or adaptation.get("validatedVehiclePackCount") != 0
     ):
-        raise LabSimFieldIntegrationError("Field donor audit identity drifted")
-    donor = _mapping(audit.get("fieldDonor"), "audit.fieldDonor")
-    if donor != {
-        "branch": "codex/software-field",
-        "productSource": FIELD_PRODUCT_SOURCE,
-        "tree": FIELD_PRODUCT_TREE,
-        "commonCoreCommit": COMMON_CORE_COMMIT,
-        "originExactAtHandoff": True,
-    }:
-        raise LabSimFieldIntegrationError("Field donor audit source drifted")
-    findings = _mapping(audit.get("semanticFindings"), "semanticFindings")
-    if (
-        findings.get("acceptedReceiptKind")
-        != "dronedream-field-harness-job-receipt"
-        or findings.get("recordedEvidenceOnly") is not True
-        or findings.get("hardwareValidationClaimed") is not False
-        or findings.get("fieldSourceCopiedIntoLab") is not False
-        or findings.get("fieldNoSimulationInstallerPolicyAppliedToLab") is not False
-        or findings.get("labRetainsSimulationPayload") is not True
-    ):
-        raise LabSimFieldIntegrationError("Field semantic audit drifted")
-    _require_denied(
-        _mapping(audit.get("decision"), "decision"),
-        (
-            "simToRealCalibration",
-            "realToSimCalibration",
-            "qualificationIssue",
-            "hardwareWrite",
-            "unlock",
-            "arm",
-            "flight",
-        ),
-        "audit decision",
-    )
-    return audit
+        raise LabSimFieldIntegrationError("FIELD sync receipt drifted")
+    for entry in sync.get("exactContractAssets", []):
+        item = _mapping(entry, "exactContractAsset")
+        path = ROOT / str(item.get("path"))
+        if (
+            not path.is_file()
+            or hashlib.sha256(path.read_bytes()).hexdigest() != item.get("sha256")
+        ):
+            raise LabSimFieldIntegrationError(f"exact donor asset drifted: {path}")
+    return sync
 
 
 def verify_contract(path: Path = CONTRACT_PATH) -> dict[str, Any]:
-    return validate_contract(json.loads(path.read_text(encoding="utf-8")))
+    return validate_contract(_load(path))
 
 
-def verify_audit(path: Path = AUDIT_PATH) -> dict[str, Any]:
-    return validate_audit(json.loads(path.read_text(encoding="utf-8")))
+def verify_sync(path: Path = SYNC_PATH) -> dict[str, Any]:
+    return validate_sync(_load(path))
+
+
+def verify_audit(path: Path = HISTORICAL_AUDIT_PATH) -> dict[str, Any]:
+    audit = _load(path)
+    if audit.get("kind") != "dronedream-lab-field-donor-audit":
+        raise LabSimFieldIntegrationError("historical Field audit identity drifted")
+    return audit
 
 
 if __name__ == "__main__":
     contract = verify_contract()
-    verify_audit()
+    verify_sync()
     print(json.dumps({"state": contract["integrationState"], **contract["currentGate"]}))

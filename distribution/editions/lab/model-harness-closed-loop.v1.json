@@ -65,7 +65,8 @@
     "realObservationEvidenceHash",
     "objectiveContractHash",
     "constraintContractHash",
-    "holdoutContractHash"
+    "holdoutContractHash",
+    "metricNormalizationReceiptHash"
   ],
   "qualification": {
     "requiresIndependentHoldout": true,
@@ -91,7 +92,8 @@
       "real-observation.receipt.preview",
       "sim-real.gap.compute",
       "model-revision.draft",
-      "qualification.receipt.draft"
+      "qualification.receipt.draft",
+      "native-calibration.receipt.draft"
     ]
   },
   "receiptPolicy": {

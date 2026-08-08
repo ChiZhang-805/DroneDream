@@ -12,111 +12,77 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 from verify_lab_sim_field_integration import (  # noqa: E402
-    COMMON_CORE_COMMIT,
     FIELD_PRODUCT_SOURCE,
-    FIELD_PRODUCT_TREE,
+    SIM_PRODUCT_SOURCE,
     LabSimFieldIntegrationError,
-    validate_audit,
     validate_contract,
-    verify_audit,
+    validate_sync,
     verify_contract,
+    verify_sync,
 )
 
 
-def test_lab_accepts_exact_field_donor_as_recorded_evidence_only() -> None:
+def test_exact_sim_and_field_donors_are_integrated_without_standalone_shells() -> None:
     contract = verify_contract()
-    audit = verify_audit()
+    sync = verify_sync()
 
-    assert contract["integrationState"] == "field-donor-accepted-sim-donor-pending"
+    assert contract["integrationState"] == "sim-and-field-capabilities-integrated"
+    assert contract["simDonor"]["productSource"] == SIM_PRODUCT_SOURCE
     assert contract["fieldDonor"]["productSource"] == FIELD_PRODUCT_SOURCE
-    assert contract["fieldDonor"]["tree"] == FIELD_PRODUCT_TREE
-    assert contract["fieldDonor"]["commonCoreCommit"] == COMMON_CORE_COMMIT
-    assert contract["fieldDonor"]["fieldSourceCopiedIntoLab"] is False
-    assert contract["fieldInput"]["envelopeKind"] == (
-        "dronedream-field-harness-job-receipt"
-    )
-    assert contract["fieldInput"]["receiptHardwareAuthority"] is False
-    assert audit["semanticFindings"]["fieldNoSimulationInstallerPolicyAppliedToLab"] is False
-    assert audit["semanticFindings"]["labRetainsSimulationPayload"] is True
+    assert contract["simDonor"]["standaloneSimShellCopiedIntoLab"] is False
+    assert contract["fieldDonor"]["fieldStandaloneShellCopiedIntoLab"] is False
+    assert sync["labAdaptations"]["fieldInstallerPolicyIncluded"] is False
+    assert sync["labAdaptations"]["labSimulationPayloadRetained"] is True
 
 
-def test_lab_owns_bridge_without_forking_common_core() -> None:
+def test_lab_owns_bidirectional_bridge_and_keeps_authority_denied() -> None:
     contract = verify_contract()
+    gate = contract["currentGate"]
 
-    assert contract["principles"]["reuseMatureEditionModules"] is True
-    assert contract["principles"]["manualCodeCopyAllowed"] is False
-    assert contract["principles"]["crossEditionHarnessOrchestrator"] is False
+    assert contract["principles"]["labOwnsBidirectionalCalibration"] is True
     assert contract["join"]["sameLabJobRequired"] is True
-
-
-def test_metric_mismatch_requires_an_explicit_normalization_receipt() -> None:
-    metrics = verify_contract()["metricCompatibility"]
-
-    assert metrics["fieldMetrics"] != metrics["labCalibrationMetrics"]
-    assert metrics["directMappingAllowed"] is False
-    assert metrics["normalizationReceiptRequired"] is True
-    assert metrics["missingNormalizationDecision"] == "deny"
-
-
-def test_lab_stays_denied_until_sim_metrics_packs_and_quorum_are_ready() -> None:
-    contract = verify_contract()
-
-    assert contract["currentGate"] == {
-        "validatedVehiclePackCount": 0,
-        "simDonorAccepted": False,
-        "fieldDonorAccepted": True,
-        "fieldEvidenceAdapterState": "accepted-offline-recorded-evidence-only",
-        "jobBindingDecision": "deny",
-        "metricNormalizationDecision": "deny",
-        "hardwareExecutionDecision": "deny",
-        "qualificationIssueDecision": "deny",
-        "fieldHandoffDecision": "deny",
-    }
+    assert contract["metricCompatibility"]["normalizationReceiptRequired"] is True
+    assert gate["validatedVehiclePackCount"] == 0
+    assert gate["hardwareExecutionDecision"] == "deny"
+    assert gate["qualificationIssueDecision"] == "deny"
+    assert gate["fieldHandoffDecision"] == "draft-only"
 
 
 @pytest.mark.parametrize(
     ("section", "key", "value"),
     [
+        ("simDonor", "productSource", "0" * 40),
         ("fieldDonor", "productSource", "0" * 40),
-        ("fieldDonor", "fieldSourceCopiedIntoLab", True),
-        ("principles", "manualCodeCopyAllowed", True),
+        ("fieldDonor", "fieldNoSimulationInstallerPolicyAppliedToLab", True),
+        ("principles", "copyOrForkCommonCore", True),
         ("principles", "crossEditionHarnessOrchestrator", True),
-        ("simInput", "hardwareAuthority", True),
-        ("fieldInput", "receiptHardwareAuthority", True),
         ("metricCompatibility", "directMappingAllowed", True),
-        ("metricCompatibility", "missingNormalizationDecision", "allow"),
         ("join", "replayDecision", "allow"),
+        ("currentGate", "validatedVehiclePackCount", 1),
         ("currentGate", "hardwareExecutionDecision", "allow"),
-        ("currentGate", "simDonorAccepted", True),
-        ("currentGate", "fieldDonorAccepted", False),
+        ("currentGate", "qualificationIssueDecision", "allow"),
     ],
 )
-def test_lab_integration_rejects_drift(section: str, key: str, value: object) -> None:
+def test_integration_contract_fails_closed(section: str, key: str, value: object) -> None:
     contract = copy.deepcopy(verify_contract())
     contract[section][key] = value
-
     with pytest.raises(LabSimFieldIntegrationError):
         validate_contract(contract)
 
 
 @pytest.mark.parametrize(
-    ("section", "key", "value"),
+    ("key", "value"),
     [
-        ("fieldDonor", "productSource", "f" * 40),
-        ("semanticFindings", "hardwareValidationClaimed", True),
-        ("semanticFindings", "fieldSourceCopiedIntoLab", True),
-        ("semanticFindings", "fieldNoSimulationInstallerPolicyAppliedToLab", True),
-        ("decision", "realToSimCalibration", "allow"),
-        ("decision", "hardwareWrite", "allow"),
+        ("compiledEditionId", "field"),
+        ("fieldBrandIncluded", True),
+        ("fieldInstallerPolicyIncluded", True),
+        ("labSimulationPayloadRetained", False),
+        ("hardwareAuthority", True),
+        ("validatedVehiclePackCount", 1),
     ],
 )
-def test_field_donor_audit_rejects_unsafe_claims(
-    section: str,
-    key: str,
-    value: object,
-) -> None:
-    audit = copy.deepcopy(verify_audit())
-    audit[section][key] = value
-
+def test_field_sync_adaptation_fails_closed(key: str, value: object) -> None:
+    sync = copy.deepcopy(verify_sync())
+    sync["labAdaptations"][key] = value
     with pytest.raises(LabSimFieldIntegrationError):
-        validate_audit(audit)
+        validate_sync(sync)

@@ -1,0 +1,120 @@
+.lab-hardware-workspace {
+  --field-focus: #087e69;
+  --field-line: color-mix(in srgb, #087e69 22%, #dce5dc);
+  --field-soft-line: color-mix(in srgb, #20c77a 12%, #edf3ed);
+  --field-panel: #ffffff;
+  min-width: 0;
+  color: #102019;
+}
+
+.lab-hardware-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: end;
+  padding: 24px 28px;
+  border-bottom: 1px solid color-mix(in srgb, #087e69 20%, transparent);
+  background: color-mix(in srgb, #f3fcef 82%, #ffffff);
+}
+
+.lab-hardware-heading > div:first-child > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #087e69;
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.lab-hardware-heading svg {
+  width: 17px;
+  height: 17px;
+}
+
+.lab-hardware-heading h1 {
+  margin: 8px 0 6px;
+  font-size: 30px;
+  letter-spacing: 0;
+}
+
+.lab-hardware-heading p {
+  max-width: 860px;
+  margin: 0;
+  color: #43544b;
+  line-height: 1.55;
+}
+
+.lab-hardware-deny {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1px 8px;
+  align-items: center;
+  min-width: 152px;
+  padding: 12px 14px;
+  border: 1px solid #e3b7aa;
+  border-radius: 6px;
+  background: #fff5f1;
+  color: #8a2d22;
+}
+
+.lab-hardware-deny small {
+  grid-column: 1 / -1;
+}
+
+.lab-hardware-safety {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 18px 28px 0;
+  padding: 12px 14px;
+  border-left: 3px solid #20c77a;
+  background: color-mix(in srgb, #a7e84a 10%, #ffffff);
+  color: #204832;
+}
+
+.lab-hardware-safety p {
+  margin: 0;
+}
+
+.field-app-embedded-lab {
+  min-height: 0;
+  margin-top: 16px;
+  background: #f3fcef;
+}
+
+.field-app-embedded-lab .field-layout {
+  min-height: 720px;
+}
+
+.field-app-embedded-lab .field-sidebar {
+  border-color: color-mix(in srgb, #087e69 22%, transparent);
+  background: #092019;
+}
+
+.field-app-embedded-lab .field-sidebar button[aria-current="page"] {
+  color: #092019;
+  background: linear-gradient(90deg, #a7e84a, #20c77a);
+}
+
+.field-app-embedded-lab .field-primary-command,
+.field-app-embedded-lab .field-tuning-primary,
+.field-app-embedded-lab .field-adapter-install-button {
+  border-color: #087e69;
+  background: #087e69;
+}
+
+@media (max-width: 760px) {
+  .lab-hardware-heading {
+    grid-template-columns: 1fr;
+    padding: 20px;
+  }
+
+  .lab-hardware-deny {
+    width: 100%;
+  }
+
+  .lab-hardware-safety {
+    margin-inline: 20px;
+  }
+}

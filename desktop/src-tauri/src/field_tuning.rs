@@ -13,6 +13,7 @@ use crate::distribution_plan::{
     native_hardware_validated_pack_count, native_safety_catalog_snapshot,
 };
 use crate::field_recovery::{resolve_field_snapshot_binding, FieldSnapshotBinding};
+use crate::hardware_domain;
 
 const CONTRACT_RAW: &str =
     include_str!("../../../distribution/editions/field/field-tuning-contract.v1.json");
@@ -131,11 +132,7 @@ fn canonical_sha256(value: &Value) -> Result<String, String> {
 }
 
 fn require_field_contract() -> Result<Value, String> {
-    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field"
-        || env!("DRONEDREAM_EDITION_PROFILE") != "field-lightweight"
-    {
-        return Err("Field tuning commands are unavailable in this edition".to_string());
-    }
+    hardware_domain::require_available()?;
     let contract: Value = serde_json::from_str(CONTRACT_RAW)
         .map_err(|error| format!("Field tuning contract is invalid: {error}"))?;
     if contract.pointer("/editionId").and_then(Value::as_str) != Some("field")
@@ -169,9 +166,9 @@ pub(crate) fn get_field_tuning_status() -> Result<FieldTuningStatus, String> {
     Ok(FieldTuningStatus {
         schema_version: 1,
         kind: "dronedream-field-tuning-status",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         execution_domain: "real-hardware",
-        runtime_profile: "field-lightweight",
+        runtime_profile: hardware_domain::runtime_profile(),
         source_commit: SOURCE_COMMIT,
         engine_pack_id: ENGINE_PACK_ID,
         contract_sha256: canonical_sha256(&contract)?,
@@ -248,7 +245,7 @@ fn run_demo(request: FieldTuningDemoRequest) -> Result<FieldTuningDemoReceipt, S
         schema_version: 1,
         kind: "dronedream-field-tuning-demo-receipt",
         job_id,
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         execution_domain: "real-hardware",
         execution_mode: "fixture-only-no-device-io",
         source_commit: SOURCE_COMMIT,
@@ -331,7 +328,8 @@ fn prepare_hardware_plan(
     if !(1..=32).contains(&request.max_iterations) {
         return Err("Field hardware tuning iteration budget must be between 1 and 32".to_string());
     }
-    let safety_catalog = native_safety_catalog_snapshot("field", &request.vehicle_pack_id)?;
+    let safety_catalog =
+        native_safety_catalog_snapshot(hardware_domain::edition_id(), &request.vehicle_pack_id)?;
     let validated_pack_count = native_hardware_validated_pack_count()?;
     let mut blockers = Vec::new();
     if validated_pack_count == 0 {
@@ -344,7 +342,7 @@ fn prepare_hardware_plan(
         .is_some_and(|editions| {
             editions
                 .iter()
-                .any(|edition| edition.as_str() == Some("field"))
+                .any(|edition| edition.as_str() == Some(hardware_domain::edition_id()))
         });
     if !field_supported {
         blockers.push("field.pack.edition-incompatible".to_string());
@@ -440,7 +438,7 @@ fn prepare_hardware_plan(
         schema_version: 1,
         kind: "dronedream-field-hardware-tuning-plan",
         job_id: format!("field-hardware-plan-{}", &request_sha256[..16]),
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         execution_domain: "real-hardware",
         source_commit: SOURCE_COMMIT,
         request_sha256,
@@ -529,7 +527,7 @@ mod tests {
     #[test]
     fn status_is_field_only_and_fail_closed() {
         let status = get_field_tuning_status().expect("Field contract should load");
-        assert_eq!(status.edition_id, "field");
+        assert_eq!(status.edition_id, hardware_domain::edition_id());
         assert_eq!(status.execution_domain, "real-hardware");
         assert!(!status.simulation_supported);
         assert!(!status.hardware_authority);

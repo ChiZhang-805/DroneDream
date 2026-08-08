@@ -26,6 +26,7 @@ import {
   type FieldProtocolFrameInspection,
 } from "../desktop/bridge";
 import type { FieldLocale } from "./catalog";
+import { hardwareDomainEdition } from "./hardwareDomain";
 
 const CATALOG_SHA256 = "5b1a7b9f5bd64624b6d4af7b0745e1ba4b1babca63fab0ba765ca97e58ac9419";
 
@@ -131,7 +132,7 @@ function staticCatalog(): FieldAdapterCatalogReport {
     schemaVersion: 1,
     kind: "dronedream-field-adapter-catalog-report",
     catalogVersion: sourceCatalog.catalogVersion,
-    editionId: "field",
+    editionId: hardwareDomainEdition,
     source: "source-bound-embedded-catalog",
     catalogSha256: CATALOG_SHA256,
     hardwareAuthority: false,

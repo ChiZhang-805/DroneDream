@@ -18,6 +18,7 @@ use uuid::Uuid;
 
 use crate::distribution_plan::native_hardware_validated_pack_count;
 use crate::field_recovery::{resolve_field_snapshot_binding, FieldSnapshotBinding};
+use crate::hardware_domain;
 
 const SOURCE_COMMIT: &str = env!("DRONEDREAM_SOURCE_COMMIT");
 const ENGINE_PACK_ID: &str = env!("DRONEDREAM_ENGINE_PACK_ID");
@@ -362,7 +363,7 @@ fn jobs_root(app: &AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_data_dir()
         .map_err(|error| format!("Field app data directory is unavailable: {error}"))?
-        .join("field-harness")
+        .join(format!("{}-harness", hardware_domain::edition_id()))
         .join("jobs"))
 }
 
@@ -406,7 +407,7 @@ fn verify_receipt(mut receipt: FieldHarnessJobReceipt) -> Result<FieldHarnessJob
 }
 
 fn load_at(root: &Path, job_id: &str) -> Result<FieldHarnessJobReceipt, String> {
-    if !job_id.starts_with("field-harness-")
+    if !job_id.starts_with(&format!("{}-harness-", hardware_domain::edition_id()))
         || job_id.len() > 96
         || !job_id
             .chars()
@@ -497,7 +498,8 @@ fn run_at(
     all_trials.push(holdout);
     let created_at = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     let job_id = format!(
-        "field-harness-{}-{}",
+        "{}-harness-{}-{}",
+        hardware_domain::edition_id(),
         &request_sha256[..16],
         &Uuid::new_v4().simple().to_string()[..8]
     );
@@ -506,7 +508,7 @@ fn run_at(
         kind: "dronedream-field-harness-job-receipt".to_string(),
         job_id,
         created_at,
-        edition_id: "field".to_string(),
+        edition_id: hardware_domain::edition_id().to_string(),
         execution_domain: "real-device-recorded-evidence".to_string(),
         execution_mode: "offline-evidence-replay-no-device-io".to_string(),
         source_commit: SOURCE_COMMIT.to_string(),
@@ -602,6 +604,7 @@ pub(crate) fn run_field_harness_job(
     app: AppHandle,
     request: FieldHarnessJobRequest,
 ) -> Result<FieldHarnessJobReceipt, String> {
+    hardware_domain::require_available()?;
     let snapshot = resolve_field_snapshot_binding(&app, &request.snapshot_sha256)?;
     run_at(&jobs_root(&app)?, request, &snapshot)
 }
@@ -610,6 +613,7 @@ pub(crate) fn run_field_harness_job(
 pub(crate) fn list_field_harness_jobs(
     app: AppHandle,
 ) -> Result<Vec<FieldHarnessJobSummary>, String> {
+    hardware_domain::require_available()?;
     list_at(&jobs_root(&app)?)
 }
 
@@ -618,6 +622,7 @@ pub(crate) fn load_field_harness_job(
     app: AppHandle,
     request: FieldHarnessJobLoadRequest,
 ) -> Result<FieldHarnessJobReceipt, String> {
+    hardware_domain::require_available()?;
     load_at(&jobs_root(&app)?, &request.job_id)
 }
 

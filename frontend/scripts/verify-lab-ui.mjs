@@ -32,7 +32,6 @@ const cases = [
   { id: "390-zh", locale: "zh-CN", viewport: { width: 390, height: 844 } },
 ];
 
-process.env.VITE_DRONEDREAM_EDITION = "lab";
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 
@@ -58,7 +57,9 @@ async function assertViewportFits(page, testCase, surface) {
     clientWidth: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,
     clippedText: Array.from(document.querySelectorAll(
-      ".lab-page button, .lab-page strong, .lab-page small, .lab-page label > span",
+      ".lab-page button, .lab-page strong, .lab-page small, .lab-page label > span, "
+        + ".lab-hardware-workspace button, .lab-hardware-workspace strong, "
+        + ".lab-hardware-workspace small, .lab-hardware-workspace label > span",
     )).filter((element) => (
       element instanceof HTMLElement
       && element.offsetParent !== null
@@ -122,12 +123,30 @@ try {
     await page.addInitScript((locale) => {
       window.localStorage.setItem("drone-dream:locale", locale);
     }, testCase.locale);
-    await page.goto(`${origin}/lab/setup`, { waitUntil: "networkidle" });
+    await page.goto(`${origin}/lab`, { waitUntil: "networkidle" });
 
     const title = testCase.locale === "en"
       ? "Sim-to-Real calibration laboratory"
       : "Sim-to-Real 校准实验室";
     await page.getByRole("heading", { name: title }).waitFor();
+    const brandImage = page.locator('img[data-brand-edition="lab"]').first();
+    await brandImage.waitFor({ state: "attached" });
+    const brandImageState = await brandImage.evaluate((image) => ({
+      complete: image instanceof HTMLImageElement && image.complete,
+      naturalWidth: image instanceof HTMLImageElement ? image.naturalWidth : 0,
+      naturalHeight: image instanceof HTMLImageElement ? image.naturalHeight : 0,
+    }));
+    assert.deepEqual(brandImageState, { complete: true, naturalWidth: 2386, naturalHeight: 218 });
+    assert((await page.getByText("DroneDream · LAB", { exact: false }).count()) > 0);
+    const palette = await page.locator(".lab-page").evaluate((element) => {
+      const style = getComputedStyle(element);
+      return ["--dd-brand-start", "--dd-brand-middle", "--dd-brand-end"]
+        .map((property) => style.getPropertyValue(property).trim().toUpperCase());
+    });
+    assert.deepEqual(palette, ["#A7E84A", "#20C77A", "#087E69"]);
+    const activeNavigationColor = await page.locator(".app-nav a.active").first()
+      .evaluate((element) => getComputedStyle(element).color);
+    assert.equal(activeNavigationColor, "rgb(8, 126, 105)");
     assert.equal(await page.locator("html").getAttribute("lang"), testCase.locale);
     assert.equal(await page.getByText(testCase.locale === "en" ? "0 of 8" : "0 / 8").count(), 1);
     assert.equal(await page.getByText(testCase.locale === "en" ? "DENY" : "拒绝").first().count(), 1);
@@ -150,14 +169,14 @@ try {
     });
     await page.getByText(
       testCase.locale === "en"
-        ? "Candidate lineage matched · calibration blocked"
-        : "候选链路已匹配 · 校准仍阻断",
+        ? "Candidate lineage matched · normalization required"
+        : "候选链路已匹配 · 需要指标归一化",
       { exact: true },
     ).waitFor();
-    assert.equal(await bridge.getAttribute("data-bridge-state"), "awaiting-sim-donor-and-metrics");
+    assert.equal(await bridge.getAttribute("data-bridge-state"), "normalization-required");
     assert.equal(
       await page.getByText(
-        testCase.locale === "en" ? "Remaining gates · 6" : "剩余门禁 · 6",
+        testCase.locale === "en" ? "Remaining gates · 5" : "剩余门禁 · 5",
         { exact: true },
       ).count(),
       1,
@@ -206,6 +225,25 @@ try {
     await assertViewportFits(page, testCase, "safety");
     evidence.push(await screenshot(page, testCase, "safety"));
 
+    await page.goto(`${origin}/lab/hardware`, { waitUntil: "networkidle" });
+    const hardwareWorkspace = page.locator(
+      '.lab-hardware-workspace[data-brand-edition="lab"]',
+    );
+    await hardwareWorkspace.getByRole("heading", { name: hardwareLabel }).waitFor();
+    assert.equal(await hardwareWorkspace.getAttribute("data-presentation-only"), "true");
+    assert.equal(await hardwareWorkspace.getAttribute("data-grants-hardware-authority"), "false");
+    const embeddedHardware = hardwareWorkspace.locator(
+      '.field-app[data-brand-edition="lab"][data-authority="false"]',
+    );
+    assert.equal(await embeddedHardware.getAttribute("data-validated-pack-count"), "0");
+    assert.equal(await embeddedHardware.getAttribute("data-quorum"), "missing");
+    assert.equal(
+      await hardwareWorkspace.getByText("0 validated packs", { exact: true }).count(),
+      1,
+    );
+    await assertViewportFits(page, testCase, "hardware-domain");
+    evidence.push(await screenshot(page, testCase, "hardware-domain"));
+
     await context.close();
   }
 } finally {
@@ -226,7 +264,7 @@ const report = {
   hardwareActionDecision: "deny",
   cases: cases.map((testCase) => ({
     ...testCase,
-    surfaces: ["calibration", "hardware", "evidence", "safety"],
+    surfaces: ["calibration", "hardware", "evidence", "safety", "hardware-domain"],
   })),
   screenshots: evidence,
   sideEffects: {
