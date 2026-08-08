@@ -467,8 +467,26 @@ try {
                     $counts.browserAction++
                     Save-ExecutionCheckpoint "browser-consent-attempted"
                     $consentReceipt = Join-Path $executionRoot "browser-consent.json"
-                    & $browserConsentVerifier -OutputReceipt $consentReceipt -TimeoutSeconds 90 -Execute
-                    if ($LASTEXITCODE -ne 0) { throw "Bounded browser consent action failed." }
+                    $consentActionFailed = $false
+                    try {
+                        & $browserConsentVerifier -OutputReceipt $consentReceipt -TimeoutSeconds 90 -Execute
+                        if ($LASTEXITCODE -ne 0) { $consentActionFailed = $true }
+                    }
+                    catch {
+                        $consentActionFailed = $true
+                    }
+
+                    # The external browser may complete the callback while the bounded helper is
+                    # still looking for an optional account/consent control. Re-read the durable
+                    # observer checkpoint before classifying that helper outcome as a failure.
+                    if (Test-Path -LiteralPath $observerPath -PathType Leaf) {
+                        try { $checkpointAfterConsent = Get-Content -LiteralPath $observerPath -Raw | ConvertFrom-Json }
+                        catch { $checkpointAfterConsent = $null }
+                        if ($null -ne $checkpointAfterConsent -and $checkpointAfterConsent.stage -ceq "authenticated-ui-ready") {
+                            return $true
+                        }
+                    }
+                    if ($consentActionFailed) { throw "Bounded browser consent action failed before authentication completed." }
                 }
             }
             return $false
@@ -655,6 +673,16 @@ finally {
     }
     if (-not $cleaned -and ((Test-Path -LiteralPath $productKey) -or (Test-Path -LiteralPath $webViewProfileRoot))) {
         try { $counts.ownedCleanup++; Save-ExecutionCheckpoint "owned-cleanup-recovery-attempted"; if (Test-Path -LiteralPath $productKey) { Remove-Item -LiteralPath $productKey -Recurse -Force }; if (Test-Path -LiteralPath $webViewProfileRoot) { Remove-Item -LiteralPath $webViewProfileRoot -Recurse -Force }; $cleaned = $true } catch { $receipt.ownedCleanupError = $_.Exception.Message }
+    }
+    try {
+        Wait-Until {
+            ((Get-WslInventory | ConvertTo-Json -Depth 10 -Compress) -ceq ($protectedBefore.wslInventory | ConvertTo-Json -Depth 10 -Compress))
+        } 60 "Existing Runtime did not return to its pre-run state during bounded recovery."
+        $receipt["runtimeRestoreObserved"] = $true
+    }
+    catch {
+        $receipt["runtimeRestoreObserved"] = $false
+        $receipt["runtimeRestoreError"] = "runtime_prestate_restore_timeout"
     }
     $receipt.counts = $counts
     $receipt.protectedStateBefore = $protectedBefore

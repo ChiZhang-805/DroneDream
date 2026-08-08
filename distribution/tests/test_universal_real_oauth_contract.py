@@ -72,6 +72,15 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
     assert 'stage -ceq "authenticated-ui-ready"' in powershell
     assert 'Write-AtomicText $postAuthSignalPath "complete"' in powershell
     assert 'Write-AtomicText $postAuthSignalPath "abort"' in powershell
+    helper_call = powershell.index("& $browserConsentVerifier")
+    callback_recheck = powershell.index(
+        'checkpointAfterConsent.stage -ceq "authenticated-ui-ready"', helper_call
+    )
+    helper_failure = powershell.index(
+        'throw "Bounded browser consent action failed before authentication completed."',
+        callback_recheck,
+    )
+    assert helper_call < callback_recheck < helper_failure
     assert 'process.exit' not in powershell
 
     ready = observer.index('await persist("authenticated-ui-ready")')
@@ -111,6 +120,11 @@ def test_runtime_prerequisite_is_existing_start_only_and_physics_stays_off() -> 
     assert "restorePreRunState = $true" in text
     assert "Assert-ProtectedStateUnchanged" in text
     assert "Successful Universal OAuth validation" in text
+    assert 'runtimeRestoreObserved"] = $true' in text
+    assert 'runtimeRestoreError"] = "runtime_prestate_restore_timeout"' in text
+    restore_wait = text.rindex("Wait-Until {")
+    final_state = text.rindex("Assert-ProtectedStateUnchanged")
+    assert restore_wait < final_state
 
 
 def test_observer_is_bounded_and_never_owns_or_logs_the_external_browser() -> None:
