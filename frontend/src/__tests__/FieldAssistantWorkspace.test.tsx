@@ -62,6 +62,30 @@ function mockCatalog() {
 describe("Field Chatting workspace", () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it("switches the compact chat and plan panels without changing authority", () => {
+    mockCatalog();
+    const { container } = render(<FieldApp initialLocale="en" />);
+    const workspace = container.querySelector(".field-assistant-workspace");
+    const chatTab = screen.getByRole("tab", { name: "Chat" });
+    const planTab = screen.getByRole("tab", { name: "Experiment plan" });
+
+    expect(workspace).toHaveAttribute("data-mobile-panel", "chat");
+    expect(workspace).toHaveAttribute("data-authority", "false");
+    expect(chatTab).toHaveAttribute("aria-selected", "true");
+    expect(planTab).toHaveAttribute("aria-selected", "false");
+    expect(chatTab).toHaveAttribute("aria-controls", "field-assistant-chat-panel");
+    expect(planTab).toHaveAttribute("aria-controls", "field-assistant-plan-panel");
+
+    fireEvent.click(planTab);
+
+    expect(workspace).toHaveAttribute("data-mobile-panel", "plan");
+    expect(chatTab).toHaveAttribute("aria-selected", "false");
+    expect(planTab).toHaveAttribute("aria-selected", "true");
+    expect(workspace).toHaveAttribute("data-authority", "false");
+    expect(screen.getByText("Waiting for your goal")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start controlled test" })).not.toBeInTheDocument();
+  });
+
   it("uses the managed model to create a proposal-only Field plan", async () => {
     mockCatalog();
     const completion = vi.spyOn(cloudModels, "completeManagedModelChat").mockResolvedValue({
@@ -70,18 +94,31 @@ describe("Field Chatting workspace", () => {
     });
     const { container } = render(<FieldApp initialLocale="en" />);
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
+    expect(screen.getByRole("heading", { name: "What real-device experiment should we prepare?" })).toBeVisible();
+    expect(screen.getAllByRole("button").filter((button) => (
+      ["Stable hover", "Smoother response", "Wind recovery"].includes(button.textContent?.trim() ?? "")
+      || button.querySelector("strong")
+    ))).toHaveLength(3);
+    expect(container.querySelector(".field-assistant-plan-card")).toBeNull();
 
-    fireEvent.change(screen.getByLabelText(/Example: reduce hover drift/), {
+    const composer = screen.getByLabelText(/Example: reduce hover drift/);
+    fireEvent.click(screen.getByRole("button", { name: /Stable hover/ }));
+    expect(composer).toHaveValue(
+      "Reduce hover drift and overshoot without increasing control effort. Use short bounded trials.",
+    );
+    fireEvent.change(composer, {
       target: { value: "Reduce hover drift with four short trials." },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.keyDown(composer, { key: "Enter", code: "Enter" });
 
     expect(await screen.findByText(/Prepare a four-trial hover stability study/)).toBeVisible();
     expect(screen.getByText("Reduce hover drift while preserving smooth control effort.")).toBeVisible();
     expect(screen.getByText("MC_ROLL_P")).toBeVisible();
     expect(screen.getByText("MC_PITCH_P")).toBeVisible();
     expect(screen.getByRole("button", { name: "Start controlled test" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
+    expect(container.querySelector(".field-assistant-plan-card")).toBeTruthy();
     expect(cloudModels.issueManagedModelGrant).toHaveBeenCalledWith(
       "assistant",
       expect.stringMatching(/^field-plan:/),
@@ -119,8 +156,9 @@ describe("Field Chatting workspace", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Managed model returned a plan outside the Field contract.",
     );
-    expect(screen.getAllByText("Waiting for your goal")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Start controlled test" })).toBeDisabled();
+    expect(screen.queryByText("Waiting for your goal")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start controlled test" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   });
 
   it("rejects duplicate parameters and unexpected model fields", async () => {
@@ -148,6 +186,7 @@ describe("Field Chatting workspace", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Managed model returned a plan outside the Field contract.",
     );
-    expect(screen.getByRole("button", { name: "Start controlled test" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Start controlled test" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
   });
 });

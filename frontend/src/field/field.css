@@ -2993,42 +2993,67 @@ body:has(.field-app),
   width: 100%;
   height: 100%;
   min-height: 0;
-  grid-template-columns: minmax(520px, 1.5fr) minmax(330px, 0.72fr);
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  overflow: hidden;
 }
 
-.field-assistant-chat,
-.field-assistant-plan {
-  min-width: 0;
-  min-height: 0;
-  border: 1px solid var(--field-line);
-  border-radius: 6px;
-  background: #ffffff;
+.field-assistant-workspace[data-has-plan="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.52fr);
+  gap: 12px;
+}
+
+.field-assistant-mobile-tabs {
+  display: none;
 }
 
 .field-assistant-chat {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: 42px minmax(0, 1fr) auto;
   overflow: hidden;
+  background: #ffffff;
 }
 
-.field-assistant-heading {
-  padding: 16px 18px 13px;
+.field-assistant-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
   border-bottom: 1px solid var(--field-soft-line);
+}
+
+.field-assistant-toolbar > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--field-muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.field-assistant-toolbar > span svg {
+  width: 15px;
+  height: 15px;
+  color: var(--dd-brand-middle);
 }
 
 .field-assistant-thread {
   min-height: 0;
-  padding: 18px;
+  padding: clamp(14px, 2.5vw, 34px);
   overflow: auto;
 }
 
 .field-assistant-empty {
   display: grid;
+  width: min(940px, 100%);
   height: 100%;
-  min-height: 280px;
+  min-height: 0;
   place-content: center;
-  gap: 22px;
+  gap: 18px;
+  margin: 0 auto;
 }
 
 .field-assistant-orbit {
@@ -3049,16 +3074,38 @@ body:has(.field-app),
   height: 27px;
 }
 
+.field-assistant-intro {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.field-assistant-intro h1,
+.field-assistant-conversation > h1 {
+  margin: 0;
+  letter-spacing: 0;
+  font-size: clamp(25px, 3vw, 38px);
+  line-height: 1.12;
+}
+
+.field-assistant-intro p {
+  max-width: 680px;
+  margin: 10px auto 0;
+  color: var(--field-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .field-assistant-prompts {
   display: grid;
-  width: min(760px, 100%);
+  width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
 .field-assistant-prompts button {
   display: grid;
-  min-height: 116px;
+  min-height: 104px;
   align-content: start;
   gap: 7px;
   padding: 13px;
@@ -3095,6 +3142,16 @@ body:has(.field-app),
   background: #f7f6f5;
 }
 
+.field-assistant-conversation {
+  width: min(900px, 100%);
+  margin: 0 auto;
+}
+
+.field-assistant-conversation > h1 {
+  margin-bottom: 20px;
+  font-size: 23px;
+}
+
 .field-assistant-message.user {
   margin-left: auto;
   border-color: color-mix(in srgb, var(--dd-brand-start) 36%, var(--field-line));
@@ -3114,8 +3171,9 @@ body:has(.field-app),
 
 .field-assistant-composer {
   position: relative;
-  margin: 0 16px 16px;
-  padding: 10px;
+  width: min(900px, calc(100% - 32px));
+  margin: 0 auto 16px;
+  padding: 11px;
   border: 1px solid var(--field-line);
   border-radius: 6px;
   background: #ffffff;
@@ -3231,13 +3289,33 @@ body:has(.field-app),
   font-size: 12px;
 }
 
-.field-assistant-plan {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+.field-assistant-plan-shell {
+  display: none;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
-.field-assistant-plan > header {
+.field-assistant-plan-card {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid var(--field-line);
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.field-assistant-workspace[data-has-plan="true"] .field-assistant-plan-shell {
+  display: grid;
+}
+
+.field-assistant-plan-card > header {
   display: flex;
   min-height: 52px;
   align-items: center;
@@ -3247,19 +3325,19 @@ body:has(.field-app),
   border-bottom: 1px solid var(--field-soft-line);
 }
 
-.field-assistant-plan > header > div {
+.field-assistant-plan-card > header > div {
   display: flex;
   align-items: center;
   gap: 7px;
 }
 
-.field-assistant-plan > header svg {
+.field-assistant-plan-card > header svg {
   width: 17px;
   height: 17px;
   color: var(--dd-brand-middle);
 }
 
-.field-assistant-plan > header > span {
+.field-assistant-plan-card > header > span {
   padding: 4px 7px;
   border-radius: 4px;
   color: var(--field-muted);
@@ -3268,7 +3346,7 @@ body:has(.field-app),
   font-weight: 700;
 }
 
-.field-assistant-plan > header > span.is-ready {
+.field-assistant-plan-card > header > span {
   color: var(--dd-brand-dark-surface);
   background: var(--dd-brand-light-surface);
 }
@@ -3319,6 +3397,23 @@ body:has(.field-app),
   min-height: 0;
   padding: 12px;
   overflow: auto;
+}
+
+.field-assistant-plan-placeholder {
+  display: grid;
+  min-height: 0;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--field-muted);
+  text-align: center;
+}
+
+.field-assistant-plan-placeholder svg {
+  width: 30px;
+  height: 30px;
+  color: var(--dd-brand-middle);
 }
 
 .field-assistant-plan-body section {
@@ -3392,23 +3487,7 @@ body:has(.field-app),
   font-size: 10px;
 }
 
-.field-assistant-plan-placeholder {
-  display: grid;
-  min-height: 0;
-  place-content: center;
-  gap: 8px;
-  color: #9d979a;
-  text-align: center;
-  font-size: 12px;
-}
-
-.field-assistant-plan-placeholder svg {
-  width: 32px;
-  height: 32px;
-  margin: 0 auto;
-}
-
-.field-assistant-plan > footer {
+.field-assistant-plan-card > footer {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -3416,7 +3495,7 @@ body:has(.field-app),
   border-top: 1px solid var(--field-soft-line);
 }
 
-.field-assistant-plan > footer button {
+.field-assistant-plan-card > footer button {
   min-height: 36px;
   padding: 7px 9px;
   border: 1px solid var(--field-line);
@@ -3427,13 +3506,13 @@ body:has(.field-app),
   cursor: pointer;
 }
 
-.field-assistant-plan > footer button:first-child {
+.field-assistant-plan-card > footer button:first-child {
   color: #ffffff;
   border-color: var(--dd-brand-middle);
   background: var(--dd-brand-middle);
 }
 
-.field-assistant-plan > footer button:disabled {
+.field-assistant-plan-card > footer button:disabled {
   color: #9d979a;
   background: #f3f1ef;
   cursor: not-allowed;
@@ -3464,10 +3543,6 @@ body:has(.field-app),
     padding-inline: 14px;
   }
 
-  .field-assistant-workspace {
-    grid-template-columns: minmax(460px, 1.25fr) minmax(300px, 0.75fr);
-  }
-
   .field-device-dashboard {
     grid-template-columns: minmax(290px, 0.65fr) minmax(420px, 1.35fr);
   }
@@ -3489,13 +3564,14 @@ body:has(.field-app),
   }
 
   .field-layout {
+    display: grid;
     height: calc(100vh - 60px);
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) 58px;
+    grid-template-rows: 58px minmax(0, 1fr);
   }
 
   .field-sidebar {
-    grid-row: 2;
+    grid-row: 1;
     height: 58px;
     padding: 5px 7px;
     border-top: 1px solid var(--field-line);
@@ -3516,29 +3592,100 @@ body:has(.field-app),
   }
 
   .field-main {
-    grid-row: 1;
+    height: calc(100vh - 118px);
+    height: calc(100dvh - 118px);
+    grid-row: 2;
   }
 
   .field-active-page {
     padding: 10px;
   }
 
-  .field-assistant-workspace {
+  .field-assistant-workspace,
+  .field-assistant-workspace[data-has-plan="true"] {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(380px, 1fr) auto;
-    overflow: auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 7px;
   }
 
-  .field-assistant-plan {
-    min-height: 310px;
+  .field-assistant-mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .field-assistant-mobile-tabs button {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--field-line);
+    border-radius: 5px;
+    color: var(--field-muted);
+    background: #ffffff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .field-assistant-mobile-tabs button[aria-selected="true"] {
+    color: var(--dd-brand-dark-surface);
+    border-color: var(--dd-brand-middle);
+    background: var(--dd-brand-light-surface);
+  }
+
+  .field-assistant-mobile-tabs svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .field-assistant-chat,
+  .field-assistant-plan-shell {
+    grid-row: 2;
+    min-height: 0;
+  }
+
+  .field-assistant-workspace[data-mobile-panel="chat"] .field-assistant-plan-shell,
+  .field-assistant-workspace[data-mobile-panel="plan"] .field-assistant-chat {
+    display: none;
+  }
+
+  .field-assistant-workspace[data-mobile-panel="plan"] .field-assistant-plan-shell {
+    display: grid;
+  }
+
+  .field-assistant-thread,
+  .field-assistant-plan-body {
+    scrollbar-width: none;
+  }
+
+  .field-assistant-thread::-webkit-scrollbar,
+  .field-assistant-plan-body::-webkit-scrollbar {
+    display: none;
   }
 
   .field-assistant-prompts {
-    grid-template-columns: 1fr;
+    gap: 7px;
   }
 
   .field-assistant-prompts button {
-    min-height: 74px;
+    min-height: 58px;
+    padding: 10px;
+  }
+
+  .field-assistant-prompts span,
+  .field-assistant-intro p {
+    display: none;
+  }
+
+  .field-assistant-intro h1 {
+    font-size: 27px;
+  }
+
+  .field-assistant-composer textarea {
+    min-height: 44px;
   }
 
   .field-device-dashboard {
@@ -3577,16 +3724,18 @@ body:has(.field-app),
     font-size: 11px;
   }
 
-  .field-assistant-heading {
-    padding: 12px;
+  .field-assistant-toolbar {
+    padding-inline: 10px;
   }
 
   .field-assistant-thread {
-    padding: 12px;
+    padding: 10px;
   }
 
   .field-assistant-composer {
-    margin: 0 10px 10px;
+    width: calc(100% - 20px);
+    margin-bottom: 10px;
+    padding: 8px;
   }
 
   .field-assistant-composer-bar select {
@@ -3595,6 +3744,31 @@ body:has(.field-app),
 
   .field-assistant-message {
     width: 90%;
+  }
+
+  .field-assistant-empty {
+    gap: 12px;
+  }
+
+  .field-assistant-orbit {
+    width: 48px;
+    height: 48px;
+  }
+
+  .field-assistant-intro h1 {
+    font-size: 22px;
+  }
+
+  .field-assistant-prompts {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .field-assistant-prompts button {
+    min-height: 42px;
+    place-content: center;
+    padding: 8px 10px;
+    text-align: center;
   }
 
   .field-compatibility-controls,

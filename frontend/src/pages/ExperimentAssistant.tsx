@@ -53,6 +53,7 @@ import {
   type ManagedModelCatalogEntry,
 } from "../features/settings/cloudModelAccess";
 import { useI18n } from "../i18n/I18nProvider";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type {
   ExperimentAssistantDocumentContext,
   ExperimentAssistantTurnResponse,
@@ -330,6 +331,7 @@ function assistantErrorMessage(
 export function ExperimentAssistant() {
   const navigate = useNavigate();
   const { locale } = useI18n();
+  const editionTheme = useEditionTheme();
   const auth = useOptionalAuth();
   const ownerId = auth?.account?.id ?? "local";
   const copy = COPY[locale];
@@ -657,7 +659,11 @@ export function ExperimentAssistant() {
   const remainingLabels = latest ? reviewLabels(latest, locale) : [];
 
   return (
-    <section className={`experiment-assistant-page ${messages.length ? "has-messages" : ""}`}>
+    <section
+      className={`experiment-assistant-page ${messages.length ? "has-messages" : ""}`}
+      data-brand-edition={editionTheme.id}
+      data-grants-hardware-authority="false"
+    >
       <div className="experiment-assistant-stage">
         {messages.length === 0 ? (
           <div className="assistant-empty-state">
