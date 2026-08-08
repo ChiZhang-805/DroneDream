@@ -43,6 +43,8 @@ class UniversalBrowserConsentContractTest(unittest.TestCase):
         self.assertIn('exactWindowTitle = "DroneDream - Google Chrome"', source)
         self.assertIn('exactWindowClass = "Chrome_WidgetWin_1"', source)
         self.assertIn("Get-AuthenticodeSignature", source)
+        self.assertIn("Sort-Object sampledPixels -Descending", source)
+        self.assertIn("$rowCount -ge 100", source)
         self.assertIn("GetForegroundWindow() -ne $target.handle", source)
         self.assertEqual(source.count("mouse_event(0x0002"), 1)
         self.assertEqual(source.count("mouse_event(0x0004"), 1)

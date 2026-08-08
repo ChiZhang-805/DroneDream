@@ -90,10 +90,11 @@ function Find-ConsentTarget {
     $graphics = [Drawing.Graphics]::FromImage($bitmap)
     try {
         $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, [Drawing.Size]::new($width, $height))
-        $minX = $width; $minY = $height; $maxX = -1; $maxY = -1; $count = 0
+        $rows = @()
         $xStart = [int]($width * 0.25); $xEnd = [int]($width * 0.75)
         $yStart = [int]($height * 0.40); $yEnd = [int]($height * 0.78)
         for ($y = $yStart; $y -lt $yEnd; $y += 2) {
+            $rowMinX = $width; $rowMaxX = -1; $rowCount = 0
             for ($x = $xStart; $x -lt $xEnd; $x += 2) {
                 $pixel = $bitmap.GetPixel($x, $y)
                 if ($pixel.R -ge 65 -and $pixel.R -le 155 -and
@@ -101,17 +102,40 @@ function Find-ConsentTarget {
                     $pixel.B -ge 145 -and
                     ($pixel.B - $pixel.R) -ge 35 -and
                     ($pixel.B - $pixel.G) -ge 55) {
-                    $count++
-                    if ($x -lt $minX) { $minX = $x }
-                    if ($x -gt $maxX) { $maxX = $x }
-                    if ($y -lt $minY) { $minY = $y }
-                    if ($y -gt $maxY) { $maxY = $y }
+                    $rowCount++
+                    if ($x -lt $rowMinX) { $rowMinX = $x }
+                    if ($x -gt $rowMaxX) { $rowMaxX = $x }
                 }
             }
+            if ($rowCount -ge 100 -and ($rowMaxX - $rowMinX) -ge 280) {
+                $rows += [ordered]@{ y = $y; minX = $rowMinX; maxX = $rowMaxX; count = $rowCount }
+            }
         }
-        if ($count -lt 1200) { return $null }
+
+        $bands = @(); $band = $null
+        foreach ($row in $rows) {
+            if ($null -eq $band -or $row.y -gt ($band.maxY + 2)) {
+                if ($null -ne $band) { $bands += $band }
+                $band = [ordered]@{
+                    minX = $row.minX; maxX = $row.maxX; minY = $row.y; maxY = $row.y
+                    sampledPixels = $row.count
+                }
+            }
+            else {
+                if ($row.minX -lt $band.minX) { $band.minX = $row.minX }
+                if ($row.maxX -gt $band.maxX) { $band.maxX = $row.maxX }
+                $band.maxY = $row.y
+                $band.sampledPixels += $row.count
+            }
+        }
+        if ($null -ne $band) { $bands += $band }
+        $candidate = @($bands | Sort-Object sampledPixels -Descending | Select-Object -First 1)
+        if ($candidate.Count -ne 1 -or $candidate[0].sampledPixels -lt 1200) { return $null }
+        $minX = $candidate[0].minX; $maxX = $candidate[0].maxX
+        $minY = $candidate[0].minY; $maxY = $candidate[0].maxY
+        $count = $candidate[0].sampledPixels
         $buttonWidth = $maxX - $minX
-        $buttonHeight = $maxY - $minY
+        $buttonHeight = $maxY - $minY + 2
         if ($buttonWidth -lt 280 -or $buttonWidth -gt 760 -or
             $buttonHeight -lt 35 -or $buttonHeight -gt 100) { return $null }
         return [ordered]@{
