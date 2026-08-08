@@ -7901,12 +7901,12 @@ a {
   color: #554b59;
 }
 
-.app-shell:not(.app-shell-launcher) .app-nav-link:hover {
+.app-shell:not(.app-shell-launcher) .app-nav a:hover {
   background: #faf1f9;
   color: #8b328f;
 }
 
-.app-shell:not(.app-shell-launcher) .app-nav-link-active {
+.app-shell:not(.app-shell-launcher) .app-nav a.active {
   background: linear-gradient(90deg, #f9e9f6, #f2eafb);
   color: #8b328f;
   box-shadow: inset 3px 0 0 #cb4eb3;
@@ -12389,6 +12389,67 @@ a {
   --focus-ring:
     0 0 0 2px color-mix(in srgb, var(--dd-brand-middle) 52%, transparent),
     0 0 24px color-mix(in srgb, var(--dd-brand-end) 28%, transparent);
+}
+
+.app-shell:not(.app-shell-launcher) {
+  --bg: color-mix(in srgb, var(--dd-brand-light-surface) 82%, #f7f7fb);
+  --bg-elev: #ffffff;
+  --bg-elev-2: color-mix(in srgb, var(--dd-brand-light-surface) 68%, #ffffff);
+  --bg-subtle: color-mix(in srgb, var(--dd-brand-light-surface) 78%, #eef1f0);
+  --border: color-mix(in srgb, var(--dd-brand-middle) 16%, #e4e6e5);
+  --border-strong: color-mix(in srgb, var(--dd-brand-middle) 28%, #cfd4d1);
+  --primary: var(--dd-brand-middle);
+  --primary-strong: var(--dd-brand-end);
+  --active: var(--dd-brand-start);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--dd-brand-middle) 22%, transparent);
+  background:
+    radial-gradient(
+      circle at 92% 5%,
+      color-mix(in srgb, var(--dd-brand-start) 13%, transparent),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 8% 92%,
+      color-mix(in srgb, var(--dd-brand-end) 8%, transparent),
+      transparent 30rem
+    ),
+    var(--bg);
+}
+
+.app-shell:not(.app-shell-launcher) a {
+  color: var(--dd-brand-middle);
+}
+
+.app-shell:not(.app-shell-launcher) .app-nav a:hover {
+  color: var(--dd-brand-end);
+  background: color-mix(in srgb, var(--dd-brand-start) 13%, #ffffff);
+}
+
+.app-shell:not(.app-shell-launcher) .app-nav a.active {
+  color: var(--dd-brand-end);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--dd-brand-start) 16%, #ffffff),
+    color-mix(in srgb, var(--dd-brand-middle) 10%, #ffffff)
+  );
+  box-shadow: inset 3px 0 var(--dd-brand-middle);
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-settings-button,
+.app-shell:not(.app-shell-launcher) .app-mobile-settings-entry {
+  color: var(--dd-brand-end);
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 32%, #d7dcd9);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 72%, #ffffff);
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--dd-brand-end) 9%, transparent);
+}
+
+.app-shell:not(.app-shell-launcher) .launcher-settings-button:hover,
+.app-shell:not(.app-shell-launcher) .launcher-settings-button:focus-visible,
+.app-shell:not(.app-shell-launcher) .app-mobile-settings-entry:hover,
+.app-shell:not(.app-shell-launcher) .app-mobile-settings-entry:focus-visible {
+  color: var(--dd-brand-end);
+  border-color: var(--dd-brand-middle);
+  background: color-mix(in srgb, var(--dd-brand-start) 14%, #ffffff);
 }
 
 body {
