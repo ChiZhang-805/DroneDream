@@ -106,7 +106,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $integratedUi.contractId -cne "dronedream-universal-integrated-workspaces/v2" -or
     $integratedUi.manifest -cne "distribution/universal/integrated-workspaces.v2.json" -or
     $integratedUi.sha256 -cnotmatch "^[0-9a-f]{64}$" -or
-    $integratedUi.sourceFileCount -ne 10 -or
+    $integratedUi.sourceFileCount -ne 12 -or
     (@($integratedUi.workspaceModes) -join ",") -cne "sim,lab,field" -or
     $integratedUi.createsCrossEditionHarnessOrchestrator -ne $false -or
     $integratedUi.presentationOnly -ne $true -or

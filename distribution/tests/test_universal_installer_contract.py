@@ -285,6 +285,7 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'Universal shared UI source binding drifted:',
         'Universal shared UI visual evidence hash drifted.',
         'dronedream-universal-integrated-workspaces/v2',
+        '$integratedUi.sourceFileCount -ne 12',
         'Universal integrated workspace manifest hash drifted.',
         'Universal integrated workspace source binding drifted:',
         'Universal integrated workspace byte-exact donor drifted:',
