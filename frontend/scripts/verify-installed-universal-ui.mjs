@@ -76,11 +76,16 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   const page = pages.find((candidate) => /(?:tauri|localhost)/u.test(candidate.url())) ?? pages[0];
   await page.waitForLoadState("domcontentloaded");
   await page.evaluate(() => {
-    if (window.location.pathname !== "/desktop/setup") {
-      window.history.replaceState({}, "", "/desktop/setup");
-      window.dispatchEvent(new PopStateEvent("popstate"));
+    // Packaged desktop builds use createHashRouter. Changing pathname here
+    // reloads the WebView at an unowned resource URL and the app falls back to
+    // its Universal launcher, which can masquerade as a failed theme switch.
+    if (window.location.hash !== "#/desktop/setup") {
+      const launcherUrl = new URL(window.location.href);
+      launcherUrl.hash = "/desktop/setup";
+      window.location.replace(launcherUrl.href);
     }
   });
+  await page.waitForURL((url) => url.hash === "#/desktop/setup");
   await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
 
   const initialViewport = await page.evaluate(() => ({
@@ -140,8 +145,12 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
       "dronedream:universal-workspace:v2",
       nextEdition === "universal" ? "sim" : nextEdition,
     );
-    window.location.assign(nextRoute);
+    // Preserve the packaged app resource URL and change only the router hash.
+    const presentationUrl = new URL(window.location.href);
+    presentationUrl.hash = nextRoute;
+    window.location.replace(presentationUrl.href);
   }, { nextLocale: locale, nextEdition: edition, nextRoute: presentationRoute });
+  await page.waitForURL((url) => url.hash === `#${presentationRoute}`);
   await page.waitForLoadState("domcontentloaded");
   await page.locator(".launcher-settings-button:visible").first().waitFor({
     state: "visible",

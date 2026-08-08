@@ -88,7 +88,10 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
     for fragment in (
         'chromium.connectOverCDP(cdpEndpoint)',
         'dronedream:universal-workspace:v2',
-        'window.location.pathname !== "/desktop/setup"',
+        'window.location.hash !== "#/desktop/setup"',
+        'launcherUrl.hash = "/desktop/setup"',
+        'presentationUrl.hash = nextRoute',
+        'url.hash === `#${presentationRoute}`',
         'nextEdition === "universal" ? "sim" : nextEdition',
         '"/vehicle-studio"',
         'startupTheme',
@@ -107,6 +110,8 @@ def test_headed_browser_observer_covers_full_finite_matrix_without_authority() -
     assert "CDP must remain loopback-only" in script
     assert "must never own or terminate the app" in script
     assert "await browser.close()" not in script
+    assert "window.location.assign(nextRoute)" not in script
+    assert 'window.history.replaceState({}, "", "/desktop/setup")' not in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
     assert "requestId" not in script
