@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import fieldFixture from "../__fixtures__/field-harness-receipt.fake.json";
 import simFixture from "../__fixtures__/sim-qualification-bridge.fake.json";
@@ -24,6 +24,10 @@ async function rehashReceipt(value: typeof fieldFixture): Promise<typeof fieldFi
 }
 
 describe("Lab Field evidence bridge", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("verifies the exact Field receipt, JCS, selected candidate, and holdout", async () => {
     const receipt = await parseFieldHarnessReceipt("field.json", fieldSource());
 
@@ -44,16 +48,40 @@ describe("Lab Field evidence bridge", () => {
     const field = await parseFieldHarnessReceipt("field.json", fieldSource());
     const decision = evaluateSimFieldBridge(simulation, field);
 
-    expect(decision.state).toBe("awaiting-sim-donor-and-metrics");
+    expect(decision.state).toBe("normalization-required");
     expect(decision.identityMatched).toBe(false);
     expect(decision.candidateLineageMatched).toBe(true);
     expect(decision.calibrationReady).toBe(false);
     expect(decision.qualificationDecision).toBe("deny");
     expect(decision.hardwareAuthority).toBe(false);
-    expect(decision.blockers).toContain("lab.sim-donor.not-accepted");
+    expect(decision.blockers).not.toContain("lab.sim-donor.not-accepted");
     expect(decision.blockers).toContain("lab.job-binding.missing");
     expect(decision.blockers).toContain("lab.metric-normalization-receipt.missing");
     expect(decision.bindings.fieldSnapshotSha256).toBe(field.snapshotSha256);
+  });
+
+  it("accepts Lab-native recorded evidence only when bound to the exact build source", async () => {
+    const labSource = "9".repeat(40);
+    vi.stubEnv("VITE_DRONEDREAM_SOURCE_COMMIT", labSource);
+    const labReceipt = {
+      ...structuredClone(fieldFixture),
+      editionId: "lab",
+      sourceCommit: labSource,
+      jobId: "lab-harness-fixture-001",
+    } as unknown as typeof fieldFixture;
+    const receipt = await parseFieldHarnessReceipt(
+      "lab-recorded.json",
+      fieldSource(await rehashReceipt(labReceipt)),
+    );
+
+    expect(receipt.editionId).toBe("lab");
+    expect(receipt.sourceCommit).toBe(labSource);
+
+    vi.stubEnv("VITE_DRONEDREAM_SOURCE_COMMIT", "8".repeat(40));
+    await expect(parseFieldHarnessReceipt(
+      "lab-recorded.json",
+      fieldSource(await rehashReceipt(labReceipt)),
+    )).rejects.toThrow(/accepted product source/);
   });
 
   it("denies candidate, Vehicle Pack, common-core, and replay mismatches", async () => {

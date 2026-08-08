@@ -30,6 +30,7 @@ export interface LabCalibrationInput {
   objectiveContractHash: string;
   constraintContractHash: string;
   holdoutContractHash: string;
+  metricNormalizationReceiptHash: string;
   sourceKind: "historical-import" | "test-fixture";
   simulation: CalibrationMetrics;
   realObservation: CalibrationMetrics;
@@ -225,6 +226,7 @@ export function parseLabCalibrationInput(
       "objectiveContractHash",
       "constraintContractHash",
       "holdoutContractHash",
+      "metricNormalizationReceiptHash",
     ],
     "Evidence binding",
   );
@@ -283,6 +285,10 @@ export function parseLabCalibrationInput(
     holdoutContractHash: shaValue(
       evidence.holdoutContractHash,
       "Holdout contract hash",
+    ),
+    metricNormalizationReceiptHash: shaValue(
+      evidence.metricNormalizationReceiptHash,
+      "Metric normalization receipt hash",
     ),
     sourceKind,
     simulation: parseMetrics(receipt.simulation, "Simulation metrics"),
@@ -409,6 +415,7 @@ export function buildLabCalibrationDraftReceipt(
       objectiveContractHash: input.objectiveContractHash,
       constraintContractHash: input.constraintContractHash,
       holdoutContractHash: input.holdoutContractHash,
+      metricNormalizationReceiptHash: input.metricNormalizationReceiptHash,
     },
     analysis: {
       objective: analysis.objective,

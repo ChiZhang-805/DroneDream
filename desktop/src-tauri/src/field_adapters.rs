@@ -18,6 +18,8 @@ use uuid::Uuid;
 
 use mavlink::{peek_reader::PeekReader, Message};
 
+use crate::hardware_domain;
+
 const CATALOG_RAW: &str =
     include_str!("../../../distribution/editions/field/adapters/catalog.v1.json");
 const MAVLINK_COMMON_RAW: &str = include_str!(
@@ -499,7 +501,7 @@ fn adapter_root(app: &AppHandle) -> Result<PathBuf, String> {
     }
     let adapters = local.join("adapters");
     ensure_plain_directory(&adapters)?;
-    let field = adapters.join("field");
+    let field = adapters.join(hardware_domain::edition_id());
     ensure_plain_directory(&field)?;
     Ok(field)
 }
@@ -571,7 +573,7 @@ fn catalog_report(root: &Path) -> Result<FieldAdapterCatalogReport, String> {
         schema_version: 1,
         kind: "dronedream-field-adapter-catalog-report",
         catalog_version: catalog.catalog_version,
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         source: "source-bound-embedded-catalog",
         catalog_sha256: sha256_hex(CATALOG_RAW.as_bytes()),
         hardware_authority: false,
@@ -625,7 +627,7 @@ fn install_to_root(
         return Ok(FieldAdapterInstallReceipt {
             schema_version: 1,
             kind: "dronedream-field-adapter-install-receipt",
-            edition_id: "field",
+            edition_id: hardware_domain::edition_id(),
             adapter_id: entry.adapter_id.clone(),
             package_sha256: actual,
             state: "already-installed",
@@ -667,7 +669,7 @@ fn install_to_root(
     Ok(FieldAdapterInstallReceipt {
         schema_version: 1,
         kind: "dronedream-field-adapter-install-receipt",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         adapter_id: entry.adapter_id.clone(),
         package_sha256: expected.to_string(),
         state: "installed",
@@ -720,7 +722,7 @@ fn inspect_mavlink_message<M: Message>(
     Ok(FieldAdapterFrameInspection {
         schema_version: 1,
         kind: "dronedream-field-adapter-frame-inspection",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         adapter_id: adapter_id.to_string(),
         protocol_version,
         system_id: header.system_id,
@@ -790,7 +792,7 @@ fn protocol_inspection(
     FieldProtocolFrameInspection {
         schema_version: 1,
         kind: "dronedream-field-protocol-frame-inspection",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         adapter_id: adapter_id.to_string(),
         protocol_family,
         classification: classification.into(),
@@ -1354,7 +1356,7 @@ fn probe_from_reader(
     Ok(FieldMavlinkTelemetryProbeReceipt {
         schema_version: 1,
         kind: "dronedream-field-mavlink-telemetry-probe-receipt",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         adapter_id: request.adapter_id.clone(),
         observation_id: request.observation_id.clone(),
         port_name: request.port_name.clone(),
@@ -1381,9 +1383,7 @@ fn probe_from_reader(
 pub(crate) fn get_field_adapter_catalog(
     app: AppHandle,
 ) -> Result<FieldAdapterCatalogReport, String> {
-    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field" {
-        return Err("Field adapters are unavailable in this edition".to_string());
-    }
+    hardware_domain::require_available()?;
     let root = adapter_root(&app)?;
     catalog_report(&root)
 }
@@ -1393,9 +1393,7 @@ pub(crate) fn install_field_adapter(
     app: AppHandle,
     request: FieldAdapterInstallRequest,
 ) -> Result<FieldAdapterInstallReceipt, String> {
-    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field" {
-        return Err("Field adapters are unavailable in this edition".to_string());
-    }
+    hardware_domain::require_available()?;
     let root = adapter_root(&app)?;
     install_to_root(&root, &request)
 }
@@ -1405,9 +1403,7 @@ pub(crate) fn inspect_field_adapter_frame(
     app: AppHandle,
     request: FieldAdapterFrameInspectionRequest,
 ) -> Result<FieldAdapterFrameInspection, String> {
-    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field" {
-        return Err("Field adapters are unavailable in this edition".to_string());
-    }
+    hardware_domain::require_available()?;
     let root = adapter_root(&app)?;
     inspect_frame(&root, &request)
 }
@@ -1417,9 +1413,7 @@ pub(crate) fn inspect_field_protocol_frame(
     app: AppHandle,
     request: FieldProtocolFrameInspectionRequest,
 ) -> Result<FieldProtocolFrameInspection, String> {
-    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field" {
-        return Err("Field protocol inspection is unavailable in this edition".to_string());
-    }
+    hardware_domain::require_available()?;
     let root = adapter_root(&app)?;
     inspect_protocol_frame(&root, &request)
 }
@@ -1429,9 +1423,7 @@ pub(crate) fn probe_field_mavlink_telemetry(
     app: AppHandle,
     request: FieldMavlinkTelemetryProbeRequest,
 ) -> Result<FieldMavlinkTelemetryProbeReceipt, String> {
-    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field" {
-        return Err("Field telemetry probing is unavailable in this edition".to_string());
-    }
+    hardware_domain::require_available()?;
     let root = adapter_root(&app)?;
     validate_probe_contract(&root, &request)?;
     crate::field_device::validate_field_serial_observation(

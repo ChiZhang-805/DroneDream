@@ -104,6 +104,7 @@ const COPY = {
     adapterState: "Adapter state",
     adapterStateValue: "Not validated",
     discovery: "Discover controller",
+    openHardware: "Open hardware laboratory",
     write: "Write parameters",
     arm: "Arm vehicle",
     flight: "Start flight / HITL",
@@ -182,6 +183,7 @@ const COPY = {
     adapterState: "适配器状态",
     adapterStateValue: "尚未验证",
     discovery: "发现飞控",
+    openHardware: "打开真机实验室",
     write: "写入参数",
     arm: "解锁飞行器",
     flight: "启动飞行 / HITL",
@@ -471,6 +473,9 @@ export function LabSetup() {
                 <div><strong>{copy.actionsDenied}</strong><p>{copy.actionsDeniedBody}</p></div>
               </div>
               <div className="lab-hardware-actions" aria-label={copy.actionsDenied}>
+                <Link to="/lab/hardware" className="btn btn-primary">
+                  <RadioTower aria-hidden="true" /> {copy.openHardware}
+                </Link>
                 {[copy.discovery, copy.write, copy.arm, copy.flight].map((label) => (
                   <button key={label} type="button" className="btn" disabled>
                     <LockKeyhole aria-hidden="true" /> {label}

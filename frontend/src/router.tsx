@@ -115,6 +115,12 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
                 const { LabSetup } = await import("./lab/LabSetup");
                 return { Component: LabSetup };
               },
+            } satisfies RouteObject, {
+              path: "lab/hardware",
+              lazy: async () => {
+                const { LabHardwareWorkspace } = await import("./lab/LabHardwareWorkspace");
+                return { Component: LabHardwareWorkspace };
+              },
             } satisfies RouteObject]
           : []),
         { path: "*", loader: () => redirect(fallbackPath) },

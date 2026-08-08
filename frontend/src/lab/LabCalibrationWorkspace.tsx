@@ -16,6 +16,10 @@ import {
 
 import { useI18n } from "../i18n/I18nProvider";
 import {
+  evaluateLabCalibrationCycle,
+  isDesktopRuntime,
+} from "../desktop/bridge";
+import {
   LabCalibrationInputError,
   analyzeLabCalibration,
   parseLabCalibrationInput,
@@ -196,10 +200,44 @@ export function LabCalibrationWorkspace() {
     setError(null);
   }
 
-  function exportDraft() {
+  async function exportDraft() {
     if (!input || !analysis) return;
+    let source: string;
+    if (isDesktopRuntime()) {
+      try {
+        const receipt = await evaluateLabCalibrationCycle({
+          schemaVersion: 1,
+          jobId: input.jobId,
+          cycleOrdinal: input.cycleOrdinal,
+          commonCoreCommit: input.commonCoreCommit,
+          editionManifestSha256: input.editionManifestSha256,
+          vehiclePackId: input.vehiclePackId,
+          controllerIdentity: input.controllerIdentity,
+          firmwareIdentity: input.firmwareIdentity,
+          simulationReceiptSha256: input.simulationReceiptHash,
+          realObservationReceiptSha256: input.realObservationReceiptHash,
+          parameterCandidateSha256: input.parameterCandidateHash,
+          objectiveContractSha256: input.objectiveContractHash,
+          constraintContractSha256: input.constraintContractHash,
+          holdoutContractSha256: input.holdoutContractHash,
+          metricNormalizationReceiptSha256: input.metricNormalizationReceiptHash,
+          objective,
+          tolerancePercent: tolerance,
+          cycleBudget,
+          simulation: input.simulation,
+          realObservation: input.realObservation,
+          independentHoldoutPassed: false,
+        });
+        source = `${JSON.stringify(receipt, null, 2)}\n`;
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : copy.rejected);
+        return;
+      }
+    } else {
+      source = serializeLabCalibrationDraftReceipt(input, analysis);
+    }
     const blob = new Blob(
-      [serializeLabCalibrationDraftReceipt(input, analysis)],
+      [source],
       { type: "application/json" },
     );
     const url = URL.createObjectURL(blob);

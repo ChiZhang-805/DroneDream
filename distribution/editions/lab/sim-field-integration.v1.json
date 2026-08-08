@@ -2,37 +2,35 @@
   "schemaVersion": 1,
   "kind": "dronedream-lab-sim-field-integration",
   "editionId": "lab",
-  "integrationState": "field-donor-accepted-sim-donor-pending",
+  "integrationState": "sim-and-field-capabilities-integrated",
+  "simDonor": {
+    "branch": "codex/software-sim",
+    "productSource": "ef70567fe4c34f261fc9f16defb6e98e95f337dc",
+    "tree": "c102508870dcc98e534e1f4e51696bfed77ff18b",
+    "modelHarnessFeatureSource": "38731d530fdf3bfed6dde43167856f9c6b4a5d67",
+    "integrationMode": "path-limited-semantic-forward-sync",
+    "standaloneSimShellCopiedIntoLab": false,
+    "sharedCoreForkCreated": false
+  },
   "fieldDonor": {
     "branch": "codex/software-field",
-    "productSource": "45e897faca6b48773f0a49d2f4d74ec67ae967fe",
-    "tree": "bd513282437004fde4464a33b498c5e98a01e5f3",
+    "productSource": "2f8fa28564dab7b1ff264c853705535373cb9068",
+    "tree": "afb7b4db584bf71e03d2f0b707b8b992e96bc7e7",
+    "authWireContractSource": "1129b561a187edf9ddb3214f3e8c993be31f281b",
     "commonCoreCommit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
     "originExactAtHandoff": true,
-    "integrationMode": "semantic-receipt-adapter",
-    "fieldSourceCopiedIntoLab": false,
-    "acceptedSurfaces": [
-      {
-        "path": "distribution/editions/field.v1.json",
-        "bytes": 2936,
-        "sha256": "cbd2c3a10843601469f91ef7d097c72459becaa6e60c387e39b721e76680bd08"
-      },
-      {
-        "path": "distribution/editions/field/field-tuning-contract.v1.json",
-        "bytes": 1988,
-        "sha256": "141a29cc9425c3857ddcf477e41d168184095adc9c7031deb16ef474b40f8815"
-      },
-      {
-        "path": "frontend/src/field/tuning.ts",
-        "bytes": 4988,
-        "sha256": "c95e1d80b76f5f1c9a92965394839610c3043df901c8764802159dc6e3abfcb7"
-      },
-      {
-        "path": "desktop/src-tauri/src/field_harness.rs",
-        "bytes": 29049,
-        "sha256": "5154c102c68a7c20e8c1d0d7744e90973f903d4fa8fd347a1371fb4da570264e"
-      }
-    ]
+    "integrationMode": "path-limited-semantic-forward-sync",
+    "fieldStandaloneShellCopiedIntoLab": false,
+    "fieldNoSimulationInstallerPolicyAppliedToLab": false,
+    "sharedCoreForkCreated": false,
+    "acceptedCapabilityGroups": [
+      "managed-read-only-protocol-adapters",
+      "recorded-telemetry-and-parameter-snapshots",
+      "bounded-model-harness-evidence-replay",
+      "preflight-and-rollback-planning",
+      "hardware-laboratory-workspace"
+    ],
+    "syncReceipt": "distribution/editions/lab/field-2f8fa285-capability-sync.v1.json"
   },
   "principles": {
     "reuseMatureEditionModules": true,
@@ -47,7 +45,9 @@
   "simInput": {
     "envelopeKind": "dronedream-simulation-qualification-receipt",
     "schemaVersion": 1,
-    "donorState": "awaiting-exact-product-source",
+    "donorState": "accepted-exact-product-source",
+    "productSource": "ef70567fe4c34f261fc9f16defb6e98e95f337dc",
+    "modelHarnessFeatureSource": "38731d530fdf3bfed6dde43167856f9c6b4a5d67",
     "requiredBindings": [
       "simJobId",
       "commonCoreCommit",
@@ -142,13 +142,13 @@
   ],
   "currentGate": {
     "validatedVehiclePackCount": 0,
-    "simDonorAccepted": false,
+    "simDonorAccepted": true,
     "fieldDonorAccepted": true,
-    "fieldEvidenceAdapterState": "accepted-offline-recorded-evidence-only",
-    "jobBindingDecision": "deny",
-    "metricNormalizationDecision": "deny",
+    "fieldEvidenceAdapterState": "integrated-recorded-evidence-and-denied-hardware-planning",
+    "jobBindingDecision": "conditional-exact-match",
+    "metricNormalizationDecision": "explicit-receipt-required",
     "hardwareExecutionDecision": "deny",
     "qualificationIssueDecision": "deny",
-    "fieldHandoffDecision": "deny"
+    "fieldHandoffDecision": "draft-only"
   }
 }

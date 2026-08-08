@@ -4,6 +4,7 @@ import type {
   FieldTuningDemoRequest,
   FieldTuningStatus,
 } from "../desktop/bridge";
+import { hardwareDomainEdition, hardwareDomainRuntimeProfile } from "./hardwareDomain";
 
 const FIXTURE_COMMIT = "0000000000000000000000000000000000000000";
 const FIXTURE_PACK = `sha256:${"0".repeat(64)}`;
@@ -20,9 +21,9 @@ export function fieldBrowserStatus(): FieldTuningStatus {
   return {
     schemaVersion: 1,
     kind: "dronedream-field-tuning-status",
-    editionId: "field",
+    editionId: hardwareDomainEdition,
     executionDomain: "real-hardware",
-    runtimeProfile: "field-lightweight",
+    runtimeProfile: hardwareDomainRuntimeProfile,
     sourceCommit: FIXTURE_COMMIT,
     enginePackId: FIXTURE_PACK,
     contractSha256: "0".repeat(64),
@@ -76,7 +77,7 @@ export function runFieldBrowserFixture(
     schemaVersion: 1,
     kind: "dronedream-field-tuning-demo-receipt",
     jobId: `field-browser-demo-${request.maxIterations}`,
-    editionId: "field",
+    editionId: hardwareDomainEdition,
     executionDomain: "real-hardware",
     executionMode: "fixture-only-no-device-io",
     sourceCommit: FIXTURE_COMMIT,
@@ -112,7 +113,7 @@ export function fieldBrowserHardwareDenial(): FieldHardwareTuningPlan {
     schemaVersion: 1,
     kind: "dronedream-field-hardware-tuning-plan",
     jobId: "field-browser-hardware-plan-fixture",
-    editionId: "field",
+    editionId: hardwareDomainEdition,
     executionDomain: "real-hardware",
     sourceCommit: FIXTURE_COMMIT,
     requestSha256: "0".repeat(64),

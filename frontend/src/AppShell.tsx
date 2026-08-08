@@ -23,6 +23,7 @@ import {
   MapPinned,
   Menu,
   MoreHorizontal,
+  RadioTower,
   Save,
   Settings,
   ShieldCheck,
@@ -162,6 +163,11 @@ const NAV_ITEMS: NavigationItem[] = labEditionEnabled
         labelKey: "app.labWorkspace",
         end: true,
         icon: FlaskConical,
+      },
+      {
+        to: "/lab/hardware",
+        labelKey: "app.hardwareLab",
+        icon: RadioTower,
       },
       ...CORE_NAV_ITEMS,
     ]

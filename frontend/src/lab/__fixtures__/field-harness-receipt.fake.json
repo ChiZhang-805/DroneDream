@@ -6,7 +6,7 @@
   "editionId": "field",
   "executionDomain": "real-device-recorded-evidence",
   "executionMode": "offline-evidence-replay-no-device-io",
-  "sourceCommit": "45e897faca6b48773f0a49d2f4d74ec67ae967fe",
+  "sourceCommit": "2f8fa28564dab7b1ff264c853705535373cb9068",
   "enginePackId": "sha256:be477878d2c9e8ea273813357aa4af57e7599eb075beb790784322359018d90c",
   "requestSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "jobName": "LAB bridge fixture",
@@ -115,5 +115,5 @@
   "armAttempts": 0,
   "flightAttempts": 0,
   "hardwareAuthority": false,
-  "receiptSha256": "6c6e9e444bd859ee6eac8b75fd318e920e099e962b8530e5f7472911049a052e"
+  "receiptSha256": "8a1df763d326aa1ea52e08547acc3e74edd4f2a823642e7255db948b0345a761"
 }

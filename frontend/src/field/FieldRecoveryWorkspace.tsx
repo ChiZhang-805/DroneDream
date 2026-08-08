@@ -27,6 +27,7 @@ import {
 } from "../desktop/bridge";
 import sourceCatalog from "../../../distribution/editions/field/adapters/catalog.v1.json";
 import type { FieldLocale } from "./catalog";
+import { hardwareDomainEdition } from "./hardwareDomain";
 import type { FieldReadOnlyProtocolEvidence } from "./FieldAdapterCenter";
 
 const COPY = {
@@ -242,7 +243,7 @@ export function FieldRecoveryWorkspace({
         const summary: FieldParameterSnapshotSummary = {
           schemaVersion: 1,
           kind: "dronedream-field-parameter-snapshot-summary",
-          editionId: "field",
+          editionId: hardwareDomainEdition,
           sourceCommit: next.sourceCommit,
           deviceObservationId: next.deviceObservationId,
           vehiclePackId: next.vehiclePackId,

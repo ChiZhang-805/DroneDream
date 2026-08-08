@@ -37,13 +37,13 @@ describe("Lab SIM / FIELD evidence bridge panel", () => {
       fixtureFile("field-recorded.fake.json", fieldFixture),
     );
 
-    expect(await screen.findByText("Candidate lineage matched · calibration blocked"))
+    expect(await screen.findByText("Candidate lineage matched · normalization required"))
       .toBeInTheDocument();
     expect(screen.getByText(/field-recorded\.fake\.json · Integrity verified/))
       .toBeInTheDocument();
     expect(screen.getByText("Recorded evidence passed")).toBeInTheDocument();
-    expect(screen.getByText("Remaining gates · 6")).toBeInTheDocument();
-    expect(root).toHaveAttribute("data-bridge-state", "awaiting-sim-donor-and-metrics");
+    expect(screen.getByText("Remaining gates · 5")).toBeInTheDocument();
+    expect(root).toHaveAttribute("data-bridge-state", "normalization-required");
     expect(screen.getByText("Evidence import never grants hardware authority."))
       .toBeInTheDocument();
   });

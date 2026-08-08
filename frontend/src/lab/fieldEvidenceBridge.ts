@@ -1,7 +1,7 @@
 import type { LabEvidencePreview } from "./evidencePreview";
 
-export const FIELD_PRODUCT_SOURCE = "45e897faca6b48773f0a49d2f4d74ec67ae967fe";
-export const FIELD_PRODUCT_TREE = "bd513282437004fde4464a33b498c5e98a01e5f3";
+export const FIELD_PRODUCT_SOURCE = "2f8fa28564dab7b1ff264c853705535373cb9068";
+export const FIELD_PRODUCT_TREE = "afb7b4db584bf71e03d2f0b707b8b992e96bc7e7";
 export const FIELD_EDITION_MANIFEST_SHA256 =
   "cbd2c3a10843601469f91ef7d097c72459becaa6e60c387e39b721e76680bd08";
 export const FIELD_TUNING_CONTRACT_SHA256 =
@@ -10,8 +10,9 @@ export const LAB_COMMON_CORE_COMMIT = "e374d3f8d96b1265fcdb06864208b676566e94d9"
 export const MAX_FIELD_RECEIPT_BYTES = 512 * 1024;
 
 const SHA256 = /^[a-f0-9]{64}$/;
+const COMMIT = /^[a-f0-9]{40}$/;
 const ENGINE_PACK = /^sha256:[a-f0-9]{64}$/;
-const JOB_ID = /^field-harness-[a-z0-9-]{1,82}$/;
+const JOB_ID = /^(?:field|lab)-harness-[a-z0-9-]{1,82}$/;
 const PARAMETER = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,79}$/;
 const RFC3339_SECONDS_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const FORBIDDEN_FIELD = /(api[-_]?key|authorization|cookie|email|header|password|secret|token)/i;
@@ -40,8 +41,9 @@ export interface FieldHarnessTrialReceipt {
 
 export interface FieldHarnessReceipt {
   fileName: string;
+  editionId: "field" | "lab";
   jobId: string;
-  sourceCommit: typeof FIELD_PRODUCT_SOURCE;
+  sourceCommit: string;
   enginePackId: string;
   requestSha256: string;
   deviceObservationId: string;
@@ -67,7 +69,7 @@ export interface FieldHarnessReceipt {
 }
 
 export interface LabSimFieldBridgeDecision {
-  state: "waiting-for-evidence" | "mismatch-denied" | "awaiting-sim-donor-and-metrics";
+  state: "waiting-for-evidence" | "mismatch-denied" | "normalization-required";
   identityMatched: boolean;
   candidateLineageMatched: boolean;
   calibrationReady: false;
@@ -348,14 +350,21 @@ export async function parseFieldHarnessReceipt(
   if (
     receipt.schemaVersion !== 1
     || receipt.kind !== "dronedream-field-harness-job-receipt"
-    || receipt.editionId !== "field"
+    || (receipt.editionId !== "field" && receipt.editionId !== "lab")
     || receipt.executionDomain !== "real-device-recorded-evidence"
     || receipt.executionMode !== "offline-evidence-replay-no-device-io"
   ) {
     throw new FieldEvidenceBridgeError("The Field receipt identity is unsupported.");
   }
-  if (receipt.sourceCommit !== FIELD_PRODUCT_SOURCE) {
-    throw new FieldEvidenceBridgeError("The Field receipt is not bound to the accepted product source.");
+  const editionId = receipt.editionId;
+  const sourceCommit = stringValue(receipt.sourceCommit, "Recorded evidence source");
+  const expectedSource = editionId === "field"
+    ? FIELD_PRODUCT_SOURCE
+    : import.meta.env.VITE_DRONEDREAM_SOURCE_COMMIT;
+  if (!COMMIT.test(sourceCommit) || !expectedSource || sourceCommit !== expectedSource) {
+    throw new FieldEvidenceBridgeError(
+      "The recorded evidence is not bound to the accepted product source.",
+    );
   }
   const createdAt = stringValue(receipt.createdAt, "Field receipt timestamp");
   if (!RFC3339_SECONDS_UTC.test(createdAt) || Number.isNaN(Date.parse(createdAt))) {
@@ -513,8 +522,9 @@ export async function parseFieldHarnessReceipt(
   }
   return {
     fileName,
+    editionId,
     jobId,
-    sourceCommit: FIELD_PRODUCT_SOURCE,
+    sourceCommit,
     enginePackId,
     requestSha256: shaValue(receipt.requestSha256, "Field request hash"),
     deviceObservationId: safeText(receipt.deviceObservationId, "Device observation ID", 160),
@@ -598,14 +608,13 @@ export function evaluateSimFieldBridge(
     };
   }
   return {
-    state: "awaiting-sim-donor-and-metrics",
+    state: "normalization-required",
     identityMatched: false,
     candidateLineageMatched: true,
     calibrationReady: false,
     qualificationDecision: "deny",
     hardwareAuthority: false,
     blockers: [
-      "lab.sim-donor.not-accepted",
       "lab.job-binding.missing",
       "lab.sim.controller-firmware-binding.unavailable",
       "lab.metric-normalization-receipt.missing",

@@ -82,12 +82,14 @@ export interface EnginePackStatus {
   message: string | null;
 }
 
+export type HardwareDomainEdition = "lab" | "field";
+
 export interface FieldTuningStatus {
   schemaVersion: 1;
   kind: "dronedream-field-tuning-status";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   executionDomain: "real-hardware";
-  runtimeProfile: "field-lightweight";
+  runtimeProfile: "unified-sim-lab" | "field-lightweight";
   sourceCommit: string;
   enginePackId: string;
   contractSha256: string;
@@ -147,7 +149,7 @@ export interface FieldAdapterCatalogReport {
   schemaVersion: 1;
   kind: "dronedream-field-adapter-catalog-report";
   catalogVersion: string;
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   source: "source-bound-embedded-catalog";
   catalogSha256: string;
   hardwareAuthority: false;
@@ -163,7 +165,7 @@ export interface FieldAdapterInstallRequest {
 export interface FieldAdapterInstallReceipt {
   schemaVersion: 1;
   kind: "dronedream-field-adapter-install-receipt";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   adapterId: string;
   packageSha256: string;
   state: "installed" | "already-installed";
@@ -181,7 +183,7 @@ export interface FieldAdapterFrameInspectionRequest {
 export interface FieldAdapterFrameInspection {
   schemaVersion: 1;
   kind: "dronedream-field-adapter-frame-inspection";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   adapterId: string;
   protocolVersion: 1 | 2;
   systemId: number;
@@ -204,7 +206,7 @@ export interface FieldProtocolFrameInspectionRequest {
 export interface FieldProtocolFrameInspection {
   schemaVersion: 1;
   kind: "dronedream-field-protocol-frame-inspection";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   adapterId: string;
   protocolFamily: string;
   classification: string;
@@ -229,7 +231,7 @@ export interface FieldMavlinkTelemetryProbeRequest {
 export interface FieldMavlinkTelemetryProbeReceipt {
   schemaVersion: 1;
   kind: "dronedream-field-mavlink-telemetry-probe-receipt";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   adapterId: string;
   observationId: string;
   portName: string;
@@ -264,7 +266,7 @@ export interface FieldDiscoveredDevice {
 export interface FieldDeviceDiscoveryReport {
   schemaVersion: 1;
   kind: "dronedream-field-device-discovery-report";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   source: "windows-serial-registry-readonly";
   supported: boolean;
   portOpenAttempts: 0;
@@ -297,7 +299,7 @@ export interface FieldTuningDemoReceipt {
   schemaVersion: 1;
   kind: "dronedream-field-tuning-demo-receipt";
   jobId: string;
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   executionDomain: "real-hardware";
   executionMode: "fixture-only-no-device-io";
   sourceCommit: string;
@@ -338,7 +340,7 @@ export interface FieldHardwareTuningPlan {
   schemaVersion: 1;
   kind: "dronedream-field-hardware-tuning-plan";
   jobId: string;
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   executionDomain: "real-hardware";
   sourceCommit: string;
   requestSha256: string;
@@ -413,7 +415,7 @@ export interface FieldHarnessJobReceipt {
   kind: "dronedream-field-harness-job-receipt";
   jobId: string;
   createdAt: string;
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   executionDomain: "real-device-recorded-evidence";
   executionMode: "offline-evidence-replay-no-device-io";
   sourceCommit: string;
@@ -480,7 +482,7 @@ export interface FieldParameterSnapshotRequest {
 export interface FieldParameterSnapshot {
   schemaVersion: 1;
   kind: "dronedream-field-parameter-snapshot";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   executionDomain: "real-hardware";
   evidenceSource: "operator-imported-read-only";
   sourceCommit: string;
@@ -502,7 +504,7 @@ export interface FieldParameterSnapshot {
 export interface FieldParameterSnapshotSummary {
   schemaVersion: 1;
   kind: "dronedream-field-parameter-snapshot-summary";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   sourceCommit: string;
   deviceObservationId: string;
   vehiclePackId: string;
@@ -533,7 +535,7 @@ export interface FieldParameterChange {
 export interface FieldParameterDiffReceipt {
   schemaVersion: 1;
   kind: "dronedream-field-parameter-diff";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   snapshotSha256: string;
   currentParameterSetSha256: string;
   changedCount: number;
@@ -547,7 +549,7 @@ export interface FieldParameterDiffReceipt {
 export interface FieldRollbackPlan {
   schemaVersion: 1;
   kind: "dronedream-field-rollback-plan";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   snapshotSha256: string;
   planSha256: string;
   changes: FieldParameterChange[];
@@ -574,7 +576,7 @@ export interface FieldPreflightRequest {
 export interface FieldPreflightPlan {
   schemaVersion: 1;
   kind: "dronedream-field-preflight-plan";
-  editionId: "field";
+  editionId: HardwareDomainEdition;
   executionDomain: "real-hardware";
   sourceCommit: string;
   requestSha256: string;
@@ -943,6 +945,142 @@ async function invokeDesktop<T>(
 
 export function isDesktopRuntime(): boolean {
   return getTauriCore() !== null;
+}
+
+export interface LabCalibrationMetricsRequest {
+  trackingRmseM: number;
+  maxErrorM: number;
+  energyWh: number;
+  overshootCount: number;
+}
+
+export interface LabCalibrationCycleRequest {
+  schemaVersion: 1;
+  jobId: string;
+  cycleOrdinal: number;
+  commonCoreCommit: string;
+  editionManifestSha256: string;
+  vehiclePackId: string;
+  controllerIdentity: string;
+  firmwareIdentity: string;
+  simulationReceiptSha256: string;
+  realObservationReceiptSha256: string;
+  parameterCandidateSha256: string;
+  objectiveContractSha256: string;
+  constraintContractSha256: string;
+  holdoutContractSha256: string;
+  metricNormalizationReceiptSha256: string;
+  objective: string;
+  tolerancePercent: number;
+  cycleBudget: number;
+  simulation: LabCalibrationMetricsRequest;
+  realObservation: LabCalibrationMetricsRequest;
+  independentHoldoutPassed: boolean;
+}
+
+export interface LabCalibrationCycleReceipt {
+  kind: "dronedream-lab-sim-real-calibration-receipt";
+  editionId: "lab";
+  productSource: string;
+  requestSha256: string;
+  objectiveContractSha256: string;
+  constraintContractSha256: string;
+  holdoutContractSha256: string;
+  metricNormalizationReceiptSha256: string;
+  aggregateGapPercent: number;
+  gapWithinTolerance: boolean;
+  nextAction:
+    | "revise-model-and-resimulate"
+    | "run-independent-holdout"
+    | "await-validated-pack-and-safety-quorum";
+  qualificationDecision: "deny";
+  trusted: false;
+  blockers: string[];
+  validatedVehiclePackCount: 0;
+  providerRequests: 0;
+  deviceOpenAttempts: 0;
+  hardwareWriteAttempts: 0;
+  armAttempts: 0;
+  flightAttempts: 0;
+  hardwareAuthority: false;
+  receiptSha256: string;
+  [key: string]: unknown;
+}
+
+function parseLabCalibrationCycleReceipt(value: unknown): LabCalibrationCycleReceipt {
+  const receipt = expectRecord(value, "lab calibration receipt");
+  const nextAction = expectString(receipt.nextAction, "lab calibration receipt.nextAction");
+  if (![
+    "revise-model-and-resimulate",
+    "run-independent-holdout",
+    "await-validated-pack-and-safety-quorum",
+  ].includes(nextAction)) {
+    throw new Error("lab calibration receipt.nextAction is unsupported");
+  }
+  const parsed: LabCalibrationCycleReceipt = {
+    ...receipt,
+    kind: expectLiteral(
+      receipt.kind,
+      "dronedream-lab-sim-real-calibration-receipt",
+      "lab calibration receipt.kind",
+    ),
+    editionId: expectLiteral(receipt.editionId, "lab", "lab calibration receipt.editionId"),
+    productSource: expectString(receipt.productSource, "lab calibration receipt.productSource"),
+    requestSha256: expectString(receipt.requestSha256, "lab calibration receipt.requestSha256"),
+    objectiveContractSha256: expectString(receipt.objectiveContractSha256, "lab calibration receipt.objectiveContractSha256"),
+    constraintContractSha256: expectString(receipt.constraintContractSha256, "lab calibration receipt.constraintContractSha256"),
+    holdoutContractSha256: expectString(receipt.holdoutContractSha256, "lab calibration receipt.holdoutContractSha256"),
+    metricNormalizationReceiptSha256: expectString(receipt.metricNormalizationReceiptSha256, "lab calibration receipt.metricNormalizationReceiptSha256"),
+    aggregateGapPercent: expectFiniteNumber(
+      receipt.aggregateGapPercent,
+      "lab calibration receipt.aggregateGapPercent",
+    ),
+    gapWithinTolerance: expectBoolean(
+      receipt.gapWithinTolerance,
+      "lab calibration receipt.gapWithinTolerance",
+    ),
+    nextAction: nextAction as LabCalibrationCycleReceipt["nextAction"],
+    qualificationDecision: expectLiteral(
+      receipt.qualificationDecision,
+      "deny",
+      "lab calibration receipt.qualificationDecision",
+    ),
+    trusted: expectLiteral(receipt.trusted, false, "lab calibration receipt.trusted"),
+    blockers: parseStringArray(receipt.blockers, "lab calibration receipt.blockers"),
+    validatedVehiclePackCount: expectLiteral(
+      receipt.validatedVehiclePackCount,
+      0,
+      "lab calibration receipt.validatedVehiclePackCount",
+    ),
+    providerRequests: expectLiteral(receipt.providerRequests, 0, "lab calibration receipt.providerRequests"),
+    deviceOpenAttempts: expectLiteral(receipt.deviceOpenAttempts, 0, "lab calibration receipt.deviceOpenAttempts"),
+    hardwareWriteAttempts: expectLiteral(receipt.hardwareWriteAttempts, 0, "lab calibration receipt.hardwareWriteAttempts"),
+    armAttempts: expectLiteral(receipt.armAttempts, 0, "lab calibration receipt.armAttempts"),
+    flightAttempts: expectLiteral(receipt.flightAttempts, 0, "lab calibration receipt.flightAttempts"),
+    hardwareAuthority: expectLiteral(receipt.hardwareAuthority, false, "lab calibration receipt.hardwareAuthority"),
+    receiptSha256: expectString(receipt.receiptSha256, "lab calibration receipt.receiptSha256"),
+  };
+  if (!/^[a-f0-9]{40}$/.test(parsed.productSource) || ![
+    parsed.requestSha256,
+    parsed.objectiveContractSha256,
+    parsed.constraintContractSha256,
+    parsed.holdoutContractSha256,
+    parsed.metricNormalizationReceiptSha256,
+    parsed.receiptSha256,
+  ].every((identity) => /^[a-f0-9]{64}$/.test(identity))) {
+    throw new Error("lab calibration receipt source or hash is invalid");
+  }
+  return parsed;
+}
+
+export function evaluateLabCalibrationCycle(
+  request: LabCalibrationCycleRequest,
+): Promise<LabCalibrationCycleReceipt> {
+  return invokeDesktop(
+    "evaluate_lab_calibration_cycle",
+    parseLabCalibrationCycleReceipt,
+    { request },
+  );
 }
 
 export type InstallerLocale = "en" | "zh-CN";
@@ -1857,6 +1995,13 @@ function parseEnginePackStatus(value: unknown): EnginePackStatus {
 
 function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
   const record = expectRecord(value, "fieldTuningStatus");
+  const editionId = expectHardwareDomainEdition(
+    record.editionId,
+    "fieldTuningStatus.editionId",
+  );
+  const expectedRuntimeProfile = editionId === "lab"
+    ? "unified-sim-lab"
+    : "field-lightweight";
   const status: FieldTuningStatus = {
     schemaVersion: expectLiteral(record.schemaVersion, 1, "fieldTuningStatus.schemaVersion"),
     kind: expectLiteral(
@@ -1864,7 +2009,7 @@ function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
       "dronedream-field-tuning-status",
       "fieldTuningStatus.kind",
     ),
-    editionId: expectLiteral(record.editionId, "field", "fieldTuningStatus.editionId"),
+    editionId,
     executionDomain: expectLiteral(
       record.executionDomain,
       "real-hardware",
@@ -1872,7 +2017,7 @@ function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
     ),
     runtimeProfile: expectLiteral(
       record.runtimeProfile,
-      "field-lightweight",
+      expectedRuntimeProfile,
       "fieldTuningStatus.runtimeProfile",
     ),
     sourceCommit: expectLowercaseHex(record.sourceCommit, "fieldTuningStatus.sourceCommit", 40),
@@ -2096,7 +2241,7 @@ function parseFieldAdapterCatalog(value: unknown): FieldAdapterCatalogReport {
       record.catalogVersion,
       "fieldAdapterCatalog.catalogVersion",
     ),
-    editionId: expectLiteral(record.editionId, "field", "fieldAdapterCatalog.editionId"),
+    editionId: expectHardwareDomainEdition(record.editionId, "fieldAdapterCatalog.editionId"),
     source: expectLiteral(
       record.source,
       "source-bound-embedded-catalog",
@@ -2145,7 +2290,7 @@ function parseFieldAdapterInstallReceipt(value: unknown): FieldAdapterInstallRec
       "dronedream-field-adapter-install-receipt",
       "fieldAdapterInstallReceipt.kind",
     ),
-    editionId: expectLiteral(record.editionId, "field", "fieldAdapterInstallReceipt.editionId"),
+    editionId: expectHardwareDomainEdition(record.editionId, "fieldAdapterInstallReceipt.editionId"),
     adapterId: expectIdentifier(record.adapterId, "fieldAdapterInstallReceipt.adapterId"),
     packageSha256: expectLowercaseHex(
       record.packageSha256,
@@ -2226,7 +2371,7 @@ function parseFieldAdapterFrameInspection(value: unknown): FieldAdapterFrameInsp
       "dronedream-field-adapter-frame-inspection",
       "fieldAdapterFrameInspection.kind",
     ),
-    editionId: expectLiteral(record.editionId, "field", "fieldAdapterFrameInspection.editionId"),
+    editionId: expectHardwareDomainEdition(record.editionId, "fieldAdapterFrameInspection.editionId"),
     adapterId: expectIdentifier(record.adapterId, "fieldAdapterFrameInspection.adapterId"),
     protocolVersion,
     systemId: expectBoundedNonNegativeInteger(
@@ -2588,7 +2733,7 @@ function parseFieldDeviceDiscoveryReport(value: unknown): FieldDeviceDiscoveryRe
       "dronedream-field-device-discovery-report",
       "fieldDeviceDiscovery.kind",
     ),
-    editionId: expectLiteral(record.editionId, "field", "fieldDeviceDiscovery.editionId"),
+    editionId: expectHardwareDomainEdition(record.editionId, "fieldDeviceDiscovery.editionId"),
     source: expectLiteral(
       record.source,
       "windows-serial-registry-readonly",
@@ -2667,7 +2812,7 @@ function parseFieldTuningDemoReceipt(value: unknown): FieldTuningDemoReceipt {
       "fieldTuningReceipt.kind",
     ),
     jobId: expectSafeNonEmptyString(record.jobId, "fieldTuningReceipt.jobId"),
-    editionId: expectLiteral(record.editionId, "field", "fieldTuningReceipt.editionId"),
+    editionId: expectHardwareDomainEdition(record.editionId, "fieldTuningReceipt.editionId"),
     executionDomain: expectLiteral(
       record.executionDomain,
       "real-hardware",
@@ -2870,7 +3015,7 @@ function parseFieldHarnessJobReceipt(value: unknown): FieldHarnessJobReceipt {
     kind: expectLiteral(record.kind, "dronedream-field-harness-job-receipt", `${path}.kind`),
     jobId: expectSafeNonEmptyString(record.jobId, `${path}.jobId`),
     createdAt: expectSafeNonEmptyString(record.createdAt, `${path}.createdAt`),
-    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    editionId: expectHardwareDomainEdition(record.editionId, `${path}.editionId`),
     executionDomain: expectLiteral(
       record.executionDomain,
       "real-device-recorded-evidence",
@@ -3123,7 +3268,7 @@ function parseFieldParameterSnapshot(value: unknown): FieldParameterSnapshot {
   return {
     schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
     kind: expectLiteral(record.kind, "dronedream-field-parameter-snapshot", `${path}.kind`),
-    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    editionId: expectHardwareDomainEdition(record.editionId, `${path}.editionId`),
     executionDomain: expectLiteral(record.executionDomain, "real-hardware", `${path}.executionDomain`),
     evidenceSource: expectLiteral(
       record.evidenceSource,
@@ -3173,7 +3318,7 @@ function parseFieldParameterSnapshotSummary(
       "dronedream-field-parameter-snapshot-summary",
       `${path}.kind`,
     ),
-    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    editionId: expectHardwareDomainEdition(record.editionId, `${path}.editionId`),
     sourceCommit: expectLowercaseHex(record.sourceCommit, `${path}.sourceCommit`, 40),
     deviceObservationId: parseFieldRecoveryIdentity(
       record.deviceObservationId,
@@ -3251,7 +3396,7 @@ function parseFieldParameterDiffReceipt(value: unknown): FieldParameterDiffRecei
   return {
     schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
     kind: expectLiteral(record.kind, "dronedream-field-parameter-diff", `${path}.kind`),
-    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    editionId: expectHardwareDomainEdition(record.editionId, `${path}.editionId`),
     snapshotSha256: expectLowercaseHex(record.snapshotSha256, `${path}.snapshotSha256`, 64),
     currentParameterSetSha256: expectLowercaseHex(
       record.currentParameterSetSha256,
@@ -3277,7 +3422,7 @@ function parseFieldRollbackPlan(value: unknown): FieldRollbackPlan {
   const plan: FieldRollbackPlan = {
     schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
     kind: expectLiteral(record.kind, "dronedream-field-rollback-plan", `${path}.kind`),
-    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    editionId: expectHardwareDomainEdition(record.editionId, `${path}.editionId`),
     snapshotSha256: expectLowercaseHex(record.snapshotSha256, `${path}.snapshotSha256`, 64),
     planSha256: expectLowercaseHex(record.planSha256, `${path}.planSha256`, 64),
     changes: parseFieldParameterChanges(record.changes, `${path}.changes`),
@@ -3323,7 +3468,7 @@ function parseFieldPreflightPlan(value: unknown): FieldPreflightPlan {
   const plan: FieldPreflightPlan = {
     schemaVersion: expectLiteral(record.schemaVersion, 1, `${path}.schemaVersion`),
     kind: expectLiteral(record.kind, "dronedream-field-preflight-plan", `${path}.kind`),
-    editionId: expectLiteral(record.editionId, "field", `${path}.editionId`),
+    editionId: expectHardwareDomainEdition(record.editionId, `${path}.editionId`),
     executionDomain: expectLiteral(
       record.executionDomain,
       "real-hardware",
@@ -3406,7 +3551,7 @@ function parseFieldHardwareTuningPlan(value: unknown): FieldHardwareTuningPlan {
       "fieldHardwarePlan.kind",
     ),
     jobId: expectSafeNonEmptyString(record.jobId, "fieldHardwarePlan.jobId"),
-    editionId: expectLiteral(record.editionId, "field", "fieldHardwarePlan.editionId"),
+    editionId: expectHardwareDomainEdition(record.editionId, "fieldHardwarePlan.editionId"),
     executionDomain: expectLiteral(
       record.executionDomain,
       "real-hardware",
@@ -4143,6 +4288,16 @@ function expectLiteral<const T extends string | number | boolean>(
 ): T {
   if (value !== expected) throw new Error(`${path} must equal ${String(expected)}`);
   return expected;
+}
+
+function expectHardwareDomainEdition(
+  value: unknown,
+  path: string,
+): HardwareDomainEdition {
+  if (value !== "lab" && value !== "field") {
+    throw new Error(`${path} must equal lab or field`);
+  }
+  return value;
 }
 
 function expectSha256Id(value: unknown, path: string): string {

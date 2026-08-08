@@ -58,7 +58,9 @@ async function assertViewportFits(page, testCase, surface) {
     clientWidth: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,
     clippedText: Array.from(document.querySelectorAll(
-      ".lab-page button, .lab-page strong, .lab-page small, .lab-page label > span",
+      ".lab-page button, .lab-page strong, .lab-page small, .lab-page label > span, "
+        + ".lab-hardware-workspace button, .lab-hardware-workspace strong, "
+        + ".lab-hardware-workspace small, .lab-hardware-workspace label > span",
     )).filter((element) => (
       element instanceof HTMLElement
       && element.offsetParent !== null
@@ -182,6 +184,9 @@ try {
         .map((property) => style.getPropertyValue(property).trim().toUpperCase());
     });
     assert.deepEqual(palette, ["#A7E84A", "#20C77A", "#087E69"]);
+    const activeNavigationColor = await page.locator(".app-nav a.active").first()
+      .evaluate((element) => getComputedStyle(element).color);
+    assert.equal(activeNavigationColor, "rgb(8, 126, 105)");
     assert.equal(await page.locator("html").getAttribute("lang"), testCase.locale);
     assert.equal(await page.getByText(testCase.locale === "en" ? "0 of 8" : "0 / 8").count(), 1);
     assert.equal(await page.getByText(testCase.locale === "en" ? "DENY" : "拒绝").first().count(), 1);
@@ -204,14 +209,14 @@ try {
     });
     await page.getByText(
       testCase.locale === "en"
-        ? "Candidate lineage matched · calibration blocked"
-        : "候选链路已匹配 · 校准仍阻断",
+        ? "Candidate lineage matched · normalization required"
+        : "候选链路已匹配 · 需要指标归一化",
       { exact: true },
     ).waitFor();
-    assert.equal(await bridge.getAttribute("data-bridge-state"), "awaiting-sim-donor-and-metrics");
+    assert.equal(await bridge.getAttribute("data-bridge-state"), "normalization-required");
     assert.equal(
       await page.getByText(
-        testCase.locale === "en" ? "Remaining gates · 6" : "剩余门禁 · 6",
+        testCase.locale === "en" ? "Remaining gates · 5" : "剩余门禁 · 5",
         { exact: true },
       ).count(),
       1,
@@ -266,6 +271,25 @@ try {
     await assertViewportFits(page, testCase, "safety");
     evidence.push(await screenshot(page, testCase, "safety"));
 
+    await page.goto(`${origin}/lab/hardware`, { waitUntil: "networkidle" });
+    const hardwareWorkspace = page.locator(
+      '.lab-hardware-workspace[data-brand-edition="lab"]',
+    );
+    await hardwareWorkspace.getByRole("heading", { name: hardwareLabel }).waitFor();
+    assert.equal(await hardwareWorkspace.getAttribute("data-presentation-only"), "true");
+    assert.equal(await hardwareWorkspace.getAttribute("data-grants-hardware-authority"), "false");
+    const embeddedHardware = hardwareWorkspace.locator(
+      '.field-app[data-brand-edition="lab"][data-authority="false"]',
+    );
+    assert.equal(await embeddedHardware.getAttribute("data-validated-pack-count"), "0");
+    assert.equal(await embeddedHardware.getAttribute("data-quorum"), "missing");
+    assert.equal(
+      await hardwareWorkspace.getByText("0 validated packs", { exact: true }).count(),
+      1,
+    );
+    await assertViewportFits(page, testCase, "hardware-domain");
+    evidence.push(await screenshot(page, testCase, "hardware-domain"));
+
     await context.close();
   }
 } finally {
@@ -314,7 +338,7 @@ const report = {
   },
   cases: cases.map((testCase) => ({
     ...testCase,
-    surfaces: ["calibration", "hardware", "evidence", "safety"],
+    surfaces: ["calibration", "hardware", "evidence", "safety", "hardware-domain"],
   })),
   screenshots: evidence,
   sideEffects: {

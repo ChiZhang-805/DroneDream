@@ -40,11 +40,12 @@ describe("FieldApp", () => {
   it("opens Chatting first and exposes six true page controls", async () => {
     const { container } = await renderField();
 
-    expect(container.querySelector(".field-brand")).toHaveAttribute(
-      "aria-label",
-      "DroneDream · FIELD",
+    expect(container.querySelector(".field-brand")).toBeNull();
+    expect(container.querySelector(".field-app")).toHaveAttribute(
+      "data-brand-edition",
+      "field",
     );
-    const navigation = screen.getByRole("navigation", { name: "Field navigation" });
+    const navigation = screen.getByRole("navigation", { name: "Hardware laboratory navigation" });
     expect(within(navigation).getAllByRole("button")).toHaveLength(6);
     expect(within(navigation).getByRole("button", { name: "Chatting" }))
       .toHaveAttribute("aria-current", "page");
@@ -159,53 +160,38 @@ describe("FieldApp", () => {
     expect(screen.getByRole("combobox", { name: "观察状态" })).toHaveValue("firmware-drift");
   });
 
-  it("keeps the Field entry independent and free of non-Field execution payloads", () => {
+  it("keeps the hardware-domain capability surface free of simulation and standalone Field shell payloads", () => {
     const sources = [
       "src/field/FieldApp.tsx",
       "src/field/FieldAssistantWorkspace.tsx",
-      "src/field/FieldSettingsDialog.tsx",
       "src/field/FieldRecoveryWorkspace.tsx",
       "src/field/FieldTuningWorkspace.tsx",
-      "src/field/FieldRoot.tsx",
       "src/field/catalog.ts",
-      "src/field/main.tsx",
+      "src/field/hardwareDomain.ts",
       "src/field/safety.ts",
       "src/field/tuning.ts",
     ].map((path) => readFileSync(resolve(process.cwd(), path), "utf8")).join("\n");
 
     expect(sources).not.toMatch(/AppShell|react-router|\/assistant|\/scenarios/);
     expect(sources).not.toMatch(/gazebo|sitl|hitl|SimulatorAdapter|simulation\.execute/i);
-    expect(sources).toContain("EditionThemeProvider");
-    expect(sources).toContain("EditionSettingsSurface");
-    expect(sources).toContain("DroneLaunchScene");
-    expect(sources).toContain('consumerProfile="field-lightweight"');
+    expect(sources).not.toMatch(/FieldBrandLockup|FieldAuthControl|FieldSettingsDialog/);
+    expect(sources).toContain("hardwareDomainEdition");
     expect(sources).toContain('data-authority="false"');
   });
 
-  it("opens shared settings without changing authority", async () => {
+  it("does not duplicate the outer Lab settings or authentication controls", async () => {
     const { container } = await renderField();
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-
-    const dialog = screen.getByRole("dialog", { name: "Field settings" });
-    expect(dialog).toHaveAttribute("data-brand-edition", "field");
-    expect(dialog).toHaveAttribute("data-settings-consumer", "field-lightweight");
-    expect(dialog).toHaveAttribute("data-presentation-only", "true");
-    expect(dialog).toHaveAttribute("data-grants-hardware-authority", "false");
-    fireEvent.click(within(dialog).getByRole("tab", { name: "Safety" }));
-    expect(within(dialog).getByText("field-lightweight")).toBeInTheDocument();
-    expect(within(dialog).getByText("Denied")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(container.querySelector("[data-quorum='missing']")).toBeTruthy();
   });
 
-  it("switches EN/ZH inside Settings and closes with Escape", async () => {
-    await renderField();
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    fireEvent.click(screen.getByRole("button", { name: "Simplified Chinese" }));
-
-    expect(screen.getByRole("dialog", { name: "Field 设置" })).toBeInTheDocument();
-    expect(document.documentElement.lang).toBe("zh-CN");
-    fireEvent.keyDown(document, { key: "Escape" });
+  it("follows the Lab-owned locale without a second locale authority", async () => {
+    await renderField("zh-CN");
+    expect(screen.getByRole("navigation", { name: "真机实验室导航" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("zh-CN");
   });
 
   it("uses canonical theme tokens and fixed viewport page layout", () => {

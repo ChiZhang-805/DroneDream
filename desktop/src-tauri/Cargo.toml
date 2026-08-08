@@ -18,14 +18,18 @@ serde_json = "1"
 [dependencies]
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+dronecan = { version = "=0.1.0", default-features = false, features = ["std"] }
 ed25519-dalek = "2"
 hex = "0.4"
+mavlink = { version = "=0.17.1", default-features = false, features = ["std", "common", "ardupilotmega"] }
+multiwii_serial_protocol = { version = "=0.1.1", default-features = false, features = ["std"] }
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 semver = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_jcs = "0.1"
 sha2 = "0.10"
+serialport = { version = "=4.9.0", default-features = false }
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2.10.1"
@@ -47,6 +51,7 @@ windows-sys = { version = "0.61", features = [
   "Win32_System_JobObjects",
   "Win32_System_Com",
   "Win32_System_Memory",
+  "Win32_System_Registry",
   "Win32_System_Threading",
   "Win32_UI_WindowsAndMessaging",
 ] }

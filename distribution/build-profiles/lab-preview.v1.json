@@ -173,6 +173,9 @@
     ],
     "gatedHardwareAdapter": [
       "hardware-bridge",
+      "managed-protocol-adapters",
+      "recorded-evidence-harness",
+      "parameter-snapshot-rollback",
       "vehicle-pack-hardware",
       "vehicle-pack-validation"
     ],
@@ -180,6 +183,9 @@
       "desktop-core",
       "engine-pack",
       "hardware-bridge",
+      "managed-protocol-adapters",
+      "recorded-evidence-harness",
+      "parameter-snapshot-rollback",
       "runtime-core",
       "runtime-simulation",
       "simulator-gazebo-harmonic",

@@ -6,6 +6,8 @@
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use crate::hardware_domain;
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct FieldDeviceObservation {
@@ -155,9 +157,7 @@ fn discover_windows_serial_map() -> Result<Vec<FieldDeviceObservation>, String> 
 
 #[tauri::command]
 pub(crate) fn discover_field_devices() -> Result<FieldDeviceDiscoveryReport, String> {
-    if env!("DRONEDREAM_DESKTOP_EDITION_ID") != "field" {
-        return Err("Field device discovery is unavailable in this edition".to_string());
-    }
+    hardware_domain::require_available()?;
     let devices = discover_windows_serial_map()?;
     Ok(report_from_devices(devices))
 }
@@ -166,7 +166,7 @@ fn report_from_devices(devices: Vec<FieldDeviceObservation>) -> FieldDeviceDisco
     FieldDeviceDiscoveryReport {
         schema_version: 1,
         kind: "dronedream-field-device-discovery-report",
-        edition_id: "field",
+        edition_id: hardware_domain::edition_id(),
         source: "windows-serial-registry-readonly",
         supported: cfg!(target_os = "windows"),
         port_open_attempts: 0,

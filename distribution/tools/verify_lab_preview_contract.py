@@ -6,18 +6,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/lab-preview.v1.json"
 TAURI_OVERLAY = ROOT / "desktop/src-tauri/tauri.lab-preview.conf.json"
 BUILD_SCRIPT = ROOT / "desktop/scripts/build-lab-preview.ps1"
 SHARED_LLVM_BUILD_SCRIPT = ROOT / "desktop/scripts/build-windows-llvm.ps1"
 WEBSITE_HANDOFF = (
-    ROOT
-    / "distribution"
-    / "editions"
-    / "lab"
-    / "website-exact-exe-handoff.awaiting.v1.json"
+    ROOT / "distribution" / "editions" / "lab" / "website-exact-exe-handoff.awaiting.v1.json"
 )
 
 
@@ -46,8 +41,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
     authority = profile.get("authority")
     if (
         not isinstance(authority, dict)
-        or authority.get("brandSourceManifest")
-        != "brand/brand-editions.v1.json"
+        or authority.get("brandSourceManifest") != "brand/brand-editions.v1.json"
         or authority.get("labBrandSourceManifest")
         != "distribution/editions/lab/brand-source-manifest.v1.json"
         or authority.get("websiteExactExeHandoff")
@@ -69,10 +63,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         website_handoff.get("state") not in {"awaiting-exact-handoff", "exact-artifact"}
         or website_handoff.get("releaseReady") is not False
         or not isinstance(receiver, dict)
-        or receiver.get("websiteSourceCommit")
-        != "afdcdee5b60883290c9d1cc0c036141920066659"
-        or receiver.get("websiteEvidenceCommit")
-        != "1a82e36b362c95983473c4a0d0d967d8c7415f92"
+        or receiver.get("websiteSourceCommit") != "afdcdee5b60883290c9d1cc0c036141920066659"
+        or receiver.get("websiteEvidenceCommit") != "1a82e36b362c95983473c4a0d0d967d8c7415f92"
         or receiver.get("mode") != "read-only-receiver"
         or receiver.get("rebuildAllowed") is not False
         or receiver.get("renameAllowed") is not False
@@ -88,7 +80,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
             or not isinstance(validation, dict)
             or validation.get("overlayInstall") != "failed"
         ):
-            raise LabPreviewContractError("Website exact artifact must preserve its failed overlay gate")
+            raise LabPreviewContractError(
+                "Website exact artifact must preserve its failed overlay gate"
+            )
 
     common_core = profile.get("commonCore")
     if not isinstance(common_core, dict):
@@ -106,7 +100,10 @@ def verify_lab_preview_contract() -> dict[str, object]:
         != "fixed Universal/Core product source commit, not origin/codex/software moving head"
     ):
         raise LabPreviewContractError("Lab preview common-core authority drifted")
-    if common_core.get("reuseOnly") is not True or common_core.get("forkOrCopyAllowed") is not False:
+    if (
+        common_core.get("reuseOnly") is not True
+        or common_core.get("forkOrCopyAllowed") is not False
+    ):
         raise LabPreviewContractError("Lab preview must reuse the common core without source forks")
     if tuple(common_core.get("paths", ())) != (
         "backend",
@@ -118,7 +115,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
     ):
         raise LabPreviewContractError("Lab preview common-core path set drifted")
     if tuple(common_core.get("receiptFields", ())) != ("commonCoreCommit", "commonCoreHash"):
-        raise LabPreviewContractError("Lab preview receipts must bind the common core commit and hash")
+        raise LabPreviewContractError(
+            "Lab preview receipts must bind the common core commit and hash"
+        )
 
     portable_patch = profile.get("portableCommonCorePatch")
     if (
@@ -128,7 +127,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
         or portable_patch.get("mustReturnToUniversal") is not True
         or portable_patch.get("mayRemainAsLabFork") is not False
     ):
-        raise LabPreviewContractError("Lab shared LLVM parameterization is not portable to Universal")
+        raise LabPreviewContractError(
+            "Lab shared LLVM parameterization is not portable to Universal"
+        )
 
     if tuple(profile.get("labDeltaPaths", ())) != (
         "desktop/scripts/build-lab-preview.ps1",
@@ -201,15 +202,12 @@ def verify_lab_preview_contract() -> dict[str, object]:
     if (
         not isinstance(brand, dict)
         or brand.get("displayName") != "DroneDream · LAB"
-        or brand.get("canonicalDonorCommit")
-        != "6de4f1343c0239a916949f0486fa63d3f460d6a8"
+        or brand.get("canonicalDonorCommit") != "6de4f1343c0239a916949f0486fa63d3f460d6a8"
         or brand.get("canonicalDonorManifest") != "brand/brand-editions.v1.json"
         or brand.get("labSourceManifest")
         != "distribution/editions/lab/brand-source-manifest.v1.json"
-        or brand.get("applicationLockup")
-        != "brand/generated/lab/lockup-compact.png"
-        or brand.get("windowsIcon")
-        != "brand/generated/lab/windows/icon.ico"
+        or brand.get("applicationLockup") != "brand/generated/lab/lockup-compact.png"
+        or brand.get("windowsIcon") != "brand/generated/lab/windows/icon.ico"
         or brand.get("grantsHardwareAuthority") is not False
     ):
         raise LabPreviewContractError("Lab preview brand payload drifted or grants authority")
@@ -238,7 +236,14 @@ def verify_lab_preview_contract() -> dict[str, object]:
             "vehicle-pack-sim",
         )
         or tuple(payload.get("gatedHardwareAdapter", ()))
-        != ("hardware-bridge", "vehicle-pack-hardware", "vehicle-pack-validation")
+        != (
+            "hardware-bridge",
+            "managed-protocol-adapters",
+            "recorded-evidence-harness",
+            "parameter-snapshot-rollback",
+            "vehicle-pack-hardware",
+            "vehicle-pack-validation",
+        )
     ):
         raise LabPreviewContractError("Lab preview payload dependency graph drifted")
 
@@ -258,10 +263,8 @@ def verify_lab_preview_contract() -> dict[str, object]:
         or toolchain.get("sharedBuildScript") != "desktop/scripts/build-windows-llvm.ps1"
         or not isinstance(rust, dict)
         or rust.get("rustupToolchain") != "1.97.0-x86_64-pc-windows-gnullvm"
-        or rust.get("rustcCommitHash")
-        != "2d8144b7880597b6e6d3dfd63a9a9efae3f533d3"
-        or rust.get("cargoCommitHash")
-        != "c980f4866141969fab6254a680546a277789d6f0"
+        or rust.get("rustcCommitHash") != "2d8144b7880597b6e6d3dfd63a9a9efae3f533d3"
+        or rust.get("cargoCommitHash") != "c980f4866141969fab6254a680546a277789d6f0"
         or not isinstance(llvm, dict)
         or llvm.get("wingetPackageId") != "MartinStorsjo.LLVM-MinGW.UCRT"
         or llvm.get("packageDirectoryName") != "llvm-mingw-20260616-ucrt-x86_64"
@@ -283,8 +286,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         != "C:\\Users\\zju20\\AppData\\Local\\DroneDream\\codex-cache\\lab-cargo-target"
         or environment.get("cargoBuildJobsMaximum") != 4
         or environment.get("rustflags") != "-C target-feature=+crt-static"
-        or environment.get("additionalConfigTransport")
-        != "ordered-repeated-cli-config"
+        or environment.get("additionalConfigTransport") != "ordered-repeated-cli-config"
         or environment.get("preserveBundleHistory") is not True
         or environment.get("allowUnsignedUpdater") is not False
     ):
@@ -322,7 +324,11 @@ def verify_lab_preview_contract() -> dict[str, object]:
     guards = profile.get("buildGuards")
     signature = profile.get("signaturePolicy")
     safety = profile.get("safetyPolicy")
-    if not isinstance(guards, dict) or not isinstance(signature, dict) or not isinstance(safety, dict):
+    if (
+        not isinstance(guards, dict)
+        or not isinstance(signature, dict)
+        or not isinstance(safety, dict)
+    ):
         raise LabPreviewContractError("Lab preview guard, signature, or safety policy is missing")
     for key in (
         "requiresExactCleanSource",
@@ -358,7 +364,9 @@ def verify_lab_preview_contract() -> dict[str, object]:
     if safety.get("uiCanAuthorizeHardwareAction") is not False:
         raise LabPreviewContractError("Lab preview UI must not authorize hardware actions")
     if tuple(safety.get("requiredDecisionLayers", ())) != ("native", "backend", "runtime"):
-        raise LabPreviewContractError("Lab preview hardware actions must require the three-layer quorum")
+        raise LabPreviewContractError(
+            "Lab preview hardware actions must require the three-layer quorum"
+        )
 
     frontend = profile.get("frontend")
     if not isinstance(frontend, dict):
@@ -369,8 +377,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         or frontend.get("buildEnvironmentValue") != "lab"
         or frontend.get("route") != "/lab/setup"
         or frontend.get("sourceRoot") != "frontend/src/lab"
-        or frontend.get("vehiclePackAdapter")
-        != "frontend/src/lab/vehicle-pack-adapter.v1.json"
+        or frontend.get("vehiclePackAdapter") != "frontend/src/lab/vehicle-pack-adapter.v1.json"
         or frontend.get("workspaceSwitchCountsAsAuthority") is not False
         or frontend.get("hardwareActionDecisionAtZeroValidatedPacks") != "deny"
     ):
@@ -380,8 +387,15 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError("Lab Tauri overlay must use its internal installer identity")
     if overlay.get("identifier") == "io.dronedream.desktop":
         raise LabPreviewContractError("Lab Tauri overlay must not reuse the base app identifier")
-    resources = overlay.get("bundle", {}).get("resources", {}) if isinstance(overlay.get("bundle"), dict) else {}
-    if not isinstance(resources, dict) or "../../distribution/build-profiles/lab-preview.v1.json" not in resources:
+    resources = (
+        overlay.get("bundle", {}).get("resources", {})
+        if isinstance(overlay.get("bundle"), dict)
+        else {}
+    )
+    if (
+        not isinstance(resources, dict)
+        or "../../distribution/build-profiles/lab-preview.v1.json" not in resources
+    ):
         raise LabPreviewContractError("Lab Tauri overlay must bundle the source Lab profile")
     bundle = overlay.get("bundle")
     if not isinstance(bundle, dict) or tuple(bundle.get("icon", ())) != (
@@ -398,6 +412,12 @@ def verify_lab_preview_contract() -> dict[str, object]:
         "../../distribution/editions/lab/safety-oauth-source-readiness.v1.json",
         "../../distribution/editions/lab/model-harness-closed-loop.v1.json",
         "../../distribution/editions/lab/sim-field-integration.v1.json",
+        "../../distribution/editions/lab/field-2f8fa285-capability-sync.v1.json",
+        "../../distribution/editions/field/field-tuning-contract.v1.json",
+        "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md",
+        "../../distribution/editions/field/adapters/catalog.v1.json",
+        "../../distribution/editions/field/adapters/packages",
+        "../../distribution/schemas/field-adapter-catalog.schema.json",
         "../../distribution/desktop/edition-coexistence.v1.json",
         "../../distribution/schemas/desktop-edition-coexistence.schema.json",
         "../../distribution/editions/lab/assets/dronedream-lab-mark-v2.png",
@@ -408,65 +428,70 @@ def verify_lab_preview_contract() -> dict[str, object]:
     ):
         if required_brand_resource not in resources:
             raise LabPreviewContractError("Lab Tauri overlay brand resources are incomplete")
-    windows = overlay.get("app", {}).get("windows", []) if isinstance(overlay.get("app"), dict) else []
-    if not isinstance(windows, list) or not windows or windows[0].get("title") != "DroneDream · LAB":
+    windows = (
+        overlay.get("app", {}).get("windows", []) if isinstance(overlay.get("app"), dict) else []
+    )
+    if (
+        not isinstance(windows, list)
+        or not windows
+        or windows[0].get("title") != "DroneDream · LAB"
+    ):
         raise LabPreviewContractError("Lab Tauri window title drifted")
     plugins = overlay.get("plugins")
     updater = plugins.get("updater") if isinstance(plugins, dict) else None
-    if (
-        not isinstance(updater, dict)
-        or updater.get("endpoints")
-        != [
-            "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json"
-        ]
-    ):
+    if not isinstance(updater, dict) or updater.get("endpoints") != [
+        "https://github.com/ChiZhang-805/DroneDream/releases/download/desktop-lab-channel/latest-lab.json"
+    ]:
         raise LabPreviewContractError("Lab updater endpoint is not edition scoped")
 
     required_script_fragments = (
-        'param(',
-        '[switch]$Build',
+        "param(",
+        "[switch]$Build",
         'status", "--porcelain=v1", "--untracked-files=all',
         '$commonCoreCommit = "e374d3f8d96b1265fcdb06864208b676566e94d9"',
         '$excludedPreviewEvidenceCommit = "e097b9ea057468bf1602ad1f1c4c5c5e88a65571"',
-        'merge-base --is-ancestor $commonCoreCommit HEAD',
-        'TAURI_SIGNING_PRIVATE_KEY_PATH',
-        'DroneDream\\codex-cache\\lab-cargo-target',
-        'desktop\\src-tauri\\target',
-        'Lab preview contract verified',
-        'Pass -Build to create the updater-signed, Authenticode-unsigned internal preview',
-        'commonCoreCommit = $commonCoreCommit',
+        "merge-base --is-ancestor $commonCoreCommit HEAD",
+        "TAURI_SIGNING_PRIVATE_KEY_PATH",
+        "DroneDream\\codex-cache\\lab-cargo-target",
+        "desktop\\src-tauri\\target",
+        "Lab preview contract verified",
+        "Pass -Build to create the updater-signed, Authenticode-unsigned internal preview",
+        "commonCoreCommit = $commonCoreCommit",
         'kind = "dronedream-lab-preview-artifact-receipt"',
-        'uiSwitchCountsAsAuthority = $false',
+        "uiSwitchCountsAsAuthority = $false",
         'hardwareActionDecision = "deny"',
-        'authenticode',
+        "authenticode",
         'state = "issued"',
         'keyId = "BA3FDCAF71CE2FF5"',
         'VITE_DRONEDREAM_EDITION = "lab"',
         'DRONEDREAM_DESKTOP_EDITION_ID = "lab"',
         'DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"',
-        'DRONEDREAM_OAUTH_CLIENT_ID',
+        "DRONEDREAM_OAUTH_CLIENT_ID",
         '$coreListing.Replace("`r`n", "`n").Replace("`r", "`n").Trim()',
-        'Get-Sha256Text $coreListingCanonical',
-        '[IO.File]::WriteAllText($receiptPath, $receiptJson, $utf8NoBom)',
+        "Get-Sha256Text $coreListingCanonical",
+        "[IO.File]::WriteAllText($receiptPath, $receiptJson, $utf8NoBom)",
         '$tauriOverlayPath = Join-Path $repoRoot "desktop\\src-tauri\\tauri.lab-preview.conf.json"',
-        'Get-Content -LiteralPath $tauriOverlayPath -Raw -Encoding UTF8',
-        '$tauriProductName = [string]$tauriOverlay.productName',
-        '$tauriDisplayName = [string]$tauriOverlay.app.windows[0].title',
-        'brand-source-manifest.v1.json',
+        "Get-Content -LiteralPath $tauriOverlayPath -Raw -Encoding UTF8",
+        "$tauriProductName = [string]$tauriOverlay.productName",
+        "$tauriDisplayName = [string]$tauriOverlay.app.windows[0].title",
+        "brand-source-manifest.v1.json",
         'canonicalDonor = New-RepoFileRef "brand\\brand-editions.v1.json"',
-        'websiteHandoffContract = New-RepoFileRef "distribution\\schemas\\lab-website-exact-exe-handoff.schema.json"',
-        'grantsHardwareAuthority = $false',
+        (
+            'websiteHandoffContract = New-RepoFileRef '
+            '"distribution\\schemas\\lab-website-exact-exe-handoff.schema.json"'
+        ),
+        "grantsHardwareAuthority = $false",
         '[ValidateSet("gnullvm")]',
-        '$readiness.toolchain.selectedToolchain',
-        '$gnullvm.strictlyPinnedReady',
-        'build-windows-llvm.ps1',
-        '-AdditionalConfigPath',
-        '-CargoTargetDir $cargoTargetFull',
-        '-LlvmRoot $gnullvm.llvmRoot',
-        '-EditionId lab',
-        '-PreserveBundleHistory',
-        'x86_64-pc-windows-gnullvm\\release\\bundle\\nsis',
-        'completed without the required updater signature',
+        "$readiness.toolchain.selectedToolchain",
+        "$gnullvm.strictlyPinnedReady",
+        "build-windows-llvm.ps1",
+        "-AdditionalConfigPath",
+        "-CargoTargetDir $cargoTargetFull",
+        "-LlvmRoot $gnullvm.llvmRoot",
+        "-EditionId lab",
+        "-PreserveBundleHistory",
+        "x86_64-pc-windows-gnullvm\\release\\bundle\\nsis",
+        "completed without the required updater signature",
     )
     for fragment in required_script_fragments:
         if fragment not in script:
@@ -485,18 +510,18 @@ def verify_lab_preview_contract() -> dict[str, object]:
             raise LabPreviewContractError(f"Lab build script contains forbidden text: {fragment}")
 
     required_shared_fragments = (
-        '[string]$AdditionalConfigPath',
-        '[string]$CargoTargetDir',
-        '[string]$LlvmRoot',
+        "[string]$AdditionalConfigPath",
+        "[string]$CargoTargetDir",
+        "[string]$LlvmRoot",
         '[string]$ExpectedProductName = "DroneDream"',
-        '[switch]$AllowUnsignedUpdater',
-        '[switch]$PreserveBundleHistory',
+        "[switch]$AllowUnsignedUpdater",
+        "[switch]$PreserveBundleHistory",
         '"--config", $additionalConfig',
         '"--config", $llvmBundleConfig',
-        '$env:CARGO_TARGET_DIR = $cargoTargetRoot',
-        'invoke-tauri-updater-signer.ps1',
-        'if (-not $AllowUnsignedUpdater)',
-        'if (-not $PreserveBundleHistory)',
+        "$env:CARGO_TARGET_DIR = $cargoTargetRoot",
+        "invoke-tauri-updater-signer.ps1",
+        "if (-not $AllowUnsignedUpdater)",
+        "if (-not $PreserveBundleHistory)",
     )
     for fragment in required_shared_fragments:
         if fragment not in shared_llvm_script:
@@ -507,9 +532,7 @@ def verify_lab_preview_contract() -> dict[str, object]:
         raise LabPreviewContractError(
             "Shared LLVM build must not transport edition config through TAURI_CONFIG"
         )
-    edition_config_index = shared_llvm_script.index(
-        '"--config", $additionalConfig'
-    )
+    edition_config_index = shared_llvm_script.index('"--config", $additionalConfig')
     llvm_config_index = shared_llvm_script.index(
         '"--config", $llvmBundleConfig',
         edition_config_index,

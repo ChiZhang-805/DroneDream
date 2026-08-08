@@ -5,7 +5,6 @@ import {
   PackageCheck,
   RadioTower,
   RefreshCw,
-  Settings,
   ShieldCheck,
   SlidersHorizontal,
   Wrench,
@@ -25,25 +24,22 @@ import {
   type FieldReadOnlyProtocolEvidence,
 } from "./FieldAdapterCenter";
 import { FieldAssistantWorkspace } from "./FieldAssistantWorkspace";
-import { FieldAuthControl } from "./FieldAuthControl";
-import { FieldBrandLockup } from "./FieldBrandLockup";
 import { FieldPreflightWorkspace } from "./FieldPreflightWorkspace";
 import { FieldRecoveryWorkspace } from "./FieldRecoveryWorkspace";
-import { FieldSettingsDialog } from "./FieldSettingsDialog";
 import { FieldTuningWorkspace } from "./FieldTuningWorkspace";
 import {
   evaluateFieldSafety,
   FIELD_OBSERVATION_FIXTURES,
   type FieldObservationState,
 } from "./safety";
+import { hardwareDomainEdition } from "./hardwareDomain";
 
 type FieldPageId = "assistant" | "device" | "compatibility" | "tuning" | "recovery" | "operations";
 
 const COPY = {
   en: {
     skip: "Skip to workspace",
-    settings: "Settings",
-    nav: "Field navigation",
+    nav: "Hardware laboratory navigation",
     assistant: "Chatting",
     device: "Device",
     compatibility: "Compatibility",
@@ -63,7 +59,7 @@ const COPY = {
     },
     scan: "Discover",
     scanning: "Scanning",
-    scanUnavailable: "Available in the installed Field app",
+    scanUnavailable: "Available in the installed Lab app",
     source: "Source",
     observation: "Observation",
     observedPorts: "Unopened serial ports",
@@ -90,8 +86,7 @@ const COPY = {
   },
   "zh-CN": {
     skip: "跳到工作区",
-    settings: "设置",
-    nav: "Field 导航",
+    nav: "真机实验室导航",
     assistant: "调优对话",
     device: "设备",
     compatibility: "兼容性",
@@ -111,7 +106,7 @@ const COPY = {
     },
     scan: "发现设备",
     scanning: "正在扫描",
-    scanUnavailable: "仅在已安装的 Field 应用中可用",
+    scanUnavailable: "仅在已安装的 Lab 应用中可用",
     source: "来源",
     observation: "观察状态",
     observedPorts: "未打开的串口",
@@ -156,7 +151,9 @@ function controllerKey(vendor: string, model: string): string {
 
 function savedLocale(): FieldLocale {
   try {
-    return window.localStorage.getItem("dronedream:field-locale") === "zh-CN" ? "zh-CN" : "en";
+    return window.localStorage.getItem(`dronedream:${hardwareDomainEdition}-hardware-locale`) === "zh-CN"
+      ? "zh-CN"
+      : "en";
   } catch {
     return "en";
   }
@@ -166,6 +163,7 @@ interface FieldAppProps {
   initialLocale?: FieldLocale;
   initialObservationState?: FieldObservationState;
   focusOnMount?: boolean;
+  embeddedInLab?: boolean;
 }
 
 function FieldPageHeading({
@@ -180,7 +178,7 @@ function FieldPageHeading({
   return (
     <header className="field-page-heading">
       <div>
-        <span className="field-page-eyebrow"><Icon aria-hidden="true" />FIELD</span>
+        <span className="field-page-eyebrow"><Icon aria-hidden="true" />{hardwareDomainEdition === "lab" ? "LAB · HARDWARE" : "FIELD"}</span>
         <h1>{title}</h1>
         <p>{body}</p>
       </div>
@@ -192,6 +190,7 @@ function FieldWorkspace({
   initialLocale,
   initialObservationState = "device-missing",
   focusOnMount = false,
+  embeddedInLab = false,
 }: FieldAppProps) {
   const [locale, setLocale] = useState<FieldLocale>(initialLocale ?? savedLocale);
   const [activePage, setActivePage] = useState<FieldPageId>("assistant");
@@ -208,10 +207,7 @@ function FieldWorkspace({
   const [deviceScanError, setDeviceScanError] = useState<string | null>(null);
   const [readOnlyEvidence, setReadOnlyEvidence] = useState<FieldReadOnlyProtocolEvidence | null>(null);
   const [latestSnapshot, setLatestSnapshot] = useState<FieldParameterSnapshot | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
-  const settingsButtonRef = useRef<HTMLButtonElement>(null);
-  const settingsCloseRef = useRef<HTMLButtonElement>(null);
   const copy = COPY[locale];
   const observation = FIELD_OBSERVATION_FIXTURES[observationState];
   const decision = useMemo(() => evaluateFieldSafety(observation), [observation]);
@@ -224,11 +220,15 @@ function FieldWorkspace({
   useEffect(() => {
     document.documentElement.lang = locale;
     try {
-      window.localStorage.setItem("dronedream:field-locale", locale);
+      window.localStorage.setItem(`dronedream:${hardwareDomainEdition}-hardware-locale`, locale);
     } catch {
       // Language persistence has no safety meaning.
     }
   }, [locale]);
+
+  useEffect(() => {
+    if (initialLocale) setLocale(initialLocale);
+  }, [initialLocale]);
 
   useEffect(() => {
     if (focusOnMount) pageRef.current?.focus({ preventScroll: true });
@@ -238,24 +238,6 @@ function FieldWorkspace({
     setActivePage(page);
     requestAnimationFrame(() => pageRef.current?.focus({ preventScroll: true }));
   };
-
-  const closeSettings = useCallback(() => {
-    setSettingsOpen(false);
-    requestAnimationFrame(() => settingsButtonRef.current?.focus());
-  }, []);
-
-  useEffect(() => {
-    if (!settingsOpen) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeSettings();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    requestAnimationFrame(() => settingsCloseRef.current?.focus());
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [closeSettings, settingsOpen]);
 
   const scanDevices = useCallback(async () => {
     setDeviceScanBusy(true);
@@ -358,19 +340,14 @@ function FieldWorkspace({
   };
 
   return (
-    <div className="field-app" data-authority="false" data-validated-pack-count={decision.validatedPackCount} data-quorum={decision.threeLayerQuorum}>
+    <div
+      className={`field-app${embeddedInLab ? " field-app-embedded-lab" : ""}`}
+      data-brand-edition={hardwareDomainEdition}
+      data-authority="false"
+      data-validated-pack-count={decision.validatedPackCount}
+      data-quorum={decision.threeLayerQuorum}
+    >
       <a className="field-skip-link" href="#field-page">{copy.skip}</a>
-      <header className="field-topbar">
-        <div className="field-brand" aria-label="DroneDream · FIELD"><FieldBrandLockup className="field-brand-lockup" variant="compact" /></div>
-        <div className="field-topbar-actions">
-          <span className="field-preview-badge" title={copy.safetyActive}><ShieldCheck aria-hidden="true" /><span>{copy.safetyActive}</span></span>
-          <FieldAuthControl locale={locale} />
-          <button ref={settingsButtonRef} className="field-settings-button" type="button" aria-label={copy.settings} title={copy.settings} aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(true)}><Settings aria-hidden="true" /></button>
-        </div>
-      </header>
-
-      {settingsOpen ? <div className="launcher-settings-backdrop field-settings-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeSettings(); }}><FieldSettingsDialog closeRef={settingsCloseRef} locale={locale} onClose={closeSettings} onLocaleChange={setLocale} /></div> : null}
-
       <div className="field-layout">
         <aside className="field-sidebar">
           <nav aria-label={copy.nav}>{NAVIGATION.map(([id, label, Icon]) => <button key={id} type="button" title={copy[label]} aria-label={copy[label]} aria-current={activePage === id ? "page" : undefined} onClick={() => selectPage(id)}><Icon aria-hidden="true" /><span>{copy[label]}</span></button>)}</nav>
@@ -387,7 +364,7 @@ function FieldWorkspace({
 export function FieldApp(props: FieldAppProps) {
   const auth = useOptionalAuth();
   return (
-    <ModelAccessProvider accountScope={`field:${auth?.account?.id ?? "local"}`}>
+    <ModelAccessProvider accountScope={`${hardwareDomainEdition}:${auth?.account?.id ?? "local"}`}>
       <FieldWorkspace {...props} />
     </ModelAccessProvider>
   );
