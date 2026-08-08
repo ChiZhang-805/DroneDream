@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-artifact-manifest",
+  "editionId": "lab",
+  "displayName": "DroneDream · LAB",
+  "version": "1.0.0",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "29730d5d9928817872d7b9dca9e853873b7acdc3",
+    "tree": "ae09f319cbe159076aa811ee4f248a53abecd7d3"
+  },
+  "commonCore": {
+    "commit": "e374d3f8d96b1265fcdb06864208b676566e94d9",
+    "hash": "b2a1d8479dd06616430e8eea9ec720f831ccaec5f5408032bc85eb3d9a0825e9"
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-29730d5-attempt10/DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12464388,
+    "sha256": "c8357f8b936e2109a7a88679744875bac15d8c89127a09b57895b37bbfd89c7e",
+    "authenticodeStatus": "NotSigned"
+  },
+  "updaterSignature": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-29730d5-attempt10/DroneDream-Lab-1.0.0.exe.sig",
+    "bytes": 428,
+    "sha256": "ef001a564a927e73b4803a027341a9662dce1e542b2b7407ae666ea4ebd49fc4",
+    "keyId": "BA3FDCAF71CE2FF5"
+  },
+  "buildReceipt": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-29730d5-attempt10/lab-preview-receipt.json",
+    "bytes": 9433,
+    "sha256": "5ccb625b81a0166fc40dbb21e90bf68cdca357b03e7b89681b306bb7bebf57f2",
+    "schemaValidated": true
+  },
+  "editionManifest": {
+    "path": "distribution/editions/lab.v1.json",
+    "bytes": 3589,
+    "sha256": "96953004774b7044129c491d3ff251213d4c7bf09d188d3d3c00724343aebf3c"
+  },
+  "buildProfile": {
+    "path": "distribution/build-profiles/lab-preview.v1.json",
+    "bytes": 15001,
+    "sha256": "d0e02b959c022f30beffc78293062c366677a370593cff5133f715b3289f3f9c"
+  },
+  "capabilities": {
+    "simModelHarness": "integrated",
+    "fieldRecordedEvidenceHarness": "integrated",
+    "managedReadOnlyHardwareAdapters": "integrated",
+    "simToRealGapAndModelCalibration": "integrated",
+    "realToSimResimulationAndHoldout": "integrated",
+    "qualificationEvidenceIssue": "draft-until-exact-job-and-validated-pack",
+    "fieldHandoff": "draft-only-until-safety-quorum"
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "workspaceOrThemeGrantsAuthority": false
+  },
+  "publication": {
+    "internalPreviewReady": true,
+    "publicReleaseReady": false,
+    "websiteDeploymentPerformed": false,
+    "waitingForUserDeploymentCommand": true
+  }
+}

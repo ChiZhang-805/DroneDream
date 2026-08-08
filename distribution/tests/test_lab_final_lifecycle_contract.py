@@ -5,7 +5,6 @@ import json
 import subprocess
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 LIFECYCLE = ROOT / "distribution/editions/lab/lifecycle"
 APPLICATION = LIFECYCLE / "final-29730d5-app-only-application-v3.v1.json"
@@ -14,6 +13,12 @@ TARGET = LIFECYCLE / "final-29730d5-app-only-target-receipt.v1.json"
 RUNNER = LIFECYCLE / "run-lab-final-app-only-lifecycle.ps1"
 INSPECTOR = LIFECYCLE / "inspect-lab-e3b427e-live-webview2.mjs"
 CLASSIFIER = LIFECYCLE / "lab-request-origin-diagnostics.mjs"
+FINAL_MANIFEST = (
+    ROOT / "distribution/build-receipts/lab-final-1.0.0-29730d5.manifest.json"
+)
+FINAL_HANDOFF = (
+    ROOT / "distribution/editions/lab/website-exact-exe-handoff.final.v1.json"
+)
 
 
 def _load(path: Path) -> dict:
@@ -126,3 +131,24 @@ def test_final_lifecycle_runner_is_parameterized_and_parses() -> None:
         text=True,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_final_website_handoff_is_exact_and_not_deployed() -> None:
+    manifest = _load(FINAL_MANIFEST)
+    handoff = _load(FINAL_HANDOFF)
+
+    assert handoff["productSource"]["commit"] == manifest["productSource"]["commit"]
+    assert handoff["files"]["installer"]["sha256"] == manifest["artifact"]["sha256"]
+    assert handoff["files"]["updaterSignature"]["sha256"] == manifest[
+        "updaterSignature"
+    ]["sha256"]
+    assert handoff["files"]["manifest"]["sha256"] == _sha(FINAL_MANIFEST)
+    assert handoff["files"]["manifest"]["bytes"] == FINAL_MANIFEST.stat().st_size
+    assert handoff["validation"]["freshInstall"] == "passed"
+    assert handoff["validation"]["sameVersionOverlay"] == "passed"
+    assert handoff["validation"]["uninstallAndOwnedCleanup"] == "passed"
+    assert handoff["publication"]["internalPreviewReady"] is True
+    assert handoff["publication"]["publicReleaseReady"] is False
+    assert handoff["publication"]["websiteDeploymentPerformed"] is False
+    assert handoff["safety"]["validatedVehiclePackCount"] == 0
+    assert handoff["safety"]["hardwareWriteArmHitlFlightDecision"] == "deny"

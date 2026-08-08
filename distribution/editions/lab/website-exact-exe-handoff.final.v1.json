@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-website-exact-exe-handoff",
+  "state": "exact-four-file-handoff-awaiting-user-deployment-command",
+  "edition": {
+    "editionId": "lab",
+    "displayName": "DroneDream · LAB",
+    "version": "1.0.0",
+    "fileName": "DroneDream-Lab-1.0.0.exe"
+  },
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "29730d5d9928817872d7b9dca9e853873b7acdc3",
+    "tree": "ae09f319cbe159076aa811ee4f248a53abecd7d3",
+    "cleanAtBuild": true
+  },
+  "files": {
+    "installer": {
+      "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-29730d5-attempt10/DroneDream-Lab-1.0.0.exe",
+      "bytes": 12464388,
+      "sha256": "c8357f8b936e2109a7a88679744875bac15d8c89127a09b57895b37bbfd89c7e",
+      "authenticodeStatus": "NotSigned"
+    },
+    "updaterSignature": {
+      "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-29730d5-attempt10/DroneDream-Lab-1.0.0.exe.sig",
+      "bytes": 428,
+      "sha256": "ef001a564a927e73b4803a027341a9662dce1e542b2b7407ae666ea4ebd49fc4"
+    },
+    "buildReceipt": {
+      "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-29730d5-attempt10/lab-preview-receipt.json",
+      "bytes": 9433,
+      "sha256": "5ccb625b81a0166fc40dbb21e90bf68cdca357b03e7b89681b306bb7bebf57f2"
+    },
+    "manifest": {
+      "path": "distribution/build-receipts/lab-final-1.0.0-29730d5.manifest.json",
+      "bytes": 2621,
+      "sha256": "c29ce11b57b69f5e1af0f64eb0dffa34866537d6ee16beeb9bee607e2b4d65af"
+    }
+  },
+  "build": {
+    "globalAttemptOrdinal": 10,
+    "buildInvocationsForProductSource": 1,
+    "successfulArtifactCountForProductSource": 1,
+    "uniqueExe": true
+  },
+  "validation": {
+    "artifactReceiptSchema": "passed",
+    "freshInstall": "passed",
+    "sameVersionOverlay": "passed",
+    "uninstallAndOwnedCleanup": "passed",
+    "shortcuts": "passed",
+    "webView2": "passed-existing-runtime-read-only",
+    "localization": {"en": "passed", "zhCN": "passed"},
+    "settingsSingleScreen": "passed",
+    "labThemeAndInteractiveThreeD": "passed",
+    "protectedOtherEditionsAndRuntimeParity": "passed",
+    "browserOAuthRealAccount": "not-run-current-artifact",
+    "px4GazeboRealRuntime": "not-run-current-artifact",
+    "realHardware": "not-run-zero-validated-packs"
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "presentationOrWorkspaceGrantsAuthority": false
+  },
+  "publication": {
+    "internalPreviewReady": true,
+    "publicReleaseReady": false,
+    "websiteDeploymentPerformed": false,
+    "downloadUrl": null,
+    "checksumUrl": null,
+    "receiptUrl": null,
+    "manifestUrl": null,
+    "signatureUrl": null,
+    "waitingForUserDeploymentCommand": true
+  }
+}
