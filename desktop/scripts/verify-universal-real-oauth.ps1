@@ -87,6 +87,26 @@ function Get-FileRecord([string]$Path) {
     }
 }
 
+function Remove-ExactOwnedUninstallerResidue($ExpectedUninstaller) {
+    if (-not (Test-Path -LiteralPath $installDirectory -PathType Container)) { return $false }
+    $entries = @(Get-ChildItem -LiteralPath $installDirectory -Force)
+    if ($entries.Count -ne 1 -or $entries[0].FullName -cne $uninstallerPath -or
+        -not $ExpectedUninstaller.exists) {
+        throw "Universal install root contains unexpected residue after its own uninstaller."
+    }
+    $actual = Get-FileRecord $uninstallerPath
+    if (-not $actual.exists -or [long]$actual.bytes -ne [long]$ExpectedUninstaller.bytes -or
+        [string]$actual.sha256 -cne [string]$ExpectedUninstaller.sha256) {
+        throw "Universal uninstaller residue identity drifted."
+    }
+    [IO.File]::Delete($uninstallerPath)
+    if (@(Get-ChildItem -LiteralPath $installDirectory -Force).Count -ne 0) {
+        throw "Universal install root changed during exact residue cleanup."
+    }
+    [IO.Directory]::Delete($installDirectory)
+    return $true
+}
+
 function Get-DirectoryRecord([string]$Path) {
     $item = Get-Item -LiteralPath $Path -ErrorAction SilentlyContinue
     return [ordered]@{
@@ -414,6 +434,7 @@ $oauthObserverProcess = $null
 $installed = $false
 $uninstalled = $false
 $cleaned = $false
+$installedUninstallerRecord = $null
 $auditBefore = @(Get-AuditRecords)
 $protectedBefore = Get-ProtectedState
 function Save-ExecutionCheckpoint([string]$Stage) {
@@ -429,6 +450,7 @@ try {
     Invoke-Checked $installerPath @("/S", "/NS", "/L=1033") "Universal isolated install"
     $installed = $true
     Wait-Until { (Test-Path -LiteralPath $applicationPath -PathType Leaf) -and (Test-Path -LiteralPath $uninstallerPath -PathType Leaf) } 30 "Universal application did not install."
+    $installedUninstallerRecord = Get-FileRecord $uninstallerPath
 
     $oldArgs = [Environment]::GetEnvironmentVariable("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "Process")
     $oldProfile = [Environment]::GetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", "Process")
@@ -630,13 +652,14 @@ try {
     Save-ExecutionCheckpoint "uninstaller-attempted"
     Invoke-Checked $uninstallerPath @("/S", "_?=$installDirectory") "Universal isolated uninstall"
     $uninstalled = $true
-    Wait-Until { -not (Test-Path -LiteralPath $installDirectory) } 30 "Universal install root remained after uninstall."
-    if ((Test-Path -LiteralPath $productKey) -or (Test-Path -LiteralPath $webViewProfileRoot)) {
+    if ((Test-Path -LiteralPath $installDirectory) -or (Test-Path -LiteralPath $productKey) -or (Test-Path -LiteralPath $webViewProfileRoot)) {
         $counts.ownedCleanup++
         Save-ExecutionCheckpoint "owned-cleanup-attempted"
+        if (Test-Path -LiteralPath $installDirectory) { $null = Remove-ExactOwnedUninstallerResidue $installedUninstallerRecord }
         if (Test-Path -LiteralPath $productKey) { Remove-Item -LiteralPath $productKey -Recurse -Force }
         if (Test-Path -LiteralPath $webViewProfileRoot) { Remove-Item -LiteralPath $webViewProfileRoot -Recurse -Force }
     }
+    Wait-Until { -not (Test-Path -LiteralPath $installDirectory) } 30 "Universal install root remained after exact owned cleanup."
     $cleaned = $true
     Wait-Until {
         ((Get-WslInventory | ConvertTo-Json -Depth 10 -Compress) -ceq ($protectedBefore.wslInventory | ConvertTo-Json -Depth 10 -Compress))
@@ -706,8 +729,8 @@ finally {
     if ($installed -and -not $uninstalled -and (Test-Path -LiteralPath $uninstallerPath -PathType Leaf)) {
         try { $counts.isolatedUninstaller++; Save-ExecutionCheckpoint "uninstaller-recovery-attempted"; Invoke-Checked $uninstallerPath @("/S", "_?=$installDirectory") "Universal failure recovery uninstall"; $uninstalled = $true } catch { $receipt.uninstallRecoveryError = $_.Exception.Message }
     }
-    if (-not $cleaned -and ((Test-Path -LiteralPath $productKey) -or (Test-Path -LiteralPath $webViewProfileRoot))) {
-        try { $counts.ownedCleanup++; Save-ExecutionCheckpoint "owned-cleanup-recovery-attempted"; if (Test-Path -LiteralPath $productKey) { Remove-Item -LiteralPath $productKey -Recurse -Force }; if (Test-Path -LiteralPath $webViewProfileRoot) { Remove-Item -LiteralPath $webViewProfileRoot -Recurse -Force }; $cleaned = $true } catch { $receipt.ownedCleanupError = $_.Exception.Message }
+    if (-not $cleaned -and $counts.ownedCleanup -eq 0 -and ((Test-Path -LiteralPath $installDirectory) -or (Test-Path -LiteralPath $productKey) -or (Test-Path -LiteralPath $webViewProfileRoot))) {
+        try { $counts.ownedCleanup++; Save-ExecutionCheckpoint "owned-cleanup-recovery-attempted"; if (Test-Path -LiteralPath $installDirectory) { $null = Remove-ExactOwnedUninstallerResidue $installedUninstallerRecord }; if (Test-Path -LiteralPath $productKey) { Remove-Item -LiteralPath $productKey -Recurse -Force }; if (Test-Path -LiteralPath $webViewProfileRoot) { Remove-Item -LiteralPath $webViewProfileRoot -Recurse -Force }; $cleaned = $true } catch { $receipt.ownedCleanupError = $_.Exception.Message }
     }
     try {
         Wait-Until {

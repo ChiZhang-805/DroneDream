@@ -126,6 +126,19 @@ def test_authenticated_app_close_handles_the_existing_exit_guard_once() -> None:
         assert forbidden not in helper
 
 
+def test_owned_uninstaller_residue_cleanup_is_exact_and_fail_closed() -> None:
+    powershell = POWERSHELL.read_text(encoding="utf-8")
+    assert "function Remove-ExactOwnedUninstallerResidue" in powershell
+    assert "$entries.Count -ne 1" in powershell
+    assert "$entries[0].FullName -cne $uninstallerPath" in powershell
+    assert "[long]$actual.bytes -ne [long]$ExpectedUninstaller.bytes" in powershell
+    assert "[string]$actual.sha256 -cne [string]$ExpectedUninstaller.sha256" in powershell
+    assert "[IO.File]::Delete($uninstallerPath)" in powershell
+    assert "[IO.Directory]::Delete($installDirectory)" in powershell
+    assert "Remove-Item -LiteralPath $installDirectory -Recurse" not in powershell
+    assert "-and $counts.ownedCleanup -eq 0 -and" in powershell
+
+
 def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
     observer = INSTALLED_UI.read_text(encoding="utf-8")
     assert 'const authenticatedWorkspace = args.get("--authenticated-workspace") === "true"' in observer
