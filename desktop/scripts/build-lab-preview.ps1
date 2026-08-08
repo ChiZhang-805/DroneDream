@@ -2,6 +2,7 @@ param(
     [switch]$Build,
     [string]$OutputRoot,
     [string]$CargoTargetDir,
+    [string]$ExpectedSourceCommit,
     [ValidateSet("gnullvm")]
     [string]$Toolchain = "gnullvm"
 )
@@ -47,9 +48,23 @@ if ($sourceCommit -cnotmatch "^[0-9a-f]{40}$") {
     throw "Unable to freeze an exact Lab preview source commit."
 }
 
-$branch = Invoke-GitText @("branch", "--show-current")
-if ($branch -cne "codex/software-lab") {
-    throw "Lab preview builds must run from codex/software-lab."
+$sourceBranch = "codex/software-lab"
+if ($ExpectedSourceCommit) {
+    if ($ExpectedSourceCommit -cnotmatch "^[0-9a-f]{40}$") {
+        throw "ExpectedSourceCommit must be a full lowercase Git commit."
+    }
+    if ($sourceCommit -cne $ExpectedSourceCommit) {
+        throw "Lab preview HEAD does not match ExpectedSourceCommit."
+    }
+}
+
+$checkoutBranch = Invoke-GitText @("branch", "--show-current")
+if ($checkoutBranch -ceq $sourceBranch) {
+    $sourceCheckoutMode = "branch"
+} elseif (-not $checkoutBranch -and $ExpectedSourceCommit -and $sourceCommit -ceq $ExpectedSourceCommit) {
+    $sourceCheckoutMode = "detached-exact"
+} else {
+    throw "Lab preview builds require codex/software-lab or a detached exact ExpectedSourceCommit."
 }
 
 $sourceStatus = Invoke-GitText @("status", "--porcelain=v1", "--untracked-files=all")
@@ -246,7 +261,7 @@ $receipt = [ordered]@{
     editionId = "lab"
     productDisplayVersion = "1.0.0"
     sourceCommit = $sourceCommit
-    branch = $branch
+    branch = $sourceBranch
     commonCoreCommit = $commonCoreCommit
     commonCoreHash = $commonCoreHash
     editionManifest = New-RepoFileRef "distribution\editions\lab.v1.json"

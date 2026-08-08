@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-attempt-failure-receipt",
+  "receiptVersion": "1.0.0",
+  "attemptId": "lab-final-2d00662-attempt8",
+  "editionId": "lab",
+  "result": "failed-before-frontend-tauri-cargo-nsis",
+  "observedAtUtc": "2026-08-08T04:16:01.8377498Z",
+  "sourceSeparation": {
+    "productSourceCommit": "2d0066227b99eb572d8ca24a666bece75bcb44a7",
+    "productSourceTree": "f41543034055ce51214ec7cdff2aac9aa7d9180a",
+    "buildCheckoutCommit": "2d0066227b99eb572d8ca24a666bece75bcb44a7",
+    "buildCheckoutMode": "detached-exact",
+    "sourceWasClean": true,
+    "applicationEvidenceIsProductSource": false
+  },
+  "application": {
+    "path": "distribution/editions/lab/desktop/yellow-build-attempt-8-2d00662-application.v1.json",
+    "bytes": 13186,
+    "sha256": "79bb8db4070ea47b1302e2690d7d588cb49c50cd0b5f88cb657aa2102e262fd1",
+    "globalBuildAttemptOrdinal": 8,
+    "sourceBuildAttemptOrdinal": 1,
+    "maximumBuildInvocations": 1,
+    "automaticRetryAllowed": false
+  },
+  "attempt": {
+    "classification": "YELLOW",
+    "controllerInvocationCount": 1,
+    "buildScriptInvocationCount": 1,
+    "frontendBuildCount": 0,
+    "tauriBuildCount": 0,
+    "cargoBuildCount": 0,
+    "nsisBuildCount": 0,
+    "artifactWriteCount": 0,
+    "exitCode": 1,
+    "automaticRetryCount": 0,
+    "retryAllowed": false
+  },
+  "failure": {
+    "stage": "source-identity-preflight",
+    "classification": "contradictory-source-checkout-contract",
+    "message": "Application required detached exact product source while build-lab-preview.ps1 required the named codex/software-lab branch.",
+    "productCompilationStarted": false,
+    "productDefectObserved": false,
+    "repairScope": [
+      "desktop/scripts/build-lab-preview.ps1",
+      "distribution/tests/test_lab_preview_contract.py"
+    ],
+    "sameAttemptMayBeReused": false
+  },
+  "resourceGateAtStart": {
+    "memoryUsedPercent": 60.3,
+    "memoryFreeGiB": 6.26,
+    "cpuPercent": 3.4,
+    "cDriveFreeGiB": 10.21,
+    "zDriveFreeGiB": 21.72,
+    "heavyProcessCount": 0,
+    "passed": true
+  },
+  "evidence": {
+    "ownedRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-2d00662-attempt8",
+    "stdout": {
+      "path": "build.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "build.stderr.log",
+      "bytes": 490,
+      "sha256": "bdcc2e6d32a6021ff50a8899299ebe508b2272733432e8513e3eb916d4bfaf68"
+    },
+    "rawLogsPreserved": true,
+    "logsContainPublicConfigurationValues": false,
+    "logsContainSecrets": false
+  },
+  "artifact": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "created": false,
+    "updaterSignatureCreated": false,
+    "artifactReceiptCreated": false,
+    "relabelOrSubstitutionAllowed": false
+  },
+  "sideEffects": {
+    "installerRun": false,
+    "runtimeMigrationOrStart": false,
+    "px4OrGazeboStarted": false,
+    "oauthProviderCalled": false,
+    "hardwareAccess": false,
+    "artifactUploaded": false,
+    "deployed": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecision": "deny",
+    "workspaceThemeModelOrEvidenceCountsAsAuthority": false
+  },
+  "nextGate": {
+    "newProductSourceRequired": true,
+    "newApplicationRequired": true,
+    "newExactYellowStartSignalRequired": true,
+    "attempt8MayBeRerun": false
+  }
+}

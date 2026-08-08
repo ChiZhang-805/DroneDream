@@ -130,6 +130,26 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertNotIn('$artifactPath.Replace($repoRoot', script)
         self.assertIn("edition-owned build-attempts root", script)
 
+    def test_lab_build_accepts_only_branch_or_explicit_detached_exact_source(self) -> None:
+        script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("[string]$ExpectedSourceCommit", script)
+        self.assertIn(
+            '$ExpectedSourceCommit -cnotmatch "^[0-9a-f]{40}$"',
+            script,
+        )
+        self.assertIn('$sourceCommit -cne $ExpectedSourceCommit', script)
+        self.assertIn('$sourceCheckoutMode = "branch"', script)
+        self.assertIn('$sourceCheckoutMode = "detached-exact"', script)
+        self.assertIn(
+            "a detached exact ExpectedSourceCommit",
+            script,
+        )
+        self.assertIn("branch = $sourceBranch", script)
+        self.assertNotIn("branch = $checkoutBranch", script)
+
     def test_shared_llvm_build_uses_ordered_cli_config_overlays(self) -> None:
         script = (ROOT / "desktop/scripts/build-windows-llvm.ps1").read_text(
             encoding="utf-8"
