@@ -44,6 +44,7 @@ class UniversalBrowserConsentContractTest(unittest.TestCase):
         self.assertIn('exactWindowClass = "Chrome_WidgetWin_1"', source)
         self.assertIn("'DroneDream - Google Chrome$'", source)
         self.assertIn("Get-ExactChromeWindow -AllowRelatedDroneDreamTitle", source)
+        self.assertIn("$null -eq $latestTabWindow", source)
         self.assertIn("if ($AllowRelatedDroneDreamTitle)", source)
         self.assertIn("Get-AuthenticodeSignature", source)
         self.assertIn("Sort-Object sampledPixels -Descending", source)

@@ -182,7 +182,11 @@ function Find-ConsentTarget {
 
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 $target = $null
-$latestTabWindow = Get-ExactChromeWindow -AllowRelatedDroneDreamTitle
+$latestTabWindow = $null
+while ([DateTime]::UtcNow -lt $deadline -and $null -eq $latestTabWindow) {
+    $latestTabWindow = Get-ExactChromeWindow -AllowRelatedDroneDreamTitle
+    if ($null -eq $latestTabWindow) { Start-Sleep -Milliseconds 250 }
+}
 if ($null -eq $latestTabWindow) { throw "The exact signed Chrome window is unavailable." }
 $latestTabHandle = [IntPtr]$latestTabWindow.Current.NativeWindowHandle
 if (-not [DroneDreamConsentNative]::SetForegroundWindow($latestTabHandle)) { throw "Unable to focus the exact consent window." }
