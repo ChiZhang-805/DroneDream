@@ -146,7 +146,7 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "contractId": "dronedream-universal-integrated-workspaces/v2",
         "manifest": "distribution/universal/integrated-workspaces.v2.json",
         "sha256": hashlib.sha256(INTEGRATED_WORKSPACES.read_bytes()).hexdigest(),
-        "sourceFileCount": 10,
+        "sourceFileCount": 12,
         "workspaceModes": ["sim", "lab", "field"],
         "createsCrossEditionHarnessOrchestrator": False,
         "presentationOnly": True,
@@ -167,7 +167,14 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "7d3d0c34d0e385d88312db34601667a384ecc9c5"
     )
     integrated_sources = integrated_manifest["sourceFiles"]  # type: ignore[index]
-    assert len(integrated_sources) == 10
+    assert len(integrated_sources) == 12
+    integration_by_path = {item["path"]: item["integration"] for item in integrated_sources}
+    assert integration_by_path["frontend/src/field/FieldApp.tsx"] == (
+        "semantic-universal-shared-locale-adapter"
+    )
+    assert integration_by_path["frontend/src/router.tsx"] == (
+        "semantic-universal-workspace-routing-and-shared-locale"
+    )
     for source_file in integrated_sources:
         path = ROOT / source_file["path"]
         assert path.is_file()
