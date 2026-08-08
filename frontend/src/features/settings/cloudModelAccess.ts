@@ -67,6 +67,27 @@ export interface ManagedModelGrant {
   usage: ManagedModelUsageSnapshot;
 }
 
+export interface ManagedModelChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+export interface ManagedModelChatCompletion {
+  id?: string;
+  model: string;
+  choices: Array<{
+    message: {
+      role: "assistant";
+      content: string;
+    };
+  }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
 export interface ManagedModelCatalogEntry {
   provider: ManagedModelProvider;
   display_name: string;
@@ -253,6 +274,90 @@ export function issueManagedModelGrant(
       ...(provider ? { provider } : {}),
     }),
   });
+}
+
+export async function completeManagedModelChat(
+  grant: ManagedModelGrant,
+  messages: ManagedModelChatMessage[],
+  responseFormat?: Record<string, unknown>,
+): Promise<ManagedModelChatCompletion> {
+  if (!grant.grant.startsWith("ddg_") || grant.grant.length > 128) {
+    throw new CloudModelAccessError(
+      "MODEL_GRANT_INVALID",
+      "The managed-model grant is invalid.",
+      401,
+    );
+  }
+  const gateway = new URL(grant.gateway_base_url);
+  if (
+    gateway.protocol !== "https:"
+    || gateway.username
+    || gateway.password
+    || !gateway.pathname.endsWith("/model-gateway")
+  ) {
+    throw new CloudModelAccessError(
+      "MODEL_GATEWAY_INVALID",
+      "The managed-model gateway address is invalid.",
+      503,
+    );
+  }
+  if (messages.length < 1 || messages.length > 24) {
+    throw new CloudModelAccessError(
+      "INVALID_REQUEST",
+      "The conversation is outside the supported size.",
+      400,
+    );
+  }
+
+  let response: Response;
+  try {
+    response = await fetchWithDeadline(
+      `${gateway.toString().replace(/\/+$/u, "")}/chat/completions`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${grant.grant}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({
+          messages,
+          ...(responseFormat ? { response_format: responseFormat } : {}),
+        }),
+      },
+      120_000,
+      CLOUD_RESPONSE_MAX_BYTES,
+    );
+  } catch (error) {
+    throw new CloudModelAccessError(
+      "NETWORK_ERROR",
+      error instanceof Error ? error.message : "The managed model could not be reached.",
+      0,
+    );
+  }
+  const parsed = await response.json() as Partial<ManagedModelChatCompletion> & {
+    error?: { code?: string; message?: string };
+  };
+  if (!response.ok) {
+    throw new CloudModelAccessError(
+      parsed.error?.code ?? "MODEL_REQUEST_FAILED",
+      parsed.error?.message ?? `The managed model returned HTTP ${response.status}.`,
+      response.status,
+    );
+  }
+  if (
+    typeof parsed.model !== "string"
+    || !Array.isArray(parsed.choices)
+    || typeof parsed.choices[0]?.message?.content !== "string"
+  ) {
+    throw new CloudModelAccessError(
+      "INVALID_RESPONSE",
+      "The managed model returned an invalid response.",
+      502,
+    );
+  }
+  return parsed as ManagedModelChatCompletion;
 }
 
 export function getBillingAvailability(): Promise<BillingAvailability> {
