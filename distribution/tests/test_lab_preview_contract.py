@@ -118,6 +118,8 @@ class LabPreviewContractTests(unittest.TestCase):
         self.assertIn('path = "${artifactName}.sig"', script)
         self.assertNotIn("$artifactPath.Replace($repoRoot", script)
         self.assertIn("edition-owned build-attempts root", script)
+        for module in lab_artifact.GATED_HARDWARE_MODULES:
+            self.assertIn(f'"{module}"', script)
 
     def test_lab_build_accepts_only_branch_or_explicit_detached_exact_source(self) -> None:
         script = (ROOT / "desktop/scripts/build-lab-preview.ps1").read_text(encoding="utf-8")

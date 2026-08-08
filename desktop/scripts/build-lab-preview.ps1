@@ -322,6 +322,9 @@ $receipt = [ordered]@{
         )
         gatedHardwareAdapter = @(
             "hardware-bridge",
+            "managed-protocol-adapters",
+            "recorded-evidence-harness",
+            "parameter-snapshot-rollback",
             "vehicle-pack-hardware",
             "vehicle-pack-validation"
         )
