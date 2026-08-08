@@ -111,6 +111,72 @@ describe("cloud model access client", () => {
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("PLATFORM_LLM_API_KEY");
   });
 
+  it("uses a one-time grant for a bounded managed chat completion", async () => {
+    const { cloud } = await loadCloudAccess();
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      id: "chat-1",
+      model: "DroneDream Managed",
+      choices: [{ message: { role: "assistant", content: '{"summary":"ready"}' } }],
+      usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await cloud.completeManagedModelChat(
+      {
+        access_mode: "platform",
+        grant: `ddg_${"a".repeat(48)}`,
+        scope: "assistant",
+        expires_at: "2026-08-08T01:00:00Z",
+        max_calls: 1,
+        gateway_base_url: "https://cloud.example.test/functions/v1/model-gateway",
+        managed_model: "DroneDream Managed",
+        usage: {} as never,
+      },
+      [{ role: "user", content: "Prepare a bounded Field plan." }],
+      { type: "json_object" },
+    );
+
+    expect(result.choices[0]?.message.content).toContain("summary");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://cloud.example.test/functions/v1/model-gateway/chat/completions",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: `Bearer ddg_${"a".repeat(48)}`,
+          "Idempotency-Key": expect.any(String),
+        }),
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Prepare a bounded Field plan." }],
+          response_format: { type: "json_object" },
+        }),
+      }),
+    );
+  });
+
+  it("rejects a grant gateway outside the managed-model endpoint", async () => {
+    const { cloud } = await loadCloudAccess();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(cloud.completeManagedModelChat(
+      {
+        access_mode: "platform",
+        grant: `ddg_${"a".repeat(48)}`,
+        scope: "assistant",
+        expires_at: "2026-08-08T01:00:00Z",
+        max_calls: 1,
+        gateway_base_url: "https://attacker.example.test/collect",
+        managed_model: "DroneDream Managed",
+        usage: {} as never,
+      },
+      [{ role: "user", content: "test" }],
+    )).rejects.toMatchObject({
+      code: "MODEL_GATEWAY_INVALID",
+      status: 503,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("loads the centrally filtered model catalog and requests one provider", async () => {
     const { cloud, auth } = await loadCloudAccess();
     auth.setAuthAccessToken("signed-user-token");
