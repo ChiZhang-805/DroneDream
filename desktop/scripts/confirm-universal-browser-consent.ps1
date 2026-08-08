@@ -32,6 +32,7 @@ $receipt = [ordered]@{
     clicked = $false
     credentialsRead = $false
     screenshotPersisted = $false
+    latestTabActivated = $false
     exactWindowTitle = "DroneDream - Google Chrome"
     exactWindowClass = "Chrome_WidgetWin_1"
 }
@@ -57,10 +58,11 @@ public static class DroneDreamConsentNative {
   [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
   [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
 }
 "@
 
-function Find-ConsentTarget {
+function Get-ExactChromeWindow {
     $desktop = [System.Windows.Automation.AutomationElement]::RootElement
     $windows = $desktop.FindAll(
         [System.Windows.Automation.TreeScope]::Children,
@@ -71,8 +73,20 @@ function Find-ConsentTarget {
         $_.Current.ClassName -ceq $receipt.exactWindowClass
     })
     if ($matches.Count -ne 1) { return $null }
-
     $window = $matches[0]
+    $process = Get-Process -Id $window.Current.ProcessId -ErrorAction Stop
+    try {
+        if (-not $process.Path -or [IO.Path]::GetFileName($process.Path) -cne "chrome.exe") { return $null }
+        $signature = Get-AuthenticodeSignature -FilePath $process.Path
+        if ($signature.Status -ne [System.Management.Automation.SignatureStatus]::Valid) { return $null }
+        return $window
+    }
+    finally { $process.Dispose() }
+}
+
+function Find-ConsentTarget {
+    $window = Get-ExactChromeWindow
+    if ($null -eq $window) { return $null }
     $process = Get-Process -Id $window.Current.ProcessId -ErrorAction Stop
     if (-not $process.Path -or [IO.Path]::GetFileName($process.Path) -cne "chrome.exe") { return $null }
     $signature = Get-AuthenticodeSignature -FilePath $process.Path
@@ -160,6 +174,19 @@ function Find-ConsentTarget {
 
 $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
 $target = $null
+$latestTabWindow = Get-ExactChromeWindow
+if ($null -eq $latestTabWindow) { throw "The exact signed Chrome window is unavailable." }
+$latestTabHandle = [IntPtr]$latestTabWindow.Current.NativeWindowHandle
+if (-not [DroneDreamConsentNative]::SetForegroundWindow($latestTabHandle)) { throw "Unable to focus the exact consent window." }
+Start-Sleep -Milliseconds 300
+if ([DroneDreamConsentNative]::GetForegroundWindow() -ne $latestTabHandle) { throw "The exact consent window did not retain focus." }
+[DroneDreamConsentNative]::keybd_event(0x11, 0, 0, [UIntPtr]::Zero)
+[DroneDreamConsentNative]::keybd_event(0x39, 0, 0, [UIntPtr]::Zero)
+[DroneDreamConsentNative]::keybd_event(0x39, 0, 2, [UIntPtr]::Zero)
+[DroneDreamConsentNative]::keybd_event(0x11, 0, 2, [UIntPtr]::Zero)
+$receipt.latestTabActivated = $true
+Write-AtomicJson $receiptPath $receipt
+Start-Sleep -Milliseconds 700
 while ([DateTime]::UtcNow -lt $deadline -and $null -eq $target) {
     $target = Find-ConsentTarget
     if ($null -eq $target) { Start-Sleep -Milliseconds 500 }

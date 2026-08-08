@@ -49,6 +49,8 @@ class UniversalBrowserConsentContractTest(unittest.TestCase):
         self.assertEqual(source.count("mouse_event(0x0002"), 1)
         self.assertEqual(source.count("mouse_event(0x0004"), 1)
         self.assertIn("SetCursorPos($original.X, $original.Y)", source)
+        self.assertEqual(source.count("keybd_event(0x39"), 2)
+        self.assertIn("latestTabActivated = $true", source)
         self.assertIn("screenshotPersisted = $false", source)
         self.assertNotIn("Password", source)
         self.assertNotIn("Cookie", source)
@@ -58,6 +60,7 @@ class UniversalBrowserConsentContractTest(unittest.TestCase):
         self.assertIn("[switch]$AllowBrowserConsentAction", source)
         self.assertIn('Save-ExecutionCheckpoint "browser-consent-attempted"', source)
         self.assertIn("$counts.browserAction++", source)
+        self.assertIn("$browserConsentState = @{ attempted = $false }", source)
         self.assertIn("Get-BytesSha256Lower $encoded", source)
         self.assertNotIn("::HashData", source)
         self.assertIn(

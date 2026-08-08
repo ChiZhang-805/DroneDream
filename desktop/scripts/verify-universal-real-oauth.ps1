@@ -449,15 +449,15 @@ try {
     if ($RunAuthenticatedUiMatrix) {
         $observerArguments += "--post-auth-hold-signal=$postAuthSignalPath"
         $oauthObserverProcess = Start-Process -FilePath (Get-Command node).Source -ArgumentList $observerArguments -PassThru -NoNewWindow
-        $browserConsentAttempted = $false
+        $browserConsentState = @{ attempted = $false }
         Wait-Until {
             $oauthObserverProcess.Refresh()
             if ($oauthObserverProcess.HasExited) { return $true }
             if (-not (Test-Path -LiteralPath $observerPath -PathType Leaf)) { return $false }
             try { $checkpoint = Get-Content -LiteralPath $observerPath -Raw | ConvertFrom-Json }
             catch { return $false }
-            if ($AllowBrowserConsentAction -and -not $browserConsentAttempted -and $checkpoint.stage -ceq "oauth-attempted") {
-                $browserConsentAttempted = $true
+            if ($AllowBrowserConsentAction -and -not $browserConsentState.attempted -and $checkpoint.stage -ceq "oauth-attempted") {
+                $browserConsentState.attempted = $true
                 $counts.browserAction++
                 Save-ExecutionCheckpoint "browser-consent-attempted"
                 $consentReceipt = Join-Path $executionRoot "browser-consent.json"
