@@ -19,6 +19,7 @@ FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
 LIFECYCLE = ROOT / "desktop/scripts/verify-universal-installer-lifecycle.ps1"
 LIFECYCLE_CONTRACT = ROOT / "desktop/scripts/edition-installer-lifecycle-contract.ps1"
 INSTALLER_UI = ROOT / "desktop/scripts/verify-installer-ui.ps1"
+VISIBLE_INSTALLER_UI = ROOT / "desktop/scripts/verify-universal-visible-installer-ui.ps1"
 HANDOFF = ROOT / "distribution/universal/release/website-exact-exe-handoff.v1.json"
 ENGINE_PACK_TOOL = ROOT / "engine-pack/tools/engine_pack.py"
 BROWSER_AUTH_VERIFIER = ROOT / "desktop/scripts/verify-browser-auth-config.mjs"
@@ -61,6 +62,25 @@ def test_release_ci_placeholder_cannot_bypass_oauth_client_registration() -> Non
     )
     assert result.returncode != 0
     assert "registered public DRONEDREAM_OAUTH_CLIENT_ID" in result.stderr
+
+
+def test_visible_installer_receipt_is_exact_source_bound_and_never_commits() -> None:
+    text = VISIBLE_INSTALLER_UI.read_text(encoding="utf-8")
+    for fragment in (
+        'ValidatePattern("^[0-9a-f]{40}$")',
+        'ValidatePattern("^[0-9a-f]{64}$")',
+        'Get-GitText @("status", "--porcelain")',
+        "Product source is not an ancestor",
+        "Frozen Universal artifact drifted",
+        "Refusing to overwrite an existing visible installer receipt",
+        'foreach ($language in @("English", "SimpChinese"))',
+        '"-SimulateFreshInstall", "-ValidatePathGuard"',
+        'installationCommits = 0',
+        'visibleInstallerUiReady = $true',
+    ):
+        assert fragment in text
+    assert "-RedirectStandardOutput" in text
+    assert "-RedirectStandardError" in text
 
 
 def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() -> None:
