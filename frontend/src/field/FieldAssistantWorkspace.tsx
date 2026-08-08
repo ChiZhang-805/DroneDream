@@ -65,6 +65,7 @@ const COPY = {
     cancel: "Cancel",
     voiceUnavailable: "Voice input is unavailable. Continue typing.",
     plan: "Experiment plan",
+    conversation: "Chat",
     objective: "Objective",
     profile: "Test profile",
     trials: "Trial budget",
@@ -104,6 +105,7 @@ const COPY = {
     cancel: "取消",
     voiceUnavailable: "当前无法使用语音输入，请继续打字。",
     plan: "实验方案",
+    conversation: "对话",
     objective: "调优目标",
     profile: "测试类型",
     trials: "试验预算",
@@ -279,6 +281,7 @@ export function FieldAssistantWorkspace({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [voiceConsent, setVoiceConsent] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<"chat" | "plan">("chat");
   const pendingRef = useRef(false);
   const voice = useVoiceInput({
     locale,
@@ -362,8 +365,39 @@ export function FieldAssistantWorkspace({
   };
 
   return (
-    <div className="field-assistant-workspace" data-authority="false" data-execution-domain="real-hardware">
-      <section className="field-assistant-chat" aria-labelledby="field-assistant-title">
+    <div
+      className="field-assistant-workspace"
+      data-authority="false"
+      data-execution-domain="real-hardware"
+      data-mobile-panel={mobilePanel}
+    >
+      <div className="field-assistant-mobile-tabs" role="tablist" aria-label={copy.title}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobilePanel === "chat"}
+          aria-controls="field-assistant-chat-panel"
+          onClick={() => setMobilePanel("chat")}
+        >
+          <Bot aria-hidden="true" />
+          {copy.conversation}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobilePanel === "plan"}
+          aria-controls="field-assistant-plan-panel"
+          onClick={() => setMobilePanel("plan")}
+        >
+          <ClipboardList aria-hidden="true" />
+          {copy.plan}
+        </button>
+      </div>
+      <section
+        id="field-assistant-chat-panel"
+        className="field-assistant-chat"
+        aria-labelledby="field-assistant-title"
+      >
         <header className="field-page-heading field-assistant-heading">
           <div>
             <span className="field-page-eyebrow"><Bot aria-hidden="true" />CHATTING</span>
@@ -459,7 +493,11 @@ export function FieldAssistantWorkspace({
         </form>
       </section>
 
-      <aside className="field-assistant-plan" aria-label={copy.plan}>
+      <aside
+        id="field-assistant-plan-panel"
+        className="field-assistant-plan"
+        aria-label={copy.plan}
+      >
         <header>
           <div><ClipboardList aria-hidden="true" /><strong>{copy.plan}</strong></div>
           <span className={plan ? "is-ready" : undefined}>{plan ? copy.ready : copy.idle}</span>

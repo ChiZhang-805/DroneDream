@@ -7940,6 +7940,26 @@ a {
 
 /* ---------- Conversational experiment drafting ---------- */
 
+.app-shell:has(.experiment-assistant-page) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell:has(.experiment-assistant-page) .app-body {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell:has(.experiment-assistant-page) .app-main {
+  flex: 1 1 0;
+}
+
+.app-shell:has(.experiment-assistant-page) .app-footer {
+  display: none;
+}
+
 .app-main:has(.experiment-assistant-page) {
   display: flex;
   max-width: none;
@@ -7949,6 +7969,16 @@ a {
   background:
     radial-gradient(circle at 76% 12%, rgba(214, 108, 218, 0.08), transparent 30rem),
     #fbfafd;
+}
+
+html[data-brand-edition="lab"] .app-main:has(.experiment-assistant-page) {
+  background:
+    radial-gradient(
+      circle at 76% 12%,
+      color-mix(in srgb, var(--dd-brand-middle) 11%, transparent),
+      transparent 30rem
+    ),
+    var(--dd-brand-light-surface);
 }
 
 .experiment-assistant-page {
@@ -8012,6 +8042,15 @@ a {
   font-weight: 670;
   letter-spacing: -0.035em;
   line-height: 1.08;
+}
+
+html[data-brand-edition="lab"] .assistant-hero-icon,
+html[data-brand-edition="lab"] .assistant-hero-icon span {
+  color: var(--dd-brand-end);
+}
+
+html[data-brand-edition="lab"] .assistant-empty-state h1 {
+  color: var(--dd-brand-dark-surface);
 }
 
 .assistant-empty-state > p {
@@ -8095,6 +8134,24 @@ a {
   border-color: #bd78c6;
   transform: translateY(-2px);
   box-shadow: 0 12px 28px rgba(74, 32, 82, 0.09);
+}
+
+html[data-brand-edition="lab"] .assistant-examples button:hover,
+html[data-brand-edition="lab"] .assistant-examples button:focus-visible {
+  border-color: var(--dd-brand-middle);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--dd-brand-end) 12%, transparent);
+}
+
+html[data-brand-edition="lab"] .assistant-examples button:nth-child(1) {
+  color: var(--dd-brand-end);
+}
+
+html[data-brand-edition="lab"] .assistant-examples button:nth-child(2) {
+  color: var(--dd-brand-middle);
+}
+
+html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
+  color: #4f850e;
 }
 
 .assistant-thread {
@@ -8311,6 +8368,14 @@ a {
   cursor: pointer;
 }
 
+html[data-brand-edition="lab"] .assistant-send-button {
+  background: var(--dd-brand-end);
+}
+
+html[data-brand-edition="lab"] .assistant-send-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--dd-brand-end) 82%, #031b13);
+}
+
 .assistant-add-button,
 .assistant-voice-button {
   background: transparent;
@@ -8516,21 +8581,43 @@ a {
 }
 
 @media (max-width: 900px) {
+  .app-shell:has(.experiment-assistant-page) {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .app-shell:has(.experiment-assistant-page) .app-body {
+    height: 100%;
+  }
+
   .experiment-assistant-page {
-    padding: 1.2rem 1rem 1rem;
+    padding: 0.85rem 1rem 0.8rem;
   }
 
   .assistant-examples {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .assistant-examples button {
-    min-height: 4.5rem;
+    min-height: 4.4rem;
+    justify-content: center;
+    padding: 0.75rem;
   }
 
   .assistant-empty-state > p {
-    width: min(100%, 34rem);
-    white-space: normal;
+    display: none;
+  }
+
+  .assistant-empty-state h1 {
+    margin-bottom: 0.8rem;
+  }
+
+  .assistant-example-body {
+    display: none;
+  }
+
+  .assistant-example-heading {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .assistant-draft-result {
@@ -8556,6 +8643,77 @@ a {
 
   .settings-model-profile-row label {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px), (max-height: 720px) {
+  .experiment-assistant-page {
+    padding: 0.65rem 0.7rem;
+  }
+
+  .assistant-empty-state {
+    margin-bottom: 0.75rem;
+  }
+
+  .assistant-hero-icon {
+    width: 3.5rem;
+    height: 3rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .assistant-hero-icon svg {
+    width: 3.2rem;
+    height: 3.2rem;
+  }
+
+  .assistant-empty-state h1 {
+    font-size: 1.55rem;
+  }
+
+  .assistant-examples {
+    gap: 0.45rem;
+  }
+
+  .assistant-examples button {
+    min-height: 3.9rem;
+    gap: 0.35rem;
+    padding: 0.55rem;
+  }
+
+  .assistant-example-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  .assistant-example-heading strong {
+    font-size: 0.78rem;
+  }
+
+  .assistant-composer textarea {
+    min-height: 4rem;
+    padding-top: 0.75rem;
+  }
+
+  .assistant-composer {
+    min-width: 0;
+  }
+
+  .assistant-composer-bar {
+    gap: 0.28rem;
+    padding-right: 0.4rem;
+    padding-left: 0.4rem;
+  }
+
+  .assistant-model-button {
+    max-width: 7rem;
+    padding-inline: 0.45rem;
+  }
+
+  .assistant-add-button,
+  .assistant-voice-button,
+  .assistant-send-button {
+    width: 2.25rem;
+    height: 2.25rem;
   }
 }
 

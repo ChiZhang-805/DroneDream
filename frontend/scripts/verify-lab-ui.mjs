@@ -60,7 +60,8 @@ async function assertViewportFits(page, testCase, surface) {
     clippedText: Array.from(document.querySelectorAll(
       ".lab-page button, .lab-page strong, .lab-page small, .lab-page label > span, "
         + ".lab-hardware-workspace button, .lab-hardware-workspace strong, "
-        + ".lab-hardware-workspace small, .lab-hardware-workspace label > span",
+        + ".lab-hardware-workspace small, .lab-hardware-workspace label > span, "
+        + ".experiment-assistant-page button, .experiment-assistant-page strong",
     )).filter((element) => (
       element instanceof HTMLElement
       && element.offsetParent !== null
@@ -76,6 +77,79 @@ async function assertViewportFits(page, testCase, surface) {
     metrics.clippedText,
     [],
     `${testCase.id}/${surface}: visible text is clipped`,
+  );
+}
+
+async function assertSingleScreen(page, testCase, surface, selector) {
+  const metrics = await page.locator(selector).evaluate((element) => ({
+    documentClientHeight: document.documentElement.clientHeight,
+    documentScrollHeight: document.documentElement.scrollHeight,
+    bodyClientHeight: document.body.clientHeight,
+    bodyScrollHeight: document.body.scrollHeight,
+    surfaceClientHeight: element.clientHeight,
+    surfaceScrollHeight: element.scrollHeight,
+    children: Array.from(element.children).map((child) => ({
+      className: child.className,
+      clientHeight: child.clientHeight,
+      scrollHeight: child.scrollHeight,
+      top: child.getBoundingClientRect().top,
+      bottom: child.getBoundingClientRect().bottom,
+    })),
+  }));
+  assert(
+    metrics.documentScrollHeight <= metrics.documentClientHeight + 1,
+    `${testCase.id}/${surface}: document requires vertical scrolling`,
+  );
+  assert(
+    metrics.bodyScrollHeight <= metrics.bodyClientHeight + 1,
+    `${testCase.id}/${surface}: body requires vertical scrolling`,
+  );
+  assert(
+    metrics.surfaceScrollHeight <= metrics.surfaceClientHeight + 1,
+    `${testCase.id}/${surface}: primary surface requires vertical scrolling ${JSON.stringify(metrics)}`,
+  );
+}
+
+async function assertElementInsideViewport(page, testCase, surface, selector) {
+  const metrics = await page.locator(selector).evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const ancestors = [];
+    let current = element.parentElement;
+    while (current && ancestors.length < 6) {
+      const currentRect = current.getBoundingClientRect();
+      ancestors.push({
+        className: current.className,
+        top: currentRect.top,
+        bottom: currentRect.bottom,
+        height: currentRect.height,
+        clientHeight: current.clientHeight,
+        scrollHeight: current.scrollHeight,
+      });
+      current = current.parentElement;
+    }
+    const layout = document.querySelector(".field-app-embedded-lab .field-layout");
+    const sidebar = document.querySelector(".field-app-embedded-lab .field-sidebar");
+    const main = document.querySelector(".field-app-embedded-lab .field-main");
+    const layoutMetrics = layout && sidebar && main ? {
+      display: getComputedStyle(layout).display,
+      rows: getComputedStyle(layout).gridTemplateRows,
+      sidebarRow: getComputedStyle(sidebar).gridRow,
+      sidebarRect: sidebar.getBoundingClientRect().toJSON(),
+      mainRow: getComputedStyle(main).gridRow,
+      mainRect: main.getBoundingClientRect().toJSON(),
+    } : null;
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      height: rect.height,
+      viewportHeight: document.documentElement.clientHeight,
+      ancestors,
+      layoutMetrics,
+    };
+  });
+  assert(
+    metrics.top >= -1 && metrics.bottom <= metrics.viewportHeight + 1,
+    `${testCase.id}/${surface}: ${selector} is outside the viewport ${JSON.stringify(metrics)}`,
   );
 }
 
@@ -163,6 +237,25 @@ try {
     await page.addInitScript((locale) => {
       window.localStorage.setItem("drone-dream:locale", locale);
     }, testCase.locale);
+    await page.goto(`${origin}/assistant?docsPreview`, { waitUntil: "networkidle" });
+    const assistantTitle = testCase.locale === "en"
+      ? "What flight experiment should we build?"
+      : "想创建怎样的飞行调优实验？";
+    await page.getByRole("heading", { name: assistantTitle }).waitFor();
+    const assistant = page.locator('.experiment-assistant-page[data-brand-edition="lab"]');
+    assert.equal(await assistant.getAttribute("data-grants-hardware-authority"), "false");
+    const assistantPalette = await assistant.evaluate(() => {
+      const style = getComputedStyle(document.documentElement);
+      return ["--dd-brand-start", "--dd-brand-middle", "--dd-brand-end"]
+        .map((property) => style.getPropertyValue(property).trim().toUpperCase());
+    });
+    assert.deepEqual(assistantPalette, ["#A7E84A", "#20C77A", "#087E69"]);
+    assert.equal(await page.locator(".assistant-examples button").count(), 3);
+    assert.equal(await page.locator(".assistant-composer").count(), 1);
+    await assertViewportFits(page, testCase, "assistant");
+    await assertSingleScreen(page, testCase, "assistant", ".experiment-assistant-page");
+    evidence.push(await screenshot(page, testCase, "assistant"));
+
     await page.goto(`${origin}/lab/setup`, { waitUntil: "networkidle" });
 
     const title = testCase.locale === "en"
@@ -288,7 +381,33 @@ try {
       1,
     );
     await assertViewportFits(page, testCase, "hardware-domain");
+    await assertSingleScreen(page, testCase, "hardware-domain", ".lab-hardware-workspace");
     evidence.push(await screenshot(page, testCase, "hardware-domain"));
+    if (testCase.viewport.width <= 760) {
+      await assertElementInsideViewport(
+        page,
+        testCase,
+        "hardware-domain",
+        ".field-assistant-composer",
+      );
+      const planTab = hardwareWorkspace.getByRole("tab", {
+        name: testCase.locale === "en" ? "Experiment plan" : "实验方案",
+      });
+      await planTab.click();
+      assert.equal(
+        await hardwareWorkspace.locator(".field-assistant-workspace").getAttribute("data-mobile-panel"),
+        "plan",
+      );
+      assert.equal(await planTab.getAttribute("aria-selected"), "true");
+      await assertSingleScreen(page, testCase, "hardware-domain-plan", ".lab-hardware-workspace");
+      await assertElementInsideViewport(
+        page,
+        testCase,
+        "hardware-domain-plan",
+        ".field-assistant-plan > footer",
+      );
+      evidence.push(await screenshot(page, testCase, "hardware-domain-plan"));
+    }
 
     await context.close();
   }
@@ -338,7 +457,15 @@ const report = {
   },
   cases: cases.map((testCase) => ({
     ...testCase,
-    surfaces: ["calibration", "hardware", "evidence", "safety", "hardware-domain"],
+    surfaces: [
+      "assistant",
+      "calibration",
+      "hardware",
+      "evidence",
+      "safety",
+      "hardware-domain",
+      ...(testCase.viewport.width <= 760 ? ["hardware-domain-plan"] : []),
+    ],
   })),
   screenshots: evidence,
   sideEffects: {

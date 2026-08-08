@@ -24,6 +24,7 @@ import {
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { isDesktopRuntime } from "../desktop/bridge";
+import { appEdition } from "../edition";
 import { recordProductEvent } from "../features/analytics/productEvents";
 import {
   applyAssistantTurn,
@@ -657,7 +658,11 @@ export function ExperimentAssistant() {
   const remainingLabels = latest ? reviewLabels(latest, locale) : [];
 
   return (
-    <section className={`experiment-assistant-page ${messages.length ? "has-messages" : ""}`}>
+    <section
+      className={`experiment-assistant-page ${messages.length ? "has-messages" : ""}`}
+      data-brand-edition={appEdition}
+      data-grants-hardware-authority="false"
+    >
       <div className="experiment-assistant-stage">
         {messages.length === 0 ? (
           <div className="assistant-empty-state">

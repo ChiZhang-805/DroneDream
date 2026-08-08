@@ -2997,6 +2997,10 @@ body:has(.field-app),
   gap: 14px;
 }
 
+.field-assistant-mobile-tabs {
+  display: none;
+}
+
 .field-assistant-chat,
 .field-assistant-plan {
   min-width: 0;
@@ -3489,6 +3493,7 @@ body:has(.field-app),
   }
 
   .field-layout {
+    display: grid;
     height: calc(100vh - 60px);
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) 58px;
@@ -3517,6 +3522,8 @@ body:has(.field-app),
 
   .field-main {
     grid-row: 1;
+    height: auto;
+    min-height: 0;
   }
 
   .field-active-page {
@@ -3525,20 +3532,110 @@ body:has(.field-app),
 
   .field-assistant-workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(380px, 1fr) auto;
-    overflow: auto;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
   }
 
+  .field-assistant-mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .field-assistant-mobile-tabs button {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--field-line);
+    border-radius: 5px;
+    color: var(--field-muted);
+    background: #ffffff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .field-assistant-mobile-tabs button[aria-selected="true"] {
+    color: var(--dd-brand-dark-surface);
+    border-color: var(--dd-brand-middle);
+    background: var(--dd-brand-light-surface);
+  }
+
+  .field-assistant-mobile-tabs svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .field-assistant-chat,
   .field-assistant-plan {
-    min-height: 310px;
+    grid-row: 2;
+    min-height: 0;
+  }
+
+  .field-assistant-workspace[data-mobile-panel="chat"] .field-assistant-plan,
+  .field-assistant-workspace[data-mobile-panel="plan"] .field-assistant-chat {
+    display: none;
+  }
+
+  .field-assistant-thread,
+  .field-assistant-plan-body {
+    scrollbar-width: none;
+  }
+
+  .field-assistant-thread::-webkit-scrollbar,
+  .field-assistant-plan-body::-webkit-scrollbar {
+    display: none;
+  }
+
+  .field-assistant-empty {
+    min-height: 0;
+    gap: 12px;
+  }
+
+  .field-assistant-orbit {
+    width: 46px;
+    height: 46px;
+  }
+
+  .field-assistant-orbit svg {
+    width: 21px;
+    height: 21px;
   }
 
   .field-assistant-prompts {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .field-assistant-prompts button {
-    min-height: 74px;
+    min-height: 58px;
+    align-content: center;
+    padding: 9px;
+  }
+
+  .field-assistant-prompts span {
+    display: none;
+  }
+
+  .field-assistant-heading {
+    padding: 10px 12px;
+  }
+
+  .field-assistant-heading p {
+    display: none;
+  }
+
+  .field-assistant-composer {
+    margin: 0 8px 8px;
+    padding: 7px;
+  }
+
+  .field-assistant-composer textarea {
+    min-height: 40px;
+    max-height: 70px;
+    padding-bottom: 5px;
   }
 
   .field-device-dashboard {
@@ -3586,7 +3683,7 @@ body:has(.field-app),
   }
 
   .field-assistant-composer {
-    margin: 0 10px 10px;
+    margin: 0 8px 8px;
   }
 
   .field-assistant-composer-bar select {

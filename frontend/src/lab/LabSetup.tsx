@@ -82,7 +82,7 @@ const COPY = {
     hardware: "Hardware laboratory",
     hardwareDetail: "Configuration preview only",
     switchNotice:
-      "Workspace selection changes the interface and workflow only. It is never counted as native, backend, runtime, or operator authority.",
+      "Workspace selection changes the workflow only; it never grants hardware authority.",
     calibration: "Calibration loop",
     setup: "Setup",
     evidence: "Qualification evidence",
@@ -161,7 +161,7 @@ const COPY = {
     hardware: "真机实验室",
     hardwareDetail: "仅提供配置预览",
     switchNotice:
-      "切换工作区只改变界面与流程，不会被计入 native、后端、Runtime 或操作员授权。",
+      "切换工作区只改变流程，绝不会授予真机权限。",
     calibration: "校准闭环",
     setup: "配置",
     evidence: "资格证据",
@@ -302,7 +302,12 @@ export function LabSetup() {
   }
 
   return (
-    <section className="lab-page" data-workspace={workspace}>
+    <section
+      className="lab-page"
+      data-workspace={workspace}
+      data-brand-edition="lab"
+      data-grants-hardware-authority="false"
+    >
       <header className="lab-header">
         <div>
           <p className="lab-eyebrow">{copy.eyebrow}</p>

@@ -62,6 +62,26 @@ function mockCatalog() {
 describe("Field Chatting workspace", () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it("switches the compact chat and plan panels without changing authority", () => {
+    mockCatalog();
+    const { container } = render(<FieldApp initialLocale="en" />);
+    const workspace = container.querySelector(".field-assistant-workspace");
+    const chatTab = screen.getByRole("tab", { name: "Chat" });
+    const planTab = screen.getByRole("tab", { name: "Experiment plan" });
+
+    expect(workspace).toHaveAttribute("data-mobile-panel", "chat");
+    expect(workspace).toHaveAttribute("data-authority", "false");
+    expect(chatTab).toHaveAttribute("aria-selected", "true");
+    expect(planTab).toHaveAttribute("aria-selected", "false");
+
+    fireEvent.click(planTab);
+
+    expect(workspace).toHaveAttribute("data-mobile-panel", "plan");
+    expect(chatTab).toHaveAttribute("aria-selected", "false");
+    expect(planTab).toHaveAttribute("aria-selected", "true");
+    expect(workspace).toHaveAttribute("data-authority", "false");
+  });
+
   it("uses the managed model to create a proposal-only Field plan", async () => {
     mockCatalog();
     const completion = vi.spyOn(cloudModels, "completeManagedModelChat").mockResolvedValue({

@@ -32,8 +32,13 @@ describe("Lab setup", () => {
     expect(screen.getByText("0 of 8")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Simulation workspace/i }))
       .toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText(/never counted as native, backend, runtime, or operator authority/i))
-      .toBeInTheDocument();
+    const workspaceNotice = screen.getByText(
+      "Workspace selection changes the workflow only; it never grants hardware authority.",
+      { exact: true },
+    );
+    expect(workspaceNotice).toBeInTheDocument();
+    expect(workspaceNotice.closest(".lab-page"))
+      .toHaveAttribute("data-grants-hardware-authority", "false");
 
     await user.click(screen.getByRole("button", { name: /Hardware laboratory/i }));
     expect(screen.getByRole("button", { name: /Hardware laboratory/i }))
