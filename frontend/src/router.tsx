@@ -131,8 +131,8 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         {
           path: "field",
           lazy: async () => {
-            const { FieldApp } = await import("./field/FieldApp");
-            return { Component: FieldApp };
+            const { UniversalFieldApp } = await import("./field/FieldApp");
+            return { Component: UniversalFieldApp };
           },
         },
         { path: "*", loader: () => redirect(fallbackPath) },

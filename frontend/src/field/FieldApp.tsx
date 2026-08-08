@@ -18,6 +18,7 @@ import {
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
+import { useI18n } from "../i18n/I18nProvider";
 import { FIELD_CATALOG, type FieldLocale } from "./catalog";
 import {
   FieldAdapterCenter,
@@ -372,4 +373,15 @@ export function FieldApp(props: FieldAppProps) {
       <FieldWorkspace {...props} />
     </ModelAccessProvider>
   );
+}
+
+/**
+ * Universal owns the shared application locale. The standalone FIELD entry
+ * keeps its edition-scoped preference, while this route adapter makes the
+ * integrated workspace follow Universal without creating a second language
+ * authority.
+ */
+export function UniversalFieldApp() {
+  const { locale } = useI18n();
+  return <FieldApp initialLocale={locale} />;
 }
