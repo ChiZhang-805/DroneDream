@@ -28,6 +28,7 @@ const edition = required("--edition");
 const expectedWidth = Number(required("--width"));
 const expectedHeight = Number(required("--height"));
 const emulateViewport = args.get("--emulate-viewport") === "true";
+const authenticatedWorkspace = args.get("--authenticated-workspace") === "true";
 
 const canonicalColors = Object.freeze({
   universal: ["#FF5574", "#6A4CFF", "#E657D1"],
@@ -102,17 +103,55 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert(pages.length >= 1, "Installed app exposed no WebView page");
   const page = pages.find((candidate) => /(?:tauri|localhost)/u.test(candidate.url())) ?? pages[0];
   await page.waitForLoadState("domcontentloaded");
-  await page.evaluate((nextLocale) => {
-    // Packaged desktop builds use createHashRouter. Changing pathname here
-    // reloads the WebView at an unowned resource URL and the app falls back to
-    // its Universal launcher, which can masquerade as a failed theme switch.
-    window.localStorage.setItem("drone-dream:locale", nextLocale);
-    const launcherUrl = new URL(window.location.href);
-    launcherUrl.hash = "/desktop/setup";
-    window.location.replace(launcherUrl.href);
-  }, locale);
-  await page.waitForURL((url) => url.hash === "#/desktop/setup");
-  await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
+  if (authenticatedWorkspace) {
+    await page.locator(".app-account-button").waitFor({ state: "visible", timeout: 30_000 });
+    const workspaceRoute = {
+      universal: "/vehicle-studio",
+      sim: "/assistant",
+      lab: "/lab",
+      field: "/field",
+    }[edition];
+    if (edition === "universal") {
+      await page.evaluate((route) => {
+        const nextUrl = new URL(window.location.href);
+        nextUrl.hash = route;
+        window.location.replace(nextUrl.href);
+      }, workspaceRoute);
+    } else {
+      await page.evaluate((nextEdition) => {
+        const selector = document.querySelector(".universal-mode-switch select");
+        if (!(selector instanceof HTMLSelectElement)) {
+          throw new Error("Universal workspace selector is missing");
+        }
+        selector.value = nextEdition;
+        selector.dispatchEvent(new Event("change", { bubbles: true }));
+      }, edition);
+    }
+    await page.waitForURL((url) => url.hash === `#${workspaceRoute}`);
+    const workspaceSelector = {
+      universal: ".vehicle-studio-page",
+      sim: ".experiment-assistant-page",
+      lab: ".lab-page",
+      field: ".field-app",
+    }[edition];
+    await page.locator(workspaceSelector).waitFor({ state: "visible", timeout: 30_000 });
+    await page.waitForFunction(
+      (expectedEdition) => document.documentElement.dataset.brandEdition === expectedEdition,
+      edition,
+    );
+  } else {
+    await page.evaluate((nextLocale) => {
+      // Packaged desktop builds use createHashRouter. Changing pathname here
+      // reloads the WebView at an unowned resource URL and the app falls back to
+      // its Universal launcher, which can masquerade as a failed theme switch.
+      window.localStorage.setItem("drone-dream:locale", nextLocale);
+      const launcherUrl = new URL(window.location.href);
+      launcherUrl.hash = "/desktop/setup";
+      window.location.replace(launcherUrl.href);
+    }, locale);
+    await page.waitForURL((url) => url.hash === "#/desktop/setup");
+    await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
+  }
 
   if (emulateViewport) {
     await page.setViewportSize({ width: expectedWidth, height: expectedHeight });
@@ -145,36 +184,39 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
       ],
     };
   });
-  assert.equal(startupTheme.edition, "universal");
-  assert.equal(startupTheme.productMode, "universal");
+  const expectedThemeEdition = authenticatedWorkspace ? edition : "universal";
+  assert.equal(startupTheme.edition, expectedThemeEdition);
+  assert.equal(startupTheme.productMode, expectedThemeEdition);
   assert.equal(startupTheme.presentationOnly, "true");
   assert.equal(startupTheme.grantsHardwareAuthority, "false");
-  assert.deepEqual(startupTheme.colors, canonicalColors.universal);
-  const scene = await page.locator(".drone-launch-scene").evaluate((element) => ({
-    edition: element.getAttribute("data-theme-edition"),
-    colors: [
-      element.getAttribute("data-theme-primary")?.toUpperCase(),
-      element.getAttribute("data-theme-secondary")?.toUpperCase(),
-      element.getAttribute("data-theme-tertiary")?.toUpperCase(),
-    ],
-    grantsHardwareAuthority: element.getAttribute("data-theme-grants-hardware-authority"),
-  }));
-  assert.equal(scene.edition, "universal");
-  assert.equal(scene.grantsHardwareAuthority, "false");
-  assert.deepEqual(scene.colors, canonicalColors.universal);
-  const sceneScreenshot = await saveScreenshot(page, "scene");
-
-  // This prerequisite intentionally stays on the unauthenticated launcher.
-  // Authenticated workspace/theme coverage belongs to the later exact OAuth
-  // matrix; navigating there here would correctly raise the mandatory account
-  // dialog and make a pre-auth observer fight the product's security gate.
-  assert.equal(edition, "universal");
+  assert.deepEqual(startupTheme.colors, canonicalColors[expectedThemeEdition]);
+  let scene = null;
+  let surfaceScreenshot = null;
+  if (authenticatedWorkspace) {
+    surfaceScreenshot = await saveScreenshot(page, "workspace");
+  } else {
+    scene = await page.locator(".drone-launch-scene").evaluate((element) => ({
+      edition: element.getAttribute("data-theme-edition"),
+      colors: [
+        element.getAttribute("data-theme-primary")?.toUpperCase(),
+        element.getAttribute("data-theme-secondary")?.toUpperCase(),
+        element.getAttribute("data-theme-tertiary")?.toUpperCase(),
+      ],
+      grantsHardwareAuthority: element.getAttribute("data-theme-grants-hardware-authority"),
+    }));
+    assert.equal(scene.edition, "universal");
+    assert.equal(scene.grantsHardwareAuthority, "false");
+    assert.deepEqual(scene.colors, canonicalColors.universal);
+    surfaceScreenshot = await saveScreenshot(page, "scene");
+    // The pre-auth prerequisite intentionally stays on the Universal launcher.
+    assert.equal(edition, "universal");
+  }
   const theme = startupTheme;
-  assert.equal(theme.edition, "universal");
-  assert.equal(theme.productMode, "universal");
+  assert.equal(theme.edition, expectedThemeEdition);
+  assert.equal(theme.productMode, expectedThemeEdition);
   assert.equal(theme.presentationOnly, "true");
   assert.equal(theme.grantsHardwareAuthority, "false");
-  assert.deepEqual(theme.colors, canonicalColors.universal);
+  assert.deepEqual(theme.colors, canonicalColors[expectedThemeEdition]);
 
   const settingsButton = await visibleSettingsButton(page);
   assert((await settingsButton.getAttribute("aria-label"))?.trim(), "Settings button needs an accessible label");
@@ -186,6 +228,13 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert.equal(await dialog.getAttribute("data-brand-edition"), edition);
   assert.equal(await dialog.getAttribute("data-presentation-only"), "true");
   assert.equal(await dialog.getAttribute("data-grants-hardware-authority"), "false");
+
+  const languageButtons = dialog.locator(".launcher-language-options button");
+  assert.equal(await languageButtons.count(), 2, "Settings must expose exactly two language choices");
+  const languageButton = languageButtons.nth(locale === "en" ? 0 : 1);
+  await languageButton.focus();
+  await languageButton.press("Enter");
+  await page.waitForFunction((expectedLocale) => document.documentElement.lang === expectedLocale, locale);
 
   const tabs = dialog.getByRole("tab");
   assert.equal(await tabs.count(), 4, "Settings must expose exactly four compact tabs");
@@ -241,6 +290,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     caseId,
     locale,
     presentationEdition: edition,
+    validationSurface: authenticatedWorkspace ? "authenticated-workspace" : "pre-auth-launcher",
     presentationOnly: true,
     grantsHardwareAuthority: false,
     actualClientViewport: initialViewport,
@@ -248,11 +298,12 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     startupTheme,
     theme,
     scene,
+    languageSelectionCount: 1,
     settingsOpenCount: 1,
     settingsTabActivationCount: 4,
     panels,
     screenshots: {
-      scene: sceneScreenshot,
+      [authenticatedWorkspace ? "workspace" : "scene"]: surfaceScreenshot,
       settings: settingsScreenshot,
     },
   });

@@ -3,6 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 POWERSHELL = ROOT / "desktop/scripts/verify-universal-real-oauth.ps1"
 OBSERVER = ROOT / "frontend/scripts/verify-installed-universal-oauth.mjs"
+INSTALLED_UI = ROOT / "frontend/scripts/verify-installed-universal-ui.mjs"
 RUNTIME_INSTALLER = ROOT / "desktop/src-tauri/src/runtime_installer.rs"
 
 
@@ -54,6 +55,7 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
     assert 'Authenticated UI matrix is unavailable in Runtime diagnosis mode.' in powershell
     for exact_count in (
         "authenticatedUiCases = if ($RunAuthenticatedUiMatrix)",
+        "languageSelections = if ($RunAuthenticatedUiMatrix)",
         "settingsOpen = if ($RunAuthenticatedUiMatrix)",
         "settingsTabActivations = if ($RunAuthenticatedUiMatrix)",
         "screenshots = if ($RunAuthenticatedUiMatrix)",
@@ -62,6 +64,10 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
     assert '@("en", "zh-CN")' in powershell
     assert '@("universal", "sim", "lab", "field")' in powershell
     assert '"--emulate-viewport=true"' in powershell
+    assert '"--authenticated-workspace=true"' in powershell
+    assert 'validationSurface -cne "authenticated-workspace"' in powershell
+    assert "languageSelectionCount -ne 1" in powershell
+    assert "workspaceScreenshotSha256" in powershell
     assert 'Start-Process -FilePath (Get-Command node).Source' in powershell
     assert 'stage -ceq "authenticated-ui-ready"' in powershell
     assert 'Write-AtomicText $postAuthSignalPath "complete"' in powershell
@@ -74,6 +80,24 @@ def test_authenticated_ui_matrix_runs_only_inside_the_authenticated_session() ->
     assert ready < signal < logout
     assert 'decision === "complete" || decision === "abort"' in observer
     assert 'Post-auth UI observation failed closed' in observer
+
+
+def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
+    observer = INSTALLED_UI.read_text(encoding="utf-8")
+    assert 'const authenticatedWorkspace = args.get("--authenticated-workspace") === "true"' in observer
+    for route in ('universal: "/vehicle-studio"', 'sim: "/assistant"', 'lab: "/lab"', 'field: "/field"'):
+        assert route in observer
+    for surface in (
+        'universal: ".vehicle-studio-page"',
+        'sim: ".experiment-assistant-page"',
+        'lab: ".lab-page"',
+        'field: ".field-app"',
+    ):
+        assert surface in observer
+    assert 'document.querySelector(".universal-mode-switch select")' in observer
+    assert 'data-theme-grants-hardware-authority' in observer
+    assert 'validationSurface: authenticatedWorkspace ? "authenticated-workspace" : "pre-auth-launcher"' in observer
+    assert 'languageSelectionCount: 1' in observer
 
 
 def test_runtime_prerequisite_is_existing_start_only_and_physics_stays_off() -> None:

@@ -363,6 +363,7 @@ $plan = [ordered]@{
         isolatedUninstaller = 1
         ownedCleanupMax = 1
         authenticatedUiCases = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }
+        languageSelections = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }
         settingsOpen = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }
         settingsTabActivations = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 4 } else { 0 }
         screenshots = if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 2 } else { 0 }
@@ -401,7 +402,7 @@ if ($frozenPlan.schemaVersion -ne 2 -or $frozenPlan.mode -cne $Mode -or
 }
 if (Test-Path -LiteralPath $executionRoot) { throw "Refusing to overwrite an existing validation execution root." }
 
-$counts = [ordered]@{ installerFreshSilentNoShortcut = 0; appLaunch = 0; runtimeStart = 0; diagnosisSettlement = 0; credentialVaultRestoreProbe = 0; loginButton = 0; oauthTransaction = 0; callback = 0; authorizationCodeExchange = 0; browserAction = 0; localLogout = 0; authenticatedUiCases = 0; settingsOpen = 0; settingsTabActivations = 0; screenshots = 0; appClose = 0; isolatedUninstaller = 0; ownedCleanup = 0 }
+$counts = [ordered]@{ installerFreshSilentNoShortcut = 0; appLaunch = 0; runtimeStart = 0; diagnosisSettlement = 0; credentialVaultRestoreProbe = 0; loginButton = 0; oauthTransaction = 0; callback = 0; authorizationCodeExchange = 0; browserAction = 0; localLogout = 0; authenticatedUiCases = 0; languageSelections = 0; settingsOpen = 0; settingsTabActivations = 0; screenshots = 0; appClose = 0; isolatedUninstaller = 0; ownedCleanup = 0 }
 $receipt = [ordered]@{ schemaVersion = 2; kind = if ($runtimeDiagnosisOnly) { "dronedream-universal-runtime-diagnosis-receipt" } else { "dronedream-universal-real-oauth-receipt" }; mode = $Mode; planSha256 = $ExpectedPlanSha256; productSourceCommit = $ProductSourceCommit; toolSourceCommit = $head; artifact = $artifact; startedAt = [DateTime]::UtcNow.ToString("O"); passed = $false; counts = $counts }
 $app = $null
 $oauthObserverProcess = $null
@@ -490,26 +491,30 @@ try {
                 "--edition=$($case.presentationEdition)" `
                 "--width=$($case.width)" `
                 "--height=$($case.height)" `
-                "--emulate-viewport=true"
+                "--emulate-viewport=true" `
+                "--authenticated-workspace=true"
             if ($LASTEXITCODE -ne 0) { throw "Authenticated installed-app UI case $($case.id) failed." }
             $caseReceipt = Get-Content -LiteralPath $caseReceiptPath -Raw | ConvertFrom-Json
             if ($caseReceipt.kind -cne "dronedream-installed-universal-ui-case-receipt" -or
                 $caseReceipt.caseId -cne $case.id -or
                 $caseReceipt.locale -cne $case.locale -or
                 $caseReceipt.presentationEdition -cne $case.presentationEdition -or
+                $caseReceipt.validationSurface -cne "authenticated-workspace" -or
                 -not $caseReceipt.presentationOnly -or $caseReceipt.grantsHardwareAuthority -or
+                $caseReceipt.languageSelectionCount -ne 1 -or
                 $caseReceipt.settingsOpenCount -ne 1 -or $caseReceipt.settingsTabActivationCount -ne 4 -or
                 @($caseReceipt.screenshots.PSObject.Properties).Count -ne 2) {
                 throw "Authenticated installed-app UI case $($case.id) produced an invalid receipt."
             }
             $counts.authenticatedUiCases++
+            $counts.languageSelections++
             $counts.settingsOpen++
             $counts.settingsTabActivations += 4
             $counts.screenshots += 2
             $receipt.authenticatedUiCases += [ordered]@{
                 caseId = $case.id
                 receipt = Get-FileRecord $caseReceiptPath
-                sceneScreenshotSha256 = $caseReceipt.screenshots.scene.sha256
+                workspaceScreenshotSha256 = $caseReceipt.screenshots.workspace.sha256
                 settingsScreenshotSha256 = $caseReceipt.screenshots.settings.sha256
             }
             Save-ExecutionCheckpoint "authenticated-ui-case-$($case.id)-completed"
@@ -597,6 +602,7 @@ try {
         $counts.browserAction -gt $(if ($AllowBrowserConsentAction) { 1 } else { 0 }) -or
         $counts.localLogout -ne $(if ($runtimeDiagnosisOnly) { 0 } else { 1 }) -or
         $counts.authenticatedUiCases -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or
+        $counts.languageSelections -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or
         $counts.settingsOpen -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count } else { 0 }) -or
         $counts.settingsTabActivations -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 4 } else { 0 }) -or
         $counts.screenshots -ne $(if ($RunAuthenticatedUiMatrix) { $uiMatrix.Count * 2 } else { 0 }) -or

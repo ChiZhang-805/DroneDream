@@ -89,8 +89,9 @@ def test_headed_browser_observer_covers_the_pre_auth_launcher_without_bypassing_
         'chromium.connectOverCDP(cdpEndpoint)',
         'launcherUrl.hash = "/desktop/setup"',
         'assert.equal(edition, "universal")',
-        'This prerequisite intentionally stays on the unauthenticated launcher.',
+        'The pre-auth prerequisite intentionally stays on the Universal launcher.',
         'startupTheme',
+        'validationSurface: authenticatedWorkspace ? "authenticated-workspace" : "pre-auth-launcher"',
         'drone-dream:locale',
         'data-theme-grants-hardware-authority',
         'data-grants-hardware-authority',
@@ -117,8 +118,8 @@ def test_headed_browser_observer_covers_the_pre_auth_launcher_without_bypassing_
     assert "await browser.close()" not in script
     assert "window.location.assign(nextRoute)" not in script
     assert 'window.history.replaceState({}, "", "/desktop/setup")' not in script
-    assert '"/vehicle-studio"' not in script
-    assert 'dronedream:universal-workspace:v2' not in script
+    assert 'if (authenticatedWorkspace)' in script
+    assert 'universal: "/vehicle-studio"' in script
     assert "password" not in script.lower()
     assert "token" not in script.lower()
     assert "requestId" not in script
