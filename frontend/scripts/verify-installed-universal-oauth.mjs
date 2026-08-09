@@ -116,6 +116,21 @@ async function waitForPostAuthUiSignal() {
   throw new Error("Post-auth UI observation did not settle within its bounded hold");
 }
 
+async function visibleAccountButton(page) {
+  const desktopButton = page.locator(".app-account-button:visible").first();
+  if (await desktopButton.count()) return desktopButton;
+
+  const mobileMenuButton = page.locator(".app-mobile-menu-button:visible").first();
+  await mobileMenuButton.waitFor({ state: "visible", timeout: 30_000 });
+  await mobileMenuButton.focus();
+  await mobileMenuButton.press("Enter");
+  const mobilePanel = page.locator(".app-mobile-menu-panel.is-open:visible").first();
+  await mobilePanel.waitFor({ state: "visible", timeout: 30_000 });
+  const mobileAccountButton = mobilePanel.locator(".app-account-button:visible").first();
+  await mobileAccountButton.waitFor({ state: "visible", timeout: 30_000 });
+  return mobileAccountButton;
+}
+
 const browser = await chromium.connectOverCDP(cdpEndpoint);
 try {
   await persist("connected");
@@ -228,7 +243,11 @@ try {
       evidence.postAuthUiMatrixObserved = postAuthUiDecision === "complete";
     }
 
-    const accountButton = page.locator(".app-account-button:visible").first();
+    // The authenticated UI matrix can finish or fail at a narrow viewport,
+    // where the account action lives inside the collapsed mobile menu. Always
+    // reach the visible account surface before reporting the earlier outcome,
+    // so a failed matrix cannot leave this Edition's local vault authenticated.
+    const accountButton = await visibleAccountButton(page);
     await accountButton.focus();
     await accountButton.press("Enter");
     const accountDialog = page.locator(".account-dialog");

@@ -305,6 +305,7 @@ def test_runtime_diagnosis_mode_is_frozen_and_cannot_consume_oauth() -> None:
 
 def test_receipt_uses_allowlisted_native_audit_hashes_and_local_logout() -> None:
     text = POWERSHELL.read_text(encoding="utf-8")
+    observer = OBSERVER.read_text(encoding="utf-8")
     assert "Browser-auth audit contains non-allowlisted fields" in text
     assert 'result -ceq "authorized"' in text
     assert 'result -ceq "no_saved_session"' in text
@@ -315,6 +316,15 @@ def test_receipt_uses_allowlisted_native_audit_hashes_and_local_logout() -> None
     assert "rawCallbackRecorded = $false" in text
     assert "credentialsRecorded = $false" in text
     assert "authorization code" not in text.lower()
+    assert "async function visibleAccountButton(page)" in observer
+    assert '.app-mobile-menu-button:visible' in observer
+    assert '.app-mobile-menu-panel.is-open:visible' in observer
+    assert 'const accountButton = await visibleAccountButton(page)' in observer
+    logout_attempt = observer.index('await persist("local-logout-attempted")')
+    failed_matrix_assertion = observer.index(
+        'assert.equal(postAuthUiDecision, "complete", "Post-auth UI observation failed closed")'
+    )
+    assert logout_attempt < failed_matrix_assertion
 
 
 def test_failure_policy_uses_only_edition_owned_cleanup_and_zero_retry() -> None:
