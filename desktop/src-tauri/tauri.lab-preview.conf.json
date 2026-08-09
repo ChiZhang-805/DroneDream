@@ -26,6 +26,12 @@
       "../../brand/generated/lab/windows/128x128@2x.png",
       "../../brand/generated/lab/windows/icon.ico"
     ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "../../brand/generated/lab/windows/icon.ico",
+        "uninstallerIcon": "../../brand/generated/lab/windows/icon.ico"
+      }
+    },
     "resources": {
       "../../distribution/build-profiles/lab-preview.v1.json": "distribution/lab-preview.v1.json",
       "../../distribution/editions/lab.v1.json": "distribution/editions/lab.v1.json",
