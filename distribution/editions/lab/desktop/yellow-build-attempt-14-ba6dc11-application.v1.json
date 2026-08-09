@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-canonical-nsis-icon-build-application",
+  "editionId": "lab",
+  "state": "prepared-awaiting-new-exact-serial-build-start",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "ba6dc119e44721b807c455a2183887102566f73e",
+    "tree": "6b75c6a5032fac9ef27ed2c8db62ba7ae0fbfa94",
+    "checkoutMode": "detached-exact",
+    "sourceWorktree": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-source-worktrees/lab-ba6dc119-attempt14",
+    "requiresCleanWorktree": true
+  },
+  "attempt": {
+    "globalBuildOrdinal": 14,
+    "sourceBuildOrdinal": 1,
+    "maximumBuildInvocations": 1,
+    "buildInvocationsAtFreeze": 0,
+    "automaticRetryMaximum": 0,
+    "outputRootMustBeAbsentBeforeExecution": true,
+    "logRootMustBeAbsentBeforeExecution": true
+  },
+  "predecessor": {
+    "globalBuildOrdinal": 13,
+    "result": "build-passed-static-icon-rejected",
+    "artifactSha256": "d3532d632d7a7cf414a55a293d9bea0eba24ff5063e8fd135afa233aabf3668f",
+    "receipt": {
+      "path": "distribution/build-receipts/lab-7b9ac353-yellow-attempt13-icon-rejected.json",
+      "bytes": 3456,
+      "sha256": "ef468fa1fb0f2c5b562391911d406469eacf3c4b402e701b34b9383f1189ed1b"
+    },
+    "mayBeRerunOrRelabeled": false
+  },
+  "executionTool": {
+    "path": "distribution/editions/lab/desktop/invoke-lab-yellow-build-logged.ps1",
+    "lfNormalizedBytes": 5619,
+    "lfNormalizedSha256": "8b6b874e924d369113666846eaad3203707e589d408bfac8988400e86b4fa769",
+    "normalNativeStderrIsFailure": false,
+    "nonzeroChildExitIsFailure": true,
+    "stdoutAndStderrSeparated": true
+  },
+  "paths": {
+    "outputRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-ba6dc119-attempt14",
+    "artifact": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-ba6dc119-attempt14/DroneDream-Lab-1.0.0.exe",
+    "updaterSignature": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-ba6dc119-attempt14/DroneDream-Lab-1.0.0.exe.sig",
+    "receipt": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-ba6dc119-attempt14/lab-preview-receipt.json",
+    "logRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-logs/lab-ba6dc119-attempt14",
+    "stdoutLog": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-logs/lab-ba6dc119-attempt14/build.stdout.log",
+    "stderrLog": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-logs/lab-ba6dc119-attempt14/build.stderr.log",
+    "cargoTarget": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target"
+  },
+  "command": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File distribution/editions/lab/desktop/invoke-lab-yellow-build-logged.ps1 -SourceRoot C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-source-worktrees/lab-ba6dc119-attempt14 -ExpectedSourceCommit ba6dc119e44721b807c455a2183887102566f73e -OutputRoot C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-ba6dc119-attempt14 -CargoTargetDir C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target -LogRoot C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-logs/lab-ba6dc119-attempt14 -OAuthClientId 0b9e7a8d-2c90-4b76-8842-511363f555bd",
+  "publicBuildInputs": {
+    "oauthClientId": "0b9e7a8d-2c90-4b76-8842-511363f555bd",
+    "oauthCallback": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "actionsVariables": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "valuesRecorded": false
+  },
+  "iconFix": {
+    "configPath": "desktop/src-tauri/tauri.lab-preview.conf.json",
+    "installerIcon": "../../brand/generated/lab/windows/icon.ico",
+    "uninstallerIcon": "../../brand/generated/lab/windows/icon.ico",
+    "canonicalIcoSha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1",
+    "shortcutIconSource": "$INSTDIR/${MAINBINARYNAME}.exe",
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "resourceGate": {
+    "maximumRamUsedPercent": 80,
+    "minimumFreeRamGiB": 3,
+    "requiresNoConcurrentCargoRustcTauriMakensisPx4Gazebo": true,
+    "mustBeRecheckedImmediatelyBeforeExecution": true
+  },
+  "artifactContract": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "version": "1.0.0",
+    "displayName": "DroneDream · LAB",
+    "internalProductName": "DroneDream-Lab",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "authenticodeExpected": "NotSigned",
+    "updaterSignatureRequired": true,
+    "validatedVehiclePackCount": 0,
+    "hardwareAuthorityDecision": "deny"
+  },
+  "forbidden": [
+    "execute-before-new-exact-start",
+    "rerun-attempt13",
+    "reuse-output-or-log-root",
+    "automatic-retry",
+    "installer-execution",
+    "overwrite-current-zju20-lab-install",
+    "runtime-start-or-migration",
+    "browser-oauth-provider",
+    "px4-gazebo-hardware",
+    "upload-deployment",
+    "secret-or-private-key-content-read"
+  ]
+}

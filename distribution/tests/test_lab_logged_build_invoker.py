@@ -17,6 +17,11 @@ APPLICATION = (
     / "distribution/editions/lab/desktop"
     / "yellow-build-attempt-13-7b9ac35-application.v1.json"
 )
+APPLICATION14 = (
+    ROOT
+    / "distribution/editions/lab/desktop"
+    / "yellow-build-attempt-14-ba6dc11-application.v1.json"
+)
 
 
 def _lf_identity(path: Path) -> tuple[int, str]:
@@ -146,3 +151,37 @@ def test_attempt13_application_binds_tool_source_and_fresh_paths() -> None:
     assert application["paths"]["outputRoot"].endswith("attempt13")
     assert application["paths"]["logRoot"].endswith("attempt13")
     assert application["state"] == "prepared-awaiting-new-exact-serial-build-start"
+
+
+def test_attempt14_application_binds_icon_fix_and_rejected_predecessor() -> None:
+    application = json.loads(APPLICATION14.read_text(encoding="utf-8"))
+    tool_bytes, tool_sha = _lf_identity(INVOKER)
+
+    assert application["productSource"] == {
+        "branch": "codex/software-lab",
+        "commit": "ba6dc119e44721b807c455a2183887102566f73e",
+        "tree": "6b75c6a5032fac9ef27ed2c8db62ba7ae0fbfa94",
+        "checkoutMode": "detached-exact",
+        "sourceWorktree": (
+            "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/"
+            "lab-source-worktrees/lab-ba6dc119-attempt14"
+        ),
+        "requiresCleanWorktree": True,
+    }
+    assert application["attempt"]["globalBuildOrdinal"] == 14
+    assert application["attempt"]["maximumBuildInvocations"] == 1
+    assert application["attempt"]["buildInvocationsAtFreeze"] == 0
+    assert application["attempt"]["automaticRetryMaximum"] == 0
+    assert application["executionTool"]["lfNormalizedBytes"] == tool_bytes
+    assert application["executionTool"]["lfNormalizedSha256"] == tool_sha
+    assert application["predecessor"]["receipt"]["sha256"] == (
+        "ef468fa1fb0f2c5b562391911d406469eacf3c4b402e701b34b9383f1189ed1b"
+    )
+    assert application["predecessor"]["mayBeRerunOrRelabeled"] is False
+    assert application["iconFix"]["installerIcon"] == (
+        "../../brand/generated/lab/windows/icon.ico"
+    )
+    assert application["iconFix"]["uninstallerIcon"] == (
+        "../../brand/generated/lab/windows/icon.ico"
+    )
+    assert application["iconFix"]["grantsHardwareAuthority"] is False
