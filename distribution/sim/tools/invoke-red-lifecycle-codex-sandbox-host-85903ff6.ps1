@@ -326,8 +326,8 @@ $runAsArguments = @("/profile", "/user:.\$expectedUserName", $guestCommand)
 $runAsExitCode = $null
 $guestReceiptPath = Join-Path $sharedRoot "execution\evidence\lifecycle-receipt.json"
 try {
-    $process = Start-Process -FilePath "$env:SystemRoot\System32\runas.exe" -ArgumentList $runAsArguments -PassThru -Wait
-    $runAsExitCode = $process.ExitCode
+    & "$env:SystemRoot\System32\runas.exe" @runAsArguments
+    $runAsExitCode = $LASTEXITCODE
     if ($runAsExitCode -ne 0) {
         throw "Interactive runas lifecycle process failed with exit code $runAsExitCode."
     }

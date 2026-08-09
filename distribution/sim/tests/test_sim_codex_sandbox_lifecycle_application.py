@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-2.v1.json"
+APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-3.v1.json"
 HOST = REPO / "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-host-85903ff6.ps1"
 GUEST = REPO / "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-85903ff6.ps1"
 
@@ -19,7 +19,7 @@ def load_application() -> dict:
 def test_application_binds_frozen_artifact_and_tool_bundle() -> None:
     application = load_application()
     assert application["editionId"] == "sim"
-    assert application["executionOrdinal"] == 2
+    assert application["executionOrdinal"] == 3
     assert application["state"] == "awaiting-user-present-start"
     assert application["sourceSeparation"]["productSourceCommit"] == (
         "573e8f991eba703bbfd6c4b35f464fbaab78903c"
@@ -101,7 +101,8 @@ def test_counts_and_authority_are_fail_closed() -> None:
 
 def test_host_launcher_has_one_interactive_runas_and_no_password_channel() -> None:
     host = HOST.read_text(encoding="utf-8")
-    assert host.count('Start-Process -FilePath "$env:SystemRoot\\System32\\runas.exe"') == 1
+    assert host.count('& "$env:SystemRoot\\System32\\runas.exe" @runAsArguments') == 1
+    assert 'Start-Process -FilePath "$env:SystemRoot\\System32\\runas.exe"' not in host
     assert '"/user:.\\$expectedUserName"' in host
     assert "$expectedUserSid" in host
     assert 'Registry::HKEY_USERS\\$expectedUserSid' in host

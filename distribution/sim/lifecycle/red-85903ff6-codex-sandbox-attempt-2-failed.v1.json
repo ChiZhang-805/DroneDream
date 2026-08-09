@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-failure",
+  "editionId": "sim",
+  "executionOrdinal": 2,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "ff8f796c608ae454bef5a12be37e95522465d819",
+  "artifact": {
+    "bytes": 12070633,
+    "sha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae"
+  },
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-2.v1.json",
+    "bytes": 8578,
+    "sha256": "766bb166d28a3165ec0eb38e8a0daba06cd27e33fae51fa29352564415912de4"
+  },
+  "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal2",
+  "hostProtectionReceipt": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal2/host-evidence/canonical-current-user-protection-receipt.json",
+    "bytes": 14142,
+    "sha256": "09dd99fa277e205b70de55bfbaf5ee6845c8187c962d1a960112fb437301e6f7",
+    "runAsExitCode": 1,
+    "canonicalCurrentUserProtectedStateUnchanged": true
+  },
+  "hostProtectedStateBefore": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal2/host-evidence/canonical-current-user-protected-state-before.json",
+    "bytes": 4621,
+    "sha256": "06b04439b62dfe65c218e7b51b732ff6b5d07fcae02d2d9bd7553716e435a1a1"
+  },
+  "classification": "start-process-runas-argument-boundary-exited-before-guest-start",
+  "mutationCounts": {
+    "sharedStagingRootsCreated": 1,
+    "interactiveRunAsInvocations": 1,
+    "guestRunnerInvocations": 0,
+    "freshInstallerInvocations": 0,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReads": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "retries": 0
+  },
+  "historicalOwnedRootReadOnly": true,
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "invoke-runas-directly-in-visible-host-console-with-single-command-argument"
+}
