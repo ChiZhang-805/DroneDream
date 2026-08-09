@@ -111,6 +111,7 @@ $visible = Read-BoundJson $VisibleInstallerReceipt $ExpectedVisibleInstallerRece
 $headed = Read-BoundJson $InstalledAppReceipt $ExpectedInstalledAppReceiptSha256 "Installed-app receipt"
 $oauth = Read-BoundJson $OAuthReceipt $ExpectedOAuthReceiptSha256 "OAuth receipt"
 $icons = Read-BoundJson $IconReceipt $ExpectedIconReceiptSha256 "Icon receipt"
+$oauthFailureProperty = $oauth.Document.PSObject.Properties["failure"]
 
 if ($build.Document.kind -cne "dronedream-universal-build-receipt" -or
     $build.Document.sourceCommit -cne $ProductSourceCommit -or $build.Document.buildCount -ne 1) {
@@ -175,7 +176,8 @@ if ($oauth.Document.kind -cne "dronedream-universal-real-oauth-receipt" -or
     $oauth.Document.counts.settingsTabActivations -ne 64 -or $oauth.Document.counts.screenshots -ne 32 -or
     @($oauth.Document.authenticatedUiCases).Count -ne 16 -or -not $oauth.Document.authEvidence.subjectHash -or
     $oauth.Document.authEvidence.rawCallbackRecorded -ne $false -or $oauth.Document.authEvidence.credentialsRecorded -ne $false -or
-    $oauth.Document.runtimeRestoreObserved -ne $true -or $oauth.Document.failure) {
+    $oauth.Document.runtimeRestoreObserved -ne $true -or
+    ($null -ne $oauthFailureProperty -and $null -ne $oauthFailureProperty.Value)) {
     throw "Real OAuth/PKCE receipt failed closed."
 }
 Assert-ArtifactIdentity $oauth.Document.artifact "OAuth receipt"
@@ -257,7 +259,7 @@ try {
     New-Item -ItemType Directory -Path $stagingRoot | Out-Null
     $readinessPath = Join-Path $stagingRoot "universal-final-readiness-receipt.json"
     $summary.kind = "dronedream-universal-final-readiness-receipt"
-    $summary.completedAt = [DateTime]::UtcNow.ToString("O")
+    $summary["completedAt"] = [DateTime]::UtcNow.ToString("O")
     Write-JsonNoBom $readinessPath $summary
     $readinessRecord = Get-FileRecord $readinessPath
 

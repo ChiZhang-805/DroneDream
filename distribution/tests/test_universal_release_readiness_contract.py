@@ -42,6 +42,8 @@ def test_finalizer_preserves_atomic_receipts_and_emits_new_immutable_outputs() -
 
 def test_finalizer_verifies_real_oauth_ui_cleanup_and_icon_surfaces() -> None:
     text = FINALIZER.read_text(encoding="utf-8")
+    assert '$oauth.Document.PSObject.Properties["failure"]' in text
+    assert "$oauth.Document.failure" not in text
     for fragment in (
         "$oauth.Document.counts.credentialVaultRestoreProbe -ne 1",
         "$oauth.Document.counts.authorizationCodeExchange -ne 1",
