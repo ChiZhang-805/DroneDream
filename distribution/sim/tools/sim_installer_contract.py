@@ -1226,20 +1226,37 @@ def validate_sim_tauri_overlay_config(
                 "Runtime Base and Engine Pack remain external dependencies. Hardware and HITL "
                 "capabilities are not included or authorized."
             ),
+            "windows": {
+                "nsis": {
+                    "installerIcon": (
+                        "../../distribution/sim/desktop/icons/dronedream-sim.ico"
+                    ),
+                    "uninstallerIcon": (
+                        "../../distribution/sim/desktop/icons/dronedream-sim.ico"
+                    ),
+                }
+            },
         },
     }
     if document != expected:
         raise SimInstallerContractError("Sim desktop overlay identity drifted")
-    icon_relative = document["bundle"]["icon"][0]
-    icon_path = (repo_root / "desktop" / "src-tauri" / icon_relative).resolve()
+    icon_relatives = [
+        document["bundle"]["icon"][0],
+        document["bundle"]["windows"]["nsis"]["installerIcon"],
+        document["bundle"]["windows"]["nsis"]["uninstallerIcon"],
+    ]
     expected_icon = (
         repo_root / "distribution" / "sim" / "desktop" / "icons" / "dronedream-sim.ico"
     ).resolve()
-    if icon_path != expected_icon or not icon_path.is_file():
-        raise SimInstallerContractError("Sim desktop overlay icon path drifted")
+    icon_paths = [
+        (repo_root / "desktop" / "src-tauri" / relative).resolve()
+        for relative in icon_relatives
+    ]
+    if any(path != expected_icon or not path.is_file() for path in icon_paths):
+        raise SimInstallerContractError("Sim desktop overlay icon paths drifted")
     if (
-        icon_path.stat().st_size != 54431
-        or sha256_file(icon_path)
+        expected_icon.stat().st_size != 54431
+        or sha256_file(expected_icon)
         != "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c"
     ):
         raise SimInstallerContractError("Sim desktop overlay icon bytes drifted")
@@ -1278,7 +1295,7 @@ def validate_installer_surface_contract(
     if (
         overlay["path"] != "distribution/sim/desktop/tauri.sim.conf.json"
         or overlay["sha256"]
-        != "718a9c0f8ec10144979f50fc4b06b75bcf68d38a810ced11e9b76384f6621359"
+        != "a60a42d80f1fbeb88055ad4bfb35aba333d62ae5c1342fef008dbd8a223b25c7"
         or overlay["baseConfigPath"] != "desktop/src-tauri/tauri.conf.json"
         or overlay["baseConfigMustRemainUniversal"] is not True
         or overlay["artifactRenameRequired"] is not True

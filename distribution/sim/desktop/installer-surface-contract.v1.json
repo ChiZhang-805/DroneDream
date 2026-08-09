@@ -13,7 +13,7 @@
   },
   "overlay": {
     "path": "distribution/sim/desktop/tauri.sim.conf.json",
-    "sha256": "718a9c0f8ec10144979f50fc4b06b75bcf68d38a810ced11e9b76384f6621359",
+    "sha256": "a60a42d80f1fbeb88055ad4bfb35aba333d62ae5c1342fef008dbd8a223b25c7",
     "baseConfigPath": "desktop/src-tauri/tauri.conf.json",
     "baseConfigSha256": "f512342f877703b55c735a52de384e1139da7ed689ee89c9c6c8e292cf67a798",
     "baseConfigMustRemainUniversal": true,

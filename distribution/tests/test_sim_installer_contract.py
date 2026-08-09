@@ -444,6 +444,16 @@ class SimInstallerContractTests(unittest.TestCase):
             load_json(OVERLAY_PATH), repo_root=ROOT
         )
         self.assertEqual(overlay["productName"], "DroneDream-Sim")
+        canonical_icon = "../../distribution/sim/desktop/icons/dronedream-sim.ico"
+        self.assertEqual(overlay["bundle"]["icon"], [canonical_icon])
+        self.assertEqual(
+            overlay["bundle"]["windows"]["nsis"]["installerIcon"],
+            canonical_icon,
+        )
+        self.assertEqual(
+            overlay["bundle"]["windows"]["nsis"]["uninstallerIcon"],
+            canonical_icon,
+        )
 
         invalid = deepcopy(overlay)
         invalid["productName"] = "DroneDream \u00b7 LAB"
@@ -451,6 +461,17 @@ class SimInstallerContractTests(unittest.TestCase):
             sim_contract.SimInstallerContractError, "overlay identity"
         ):
             sim_contract.validate_sim_tauri_overlay_config(invalid, repo_root=ROOT)
+
+        for field in ("installerIcon", "uninstallerIcon"):
+            with self.subTest(field=field):
+                invalid = deepcopy(overlay)
+                invalid["bundle"]["windows"]["nsis"][field] = "icons/icon.ico"
+                with self.assertRaisesRegex(
+                    sim_contract.SimInstallerContractError, "overlay identity"
+                ):
+                    sim_contract.validate_sim_tauri_overlay_config(
+                        invalid, repo_root=ROOT
+                    )
 
         invalid = deepcopy(overlay)
         invalid["bundle"]["icon"] = ["icons/icon.ico"]
