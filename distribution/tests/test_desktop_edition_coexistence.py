@@ -201,6 +201,19 @@ def test_nsis_keeps_internal_ownership_but_uses_display_shortcuts() -> None:
     assert 'DRONEDREAM_REMOVE_INTERNAL_SHORTCUT' in template
     assert 'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe"' in identity
 
+    edition_icon_shortcut = (
+        'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe" '
+        '"" "$INSTDIR\\${MAINBINARYNAME}.exe" 0'
+    )
+    assert edition_icon_shortcut in identity
+    assert edition_icon_shortcut in hook
+    assert "CreateShortcut" not in "\n".join(
+        line for line in identity.splitlines() if "DroneDream.ico" in line
+    )
+    assert "CreateShortcut" not in "\n".join(
+        line for line in hook.splitlines() if "DroneDream.ico" in line
+    )
+
     # Every outer expansion supplies a call-site prefix. Nested shortcut macros
     # derive a distinct suffix from that prefix instead of redeclaring the
     # outer completion label (the previous desktop macro emitted the same

@@ -66,6 +66,7 @@ FIELD_FRONTEND_APP = Path("frontend/src/field/FieldApp.tsx")
 FIELD_FRONTEND_MAIN = Path("frontend/src/field/main.tsx")
 FIELD_VITE_CONFIG = Path("frontend/vite.field.config.ts")
 BASE_TAURI_CONFIG = Path("desktop/src-tauri/tauri.conf.json")
+EDITION_IDENTITY = Path("desktop/src-tauri/nsis/edition-identity.nsh")
 FIELD_SHORTCUT_PROPOSAL = Path(
     "distribution/editions/field/installer-shortcut-icon-common-core-proposal.v1.json"
 )
@@ -291,6 +292,7 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
     hook_relative = effective_tauri["bundle"]["windows"]["nsis"]["installerHooks"]
     hook_path = repo_root / "desktop" / "src-tauri" / hook_relative
     hook_source = hook_path.read_text(encoding="utf-8")
+    identity_source = (repo_root / EDITION_IDENTITY).read_text(encoding="utf-8")
 
     verification_errors: list[str] = []
     assets = []
@@ -438,7 +440,15 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "authorityRemainsFalse": 'data-authority="false"' in app_source,
         "canonicalDonor": all(canonical_checks.values()),
         "installerShortcutFieldIcon": (
-            '$INSTDIR\\icons\\DroneDream.ico' in hook_source
+            'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe" '
+            '"" "$INSTDIR\\${MAINBINARYNAME}.exe" 0' in hook_source
+            and 'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe" '
+            '"" "$INSTDIR\\${MAINBINARYNAME}.exe" 0' in identity_source
+            and not any(
+                "CreateShortcut" in line and "DroneDream.ico" in line
+                for source in (hook_source, identity_source)
+                for line in source.splitlines()
+            )
             and resources.get("../../brand/generated/field/windows/icon.ico")
             == "icons/DroneDream.ico"
             and "icons/icon.ico" not in resources
