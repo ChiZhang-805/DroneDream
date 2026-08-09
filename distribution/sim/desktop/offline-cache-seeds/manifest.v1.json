@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-exact-offline-cache-seeds",
+  "state": "source-bound-development-dependency-only",
+  "editionId": "sim",
+  "productPayload": false,
+  "networkRequired": false,
+  "globalCacheMutationAllowed": false,
+  "seeds": [
+    {
+      "packageName": "@tauri-apps/plugin-notification",
+      "version": "2.3.3",
+      "resolved": "https://registry.npmjs.org/@tauri-apps/plugin-notification/-/plugin-notification-2.3.3.tgz",
+      "lockIntegrity": "sha512-Zw+ZH18RJb41G4NrfHgIuofJiymusqN+q8fGUIIV7vyCH+5sSn5coqRv/MWB9qETsUs97vmU045q7OyseCV3Qg==",
+      "path": "distribution/sim/desktop/offline-cache-seeds/tauri-apps-plugin-notification-2.3.3.tgz",
+      "bytes": 6663,
+      "sha256": "944ded5d471822a0e68614c7d640780ada4dbb92d10c8e3f5856d7239f189793",
+      "sourceKind": "local-installed-package-repack",
+      "sourceReference": "frontend/node_modules/@tauri-apps/plugin-notification@2.3.3; exact lock-integrity match"
+    },
+    {
+      "packageName": "brace-expansion",
+      "version": "5.0.8",
+      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-5.0.8.tgz",
+      "lockIntegrity": "sha512-JZyDyq3D4AUifKTPOB7DELf6XsB3WdPuNxCtob1vFXPsSXhdAiHBWJ/tJ8HAc9aH84BK+5JFZLNkJKx3G9kzQg==",
+      "path": "distribution/sim/desktop/offline-cache-seeds/brace-expansion-5.0.8.tgz",
+      "bytes": 10242,
+      "sha256": "a03b06e66d862d0278b1ff45b66427f245f99c665800dc9bd790c0c13d2247fe",
+      "sourceKind": "local-installed-package-repack",
+      "sourceReference": "frontend/node_modules/brace-expansion@5.0.8; exact lock-integrity match"
+    },
+    {
+      "packageName": "nanoid",
+      "version": "3.3.16",
+      "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.16.tgz",
+      "lockIntegrity": "sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==",
+      "path": "distribution/sim/desktop/offline-cache-seeds/nanoid-3.3.16.tgz",
+      "bytes": 5634,
+      "sha256": "42b7f772b6df95f32aab9a2aab1ef6209a0883fd1cbb410f659d0cd61c8ff4b6",
+      "sourceKind": "frozen-attempt-cache-object",
+      "sourceReference": "npm-snapshot-ordinal12-413a83b; exact SHA-512 content address"
+    },
+    {
+      "packageName": "postcss",
+      "version": "8.5.22",
+      "resolved": "https://registry.npmjs.org/postcss/-/postcss-8.5.22.tgz",
+      "lockIntegrity": "sha512-KBDEIpLrvpv16pp3K0Fw+UCoZfopFjjgeB+0tA/aaThfEE74kKDLrgg603YvOWJyg3+WYtyq3xYsQWsIyZlPqQ==",
+      "path": "distribution/sim/desktop/offline-cache-seeds/postcss-8.5.22.tgz",
+      "bytes": 51387,
+      "sha256": "1d09d6b933578d908a7c8c1e4588a43ae6cef117564b62ae1e23be42a28d269d",
+      "sourceKind": "local-installed-package-repack",
+      "sourceReference": "frontend/node_modules/postcss@8.5.22; exact lock-integrity match"
+    },
+    {
+      "packageName": "react-router",
+      "version": "7.18.1",
+      "resolved": "https://registry.npmjs.org/react-router/-/react-router-7.18.1.tgz",
+      "lockIntegrity": "sha512-GDLgg3i3uM0aeJO3Fm+TCS+sDQ7gu12T6x0qdTEzcwqEfleci7JwugVNIF3U//0FWKnJT7ptG+20B2jfDqnZAg==",
+      "path": "distribution/sim/desktop/offline-cache-seeds/react-router-7.18.1.tgz",
+      "bytes": 1083274,
+      "sha256": "852f5a40ed821e9f59f075058cf944251dd8ac587f1d2a4dd187a839008f696e",
+      "sourceKind": "frozen-attempt-cache-object",
+      "sourceReference": "npm-snapshot-ordinal12-413a83b; exact SHA-512 content address"
+    },
+    {
+      "packageName": "react-router-dom",
+      "version": "7.18.1",
+      "resolved": "https://registry.npmjs.org/react-router-dom/-/react-router-dom-7.18.1.tgz",
+      "lockIntegrity": "sha512-KaZh+X/6UtEp28x51AUYZDMg9NGoz2ja3dNHa+ta/tk40vCzKhQ/RypCWBMLbmDr6//E24Vv5uPsrqXFozdkAg==",
+      "path": "distribution/sim/desktop/offline-cache-seeds/react-router-dom-7.18.1.tgz",
+      "bytes": 2382,
+      "sha256": "edac2f6ff14daf8736db46ad4ed7ab7ebb347978cca46a944eb15658b2ebcfa3",
+      "sourceKind": "frozen-attempt-cache-object",
+      "sourceReference": "npm-snapshot-ordinal12-413a83b; exact SHA-512 content address"
+    },
+    {
+      "packageName": "undici",
+      "version": "7.28.0",
+      "resolved": "https://registry.npmjs.org/undici/-/undici-7.28.0.tgz",
+      "lockIntegrity": "sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==",
+      "path": "distribution/sim/desktop/offline-cache-seeds/undici-7.28.0.tgz",
+      "bytes": 393676,
+      "sha256": "2b39f83d6c479b8172188ad690c4af1c10dd6fecbfb084fd3ffdf59de5187d5f",
+      "sourceKind": "local-installed-package-repack",
+      "sourceReference": "frontend/node_modules/undici@7.28.0; exact lock-integrity match"
+    }
+  ],
+  "policies": {
+    "resolvedUrlMustMatchCompatibleLockRow": true,
+    "sha512MustMatchLockIntegrity": true,
+    "attemptOwnedSnapshotOnly": true,
+    "verifySnapshotAcceptsSeedArguments": false,
+    "arbitrarySeedAllowed": false,
+    "pathEscapeAllowed": false
+  }
+}

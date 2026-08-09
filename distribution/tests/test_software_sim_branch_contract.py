@@ -274,6 +274,9 @@ YELLOW_APPLICATION_PATH = YELLOW_ATTEMPT_14_APPLICATION_PATH
 LOCKFILE_OFFLINE_CACHE_TOOL = (
     DISTRIBUTION / "sim" / "desktop" / "lockfile-offline-cache.mjs"
 )
+OFFLINE_CACHE_SEED_MANIFEST = (
+    DISTRIBUTION / "sim" / "desktop" / "offline-cache-seeds" / "manifest.v1.json"
+)
 PUBLIC_BUILD_CONFIG_LAUNCHER = (
     DISTRIBUTION / "sim" / "desktop" / "invoke-github-public-build-config.ps1"
 )
@@ -367,6 +370,57 @@ def write_offline_cache_fixture(root: Path) -> tuple[Path, Path, str, Path, Path
     )
     fingerprint = hashlib.sha256(semantic_lines.encode()).hexdigest()
     return repo, cache, fingerprint, content, index
+
+
+def write_offline_cache_seed_manifest(
+    repo: Path,
+    resolved: str,
+    integrity: str,
+    tarball: bytes,
+) -> Path:
+    seed_dir = repo / "distribution" / "sim" / "desktop" / "offline-cache-seeds"
+    seed_dir.mkdir(parents=True, exist_ok=True)
+    seed_path = seed_dir / "fixture-seed.tgz"
+    seed_path.write_bytes(tarball)
+    manifest_path = seed_dir / "manifest.v1.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "kind": "dronedream-sim-exact-offline-cache-seeds",
+                "state": "source-bound-development-dependency-only",
+                "editionId": "sim",
+                "productPayload": False,
+                "networkRequired": False,
+                "globalCacheMutationAllowed": False,
+                "seeds": [
+                    {
+                        "packageName": "example",
+                        "version": "1.0.0",
+                        "resolved": resolved,
+                        "lockIntegrity": integrity,
+                        "path": "distribution/sim/desktop/offline-cache-seeds/fixture-seed.tgz",
+                        "bytes": len(tarball),
+                        "sha256": hashlib.sha256(tarball).hexdigest(),
+                        "sourceKind": "fixture",
+                        "sourceReference": "unit-test-owned-bytes",
+                    }
+                ],
+                "policies": {
+                    "resolvedUrlMustMatchCompatibleLockRow": True,
+                    "sha512MustMatchLockIntegrity": True,
+                    "attemptOwnedSnapshotOnly": True,
+                    "verifySnapshotAcceptsSeedArguments": False,
+                    "arbitrarySeedAllowed": False,
+                    "pathEscapeAllowed": False,
+                },
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 def run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
@@ -1435,6 +1489,152 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
                 receipt["snapshot"]["fingerprint"],
             )
 
+    def test_lockfile_offline_cache_contract_seeds_exact_missing_tarball_from_manifest(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo, cache, fingerprint, content, index = write_offline_cache_fixture(root)
+            tarball = content.read_bytes()
+            integrity = "sha512-" + base64.b64encode(hashlib.sha512(tarball).digest()).decode()
+            resolved = "https://registry.npmjs.org/example/-/example-1.0.0.tgz"
+            manifest = write_offline_cache_seed_manifest(repo, resolved, integrity, tarball)
+            content.unlink()
+            index.unlink()
+            owned = root / "owned"
+            snapshot = owned / "attempt-cache"
+
+            completed = subprocess.run(
+                [
+                    "node",
+                    str(LOCKFILE_OFFLINE_CACHE_TOOL),
+                    "--mode",
+                    "create-snapshot",
+                    "--repo-root",
+                    str(repo),
+                    "--cache-root",
+                    str(cache),
+                    "--expected-semantic-fingerprint",
+                    fingerprint,
+                    "--owned-base",
+                    str(owned),
+                    "--snapshot-root",
+                    str(snapshot),
+                    "--seed-manifest",
+                    str(manifest),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            receipt = json.loads(completed.stdout)
+            self.assertEqual(receipt["localSeedCount"], 1)
+            self.assertEqual(receipt["seedManifest"]["seedCount"], 1)
+            self.assertEqual(receipt["snapshot"]["fileCount"], 2)
+            self.assertFalse(content.exists())
+            self.assertFalse(index.exists())
+
+            verified = subprocess.run(
+                [
+                    "node",
+                    str(LOCKFILE_OFFLINE_CACHE_TOOL),
+                    "--mode",
+                    "verify-snapshot",
+                    "--repo-root",
+                    str(repo),
+                    "--cache-root",
+                    str(snapshot),
+                    "--expected-semantic-fingerprint",
+                    fingerprint,
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(verified.returncode, 0, verified.stderr)
+
+    def test_lockfile_offline_cache_seed_manifest_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo, cache, fingerprint, content, index = write_offline_cache_fixture(root)
+            tarball = content.read_bytes()
+            content.unlink()
+            index.unlink()
+            resolved = "https://registry.npmjs.org/example/-/example-1.0.0.tgz"
+            wrong_integrity = "sha512-" + base64.b64encode(
+                hashlib.sha512(b"not-the-lockfile-tarball").digest()
+            ).decode()
+            manifest = write_offline_cache_seed_manifest(
+                repo,
+                resolved,
+                wrong_integrity,
+                b"not-the-lockfile-tarball",
+            )
+            base = [
+                "node",
+                str(LOCKFILE_OFFLINE_CACHE_TOOL),
+                "--repo-root",
+                str(repo),
+                "--cache-root",
+                str(cache),
+                "--expected-semantic-fingerprint",
+                fingerprint,
+                "--seed-manifest",
+                str(manifest),
+            ]
+            mismatch = subprocess.run(
+                [*base, "--mode", "verify-global"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(mismatch.returncode, 0)
+            self.assertIn("disagrees with the exact lock row", mismatch.stderr)
+
+            verify_mode = subprocess.run(
+                [*base, "--mode", "verify-snapshot"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(verify_mode.returncode, 0)
+            self.assertIn("must use only cache-owned content", verify_mode.stderr)
+
+            exact_integrity = "sha512-" + base64.b64encode(
+                hashlib.sha512(tarball).digest()
+            ).decode()
+            manifest = write_offline_cache_seed_manifest(repo, resolved, exact_integrity, tarball)
+            manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+            extra = dict(manifest_data["seeds"][0])
+            extra["resolved"] = "https://registry.npmjs.org/not-locked/-/not-locked-1.0.0.tgz"
+            extra["path"] = "distribution/sim/desktop/offline-cache-seeds/extra-seed.tgz"
+            (manifest.parent / "extra-seed.tgz").write_bytes(tarball)
+            manifest_data["seeds"].append(extra)
+            manifest.write_text(json.dumps(manifest_data), encoding="utf-8")
+            unknown = subprocess.run(
+                [*base[:-2], "--seed-manifest", str(manifest), "--mode", "verify-global"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unknown.returncode, 0)
+            self.assertIn("absent from the exact compatible lock rows", unknown.stderr)
+
+            manifest_data["seeds"] = [manifest_data["seeds"][0]]
+            manifest_data["seeds"][0]["path"] = (
+                "distribution/sim/desktop/offline-cache-seeds/../outside.tgz"
+            )
+            manifest.write_text(json.dumps(manifest_data), encoding="utf-8")
+            escaped = subprocess.run(
+                [*base[:-2], "--seed-manifest", str(manifest), "--mode", "verify-global"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(escaped.returncode, 0)
+            self.assertIn("escapes the edition-owned source directory", escaped.stderr)
+
     def test_lockfile_offline_cache_contract_fails_closed_on_required_object_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1495,6 +1695,32 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             self.assertNotIn(forbidden, text)
         self.assertIn("COPYFILE_EXCL", text)
         self.assertIn("Snapshot root already exists; retry is forbidden.", text)
+
+    def test_offline_cache_seed_is_exact_lock_bound_and_not_product_payload(self) -> None:
+        manifest = load_json(OFFLINE_CACHE_SEED_MANIFEST)
+        self.assertFalse(manifest["productPayload"])
+        self.assertFalse(manifest["networkRequired"])
+        self.assertFalse(manifest["globalCacheMutationAllowed"])
+        self.assertEqual(len(manifest["seeds"]), 7)
+        frontend_lock = (ROOT / "frontend" / "package-lock.json").read_text(
+            encoding="utf-8"
+        )
+        declared_paths = set()
+        for seed in manifest["seeds"]:
+            seed_path = ROOT / seed["path"]
+            declared_paths.add(seed_path.resolve())
+            self.assertEqual(seed_path.stat().st_size, seed["bytes"])
+            self.assertEqual(
+                hashlib.sha256(seed_path.read_bytes()).hexdigest(), seed["sha256"]
+            )
+            actual_integrity = "sha512-" + base64.b64encode(
+                hashlib.sha512(seed_path.read_bytes()).digest()
+            ).decode()
+            self.assertEqual(actual_integrity, seed["lockIntegrity"])
+            self.assertIn(seed["resolved"], frontend_lock)
+            self.assertIn(seed["lockIntegrity"], frontend_lock)
+        actual_paths = {path.resolve() for path in OFFLINE_CACHE_SEED_MANIFEST.parent.glob("*.tgz")}
+        self.assertEqual(actual_paths, declared_paths)
 
     def test_stable_offline_cache_contract_excludes_mutable_global_surfaces(self) -> None:
         contract = load_json(STABLE_OFFLINE_CACHE_CONTRACT_PATH)

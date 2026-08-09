@@ -30,6 +30,7 @@ function parseArgs(argv) {
     "--expected-semantic-fingerprint",
     "--owned-base",
     "--snapshot-root",
+    "--seed-manifest",
   ]);
   for (const key of values.keys()) {
     if (!allowed.has(key)) {
@@ -59,6 +60,9 @@ function parseArgs(argv) {
       }
     }
   }
+  if (values.get("--seed-manifest") && mode === "verify-snapshot") {
+    fail("Snapshot verification must use only cache-owned content and indexes.");
+  }
   return Object.fromEntries([...values].map(([key, value]) => [key.slice(2), value]));
 }
 
@@ -77,6 +81,142 @@ function sha256Bytes(bytes) {
 
 function sha256File(filePath) {
   return sha256Bytes(fs.readFileSync(filePath));
+}
+
+function exactKeys(value, expected, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail(`${label} must be an object.`);
+  const actual = Object.keys(value).sort();
+  const wanted = [...expected].sort();
+  if (actual.length !== wanted.length || actual.some((key, index) => key !== wanted[index])) {
+    fail(`${label} has unknown or missing fields.`);
+  }
+}
+
+function readSeedManifest(repoRoot, manifestValue) {
+  if (!manifestValue) return null;
+  const manifestPath = fullPath(manifestValue);
+  const expectedRelative = "distribution/sim/desktop/offline-cache-seeds/manifest.v1.json";
+  const relative = path.relative(repoRoot, manifestPath).split(path.sep).join("/");
+  if (relative !== expectedRelative || !isWithin(manifestPath, repoRoot)) {
+    fail("Seed manifest must be the exact edition-owned source path.");
+  }
+  if (!fs.existsSync(manifestPath)) fail("Seed manifest does not exist.");
+  const manifestStat = fs.lstatSync(manifestPath);
+  if (!manifestStat.isFile() || manifestStat.isSymbolicLink()) {
+    fail("Seed manifest must be a regular source file.");
+  }
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  exactKeys(
+    manifest,
+    [
+      "schemaVersion",
+      "kind",
+      "state",
+      "editionId",
+      "productPayload",
+      "networkRequired",
+      "globalCacheMutationAllowed",
+      "seeds",
+      "policies",
+    ],
+    "Seed manifest",
+  );
+  if (
+    manifest.schemaVersion !== 1 ||
+    manifest.kind !== "dronedream-sim-exact-offline-cache-seeds" ||
+    manifest.state !== "source-bound-development-dependency-only" ||
+    manifest.editionId !== "sim" ||
+    manifest.productPayload !== false ||
+    manifest.networkRequired !== false ||
+    manifest.globalCacheMutationAllowed !== false ||
+    !Array.isArray(manifest.seeds) ||
+    manifest.seeds.length === 0
+  ) {
+    fail("Seed manifest safety contract is invalid.");
+  }
+  exactKeys(
+    manifest.policies,
+    [
+      "resolvedUrlMustMatchCompatibleLockRow",
+      "sha512MustMatchLockIntegrity",
+      "attemptOwnedSnapshotOnly",
+      "verifySnapshotAcceptsSeedArguments",
+      "arbitrarySeedAllowed",
+      "pathEscapeAllowed",
+    ],
+    "Seed manifest policies",
+  );
+  if (
+    manifest.policies.resolvedUrlMustMatchCompatibleLockRow !== true ||
+    manifest.policies.sha512MustMatchLockIntegrity !== true ||
+    manifest.policies.attemptOwnedSnapshotOnly !== true ||
+    manifest.policies.verifySnapshotAcceptsSeedArguments !== false ||
+    manifest.policies.arbitrarySeedAllowed !== false ||
+    manifest.policies.pathEscapeAllowed !== false
+  ) {
+    fail("Seed manifest policies are not fail-closed.");
+  }
+  const byResolved = new Map();
+  for (const entry of manifest.seeds) {
+    exactKeys(
+      entry,
+      [
+        "packageName",
+        "version",
+        "resolved",
+        "lockIntegrity",
+        "path",
+        "bytes",
+        "sha256",
+        "sourceKind",
+        "sourceReference",
+      ],
+      "Seed entry",
+    );
+    if (
+      typeof entry.packageName !== "string" ||
+      typeof entry.version !== "string" ||
+      !entry.resolved?.match(/^https:\/\/registry\.npmjs\.org\/.+\.tgz$/) ||
+      !entry.lockIntegrity?.match(/^sha512-[A-Za-z0-9+/]+={0,2}$/) ||
+      !entry.sha256?.match(/^[0-9a-f]{64}$/) ||
+      !Number.isSafeInteger(entry.bytes) ||
+      entry.bytes <= 0 ||
+      typeof entry.sourceKind !== "string" ||
+      typeof entry.sourceReference !== "string"
+    ) {
+      fail("Seed entry metadata is invalid.");
+    }
+    if (
+      entry.path.includes("\\") ||
+      !entry.path.startsWith("distribution/sim/desktop/offline-cache-seeds/") ||
+      path.posix.normalize(entry.path) !== entry.path
+    ) {
+      fail("Seed tarball path escapes the edition-owned source directory.");
+    }
+    const tarballPath = fullPath(path.join(repoRoot, ...entry.path.split("/")));
+    if (!isWithin(tarballPath, repoRoot)) fail("Seed tarball path escapes the source root.");
+    if (!fs.existsSync(tarballPath)) fail(`Seed tarball is missing: ${entry.resolved}`);
+    const tarballStat = fs.lstatSync(tarballPath);
+    if (!tarballStat.isFile() || tarballStat.isSymbolicLink()) {
+      fail("Seed tarball must be a regular source file.");
+    }
+    const bytes = fs.readFileSync(tarballPath);
+    const integrity = `sha512-${crypto.createHash("sha512").update(bytes).digest("base64")}`;
+    if (bytes.length !== entry.bytes || sha256Bytes(bytes) !== entry.sha256 || integrity !== entry.lockIntegrity) {
+      fail(`Seed tarball bytes drifted: ${entry.resolved}`);
+    }
+    if (byResolved.has(entry.resolved)) fail(`Duplicate seed resolved URL: ${entry.resolved}`);
+    byResolved.set(entry.resolved, { ...entry, tarballPath });
+  }
+  return {
+    byResolved,
+    sourceInput: {
+      path: relative,
+      bytes: manifestStat.size,
+      sha256: sha256File(manifestPath),
+      seedCount: manifest.seeds.length,
+    },
+  };
 }
 
 function packageCompatible(entry, operatingSystem, architecture) {
@@ -141,7 +281,7 @@ function readExactLocks(repoRoot) {
   return { sourceInputs, rows };
 }
 
-function selectRequiredCache(repoRoot, cacheRoot) {
+function selectRequiredCache(repoRoot, cacheRoot, seedManifest = null) {
   const { sourceInputs, rows } = readExactLocks(repoRoot);
   const byResolved = new Map();
   for (const row of rows) {
@@ -154,13 +294,31 @@ function selectRequiredCache(repoRoot, cacheRoot) {
 
   const content = new Map();
   const indexes = new Map();
+  const matchedSeeds = new Set();
+  const usedSeeds = new Set();
   for (const row of byResolved.values()) {
+    const seed = seedManifest?.byResolved.get(row.resolved) ?? null;
+    if (seed) {
+      matchedSeeds.add(row.resolved);
+      if (seed.lockIntegrity !== row.integrity) {
+        fail(`Seed lock integrity disagrees with the exact lock row: ${row.resolved}`);
+      }
+    }
     const contentRelativePath = cacheContentRelativePath(row.integrity);
     const contentPath = path.join(cacheRoot, contentRelativePath);
-    if (!fs.existsSync(contentPath) || !fs.statSync(contentPath).isFile()) {
+    let bytes;
+    let contentSourcePath = contentPath;
+    let seededContent = false;
+    if (fs.existsSync(contentPath) && fs.statSync(contentPath).isFile()) {
+      bytes = fs.readFileSync(contentPath);
+    } else if (seed) {
+      bytes = fs.readFileSync(seed.tarballPath);
+      contentSourcePath = seed.tarballPath;
+      seededContent = true;
+      usedSeeds.add(row.resolved);
+    } else {
       fail(`Required content-addressed tarball is missing: ${row.resolved}`);
     }
-    const bytes = fs.readFileSync(contentPath);
     const actualIntegrity = `sha512-${crypto.createHash("sha512").update(bytes).digest("base64")}`;
     if (actualIntegrity !== row.integrity) {
       fail(`Required content-addressed tarball integrity drifted: ${row.resolved}`);
@@ -170,40 +328,47 @@ function selectRequiredCache(repoRoot, cacheRoot) {
       relativePath: contentRelativePath.split(path.sep).join("/"),
       bytes: bytes.length,
       sha256: sha256Bytes(bytes),
+      sourcePath: contentSourcePath,
+      seeded: seededContent,
     });
 
     const key = cacheIndexKey(row.resolved);
     const indexRelativePath = cacheIndexRelativePath(key);
     const indexPath = path.join(cacheRoot, indexRelativePath);
-    if (!fs.existsSync(indexPath) || !fs.statSync(indexPath).isFile()) {
-      fail(`Required cache index is missing: ${row.resolved}`);
-    }
-    const validEntry = fs
-      .readFileSync(indexPath, "utf8")
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .some((line) => {
-        const separator = line.indexOf("\t");
-        if (separator < 0) return false;
-        const checksum = line.slice(0, separator);
-        const json = line.slice(separator + 1);
-        if (crypto.createHash("sha1").update(json).digest("hex") !== checksum) return false;
-        try {
-          const value = JSON.parse(json);
-          return value.key === key && value.integrity === row.integrity && value.size === bytes.length;
-        } catch {
-          return false;
-        }
-      });
+    const validEntry = fs.existsSync(indexPath) && fs.statSync(indexPath).isFile()
+      ? fs
+          .readFileSync(indexPath, "utf8")
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .some((line) => {
+            const separator = line.indexOf("\t");
+            if (separator < 0) return false;
+            const checksum = line.slice(0, separator);
+            const json = line.slice(separator + 1);
+            if (crypto.createHash("sha1").update(json).digest("hex") !== checksum) return false;
+            try {
+              const value = JSON.parse(json);
+              return value.key === key && value.integrity === row.integrity && value.size === bytes.length;
+            } catch {
+              return false;
+            }
+          })
+      : false;
     if (!validEntry) {
-      fail(`Required cache index mapping is invalid: ${row.resolved}`);
+      if (!seed) fail(`Required cache index mapping is invalid: ${row.resolved}`);
+      usedSeeds.add(row.resolved);
     }
     indexes.set(key, {
       key,
       resolved: row.resolved,
       integrity: row.integrity,
       relativePath: indexRelativePath.split(path.sep).join("/"),
+      bytes: bytes.length,
+      seeded: !validEntry,
     });
+  }
+  if (seedManifest && matchedSeeds.size !== seedManifest.byResolved.size) {
+    fail("A seed resolved URL is absent from the exact compatible lock rows.");
   }
 
   const contentEntries = [...content.values()].sort((left, right) => left.integrity.localeCompare(right.integrity));
@@ -220,6 +385,8 @@ function selectRequiredCache(repoRoot, cacheRoot) {
     indexEntries,
     contentBytes: contentEntries.reduce((total, entry) => total + entry.bytes, 0),
     semanticFingerprint: sha256Bytes(semanticLines.join("\n")),
+    seedManifest: seedManifest?.sourceInput ?? null,
+    localSeedCount: usedSeeds.size,
   };
 }
 
@@ -257,11 +424,22 @@ function snapshotFingerprint(snapshotRoot, selection) {
 }
 
 function copySelection(cacheRoot, snapshotRoot, selection) {
-  for (const entry of [...selection.contentEntries, ...selection.indexEntries]) {
-    const source = path.join(cacheRoot, entry.relativePath);
+  for (const entry of selection.contentEntries) {
+    const source = entry.sourcePath ?? path.join(cacheRoot, entry.relativePath);
     const destination = path.join(snapshotRoot, entry.relativePath);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
     fs.copyFileSync(source, destination, fs.constants.COPYFILE_EXCL);
+  }
+  for (const entry of selection.indexEntries) {
+    const destination = path.join(snapshotRoot, entry.relativePath);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    if (!entry.seeded) {
+      fs.copyFileSync(path.join(cacheRoot, entry.relativePath), destination, fs.constants.COPYFILE_EXCL);
+      continue;
+    }
+    const value = JSON.stringify({ key: entry.key, integrity: entry.integrity, time: 0, size: entry.bytes });
+    const checksum = crypto.createHash("sha1").update(value).digest("hex");
+    fs.writeFileSync(destination, `${checksum}\t${value}\n`, { encoding: "utf8", flag: "wx" });
   }
 }
 
@@ -272,9 +450,12 @@ function main() {
   if (!fs.statSync(repoRoot).isDirectory() || !fs.statSync(cacheRoot).isDirectory()) {
     fail("Repo root and cache root must be existing directories.");
   }
-  const selection = selectRequiredCache(repoRoot, cacheRoot);
+  const seedManifest = readSeedManifest(repoRoot, args["seed-manifest"]);
+  const selection = selectRequiredCache(repoRoot, cacheRoot, seedManifest);
   if (selection.semanticFingerprint !== args["expected-semantic-fingerprint"]) {
-    fail("Lock-bound offline cache semantic fingerprint drifted.");
+    fail(
+      `Lock-bound offline cache semantic fingerprint drifted: expected ${args["expected-semantic-fingerprint"]} actual ${selection.semanticFingerprint}`,
+    );
   }
 
   let snapshot = null;
@@ -319,6 +500,8 @@ function main() {
       ignoredGlobalCacheSurfaces: ["_logs", "_npx", "_update-notifier-last-checked", "unreferenced-cacache-objects"],
       networkInvocations: 0,
       npmInvocations: 0,
+      seedManifest: selection.seedManifest,
+      localSeedCount: selection.localSeedCount,
       snapshot,
     })}\n`,
   );
