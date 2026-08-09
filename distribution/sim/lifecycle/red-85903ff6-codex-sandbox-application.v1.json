@@ -55,6 +55,7 @@
     "userName": "CodexSandboxOffline",
     "sid": "S-1-5-21-2197768555-4123441877-442284878-1020",
     "profile": "C:/Users/CodexSandboxOffline",
+    "hostPlanProfileState": "unloaded-or-inaccessible",
     "mustBePreExisting": true,
     "mustBeEnabled": true,
     "passwordEntry": "interactive-runas-window-by-user-only",
@@ -65,8 +66,8 @@
   },
   "toolBundle": {
     "hostLauncherPath": "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-host-85903ff6.ps1",
-    "hostLauncherBytes": 15975,
-    "hostLauncherSha256": "5b609faa13f02af961834a095434e598b7607a89eb5ba4544965e11ab32e0652",
+    "hostLauncherBytes": 16140,
+    "hostLauncherSha256": "05b935842f7f4e6de150affa9de9b6e581254093304df541834e4daca898f515",
     "guestRunnerPath": "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-85903ff6.ps1",
     "guestRunnerBytes": 40539,
     "guestRunnerSha256": "4a705520a9b8ce02475620fcd493c80ba677acecf04a70dbbae4f2586ef27d2d",

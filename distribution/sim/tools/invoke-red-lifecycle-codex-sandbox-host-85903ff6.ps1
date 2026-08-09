@@ -66,7 +66,7 @@ function Get-ExactFileRecord {
 function Assert-OrdinaryDirectory {
     param([Parameter(Mandatory = $true)][string]$Path)
 
-    $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
     if (-not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
         throw "Expected an ordinary directory: $Path"
     }
@@ -225,7 +225,8 @@ if (-not [string]::Equals(
     )) {
     throw "The disposable Windows user profile path changed."
 }
-Assert-OrdinaryDirectory -Path $expectedUserProfile
+$profileHiveLoaded = Test-Path -LiteralPath "Registry::HKEY_USERS\$expectedUserSid"
+$profileState = if ($profileHiveLoaded) { "loaded" } else { "unloaded-or-inaccessible" }
 Assert-OrdinaryDirectory -Path "C:\Users\Public"
 Assert-OrdinaryDirectory -Path "C:\Users\Public\Documents"
 
@@ -245,6 +246,7 @@ $plan = [ordered]@{
         userName = $expectedUserName
         sid = $expectedUserSid
         profile = $expectedUserProfile
+        profileState = $profileState
         enabled = $true
         passwordReadRecordedOrTransmitted = $false
     }

@@ -45,6 +45,7 @@ def test_disposable_user_and_owned_paths_are_exact() -> None:
         "userName": "CodexSandboxOffline",
         "sid": "S-1-5-21-2197768555-4123441877-442284878-1020",
         "profile": "C:/Users/CodexSandboxOffline",
+        "hostPlanProfileState": "unloaded-or-inaccessible",
         "mustBePreExisting": True,
         "mustBeEnabled": True,
         "passwordEntry": "interactive-runas-window-by-user-only",
@@ -102,6 +103,8 @@ def test_host_launcher_has_one_interactive_runas_and_no_password_channel() -> No
     assert host.count('Start-Process -FilePath "$env:SystemRoot\\System32\\runas.exe"') == 1
     assert '"/user:.\\$expectedUserName"' in host
     assert "$expectedUserSid" in host
+    assert 'Registry::HKEY_USERS\\$expectedUserSid' in host
+    assert '"unloaded-or-inaccessible"' in host
     assert "Get-HostProtectedState" in host
     assert "canonicalCurrentUserProtectedStateUnchanged" in host
     forbidden = ("ConvertTo-SecureString", "PSCredential", "-Credential", "Read-Host")
