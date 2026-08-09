@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-evidence-correction",
+  "editionId": "sim",
+  "state": "append-only-correction-original-receipt-preserved",
+  "corrects": {
+    "path": "distribution/sim/desktop/yellow-build-attempt-20-8014750-stable-cache-preflight-failed.v1.json",
+    "bytes": 4421,
+    "sha256": "aeb0760af7654087cafd1ac65e887abb6f0b5bfb68d3b032333de6b03f7b93ac",
+    "jsonPointer": "/offlineRecoveryProof/globalCacheWritten",
+    "recordedValue": false
+  },
+  "correction": {
+    "replacementClaim": "the earlier false value cannot be upheld",
+    "reason": "A post-experiment read found the exact plugin-notification content object in the global npm cache while its index mapping remained absent.",
+    "causality": "The first local npm pack invocation is the likely writer, but this correction does not claim exclusive causality.",
+    "originalReceiptRewritten": false,
+    "historicalFailureClassificationChanged": false,
+    "ordinalTwentyRemainsConsumed": true
+  },
+  "postExperimentObservation": {
+    "resolved": "https://registry.npmjs.org/@tauri-apps/plugin-notification/-/plugin-notification-2.3.3.tgz",
+    "contentExists": true,
+    "contentBytes": 6663,
+    "contentSha256": "944ded5d471822a0e68614c7d640780ada4dbb92d10c8e3f5856d7239f189793",
+    "contentMatchesLockIntegrity": true,
+    "indexMappingExists": false,
+    "secretOrCredentialRead": false
+  },
+  "recoveryPolicy": {
+    "globalCacheIsFutureBuildInput": false,
+    "globalCacheMutationAllowed": false,
+    "sourceTrackedExactSeedsRequired": true,
+    "attemptOwnedSnapshotRequired": true,
+    "networkRequired": false,
+    "oldReceiptOrApplicationReusable": false
+  }
+}

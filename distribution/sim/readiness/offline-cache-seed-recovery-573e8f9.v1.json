@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-offline-cache-seed-recovery-readiness",
+  "state": "green-verified-awaiting-new-serial-yellow",
+  "editionId": "sim",
+  "productSource": {
+    "commit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+    "tree": "57771ea1cbac8bc22453cf02f76bbb6bb547afb2"
+  },
+  "ordinalTwentyFailure": {
+    "receiptPath": "distribution/sim/desktop/yellow-build-attempt-20-8014750-stable-cache-preflight-failed.v1.json",
+    "receiptSha256": "aeb0760af7654087cafd1ac65e887abb6f0b5bfb68d3b032333de6b03f7b93ac",
+    "correctionPath": "distribution/sim/desktop/yellow-build-attempt-20-8014750-cache-mutation-correction.v1.json",
+    "correctionSha256": "5cadb97fb558731edfe835435bb4d6605a951b64d0e1e2bdc33e5ceac49bc9f9",
+    "permanentlyConsumed": true,
+    "reusable": false
+  },
+  "sourceBoundRecovery": {
+    "toolPath": "distribution/sim/desktop/lockfile-offline-cache.mjs",
+    "toolGitBlob": "0b2e869c1dd4ff185b2faf3550c909566ddace36",
+    "toolBytes": 19660,
+    "toolSha256": "35c8104b4480915c0102bfcb0a48c82feef83c2965e55b2363ff740aed626051",
+    "seedManifestPath": "distribution/sim/desktop/offline-cache-seeds/manifest.v1.json",
+    "seedManifestGitBlob": "ca0418077946668d2e2c472821206b000af53310",
+    "seedManifestBytes": 4930,
+    "seedManifestSha256": "da55441d6b81f9c1904fcad4e3e2cf3949280be10b48c7016e14105786f37156",
+    "declaredSeedCount": 7,
+    "allSeedBytesMatchLockSha512": true,
+    "productPayload": false,
+    "networkRequired": false,
+    "globalCacheMutationAllowed": false
+  },
+  "verifiedSelection": {
+    "operatingSystem": "win32",
+    "architecture": "x64",
+    "compatibleLockRows": 331,
+    "uniqueResolvedTarballs": 324,
+    "contentObjectCount": 324,
+    "contentBytes": 55567357,
+    "indexKeyCount": 324,
+    "semanticFingerprint": "71203209c1ce50b039c0910a6b2b3786391afd58bf2e27a1a61166f1431f39ad",
+    "localSeedCount": 7,
+    "snapshotCreated": false,
+    "npmInvocations": 0,
+    "networkInvocations": 0
+  },
+  "sourceInputs": [
+    {
+      "path": "desktop/package.json",
+      "bytes": 1056,
+      "sha256": "ba37f6edb95c454ea0f83130b98f708c0f27990133c705c8c23597ac96fd36b6"
+    },
+    {
+      "path": "desktop/package-lock.json",
+      "bytes": 7449,
+      "sha256": "1138f300f140dfcaf22a6c47d44f676e9ea9294b77a2caabb7fa08ef8340d058"
+    },
+    {
+      "path": "frontend/package.json",
+      "bytes": 2392,
+      "sha256": "ebfd1be4f47ad1089a0659ba7d994c8f650731283e4b92771c574eeb7a9f5e84"
+    },
+    {
+      "path": "frontend/package-lock.json",
+      "bytes": 183332,
+      "sha256": "926d364952dc75662cfeed48827606f44326430c065b54e9131fb499942d613b"
+    }
+  ],
+  "greenTests": {
+    "focusedOfflineCache": "7 passed, 75 deselected",
+    "ruff": "pass",
+    "nodeSyntax": "pass",
+    "releaseSource": "2011 tracked, 391 npm, 542 Rust",
+    "diffCheck": "pass",
+    "fullSimContract": "76 passed, 3 subtests passed, 6 pre-existing historical-current-byte/path-inventory failures"
+  },
+  "execution": {
+    "snapshotRootsCreated": 0,
+    "dependencyRootsCreated": 0,
+    "npmCiInvocations": 0,
+    "junctionsCreated": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactsCreated": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "deployments": 0
+  },
+  "nextGate": {
+    "newExactApplicationRequired": true,
+    "newSerialYellowStartRequired": true,
+    "labOwnsCurrentProductionBuildSlot": true,
+    "buildAuthorizedByThisReceipt": false
+  }
+}

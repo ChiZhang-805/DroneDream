@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-plan-receipt",
+  "editionId": "sim",
+  "state": "green-plan-only-awaiting-new-serial-start",
+  "productSource": {
+    "commit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+    "tree": "57771ea1cbac8bc22453cf02f76bbb6bb547afb2"
+  },
+  "application": {
+    "path": "distribution/sim/desktop/yellow-build-attempt-21-573e8f9-application.v1.json",
+    "bytes": 8700,
+    "sha256": "04daf74e209613ebda13fdbe88518b757134cf2ce007fd5ba14ec11d68779828"
+  },
+  "entryScript": {
+    "path": "distribution/sim/desktop/invoke-yellow-build-attempt-21-573e8f9.ps1",
+    "bytes": 29739,
+    "sha256": "4f377d067339516ef5cf47e15aa37775313a5b1e7517c1328a59a0d0a8fd4f92",
+    "powerShellAst": "pass"
+  },
+  "readiness": {
+    "path": "distribution/sim/readiness/offline-cache-seed-recovery-573e8f9.v1.json",
+    "bytes": 3509,
+    "sha256": "59b97c66f6c8f3b41e76db799018023b80449b58bc4378a584883988a490c183"
+  },
+  "ordinalTwentyCorrection": {
+    "path": "distribution/sim/desktop/yellow-build-attempt-20-8014750-cache-mutation-correction.v1.json",
+    "bytes": 1676,
+    "sha256": "5cadb97fb558731edfe835435bb4d6605a951b64d0e1e2bdc33e5ceac49bc9f9"
+  },
+  "planResult": {
+    "sourceRootAbsent": true,
+    "runRootAbsent": true,
+    "snapshotRootAbsent": true,
+    "dependencyRootAbsent": true,
+    "verificationDependencyRootAbsent": true,
+    "cargoTargetAbsent": true,
+    "requiredContentObjects": 324,
+    "requiredIndexKeys": 324,
+    "requiredLocalSeeds": 7
+  },
+  "executedCounts": {
+    "launcher": 0,
+    "publicVariableFetch": 0,
+    "preflight": 0,
+    "prepare": 0,
+    "execute": 0,
+    "snapshot": 0,
+    "npmCi": 0,
+    "junction": 0,
+    "frontend": 0,
+    "tauri": 0,
+    "cargo": 0,
+    "nsis": 0,
+    "artifact": 0,
+    "retry": 0
+  },
+  "authorization": {
+    "planOnly": true,
+    "preflight": false,
+    "prepare": false,
+    "execute": false,
+    "labOwnsCurrentProductionBuildSlot": true,
+    "newExactSerialStartRequired": true
+  },
+  "nonClaims": {
+    "snapshotCreated": false,
+    "dependencyBundleCreated": false,
+    "buildStarted": false,
+    "artifactCreated": false,
+    "releaseReady": false
+  }
+}

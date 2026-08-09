@@ -277,6 +277,27 @@ LOCKFILE_OFFLINE_CACHE_TOOL = (
 OFFLINE_CACHE_SEED_MANIFEST = (
     DISTRIBUTION / "sim" / "desktop" / "offline-cache-seeds" / "manifest.v1.json"
 )
+YELLOW_ATTEMPT_21_APPLICATION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-21-573e8f9-application.v1.json"
+)
+YELLOW_ATTEMPT_21_ENTRY_PATH = (
+    DISTRIBUTION / "sim" / "desktop" / "invoke-yellow-build-attempt-21-573e8f9.ps1"
+)
+YELLOW_ATTEMPT_21_PLAN_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-21-573e8f9-plan-receipt.v1.json"
+)
+YELLOW_ATTEMPT_20_CORRECTION_PATH = (
+    DISTRIBUTION
+    / "sim"
+    / "desktop"
+    / "yellow-build-attempt-20-8014750-cache-mutation-correction.v1.json"
+)
 PUBLIC_BUILD_CONFIG_LAUNCHER = (
     DISTRIBUTION / "sim" / "desktop" / "invoke-github-public-build-config.ps1"
 )
@@ -1721,6 +1742,112 @@ class SoftwareSimBranchContractTests(unittest.TestCase):
             self.assertIn(seed["lockIntegrity"], frontend_lock)
         actual_paths = {path.resolve() for path in OFFLINE_CACHE_SEED_MANIFEST.parent.glob("*.tgz")}
         self.assertEqual(actual_paths, declared_paths)
+
+    def test_yellow_attempt_21_binds_seed_recovery_and_new_owned_roots(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_21_APPLICATION_PATH)
+        source = application["sourceSeparation"]
+        self.assertEqual(
+            source["productSourceCommit"],
+            "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+        )
+        self.assertEqual(
+            git("show", "-s", "--format=%T", source["productSourceCommit"]),
+            source["productSourceTree"],
+        )
+        stable = application["stableOfflineCache"]
+        self.assertEqual(stable["contentObjectCount"], 324)
+        self.assertEqual(stable["indexKeyCount"], 324)
+        self.assertEqual(stable["seedManifest"]["seedCount"], 7)
+        self.assertEqual(stable["selectedCacheFileCopyMaximum"], 648)
+        self.assertTrue(stable["globalCacheReadOnly"])
+        self.assertFalse(stable["networkAllowed"])
+        for item in (stable["tool"], stable["seedManifest"]):
+            product_bytes = subprocess.run(
+                ["git", "show", f"{source['productSourceCommit']}:{item['path']}"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+            ).stdout
+            self.assertEqual(len(product_bytes), item["bytes"])
+            self.assertEqual(hashlib.sha256(product_bytes).hexdigest(), item["sha256"])
+            self.assertEqual(
+                git("rev-parse", f"{source['productSourceCommit']}:{item['path']}"),
+                item["gitBlob"],
+            )
+        bundle = application["dependencyBundle"]
+        identity = "\n".join(bundle["identityInputsInOrder"]).encode()
+        self.assertEqual(
+            bundle["bundleId"],
+            f"npm-win32-x64-{hashlib.sha256(identity).hexdigest()[:16]}",
+        )
+        self.assertEqual(bundle["independentCleanOfflineTrees"], 2)
+        self.assertEqual(bundle["npmCiInvocationMaximum"], 4)
+        self.assertTrue(bundle["treeFingerprintsMustMatchExactly"])
+        self.assertTrue(application["ownedRoots"]["allAbsentAtPlanFreeze"])
+        self.assertFalse(application["authorization"]["preflightAuthorized"])
+        self.assertFalse(application["authorization"]["executeAuthorized"])
+
+    def test_yellow_attempt_21_plan_and_entry_are_exact_non_mutating(self) -> None:
+        application = load_json(YELLOW_ATTEMPT_21_APPLICATION_PATH)
+        receipt = load_json(YELLOW_ATTEMPT_21_PLAN_PATH)
+        entry = application["executionPlan"]["entryScript"]
+        self.assertEqual(YELLOW_ATTEMPT_21_ENTRY_PATH.stat().st_size, entry["bytes"])
+        self.assertEqual(
+            hashlib.sha256(YELLOW_ATTEMPT_21_ENTRY_PATH.read_bytes()).hexdigest(),
+            entry["sha256"],
+        )
+        self.assertEqual(
+            git("check-attr", "eol", "--", entry["path"]),
+            f"{entry['path']}: eol: lf",
+        )
+        for binding in (receipt["application"], receipt["entryScript"], receipt["readiness"]):
+            path = ROOT / binding["path"]
+            self.assertEqual(path.stat().st_size, binding["bytes"])
+            self.assertEqual(
+                hashlib.sha256(path.read_bytes()).hexdigest(), binding["sha256"]
+            )
+        completed = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(YELLOW_ATTEMPT_21_ENTRY_PATH),
+                "-Mode",
+                "Plan",
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        plan = json.loads(completed.stdout)
+        self.assertEqual(plan["requiredContentObjects"], 324)
+        self.assertEqual(plan["requiredIndexKeys"], 324)
+        self.assertEqual(plan["requiredLocalSeeds"], 7)
+        self.assertTrue(plan["sourceRootAbsent"])
+        self.assertTrue(plan["runRootAbsent"])
+        self.assertTrue(plan["verificationDependencyRootAbsent"])
+        zero_count_keys = ("preflights", "npmCiInvocations", "buildInvocations")
+        self.assertTrue(all(plan[key] == 0 for key in zero_count_keys))
+
+    def test_ordinal_20_cache_mutation_correction_is_append_only_and_fail_closed(
+        self,
+    ) -> None:
+        correction = load_json(YELLOW_ATTEMPT_20_CORRECTION_PATH)
+        original = ROOT / correction["corrects"]["path"]
+        self.assertEqual(original.stat().st_size, correction["corrects"]["bytes"])
+        self.assertEqual(
+            hashlib.sha256(original.read_bytes()).hexdigest(),
+            correction["corrects"]["sha256"],
+        )
+        self.assertFalse(correction["correction"]["originalReceiptRewritten"])
+        self.assertTrue(correction["correction"]["ordinalTwentyRemainsConsumed"])
+        self.assertFalse(correction["recoveryPolicy"]["globalCacheMutationAllowed"])
+        self.assertTrue(correction["recoveryPolicy"]["sourceTrackedExactSeedsRequired"])
+        self.assertFalse(correction["recoveryPolicy"]["oldReceiptOrApplicationReusable"])
 
     def test_stable_offline_cache_contract_excludes_mutable_global_surfaces(self) -> None:
         contract = load_json(STABLE_OFFLINE_CACHE_CONTRACT_PATH)
