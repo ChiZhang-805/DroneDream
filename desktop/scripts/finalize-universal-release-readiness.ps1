@@ -262,6 +262,11 @@ try {
     $summary["completedAt"] = [DateTime]::UtcNow.ToString("O")
     Write-JsonNoBom $readinessPath $summary
     $readinessRecord = Get-FileRecord $readinessPath
+    $finalReadinessRecord = [ordered]@{
+        path = Join-Path $outputRootFull "universal-final-readiness-receipt.json"
+        bytes = $readinessRecord.bytes
+        sha256 = $readinessRecord.sha256
+    }
 
     $finalManifest = [ordered]@{
         schemaVersion = 1
@@ -274,7 +279,7 @@ try {
         checksum = $checksum
         updaterSignature = $signature
         buildReceipt = $build.Record
-        readinessReceipt = $readinessRecord
+        readinessReceipt = $finalReadinessRecord
         validationReceipts = @(
             $lifecycle.Record, $visible.Record, $headed.Record, $oauth.Record, $icons.Record
         )
@@ -284,6 +289,11 @@ try {
     $manifestPath = Join-Path $stagingRoot "universal-final-handoff-manifest.json"
     Write-JsonNoBom $manifestPath $finalManifest
     $manifestRecord = Get-FileRecord $manifestPath
+    $finalManifestRecord = [ordered]@{
+        path = Join-Path $outputRootFull "universal-final-handoff-manifest.json"
+        bytes = $manifestRecord.bytes
+        sha256 = $manifestRecord.sha256
+    }
 
     $websiteHandoff = [ordered]@{
         schemaVersion = 1
@@ -302,9 +312,9 @@ try {
         updaterSigSha256 = $signature.sha256
         checksumPath = $checksum.path
         checksumSha256 = $checksum.sha256
-        receiptPath = $readinessRecord.path.Replace($stagingRoot, $outputRootFull)
+        receiptPath = $finalReadinessRecord.path
         receiptSha256 = $readinessRecord.sha256
-        manifestPath = $manifestRecord.path.Replace($stagingRoot, $outputRootFull)
+        manifestPath = $finalManifestRecord.path
         manifestSha256 = $manifestRecord.sha256
         buildReceiptPath = $build.Record.path
         buildReceiptSha256 = $build.Record.sha256
@@ -325,7 +335,31 @@ try {
     }
     $websitePath = Join-Path $stagingRoot "website-exact-exe-handoff.final.v1.json"
     Write-JsonNoBom $websitePath $websiteHandoff
+    foreach ($pendingJsonPath in @($manifestPath, $websitePath)) {
+        $pendingJson = Get-Content -LiteralPath $pendingJsonPath -Raw -Encoding UTF8
+        if ($pendingJson.Contains(".staging-")) {
+            throw "Final handoff output leaked a transient staging path."
+        }
+    }
     Move-Item -LiteralPath $stagingRoot -Destination $outputRootFull
+
+    $finalReadiness = Get-FileRecord $finalReadinessRecord.path
+    $finalManifestFile = Get-FileRecord $finalManifestRecord.path
+    $finalWebsitePath = Join-Path $outputRootFull "website-exact-exe-handoff.final.v1.json"
+    $finalWebsiteFile = Get-FileRecord $finalWebsitePath
+    $finalManifestDocument = Get-Content -LiteralPath $finalManifestFile.path -Raw -Encoding UTF8 | ConvertFrom-Json
+    $finalWebsiteDocument = Get-Content -LiteralPath $finalWebsiteFile.path -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($finalReadiness.bytes -ne $finalReadinessRecord.bytes -or
+        $finalReadiness.sha256 -cne $finalReadinessRecord.sha256 -or
+        [IO.Path]::GetFullPath([string]$finalManifestDocument.readinessReceipt.path) -cne $finalReadiness.path -or
+        [long]$finalManifestDocument.readinessReceipt.bytes -ne $finalReadiness.bytes -or
+        [string]$finalManifestDocument.readinessReceipt.sha256 -cne $finalReadiness.sha256 -or
+        [IO.Path]::GetFullPath([string]$finalWebsiteDocument.receiptPath) -cne $finalReadiness.path -or
+        [string]$finalWebsiteDocument.receiptSha256 -cne $finalReadiness.sha256 -or
+        [IO.Path]::GetFullPath([string]$finalWebsiteDocument.manifestPath) -cne $finalManifestFile.path -or
+        [string]$finalWebsiteDocument.manifestSha256 -cne $finalManifestFile.sha256) {
+        throw "Final handoff output failed its post-move path and hash verification."
+    }
 }
 catch {
     if (Test-Path -LiteralPath $stagingRoot) { Remove-Item -LiteralPath $stagingRoot -Recurse -Force }

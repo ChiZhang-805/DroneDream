@@ -38,6 +38,14 @@ def test_finalizer_preserves_atomic_receipts_and_emits_new_immutable_outputs() -
     assert 'releaseReady = $true' in text
     assert 'deploymentPerformed = $false' in text
     assert 'websiteMustNotRebuildOrRename = $true' in text
+    assert '$finalReadinessRecord = [ordered]@{' in text
+    assert '$finalManifestRecord = [ordered]@{' in text
+    assert 'readinessReceipt = $finalReadinessRecord' in text
+    assert 'receiptPath = $finalReadinessRecord.path' in text
+    assert 'manifestPath = $finalManifestRecord.path' in text
+    assert '.Replace($stagingRoot, $outputRootFull)' not in text
+    assert 'if ($pendingJson.Contains(".staging-"))' in text
+    assert 'Final handoff output failed its post-move path and hash verification.' in text
 
 
 def test_finalizer_verifies_real_oauth_ui_cleanup_and_icon_surfaces() -> None:
