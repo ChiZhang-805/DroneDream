@@ -326,7 +326,8 @@ finally {
     if (-not $receipt.protectedShortcutParity) {
         throw "Protected legacy shortcut state was not restored exactly."
     }
-    if (Test-Path -LiteralPath $uninstallKey -or Test-Path -LiteralPath $installRoot) {
+    if ((Test-Path -LiteralPath $uninstallKey) -or
+        (Test-Path -LiteralPath $installRoot)) {
         throw "Universal icon audit left installed product state behind."
     }
     $receipt | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $receiptPath -Encoding utf8

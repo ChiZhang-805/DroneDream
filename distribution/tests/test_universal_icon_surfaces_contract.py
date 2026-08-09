@@ -22,6 +22,7 @@ def test_icon_surface_verifier_is_exact_source_bound_and_bounded() -> None:
         'Arguments @("/S", "/L=1033")',
         'Arguments @("/S", "/L=1033") -Stage "icon-audit-uninstall"',
         "protectedShortcutParity",
+        "(Test-Path -LiteralPath $uninstallKey) -or",
         "Refusing to replace an existing icon evidence directory",
     ):
         assert required in text
@@ -40,3 +41,4 @@ def test_icon_surface_verifier_does_not_expand_product_scope() -> None:
         assert forbidden not in text
     assert "Remove-Item -Recurse" not in text
     assert "Get-ChildItem -Recurse" not in text
+    assert "Test-Path -LiteralPath $uninstallKey -or" not in text
