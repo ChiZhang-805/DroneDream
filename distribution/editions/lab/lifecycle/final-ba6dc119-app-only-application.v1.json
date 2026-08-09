@@ -1,0 +1,238 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-app-only-lifecycle-application",
+  "editionId": "lab",
+  "state": "prepared-provider-gated-no-execute",
+  "sourceSeparation": {
+    "artifactProductSourceCommit": "ba6dc119e44721b807c455a2183887102566f73e",
+    "artifactProductSourceTree": "6b75c6a5032fac9ef27ed2c8db62ba7ae0fbfa94",
+    "executionEvidenceIsArtifactSource": false,
+    "productRuntimeSemanticsChanged": false
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-ba6dc119-attempt14/DroneDream-Lab-1.0.0.exe",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12551766,
+    "sha256": "a7a9e2bfebb96cd06f88e70c02cd74bc8ab9c0a24a195ae2d50cdac5e74d6b2b",
+    "version": "1.0.0",
+    "authenticodeStatus": "NotSigned",
+    "updaterSignatureSha256": "dfa58897ee6545cee432f2077c681fdab624cb2074a5d75dc6a20317b0c637be",
+    "mayBeRebuiltRelabeledOverwrittenOrDeletedByThisApplication": false
+  },
+  "staticAcceptanceReceipt": {
+    "path": "distribution/build-receipts/lab-ba6dc119-yellow-attempt14-static-passed.json",
+    "bytes": 3625,
+    "sha256": "9e6890f682c0a78e1360cbe57c077231af82724a190a022b171c19d5e917eab0"
+  },
+  "plan": {
+    "path": "distribution/editions/lab/lifecycle/final-ba6dc119-app-only-plan.v1.json",
+    "bytes": 3399,
+    "sha256": "555afd001b95130a18e27687b9d9db97d97451399e5caba47f25f45e4bd71e85"
+  },
+  "targetReceipt": {
+    "path": "distribution/editions/lab/lifecycle/final-ba6dc119-app-only-target-receipt.v1.json",
+    "bytes": 2399,
+    "sha256": "63e65e234c9f71a75a118bf72c622b0859568fb106b071df65f41a44b10ac706"
+  },
+  "executionTools": {
+    "stagingAdapter": {
+      "path": "distribution/editions/lab/lifecycle/stage-lab-final-lifecycle-input.ps1",
+      "lfNormalizedBytes": 7897,
+      "lfNormalizedSha256": "6d66a53f7194f7d8ba405aedc24efb493ce0e94a46d81049821ceef62506a96b"
+    },
+    "adapter": {
+        "path": "distribution/editions/lab/lifecycle/run-lab-final-app-only-lifecycle.ps1",
+        "lfNormalizedBytes": 45798,
+        "lfNormalizedSha256": "637f75fdc4da4a67681422b7cd6ee298fe372d9da2f250ca1ec01c9cae5b7f0d"
+    },
+    "liveInspector": {
+      "path": "distribution/editions/lab/lifecycle/inspect-lab-e3b427e-live-webview2.mjs",
+      "lfNormalizedBytes": 12682,
+      "lfNormalizedSha256": "ff5e4d8819a34c7f000a74ede064f945a617aa71ee6cd6468bc1b31a48171ef5"
+    },
+    "requestDiagnosticsClassifier": {
+      "path": "distribution/editions/lab/lifecycle/lab-request-origin-diagnostics.mjs",
+      "lfNormalizedBytes": 5903,
+      "lfNormalizedSha256": "b13b6bcb9c6c482340f24a6de0f5542c6b6c098e45254f406f2fb3c1e7ab8941"
+    }
+  },
+  "attempt": {
+    "segmentAOrdinal": 1,
+    "maximumExecutionInvocations": 1,
+    "executionInvocationsAtFreeze": 0,
+    "automaticRetryMaximum": 0,
+    "priorAttemptResult": "none-new-product-source"
+  },
+  "provider": {
+    "class": "existing-disposable-local-windows-user",
+    "accountName": "CodexSandboxOffline",
+    "profileRoot": "C:/Users/CodexSandboxOffline",
+    "enabledAtFreeze": true,
+    "profileLoadedAtFreeze": false,
+    "passwordRequired": true,
+    "passwordReadOrRecordedAllowed": false,
+    "operatorInteractiveLogonRequired": true,
+    "state": "blocked-awaiting-operator-interactive-logon"
+  },
+  "ownedIsolation": {
+    "providerClass": "disposable-user-owned-app-namespace",
+    "stagingRoot": "C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input",
+    "stagingRootMustBeAbsentBeforeExecution": true,
+    "staging": {
+      "preservesRepositoryRelativePaths": true,
+      "maximumInvocations": 1,
+      "invocationsAtFreeze": 0,
+      "automaticRetryMaximum": 0,
+      "applicationSelfRelativePath": "distribution/editions/lab/lifecycle/final-ba6dc119-app-only-application.v1.json",
+      "artifactRelativePath": "artifact/DroneDream-Lab-1.0.0.exe",
+      "inputs": [
+        {
+          "sourceClass": "exact-absolute-artifact",
+          "sourceAbsolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-ba6dc119-attempt14/DroneDream-Lab-1.0.0.exe",
+          "relativePath": "artifact/DroneDream-Lab-1.0.0.exe",
+          "bytes": 12551766,
+          "sha256": "a7a9e2bfebb96cd06f88e70c02cd74bc8ab9c0a24a195ae2d50cdac5e74d6b2b"
+        },
+        {
+          "sourceClass": "repository-relative",
+          "relativePath": "distribution/build-receipts/lab-ba6dc119-yellow-attempt14-static-passed.json",
+          "bytes": 3625,
+          "sha256": "9e6890f682c0a78e1360cbe57c077231af82724a190a022b171c19d5e917eab0"
+        },
+        {
+          "sourceClass": "repository-relative",
+          "relativePath": "distribution/editions/lab/lifecycle/final-ba6dc119-app-only-plan.v1.json",
+          "bytes": 3399,
+          "sha256": "555afd001b95130a18e27687b9d9db97d97451399e5caba47f25f45e4bd71e85"
+        },
+        {
+          "sourceClass": "repository-relative",
+          "relativePath": "distribution/editions/lab/lifecycle/final-ba6dc119-app-only-target-receipt.v1.json",
+          "bytes": 2399,
+          "sha256": "63e65e234c9f71a75a118bf72c622b0859568fb106b071df65f41a44b10ac706"
+        },
+        {
+          "sourceClass": "repository-relative",
+          "relativePath": "distribution/editions/lab/lifecycle/run-lab-final-app-only-lifecycle.ps1",
+          "hashMode": "lf-normalized",
+          "bytes": 45798,
+          "sha256": "637f75fdc4da4a67681422b7cd6ee298fe372d9da2f250ca1ec01c9cae5b7f0d"
+        },
+        {
+          "sourceClass": "repository-relative",
+          "relativePath": "distribution/editions/lab/lifecycle/inspect-lab-e3b427e-live-webview2.mjs",
+          "hashMode": "lf-normalized",
+          "bytes": 12682,
+          "sha256": "ff5e4d8819a34c7f000a74ede064f945a617aa71ee6cd6468bc1b31a48171ef5"
+        },
+        {
+          "sourceClass": "repository-relative",
+          "relativePath": "distribution/editions/lab/lifecycle/lab-request-origin-diagnostics.mjs",
+          "hashMode": "lf-normalized",
+          "bytes": 5903,
+          "sha256": "b13b6bcb9c6c482340f24a6de0f5542c6b6c098e45254f406f2fb3c1e7ab8941"
+        },
+        {
+          "sourceClass": "repository-relative",
+          "relativePath": "brand/generated/lab/windows/icon.ico",
+          "bytes": 55959,
+          "sha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
+        },
+        {
+          "sourceClass": "repository-relative",
+          "relativePath": "brand/generated/lab/windows/32x32.png",
+          "bytes": 2040,
+          "sha256": "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc"
+        }
+      ],
+      "additionalInputsAllowed": false
+    },
+    "ownedBase": "C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Lab-RED",
+    "runId": "lab-ba6dc119-segment-a-red1",
+    "runRoot": "C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1",
+    "runRootMustBeAbsentBeforeExecution": true,
+    "runRootReuseAllowed": false,
+    "mutationAllowedOnlyForExactLabIdentity": true,
+    "currentZju20CanonicalLabProtected": true
+  },
+  "segments": {
+    "a": {
+      "orderedStages": ["fresh-install-en-and-live-ui", "same-version-overlay-zh-and-live-ui", "uninstall-owned-cleanup-and-parity"],
+      "exactCounts": {
+        "freshInstallerInvocations": 1,
+        "overlayInstallerInvocations": 1,
+        "applicationLaunches": 2,
+        "applicationCloses": 2,
+        "uninstallerInvocations": 1,
+        "ownedPreferenceKeyCleanupInvocations": 1,
+        "liveWebView2Inspections": 2,
+        "languageTransitions": 2,
+        "languageSurfaceAssertions": 4,
+        "settingsSingleScreenChecks": 2,
+        "labThemeChecks": 2,
+        "authorityFalseChecks": 2,
+        "shortcutIdentityChecks": 3,
+        "protectedStateSnapshots": 5,
+        "protectedStateParityChecks": 4,
+        "browserLaunches": 0,
+        "oauthBoundaryChecks": 0,
+        "providerTokenExchanges": 0,
+        "accountReads": 0,
+        "artifactBuilds": 0,
+        "runtimeStartsOrMigrations": 0,
+        "px4Starts": 0,
+        "gazeboStarts": 0,
+        "hardwareActions": 0,
+        "uploadsOrDeployments": 0
+      }
+    },
+    "b": {
+      "state": "fail-closed-not-executed",
+      "blocksSegmentA": false
+    }
+  },
+  "installerLanguages": {
+    "fresh": {"id": "1033", "locale": "en-US"},
+    "overlay": {"id": "2052", "locale": "zh-CN"},
+    "exactChecks": 2
+  },
+  "iconAcceptance": {
+    "canonicalWindowsIcon": {
+      "path": "brand/generated/lab/windows/icon.ico",
+      "sha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
+    },
+    "canonicalRenderSource": {
+      "path": "brand/generated/lab/windows/32x32.png",
+      "sha256": "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc"
+    },
+    "shortcutIconSource": "$INSTDIR/${MAINBINARYNAME}.exe",
+    "requiredSurfaces": ["installer", "installed-exe", "desktop-shortcut", "start-menu-shortcut"],
+    "actualShellRenderedEvidenceRequired": true,
+    "windowsShellRenderedContactSheetRequired": true,
+    "installerAndAppPeMustMatch": true,
+    "allSurfacesMustDisplayLabGreen": true
+  },
+  "liveAssertions": {
+    "documentElementEdition": "lab",
+    "appShellRequired": true,
+    "languages": ["en", "zh-CN"],
+    "settingsDialogAndPanelNoVerticalOverflow": true,
+    "themePalette": ["#A7E84A", "#20C77A", "#087E69"],
+    "threeDCanvasMustBeNonblankAndResponsive": true,
+    "themeSettingsAndThreeDGrantHardwareAuthority": false,
+    "themeAndSettingsPresentationOnly": true,
+    "webView2Provider": "existing-system-runtime-read-only"
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "frontendSettingsThemeOrWorkspaceCountsAsAuthority": false
+  },
+  "authorization": {
+    "segmentAExecutionDecision": "prepared-awaiting-new-exact-red-authorization",
+    "providerDecision": "blocked-awaiting-operator-interactive-logon",
+    "segmentBExecutionDecision": "deny-before-real-auth-boundary",
+    "browserOauthProviderRuntimePx4GazeboHardwareAllowed": false
+  }
+}

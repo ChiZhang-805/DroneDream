@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-app-only-lifecycle-plan",
+  "editionId": "lab",
+  "state": "exact-artifact-provider-gated",
+  "artifact": {
+    "productSourceCommit": "ba6dc119e44721b807c455a2183887102566f73e",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12551766,
+    "sha256": "a7a9e2bfebb96cd06f88e70c02cd74bc8ab9c0a24a195ae2d50cdac5e74d6b2b",
+    "authenticodeStatus": "NotSigned",
+    "updaterSignatureSha256": "dfa58897ee6545cee432f2077c681fdab624cb2074a5d75dc6a20317b0c637be"
+  },
+  "provider": {
+    "class": "existing-disposable-local-windows-user",
+    "accountName": "CodexSandboxOffline",
+    "profileRoot": "C:/Users/CodexSandboxOffline",
+    "enabledAtFreeze": true,
+    "profileLoadedAtFreeze": false,
+    "passwordRequired": true,
+    "passwordReadOrRecordedAllowed": false,
+    "operatorInteractiveLogonRequired": true,
+    "currentZju20CanonicalLabMustRemainUntouched": true
+  },
+  "orderedStages": [
+    "outer-host-protected-baseline",
+    "operator-interactive-provider-logon",
+    "provider-fresh-install-en-and-live-ui",
+    "provider-same-version-overlay-zh-and-live-ui",
+    "provider-uninstall-owned-cleanup",
+    "outer-host-protected-parity"
+  ],
+  "exactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "applicationCloses": 2,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "languageSurfaceAssertions": 4,
+    "settingsSingleScreenChecks": 2,
+    "labThemeChecks": 2,
+    "authorityFalseChecks": 2,
+    "shortcutIdentityChecks": 3,
+    "protectedStateSnapshots": 5,
+    "protectedStateParityChecks": 4,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "accountReads": 0,
+    "artifactBuilds": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "installerLanguages": {
+    "fresh": {"id": "1033", "locale": "en-US"},
+    "overlay": {"id": "2052", "locale": "zh-CN"},
+    "exactChecks": 2
+  },
+  "iconAcceptance": {
+    "requiredSurfaces": ["installer", "installed-exe", "desktop-shortcut", "start-menu-shortcut"],
+    "canonicalIcoSha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1",
+    "canonicalRenderSourceSha256": "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc",
+    "windowsShellRenderedContactSheetRequired": true,
+    "installerAndAppPeMustMatch": true,
+    "allSurfacesMustDisplayLabGreen": true
+  },
+  "uiAcceptance": {
+    "languages": ["en", "zh-CN"],
+    "settingsSingleScreenNoVerticalScroll": true,
+    "fixedThemeEdition": "lab",
+    "themePalette": ["#A7E84A", "#20C77A", "#087E69"],
+    "threeDLauncherResponsive": true,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "requiredAuthorityLayers": ["native", "backend", "runtime"],
+    "frontendSettingsThemeOrWorkspaceCountsAsAuthority": false
+  },
+  "protectedScopes": ["zju20-lab", "base", "universal", "sim", "field", "runtime", "webview2"],
+  "forbiddenDuringExecution": ["browser", "oauth", "provider-network", "runtime", "px4", "gazebo", "hardware", "build", "upload", "deploy"]
+}

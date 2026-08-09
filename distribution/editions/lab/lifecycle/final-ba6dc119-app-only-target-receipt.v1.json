@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-app-only-target-receipt",
+  "editionId": "lab",
+  "state": "target-only-no-execution-evidence",
+  "artifact": {
+    "productSourceCommit": "ba6dc119e44721b807c455a2183887102566f73e",
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "bytes": 12551766,
+    "sha256": "a7a9e2bfebb96cd06f88e70c02cd74bc8ab9c0a24a195ae2d50cdac5e74d6b2b",
+    "authenticodeStatus": "NotSigned"
+  },
+  "requiredOutcome": {
+    "result": "segment-a-app-only-passed",
+    "freshInstallEnglish": "passed",
+    "overlayInstallSimplifiedChinese": "passed",
+    "uninstallAndOwnedRollback": "passed",
+    "shortcutIdentity": "passed",
+    "installerAppDesktopStartMenuLabGreenIcons": "passed",
+    "webView2ExistingRuntimeOnly": "passed",
+    "languages": ["en", "zh-CN"],
+    "settingsSingleScreen": "passed",
+    "fixedThemeEdition": "lab",
+    "themePalette": ["#A7E84A", "#20C77A", "#087E69"],
+    "settingsOrThemeGrantsHardwareAuthority": false,
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny"
+  },
+  "requiredExactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "applicationCloses": 2,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "languageSurfaceAssertions": 4,
+    "settingsSingleScreenChecks": 2,
+    "labThemeChecks": 2,
+    "authorityFalseChecks": 2,
+    "shortcutIdentityChecks": 3,
+    "protectedStateSnapshots": 5,
+    "protectedStateParityChecks": 4,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "accountReads": 0,
+    "artifactBuilds": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "requiredFinalState": {
+    "providerLabInstallRootAbsent": true,
+    "providerLabUninstallKeyAbsent": true,
+    "providerLabOwnedAppDataAbsent": true,
+    "providerLabShortcutsAbsent": true,
+    "providerLabOwnedPreferenceKeyAbsent": true,
+    "zju20CanonicalLabMatchesBaseline": true,
+    "otherProtectedStateMatchesBaseline": true
+  },
+  "failurePolicy": {
+    "stopAtFirstFailure": true,
+    "automaticRetryAllowed": false,
+    "preservePartialEvidence": true,
+    "historicalArtifactDeletionAllowed": false
+  }
+}

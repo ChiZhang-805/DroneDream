@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-app-only-command-contract",
+  "contractVersion": "1.0.0",
+  "editionId": "lab",
+  "state": "green-prepared-provider-gated-awaiting-exact-red-start",
+  "artifact": {
+    "productSourceCommit": "ba6dc119e44721b807c455a2183887102566f73e",
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-ba6dc119-attempt14/DroneDream-Lab-1.0.0.exe",
+    "bytes": 12551766,
+    "sha256": "a7a9e2bfebb96cd06f88e70c02cd74bc8ab9c0a24a195ae2d50cdac5e74d6b2b"
+  },
+  "application": {
+    "path": "distribution/editions/lab/lifecycle/final-ba6dc119-app-only-application.v1.json",
+    "bytes": 10167,
+    "sha256": "c746b13c2c01f0afcb58770236c55661c2d9074fd9c3267ef19b957912a7064e"
+  },
+  "plan": {
+    "path": "distribution/editions/lab/lifecycle/final-ba6dc119-app-only-plan.v1.json",
+    "bytes": 3399,
+    "sha256": "555afd001b95130a18e27687b9d9db97d97451399e5caba47f25f45e4bd71e85"
+  },
+  "targetReceipt": {
+    "path": "distribution/editions/lab/lifecycle/final-ba6dc119-app-only-target-receipt.v1.json",
+    "bytes": 2399,
+    "sha256": "63e65e234c9f71a75a118bf72c622b0859568fb106b071df65f41a44b10ac706"
+  },
+  "tools": {
+    "stagingAdapter": {
+      "path": "distribution/editions/lab/lifecycle/stage-lab-final-lifecycle-input.ps1",
+      "lfNormalizedBytes": 7897,
+      "lfNormalizedSha256": "6d66a53f7194f7d8ba405aedc24efb493ce0e94a46d81049821ceef62506a96b"
+    },
+    "lifecycleAdapter": {
+      "path": "distribution/editions/lab/lifecycle/run-lab-final-app-only-lifecycle.ps1",
+      "lfNormalizedBytes": 45798,
+      "lfNormalizedSha256": "637f75fdc4da4a67681422b7cd6ee298fe372d9da2f250ca1ec01c9cae5b7f0d"
+    },
+    "liveInspector": {
+      "path": "distribution/editions/lab/lifecycle/inspect-lab-e3b427e-live-webview2.mjs",
+      "lfNormalizedBytes": 12682,
+      "lfNormalizedSha256": "ff5e4d8819a34c7f000a74ede064f945a617aa71ee6cd6468bc1b31a48171ef5"
+    },
+    "requestDiagnosticsClassifier": {
+      "path": "distribution/editions/lab/lifecycle/lab-request-origin-diagnostics.mjs",
+      "lfNormalizedBytes": 5903,
+      "lfNormalizedSha256": "b13b6bcb9c6c482340f24a6de0f5542c6b6c098e45254f406f2fb3c1e7ab8941"
+    }
+  },
+  "provider": {
+    "launcherClass": "operator-interactive-runas-with-profile",
+    "accountName": "CodexSandboxOffline",
+    "profileRoot": "C:/Users/CodexSandboxOffline",
+    "passwordPromptMustBeHandledByOperator": true,
+    "passwordMayBeReadRecordedOrPassedAsArgument": false,
+    "currentZju20CanonicalLabProtected": true
+  },
+  "staging": {
+    "outputRoot": "C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input",
+    "outputRootMustBeAbsent": true,
+    "maximumInvocations": 1,
+    "invocationsAtFreeze": 0,
+    "automaticRetryMaximum": 0,
+    "additionalInputsAllowed": false,
+    "validatedInputCountIncludingApplicationSelf": 10,
+    "planOnlyCommand": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File distribution/editions/lab/lifecycle/stage-lab-final-lifecycle-input.ps1 -Application distribution/editions/lab/lifecycle/final-ba6dc119-app-only-application.v1.json -ExpectedApplicationSha256 c746b13c2c01f0afcb58770236c55661c2d9074fd9c3267ef19b957912a7064e -SourceRoot C:/Users/zju20/.codex/worktrees/b3db/DroneDream -OutputRoot C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input",
+    "exactFutureRedStageCommand": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File distribution/editions/lab/lifecycle/stage-lab-final-lifecycle-input.ps1 -Application distribution/editions/lab/lifecycle/final-ba6dc119-app-only-application.v1.json -ExpectedApplicationSha256 c746b13c2c01f0afcb58770236c55661c2d9074fd9c3267ef19b957912a7064e -SourceRoot C:/Users/zju20/.codex/worktrees/b3db/DroneDream -OutputRoot C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input -Execute",
+    "executionAuthorizedNow": false
+  },
+  "segmentA": {
+    "ordinal": 1,
+    "maximumExecutionInvocations": 1,
+    "executionInvocationsAtFreeze": 0,
+    "automaticRetryMaximum": 0,
+    "providerOwnedOutputRoot": "C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1",
+    "providerOwnedOutputRootMustBeAbsent": true,
+    "innerRedCommand": "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/distribution/editions/lab/lifecycle/run-lab-final-app-only-lifecycle.ps1 -Installer C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/artifact/DroneDream-Lab-1.0.0.exe -ExpectedInstallerSha256 a7a9e2bfebb96cd06f88e70c02cd74bc8ab9c0a24a195ae2d50cdac5e74d6b2b -ExpectedInstallerBytes 12551766 -ExpectedProductSourceCommit ba6dc119e44721b807c455a2183887102566f73e -Application C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/distribution/editions/lab/lifecycle/final-ba6dc119-app-only-application.v1.json -ExpectedApplicationSha256 c746b13c2c01f0afcb58770236c55661c2d9074fd9c3267ef19b957912a7064e -Plan C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/distribution/editions/lab/lifecycle/final-ba6dc119-app-only-plan.v1.json -ExpectedPlanSha256 555afd001b95130a18e27687b9d9db97d97451399e5caba47f25f45e4bd71e85 -TargetReceipt C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/distribution/editions/lab/lifecycle/final-ba6dc119-app-only-target-receipt.v1.json -ExpectedTargetReceiptSha256 63e65e234c9f71a75a118bf72c622b0859568fb106b071df65f41a44b10ac706 -OutputRoot C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1 -Execute",
+    "operatorInteractiveLauncherCommand": "runas.exe /profile /user:.\\CodexSandboxOffline \"powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/distribution/editions/lab/lifecycle/run-lab-final-app-only-lifecycle.ps1 -Installer C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/artifact/DroneDream-Lab-1.0.0.exe -ExpectedInstallerSha256 a7a9e2bfebb96cd06f88e70c02cd74bc8ab9c0a24a195ae2d50cdac5e74d6b2b -ExpectedInstallerBytes 12551766 -ExpectedProductSourceCommit ba6dc119e44721b807c455a2183887102566f73e -Application C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/distribution/editions/lab/lifecycle/final-ba6dc119-app-only-application.v1.json -ExpectedApplicationSha256 c746b13c2c01f0afcb58770236c55661c2d9074fd9c3267ef19b957912a7064e -Plan C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/distribution/editions/lab/lifecycle/final-ba6dc119-app-only-plan.v1.json -ExpectedPlanSha256 555afd001b95130a18e27687b9d9db97d97451399e5caba47f25f45e4bd71e85 -TargetReceipt C:/Users/Public/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1-input/distribution/editions/lab/lifecycle/final-ba6dc119-app-only-target-receipt.v1.json -ExpectedTargetReceiptSha256 63e65e234c9f71a75a118bf72c622b0859568fb106b071df65f41a44b10ac706 -OutputRoot C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Lab-RED/lab-ba6dc119-segment-a-red1 -Execute\"",
+    "executionAuthorizedNow": false,
+    "failureDecision": "preserve-evidence-rollback-owned-state-and-stop-no-replay"
+  },
+  "exactCounts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "applicationCloses": 2,
+    "uninstallerInvocations": 1,
+    "ownedPreferenceKeyCleanupInvocations": 1,
+    "liveWebView2Inspections": 2,
+    "languageTransitions": 2,
+    "languageSurfaceAssertions": 4,
+    "settingsSingleScreenChecks": 2,
+    "labThemeChecks": 2,
+    "authorityFalseChecks": 2,
+    "shortcutIdentityChecks": 3,
+    "protectedStateSnapshots": 5,
+    "protectedStateParityChecks": 4,
+    "browserLaunches": 0,
+    "oauthBoundaryChecks": 0,
+    "providerTokenExchanges": 0,
+    "accountReads": 0,
+    "artifactBuilds": 0,
+    "runtimeStartsOrMigrations": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "uploadsOrDeployments": 0
+  },
+  "authorization": {
+    "stagingExecutionAuthorizedNow": false,
+    "segmentARedCommandAuthorizedNow": false,
+    "newExactStartSignalRequired": true,
+    "browserOauthProviderNetworkRuntimePx4GazeboHardwareAllowed": false,
+    "buildSystemComponentUploadOrDeployAllowed": false
+  }
+}

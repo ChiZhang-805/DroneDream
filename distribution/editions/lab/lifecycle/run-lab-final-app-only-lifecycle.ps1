@@ -198,6 +198,26 @@ if ($applicationContract.attempt.maximumExecutionInvocations -ne 1 -or
         $outputPath) {
     throw "The one-shot lifecycle attempt or owned output root binding does not match."
 }
+if ($applicationContract.provider.class -cne "existing-disposable-local-windows-user" -or
+    [string]::IsNullOrWhiteSpace($applicationContract.provider.accountName) -or
+    [string]::IsNullOrWhiteSpace($applicationContract.provider.profileRoot) -or
+    $applicationContract.provider.passwordRequired -ne $true -or
+    $applicationContract.provider.passwordReadOrRecordedAllowed -ne $false -or
+    $applicationContract.provider.operatorInteractiveLogonRequired -ne $true -or
+    $applicationContract.ownedIsolation.currentZju20CanonicalLabProtected -ne $true) {
+    throw "The disposable-provider isolation contract is missing or unsafe."
+}
+if ($Execute) {
+    $expectedProvider = [string]$applicationContract.provider.accountName
+    $expectedProfile = [IO.Path]::GetFullPath(
+        [string]$applicationContract.provider.profileRoot
+    ).TrimEnd("\")
+    $actualProfile = [IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd("\")
+    if ($env:USERNAME -cne $expectedProvider -or
+        $actualProfile -cne $expectedProfile) {
+        throw "Execution is permitted only inside the exact disposable Windows user profile."
+    }
+}
 
 $counters = [ordered]@{
     freshInstallerInvocations = 0
