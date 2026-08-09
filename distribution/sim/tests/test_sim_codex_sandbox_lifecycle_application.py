@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-5.v1.json"
+APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-6.v1.json"
 HOST = REPO / "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-host-85903ff6.ps1"
 VISIBLE_HOST = REPO / (
     "distribution/sim/tools/"
@@ -23,7 +23,7 @@ def load_application() -> dict:
 def test_application_binds_frozen_artifact_and_tool_bundle() -> None:
     application = load_application()
     assert application["editionId"] == "sim"
-    assert application["executionOrdinal"] == 5
+    assert application["executionOrdinal"] == 6
     assert application["state"] == "awaiting-user-present-start"
     assert application["sourceSeparation"]["productSourceCommit"] == (
         "573e8f991eba703bbfd6c4b35f464fbaab78903c"

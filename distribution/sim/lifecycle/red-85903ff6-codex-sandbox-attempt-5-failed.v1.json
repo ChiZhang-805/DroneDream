@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-failure",
+  "editionId": "sim",
+  "executionOrdinal": 5,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "f6addd62cb499ebe5df48f27fd3001d0f959fc44",
+  "artifactSha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-5.v1.json",
+    "bytes": 9718,
+    "sha256": "2df2731b72d54b13204305ce3d6478f253d085e04bb57e202e7bcc6e32ead3bf"
+  },
+  "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal5",
+  "hostProtectionReceipt": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal5/host-evidence/canonical-current-user-protection-receipt.json",
+    "bytes": 14142,
+    "sha256": "e18323ca97c310f07811f73302b8f187499e92f2e995eb2cf7f13524a8aa04d1",
+    "runAsExitCode": 1,
+    "canonicalCurrentUserProtectedStateUnchanged": true
+  },
+  "visibleHostTranscript": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/host-launcher-evidence/sim-red-final-85903ff6-ordinal5.txt",
+    "bytes": 1974,
+    "sha256": "db1f42e90303ac58c097aafd75221a10ee64a5229229cb183d7077602438dda3",
+    "containsCredentialValue": false
+  },
+  "classification": "windows-runas-could-not-acquire-user-password-before-guest-start",
+  "mutationCounts": {
+    "visibleHostLaunchers": 1,
+    "sharedStagingRootsCreated": 1,
+    "interactiveRunAsInvocations": 1,
+    "guestRunnerInvocations": 0,
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReadsByAutomation": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "historicalOwnedRootReadOnly": true,
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "fresh-ordinal-with-user-present-interactive-password-entry"
+}
