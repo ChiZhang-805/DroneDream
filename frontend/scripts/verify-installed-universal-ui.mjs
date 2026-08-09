@@ -118,6 +118,28 @@ async function assertAuthenticatedAccountSurface(page) {
   assert.equal(await menuButton.getAttribute("aria-expanded"), "false");
 }
 
+async function visibleWorkspaceModeSelector(page) {
+  const desktopSelector = page.locator(".universal-mode-switch select:visible").first();
+  if (await desktopSelector.isVisible()) return desktopSelector;
+
+  const menuButton = page.locator(".app-mobile-menu-button:visible").first();
+  await menuButton.waitFor({ state: "visible", timeout: 30_000 });
+  if ((await menuButton.getAttribute("aria-expanded")) !== "true") {
+    await menuButton.click();
+  }
+  const menuPanel = page.locator(".app-mobile-menu-panel.is-open:visible").first();
+  await menuPanel.waitFor({ state: "visible", timeout: 30_000 });
+  await menuPanel.locator(".universal-mode-switch select:visible").first().waitFor({
+    state: "visible",
+    timeout: 30_000,
+  });
+
+  // Return the stable AppShell control rather than a locator scoped to the
+  // open panel. Selecting a workspace intentionally collapses the mobile menu,
+  // but the same select remains mounted and its value must still be verified.
+  return page.locator(".universal-mode-switch select").first();
+}
+
 const browser = await chromium.connectOverCDP(cdpEndpoint);
 {
   const contexts = browser.contexts();
@@ -126,6 +148,9 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert(pages.length >= 1, "Installed app exposed no WebView page");
   const page = pages.find((candidate) => /(?:tauri|localhost)/u.test(candidate.url())) ?? pages[0];
   await page.waitForLoadState("domcontentloaded");
+  if (emulateViewport) {
+    await page.setViewportSize({ width: expectedWidth, height: expectedHeight });
+  }
   if (authenticatedWorkspace) {
     await assertAuthenticatedAccountSurface(page);
     const workspaceRoute = {
@@ -134,8 +159,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
       lab: "/lab",
       field: "/field",
     }[edition];
-    const workspaceModeSelector = page.locator(".universal-mode-switch select").first();
-    await workspaceModeSelector.waitFor({ state: "visible", timeout: 30_000 });
+    const workspaceModeSelector = await visibleWorkspaceModeSelector(page);
     await workspaceModeSelector.selectOption(edition);
     await page.waitForURL((url) => url.hash === `#${workspaceRoute}`);
     assert.equal(await workspaceModeSelector.inputValue(), edition);
@@ -162,10 +186,6 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     }, locale);
     await page.waitForURL((url) => url.hash === "#/desktop/setup");
     await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
-  }
-
-  if (emulateViewport) {
-    await page.setViewportSize({ width: expectedWidth, height: expectedHeight });
   }
 
   const initialViewport = await page.evaluate(() => ({

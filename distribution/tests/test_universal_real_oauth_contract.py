@@ -159,7 +159,11 @@ def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
         'field: ".field-app"',
     ):
         assert surface in observer
-    assert 'page.locator(".universal-mode-switch select").first()' in observer
+    assert "async function visibleWorkspaceModeSelector(page)" in observer
+    assert 'page.locator(".universal-mode-switch select:visible").first()' in observer
+    assert 'menuPanel.locator(".universal-mode-switch select:visible")' in observer
+    assert 'return page.locator(".universal-mode-switch select").first()' in observer
+    assert "const workspaceModeSelector = await visibleWorkspaceModeSelector(page)" in observer
     assert "await workspaceModeSelector.selectOption(edition)" in observer
     assert "assert.equal(await workspaceModeSelector.inputValue(), edition)" in observer
     assert "async function assertAuthenticatedAccountSurface(page)" in observer
@@ -171,6 +175,14 @@ def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
         in observer
     )
     assert 'languageSelectionCount: 1' in observer
+
+    browser_scope = observer.index("const browser = await chromium.connectOverCDP")
+    viewport = observer.index("if (emulateViewport)", browser_scope)
+    authenticated = observer.index("if (authenticatedWorkspace)", viewport)
+    selector = observer.index(
+        "await visibleWorkspaceModeSelector(page)", authenticated
+    )
+    assert browser_scope < viewport < authenticated < selector
 
 
 def test_runtime_prerequisite_is_existing_start_only_and_physics_stays_off() -> None:
