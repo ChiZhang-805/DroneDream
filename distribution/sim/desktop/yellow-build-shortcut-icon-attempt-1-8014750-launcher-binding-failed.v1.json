@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-launcher-binding-failure-receipt",
+  "editionId": "sim",
+  "executionClass": "YELLOW",
+  "state": "failed-frozen-no-retry",
+  "productSource": {
+    "commit": "801475050d8b50ec6981f46e282712e02eace243",
+    "tree": "bfb563eb2aeb3dd457228510ec6239243caa6cd5"
+  },
+  "evidenceSourceBeforeExecution": "5e5380b1f9dbccab4ecadca8655656114884cfb4",
+  "application": {
+    "path": "distribution/sim/desktop/yellow-build-shortcut-icon-attempt-1-8014750-application.v1.json",
+    "bytes": 32082,
+    "sha256": "2e0920848535fd660a9c9a95b810102e1a1d65d7390f2b793e0e6f23d836543f"
+  },
+  "entryScript": {
+    "path": "distribution/sim/desktop/invoke-yellow-build-shortcut-icon-attempt-1-8014750.ps1",
+    "bytes": 27891,
+    "sha256": "cf120131ca27ed7f2eed0ff97b0ec1f52662fe14eaeff37b41c49edc651ed812"
+  },
+  "authorizedCommand": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-github-public-build-config.ps1 -Mode ExecuteSequence -EntryScript C:\\Users\\zju20\\.codex\\worktrees\\d47f\\DroneDream\\distribution\\sim\\desktop\\invoke-yellow-build-shortcut-icon-attempt-1-8014750.ps1 -EntryScriptSha256 cf120131ca27ed7f2eed0ff97b0ec1f52662fe14eaeff37b41c49edc651ed812",
+  "exitCode": 1,
+  "failure": {
+    "stage": "launcher-entry-binding-before-public-variable-fetch",
+    "classification": "entry-script-filename-not-accepted-by-launcher-allowlist",
+    "message": "Entry script must be an exact Sim attempt script under the owned desktop root.",
+    "launcherRequiredPattern": "^invoke-yellow-build-attempt-[0-9]+-[0-9a-f]{7}\\.ps1$",
+    "actualEntryFileName": "invoke-yellow-build-shortcut-icon-attempt-1-8014750.ps1",
+    "productOrArtifactDefectObserved": false
+  },
+  "executedCounts": {
+    "launcherInvocations": 1,
+    "publicRepositoryVariableFetches": 0,
+    "controlledChildInvocations": 0,
+    "preflights": 0,
+    "prepares": 0,
+    "executes": 0,
+    "snapshotsCreated": 0,
+    "cacheFilesCopied": 0,
+    "npmCiInvocations": 0,
+    "junctionsCreated": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0,
+    "retries": 0
+  },
+  "ownedRoots": {
+    "sourceRoot": {
+      "path": "C:/Users/zju20/ddss1",
+      "existsAfterFailure": false
+    },
+    "runRoot": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-shortcut-icon-attempt1-8014750",
+      "existsAfterFailure": false
+    },
+    "cargoTarget": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/sim-cargo-target-8014750-shortcut-icon-attempt1",
+      "existsAfterFailure": false
+    },
+    "snapshotRoot": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm-snapshots/npm-snapshot-shortcut-icon-attempt1-8014750",
+      "existsAfterFailure": false
+    },
+    "dependencyRoot": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-334b3bf8a3f774ff",
+      "existsAfterFailure": false
+    }
+  },
+  "authorizationAccounting": {
+    "thisExactAuthorizationConsumed": true,
+    "retryAllowed": false,
+    "originalCommandMayBeReused": false,
+    "newExactApplicationAndAuthorizationRequired": true
+  },
+  "nonClaims": {
+    "publicConfigurationRead": false,
+    "buildStarted": false,
+    "artifactCreated": false,
+    "artifactValidated": false,
+    "releaseReady": false
+  }
+}
