@@ -12,7 +12,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
   supabaseClient: null,
 }));
 
-function renderWorkspace() {
+function renderWorkspace(initialEntry = "/assistant") {
   const router = createMemoryRouter(
     [
       {
@@ -20,10 +20,11 @@ function renderWorkspace() {
         element: <AppShell />,
         children: [
           { path: "assistant", element: <div>Assistant workspace</div> },
+          { path: "vehicle-studio", element: <div>Vehicle Studio workspace</div> },
         ],
       },
     ],
-    { initialEntries: ["/assistant"] },
+    { initialEntries: [initialEntry] },
   );
   const page = render(
     <I18nProvider>
@@ -53,6 +54,20 @@ function useMobileViewport(): void {
 }
 
 describe("workspace account entry", () => {
+  it("identifies the Universal-only modeling surface instead of the last professional workspace", () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "field");
+    const { router } = renderWorkspace("/vehicle-studio");
+
+    const selector = screen.getByRole("combobox", { name: "Workspace mode" });
+    expect(selector).toHaveValue("universal");
+    expect(screen.getByRole("option", { name: "DroneDream" })).toBeInTheDocument();
+    expect(document.documentElement).toHaveAttribute("data-brand-edition", "universal");
+    expect(document.documentElement).toHaveAttribute("data-theme-grants-hardware-authority", "false");
+
+    router.dispose();
+  });
+
   it("shows an honest local profile when cloud auth is not configured", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     const { router } = renderWorkspace();

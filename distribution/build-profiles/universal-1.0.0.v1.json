@@ -34,7 +34,7 @@
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "8c0d4d69942a980f30eec22a0d4c90e800f086c653bea0915e86c7a8e2d748b9"
+        "sha256": "61d6c4197052c85d5de7caef21994540e0f15100d0abcbe8f6e68cc3bae42ab7"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
@@ -107,7 +107,7 @@
       "grantsSimulationExecution": false,
       "grantsHardwareAuthority": false,
       "sourceFiles": [
-        {"path": "frontend/src/pages/VehicleStudio.tsx", "sha256": "ff1f370855bd5da4bee6c330b00c7599325969db566f2550ba7e2eeace22aa26"},
+        {"path": "frontend/src/pages/VehicleStudio.tsx", "sha256": "72fab0a4abe143089ba3061212a94a21198cb0eec08cfa85034939fd0b2481e7"},
         {"path": "frontend/src/components/VehicleModelPreview3D.tsx", "sha256": "1111d9ef8f0fb6fde60884e9aa48d2746cbf97132f16a99d9cb3d507ca00c8d3"},
         {"path": "frontend/src/features/vehicleStudio/model.ts", "sha256": "8bd19421f9dec258fed7d0e1cb705e210af6f0e491b4e1263ff0e83c2cdc977d"},
         {"path": "frontend/src/features/vehicleStudio/pack.ts", "sha256": "82454a93ec0b8c4382971b6d51d033dca8521e569837aab9c39ba9252770684a"},

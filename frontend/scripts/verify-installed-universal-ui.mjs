@@ -134,23 +134,11 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
       lab: "/lab",
       field: "/field",
     }[edition];
-    if (edition === "universal") {
-      await page.evaluate((route) => {
-        const nextUrl = new URL(window.location.href);
-        nextUrl.hash = route;
-        window.location.replace(nextUrl.href);
-      }, workspaceRoute);
-    } else {
-      await page.evaluate((nextEdition) => {
-        const selector = document.querySelector(".universal-mode-switch select");
-        if (!(selector instanceof HTMLSelectElement)) {
-          throw new Error("Universal workspace selector is missing");
-        }
-        selector.value = nextEdition;
-        selector.dispatchEvent(new Event("change", { bubbles: true }));
-      }, edition);
-    }
+    const workspaceModeSelector = page.locator(".universal-mode-switch select").first();
+    await workspaceModeSelector.waitFor({ state: "visible", timeout: 30_000 });
+    await workspaceModeSelector.selectOption(edition);
     await page.waitForURL((url) => url.hash === `#${workspaceRoute}`);
+    assert.equal(await workspaceModeSelector.inputValue(), edition);
     const workspaceSelector = {
       universal: ".vehicle-studio-page",
       sim: ".experiment-assistant-page",
@@ -216,7 +204,9 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   let scene = null;
   let surfaceScreenshot;
   if (authenticatedWorkspace) {
-    surfaceScreenshot = await saveScreenshot(page, "workspace");
+    // Capture the workspace after Settings applies the requested locale below.
+    // This prevents each case from inheriting the previous case's language.
+    surfaceScreenshot = null;
   } else {
     scene = await page.locator(".drone-launch-scene").evaluate((element) => ({
       edition: element.getAttribute("data-theme-edition"),
@@ -306,6 +296,9 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   await closeButton.focus();
   await closeButton.press("Enter");
   await dialog.waitFor({ state: "hidden" });
+  if (authenticatedWorkspace) {
+    surfaceScreenshot = await saveScreenshot(page, "workspace");
+  }
 
   await atomicJson(outputPath, {
     schemaVersion: 1,

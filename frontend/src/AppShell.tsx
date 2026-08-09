@@ -2695,8 +2695,13 @@ function AppShellContent() {
         >
           <UniversalModeSwitch
             mode={universalMode}
+            activeEdition={location.pathname === "/vehicle-studio" ? "universal" : universalMode}
             locale={locale}
             onChange={handleUniversalModeChange}
+            onOpenUniversal={() => {
+              setMobileMenuOpen(false);
+              navigate("/vehicle-studio");
+            }}
           />
           <nav className="app-nav" aria-label={t("app.primaryNav")}>
           <span id="runtime-nav-description" className="sr-only">

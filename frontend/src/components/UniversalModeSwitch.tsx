@@ -2,6 +2,7 @@ import { Layers3 } from "lucide-react";
 
 import { BrandLockup } from "./BrandLockup";
 import {
+  type BrandEditionId,
   EDITION_BRAND_TOKENS,
 } from "../brand/edition-brand.generated";
 import {
@@ -20,14 +21,20 @@ const COPY = {
   },
 } as const;
 
+const SELECTABLE_SURFACES: BrandEditionId[] = ["universal", ...UNIVERSAL_WORKSPACE_IDS];
+
 export function UniversalModeSwitch({
   mode,
+  activeEdition = mode,
   locale,
   onChange,
+  onOpenUniversal,
 }: {
   mode: UniversalWorkspaceId;
+  activeEdition?: BrandEditionId;
   locale: keyof typeof COPY;
   onChange: (mode: UniversalWorkspaceId) => void;
+  onOpenUniversal?: () => void;
 }) {
   const copy = COPY[locale];
   return (
@@ -37,18 +44,24 @@ export function UniversalModeSwitch({
       data-presentation-only="true"
       data-grants-hardware-authority="false"
     >
-      <div className="universal-mode-switch-current" data-brand-edition={mode}>
+      <div className="universal-mode-switch-current" data-brand-edition={activeEdition}>
         <Layers3 aria-hidden="true" strokeWidth={1.8} />
-        <BrandLockup edition={mode} variant="compact" />
+        <BrandLockup edition={activeEdition} variant="compact" />
       </div>
       <label>
         <span className="sr-only">{copy.label}</span>
         <select
           aria-label={copy.label}
-          value={mode}
-          onChange={(event) => onChange(event.target.value as UniversalWorkspaceId)}
+          value={activeEdition}
+          onChange={(event) => {
+            if (event.target.value === "universal") {
+              onOpenUniversal?.();
+              return;
+            }
+            onChange(event.target.value as UniversalWorkspaceId);
+          }}
         >
-          {UNIVERSAL_WORKSPACE_IDS.map((edition) => (
+          {SELECTABLE_SURFACES.map((edition) => (
             <option key={edition} value={edition}>
               {EDITION_BRAND_TOKENS[edition].productName}
             </option>

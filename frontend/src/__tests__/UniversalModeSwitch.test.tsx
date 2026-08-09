@@ -38,22 +38,35 @@ describe("UniversalModeSwitch", () => {
     expect(document.documentElement.dataset.themeGrantsHardwareAuthority).toBe("false");
   });
 
-  it("offers the three integrated workspaces and never represents the switch as authority", () => {
+  it("offers the Universal modeling surface and three integrated workspaces without granting authority", () => {
     const onChange = vi.fn();
+    const onOpenUniversal = vi.fn();
     const { container } = render(
-      <UniversalModeSwitch mode="sim" locale="en" onChange={onChange} />,
+      <UniversalModeSwitch
+        mode="sim"
+        activeEdition="universal"
+        locale="en"
+        onChange={onChange}
+        onOpenUniversal={onOpenUniversal}
+      />,
     );
 
     const region = container.querySelector(".universal-mode-switch");
     expect(region).toHaveAttribute("data-presentation-only", "true");
     expect(region).toHaveAttribute("data-grants-hardware-authority", "false");
-    expect(screen.getAllByRole("option")).toHaveLength(3);
-    expect(screen.queryByRole("option", { name: "DroneDream" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("option")).toHaveLength(4);
+    expect(screen.getByRole("option", { name: "DroneDream" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Workspace mode" })).toHaveValue("universal");
 
     fireEvent.change(screen.getByRole("combobox", { name: "Workspace mode" }), {
       target: { value: "lab" },
     });
     expect(onChange).toHaveBeenCalledWith("lab");
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Workspace mode" }), {
+      target: { value: "universal" },
+    });
+    expect(onOpenUniversal).toHaveBeenCalledOnce();
   });
 
   it("authors the Chinese safety boundary independently", () => {

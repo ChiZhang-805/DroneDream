@@ -1,6 +1,10 @@
+import { render, screen, within } from "@testing-library/react";
+import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildVehiclePreviewGeometry } from "../features/vehicleStudio/preview";
+import { I18nProvider } from "../i18n/I18nProvider";
+import { VehicleStudio } from "../pages/VehicleStudio";
 import {
   buildVehiclePackDraft,
   canonicalJson,
@@ -21,6 +25,14 @@ import {
   saveVehicleModel,
 } from "../features/vehicleStudio/storage";
 
+vi.mock("../features/auth/AuthContext", () => ({
+  useAuth: () => ({ account: { id: "vehicle-studio-test-owner" } }),
+}));
+
+vi.mock("../components/VehicleModelPreview3D", () => ({
+  VehicleModelPreview3D: () => createElement("div", { "data-testid": "vehicle-preview" }),
+}));
+
 function memoryStorage() {
   const values = new Map<string, string>();
   return {
@@ -30,6 +42,21 @@ function memoryStorage() {
 }
 
 describe("Universal Vehicle Studio contract", () => {
+  it("renders independently authored Chinese modeling and option copy", () => {
+    window.localStorage.clear();
+    window.localStorage.setItem("drone-dream:locale", "zh-CN");
+    render(createElement(I18nProvider, null, createElement(VehicleStudio)));
+
+    expect(screen.getByRole("heading", { name: "无人机建模工作室" })).toBeVisible();
+    const vehicleClass = screen.getByRole("combobox", { name: "机型类别" });
+    expect(within(vehicleClass).getByRole("option", { name: "小型多旋翼" }))
+      .toBeInTheDocument();
+    expect(within(vehicleClass).getByRole("option", { name: "中型多旋翼" }))
+      .toBeInTheDocument();
+    expect(within(vehicleClass).getByRole("option", { name: "研究级多旋翼" }))
+      .toBeInTheDocument();
+  });
+
   it("builds normalized three-dimensional geometry for every supported rotor layout", () => {
     for (const motorCount of [4, 6, 8] as const) {
       const draft = createVehicleModelDraft();

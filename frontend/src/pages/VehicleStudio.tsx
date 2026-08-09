@@ -96,6 +96,14 @@ const COPY = {
     packBoundary: "Receiving Editions must verify the envelope again. SIM may use generated assets only after its own compatibility gate; LAB/FIELD hardware use remains denied until signed validation evidence exists.",
     history: "Revision history",
     restore: "Restore as new revision",
+    vehicleClassSmall: "Small multicopter",
+    vehicleClassMedium: "Medium multicopter",
+    vehicleClassResearch: "Research multicopter",
+    bodyShapeBox: "Box",
+    bodyShapeCylinder: "Cylinder",
+    controlPosition: "Position",
+    controlVelocity: "Velocity",
+    controlAttitude: "Attitude",
   },
   "zh-CN": {
     eyebrow: "UNIVERSAL 专属能力",
@@ -150,6 +158,14 @@ const COPY = {
     packBoundary: "接收端必须再次验证封装。SIM 仍需通过自身兼容性门才能使用生成资产；LAB/FIELD 在获得签名验证证据前继续拒绝真机用途。",
     history: "版本历史",
     restore: "恢复为新版本",
+    vehicleClassSmall: "小型多旋翼",
+    vehicleClassMedium: "中型多旋翼",
+    vehicleClassResearch: "研究级多旋翼",
+    bodyShapeBox: "箱形机身",
+    bodyShapeCylinder: "圆柱形机身",
+    controlPosition: "位置控制",
+    controlVelocity: "速度控制",
+    controlAttitude: "姿态控制",
   },
 } as const;
 
@@ -310,11 +326,11 @@ export function VehicleStudio() {
               {tab === "identity" ? <>
                 <label>{copy.modelName}<input value={draft.name} onChange={(event) => update((next) => { next.name = event.target.value; })} /></label>
                 <label>{copy.manufacturer}<input value={draft.manufacturer} onChange={(event) => update((next) => { next.manufacturer = event.target.value; })} /></label>
-                <label>{copy.vehicleClass}<select value={draft.vehicleClass} onChange={(event) => update((next) => { next.vehicleClass = event.target.value as VehicleClass; })}><option value="multicopter-small">Small multicopter</option><option value="multicopter-medium">Medium multicopter</option><option value="multicopter-research">Research multicopter</option></select></label>
+                <label>{copy.vehicleClass}<select value={draft.vehicleClass} onChange={(event) => update((next) => { next.vehicleClass = event.target.value as VehicleClass; })}><option value="multicopter-small">{copy.vehicleClassSmall}</option><option value="multicopter-medium">{copy.vehicleClassMedium}</option><option value="multicopter-research">{copy.vehicleClassResearch}</option></select></label>
                 <label className="vehicle-studio-wide">{copy.notes}<textarea value={draft.notes} onChange={(event) => update((next) => { next.notes = event.target.value; })} /></label>
               </> : null}
               {tab === "airframe" ? <>
-                <label>{copy.bodyShape}<select value={draft.body.shape} onChange={(event) => update((next) => { next.body.shape = event.target.value as "box" | "cylinder"; })}><option value="box">Box</option><option value="cylinder">Cylinder</option></select></label>
+                <label>{copy.bodyShape}<select value={draft.body.shape} onChange={(event) => update((next) => { next.body.shape = event.target.value as "box" | "cylinder"; })}><option value="box">{copy.bodyShapeBox}</option><option value="cylinder">{copy.bodyShapeCylinder}</option></select></label>
                 <label>{copy.mass}<input type="number" min="0.01" step="0.01" value={draft.body.massKg} onChange={(event) => update((next) => { next.body.massKg = numberValue(event); })} /></label>
                 <label>{copy.length}<input type="number" min="0.01" step="0.01" value={draft.body.lengthM} onChange={(event) => update((next) => { next.body.lengthM = numberValue(event); })} /></label>
                 <label>{copy.width}<input type="number" min="0.01" step="0.01" value={draft.body.widthM} onChange={(event) => update((next) => { next.body.widthM = numberValue(event); })} /></label>
@@ -332,7 +348,7 @@ export function VehicleStudio() {
                 <label>{copy.autopilot}<select value={draft.autopilot.family} onChange={(event) => update((next) => { next.autopilot.family = event.target.value as AutopilotFamily; })}><option value="px4">PX4</option><option value="ardupilot">ArduPilot</option><option value="crazyflie">Crazyflie</option></select></label>
                 <label>{copy.controller}<input value={draft.autopilot.controllerModel} onChange={(event) => update((next) => { next.autopilot.controllerModel = event.target.value; })} /></label>
                 <label>{copy.firmware}<input value={draft.autopilot.firmwareVersion} onChange={(event) => update((next) => { next.autopilot.firmwareVersion = event.target.value; })} /></label>
-                <label>{copy.controlTarget}<select value={draft.controlTarget.primary} onChange={(event) => update((next) => { next.controlTarget.primary = event.target.value as "position" | "velocity" | "attitude"; })}><option value="position">Position</option><option value="velocity">Velocity</option><option value="attitude">Attitude</option></select></label>
+                <label>{copy.controlTarget}<select value={draft.controlTarget.primary} onChange={(event) => update((next) => { next.controlTarget.primary = event.target.value as "position" | "velocity" | "attitude"; })}><option value="position">{copy.controlPosition}</option><option value="velocity">{copy.controlVelocity}</option><option value="attitude">{copy.controlAttitude}</option></select></label>
                 <fieldset className="vehicle-studio-wide"><legend>{copy.sensors}</legend>{SENSOR_TYPES.map((sensorType) => {
                   const sensor = draft.sensors.find((item) => item.type === sensorType);
                   return <label className="vehicle-studio-check" key={sensorType}><input type="checkbox" checked={Boolean(sensor?.enabled)} onChange={(event) => update((next) => {

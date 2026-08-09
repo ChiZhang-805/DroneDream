@@ -83,7 +83,7 @@ def test_headed_verifier_protects_every_non_universal_edition_namespace() -> Non
     assert "Edition registry path escaped the HKCU Software contract." in script
 
 
-def test_headed_browser_observer_covers_the_pre_auth_launcher_without_bypassing_the_account_gate() -> None:
+def test_headed_browser_observer_covers_pre_auth_without_bypassing_account_gate() -> None:
     script = BROWSER.read_text(encoding="utf-8")
     for fragment in (
         'chromium.connectOverCDP(cdpEndpoint)',
@@ -91,7 +91,8 @@ def test_headed_browser_observer_covers_the_pre_auth_launcher_without_bypassing_
         'assert.equal(edition, "universal")',
         'The pre-auth prerequisite intentionally stays on the Universal launcher.',
         'startupTheme',
-        'validationSurface: authenticatedWorkspace ? "authenticated-workspace" : "pre-auth-launcher"',
+        'validationSurface: authenticatedWorkspace '
+        '? "authenticated-workspace" : "pre-auth-launcher"',
         'drone-dream:locale',
         'data-theme-grants-hardware-authority',
         'data-grants-hardware-authority',
@@ -108,6 +109,9 @@ def test_headed_browser_observer_covers_the_pre_auth_launcher_without_bypassing_
         '".app-mobile-menu-panel.is-open:visible"',
         'assert.equal(await menuButton.getAttribute("aria-expanded"), "true")',
         'async function assertAuthenticatedAccountSurface(page)',
+        'await workspaceModeSelector.selectOption(edition)',
+        'assert.equal(await workspaceModeSelector.inputValue(), edition)',
+        'prevents each case from inheriting the previous case\'s language',
         'menuPanel.locator(".app-account-button:visible")',
         'await menuPanel.waitFor({ state: "hidden", timeout: 30_000 })',
         'await closeButton.press("Enter")',
