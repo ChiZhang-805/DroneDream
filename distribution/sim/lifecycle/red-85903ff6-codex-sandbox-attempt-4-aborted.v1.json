@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-abort",
+  "editionId": "sim",
+  "executionOrdinal": 4,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "a75ce92a5c627672cafb2390c3f8bc7b901134c5",
+  "artifactSha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-4.v1.json",
+    "bytes": 9542,
+    "sha256": "24c03da6d3e1d92f787bc425cbcb4fd2c70ec5b675e8dd83d6083e9b387a7f35"
+  },
+  "classification": "visible-console-host-produced-no-output-and-no-owned-root",
+  "controlledAbort": {
+    "ownedHostProcessStopped": true,
+    "hostCommandOwnershipVerified": true,
+    "otherEditionProcessesTouched": false
+  },
+  "observedState": {
+    "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal4",
+    "ownedRootCreated": false,
+    "guestReceiptCreated": false,
+    "artifactBytes": 12070633,
+    "artifactSha256AfterAbort": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae"
+  },
+  "mutationCounts": {
+    "visibleHostLaunchers": 1,
+    "sharedStagingRootsCreated": 0,
+    "interactiveRunAsInvocations": 0,
+    "guestRunnerInvocations": 0,
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReads": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "retries": 0
+  },
+  "historicalOwnedRootReadOnly": true,
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "use-exact-visible-host-wrapper-with-non-sensitive-no-clobber-transcript"
+}

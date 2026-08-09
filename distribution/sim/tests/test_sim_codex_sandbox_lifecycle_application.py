@@ -3,8 +3,12 @@ import json
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-4.v1.json"
+APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-5.v1.json"
 HOST = REPO / "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-host-85903ff6.ps1"
+VISIBLE_HOST = REPO / (
+    "distribution/sim/tools/"
+    "invoke-red-lifecycle-codex-sandbox-visible-host-85903ff6.ps1"
+)
 GUEST = REPO / "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-85903ff6.ps1"
 
 
@@ -19,7 +23,7 @@ def load_application() -> dict:
 def test_application_binds_frozen_artifact_and_tool_bundle() -> None:
     application = load_application()
     assert application["editionId"] == "sim"
-    assert application["executionOrdinal"] == 4
+    assert application["executionOrdinal"] == 5
     assert application["state"] == "awaiting-user-present-start"
     assert application["sourceSeparation"]["productSourceCommit"] == (
         "573e8f991eba703bbfd6c4b35f464fbaab78903c"
@@ -29,6 +33,8 @@ def test_application_binds_frozen_artifact_and_tool_bundle() -> None:
         "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae"
     )
     tools = application["toolBundle"]
+    assert tools["visibleHostBytes"] == VISIBLE_HOST.stat().st_size
+    assert tools["visibleHostSha256"] == sha256(VISIBLE_HOST)
     assert tools["hostLauncherBytes"] == HOST.stat().st_size
     assert tools["hostLauncherSha256"] == sha256(HOST)
     assert tools["guestRunnerBytes"] == GUEST.stat().st_size
@@ -113,6 +119,19 @@ def test_host_launcher_has_one_interactive_runas_and_no_password_channel() -> No
     assert '$_.CommandLine -match "(Lab-RED|Field-RED|Sim-RED)"' in host
     forbidden = ("ConvertTo-SecureString", "PSCredential", "-Credential", "Read-Host")
     assert all(token not in host for token in forbidden)
+
+
+def test_visible_host_transcript_is_scoped_and_does_not_capture_password() -> None:
+    visible_host = VISIBLE_HOST.read_text(encoding="utf-8")
+    assert "host-launcher-evidence" in visible_host
+    assert "Start-Transcript" in visible_host
+    assert "-NoClobber" in visible_host
+    assert "Visible host transcript escaped its exact evidence root" in visible_host
+    assert "Visible host transcript already exists; retry is forbidden" in visible_host
+    assert "-Mode StageAndRunAs" in visible_host
+    assert "runas.exe" not in visible_host
+    forbidden = ("ConvertTo-SecureString", "PSCredential", "-Credential", "Read-Host")
+    assert all(token not in visible_host for token in forbidden)
 
 
 def test_guest_runner_requires_exact_user_profile_and_shortcut_icon_source() -> None:
