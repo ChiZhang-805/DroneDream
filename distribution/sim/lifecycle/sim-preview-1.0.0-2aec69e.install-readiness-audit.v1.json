@@ -27,7 +27,7 @@
     },
     {
       "path": "desktop/src-tauri/nsis/edition-identity.nsh",
-      "sha256": "9e361a39c044ec5ae5c87a63000962acde597f672034510de434c2053525e95b",
+      "sha256": "1d7e885a96f070fad510642d10cd7d8bc89185421ff97a30e497fb222c971ff9",
       "coverage": ["fresh-install", "overlay-upgrade", "uninstall", "shortcut"]
     },
     {
@@ -37,7 +37,7 @@
     },
     {
       "path": "desktop/src-tauri/nsis/webview2-health.nsh",
-      "sha256": "625ef94f41f471890ef0e5ecf6458ac421b4bdfccecaf879d391d8d1c12efb0a",
+      "sha256": "f7d241636ccd8aa76d73911efc222acead62856835d4fad3ce9ef6e4cbcc46f9",
       "coverage": ["webview2"]
     },
     {

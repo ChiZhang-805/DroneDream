@@ -388,6 +388,8 @@ SURFACE_SOURCE_REQUIREMENTS = {
         '!define DRONEDREAM_DISPLAYNAME "DroneDream · SIM"',
         '!error "Unknown DroneDream installer PRODUCTNAME: ${PRODUCTNAME}"',
         "!macro DRONEDREAM_CREATE_DISPLAY_SHORTCUT SHORTCUT_PATH LABEL_PREFIX",
+        'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\\${MAINBINARYNAME}.exe" '
+        '"" "$INSTDIR\\${MAINBINARYNAME}.exe" 0',
         "IsShortcutTarget",
         "SetErrors",
     ),

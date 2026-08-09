@@ -70,12 +70,13 @@
     },
     {
       "path": "desktop/src-tauri/nsis/edition-identity.nsh",
-      "sha256": "9e361a39c044ec5ae5c87a63000962acde597f672034510de434c2053525e95b",
+      "sha256": "1d7e885a96f070fad510642d10cd7d8bc89185421ff97a30e497fb222c971ff9",
       "requiredText": [
         "!else if \"${PRODUCTNAME}\" == \"DroneDream-Sim\"",
         "!define DRONEDREAM_DISPLAYNAME \"DroneDream · SIM\"",
         "!error \"Unknown DroneDream installer PRODUCTNAME: ${PRODUCTNAME}\"",
         "!macro DRONEDREAM_CREATE_DISPLAY_SHORTCUT SHORTCUT_PATH LABEL_PREFIX",
+        "CreateShortcut \"${SHORTCUT_PATH}\" \"$INSTDIR\\${MAINBINARYNAME}.exe\" \"\" \"$INSTDIR\\${MAINBINARYNAME}.exe\" 0",
         "IsShortcutTarget",
         "SetErrors"
       ]
@@ -126,7 +127,7 @@
   },
   "lifecycleReadiness": {
     "path": "distribution/sim/lifecycle/sim-preview-1.0.0-2aec69e.install-readiness-audit.v1.json",
-    "sha256": "6b743cb8fb35327a0a89e8d34531de050aa145aafbb67f7c04e38d6531374fd6",
+    "sha256": "9b86d910ae71a5591ddb6c4bad92ea7c3ecf3addedb864e7492b126dbf982561",
     "requiredPlannedScenarios": [
       "freshInstall",
       "overlayUpgrade",
