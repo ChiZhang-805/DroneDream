@@ -121,6 +121,13 @@ class FieldBrandAssetTests(unittest.TestCase):
                 "../../brand/generated/field/windows/icon.ico",
             ],
         )
+        self.assertEqual(
+            desktop_config["bundle"]["windows"]["nsis"],
+            {
+                "installerIcon": "../../brand/generated/field/windows/icon.ico",
+                "uninstallerIcon": "../../brand/generated/field/windows/icon.ico",
+            },
+        )
 
 
 if __name__ == "__main__":

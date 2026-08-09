@@ -44,6 +44,12 @@
       "../../brand/generated/field/windows/icon.ico": "icons/DroneDream.ico",
       "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md": "licenses/Field-Adapter-THIRD-PARTY-NOTICES.md"
     },
+    "windows": {
+      "nsis": {
+        "installerIcon": "../../brand/generated/field/windows/icon.ico",
+        "uninstallerIcon": "../../brand/generated/field/windows/icon.ico"
+      }
+    },
     "publisher": "DroneDream",
     "shortDescription": "Real-device operations and autonomous field tuning",
     "longDescription": "DroneDream · FIELD provides read-only device discovery and the safety-gated workflow for telemetry, bounded Model + Harness parameter tuning, qualification evidence, snapshots, rollback, preflight, takeover, and emergency operations. It contains no simulation stage, and hardware execution remains gated by native safety contracts."
