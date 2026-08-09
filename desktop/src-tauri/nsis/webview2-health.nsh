@@ -16,9 +16,9 @@
   !include "${DRONEDREAM_EDITION_IDENTITY_FILE}"
 !macroend
 
-; Recreate only shortcuts that already belong to this installation. Pointing
-; at a dedicated icon resource gives Windows a new cache identity when an
-; existing 1.0.0 installation replaces the retired legacy cloud artwork.
+; Recreate only shortcuts that already belong to this installation. The main
+; executable carries the canonical icon selected by the exact Edition overlay,
+; so a shared resource can never make SIM/LAB/FIELD shortcuts look Universal.
 ; Missing shortcuts stay missing, including when the user chose /NS.
 !macro DRONEDREAM_REFRESH_BRANDED_SHORTCUT SHORTCUT_PATH
   !insertmacro IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"
@@ -29,7 +29,7 @@
   ${EndIf}
   ${If} $0 = 1
     Delete "${SHORTCUT_PATH}"
-    CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\icons\DroneDream.ico" 0
+    CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
     !insertmacro SetLnkAppUserModelId "${SHORTCUT_PATH}"
   ${EndIf}
 !macroend

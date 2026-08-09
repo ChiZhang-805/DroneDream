@@ -54,7 +54,9 @@
 
   Delete "${SHORTCUT_PATH}"
   ${LABEL_PREFIX}_create:
-    CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\icons\DroneDream.ico" 0
+    ; Read the icon from the edition-bound executable. Each Tauri overlay embeds
+    ; its canonical Universal/SIM/LAB/FIELD icon in this binary.
+    CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
     !insertmacro SetLnkAppUserModelId "${SHORTCUT_PATH}"
   ${LABEL_PREFIX}_done:
 !macroend

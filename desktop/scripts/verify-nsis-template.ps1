@@ -377,7 +377,7 @@ foreach ($required in @(
     '!macro DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT DISPLAY_PATH INTERNAL_PATH LABEL_PREFIX',
     'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe"',
     'IsShortcutTarget "${SHORTCUT_PATH}" "$INSTDIR\$OldMainBinaryName"',
-    'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\icons\DroneDream.ico" 0',
+    'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0',
     'DRONEDREAM_MIGRATE_INTERNAL_SHORTCUT "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk" "$DESKTOP\${PRODUCTNAME}.lnk"',
     'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$DESKTOP\${PRODUCTNAME}.lnk"',
     'DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"',
@@ -388,6 +388,17 @@ foreach ($required in @(
     if (-not $installerHook.Contains($required)) {
         throw "Durable installer quiesce contract is missing: $required"
     }
+}
+
+$editionShortcut =
+    'CreateShortcut "${SHORTCUT_PATH}" "$INSTDIR\${MAINBINARYNAME}.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0'
+if (-not $editionIdentity.Contains($editionShortcut) -or
+    -not $installerHook.Contains($editionShortcut)) {
+    throw "Desktop and Start Menu shortcuts must read the exact Edition icon from the main executable"
+}
+if ($editionIdentity -match 'CreateShortcut[^\r\n]+DroneDream\.ico' -or
+    $installerHook -match 'CreateShortcut[^\r\n]+DroneDream\.ico') {
+    throw "Shortcuts must not use the shared legacy icon resource"
 }
 
 $officialBrandIconPath = Join-Path $repoRoot "docs\assets\drone-dream-icon.png"
