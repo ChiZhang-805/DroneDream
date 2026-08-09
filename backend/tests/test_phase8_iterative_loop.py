@@ -993,9 +993,18 @@ def test_llm_harness_heartbeat_prevents_live_claim_takeover(
     worker = threading.Thread(target=finalize_in_thread, daemon=True)
     worker.start()
     try:
-        assert entered.wait(timeout=provider_wait_timeout_seconds), (
-            "finalizer never reached provider"
-        )
+        provider_entry_deadline = time.monotonic() + provider_wait_timeout_seconds
+        while not entered.wait(timeout=0.05):
+            if errors:
+                raise AssertionError(
+                    "finalizer failed before reaching provider"
+                ) from errors[0]
+            assert worker.is_alive(), (
+                "finalizer exited before reaching provider without an error"
+            )
+            assert time.monotonic() < provider_entry_deadline, (
+                "finalizer never reached provider"
+            )
         with ctx["db_module"].SessionLocal() as db:
             job = db.get(ctx["models"].Job, job_id)
             initial_token = job.finalization_claim_token

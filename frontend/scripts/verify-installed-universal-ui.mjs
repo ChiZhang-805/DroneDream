@@ -214,7 +214,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert.equal(startupTheme.grantsHardwareAuthority, "false");
   assert.deepEqual(startupTheme.colors, canonicalColors[expectedThemeEdition]);
   let scene = null;
-  let surfaceScreenshot = null;
+  let surfaceScreenshot;
   if (authenticatedWorkspace) {
     surfaceScreenshot = await saveScreenshot(page, "workspace");
   } else {
