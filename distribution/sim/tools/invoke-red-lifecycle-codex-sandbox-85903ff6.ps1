@@ -784,7 +784,11 @@ try {
         [long]$applicationDocument.artifact.bytes -ne $expectedArtifactBytes -or
         [string]$applicationDocument.disposableWindowsUser.userName -cne $expectedUserName -or
         [string]$applicationDocument.disposableWindowsUser.sid -cne $expectedUserSid -or
-        [string]$applicationDocument.disposableWindowsUser.profile -cne $expectedUserProfile -or
+        -not [string]::Equals(
+            [IO.Path]::GetFullPath([string]$applicationDocument.disposableWindowsUser.profile).TrimEnd("\"),
+            [IO.Path]::GetFullPath($expectedUserProfile).TrimEnd("\"),
+            [StringComparison]::OrdinalIgnoreCase
+        ) -or
         [string]$applicationDocument.toolBundle.contractSha256 -cne (Get-FileHash -LiteralPath $contractPath -Algorithm SHA256).Hash.ToLowerInvariant()) {
         throw "Lifecycle runner or application identity drifted."
     }

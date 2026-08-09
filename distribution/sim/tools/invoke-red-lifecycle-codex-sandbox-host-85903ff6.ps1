@@ -179,9 +179,17 @@ if ([string]$application.editionId -cne "sim" -or
     [long]$application.artifact.bytes -ne 12070633 -or
     [string]$application.disposableWindowsUser.userName -cne $expectedUserName -or
     [string]$application.disposableWindowsUser.sid -cne $expectedUserSid -or
-    [string]$application.disposableWindowsUser.profile -cne $expectedUserProfile -or
+    -not [string]::Equals(
+        [IO.Path]::GetFullPath([string]$application.disposableWindowsUser.profile).TrimEnd("\"),
+        [IO.Path]::GetFullPath($expectedUserProfile).TrimEnd("\"),
+        [StringComparison]::OrdinalIgnoreCase
+    ) -or
     [string]$application.toolBundle.hostLauncherSha256 -cne $ExpectedLauncherSha256 -or
-    [string]$application.ownedSurface.sharedRoot -cne $sharedRoot) {
+    -not [string]::Equals(
+        [IO.Path]::GetFullPath([string]$application.ownedSurface.sharedRoot).TrimEnd("\"),
+        [IO.Path]::GetFullPath($sharedRoot).TrimEnd("\"),
+        [StringComparison]::OrdinalIgnoreCase
+    )) {
     throw "Lifecycle application contract drifted."
 }
 
