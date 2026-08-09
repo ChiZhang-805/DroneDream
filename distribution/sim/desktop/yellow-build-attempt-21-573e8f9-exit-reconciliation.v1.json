@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-build-exit-reconciliation",
+  "recordVersion": "1.0.0",
+  "editionId": "sim",
+  "state": "artifact-built-outer-exit-failed-cleanup-reconciled-no-retry",
+  "sourceSeparation": {
+    "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+    "productSourceTree": "57771ea1cbac8bc22453cf02f76bbb6bb547afb2",
+    "executionEvidenceHead": "831716296101626187749e1778d711947e5475f8",
+    "evidenceIsProductSource": false
+  },
+  "attempt": {
+    "globalApplicationOrdinal": 21,
+    "launcherInvocations": 1,
+    "publicVariableFetches": 2,
+    "preflightInvocations": 1,
+    "prepareInvocations": 1,
+    "executeInvocations": 1,
+    "snapshotInvocations": 1,
+    "selectedCacheCopies": 648,
+    "npmCiInvocations": 4,
+    "junctionsCreated": 2,
+    "buildScriptInvocations": 1,
+    "frontendBuilds": 1,
+    "tauriBuilds": 1,
+    "cargoBuilds": 1,
+    "nsisBuilds": 1,
+    "artifactBuilds": 1,
+    "retryCount": 0,
+    "outerLauncherExitCode": 1
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal21-573e8f9/bundle/DroneDream-Sim-1.0.0.exe",
+    "bytes": 12070633,
+    "sha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+    "buildReceiptState": "built-frozen-awaiting-static-acceptance",
+    "createdBeforeCleanupFailure": true,
+    "rebuiltOrRelabelledAfterFailure": false
+  },
+  "failure": {
+    "classification": "postbuild-owned-junction-target-verifier-false-negative",
+    "entryPath": "distribution/sim/desktop/invoke-yellow-build-attempt-21-573e8f9.ps1",
+    "entrySha256AtExecution": "4f377d067339516ef5cf47e15aa37775313a5b1e7517c1328a59a0d0a8fd4f92",
+    "failingFunction": "Remove-ExactJunction",
+    "reason": "Resolve-Path returned the junction link path rather than the FileSystemInfo.Target value, so exact owned targets were incorrectly reported as mismatches.",
+    "productBytesAffected": false,
+    "nativeGitProbeWarningAlsoObserved": true,
+    "nativeGitProbeWarningClassification": "expected-non-git-dependency-root-probe-emitted-stderr-and-did-not-change-the-build-result"
+  },
+  "boundedCleanup": {
+    "performedAfterFailure": true,
+    "junctionDeleteInvocations": 2,
+    "recursiveDeleteInvocations": 0,
+    "targetDirectoriesDeleted": false,
+    "desktop": {
+      "link": "C:/Users/zju20/ddss3/desktop/node_modules",
+      "expectedTarget": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-ac4e29a5f75e9dd0/desktop/node_modules",
+      "linkTypeVerified": "Junction",
+      "targetExact": true,
+      "removed": true
+    },
+    "frontend": {
+      "link": "C:/Users/zju20/ddss3/frontend/node_modules",
+      "expectedTarget": "C:/Users/zju20/AppData/Local/DroneDream/codex-dependencies/npm/npm-win32-x64-ac4e29a5f75e9dd0/frontend/node_modules",
+      "linkTypeVerified": "Junction",
+      "targetExact": true,
+      "removed": true
+    },
+    "detachedSourceCleanAfterCleanup": true
+  },
+  "correction": {
+    "modulePath": "distribution/sim/desktop/junction-ownership.psm1",
+    "historicalEntryModified": false,
+    "futureBehavior": "read FileSystemInfo.Target, require one absolute exact target, require directory Junction, delete only the link itself, and fail closed for mismatch or ordinary paths"
+  },
+  "nonClaims": {
+    "outerLauncherPassed": false,
+    "buildRetried": false,
+    "installerExecuted": false,
+    "runtimeStarted": false,
+    "px4OrGazeboStarted": false,
+    "hardwareUsed": false,
+    "websiteDeployed": false,
+    "releaseReady": false
+  }
+}
