@@ -43,10 +43,13 @@ if ((Split-Path -Leaf $installerPath) -cne "DroneDream-Universal-1.0.0.exe") {
 }
 
 $canonicalIcon = Join-Path $repoRoot "brand\generated\universal\windows\icon.ico"
+$canonicalPng = Join-Path $repoRoot "brand\generated\universal\windows\32x32.png"
 $tauriIcon = Join-Path $repoRoot "desktop\src-tauri\icons\icon.ico"
 $canonicalIconSha256 = (Get-FileHash -LiteralPath $canonicalIcon -Algorithm SHA256).Hash.ToLowerInvariant()
+$canonicalPngSha256 = (Get-FileHash -LiteralPath $canonicalPng -Algorithm SHA256).Hash.ToLowerInvariant()
 $tauriIconSha256 = (Get-FileHash -LiteralPath $tauriIcon -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($canonicalIconSha256 -cne "88223fab6c2b0d493aaedab932c04d40def4da58e28f6d670adbfd745a6ca8ba" -or
+    $canonicalPngSha256 -cne "acd4ef1fc198bf157c73c26edfb6c2814d46286857b69bfbd857a7328243d19f" -or
     $tauriIconSha256 -cne $canonicalIconSha256) {
     throw "Universal canonical and Tauri icon bytes are not the approved purple asset."
 }
@@ -131,6 +134,32 @@ function Save-AssociatedIconPng {
     finally { $icon.Dispose() }
 }
 
+function Test-ImagePixelEquality {
+    param([string]$Reference, [string]$Actual)
+    Add-Type -AssemblyName System.Drawing
+    $referenceBitmap = [Drawing.Bitmap]::FromFile($Reference)
+    $actualBitmap = [Drawing.Bitmap]::FromFile($Actual)
+    try {
+        if ($referenceBitmap.Width -ne $actualBitmap.Width -or
+            $referenceBitmap.Height -ne $actualBitmap.Height) {
+            return $false
+        }
+        for ($y = 0; $y -lt $referenceBitmap.Height; $y++) {
+            for ($x = 0; $x -lt $referenceBitmap.Width; $x++) {
+                if ($referenceBitmap.GetPixel($x, $y).ToArgb() -ne
+                    $actualBitmap.GetPixel($x, $y).ToArgb()) {
+                    return $false
+                }
+            }
+        }
+        return $true
+    }
+    finally {
+        $referenceBitmap.Dispose()
+        $actualBitmap.Dispose()
+    }
+}
+
 function Save-EvidenceBoard {
     param([object[]]$Surfaces, [string]$Destination)
     Add-Type -AssemblyName System.Drawing
@@ -179,6 +208,7 @@ $receipt = [ordered]@{
     executionToolHead = (& git -C $repoRoot rev-parse HEAD).Trim()
     installer = [ordered]@{ path = $installerPath; bytes = $actualBytes; sha256 = $actualSha256 }
     canonicalIcon = [ordered]@{ path = $canonicalIcon; bytes = (Get-Item $canonicalIcon).Length; sha256 = $canonicalIconSha256 }
+    canonicalPng = [ordered]@{ path = $canonicalPng; bytes = (Get-Item $canonicalPng).Length; sha256 = $canonicalPngSha256 }
     preflight = $preflight
     counts = [ordered]@{ installer = 0; uninstaller = 0; ownedCleanup = 0; shortcutBackups = 0; shortcutRestores = 0 }
     surfaces = @()
@@ -234,6 +264,9 @@ try {
         $surface = $surfaceInputs[$index]
         $png = Join-Path $outputRootFull ("surface-{0}.png" -f $index)
         Save-AssociatedIconPng -Source $surface.source -Destination $png
+        if (-not (Test-ImagePixelEquality -Reference $canonicalPng -Actual $png)) {
+            throw "The $($surface.label) icon pixels do not match the canonical Universal icon."
+        }
         $sourceSha = (Get-FileHash -LiteralPath $surface.source -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($index -ge 2 -and ([string]$surface.source).EndsWith(".ico", [StringComparison]::OrdinalIgnoreCase) -and $sourceSha -cne $canonicalIconSha256) {
             throw "Shortcut icon source is not the canonical Universal icon: $($surface.source)"
