@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-abort",
+  "editionId": "sim",
+  "executionOrdinal": 3,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "26329e4ad06a8f020c18b83ccb569e68eecc0fe5",
+  "artifactSha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-3.v1.json",
+    "bytes": 9028,
+    "sha256": "cede95b2b626ace78f7e99e2f81ca46d96c4be3ffb3c4647c89a14468ac08fe8"
+  },
+  "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal3",
+  "hostProtectionReceipt": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal3/host-evidence/canonical-current-user-protection-receipt.json",
+    "bytes": 14143,
+    "sha256": "b4610ff2937af614c9d428464d1e1c55002ff36f2b8205e0e3e685b2228d56cf",
+    "runAsExitCode": -1,
+    "canonicalCurrentUserProtectedStateUnchanged": true
+  },
+  "classification": "background-tool-session-console-not-user-visible",
+  "controlledAbort": {
+    "ownedRunAsProcessStopped": true,
+    "hostProcessExitedNormallyAfterChildStop": true,
+    "otherEditionProcessesTouched": false
+  },
+  "mutationCounts": {
+    "sharedStagingRootsCreated": 1,
+    "interactiveRunAsInvocations": 1,
+    "guestRunnerInvocations": 0,
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReads": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "retries": 0
+  },
+  "historicalOwnedRootReadOnly": true,
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "launch-host-through-cmd-start-visible-console"
+}
