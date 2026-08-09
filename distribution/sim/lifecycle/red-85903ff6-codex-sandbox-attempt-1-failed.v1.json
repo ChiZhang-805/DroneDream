@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-failure",
+  "editionId": "sim",
+  "executionOrdinal": 1,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "ee046d75714434bf3035644b1e9374bfd4ff8334",
+  "artifact": {
+    "bytes": 12070633,
+    "sha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae"
+  },
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application.v1.json",
+    "bytes": 8124,
+    "sha256": "00f7c9ca70b012bc246ddf0c9bb4c4b25b96c820a216a9aa0233eff731e5526d"
+  },
+  "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal1",
+  "hostProtectionReceipt": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal1/host-evidence/canonical-current-user-protection-receipt.json",
+    "bytes": 14142,
+    "sha256": "5f044f99d0f4c079519ab6705c146f70c2967fe9d8fcc13ab6c61c85694124f0",
+    "runAsExitCode": 1,
+    "canonicalCurrentUserProtectedStateUnchanged": true
+  },
+  "hostProtectedStateBefore": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal1/host-evidence/canonical-current-user-protected-state-before.json",
+    "bytes": 4621,
+    "sha256": "06b04439b62dfe65c218e7b51b732ff6b5d07fcae02d2d9bd7553716e435a1a1"
+  },
+  "classification": "interactive-runas-exited-before-guest-start",
+  "concurrentDisposableUserLifecycleProcessesObservedAfterFailure": true,
+  "mutationCounts": {
+    "sharedStagingRootsCreated": 1,
+    "interactiveRunAsInvocations": 1,
+    "guestRunnerInvocations": 0,
+    "freshInstallerInvocations": 0,
+    "overlayInstallerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReads": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "retries": 0
+  },
+  "historicalOwnedRootReadOnly": true,
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "new-ordinal-with-pre-staging-disposable-user-concurrency-gate"
+}

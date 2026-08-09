@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application.v1.json"
+APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-2.v1.json"
 HOST = REPO / "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-host-85903ff6.ps1"
 GUEST = REPO / "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-85903ff6.ps1"
 
@@ -19,6 +19,7 @@ def load_application() -> dict:
 def test_application_binds_frozen_artifact_and_tool_bundle() -> None:
     application = load_application()
     assert application["editionId"] == "sim"
+    assert application["executionOrdinal"] == 2
     assert application["state"] == "awaiting-user-present-start"
     assert application["sourceSeparation"]["productSourceCommit"] == (
         "573e8f991eba703bbfd6c4b35f464fbaab78903c"
@@ -107,6 +108,8 @@ def test_host_launcher_has_one_interactive_runas_and_no_password_channel() -> No
     assert '"unloaded-or-inaccessible"' in host
     assert "Get-HostProtectedState" in host
     assert "canonicalCurrentUserProtectedStateUnchanged" in host
+    assert "CodexSandboxOffline is occupied by another Edition lifecycle process" in host
+    assert '$_.CommandLine -match "(Lab-RED|Field-RED|Sim-RED)"' in host
     forbidden = ("ConvertTo-SecureString", "PSCredential", "-Credential", "Read-Host")
     assert all(token not in host for token in forbidden)
 

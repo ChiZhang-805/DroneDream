@@ -33,10 +33,15 @@ $application = Get-Content -LiteralPath $applicationFull -Raw | ConvertFrom-Json
 $expectedUserName = "CodexSandboxOffline"
 $expectedUserSid = "S-1-5-21-2197768555-4123441877-442284878-1020"
 $expectedUserProfile = "C:\Users\CodexSandboxOffline"
-$sharedRoot = "C:\Users\Public\Documents\DroneDream-Codex\Sim-RED\sim-red-final-85903ff6-ordinal1"
+$executionOrdinal = [int]$application.executionOrdinal
+if ($executionOrdinal -lt 1) {
+    throw "Lifecycle application execution ordinal is invalid."
+}
+$expectedSharedRoot = "C:\Users\Public\Documents\DroneDream-Codex\Sim-RED\sim-red-final-85903ff6-ordinal$executionOrdinal"
+$sharedRoot = [IO.Path]::GetFullPath([string]$application.ownedSurface.sharedRoot)
 $sharedToolRoot = Join-Path $sharedRoot "tool"
 $sharedIntakeRoot = Join-Path $sharedRoot "intake"
-$sharedApplication = Join-Path $sharedToolRoot "red-85903ff6-codex-sandbox-application.v1.json"
+$sharedApplication = Join-Path $sharedToolRoot (Split-Path -Leaf $applicationFull)
 $sharedGuestRunner = Join-Path $sharedToolRoot "invoke-red-lifecycle-codex-sandbox-85903ff6.ps1"
 $sharedContract = Join-Path $sharedToolRoot "edition-installer-lifecycle-contract.ps1"
 $sharedStaticAcceptance = Join-Path $sharedToolRoot "yellow-build-attempt-21-573e8f9-static-accepted.v1.json"
@@ -174,6 +179,7 @@ $applicationRecord = Get-ExactFileRecord `
 
 if ([string]$application.editionId -cne "sim" -or
     [string]$application.state -cne "awaiting-user-present-start" -or
+    [int]$application.executionOrdinal -ne $executionOrdinal -or
     [string]$application.sourceSeparation.productSourceCommit -cne "573e8f991eba703bbfd6c4b35f464fbaab78903c" -or
     [string]$application.artifact.sha256 -cne "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae" -or
     [long]$application.artifact.bytes -ne 12070633 -or
@@ -187,7 +193,7 @@ if ([string]$application.editionId -cne "sim" -or
     [string]$application.toolBundle.hostLauncherSha256 -cne $ExpectedLauncherSha256 -or
     -not [string]::Equals(
         [IO.Path]::GetFullPath([string]$application.ownedSurface.sharedRoot).TrimEnd("\"),
-        [IO.Path]::GetFullPath($sharedRoot).TrimEnd("\"),
+        [IO.Path]::GetFullPath($expectedSharedRoot).TrimEnd("\"),
         [StringComparison]::OrdinalIgnoreCase
     )) {
     throw "Lifecycle application contract drifted."
@@ -230,6 +236,20 @@ $profileState = if ($profileHiveLoaded) { "loaded" } else { "unloaded-or-inacces
 Assert-OrdinaryDirectory -Path "C:\Users\Public"
 Assert-OrdinaryDirectory -Path "C:\Users\Public\Documents"
 
+$conflictingLifecycleProcesses = @(
+    Get-CimInstance Win32_Process |
+        Where-Object {
+            $_.ProcessId -ne $PID -and
+            $_.Name -in @("powershell.exe", "runas.exe") -and
+            $_.CommandLine -match "CodexSandboxOffline" -and
+            $_.CommandLine -match "(Lab-RED|Field-RED|Sim-RED)"
+        } |
+        Select-Object ProcessId, ParentProcessId, Name
+)
+if ($Mode -ceq "StageAndRunAs" -and $conflictingLifecycleProcesses.Count -ne 0) {
+    throw "CodexSandboxOffline is occupied by another Edition lifecycle process; refusing concurrent staging or install."
+}
+
 if (Test-Path -LiteralPath $sharedRoot) {
     throw "The exact lifecycle shared root already exists; refusing reuse."
 }
@@ -247,6 +267,7 @@ $plan = [ordered]@{
         sid = $expectedUserSid
         profile = $expectedUserProfile
         profileState = $profileState
+        conflictingLifecycleProcessCount = $conflictingLifecycleProcesses.Count
         enabled = $true
         passwordReadRecordedOrTransmitted = $false
     }
