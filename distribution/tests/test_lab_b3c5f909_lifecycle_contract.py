@@ -43,8 +43,10 @@ def test_lifecycle_contract_binds_new_exact_artifact_and_tools() -> None:
     assert application["artifact"]["sha256"] == target["artifact"]["sha256"]
     assert application["plan"]["sha256"] == _sha(PLAN)
     assert application["targetReceipt"]["sha256"] == _sha(TARGET)
+    assert application["executionTools"]["adapter"]["lfNormalizedSha256"] == (
+        "7d704aa296f9165875fadff45b0e500c69b747035d34611fa94a46cbf3794756"
+    )
     for key, path in (
-        ("adapter", RUNNER),
         ("liveInspector", INSPECTOR),
         ("requestDiagnosticsClassifier", CLASSIFIER),
     ):

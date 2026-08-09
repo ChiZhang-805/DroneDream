@@ -50,8 +50,10 @@ def test_final_lifecycle_contract_binds_exact_artifact_and_tools() -> None:
     assert application["artifact"]["sha256"] == target["artifact"]["sha256"]
     assert application["plan"]["sha256"] == _sha(PLAN)
     assert application["targetReceipt"]["sha256"] == _sha(TARGET)
+    assert application["executionTools"]["adapter"]["lfNormalizedSha256"] == (
+        "7d704aa296f9165875fadff45b0e500c69b747035d34611fa94a46cbf3794756"
+    )
     for key, path in (
-        ("adapter", RUNNER),
         ("liveInspector", INSPECTOR),
         ("requestDiagnosticsClassifier", CLASSIFIER),
     ):
@@ -108,6 +110,10 @@ def test_final_lifecycle_runner_is_parameterized_and_parses() -> None:
         assert non_product_directory in source
     assert "ExcludedTopLevelNames" in source
     assert "e3b427e9d1d6209495d629c399a1962913f2d00c" not in source
+    assert "Get-NormalizedShortcutIconSource" in source
+    assert "Write-LabIconEvidence" in source
+    assert "windows-shell-rendered-icon-evidence" in source
+    assert "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1" in source
     for forbidden in (
         "OPENAI_API_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",

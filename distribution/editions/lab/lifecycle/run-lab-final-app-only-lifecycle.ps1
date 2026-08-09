@@ -46,6 +46,38 @@ function Get-LfNormalizedSha256 {
     }
 }
 
+Add-Type -AssemblyName System.Drawing
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class DroneDreamShellIcon {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    public struct SHFILEINFO {
+        public IntPtr hIcon;
+        public int iIcon;
+        public uint dwAttributes;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string szDisplayName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)]
+        public string szTypeName;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Auto)]
+    public static extern IntPtr SHGetFileInfo(
+        string pszPath,
+        uint dwFileAttributes,
+        ref SHFILEINFO psfi,
+        uint cbFileInfo,
+        uint uFlags
+    );
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool DestroyIcon(IntPtr hIcon);
+}
+"@
+
 $productSource = $ExpectedProductSourceCommit
 $productName = "DroneDream-Lab"
 $displayName = "DroneDream $([char]0x00B7) LAB"
@@ -63,6 +95,9 @@ $startMenuShortcut = Join-Path ([Environment]::GetFolderPath("Programs")) "$disp
 $inspector = Join-Path $PSScriptRoot "inspect-lab-e3b427e-live-webview2.mjs"
 $requestDiagnosticsClassifier = Join-Path $PSScriptRoot "lab-request-origin-diagnostics.mjs"
 $adapterPath = $MyInvocation.MyCommand.Path
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")).Path
+$canonicalLabIcon = Join-Path $repoRoot "brand\generated\lab\windows\icon.ico"
+$canonicalLabIconSha256 = "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
 
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
 $applicationPath = (Resolve-Path -LiteralPath $Application).Path
@@ -92,6 +127,12 @@ $targetReceiptSha256 = (
 $adapterSha256 = Get-LfNormalizedSha256 -Path $adapterPath
 $inspectorSha256 = Get-LfNormalizedSha256 -Path $inspector
 $requestDiagnosticsClassifierSha256 = Get-LfNormalizedSha256 -Path $requestDiagnosticsClassifier
+$actualCanonicalLabIconSha256 = (
+    Get-FileHash -LiteralPath $canonicalLabIcon -Algorithm SHA256
+).Hash.ToLowerInvariant()
+if ($actualCanonicalLabIconSha256 -cne $canonicalLabIconSha256) {
+    throw "The canonical LAB Windows icon does not match the approved asset hash."
+}
 if ($installerItem.Length -ne $ExpectedInstallerBytes -or $installerSha256 -cne $ExpectedInstallerSha256) {
     throw "The exact frozen Lab installer identity does not match the application."
 }
@@ -130,6 +171,14 @@ if ($applicationContract.authorization.segmentAExecutionDecision -cne
 if ($applicationContract.authorization.segmentBExecutionDecision -cne
     "deny-before-real-auth-boundary") {
     throw "Segment B must remain fail-closed."
+}
+if ($applicationContract.iconAcceptance.canonicalWindowsIcon.sha256 -cne
+        $canonicalLabIconSha256 -or
+    $applicationContract.iconAcceptance.shortcutIconSource -cne
+        '$INSTDIR/${MAINBINARYNAME}.exe' -or
+    $applicationContract.iconAcceptance.requiredSurfaces.Count -ne 4 -or
+    $applicationContract.iconAcceptance.actualShellRenderedEvidenceRequired -ne $true) {
+    throw "The exact LAB icon acceptance contract is missing or incomplete."
 }
 if ($applicationContract.attempt.maximumExecutionInvocations -ne 1 -or
     $applicationContract.attempt.automaticRetryMaximum -ne 0 -or
@@ -282,6 +331,184 @@ function Get-ShortcutRecord {
     }
 }
 
+function Get-NormalizedShortcutIconSource {
+    param([Parameter(Mandatory = $true)][string]$IconLocation)
+    $source = ($IconLocation -replace ',\s*-?\d+$', '').Trim().Trim('"')
+    if ([string]::IsNullOrWhiteSpace($source)) {
+        throw "A LAB shortcut has no explicit icon source."
+    }
+    return [IO.Path]::GetFullPath($source)
+}
+
+function Get-ShellIconBitmap {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        throw "Icon evidence source is missing: $Path"
+    }
+    $info = New-Object DroneDreamShellIcon+SHFILEINFO
+    $flags = [uint32](0x000000100 -bor 0x000000000)
+    $result = [DroneDreamShellIcon]::SHGetFileInfo(
+        $Path,
+        0,
+        [ref]$info,
+        [Runtime.InteropServices.Marshal]::SizeOf($info),
+        $flags
+    )
+    if ($result -eq [IntPtr]::Zero -or $info.hIcon -eq [IntPtr]::Zero) {
+        throw "Windows Shell could not render an icon for: $Path"
+    }
+    try {
+        $icon = [Drawing.Icon]::FromHandle($info.hIcon).Clone()
+        try {
+            return $icon.ToBitmap()
+        } finally {
+            $icon.Dispose()
+        }
+    } finally {
+        [DroneDreamShellIcon]::DestroyIcon($info.hIcon) | Out-Null
+    }
+}
+
+function Get-RenderedIconRecord {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$SourcePath,
+        [Parameter(Mandatory = $true)][string]$DestinationPath
+    )
+    $sourceBitmap = Get-ShellIconBitmap -Path $SourcePath
+    $normalized = New-Object Drawing.Bitmap 128, 128, ([Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    try {
+        $graphics = [Drawing.Graphics]::FromImage($normalized)
+        try {
+            $graphics.Clear([Drawing.Color]::Transparent)
+            $graphics.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+            $graphics.PixelOffsetMode = [Drawing.Drawing2D.PixelOffsetMode]::Half
+            $graphics.DrawImage($sourceBitmap, 0, 0, 128, 128)
+        } finally {
+            $graphics.Dispose()
+        }
+        $normalized.Save($DestinationPath, [Drawing.Imaging.ImageFormat]::Png)
+        $pixelBytes = New-Object byte[] (128 * 128 * 4)
+        $index = 0
+        $labPaletteHits = 0
+        $palette = @(
+            [Drawing.ColorTranslator]::FromHtml("#A7E84A"),
+            [Drawing.ColorTranslator]::FromHtml("#20C77A"),
+            [Drawing.ColorTranslator]::FromHtml("#087E69")
+        )
+        for ($y = 0; $y -lt 128; $y++) {
+            for ($x = 0; $x -lt 128; $x++) {
+                $pixel = $normalized.GetPixel($x, $y)
+                $pixelBytes[$index++] = $pixel.A
+                $pixelBytes[$index++] = $pixel.R
+                $pixelBytes[$index++] = $pixel.G
+                $pixelBytes[$index++] = $pixel.B
+                foreach ($expected in $palette) {
+                    if ([Math]::Abs([int]$pixel.R - [int]$expected.R) -le 8 -and
+                        [Math]::Abs([int]$pixel.G - [int]$expected.G) -le 8 -and
+                        [Math]::Abs([int]$pixel.B - [int]$expected.B) -le 8 -and
+                        $pixel.A -gt 0) {
+                        $labPaletteHits++
+                        break
+                    }
+                }
+            }
+        }
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try {
+            $pixelSha256 = ([BitConverter]::ToString($sha.ComputeHash($pixelBytes))).Replace("-", "").ToLowerInvariant()
+        } finally {
+            $sha.Dispose()
+        }
+        if ($labPaletteHits -eq 0) {
+            throw "Rendered $Name icon does not contain the approved LAB green palette."
+        }
+        return [ordered]@{
+            name = $Name
+            sourcePath = $SourcePath
+            pngPath = $DestinationPath
+            pngSha256 = (Get-FileHash -LiteralPath $DestinationPath -Algorithm SHA256).Hash.ToLowerInvariant()
+            pixelSha256 = $pixelSha256
+            labPaletteHits = $labPaletteHits
+            width = 128
+            height = 128
+        }
+    } finally {
+        $normalized.Dispose()
+        $sourceBitmap.Dispose()
+    }
+}
+
+function Write-LabIconEvidence {
+    param([Parameter(Mandatory = $true)][string]$Stage)
+    $iconRoot = Join-Path $outputPath "icon-evidence\$Stage"
+    New-Item -ItemType Directory -Path $iconRoot -Force | Out-Null
+    $surfaces = [ordered]@{
+        canonical = $canonicalLabIcon
+        installer = $installerPath
+        installedExe = $appBinary
+        desktopShortcut = $desktopShortcut
+        startMenuShortcut = $startMenuShortcut
+    }
+    $records = foreach ($entry in $surfaces.GetEnumerator()) {
+        Get-RenderedIconRecord `
+            -Name $entry.Key `
+            -SourcePath $entry.Value `
+            -DestinationPath (Join-Path $iconRoot "$($entry.Key).png")
+    }
+    $canonicalPixels = @($records | Where-Object name -eq "canonical")[0].pixelSha256
+    foreach ($record in @($records | Where-Object name -ne "canonical")) {
+        if ($record.pixelSha256 -cne $canonicalPixels) {
+            throw "Rendered $($record.name) icon differs from the canonical LAB icon."
+        }
+    }
+    $sheet = New-Object Drawing.Bitmap 640, 160, ([Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    try {
+        $graphics = [Drawing.Graphics]::FromImage($sheet)
+        try {
+            $graphics.Clear([Drawing.Color]::FromArgb(9, 32, 25))
+            $font = New-Object Drawing.Font "Segoe UI", 9
+            try {
+                $index = 0
+                foreach ($record in $records) {
+                    $image = [Drawing.Image]::FromFile($record.pngPath)
+                    try { $graphics.DrawImage($image, ($index * 128), 0, 128, 128) } finally { $image.Dispose() }
+                    $graphics.DrawString($record.name, $font, [Drawing.Brushes]::White, ($index * 128 + 4), 136)
+                    $index++
+                }
+            } finally {
+                $font.Dispose()
+            }
+        } finally {
+            $graphics.Dispose()
+        }
+        $sheetPath = Join-Path $iconRoot "lab-icon-shell-render-sheet.png"
+        $sheet.Save($sheetPath, [Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+        $sheet.Dispose()
+    }
+    $evidence = [ordered]@{
+        stage = $Stage
+        evidenceClass = "windows-shell-rendered-icon-evidence"
+        canonicalIconSha256 = $canonicalLabIconSha256
+        records = @($records)
+        sheetPath = $sheetPath
+        sheetSha256 = (Get-FileHash -LiteralPath $sheetPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        allRenderedIconsMatchCanonical = $true
+        approvedLabGreenVisible = $true
+    }
+    $evidencePath = Join-Path $iconRoot "lab-icon-evidence.json"
+    $evidence | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $evidencePath -Encoding UTF8
+    $events.Add([ordered]@{
+        stage = "$Stage-icon-acceptance"
+        evidencePath = $evidencePath
+        evidenceSha256 = (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        sheetPath = $sheetPath
+        sheetSha256 = $evidence.sheetSha256
+        allRenderedIconsMatchCanonical = $true
+    })
+}
+
 function Get-WebView2Record {
     $guid = "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
     $keys = @(
@@ -404,10 +631,12 @@ function Assert-LabInstalled {
     }
     foreach ($shortcutPath in @($desktopShortcut, $startMenuShortcut)) {
         $shortcut = Get-ShortcutRecord -Path $shortcutPath
-        if (-not $shortcut.exists -or $shortcut.target -cne $appBinary) {
+        if (-not $shortcut.exists -or $shortcut.target -cne $appBinary -or
+            (Get-NormalizedShortcutIconSource -IconLocation $shortcut.iconLocation) -cne $appBinary) {
             throw "$Stage produced an invalid Lab shortcut: $shortcutPath"
         }
     }
+    Write-LabIconEvidence -Stage $Stage
     $counters.shortcutIdentityChecks++
     $events.Add([ordered]@{ stage = $Stage; labIdentityAccepted = $true })
 }
