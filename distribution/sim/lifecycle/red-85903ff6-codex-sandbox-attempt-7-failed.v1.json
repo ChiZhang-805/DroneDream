@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-failure",
+  "editionId": "sim",
+  "executionOrdinal": 7,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "2f9fed706bc94a48bb2938ff104ed592be92aac7",
+  "artifactSha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-7.v1.json",
+    "bytes": 8988,
+    "sha256": "aef12cdd65e29288d12879697f8f76561d6268a1b083fe19a392da6a78a025c7"
+  },
+  "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal7",
+  "hostProtectionReceipt": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal7/host-evidence/canonical-current-user-protection-receipt.json",
+    "bytes": 14142,
+    "sha256": "60da2fa53f0549f6c5684aad073fe2a2384e149687990043a6d17b15ed51a4da",
+    "runAsExitCode": 1,
+    "canonicalCurrentUserProtectedStateUnchanged": true
+  },
+  "visibleHostTranscript": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/host-launcher-evidence/sim-red-final-85903ff6-ordinal7.txt",
+    "bytes": 1974,
+    "sha256": "5f842d35693906f1da9e5d8864df0bc0872a2d04a79e9331438c943f310f8ab9",
+    "containsCredentialValue": false
+  },
+  "classification": "windows-terminal-pseudoconsole-runas-input-unavailable-before-guest-start",
+  "mutationCounts": {
+    "visibleHostLaunchers": 1,
+    "sharedStagingRootsCreated": 1,
+    "interactiveRunAsInvocations": 1,
+    "guestRunnerInvocations": 0,
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReadsByAutomation": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "historicalOwnedRootReadOnly": true,
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "launch-fresh-ordinal-through-explicit-classic-conhost"
+}

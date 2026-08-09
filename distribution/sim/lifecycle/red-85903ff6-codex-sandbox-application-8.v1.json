@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-final-lifecycle-application",
+  "applicationVersion": "1.0.0",
+  "editionId": "sim",
+  "executionOrdinal": 8,
+  "state": "awaiting-user-present-start",
+  "sourceSeparation": {
+    "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+    "productSourceTree": "57771ea1cbac8bc22453cf02f76bbb6bb547afb2",
+    "staticEvidenceCommit": "1407f996cd06766703c4466d5453e41f2801455e",
+    "toolEvidenceHeadPolicy": "exact-clean-head-containing-this-application-and-runners",
+    "toolEvidenceIsProductSource": false
+  },
+  "priorAttempt": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-attempt-7-failed.v1.json",
+    "classification": "windows-terminal-pseudoconsole-runas-input-unavailable-before-guest-start",
+    "installerInvocations": 0,
+    "ownedRootReadOnly": true,
+    "reuseAllowed": false
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal21-573e8f9/bundle/DroneDream-Sim-1.0.0.exe",
+    "fileName": "DroneDream-Sim-1.0.0.exe",
+    "bytes": 12070633,
+    "sha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+    "authenticodeState": "NotSigned",
+    "peCertificateTableOffset": 0,
+    "peCertificateTableBytes": 0,
+    "updaterCompanion": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal21-573e8f9/bundle/DroneDream-Sim-1.0.0.exe.sig",
+      "bytes": 428,
+      "sha256": "aae99e53642807329b19283e3a0c00928c848b61757e4379d32cf8d2db406293",
+      "verifiedKeyId": "BA3FDCAF71CE2FF5"
+    },
+    "checksumCompanion": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-ordinal21-573e8f9/bundle/DroneDream-Sim-1.0.0.exe.sha256",
+      "bytes": 92,
+      "sha256": "88fcd7a93f85c7db175e48aff9be8a168f8930a3fd5ef31e9734c81ef35d594b"
+    },
+    "staticAcceptancePath": "distribution/sim/desktop/yellow-build-attempt-21-573e8f9-static-accepted.v1.json",
+    "staticAcceptanceBytes": 9912,
+    "staticAcceptanceSha256": "a79b378c25ce8e4ede2b7bf6e5b215ee6f54532a91ed0acb67ce0bd940b335a9",
+    "rebuildAllowed": false,
+    "relabelAllowed": false
+  },
+  "canonicalSimBrand": {
+    "icoPath": "distribution/sim/desktop/icons/dronedream-sim.ico",
+    "icoBytes": 54431,
+    "icoSha256": "9683781a32b9292aecfdc5044c2841089c9f2b4e8a04e0a24ebefcc799c2982c",
+    "icoFrameCount": 9,
+    "centeredLockupSha256": "f3dd34d3e1a546e4299370d6cbe21d9f03b07a5910dcae061a322ba6c548fd6e",
+    "centeredGapPixels": {"left": 53, "right": 53, "tolerance": 0},
+    "staticInstallerAndAppIconPixelMatch": true,
+    "shortcutIconContract": "desktop-and-start-menu-shortcuts-must-resolve-icon-from-installed-main-executable",
+    "visibleInstalledShortcutAcceptancePending": true
+  },
+  "disposableWindowsUser": {
+    "userName": "CodexSandboxOffline",
+    "sid": "S-1-5-21-2197768555-4123441877-442284878-1020",
+    "profile": "C:/Users/CodexSandboxOffline",
+    "hostPlanProfileState": "unloaded-or-inaccessible",
+    "mustBePreExisting": true,
+    "mustBeEnabled": true,
+    "passwordEntry": "interactive-runas-window-by-user-only",
+    "passwordReadAllowed": false,
+    "passwordRecordAllowed": false,
+    "passwordTransmitAllowed": false,
+    "systemFeatureChangesAllowed": false
+  },
+  "toolBundle": {
+    "visibleHostPath": "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-visible-host-85903ff6.ps1",
+    "visibleHostBytes": 2418,
+    "visibleHostSha256": "9875179691b37136097af3dd23f06b0a44f603c575afd57573ae42cf0c9f0b47",
+    "hostLauncherPath": "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-host-85903ff6.ps1",
+    "hostLauncherBytes": 17473,
+    "hostLauncherSha256": "b94864f953ad419a857feed29a0428bb90d73e45570114d903d2128688623bdb",
+    "guestRunnerPath": "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-85903ff6.ps1",
+    "guestRunnerBytes": 40534,
+    "guestRunnerSha256": "ab4dd273ef042b6795bcd590b58457fddc126043d1771eff2b27b6dcae05d304",
+    "contractPath": "desktop/scripts/edition-installer-lifecycle-contract.ps1",
+    "contractBytes": 4025,
+    "contractSha256": "f2ca2c92a1a6b7f267041002d838599c550438e6ea4490970f94ca2c76d17d4e",
+    "staticAcceptancePath": "distribution/sim/desktop/yellow-build-attempt-21-573e8f9-static-accepted.v1.json",
+    "staticAcceptanceBytes": 9912,
+    "staticAcceptanceSha256": "a79b378c25ce8e4ede2b7bf6e5b215ee6f54532a91ed0acb67ce0bd940b335a9"
+  },
+  "ownedSurface": {
+    "sharedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal8",
+    "sharedIntakeRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal8/intake",
+    "sharedToolRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal8/tool",
+    "sharedExecutionRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal8/execution",
+    "visibleHostTranscript": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/host-launcher-evidence/sim-red-final-85903ff6-ordinal8.txt",
+    "sandboxInstallRoot": "C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Sim",
+    "sandboxUninstallKey": "HKU/<CodexSandboxOffline-SID>/Software/Microsoft/Windows/CurrentVersion/Uninstall/DroneDream-Sim",
+    "sandboxDesktopShortcut": "C:/Users/CodexSandboxOffline/Desktop/DroneDream \u00b7 SIM.lnk",
+    "sandboxStartMenuShortcut": "C:/Users/CodexSandboxOffline/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/DroneDream \u00b7 SIM.lnk",
+    "sandboxAppDataRoots": [
+      "C:/Users/CodexSandboxOffline/AppData/Roaming/io.dronedream.sim",
+      "C:/Users/CodexSandboxOffline/AppData/Local/io.dronedream.sim"
+    ],
+    "canonicalCurrentUserSimInstallRoot": "C:/Users/zju20/AppData/Local/DroneDream-Sim",
+    "canonicalCurrentUserInstallProtectedBySeparateProfileAndHostParitySnapshot": true,
+    "allRootsMustBeAbsentBeforeExecution": true
+  },
+  "acceptanceMatrix": {
+    "sequence": [
+      "host-current-user-protected-state-snapshot",
+      "interactive-runas-disposable-user-identity-gate",
+      "fresh-en-install",
+      "identity-payload-desktop-start-menu-shortcut-icon-source-check",
+      "overlay-zh-install",
+      "identity-payload-desktop-start-menu-shortcut-icon-source-check",
+      "single-app-launch-live-webview2",
+      "pkce-49211-bind-boundary",
+      "owned-uninstall",
+      "sandbox-residue-and-protected-parity-check",
+      "host-current-user-protected-state-parity-check"
+    ],
+    "exactMaximumCounts": {
+      "hostLaunchers": 1,
+      "interactiveRunAsPrompts": 1,
+      "freshInstallerInvocations": 1,
+      "overlayInstallerInvocations": 1,
+      "applicationLaunches": 1,
+      "uninstallerInvocations": 1,
+      "pkceBoundaryChecks": 1,
+      "installerLanguagePreferenceWrites": 2,
+      "installerLanguagePreferenceCleanupWrites": 1,
+      "failureLanguagePreferenceCleanupWrites": 1,
+      "browserLoginTransactions": 0,
+      "realTokenExchanges": 0,
+      "credentialReads": 0,
+      "passwordReads": 0,
+      "systemFeatureChanges": 0,
+      "runtimeStarts": 0,
+      "px4Starts": 0,
+      "gazeboStarts": 0,
+      "hardwareActions": 0,
+      "artifactBuilds": 0,
+      "automaticRetries": 0
+    }
+  },
+  "rollback": {
+    "mechanism": "single-owned-sandbox-sim-uninstaller",
+    "ownershipRequiresExactInstallLocationAndUninstallString": true,
+    "sameUninstallerBudgetUsedForFailureRecovery": true,
+    "manualProtectedStateDeletionAllowed": false,
+    "canonicalCurrentUserCleanupAllowed": false,
+    "stopAfterFailure": true
+  },
+  "oauthBoundary": {
+    "callback": "http://127.0.0.1:49211/desktop-auth/sim/callback",
+    "listenerBindCheckOnly": true,
+    "browserOpenAllowed": false,
+    "credentialReadAllowed": false,
+    "realTokenExchangeAllowed": false
+  },
+  "futureCommand": {
+    "shell": "C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
+    "outerVisibleConsoleLauncher": "C:/Windows/System32/conhost.exe",
+    "visibleHostPath": "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-visible-host-85903ff6.ps1",
+    "mode": "StageAndRunAs",
+    "requiresExactToolEvidenceHead": true,
+    "requiresExactApplicationBytesAndSha256": true,
+    "requiresUserPresentStart": true,
+    "executionAuthorized": false
+  },
+  "authorization": {
+    "planOnlyAuthorized": true,
+    "stageCopyAuthorized": false,
+    "interactiveRunAsAuthorized": false,
+    "installerExecutionAuthorized": false,
+    "websiteDeploymentAuthorized": false
+  },
+  "nonClaims": {
+    "sharedRootCreated": false,
+    "runAsStarted": false,
+    "passwordRequested": false,
+    "installerExecuted": false,
+    "applicationLaunched": false,
+    "runtimeStarted": false,
+    "px4OrGazeboStarted": false,
+    "hardwareUsed": false,
+    "artifactRebuilt": false,
+    "lifecycleValidated": false,
+    "releaseReady": false,
+    "websiteHandoffReady": false,
+    "websiteDeployed": false
+  }
+}
