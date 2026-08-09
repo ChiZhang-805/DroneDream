@@ -666,6 +666,24 @@ function Assert-LabInstalled {
     $events.Add([ordered]@{ stage = $Stage; labIdentityAccepted = $true })
 }
 
+function Assert-InstallerLanguage {
+    param(
+        [Parameter(Mandatory = $true)][string]$Stage,
+        [Parameter(Mandatory = $true)][string]$ExpectedLanguageId
+    )
+    $properties = Get-ItemProperty -LiteralPath $productKey
+    $observed = [string]$properties.'Installer Language'
+    if ($observed -cne $ExpectedLanguageId) {
+        throw "$Stage did not persist the expected NSIS installer language."
+    }
+    $events.Add([ordered]@{
+        stage = "$Stage-installer-language"
+        expectedLanguageId = $ExpectedLanguageId
+        observedLanguageId = $observed
+        accepted = $true
+    })
+}
+
 function Get-FreeLoopbackPort {
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
     $listener.Start()
@@ -898,16 +916,24 @@ try {
     $env:TMP = $tempPath
 
     $counters.freshInstallerInvocations++
-    Invoke-ProcessOnce -Executable $installerPath -Arguments @("/S") -Stage "fresh-install"
+    Invoke-ProcessOnce `
+        -Executable $installerPath `
+        -Arguments @("/S", "/LANG=1033") `
+        -Stage "fresh-install"
     $freshInstalled = $true
     Assert-LabInstalled -Stage "fresh-install"
+    Assert-InstallerLanguage -Stage "fresh-install" -ExpectedLanguageId "1033"
     Assert-ProtectedParity -Before $protectedBefore -Stage "fresh-install"
 
     Invoke-LiveInspection -Phase "fresh"
 
     $counters.overlayInstallerInvocations++
-    Invoke-ProcessOnce -Executable $installerPath -Arguments @("/S", "/UPDATE") -Stage "overlay-install"
+    Invoke-ProcessOnce `
+        -Executable $installerPath `
+        -Arguments @("/S", "/UPDATE", "/LANG=2052") `
+        -Stage "overlay-install"
     Assert-LabInstalled -Stage "overlay-install"
+    Assert-InstallerLanguage -Stage "overlay-install" -ExpectedLanguageId "2052"
     Assert-ProtectedParity -Before $protectedBefore -Stage "overlay-install"
 
     Invoke-LiveInspection -Phase "overlay"

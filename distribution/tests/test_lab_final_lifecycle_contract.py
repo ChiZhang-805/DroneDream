@@ -117,6 +117,9 @@ def test_final_lifecycle_runner_is_parameterized_and_parses() -> None:
     assert "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc" in source
     assert "installerAndAppPeIconsMatch" in source
     assert "allProductSurfacesDisplayLabGreen" in source
+    assert 'Arguments @("/S", "/LANG=1033")' in source
+    assert 'Arguments @("/S", "/UPDATE", "/LANG=2052")' in source
+    assert "Assert-InstallerLanguage" in source
     for forbidden in (
         "OPENAI_API_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
