@@ -280,7 +280,10 @@ try {
         })
     }
     Save-EvidenceBoard -Surfaces $surfaces -Destination $screenshotPath
-    $receipt.surfaces = @($surfaces)
+    # Enumerate the generic list through the pipeline. Windows PowerShell 5.1
+    # can throw "Argument types do not match" when @($genericList) is assigned
+    # directly into an OrderedDictionary value.
+    $receipt.surfaces = @($surfaces | ForEach-Object { $_ })
     $receipt.screenshot = [ordered]@{
         path = $screenshotPath
         bytes = (Get-Item -LiteralPath $screenshotPath).Length

@@ -18,6 +18,7 @@ def test_icon_surface_verifier_is_exact_source_bound_and_bounded() -> None:
         "brand\\generated\\universal\\windows\\32x32.png",
         "acd4ef1fc198bf157c73c26edfb6c2814d46286857b69bfbd857a7328243d19f",
         "Test-ImagePixelEquality",
+        "$receipt.surfaces = @($surfaces | ForEach-Object { $_ })",
         "git -C $repoRoot diff --quiet $ProductSourceCommit",
         'Arguments @("/S", "/L=1033")',
         'Arguments @("/S", "/L=1033") -Stage "icon-audit-uninstall"',
@@ -42,3 +43,4 @@ def test_icon_surface_verifier_does_not_expand_product_scope() -> None:
     assert "Remove-Item -Recurse" not in text
     assert "Get-ChildItem -Recurse" not in text
     assert "Test-Path -LiteralPath $uninstallKey -or" not in text
+    assert "$receipt.surfaces = @($surfaces)" not in text
