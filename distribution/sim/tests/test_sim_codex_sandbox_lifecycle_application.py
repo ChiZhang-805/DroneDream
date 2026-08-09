@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
-APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-8.v1.json"
+APPLICATION = REPO / "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-9.v1.json"
 HOST = REPO / "distribution/sim/tools/invoke-red-lifecycle-codex-sandbox-host-85903ff6.ps1"
 VISIBLE_HOST = REPO / (
     "distribution/sim/tools/"
@@ -23,7 +23,7 @@ def load_application() -> dict:
 def test_application_binds_frozen_artifact_and_tool_bundle() -> None:
     application = load_application()
     assert application["editionId"] == "sim"
-    assert application["executionOrdinal"] == 8
+    assert application["executionOrdinal"] == 9
     assert application["state"] == "awaiting-user-present-start"
     assert application["sourceSeparation"]["productSourceCommit"] == (
         "573e8f991eba703bbfd6c4b35f464fbaab78903c"
@@ -146,6 +146,9 @@ def test_visible_host_transcript_is_scoped_and_does_not_capture_password() -> No
     assert "-NoClobber" in visible_host
     assert "Visible host transcript escaped its exact evidence root" in visible_host
     assert "Visible host transcript already exists; retry is forbidden" in visible_host
+    assert "[Console]::ReadKey($true)" in visible_host
+    assert "[ConsoleKey]::Enter" in visible_host
+    assert "readiness gate accepts only ENTER" in visible_host
     assert "-Mode StageAndRunAs" in visible_host
     assert "runas.exe" not in visible_host
     forbidden = ("ConvertTo-SecureString", "PSCredential", "-Credential", "Read-Host")

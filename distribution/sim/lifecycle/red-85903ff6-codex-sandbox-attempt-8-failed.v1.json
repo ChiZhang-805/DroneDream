@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-failure",
+  "editionId": "sim",
+  "executionOrdinal": 8,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "320049860de1f3473b3ba5d9d2bd173437fe564a",
+  "artifactSha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-8.v1.json",
+    "bytes": 8986,
+    "sha256": "217e47e1888c72c09e53718109049c800890eb7f806cd4b364016ea0882c9555"
+  },
+  "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal8",
+  "hostProtectionReceipt": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal8/host-evidence/canonical-current-user-protection-receipt.json",
+    "bytes": 14142,
+    "sha256": "0f516e5efa00c65904d61bd1235d7813a7eee21715a2c474e43414997102f5ec",
+    "runAsExitCode": 1,
+    "canonicalCurrentUserProtectedStateUnchanged": true
+  },
+  "visibleHostTranscript": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/host-launcher-evidence/sim-red-final-85903ff6-ordinal8.txt",
+    "bytes": 1974,
+    "sha256": "627f5daeeb1e7a3738020ae82256b3e143a5fa56ee8d0891be6a786b9b82b400",
+    "containsCredentialValue": false
+  },
+  "classification": "classic-conhost-started-without-proven-keyboard-input-before-runas",
+  "mutationCounts": {
+    "visibleHostLaunchers": 1,
+    "sharedStagingRootsCreated": 1,
+    "interactiveRunAsInvocations": 1,
+    "guestRunnerInvocations": 0,
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReadsByAutomation": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "historicalOwnedRootReadOnly": true,
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "require-no-echo-enter-readiness-gate-before-runas"
+}

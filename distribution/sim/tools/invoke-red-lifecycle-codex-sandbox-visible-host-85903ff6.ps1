@@ -48,7 +48,13 @@ $started = $false
 try {
     Start-Transcript -LiteralPath $transcriptFull -NoClobber -ErrorAction Stop | Out-Null
     $started = $true
-    Write-Host "Starting exact DroneDream SIM lifecycle host. Password input remains inside Windows runas."
+    Write-Host "Press ENTER once to confirm this visible console can receive keyboard input."
+    $readyKey = [Console]::ReadKey($true)
+    if ($readyKey.Key -ne [ConsoleKey]::Enter) {
+        throw "Visible host readiness gate accepts only ENTER."
+    }
+    Write-Host "Console input confirmed. Starting exact DroneDream SIM lifecycle host."
+    Write-Host "Password input remains inside Windows runas and is never read by this wrapper."
     & $hostLauncher `
         -ExpectedToolHead $ExpectedToolHead `
         -ExpectedLauncherSha256 $ExpectedLauncherSha256 `
