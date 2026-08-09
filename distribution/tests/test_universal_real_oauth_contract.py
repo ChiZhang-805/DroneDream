@@ -141,8 +141,16 @@ def test_owned_uninstaller_residue_cleanup_is_exact_and_fail_closed() -> None:
 
 def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
     observer = INSTALLED_UI.read_text(encoding="utf-8")
-    assert 'const authenticatedWorkspace = args.get("--authenticated-workspace") === "true"' in observer
-    for route in ('universal: "/vehicle-studio"', 'sim: "/assistant"', 'lab: "/lab"', 'field: "/field"'):
+    assert (
+        'const authenticatedWorkspace = args.get("--authenticated-workspace") === "true"'
+        in observer
+    )
+    for route in (
+        'universal: "/vehicle-studio"',
+        'sim: "/assistant"',
+        'lab: "/lab"',
+        'field: "/field"',
+    ):
         assert route in observer
     for surface in (
         'universal: ".vehicle-studio-page"',
@@ -151,11 +159,17 @@ def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
         'field: ".field-app"',
     ):
         assert surface in observer
-    assert 'document.querySelector(".universal-mode-switch select")' in observer
+    assert 'page.locator(".universal-mode-switch select").first()' in observer
+    assert "await workspaceModeSelector.selectOption(edition)" in observer
+    assert "assert.equal(await workspaceModeSelector.inputValue(), edition)" in observer
     assert "async function assertAuthenticatedAccountSurface(page)" in observer
     assert 'menuPanel.locator(".app-account-button:visible")' in observer
     assert 'data-theme-grants-hardware-authority' in observer
-    assert 'validationSurface: authenticatedWorkspace ? "authenticated-workspace" : "pre-auth-launcher"' in observer
+    assert (
+        'validationSurface: authenticatedWorkspace '
+        '? "authenticated-workspace" : "pre-auth-launcher"'
+        in observer
+    )
     assert 'languageSelectionCount: 1' in observer
 
 
