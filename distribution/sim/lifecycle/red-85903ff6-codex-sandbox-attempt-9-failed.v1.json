@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-failure",
+  "editionId": "sim",
+  "executionOrdinal": 9,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "c87c78043e02b825a2dbae919ee6b67ee5960ef0",
+  "artifactSha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-9.v1.json",
+    "bytes": 8979,
+    "sha256": "a40453dfde981388ce60382c5241bbdf61ee723a811d8483991f952ad4921921"
+  },
+  "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal9",
+  "hostProtectionReceipt": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal9/host-evidence/canonical-current-user-protection-receipt.json",
+    "bytes": 14142,
+    "sha256": "76ecd6934d9df180142f37c1d6343638d3f6a09cec6f54e8435c9a3d0242d67b",
+    "runAsExitCode": 1,
+    "canonicalCurrentUserProtectedStateUnchanged": true
+  },
+  "visibleHostTranscript": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/host-launcher-evidence/sim-red-final-85903ff6-ordinal9.txt",
+    "bytes": 2112,
+    "sha256": "e7a510815daa6a33a360f581f811c19cf4a7ffa78b9da00fcad7087f2c7d61a3",
+    "containsCredentialValue": false
+  },
+  "classification": "background-created-console-had-nonhuman-enter-buffer-but-no-runas-password-input",
+  "mutationCounts": {
+    "visibleHostLaunchers": 1,
+    "readinessKeyChecks": 1,
+    "sharedStagingRootsCreated": 1,
+    "interactiveRunAsInvocations": 1,
+    "guestRunnerInvocations": 0,
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReadsByAutomation": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "historicalOwnedRootReadOnly": true,
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "launch-exact-command-from-windows-run-dialog-in-interactive-explorer-session"
+}
