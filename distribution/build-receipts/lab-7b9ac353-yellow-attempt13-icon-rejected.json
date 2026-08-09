@@ -62,7 +62,7 @@
   "rootCause": {
     "classification": "lab-overlay-missing-nsis-installer-icon-binding",
     "productCompileFailureObserved": false,
-    "fixedByProductCommit": "ba6dc11948ee5520e34ad4dd1a90c7b73b407797"
+    "fixedByProductCommit": "ba6dc119e44721b807c455a2183887102566f73e"
   },
   "executionBoundaries": {
     "installerExecuted": false,
