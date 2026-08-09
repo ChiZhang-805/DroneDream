@@ -63,6 +63,7 @@ FIELD_EVIDENCE_PREFIXES = (
 FIELD_BRANDING_MANIFEST = Path("distribution/editions/field/branding/source-manifest.v1.json")
 FIELD_TAURI_CONFIG = Path("desktop/src-tauri/tauri.field.conf.json")
 FIELD_FRONTEND_APP = Path("frontend/src/field/FieldApp.tsx")
+FIELD_FRONTEND_MAIN = Path("frontend/src/field/main.tsx")
 FIELD_VITE_CONFIG = Path("frontend/vite.field.config.ts")
 BASE_TAURI_CONFIG = Path("desktop/src-tauri/tauri.conf.json")
 FIELD_SHORTCUT_PROPOSAL = Path(
@@ -279,6 +280,7 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
     effective_tauri = apply_json_merge_patch(base_tauri, tauri)
     edition = load_json(repo_root / "distribution" / "editions" / "field.v1.json")
     app_source = (repo_root / FIELD_FRONTEND_APP).read_text(encoding="utf-8")
+    main_source = (repo_root / FIELD_FRONTEND_MAIN).read_text(encoding="utf-8")
     vite_source = (repo_root / FIELD_VITE_CONFIG).read_text(encoding="utf-8")
     proposal_path = repo_root / FIELD_SHORTCUT_PROPOSAL
     proposal = load_json(proposal_path)
@@ -397,8 +399,8 @@ def field_desktop_preview_structure(repo_root: Path) -> dict[str, Any]:
         "windowTitle": effective_tauri.get("app", {}).get("windows", [{}])[0].get("title")
         == field_identity["displayName"]
         == manifest.get("displayName"),
-        "frontendCanonicalLockup": "BrandLockup" in app_source
-        and 'edition="field"' in app_source,
+        "frontendCanonicalLockup": "FieldBrandLockup" in app_source
+        and '<EditionThemeProvider edition="field">' in main_source,
         "frontendNoPrivateBrandingRoot": "../distribution/editions/field/branding"
         not in vite_source,
         "tauriIcon": bundle.get("icon") == expected_icons,

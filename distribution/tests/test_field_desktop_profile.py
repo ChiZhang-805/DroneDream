@@ -101,7 +101,12 @@ class FieldDesktopProfileTests(unittest.TestCase):
             "../../distribution/editions/field/adapters/THIRD_PARTY_NOTICES.md":
                 "licenses/Field-Adapter-THIRD-PARTY-NOTICES.md",
         })
-        self.assertNotIn("windows", self.config["bundle"])
+        self.assertEqual(self.config["bundle"]["windows"], {
+            "nsis": {
+                "installerIcon": "../../brand/generated/field/windows/icon.ico",
+                "uninstallerIcon": "../../brand/generated/field/windows/icon.ico",
+            },
+        })
 
     def test_desktop_package_has_no_direct_field_executable_build_command(self) -> None:
         scripts = self.package["scripts"]
