@@ -26,6 +26,12 @@
       "../../brand/generated/universal/windows/128x128@2x.png",
       "../../brand/generated/universal/windows/icon.ico"
     ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "../../brand/generated/universal/windows/icon.ico",
+        "uninstallerIcon": "../../brand/generated/universal/windows/icon.ico"
+      }
+    },
     "resources": {
       "../../distribution/build-profiles/universal-1.0.0.v1.json": "distribution/universal-build-profile.v1.json",
       "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",

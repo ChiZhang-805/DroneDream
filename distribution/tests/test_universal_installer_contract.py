@@ -213,6 +213,11 @@ def test_universal_overlay_uses_mother_brand_and_canonical_windows_icon() -> Non
     assert overlay["productName"] == "DroneDream-Universal"
     assert overlay["app"]["windows"][0]["title"] == "DroneDream"  # type: ignore[index]
     assert "../../brand/generated/universal/windows/icon.ico" in overlay["bundle"]["icon"]  # type: ignore[index]
+    nsis = overlay["bundle"]["windows"]["nsis"]  # type: ignore[index]
+    assert nsis == {
+        "installerIcon": "../../brand/generated/universal/windows/icon.ico",
+        "uninstallerIcon": "../../brand/generated/universal/windows/icon.ico",
+    }
     resources = overlay["bundle"]["resources"]  # type: ignore[index]
     assert resources["../../distribution/desktop/edition-coexistence.v1.json"] == (  # type: ignore[index]
         "distribution/desktop/edition-coexistence.v1.json"

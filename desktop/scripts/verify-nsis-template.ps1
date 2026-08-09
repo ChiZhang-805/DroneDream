@@ -11,6 +11,7 @@ $chineseLanguagePath = Join-Path $repoRoot "desktop\src-tauri\nsis\languages\Sim
 $installerHookPath = Join-Path $repoRoot "desktop\src-tauri\nsis\webview2-health.nsh"
 $packageLockPath = Join-Path $repoRoot "desktop\package-lock.json"
 $tauriConfigPath = Join-Path $repoRoot "desktop\src-tauri\tauri.conf.json"
+$universalOverlayPath = Join-Path $repoRoot "desktop\src-tauri\tauri.universal.conf.json"
 
 $packageLock = Get-Content -LiteralPath $packageLockPath -Raw
 $cliMatch = [regex]::Match(
@@ -40,6 +41,12 @@ if ($customLanguages.English -cne "nsis/languages/English.nsh" -or
 }
 if ($config.bundle.resources.'icons/icon.ico' -cne "icons/DroneDream.ico") {
     throw "The installed shortcut icon must use the dedicated DroneDream wing-mark resource"
+}
+$universalOverlay = Get-Content -LiteralPath $universalOverlayPath -Raw | ConvertFrom-Json
+$universalIcon = "../../brand/generated/universal/windows/icon.ico"
+if ($universalOverlay.bundle.windows.nsis.installerIcon -cne $universalIcon -or
+    $universalOverlay.bundle.windows.nsis.uninstallerIcon -cne $universalIcon) {
+    throw "Universal NSIS installer and uninstaller must embed the canonical Universal icon"
 }
 
 $template = Get-Content -LiteralPath $templatePath -Raw
