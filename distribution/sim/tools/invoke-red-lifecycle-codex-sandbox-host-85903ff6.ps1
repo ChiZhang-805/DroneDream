@@ -239,10 +239,18 @@ Assert-OrdinaryDirectory -Path "C:\Users\Public\Documents"
 $conflictingLifecycleProcesses = @(
     Get-CimInstance Win32_Process |
         Where-Object {
+            $commandLine = [string]$_.CommandLine
+            $isInteractiveRunAs = (
+                $_.Name -ceq "runas.exe" -and
+                $commandLine -match '/user:\\.\\CodexSandboxOffline(?:\s|$)'
+            )
+            $isLifecycleScript = (
+                $_.Name -ceq "powershell.exe" -and
+                $commandLine -match '(?i)\s-File\s+[^\r\n]*(?:invoke-red-lifecycle|red-lifecycle)[^\r\n]*\.ps1(?:\s|$)' -and
+                $commandLine -match '(?i)\s-Mode\s+(?:Execute|StageAndRunAs)(?:\s|$)'
+            )
             $_.ProcessId -ne $PID -and
-            $_.Name -in @("powershell.exe", "runas.exe") -and
-            $_.CommandLine -match "CodexSandboxOffline" -and
-            $_.CommandLine -match "(Lab-RED|Field-RED|Sim-RED)"
+            ($isInteractiveRunAs -or $isLifecycleScript)
         } |
         Select-Object ProcessId, ParentProcessId, Name
 )

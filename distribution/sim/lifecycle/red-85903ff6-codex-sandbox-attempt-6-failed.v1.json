@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-codex-sandbox-lifecycle-failure",
+  "editionId": "sim",
+  "executionOrdinal": 6,
+  "productSourceCommit": "573e8f991eba703bbfd6c4b35f464fbaab78903c",
+  "toolEvidenceHead": "a49052e23d5172a08b7a5382d8aaa7d5f38f0143",
+  "artifactSha256": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae",
+  "application": {
+    "path": "distribution/sim/lifecycle/red-85903ff6-codex-sandbox-application-6.v1.json",
+    "bytes": 8985,
+    "sha256": "448ed7464f5c65deb31a6cff63457baa40bbe9728f4f8d618dd59c31bd744996"
+  },
+  "visibleHostTranscript": {
+    "path": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/host-launcher-evidence/sim-red-final-85903ff6-ordinal6.txt",
+    "bytes": 1976,
+    "sha256": "a50b6670f3e609d19e41ae75973993d20d56bff182b6043d3cfe26009521e1bf",
+    "containsCredentialValue": false
+  },
+  "classification": "read-only-powershell-diagnostic-misclassified-as-lifecycle-conflict",
+  "observedState": {
+    "ownedRoot": "C:/Users/Public/Documents/DroneDream-Codex/Sim-RED/sim-red-final-85903ff6-ordinal6",
+    "ownedRootCreated": false,
+    "runAsStarted": false,
+    "guestRunnerStarted": false,
+    "artifactSha256AfterFailure": "85903ff6a5dad93224f5396096d90f2e96e71eb5e68980df7ca2691d8001ddae"
+  },
+  "mutationCounts": {
+    "visibleHostLaunchers": 1,
+    "sharedStagingRootsCreated": 0,
+    "interactiveRunAsInvocations": 0,
+    "guestRunnerInvocations": 0,
+    "installerInvocations": 0,
+    "applicationLaunches": 0,
+    "uninstallerInvocations": 0,
+    "passwordReads": 0,
+    "runtimeStarts": 0,
+    "px4Starts": 0,
+    "gazeboStarts": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "automaticRetries": 0
+  },
+  "reuseAllowed": false,
+  "artifactRebuildRequired": false,
+  "nextAction": "require-actual-file-script-or-runas-process-shape-before-conflict"
+}
