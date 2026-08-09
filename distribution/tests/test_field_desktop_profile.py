@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -118,26 +121,79 @@ class FieldDesktopProfileTests(unittest.TestCase):
             "npm run frontend:field-build",
         )
 
-    def test_zero_validated_pack_registry_denies_before_any_build(self) -> None:
-        completed = subprocess.run(
-            [
-                "powershell",
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-File",
-                str(BUILD_GATE),
-            ],
-            cwd=ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
+    def test_zero_validated_pack_registry_allows_ui_build_but_not_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            script = root / "desktop" / "scripts" / BUILD_GATE.name
+            registry = root / "distribution" / "vehicle-packs" / "registry.v1.json"
+            safety = root / "distribution" / "safety" / "edition-execution-gate.v1.json"
+            for source, target in (
+                (BUILD_GATE, script),
+                (ROOT / "distribution/vehicle-packs/registry.v1.json", registry),
+                (ROOT / "distribution/safety/edition-execution-gate.v1.json", safety),
+            ):
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(["git", "add", "."], cwd=root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=DroneDream Contract",
+                    "-c",
+                    "user.email=contract@invalid",
+                    "commit",
+                    "-qm",
+                    "fixture",
+                ],
+                cwd=root,
+                check=True,
+            )
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "checkout", "--detach", "-q", head],
+                cwd=root,
+                check=True,
+            )
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "DRONEDREAM_EDITION_PROFILE": "field-lightweight",
+                    "DRONEDREAM_DESKTOP_EDITION_ID": "field",
+                    "VITE_DRONEDREAM_EDITION": "field",
+                    "DRONEDREAM_OAUTH_CLIENT_ID":
+                        "3140bbe2-5f0e-4699-8a9b-295d4030f853",
+                    "DRONEDREAM_RELEASE_SOURCE_COMMIT": head,
+                }
+            )
+            completed = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(script),
+                ],
+                cwd=root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
         output = f"{completed.stdout}\n{completed.stderr}"
-        self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("zero hardware-validated Vehicle Packs", output)
-        self.assertNotIn("frontend:field-build", output)
+        self.assertEqual(completed.returncode, 0, output)
+        self.assertIn("validated hardware packs: 0", output)
+        self.assertIn("Hardware authority remains denied", output)
 
     def test_build_gate_requires_exact_field_compile_and_auth_namespaces(self) -> None:
         source = BUILD_GATE.read_text(encoding="utf-8")
@@ -145,7 +201,12 @@ class FieldDesktopProfileTests(unittest.TestCase):
             'DRONEDREAM_EDITION_PROFILE -cne "field-lightweight"',
             'DRONEDREAM_DESKTOP_EDITION_ID -cne "field"',
             'VITE_DRONEDREAM_EDITION -cne "field"',
-            'DRONEDREAM_OAUTH_CLIENT_ID -cne "dronedream-desktop-field"',
+            'DRONEDREAM_OAUTH_CLIENT_ID -cne "3140bbe2-5f0e-4699-8a9b-295d4030f853"',
+            'DRONEDREAM_RELEASE_SOURCE_COMMIT -cnotmatch',
+            'frontendIsAuthority -ne $false',
+            'hardwareActionHandlersImplemented -ne $false',
+            'zeroValidatedPackDecision -cne "deny"',
+            '"native,backend,runtime"',
         ):
             self.assertIn(binding, source)
 
