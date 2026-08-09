@@ -95,7 +95,7 @@ foreach ($path in @(
 }
 
 $build = Read-BoundJson $BuildReceipt $ExpectedBuildReceiptSha256 "Build receipt"
-$buildManifest = Read-BoundJson $BuildManifest $ExpectedBuildManifestSha256 "Build manifest"
+$boundBuildManifest = Read-BoundJson $BuildManifest $ExpectedBuildManifestSha256 "Build manifest"
 $lifecycle = Read-BoundJson $LifecycleReceipt $ExpectedLifecycleReceiptSha256 "Lifecycle receipt"
 $visible = Read-BoundJson $VisibleInstallerReceipt $ExpectedVisibleInstallerReceiptSha256 "Visible installer receipt"
 $headed = Read-BoundJson $InstalledAppReceipt $ExpectedInstalledAppReceiptSha256 "Installed-app receipt"
@@ -107,8 +107,8 @@ if ($build.Document.kind -cne "dronedream-universal-build-receipt" -or
     throw "Build receipt source or build count drifted."
 }
 Assert-ArtifactIdentity $build.Document.artifact "Build receipt"
-if ($buildManifest.Document.sourceCommit -cne $ProductSourceCommit -or
-    $buildManifest.Document.buildCount -ne 1 -or $buildManifest.Document.releaseReady -ne $false) {
+if ($boundBuildManifest.Document.sourceCommit -cne $ProductSourceCommit -or
+    $boundBuildManifest.Document.buildCount -ne 1 -or $boundBuildManifest.Document.releaseReady -ne $false) {
     throw "Historical build manifest is not the immutable pre-validation record."
 }
 $checksum = Get-FileRecord ([string]$build.Document.checksum.absolutePath)
@@ -206,7 +206,7 @@ $summary = [ordered]@{
     checksum = $checksum
     evidence = [ordered]@{
         buildReceipt = $build.Record
-        immutableBuildManifest = $buildManifest.Record
+        immutableBuildManifest = $boundBuildManifest.Record
         lifecycle = $lifecycle.Record
         visibleInstaller = $visible.Record
         installedAppHeaded = $headed.Record

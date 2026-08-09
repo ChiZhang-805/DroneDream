@@ -26,6 +26,8 @@ def test_finalizer_requires_every_same_artifact_gate() -> None:
 
 def test_finalizer_preserves_atomic_receipts_and_emits_new_immutable_outputs() -> None:
     text = FINALIZER.read_text(encoding="utf-8")
+    assert "$boundBuildManifest = Read-BoundJson $BuildManifest" in text
+    assert "$buildManifest = Read-BoundJson $BuildManifest" not in text
     assert "Set-Content -LiteralPath $BuildManifest" not in text
     assert "Set-Content -LiteralPath $BuildReceipt" not in text
     assert '"universal-final-readiness-receipt.json"' in text
