@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-final-icon-corrected-build-application",
+  "editionId": "lab",
+  "state": "prepared-awaiting-exact-serial-build-start",
+  "productSource": {
+    "branch": "codex/software-lab",
+    "commit": "7b9ac353b157ab0a7d03da54c1156e23f81d7cdf",
+    "tree": "082f9eeb16927b5853b449ece6f69c062c8273e6",
+    "requiresHeadEqualsUpstream": true,
+    "requiresCleanWorktree": true
+  },
+  "attempt": {
+    "globalBuildOrdinal": 12,
+    "sourceBuildOrdinal": 1,
+    "maximumBuildInvocations": 1,
+    "automaticRetryMaximum": 0,
+    "outputRootMustBeAbsentBeforeExecution": true
+  },
+  "paths": {
+    "outputRoot": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-7b9ac353-attempt12",
+    "artifact": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-7b9ac353-attempt12/DroneDream-Lab-1.0.0.exe",
+    "updaterSignature": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-7b9ac353-attempt12/DroneDream-Lab-1.0.0.exe.sig",
+    "receipt": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-7b9ac353-attempt12/lab-preview-receipt.json",
+    "cargoTarget": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target",
+    "updaterPrivateKeyPath": "C:/Users/zju20/.tauri/dronedream-updater.key"
+  },
+  "command": "powershell -NoProfile -ExecutionPolicy Bypass -File desktop/scripts/build-lab-preview.ps1 -Build -Toolchain gnullvm -OutputRoot C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-7b9ac353-attempt12 -CargoTargetDir C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-cargo-target -ExpectedSourceCommit 7b9ac353b157ab0a7d03da54c1156e23f81d7cdf",
+  "processEnvironment": {
+    "CARGO_BUILD_JOBS": "2",
+    "DRONEDREAM_OAUTH_CLIENT_ID": "0b9e7a8d-2c90-4b76-8842-511363f555bd",
+    "oauthCallback": "http://127.0.0.1:49212/desktop-auth/lab/callback",
+    "TAURI_SIGNING_PRIVATE_KEY_PASSWORD": "empty",
+    "updaterKeyId": "BA3FDCAF71CE2FF5",
+    "publicActionsVariables": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "publicVariableValuesRecorded": false,
+    "privateKeyContentRead": false
+  },
+  "artifactContract": {
+    "fileName": "DroneDream-Lab-1.0.0.exe",
+    "version": "1.0.0",
+    "displayName": "DroneDream · LAB",
+    "internalProductName": "DroneDream-Lab",
+    "bundleIdentifier": "io.dronedream.desktop.lab",
+    "authenticodeExpected": "NotSigned",
+    "updaterSignatureRequired": true
+  },
+  "brandContract": {
+    "canonicalWindowsIcon": {
+      "path": "brand/generated/lab/windows/icon.ico",
+      "bytes": 55959,
+      "sha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
+    },
+    "canonicalMark": {
+      "path": "brand/generated/lab/mark-1024.png",
+      "bytes": 98418,
+      "sha256": "63d87e2ba200fb6d728a8b8bba96f7f593f216890a376e31b0796596405d0806"
+    },
+    "centeredSeparatorLockup": {
+      "path": "brand/generated/lab/lockup-compact.png",
+      "bytes": 123162,
+      "sha256": "c82b6580a3f2d22018a99cbadbb90179838f3ec9f481e273466320f1aa021c94",
+      "sourceCommit": "6de4f1343c0239a916949f0486fa63d3f460d6a8"
+    },
+    "shortcutIconSource": "$INSTDIR/${MAINBINARYNAME}.exe",
+    "sharedLegacyIconResourceMayBackShortcut": false,
+    "requiredSurfaces": [
+      "installer",
+      "installed-executable",
+      "desktop-shortcut",
+      "start-menu-shortcut",
+      "application-launcher"
+    ],
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "predecessorArtifact": {
+    "productSource": "b3c5f90948f206472e3e12504d8205cb563ac9dc",
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-b3c5f909-attempt11/DroneDream-Lab-1.0.0.exe",
+    "bytes": 12468471,
+    "sha256": "cf3ce9dd592995f90c9c0ed7dad014bfb74108a39d066194c8f315a012111811",
+    "retainedAsHistoricalEvidence": true,
+    "finalIconAcceptanceEligible": false,
+    "reason": "shortcuts referenced the shared legacy icon resource"
+  },
+  "postBuildRequirements": {
+    "staticArtifactVerifier": true,
+    "peAndAuthenticodeInspection": true,
+    "installerIconRender": true,
+    "installedExecutableIconRender": true,
+    "shortcutTargetAndIconLocationInspection": true,
+    "desktopAndStartMenuIconScreenshots": true,
+    "enZhInstaller": true,
+    "freshInstall": true,
+    "sameVersionOverlay": true,
+    "webView2LiveInspection": true,
+    "simToRealAndRealToSimSurfaceCheck": true,
+    "hardwareAuthorityDecision": "deny",
+    "uninstallAndOwnedCleanup": true,
+    "requiresDisposableWindowsUserWithoutCanonicalLabIdentity": true
+  },
+  "resourceGate": {
+    "maximumRamUsedPercent": 80,
+    "minimumFreeRamGiB": 3,
+    "requiresNoConcurrentCargoRustcTauriMakensisPx4Gazebo": true
+  },
+  "forbidden": [
+    "overwrite-current-zju20-lab-install",
+    "reuse-output-root",
+    "automatic-retry",
+    "runtime-start-or-migration",
+    "px4",
+    "gazebo",
+    "hardware-discovery",
+    "parameter-write",
+    "arm",
+    "flight",
+    "hitl",
+    "browser-oauth",
+    "provider",
+    "upload",
+    "deployment",
+    "service-role",
+    "model-api-key",
+    "password-read",
+    "private-key-content-read"
+  ]
+}
