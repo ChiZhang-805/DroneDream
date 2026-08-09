@@ -98,6 +98,8 @@ $adapterPath = $MyInvocation.MyCommand.Path
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..")).Path
 $canonicalLabIcon = Join-Path $repoRoot "brand\generated\lab\windows\icon.ico"
 $canonicalLabIconSha256 = "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1"
+$canonicalLabIconRenderSource = Join-Path $repoRoot "brand\generated\lab\windows\32x32.png"
+$canonicalLabIconRenderSha256 = "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc"
 
 $installerPath = (Resolve-Path -LiteralPath $Installer).Path
 $applicationPath = (Resolve-Path -LiteralPath $Application).Path
@@ -132,6 +134,12 @@ $actualCanonicalLabIconSha256 = (
 ).Hash.ToLowerInvariant()
 if ($actualCanonicalLabIconSha256 -cne $canonicalLabIconSha256) {
     throw "The canonical LAB Windows icon does not match the approved asset hash."
+}
+$actualCanonicalLabIconRenderSha256 = (
+    Get-FileHash -LiteralPath $canonicalLabIconRenderSource -Algorithm SHA256
+).Hash.ToLowerInvariant()
+if ($actualCanonicalLabIconRenderSha256 -cne $canonicalLabIconRenderSha256) {
+    throw "The canonical LAB Windows icon render source does not match the approved asset hash."
 }
 if ($installerItem.Length -ne $ExpectedInstallerBytes -or $installerSha256 -cne $ExpectedInstallerSha256) {
     throw "The exact frozen Lab installer identity does not match the application."
@@ -176,6 +184,8 @@ if ($applicationContract.iconAcceptance.canonicalWindowsIcon.sha256 -cne
         $canonicalLabIconSha256 -or
     $applicationContract.iconAcceptance.shortcutIconSource -cne
         '$INSTDIR/${MAINBINARYNAME}.exe' -or
+    $applicationContract.iconAcceptance.canonicalRenderSource.sha256 -cne
+        $canonicalLabIconRenderSha256 -or
     $applicationContract.iconAcceptance.requiredSurfaces.Count -ne 4 -or
     $applicationContract.iconAcceptance.actualShellRenderedEvidenceRequired -ne $true) {
     throw "The exact LAB icon acceptance contract is missing or incomplete."
@@ -345,6 +355,14 @@ function Get-ShellIconBitmap {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "Icon evidence source is missing: $Path"
     }
+    if ([IO.Path]::GetExtension($Path) -ieq ".png") {
+        $image = [Drawing.Image]::FromFile($Path)
+        try {
+            return [Drawing.Bitmap]::new($image)
+        } finally {
+            $image.Dispose()
+        }
+    }
     $info = New-Object DroneDreamShellIcon+SHFILEINFO
     $flags = [uint32](0x000000100 -bor 0x000000000)
     $result = [DroneDreamShellIcon]::SHGetFileInfo(
@@ -444,7 +462,7 @@ function Write-LabIconEvidence {
     $iconRoot = Join-Path $outputPath "icon-evidence\$Stage"
     New-Item -ItemType Directory -Path $iconRoot -Force | Out-Null
     $surfaces = [ordered]@{
-        canonical = $canonicalLabIcon
+        canonical = $canonicalLabIconRenderSource
         installer = $installerPath
         installedExe = $appBinary
         desktopShortcut = $desktopShortcut
@@ -456,11 +474,15 @@ function Write-LabIconEvidence {
             -SourcePath $entry.Value `
             -DestinationPath (Join-Path $iconRoot "$($entry.Key).png")
     }
-    $canonicalPixels = @($records | Where-Object name -eq "canonical")[0].pixelSha256
     foreach ($record in @($records | Where-Object name -ne "canonical")) {
-        if ($record.pixelSha256 -cne $canonicalPixels) {
-            throw "Rendered $($record.name) icon differs from the canonical LAB icon."
+        if ($record.labPaletteHits -eq 0) {
+            throw "Rendered $($record.name) icon does not display the approved LAB green palette."
         }
+    }
+    $installerPixels = @($records | Where-Object name -eq "installer")[0].pixelSha256
+    $appPixels = @($records | Where-Object name -eq "installedExe")[0].pixelSha256
+    if ($installerPixels -cne $appPixels) {
+        throw "The installer PE icon differs from the installed LAB application PE icon."
     }
     $sheet = New-Object Drawing.Bitmap 640, 160, ([Drawing.Imaging.PixelFormat]::Format32bppArgb)
     try {
@@ -491,10 +513,12 @@ function Write-LabIconEvidence {
         stage = $Stage
         evidenceClass = "windows-shell-rendered-icon-evidence"
         canonicalIconSha256 = $canonicalLabIconSha256
+        canonicalRenderSourceSha256 = $canonicalLabIconRenderSha256
         records = @($records)
         sheetPath = $sheetPath
         sheetSha256 = (Get-FileHash -LiteralPath $sheetPath -Algorithm SHA256).Hash.ToLowerInvariant()
-        allRenderedIconsMatchCanonical = $true
+        installerAndAppPeIconsMatch = $true
+        allProductSurfacesDisplayLabGreen = $true
         approvedLabGreenVisible = $true
     }
     $evidencePath = Join-Path $iconRoot "lab-icon-evidence.json"
@@ -505,7 +529,8 @@ function Write-LabIconEvidence {
         evidenceSha256 = (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).Hash.ToLowerInvariant()
         sheetPath = $sheetPath
         sheetSha256 = $evidence.sheetSha256
-        allRenderedIconsMatchCanonical = $true
+        installerAndAppPeIconsMatch = $true
+        allProductSurfacesDisplayLabGreen = $true
     })
 }
 

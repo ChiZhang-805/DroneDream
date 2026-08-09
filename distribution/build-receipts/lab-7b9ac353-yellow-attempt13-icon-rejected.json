@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-lab-yellow-build-icon-rejection-receipt",
+  "editionId": "lab",
+  "result": "build-passed-static-icon-rejected",
+  "attempt": {
+    "globalBuildOrdinal": 13,
+    "maximumBuildInvocations": 1,
+    "actualBuildInvocations": 1,
+    "automaticRetryMaximum": 0,
+    "retryPerformed": false,
+    "consumed": true
+  },
+  "productSource": {
+    "commit": "7b9ac353b157ab0a7d03da54c1156e23f81d7cdf",
+    "tree": "082f9eeb16927b5853b449ece6f69c062c8273e6"
+  },
+  "artifact": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-7b9ac353-attempt13/DroneDream-Lab-1.0.0.exe",
+    "bytes": 12469550,
+    "sha256": "d3532d632d7a7cf414a55a293d9bea0eba24ff5063e8fd135afa233aabf3668f",
+    "authenticodeStatus": "NotSigned",
+    "retainedAsHistoricalEvidence": true,
+    "finalIconAcceptanceEligible": false
+  },
+  "updaterSignature": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-7b9ac353-attempt13/DroneDream-Lab-1.0.0.exe.sig",
+    "bytes": 428,
+    "sha256": "fa7d7698c5399b46f039438d14806415f7b3b3f497494f30433c28f271431781"
+  },
+  "previewReceipt": {
+    "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-attempts/lab-final-7b9ac353-attempt13/lab-preview-receipt.json",
+    "bytes": 9434,
+    "sha256": "2c1f1859d95af4b74078c5c379bad750890b9a665b4d36ba0041d88bf7982061",
+    "mayBeRelabeledFinal": false
+  },
+  "buildLogs": {
+    "stdout": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-logs/lab-7b9ac353-attempt13/build.stdout.log",
+      "bytes": 11118,
+      "sha256": "ab079834dcd7e3fe07af29f3e664a1ab2551f0a9c6db1f7e77c1ffb8d79226c3"
+    },
+    "stderr": {
+      "path": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-logs/lab-7b9ac353-attempt13/build.stderr.log",
+      "bytes": 12107,
+      "sha256": "f4bf57f977c0312868807f99d564c75c8e4cb8ed2289d4dedafeb324b5c3dbb2",
+      "normalNativeStderrAccepted": true
+    }
+  },
+  "iconEvidence": {
+    "receiptPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-logs/lab-7b9ac353-attempt13/static-icon-evidence/lab-static-icon-failure-evidence.json",
+    "receiptBytes": 2471,
+    "receiptSha256": "e20006adf10a3bf094a3e668199834059d60fd0a2b141db82c334b5fcdcc084f",
+    "sheetPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-cache/lab-build-logs/lab-7b9ac353-attempt13/static-icon-evidence/lab-static-icon-failure-sheet.png",
+    "sheetBytes": 31633,
+    "sheetSha256": "c232529c6419ca3b01dc63181b701a5a553c7155d593ad756e90bbb6697f821b",
+    "canonicalIcoSha256": "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1",
+    "appPeObserved": "lab-green-icon",
+    "installerPeObserved": "generic-nsis-install-icon",
+    "installerMatchesCanonicalLab": false
+  },
+  "rootCause": {
+    "classification": "lab-overlay-missing-nsis-installer-icon-binding",
+    "productCompileFailureObserved": false,
+    "fixedByProductCommit": "ba6dc11948ee5520e34ad4dd1a90c7b73b407797"
+  },
+  "executionBoundaries": {
+    "installerExecuted": false,
+    "existingLabInstallTouched": false,
+    "runtimeStartedOrMigrated": false,
+    "browserOauthProviderUsed": false,
+    "px4GazeboHardwareUsed": false,
+    "uploadOrDeploymentPerformed": false
+  },
+  "releaseReady": false,
+  "lifecycleAllowed": false,
+  "nextAction": "freeze a fresh build application at ba6dc119; do not rerun attempt13"
+}

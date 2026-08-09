@@ -114,6 +114,9 @@ def test_final_lifecycle_runner_is_parameterized_and_parses() -> None:
     assert "Write-LabIconEvidence" in source
     assert "windows-shell-rendered-icon-evidence" in source
     assert "67b5747de298ffcf64d062294829306bd9b66df4ee52cfa8a8e3498cb94d5fa1" in source
+    assert "e8d22185013bb6e15bdabb2a03fd82a8f6b5d7db690d336f8067ff6e0a7dcfcc" in source
+    assert "installerAndAppPeIconsMatch" in source
+    assert "allProductSurfacesDisplayLabGreen" in source
     for forbidden in (
         "OPENAI_API_KEY",
         "SUPABASE_SERVICE_ROLE_KEY",
