@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-sim-yellow-stable-cache-preflight-failure-receipt",
+  "editionId": "sim",
+  "executionClass": "YELLOW",
+  "state": "failed-frozen-no-retry",
+  "productSource": {
+    "commit": "801475050d8b50ec6981f46e282712e02eace243",
+    "tree": "bfb563eb2aeb3dd457228510ec6239243caa6cd5"
+  },
+  "evidenceSourceBeforeExecution": "cd9c8b9546a11ec10fb7f1928543578c0f01d776",
+  "application": {
+    "path": "distribution/sim/desktop/yellow-build-attempt-20-8014750-application.v1.json",
+    "bytes": 32583,
+    "sha256": "8decb79e5d45ece2eee30ed96671895e972216075dd6fd23d4b42c21e9843da1"
+  },
+  "entryScript": {
+    "path": "distribution/sim/desktop/invoke-yellow-build-attempt-20-8014750.ps1",
+    "bytes": 27842,
+    "sha256": "84da1af5e39b1617a9451a03204011360c82e2fb90cdb271598f8ff8fe209e54"
+  },
+  "exitCode": 1,
+  "failure": {
+    "stage": "Preflight/stable-offline-cache-verification",
+    "classification": "required-lockfile-tarball-missing-from-read-only-global-cache",
+    "firstFailingResolvedUrl": "https://registry.npmjs.org/@tauri-apps/plugin-notification/-/plugin-notification-2.3.3.tgz",
+    "expectedIntegrity": "sha512-Zw+ZH18RJb41G4NrfHgIuofJiymusqN+q8fGUIIV7vyCH+5sSn5coqRv/MWB9qETsUs97vmU045q7OyseCV3Qg==",
+    "globalCacheMutated": false,
+    "productBuildStarted": false
+  },
+  "applicationDrift": {
+    "frontendPackageJsonActualSha256": "ebfd1be4f47ad1089a0659ba7d994c8f650731283e4b92771c574eeb7a9f5e84",
+    "frontendPackageLockActualSha256": "926d364952dc75662cfeed48827606f44326430c065b54e9131fb499942d613b",
+    "applicationFrontendPackageJsonSha256": "cd905e33a1faad2c22b165ba407e16c05d01fbdab1738dd156d616cfee4daf05",
+    "applicationFrontendPackageLockSha256": "27b8f36c53be1a02eecbd99801033639662a4697c42ad1141d276c78adbc664a",
+    "classification": "copied-stale-source-input-and-cache-selection-contract"
+  },
+  "readOnlySecondaryAudit": {
+    "historicalArtifactPath": "C:/Users/zju20/AppData/Local/DroneDream/codex-sandboxes/software-sim/yellow-2/sim-y2-20260806T120129Z-f24eb3a/bundle/DroneDream-Sim-1.0.0.exe",
+    "historicalArtifactExpectedSha256": "f23987bac2af03fd085f981ecd730948e0fe0e831acf639e2bffcb7c31ffbece",
+    "historicalArtifactExists": false,
+    "wouldHaveBlockedAfterCache": true,
+    "supersededBrandArtifactExists": true,
+    "supersededBrandArtifactSha256": "9c6bf8ae11014693e6e7f723329c05f5a97b2ed359a0a28a3871868f4b65677c"
+  },
+  "offlineRecoveryProof": {
+    "sourcePackageRoot": "frontend/node_modules/@tauri-apps/plugin-notification",
+    "packageName": "@tauri-apps/plugin-notification",
+    "packageVersion": "2.3.3",
+    "localNpmPackInvocations": 1,
+    "networkInvocations": 0,
+    "generatedTarballBytes": 6663,
+    "generatedTarballIntegrity": "sha512-Zw+ZH18RJb41G4NrfHgIuofJiymusqN+q8fGUIIV7vyCH+5sSn5coqRv/MWB9qETsUs97vmU045q7OyseCV3Qg==",
+    "matchesLockfileIntegrity": true,
+    "temporaryDirectoryRemoved": true,
+    "globalCacheWritten": false
+  },
+  "executedCounts": {
+    "launcherInvocations": 1,
+    "publicRepositoryVariableFetches": 2,
+    "controlledChildInvocations": 1,
+    "preflights": 1,
+    "prepares": 0,
+    "executes": 0,
+    "snapshotsCreated": 0,
+    "cacheFilesCopied": 0,
+    "npmCiInvocations": 0,
+    "junctionsCreated": 0,
+    "frontendBuilds": 0,
+    "tauriBuilds": 0,
+    "cargoBuilds": 0,
+    "nsisBuilds": 0,
+    "artifactBuilds": 0,
+    "installations": 0,
+    "runtimeStarts": 0,
+    "px4GazeboStarts": 0,
+    "hardwareActions": 0,
+    "deployments": 0,
+    "retries": 0
+  },
+  "ownedRootsAfterFailure": {
+    "sourceRootExists": false,
+    "runRootExists": false,
+    "cargoTargetExists": false,
+    "snapshotRootExists": false,
+    "dependencyRootExists": false,
+    "newOwnedRootCount": 0
+  },
+  "publicConfiguration": {
+    "allowedVariableNames": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "valuesPrinted": false,
+    "valuesPersisted": false,
+    "valuesPresentAfterLauncherFinally": false,
+    "secretServiceRoleAccountTokenOrModelKeyRead": false
+  },
+  "authorizationAccounting": {
+    "ordinalTwentyPermanentlyConsumed": true,
+    "sameApplicationOrCommandReuseAllowed": false,
+    "retryAllowed": false,
+    "newExactApplicationAndSerialStartRequired": true
+  },
+  "nonClaims": {
+    "snapshotCreated": false,
+    "dependencyBundleCreated": false,
+    "buildStarted": false,
+    "artifactCreated": false,
+    "releaseReady": false
+  }
+}
