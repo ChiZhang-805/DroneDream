@@ -57,7 +57,17 @@ function Write-JsonNoBom([string]$Path, [object]$Value) {
 }
 
 function Assert-ArtifactIdentity([object]$Artifact, [string]$Label) {
-    $path = if ($Artifact.absolutePath) { [string]$Artifact.absolutePath } else { [string]$Artifact.path }
+    $absolutePathProperty = $Artifact.PSObject.Properties["absolutePath"]
+    $pathProperty = $Artifact.PSObject.Properties["path"]
+    $path = if ($null -ne $absolutePathProperty -and $absolutePathProperty.Value) {
+        [string]$absolutePathProperty.Value
+    }
+    elseif ($null -ne $pathProperty -and $pathProperty.Value) {
+        [string]$pathProperty.Value
+    }
+    else {
+        throw "$Label omitted its artifact path."
+    }
     $sha = [string]$Artifact.sha256
     $bytes = [long]$Artifact.bytes
     if ([IO.Path]::GetFullPath($path) -cne $installerPath -or $sha -cne $ExpectedSha256 -or $bytes -ne $ExpectedBytes) {

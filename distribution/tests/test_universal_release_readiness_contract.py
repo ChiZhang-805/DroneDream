@@ -20,6 +20,8 @@ def test_finalizer_requires_every_same_artifact_gate() -> None:
         assert f"[string]${parameter}" in text
         assert f"Expected{parameter}Sha256" in text
     assert text.count("Assert-ArtifactIdentity") >= 6
+    assert '$Artifact.PSObject.Properties["absolutePath"]' in text
+    assert '$Artifact.PSObject.Properties["path"]' in text
     assert 'buildCount -ne 1' in text
     assert 'authenticode.Status -cne "NotSigned"' in text
 
