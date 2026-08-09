@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-final-disposable-lifecycle-plan",
+  "editionId": "field",
+  "state": "green-frozen-no-execute",
+  "productSource": {
+    "commit": "95a4623f935fc82af0c3912528c57054f4aaa0a7",
+    "tree": "860bc5fa6481f57c7f40739cc208f234b47abd06"
+  },
+  "artifact": {
+    "fileName": "DroneDream-Field-1.0.0.exe",
+    "bytes": 6348757,
+    "sha256": "153c1eadbe07fa51a2bc050755e0aa2fec2e40f1a2bd7710f2b9640f4ccb97ff",
+    "version": "1.0.0",
+    "authenticodeStatus": "NotSigned"
+  },
+  "provider": {
+    "class": "existing-disposable-local-windows-user",
+    "accountName": "CodexSandboxOffline",
+    "sid": "S-1-5-21-2197768555-4123441877-442284878-1020",
+    "profileRoot": "C:/Users/CodexSandboxOffline",
+    "enabledAtFreeze": true,
+    "profileLoadedAtFreeze": false,
+    "passwordMustBeEnteredByOperatorInRunasPrompt": true,
+    "passwordReadRecordedOrPassedAllowed": false,
+    "windowsSandboxOrHyperVChangesAllowed": false,
+    "zju20CanonicalFieldFallbackAllowed": false
+  },
+  "orderedStages": [
+    "stage-exact-inputs-once",
+    "operator-interactive-runas-logon",
+    "assert-exact-provider-username-sid-profile",
+    "fresh-install-en",
+    "verify-installer-installed-exe-desktop-start-menu-field-icons",
+    "launch-installed-exe-and-verify-field-3d-en-authority-false",
+    "same-version-overlay-zh",
+    "launch-desktop-shortcut-and-verify-field-3d-zh-authority-false",
+    "uninstall-once",
+    "owned-field-cleanup-once",
+    "verify-provider-protected-state-parity"
+  ],
+  "counts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "applicationCloses": 2,
+    "launcherInspections": 2,
+    "languageTransitions": 2,
+    "threeDChecks": 2,
+    "authorityFalseChecks": 2,
+    "iconSurfaceChecks": 4,
+    "settingsLiveChecks": 0,
+    "uninstallerInvocations": 1,
+    "ownedCleanupInvocations": 1,
+    "browserLaunches": 0,
+    "oauthTransactions": 0,
+    "accountReads": 0,
+    "tokenReads": 0,
+    "runtimeActions": 0,
+    "px4Actions": 0,
+    "gazeboActions": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "uploadsOrDeployments": 0
+  },
+  "iconAcceptance": {
+    "requiredSurfaces": ["installer", "installed-exe", "desktop-shortcut", "start-menu-shortcut"],
+    "canonicalIcoSha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559",
+    "canonicalRenderSourceSha256": "711aa54f3398a3f6381e456fb8563ff2bd71da2bccaf98da1a19bf76694987e6",
+    "allPixelHashesMustEqualCanonical32x32": true
+  },
+  "uiAcceptance": {
+    "launcherLanguages": ["en", "zh-CN"],
+    "fieldTheme": ["#FFC247", "#FF754B", "#D746A5"],
+    "threeDCanvasMustBeNonblankAndResponsive": true,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "settingsStaticEvidenceBound": true,
+    "settingsLiveExecutionState": "deferred-fail-closed-before-real-field-oauth-boundary",
+    "settingsDeferralReason": "The production FieldRoot mounts FieldApp only after a real Field OAuth session; this segment forbids browser, OAuth, account, and token actions."
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "runtimePx4GazeboSimulatorPayloadDecision": "absent",
+    "frontendPresentationCountsAsAuthority": false
+  },
+  "forbidden": [
+    "browser", "oauth", "account", "token", "provider-network", "runtime-change",
+    "px4", "gazebo", "sitl", "hitl", "device", "hardware", "build", "signing",
+    "upload", "deploy", "zju20-field-mutation", "windows-sandbox-enable", "hyper-v-enable"
+  ]
+}

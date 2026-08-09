@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-final-disposable-lifecycle-command-contract",
+  "editionId": "field",
+  "state": "green-frozen-awaiting-user-present-red-start",
+  "productSourceCommit": "95a4623f935fc82af0c3912528c57054f4aaa0a7",
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/.codex/visualizations/2026/08/05/019fd0e2-71cc-7742-bfab-612510f37c39/field-yellow-build-95a4623-installer-icons-v6/artifact/DroneDream-Field-1.0.0.exe",
+    "bytes": 6348757,
+    "sha256": "153c1eadbe07fa51a2bc050755e0aa2fec2e40f1a2bd7710f2b9640f4ccb97ff"
+  },
+  "application": {
+    "path": "distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-application.v1.json",
+    "bytes": 8666,
+    "sha256": "02b68a92101181ce7ad5ef10eaeb0ffdc7eb7361e53b66b93f61d5a04f17fa44"
+  },
+  "plan": {
+    "path": "distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-plan.v1.json",
+    "bytes": 3570,
+    "sha256": "e73b452dfe5b7d649725742a83b2ed342e17455fc824c72110c2dda5daac007e"
+  },
+  "provider": {
+    "accountName": "CodexSandboxOffline",
+    "sid": "S-1-5-21-2197768555-4123441877-442284878-1020",
+    "profileRoot": "C:/Users/CodexSandboxOffline",
+    "launcher": "runas.exe /profile /user:.\\CodexSandboxOffline",
+    "passwordMustBeEnteredByUserInteractively": true,
+    "passwordReadRecordedOrPassedAllowed": false
+  },
+  "roots": {
+    "stagingRoot": "C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input",
+    "providerRunRoot": "C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1",
+    "bothMustBeAbsentBeforeExecution": true
+  },
+  "attempt": {
+    "ordinal": 1,
+    "maximum": 1,
+    "executionsAtFreeze": 0,
+    "stagingMaximum": 1,
+    "stagingAtFreeze": 0,
+    "retryMaximum": 0
+  },
+  "commands": {
+    "greenPlanOnlyStaging": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Users/zju20/.codex/worktrees/2833/DroneDream/distribution/editions/field/lifecycle/stage-field-final-lifecycle-input.ps1 -Application C:/Users/zju20/.codex/worktrees/2833/DroneDream/distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-application.v1.json -ExpectedApplicationSha256 02b68a92101181ce7ad5ef10eaeb0ffdc7eb7361e53b66b93f61d5a04f17fa44 -SourceRoot C:/Users/zju20/.codex/worktrees/2833/DroneDream -OutputRoot C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input",
+    "futureExactStaging": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Users/zju20/.codex/worktrees/2833/DroneDream/distribution/editions/field/lifecycle/stage-field-final-lifecycle-input.ps1 -Application C:/Users/zju20/.codex/worktrees/2833/DroneDream/distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-application.v1.json -ExpectedApplicationSha256 02b68a92101181ce7ad5ef10eaeb0ffdc7eb7361e53b66b93f61d5a04f17fa44 -SourceRoot C:/Users/zju20/.codex/worktrees/2833/DroneDream -OutputRoot C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input -Execute",
+    "innerLifecycle": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input/distribution/editions/field/lifecycle/run-field-final-disposable-lifecycle.ps1 -Installer C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input/artifact/DroneDream-Field-1.0.0.exe -ExpectedInstallerSha256 153c1eadbe07fa51a2bc050755e0aa2fec2e40f1a2bd7710f2b9640f4ccb97ff -ExpectedInstallerBytes 6348757 -Application C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input/distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-application.v1.json -ExpectedApplicationSha256 02b68a92101181ce7ad5ef10eaeb0ffdc7eb7361e53b66b93f61d5a04f17fa44 -Plan C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input/distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-plan.v1.json -ExpectedPlanSha256 e73b452dfe5b7d649725742a83b2ed342e17455fc824c72110c2dda5daac007e -OutputRoot C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1 -Execute",
+    "operatorInteractiveRunas": "runas.exe /profile /user:.\\CodexSandboxOffline \"powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input/distribution/editions/field/lifecycle/run-field-final-disposable-lifecycle.ps1 -Installer C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input/artifact/DroneDream-Field-1.0.0.exe -ExpectedInstallerSha256 153c1eadbe07fa51a2bc050755e0aa2fec2e40f1a2bd7710f2b9640f4ccb97ff -ExpectedInstallerBytes 6348757 -Application C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input/distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-application.v1.json -ExpectedApplicationSha256 02b68a92101181ce7ad5ef10eaeb0ffdc7eb7361e53b66b93f61d5a04f17fa44 -Plan C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input/distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-plan.v1.json -ExpectedPlanSha256 e73b452dfe5b7d649725742a83b2ed342e17455fc824c72110c2dda5daac007e -OutputRoot C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1 -Execute\""
+  },
+  "authorization": {
+    "executeNow": false,
+    "userPresentSignalRequired": true,
+    "stagingAndRunasMustBeSeparatelyObserved": true,
+    "settingsLiveIsNotClaimedByThisNoOauthSegment": true,
+    "failureDecision": "freeze-receipt-run-owned-rollback-stop-no-retry"
+  }
+}

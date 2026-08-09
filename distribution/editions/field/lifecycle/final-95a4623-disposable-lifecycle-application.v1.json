@@ -1,0 +1,210 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-field-final-disposable-lifecycle-application",
+  "editionId": "field",
+  "state": "green-frozen-provider-gated-no-execute",
+  "productSource": {
+    "commit": "95a4623f935fc82af0c3912528c57054f4aaa0a7",
+    "tree": "860bc5fa6481f57c7f40739cc208f234b47abd06"
+  },
+  "artifact": {
+    "absolutePath": "C:/Users/zju20/.codex/visualizations/2026/08/05/019fd0e2-71cc-7742-bfab-612510f37c39/field-yellow-build-95a4623-installer-icons-v6/artifact/DroneDream-Field-1.0.0.exe",
+    "fileName": "DroneDream-Field-1.0.0.exe",
+    "bytes": 6348757,
+    "sha256": "153c1eadbe07fa51a2bc050755e0aa2fec2e40f1a2bd7710f2b9640f4ccb97ff",
+    "version": "1.0.0",
+    "authenticodeStatus": "NotSigned",
+    "installedMainBinary": {
+      "bytes": 18700288,
+      "sha256": "a2107b4973ff40863f50d2c3be98ff6df126a5c3c86a22bbdeb8284783d193dd"
+    },
+    "mayBeRebuiltResignedRelabeledOverwrittenOrDeleted": false
+  },
+  "buildReceipt": {
+    "absolutePath": "C:/Users/zju20/.codex/visualizations/2026/08/05/019fd0e2-71cc-7742-bfab-612510f37c39/field-yellow-build-95a4623-installer-icons-v6/build-receipt.json",
+    "bytes": 3221,
+    "sha256": "2b952ab9f61017fa5094ff6ef776387a302387d7a6c58e42a40f3dc07afe2938"
+  },
+  "staticAuditReceipt": {
+    "absolutePath": "C:/Users/zju20/.codex/visualizations/2026/08/05/019fd0e2-71cc-7742-bfab-612510f37c39/field-yellow-build-95a4623-installer-icons-v6/static-audit-1/static-audit-receipt.json",
+    "bytes": 4161,
+    "sha256": "176f882bd40d8599c46b694179bf4e661f6a28f3b7c04855ee9ed6c8292ebdf7"
+  },
+  "plan": {
+    "path": "distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-plan.v1.json",
+    "bytes": 3570,
+    "sha256": "e73b452dfe5b7d649725742a83b2ed342e17455fc824c72110c2dda5daac007e"
+  },
+  "provider": {
+    "class": "existing-disposable-local-windows-user",
+    "accountName": "CodexSandboxOffline",
+    "sid": "S-1-5-21-2197768555-4123441877-442284878-1020",
+    "profileRoot": "C:/Users/CodexSandboxOffline",
+    "enabledAtFreeze": true,
+    "profileLoadedAtFreeze": false,
+    "passwordRequired": true,
+    "passwordMustBeEnteredByUserInInteractiveRunasPrompt": true,
+    "passwordReadRecordedOrPassedAllowed": false,
+    "windowsSandboxOrHyperVChangesAllowed": false,
+    "zju20CanonicalFieldFallbackAllowed": false
+  },
+  "tools": {
+    "stagingAdapter": {
+      "path": "distribution/editions/field/lifecycle/stage-field-final-lifecycle-input.ps1",
+      "lfNormalizedBytes": 5568,
+      "lfNormalizedSha256": "e2c498fee5c4bb903f3f8857b79226b5749a2861a4070814d96939f05a30d45b"
+    },
+    "runner": {
+      "path": "distribution/editions/field/lifecycle/run-field-final-disposable-lifecycle.ps1",
+      "lfNormalizedBytes": 22475,
+      "lfNormalizedSha256": "1a7a3e85929596b8a1b5a548aff437fd6c497ab004828a7eb7d3c3cf0b9cf6cc"
+    },
+    "launcherInspector": {
+      "path": "distribution/editions/field/lifecycle/inspect-field-owned-launcher.mjs",
+      "lfNormalizedBytes": 9120,
+      "lfNormalizedSha256": "3815e7756f5c27ffe031681dc4483c27f1de95fcee6c66b4730c5e6dc9122baa"
+    }
+  },
+  "applicationSelfRelativePath": "distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-application.v1.json",
+  "stagingInputs": [
+    {
+      "sourceClass": "exact-absolute",
+      "sourceAbsolutePath": "C:/Users/zju20/.codex/visualizations/2026/08/05/019fd0e2-71cc-7742-bfab-612510f37c39/field-yellow-build-95a4623-installer-icons-v6/artifact/DroneDream-Field-1.0.0.exe",
+      "relativePath": "artifact/DroneDream-Field-1.0.0.exe",
+      "bytes": 6348757,
+      "sha256": "153c1eadbe07fa51a2bc050755e0aa2fec2e40f1a2bd7710f2b9640f4ccb97ff"
+    },
+    {
+      "sourceClass": "exact-absolute",
+      "sourceAbsolutePath": "C:/Users/zju20/.codex/visualizations/2026/08/05/019fd0e2-71cc-7742-bfab-612510f37c39/field-yellow-build-95a4623-installer-icons-v6/build-receipt.json",
+      "relativePath": "receipts/build-receipt.json",
+      "bytes": 3221,
+      "sha256": "2b952ab9f61017fa5094ff6ef776387a302387d7a6c58e42a40f3dc07afe2938"
+    },
+    {
+      "sourceClass": "exact-absolute",
+      "sourceAbsolutePath": "C:/Users/zju20/.codex/visualizations/2026/08/05/019fd0e2-71cc-7742-bfab-612510f37c39/field-yellow-build-95a4623-installer-icons-v6/static-audit-1/static-audit-receipt.json",
+      "relativePath": "receipts/static-audit-receipt.json",
+      "bytes": 4161,
+      "sha256": "176f882bd40d8599c46b694179bf4e661f6a28f3b7c04855ee9ed6c8292ebdf7"
+    },
+    {
+      "sourceClass": "repository-relative",
+      "relativePath": "distribution/editions/field/lifecycle/final-95a4623-disposable-lifecycle-plan.v1.json",
+      "bytes": 3570,
+      "sha256": "e73b452dfe5b7d649725742a83b2ed342e17455fc824c72110c2dda5daac007e"
+    },
+    {
+      "sourceClass": "repository-relative",
+      "relativePath": "distribution/editions/field/lifecycle/run-field-final-disposable-lifecycle.ps1",
+      "hashMode": "lf-normalized",
+      "bytes": 22475,
+      "sha256": "1a7a3e85929596b8a1b5a548aff437fd6c497ab004828a7eb7d3c3cf0b9cf6cc"
+    },
+    {
+      "sourceClass": "repository-relative",
+      "relativePath": "distribution/editions/field/lifecycle/inspect-field-owned-launcher.mjs",
+      "hashMode": "lf-normalized",
+      "bytes": 9120,
+      "sha256": "3815e7756f5c27ffe031681dc4483c27f1de95fcee6c66b4730c5e6dc9122baa"
+    },
+    {
+      "sourceClass": "repository-relative",
+      "relativePath": "brand/generated/field/windows/icon.ico",
+      "bytes": 55337,
+      "sha256": "b90e188679d209009e5eda859665a3582efe1e9129e5f8ecce3c08783b794559"
+    },
+    {
+      "sourceClass": "repository-relative",
+      "relativePath": "brand/generated/field/windows/32x32.png",
+      "bytes": 1991,
+      "sha256": "711aa54f3398a3f6381e456fb8563ff2bd71da2bccaf98da1a19bf76694987e6"
+    }
+  ],
+  "isolation": {
+    "stagingRoot": "C:/Users/Public/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1-input",
+    "stagingRootMustBeAbsent": true,
+    "runRoot": "C:/Users/CodexSandboxOffline/AppData/Local/DroneDream-Codex/Field-RED/field-95a4623-segment-a-red1",
+    "runRootMustBeAbsent": true,
+    "currentZju20CanonicalFieldProtected": true,
+    "onlyProviderFieldNamespaceMayMutate": true
+  },
+  "protectedZju20FieldBaseline": {
+    "installRoot": "C:/Users/zju20/AppData/Local/DroneDream-Field",
+    "mainBinary": {
+      "bytes": 18700800,
+      "sha256": "8b4293fc8a14f1cc3873046b15b6c1c5d248db52cdfa645eb9f20ce95265ecb8"
+    },
+    "uninstaller": {
+      "bytes": 82040,
+      "sha256": "a86f054d04d2ed8a12069b684361707fb5c2b319ab991a50958144a1062b4379"
+    },
+    "desktopShortcut": {
+      "bytes": 2270,
+      "sha256": "0ccfd7100ce875aa884bbd0ee73a5ede0c23b357b464f4ec3c7fc8145cf75b26"
+    },
+    "startMenuShortcut": {
+      "bytes": 2278,
+      "sha256": "f17b5c8aec5217737e781481bec46f1265cffd347513cffeb0671c699165c3ac"
+    },
+    "uninstallRegistration": {
+      "displayName": "DroneDream · FIELD",
+      "displayVersion": "1.0.0",
+      "mainBinaryName": "drone-dream-desktop.exe"
+    },
+    "mustRemainByteExact": true
+  },
+  "attempt": {
+    "ordinal": 1,
+    "maximum": 1,
+    "executionsAtFreeze": 0,
+    "stagingMaximum": 1,
+    "stagingAtFreeze": 0,
+    "retryMaximum": 0
+  },
+  "counts": {
+    "freshInstallerInvocations": 1,
+    "overlayInstallerInvocations": 1,
+    "applicationLaunches": 2,
+    "applicationCloses": 2,
+    "launcherInspections": 2,
+    "languageTransitions": 2,
+    "threeDChecks": 2,
+    "authorityFalseChecks": 2,
+    "iconSurfaceChecks": 4,
+    "settingsLiveChecks": 0,
+    "uninstallerInvocations": 1,
+    "ownedCleanupInvocations": 1,
+    "browserLaunches": 0,
+    "oauthTransactions": 0,
+    "accountReads": 0,
+    "tokenReads": 0,
+    "runtimeActions": 0,
+    "px4Actions": 0,
+    "gazeboActions": 0,
+    "hardwareActions": 0,
+    "builds": 0,
+    "uploadsOrDeployments": 0
+  },
+  "inspection": {
+    "playwrightWorkingDirectory": "C:/Users/zju20/.codex/worktrees/2833/DroneDream",
+    "externalBrowserAllowed": false,
+    "oauthAllowed": false,
+    "launcherAndThreeDLiveRequired": true,
+    "settingsLiveState": "deferred-fail-closed",
+    "settingsStaticEvidenceReceiptSha256": "176f882bd40d8599c46b694179bf4e661f6a28f3b7c04855ee9ed6c8292ebdf7"
+  },
+  "safety": {
+    "validatedVehiclePackCount": 0,
+    "hardwareWriteArmHitlFlightDecision": "deny",
+    "runtimePx4GazeboSimulatorPayloadDecision": "absent",
+    "themeOrUiCountsAsAuthority": false
+  },
+  "authorization": {
+    "stagingAuthorizedNow": false,
+    "lifecycleAuthorizedNow": false,
+    "userPresentSignalRequired": true,
+    "passwordMayBeHandledOnlyByUserInRunasPrompt": true,
+    "settingsSegmentRequiresSeparateRealAuthBoundaryDecision": true
+  }
+}
