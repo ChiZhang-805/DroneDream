@@ -1,48 +1,48 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-11",
+  "generatedAt": "2026-08-12",
   "editions": [
     {
       "id": "sim",
-      "status": "unavailable",
+      "status": "published",
       "version": "1.0.0",
       "fileName": "DroneDream-Sim_1.0.0_x64-setup.exe",
-      "downloadUrl": null,
-      "checksumUrl": null,
-      "signatureUrl": null,
-      "receiptUrl": null,
-      "sizeBytes": null,
-      "sha256": null,
-      "sourceCommit": null,
-      "publishedAt": null
+      "downloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Sim_1.0.0_x64-setup.exe",
+      "checksumUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Sim_1.0.0_x64-setup.exe.sha256",
+      "signatureUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Sim_1.0.0_x64-setup.exe.sig",
+      "receiptUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Sim_1.0.0_x64-setup.exe.receipt.json",
+      "sizeBytes": 12550857,
+      "sha256": "9044a1852131fc97ecc131f26aa38955250b506fb3ece408a5c74f3fe6ff71ee",
+      "sourceCommit": "6f52b2239e45d730b032f331f8ca085975967aa3",
+      "publishedAt": "2026-08-12"
     },
     {
       "id": "lab",
-      "status": "unavailable",
+      "status": "published",
       "version": "1.0.0",
       "fileName": "DroneDream-Lab_1.0.0_x64-setup.exe",
-      "downloadUrl": null,
-      "checksumUrl": null,
-      "signatureUrl": null,
-      "receiptUrl": null,
-      "sizeBytes": null,
-      "sha256": null,
-      "sourceCommit": null,
-      "publishedAt": null
+      "downloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Lab_1.0.0_x64-setup.exe",
+      "checksumUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Lab_1.0.0_x64-setup.exe.sha256",
+      "signatureUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Lab_1.0.0_x64-setup.exe.sig",
+      "receiptUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Lab_1.0.0_x64-setup.exe.receipt.json",
+      "sizeBytes": 12935525,
+      "sha256": "3e3aa1c780ebd3a5cd8c52493c7601ea41e56ab26a82b43ddd5248a2c2b2883d",
+      "sourceCommit": "6f52b2239e45d730b032f331f8ca085975967aa3",
+      "publishedAt": "2026-08-12"
     },
     {
       "id": "field",
-      "status": "unavailable",
+      "status": "published",
       "version": "1.0.0",
       "fileName": "DroneDream-Field_1.0.0_x64-setup.exe",
-      "downloadUrl": null,
-      "checksumUrl": null,
-      "signatureUrl": null,
-      "receiptUrl": null,
-      "sizeBytes": null,
-      "sha256": null,
-      "sourceCommit": null,
-      "publishedAt": null
+      "downloadUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Field_1.0.0_x64-setup.exe",
+      "checksumUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Field_1.0.0_x64-setup.exe.sha256",
+      "signatureUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Field_1.0.0_x64-setup.exe.sig",
+      "receiptUrl": "https://github.com/ChiZhang-805/DroneDream/releases/download/four-edition-v1.0.0/DroneDream-Field_1.0.0_x64-setup.exe.receipt.json",
+      "sizeBytes": 6198491,
+      "sha256": "99698f7416808a113a1542f706c446eba8c5673f55fd499a313804bc2f7916a7",
+      "sourceCommit": "6f52b2239e45d730b032f331f8ca085975967aa3",
+      "publishedAt": "2026-08-12"
     }
   ]
 }

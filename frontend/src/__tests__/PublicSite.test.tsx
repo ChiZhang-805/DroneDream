@@ -316,9 +316,9 @@ describe("DroneDream public website", () => {
     expect(fallbackRelease).toMatchObject({
       version: "1.0.0",
       fileName: "DroneDream_1.0.0_x64-setup.exe",
-      sha256: "c2018379a21fb72a7cf3c4a7f6381d3fa49cf54a03c167a196d950fd651225a4",
-      sizeBytes: 6_605_457,
-      publishedAt: "2026-07-25",
+      sha256: "84b6b5a25cfe0cd110d214b7849032624b93b2c529eca1f9923658aee93fe813",
+      sizeBytes: 12_888_384,
+      publishedAt: "2026-08-12",
     });
     expect(isWebsiteRelease(fallbackRelease)).toBe(true);
     expect(isWebsiteRelease({ ...fallbackRelease, sha256: "unsafe" })).toBe(false);

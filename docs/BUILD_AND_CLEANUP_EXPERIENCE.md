@@ -879,3 +879,31 @@ been removed without losing recovery evidence.
   result hashes. Never point `git clean` at a cache nested under ignored
   `node_modules`, because Git may propose deleting the dependency root; delete
   only the resolved, exact cache subdirectory.
+- Installed-login acceptance lesson: do not reuse Universal DOM selectors or a
+  frozen list of transient button labels across all editions. Universal, SIM,
+  and LAB use `.launcher-primary-action`, while the intentionally standalone
+  FIELD launcher uses `.field-auth-control-launcher`. LAB can also move from
+  `Waiting for browser sign-in` through `Confirming account` before the account
+  surface appears. Observe the edition-specific terminal contract (100-percent
+  gate, callback listener, or authenticated account surface) instead of treating
+  a new intermediate label or an instantaneous listener snapshot as a product
+  failure. Every failed isolated WebView profile must be closed and deleted
+  before the corrected rerun.
+- Windows text-encoding lesson: Windows PowerShell 5.1 reads BOM-less UTF-8 as
+  the active ANSI code page unless `-Encoding UTF8` is supplied. Its displayed
+  mojibake is not evidence that a TypeScript source file is corrupt. Re-read the
+  exact bytes with an explicit UTF-8 decoder before editing localized copy; this
+  prevented a false FIELD rebuild after the installed Chinese strings proved to
+  be intact.
+- OAuth probe lesson: use `${base}?query=...` rather than `$base?query=...` when
+  interpolating a URL in Windows PowerShell. The latter was parsed as a malformed
+  variable reference and `curl` correctly rejected the hostname before making a
+  request. The corrected four-client probe returned HTTPS redirects to
+  `getdronedream.com/oauth/consent`; the failed command created no file or product
+  artifact.
+- Frontend-test invocation lesson: run UI tests through the repository's
+  `npm --prefix frontend test -- ...` script so `vitest.config.ts` loads the
+  required JSDOM environment. Calling the Vitest binary through a generic
+  `npm exec` bypassed that project configuration and made every DOM test fail
+  with `document` or `window` undefined. That was a harness error, not a product
+  regression, and it produced no release or source artifact.
