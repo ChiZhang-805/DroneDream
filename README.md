@@ -52,6 +52,42 @@ language across the rest of the experience.
 These tracks share the DroneDream identity and may consume frozen outputs from
 one another, but each keeps authority over its own deliverables.
 
+## One authoritative repository
+
+This checkout is the single source authority. Its top-level directories are
+responsibility boundaries, not alternate copies of the product:
+
+| Area | Directories | Responsibility |
+| --- | --- | --- |
+| Product applications | `frontend/`, `backend/`, `worker/`, `desktop/`, `website/` | Browser and desktop interfaces, APIs, background execution, native shell, and public delivery experience. |
+| Runtime and platform | `runtime/`, `engine-pack/`, `supabase/` | Isolated simulator/runtime contracts, versioned engine content, authentication, storage, and server-side functions. |
+| Release and identity | `distribution/`, `deploy/`, `brand/` | Edition contracts, signed-delivery metadata, deployment configuration, and canonical brand sources/derived assets. |
+| Verification and knowledge | `scripts/`, `docs/`, `artifacts/`, `.github/` | Reproduction tools, architecture/operations guidance, immutable receipted evidence, and CI policy. |
+
+`artifacts/technical-report/` and `artifacts/test-runs/` contain tracked,
+content-addressed evidence used by frozen claims and regression contracts; they
+are not scratch output. Local job runs, databases, bytecode, test caches,
+frontend build output, Cargo targets, installers, and dependency trees remain
+ignored or outside the repository and must be removed when their owning task
+finishes. Historical source belongs in Git history or a verified external
+recovery archive, never in a second `legacy/`, `repro/`, or copied source root.
+
+## Four desktop editions
+
+All four Windows installers are built from the same commit by
+`desktop/scripts/build-four-edition-installers.ps1`, while product contracts
+keep their capabilities and namespaces isolated:
+
+| Edition | Product role | Native profile |
+| --- | --- | --- |
+| Universal | Complete launcher for simulation and laboratory workflows, shared account, setup, updates, and evidence navigation. | `unified-sim-lab` |
+| SIM | Simulation-only workspace; it never authorizes physical hardware and requires the Runtime Base plus Engine Pack. | `sim-only` |
+| LAB | Sim-to-Real and Real-to-Sim calibration/evidence workspace with hardware actions kept fail-closed. | `unified-sim-lab` |
+| FIELD | Lightweight standalone real-device shell with no simulator Runtime planner or inherited Runtime installation state. | `field-lightweight` |
+
+Build failures, their exact cleanup, and reusable corrections are maintained in
+the single [build and cleanup experience log](docs/BUILD_AND_CLEANUP_EXPERIENCE.md).
+
 ## 🧠 AURORA, the technical core
 
 **AURORA — Agentic UAV Refinement through Optimization, Reflection, and

@@ -478,3 +478,20 @@ been removed without losing recovery evidence.
   recovery command returned zero and the marker then disappeared. The complete
   A7 installer handoff, external Cargo target, generated source paths, and
   product processes were verified absent immediately afterward.
+- Repository hygiene audit: the post-test workspace contained 47,420,232 bytes
+  of ignored `artifacts/jobs` output, an empty 983,040-byte SQLite container
+  with zero pages/tables, pytest and Python bytecode caches, and two TypeScript
+  incremental-build files. A path-scoped `git clean` dry run named exactly
+  those eleven targets before deletion; all became absent. A malformed
+  read-only SQLite CLI URI also created a zero-byte root file named `=ro`; it
+  was separately identified, dry-run, and removed immediately. Dependency
+  junctions were retained because they are still required for final repeatable
+  validation.
+- Hierarchy lesson: do not imitate another project's folder names mechanically
+  or create `legacy/`/`repro/` catch-alls. DroneDream already has useful
+  responsibility boundaries for applications, runtime/platform, release/brand,
+  and verification/evidence. The root README now makes those boundaries and
+  the four edition contracts explicit. Tracked technical-report and test-run
+  evidence remains immutable; moving or deduplicating it would break frozen
+  provenance, while ordinary generated data stays ignored or outside the
+  source repository.
